@@ -1,0 +1,99 @@
+# IronDev Testing Guide
+
+## Test projects
+
+| Project | Type | DB required | Runs |
+|---|---|---|---|
+| `IronDev.IntegrationTests` | Service + DB integration | Yes (`IronDeveloper_Test`) | Sequential |
+| `IronDev.IntegrationTests.Api` | API + DB integration | Yes (`IronDeveloper_Test`) | Sequential |
+
+There are no unit test projects yet. The integration tests cover all service behaviour against a real SQL Server instance.
+
+---
+
+## Database setup
+
+### Test DB name
+`IronDeveloper_Test`
+
+### How to create / reset it
+Run `IronDeveloper/Database/rebuild_db.sql` against your local SQL Server with the database name substituted to `IronDeveloper_Test`. You can do this in SSMS, or run the integration tests — the test base class seeds required tenants/users automatically each run.
+
+> The test base class does **not** drop and recreate the DB. It only deletes domain rows (projects, tickets, chat, etc.) before each test. Tenant and user rows are preserved and re-seeded if missing.
+
+---
+
+## Running the tests
+
+### Service integration tests (most common)
+```bash
+dotnet test IronDev.IntegrationTests --settings IronDev.IntegrationTests/integration.runsettings
+```
+
+### API integration tests
+```bash
+dotnet test IronDev.IntegrationTests.Api
+```
+
+### Run everything
+```bash
+dotnet test IronDeveloper/IronDeveloper.slnx --settings IronDev.IntegrationTests/integration.runsettings
+```
+
+---
+
+## Why sequential execution
+
+Integration tests share a single SQL Server test database. Running them in parallel causes:
+- FK constraint violations (one test deletes projects while another is inserting children)
+- Cross-test data contamination (tenant isolation tests see data from another test's seeding)
+
+`integration.runsettings` forces 1 worker at class level. **Do not remove this guard.**
+
+If you want parallelism in future, use isolated databases per test class instead.
+
+---
+
+## Test matrix
+
+### Infrastructure / DB
+
+| Suite | Key tests |
+|---|---|
+| `ChatHistoryServiceIntegrationTests` | Save/load round-trip |
+| `ProjectMemoryServiceIntegrationTests` | Save decision, no duplicate titles, save/load summary |
+| `TicketServiceIntegrationTests` | Save/load ticket |
+| `CodeIndexServiceIntegrationTests` | Index directory, hash-based dedup |
+| `PromptContextBuilderIntegrationTests` | Context includes summary, decisions, messages, indexed files |
+| `CodeWorkbenchWorkflowTests` | Load ticket, generate plan, strip code fences |
+| `TenantIsolationIntegrationTests` | TenantA cannot see TenantB data (6 entity types), ownership guards throw on cross-tenant saves |
+
+### API
+
+| Suite | Key tests |
+|---|---|
+| `ApiHarnessTests` | Host boots, health endpoint returns 200, anonymous requests rejected |
+| `AuthControllerTests` | Valid login returns token, invalid credentials return 401/400, /me with/without token |
+| `TenantControllerTests` | Tenant list returns only assigned, select assigned succeeds with tenant-bearing token, select unassigned returns 403 |
+
+---
+
+## Test baseline (Sprint 1 close)
+
+| Project | Passed | Failed |
+|---|---|---|
+| `IronDev.IntegrationTests` | 21 | 0 |
+| `IronDev.IntegrationTests.Api` | TBD (Sprint 2) | — |
+
+---
+
+## Test rules going forward
+
+For every new **backend function**:
+- 1 happy-path integration test
+- 1 tenant/isolation or guard test
+
+For every new **API endpoint**:
+- 1 success test (correct status + body)
+- 1 auth test (anonymous → 401)
+- 1 tenant isolation test where applicable

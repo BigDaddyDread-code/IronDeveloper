@@ -1,0 +1,124 @@
+# IronDev Architecture
+
+## Overview
+
+IronDev is structured as a **multi-tenant client-server system**.
+
+The WPF desktop client currently communicates directly with local SQL services (Sprint 1 foundation). The REST API backend is being built in parallel and will eventually own all data-access paths. The WPF client will migrate to HTTP calls in Sprint 3.
+
+---
+
+## Layer Map
+
+```
+┌─────────────────────────────────────────────────┐
+│  IronDeveloper (WPF client)                     │
+│  · Project panel, chat, tickets, workbench      │
+│  · Currently uses Infrastructure services       │
+│    directly (local mode)                        │
+│  · Will migrate to HTTP client in Sprint 3      │
+└──────────────┬──────────────────────────────────┘
+               │ (future: HTTP)
+┌──────────────▼──────────────────────────────────┐
+│  IronDev.Api (ASP.NET Core REST backend)        │
+│  · Auth: POST /api/auth/login                   │
+│  · Tenant selection: POST /api/tenants/select   │
+│  · Domain APIs: projects, tickets, chat, memory │
+│  · JWT authentication + request-scoped tenancy  │
+└──────────────┬──────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────┐
+│  IronDev.Infrastructure                         │
+│  · Dapper SQL repositories                      │
+│  · UserService, ProjectService, TicketService   │
+│  · ChatHistoryService, ProjectMemoryService     │
+│  · CodeIndexService, PromptContextBuilder       │
+│  · DevelopmentTenantContext (local/WPF fallback)│
+│  · WorkbenchGeneratorService                    │
+└──────────────┬──────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────┐
+│  IronDev.Core                                   │
+│  · Domain models (Project, Ticket, ChatMessage) │
+│  · ICurrentTenantContext                        │
+│  · Auth DTOs (LoginRequest, LoginResponse, etc) │
+│  · ILLMService interface                        │
+└──────────────┬──────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────┐
+│  SQL Server                                     │
+│  · IronDeveloper (production)                   │
+│  · IronDeveloper_Test (integration tests)       │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## Tenancy Model
+
+Every domain entity carries a `TenantId` foreign key. All service reads filter by `TenantId`. All service writes validate project ownership before insert.
+
+| Table | TenantId column | Enforced by |
+|---|---|---|
+| Projects | ✅ | ProjectService WHERE clause |
+| ChatMessages | ✅ | ChatHistoryService ownership guard |
+| ProjectSummaries | ✅ | ProjectMemoryService ownership guard |
+| ProjectDecisions | ✅ | ProjectMemoryService ownership guard |
+| ProjectTickets | ✅ | TicketService ownership guard |
+| ProjectFiles | ✅ | CodeIndexService ownership guard |
+
+**Ownership guard pattern:** before any insert, services verify `SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId`. Cross-tenant writes throw `UnauthorizedAccessException`.
+
+---
+
+## ICurrentTenantContext
+
+The tenancy abstraction is interface-based and scoped per request/operation.
+
+| Context | Used in | Returns |
+|---|---|---|
+| `DevelopmentTenantContext` | WPF client (local dev) | Always `TenantId = 1` |
+| `JwtTenantContext` | ASP.NET Core API | Reads `tenant_id` claim from JWT |
+| `TestTenantContext` | Integration tests | Mutable — tests switch tenants to verify isolation |
+
+---
+
+## Auth Flow (Sprint 2)
+
+```
+1. POST /api/auth/login  →  base JWT (userId, email — no tenant claim)
+2. GET  /api/tenants     →  list of tenants user is a member of
+3. POST /api/tenants/select  →  new JWT with tenant_id claim embedded
+4. All subsequent API calls use the tenant-bearing JWT
+```
+
+Services resolve `ICurrentTenantContext` from the JWT claim per-request.
+
+---
+
+## Local vs Backend Responsibilities
+
+### Stays local (client-side)
+- Local file system access
+- Code indexing of local repository paths
+- Workbench sandbox preview (temp drafts, not persisted)
+- Future: local build/test execution loop
+
+### Belongs to the backend
+- Authentication and session management
+- Tenant resolution and enforcement
+- All persistent data: projects, tickets, chat, memory, decisions, summaries
+- Code index storage (indexed content stored in SQL)
+- Prompt context assembly
+
+---
+
+## Key Design Decisions
+
+| Decision | Detail |
+|---|---|
+| Dapper over EF Core | SQL-native, explicit queries, no migration complexity |
+| BCrypt for password hashing | Industry standard, no extra ASP.NET dependency |
+| JWT re-issue on tenant select | Tenant identity embedded in token, not a client-controlled header |
+| Sequential integration tests | Tests share a real SQL Server DB — parallelism causes FK conflicts |
+| No ASP.NET Core Identity | Too heavy for current phase; plain `UserService` + Dapper is sufficient |

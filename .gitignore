@@ -1,0 +1,55 @@
+## Build outputs
+bin/
+obj/
+out/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.vbproj.user
+*.csproj.user
+*.dsw
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+
+## Rider
+.idea/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Secrets — never commit these
+appsettings.Production.json
+appsettings.Staging.json
+**/secrets.json
+**/*.pfx
+**/*.p12
+
+## Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+## Temp / scratch
+rebuild_test.sql
+test_output.txt
+DbRebuilder.cs
+DbRebuildTest/
+
+## Logs
+*.log
+logs/

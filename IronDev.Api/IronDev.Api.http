@@ -1,0 +1,6 @@
+@IronDev.Api_HostAddress = http://localhost:5008
+
+GET {{IronDev.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
