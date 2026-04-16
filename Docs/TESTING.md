@@ -17,7 +17,7 @@ There are no unit test projects yet. The integration tests cover all service beh
 `IronDeveloper_Test`
 
 ### How to create / reset it
-Run `IronDeveloper/Database/rebuild_db.sql` against your local SQL Server with the database name substituted to `IronDeveloper_Test`. You can do this in SSMS, or run the integration tests — the test base class seeds required tenants/users automatically each run.
+Run `Database/rebuild_db.sql` against your local SQL Server with the database name substituted to `IronDeveloper_Test`. You can do this in SSMS, or run the integration tests — the test base class seeds required tenants/users automatically each run.
 
 > The test base class does **not** drop and recreate the DB. It only deletes domain rows (projects, tickets, chat, etc.) before each test. Tenant and user rows are preserved and re-seeded if missing.
 
@@ -37,7 +37,7 @@ dotnet test IronDev.IntegrationTests.Api
 
 ### Run everything
 ```bash
-dotnet test IronDeveloper/IronDeveloper.slnx --settings IronDev.IntegrationTests/integration.runsettings
+dotnet test IronDev.slnx --settings IronDev.IntegrationTests/integration.runsettings
 ```
 
 ---

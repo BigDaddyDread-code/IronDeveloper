@@ -54,13 +54,17 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         if (matchedFiles.Count > 0)
         {
-            sb.AppendLine("Relevant Code Files:");
+            sb.AppendLine("## Relevant Code Context");
+            sb.AppendLine("The following files from the local repository match the current request context:");
+            sb.AppendLine();
             foreach (var file in matchedFiles)
             {
-                sb.AppendLine($"--- FILE: {file.FilePath} ---");
+                sb.AppendLine($"### File: {file.FilePath}");
+                sb.AppendLine("```");
                 var content = file.Content;
-                if (content.Length > 3000) content = content.Substring(0, 3000) + "\n...[TRUNCATED]...";
+                if (content.Length > 4000) content = content.Substring(0, 4000) + "\n...[TRUNCATED]...";
                 sb.AppendLine(content);
+                sb.AppendLine("```");
                 sb.AppendLine();
             }
         }
@@ -98,17 +102,25 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         return sb.ToString();
     }
 
+
     private static string ExtractSearchQuery(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return string.Empty;
         
+        // Split by punctuation but keep dots for filenames
         var words = text.Split(new[] { ' ', '\n', '\r', '\t', '?', '!', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
         
-        // Find filename-like words
-        var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".xaml") || w.EndsWith(".sql")));
-        if (fileLike != null) return fileLike.Trim('\'', '\"');
+        // 1. Look for explicit filenames
+        var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".xaml") || w.EndsWith(".sql") || w.EndsWith(".js") || w.EndsWith(".ts")));
+        if (fileLike != null) return fileLike.Trim('\'', '\"', '`');
         
-        // Fallback: longest word > 5 chars
-        return words.Where(w => w.Length > 5).OrderByDescending(w => w.Length).FirstOrDefault() ?? string.Empty;
+        // 2. Look for CamelCase words that might be class names (e.g., CodeWorkbenchViewModel)
+        var camelCase = words.FirstOrDefault(w => w.Length > 8 && char.IsUpper(w[0]) && w.Any(char.IsLower));
+        if (camelCase != null) return camelCase.Trim('\'', '\"', '`');
+
+        // 3. Fallback: longest technical-looking word
+        return words.Where(w => w.Length > 4)
+            .OrderByDescending(w => w.Length)
+            .FirstOrDefault() ?? string.Empty;
     }
 }

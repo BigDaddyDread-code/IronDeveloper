@@ -17,14 +17,15 @@ IronDev is an AI-assisted software development assistant. It helps developers ma
 ## Solution layout
 
 ```
-IronDev.Api/                  ASP.NET Core REST backend
-IronDev.Core/                 Shared models, interfaces, DTOs
-IronDev.Infrastructure/       Dapper SQL services, auth contexts
-IronDev.IntegrationTests/     DB-backed integration tests (sequential)
-IronDev.IntegrationTests.Api/ API-level integration tests (WebApplicationFactory)
-IronDeveloper/                WPF desktop client
-IronDeveloper/Database/       SQL schema — rebuild_db.sql
-Docs/                         Architecture, roadmap, testing docs
+Database/                      SQL schema — rebuild_db.sql
+Docs/                          Architecture, roadmap, testing docs
+IronDev.Api/                   ASP.NET Core REST backend
+IronDev.Core/                  Shared models, interfaces, DTOs
+IronDev.Infrastructure/        Dapper SQL services, auth contexts
+IronDev.IntegrationTests/      DB-backed integration tests (sequential)
+IronDev.IntegrationTests.Api/  API-level integration tests (WebApplicationFactory)
+IronDeveloper/                 WPF desktop client
+IronDev.slnx                   Root solution file
 ```
 
 ---
@@ -39,11 +40,11 @@ Docs/                         Architecture, roadmap, testing docs
 
 ### Database setup
 
-Run `rebuild_db.sql` against your local SQL Server to create the `IronDeveloper` database with the full schema and seed data.
+Run `Database/rebuild_db.sql` against your local SQL Server to create the `IronDeveloper` database with the full schema and seed data.
 
 ```sql
 -- In SSMS or sqlcmd, run:
-IronDeveloper/Database/rebuild_db.sql
+Database/rebuild_db.sql
 ```
 
 For the **test database**, run the same script with the database name replaced to `IronDeveloper_Test`. Integration tests do this automatically via the test base class seeding logic.

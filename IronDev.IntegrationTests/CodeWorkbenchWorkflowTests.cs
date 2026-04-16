@@ -1,11 +1,17 @@
+using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using IronDev.Agent.ViewModels;
+using IronDev.Data;
 using IronDev.Data.Models;
 using IronDev.Services;
-using IronDev.Core;
+using IronDev.Infrastructure.Services;
 using IronDev.AI;
+using IronDev.Core;
+using IronDev.Agent.Models;
+using IronDev.Agent.ViewModels;
 
 namespace IronDev.IntegrationTests;
 
@@ -55,6 +61,31 @@ public class CodeWorkbenchWorkflowTests : IntegrationTestBase
             Assert.AreEqual("Test Load Ticket", vm.LoadedTicket.Title);
             Assert.IsTrue(vm.LoadTriggered);
         }
+    }
+
+    [TestMethod]
+    public async Task OpenWorkbench_WithoutSelectedTicket_ShouldReturnFalseInCanExecute()
+    {
+        using var scope = ServiceProvider.CreateScope();
+        var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+        var vm = new OutputPanelViewModel(ticketService);
+        
+        vm.ClearTicket();
+        Assert.IsFalse(vm.CanOpenWorkbench, "Workbench should be disabled when no ticket is loaded");
+        Assert.IsFalse(vm.OpenWorkbenchCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task OpenWorkbench_WithSelectedTicket_ShouldReturnTrueInCanExecute()
+    {
+        using var scope = ServiceProvider.CreateScope();
+        var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+        var vm = new OutputPanelViewModel(ticketService);
+        
+        vm.Receive(new TicketSelectedMessage(new TicketItem { Id = 123, Title = "Saved Ticket" }));
+        
+        Assert.IsTrue(vm.CanOpenWorkbench, "Workbench should be enabled when a saved ticket is selected");
+        Assert.IsTrue(vm.OpenWorkbenchCommand.CanExecute(null));
     }
 
     [TestMethod]

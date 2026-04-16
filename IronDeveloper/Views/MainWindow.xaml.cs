@@ -19,15 +19,25 @@ public partial class MainWindow : Window, IRecipient<OpenWorkbenchMessage>
 
     public void Receive(OpenWorkbenchMessage message)
     {
-        var app = (App)Application.Current;
-        var workbenchWindow = app.Services.GetRequiredService<CodeWorkbenchWindow>();
-        
-        var vm = (CodeWorkbenchViewModel)workbenchWindow.DataContext;
-        vm.TicketId = message.TicketId;
-        _ = vm.LoadTicketCommand.ExecuteAsync(null);
-        
-        workbenchWindow.Owner = this;
-        workbenchWindow.Show();
+        try
+        {
+            var app = (App)Application.Current;
+            var workbenchWindow = app.Services.GetRequiredService<CodeWorkbenchWindow>();
+            
+            if (workbenchWindow.DataContext is CodeWorkbenchViewModel vm)
+            {
+                vm.TicketId = message.TicketId;
+                _ = vm.LoadTicketCommand.ExecuteAsync(null);
+                
+                workbenchWindow.Owner = this;
+                workbenchWindow.Show();
+            }
+            // else: VM not set, which shouldn't happen with our DI setup
+        }
+        catch (Exception ex)
+        {
+            WeakReferenceMessenger.Default.Send(new StatusMessage($"Error opening workbench: {ex.Message}"));
+        }
     }
 
     private void Ticket_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

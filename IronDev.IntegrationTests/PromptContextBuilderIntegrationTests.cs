@@ -57,7 +57,7 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         StringAssert.Contains(prompt, "Use SQL memory");
         StringAssert.Contains(prompt, "Please create a ticket");
         StringAssert.Contains(prompt, "Generate a ticket for MainWindow.xaml");
-        StringAssert.Contains(prompt, "--- FILE: MainWindow.xaml ---");
+        StringAssert.Contains(prompt, "### File: MainWindow.xaml");
         StringAssert.Contains(prompt, "<Window><Grid></Grid></Window>");
     }
 }

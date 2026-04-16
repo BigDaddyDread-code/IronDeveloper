@@ -70,6 +70,7 @@ public partial class OutputPanelViewModel : ObservableObject,
         LoadTicketFields(message.Ticket);
         IsNewPreview = false;
         StatusText = "Viewing Saved Ticket";
+        OpenWorkbenchCommand.NotifyCanExecuteChanged();
     }
 
     private void LoadTicketFields(TicketItem ticket)
@@ -145,14 +146,13 @@ public partial class OutputPanelViewModel : ObservableObject,
             }
 
             WeakReferenceMessenger.Default.Send(new TicketSavedMessage(id));
+            OpenWorkbenchCommand.NotifyCanExecuteChanged();
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($">>>>>>>>> SAVE ERROR: {ex}");
             StatusText = $"Error Saving: {ex.Message}";
         }
-        
-        OnPropertyChanged(nameof(CanOpenWorkbench));
     }
 
     public bool CanOpenWorkbench => CurrentTicket != null && CurrentTicket.Id > 0;
