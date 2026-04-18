@@ -1,0 +1,95 @@
+<UserControl x:Class="IronDev.Agent.Views.Workflow.LoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workflow"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:LoginViewModel, IsDesignTimeCreatable=False}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ── Left Side: Brand Panel ──────────────────────────────────── -->
+        <Border Grid.Column="0" Background="#060D16">
+            <StackPanel VerticalAlignment="Center" Margin="48,0">
+                <TextBlock Text="IRONDEV" FontSize="40" FontWeight="Black"
+                           Foreground="{StaticResource FocusBorderBrush}" Margin="0,0,0,10"/>
+                <TextBlock Text="AI-Powered Engineering Platform" FontSize="13" Opacity="0.4" Margin="0,0,0,48"/>
+                
+                <StackPanel Opacity="0.4">
+                    <TextBlock Text="• Intelligent code indexing"          FontSize="13" Margin="0,0,0,8"/>
+                    <TextBlock Text="• Architecture-aware AI chat"          FontSize="13" Margin="0,0,0,8"/>
+                    <TextBlock Text="• Automated ticket generation"         FontSize="13" Margin="0,0,0,8"/>
+                    <TextBlock Text="• Architectural decision audit log"    FontSize="13"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ── Right Side: Login Form ──────────────────────────────────── -->
+        <Grid Grid.Column="1">
+            <Border Width="440" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Border Style="{StaticResource IronCard}">
+                    <StackPanel>
+                        <TextBlock Text="SIGN IN" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
+                        
+                        <Grid>
+                            <!-- Stage 1: Credentials -->
+                            <StackPanel Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource InverseVisibilityConverter}}">
+                                <TextBlock Text="Enter your credentials" FontSize="24" FontWeight="Bold" Margin="0,0,0,32"/>
+
+                                <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
+                                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,2"/>
+                                <TextBlock Text="{Binding UsernameError}" Foreground="{StaticResource StatusErrorBrush}"
+                                           FontSize="11" Margin="4,2,0,16"
+                                           Visibility="{Binding UsernameError, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+                                <TextBlock Text="PASSWORD" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
+                                <PasswordBox x:Name="PasswordInput" Margin="0,0,0,2"/>
+                                <TextBlock Text="{Binding PasswordError}" Foreground="{StaticResource StatusErrorBrush}"
+                                           FontSize="11" Margin="4,2,0,16"
+                                           Visibility="{Binding PasswordError, Converter={StaticResource StringToVisibilityConverter}}"/>
+                            </StackPanel>
+
+                            <!-- Stage 2: Tenant Selection -->
+                            <StackPanel Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="Select your workspace" FontSize="24" FontWeight="Bold" Margin="0,0,0,32"/>
+
+                                <TextBlock Text="WORKSPACE TENANT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
+                                <ComboBox ItemsSource="{Binding AvailableTenants}"
+                                          SelectedItem="{Binding SelectedTenant}"
+                                          DisplayMemberPath="Name"
+                                          Margin="0,0,0,32">
+                                </ComboBox>
+                                
+                                <Button Content="Change User" Style="{StaticResource IronGhostButton}"
+                                        HorizontalAlignment="Left" Margin="0,0,0,16"
+                                        Command="{Binding CancelTenantSelectionCommand}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Content="{Binding IsTenantSelectorVisible, Converter={StaticResource LoginButtonTextConverter}}"
+                                Command="{Binding SignInCommand}"
+                                CommandParameter="{Binding Password, ElementName=PasswordInput}"
+                                Style="{StaticResource IronPrimaryButton}"
+                                HorizontalAlignment="Stretch" Height="52"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+
+                        <TextBlock Text="Forgot credentials?  Contact your Admin"
+                                   FontSize="11" Opacity="0.28" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+                        
+                        <!-- Busy indicator -->
+                        <TextBlock Text="Authenticating…"
+                                   Style="{StaticResource IronMetaLabel}"
+                                   HorizontalAlignment="Center" Margin="0,14,0,0"
+                                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </Border>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
+

@@ -1,17 +1,15 @@
 using System;
 using System.Windows;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
-using IronDev.AI;
-using IronDev.Core.Auth;
-using IronDev.Data;
-using IronDev.Infrastructure.Auth;
-using IronDev.Services;
-using IronDev.Agent.Services;
-using IronDev.Core;
-using IronDev.Agent.ViewModels;
+using IronDev.Agent.ViewModels.Shell;
+using IronDev.Agent.ViewModels.Workflow;
+using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Agent.Views;
+using IronDev.Agent.Services;
+using IronDev.Agent.Services.Interfaces;
+using IronDev.Agent.Services.Mock;
 
 namespace IronDev.Agent;
 
@@ -26,34 +24,38 @@ public partial class App : Application
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((context, services) =>
             {
-                services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
-                // Scoped tenant context — DevelopmentTenantContext always returns TenantId=1 for local dev.
-                // Will be replaced by session/JWT context in Sprint 2 without changing any service code.
-                services.AddScoped<ICurrentTenantContext, DevelopmentTenantContext>();
-                services.AddScoped<IProjectService, ProjectService>();
-                services.AddScoped<IChatHistoryService, ChatHistoryService>();
-                services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
-                services.AddScoped<ITicketService, TicketService>();
-                services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
-                services.AddScoped<IWorkbenchGeneratorService, WorkbenchGeneratorService>();
-                services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
+                // ── Data & Infrastructure ─────────────────────────────────────
+                services.AddSingleton<global::IronDev.Data.IDbConnectionFactory, global::IronDev.Data.SqlConnectionFactory>();
                 
-                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                if (string.IsNullOrWhiteSpace(apiKey))
-                    throw new InvalidOperationException("OPENAI_API_KEY is not set.");
+                // Tenancy Bridge
+                services.AddSingleton<AgentTenantContext>();
+                services.AddSingleton<global::IronDev.Core.Auth.ICurrentTenantContext>(sp => sp.GetRequiredService<AgentTenantContext>());
                 
-                services.AddSingleton<ILLMService>(sp => new OpenAiLlmService(apiKey));
+                // Real Services from Infrastructure
+                services.AddTransient<global::IronDev.Services.IUserService, global::IronDev.Services.UserService>();
+                services.AddTransient<global::IronDev.Services.IProjectService, global::IronDev.Services.ProjectService>();
+                services.AddTransient<global::IronDev.Services.ITicketService, global::IronDev.Services.TicketService>();
+                services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
+                services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
 
-                // ViewModels
-                services.AddTransient<ProjectPanelViewModel>();
-                services.AddTransient<ChatViewModel>();
-                services.AddTransient<OutputPanelViewModel>();
-                services.AddTransient<CodeWorkbenchViewModel>();
-                services.AddTransient<MainViewModel>();
+                // ── Workflow ViewModels ───────────────────────────────────────
+                services.AddTransient<LoginViewModel>();
+                services.AddTransient<ProjectHubViewModel>();
+                services.AddTransient<CreateProjectViewModel>();
+                services.AddTransient<ProjectOverviewViewModel>();
 
-                // Views
-                services.AddTransient<MainWindow>();
-                services.AddTransient<CodeWorkbenchWindow>();
+                // ── Workspace ViewModels ──────────────────────────────────────
+                services.AddTransient<ChatWorkspaceViewModel>();
+                services.AddTransient<TicketsWorkspaceViewModel>();
+                services.AddTransient<DecisionsWorkspaceViewModel>();
+                services.AddTransient<SettingsWorkspaceViewModel>();
+
+                // ── Shell ─────────────────────────────────────────────────────
+                services.AddSingleton<ShellViewModel>();
+                services.AddSingleton<MainWindow>();
+
+                // Mocks for pending features
+                services.AddTransient<IChatShellService, MockChatShellService>();
             })
             .Build();
     }
@@ -71,9 +73,7 @@ public partial class App : Application
     protected override async void OnExit(ExitEventArgs e)
     {
         using (_host)
-        {
             await _host.StopAsync(TimeSpan.FromSeconds(5));
-        }
 
         base.OnExit(e);
     }

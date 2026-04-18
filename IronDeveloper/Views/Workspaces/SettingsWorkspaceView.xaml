@@ -1,0 +1,74 @@
+<UserControl x:Class="IronDev.Agent.Views.Workspaces.SettingsWorkspaceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:SettingsWorkspaceViewModel, IsDesignTimeCreatable=False}">
+
+    <ScrollViewer Background="{StaticResource AppBackgroundBrush}">
+        <StackPanel Margin="40,36,40,40" MaxWidth="600">
+
+            <!-- Header -->
+            <TextBlock Text="WORKSPACE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+            <TextBlock Text="Settings" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,28"/>
+
+            <!-- AI Model section -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <StackPanel>
+                    <TextBlock Text="AI MODEL" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
+                    <TextBlock Text="Active Model" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding AvailableModels}"
+                              SelectedItem="{Binding SelectedModel}"/>
+
+                    <TextBlock Text="API Endpoint" Style="{StaticResource IronMetaLabel}" Margin="0,16,0,6"/>
+                    <TextBox Text="{Binding ApiEndpoint, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Behaviour toggles -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <StackPanel>
+                    <TextBlock Text="BEHAVIOUR" Style="{StaticResource IronEyebrow}" Margin="0,0,0,14"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Stream Responses" FontWeight="SemiBold" FontSize="14"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock Text="Show tokens as they arrive rather than waiting for completion."
+                                       Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" IsChecked="{Binding StreamResponses}"
+                                      VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Auto-Index on Open" FontWeight="SemiBold" FontSize="14"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock Text="Automatically re-index the project when it is opened."
+                                       Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" IsChecked="{Binding AutoIndex}"
+                                      VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Note -->
+            <TextBlock Text="Settings are stored in memory only in this preview build."
+                       Style="{StaticResource IronMetaLabel}" HorizontalAlignment="Center"
+                       Opacity="0.4" Margin="0,4,0,0"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
