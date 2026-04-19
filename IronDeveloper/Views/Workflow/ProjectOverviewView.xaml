@@ -95,6 +95,21 @@
                     </ItemsControl>
                 </StackPanel>
             </Grid>
+
+            <!-- Indexing Status -->
+            <TextBlock Text="Index Status:" FontWeight="Bold" />
+            <TextBlock Text="{Binding ActiveProject.IndexStatus}" />
+
+            <!-- Last Indexed Time -->
+            <TextBlock Text="Last Indexed:" FontWeight="Bold" />
+            <TextBlock Text="{Binding ActiveProject.LastIndexedUtc, StringFormat='{}{0:MM/dd/yyyy HH:mm:ss}'}" />
+
+            <!-- Indexed File Count -->
+            <TextBlock Text="Indexed File Count:" FontWeight="Bold" />
+            <TextBlock Text="{Binding ActiveProject.IndexedFileCount}" />
+
+            <!-- Index Button -->
+            <Button Content="Index Project" Command="{Binding IndexProjectCommand}" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

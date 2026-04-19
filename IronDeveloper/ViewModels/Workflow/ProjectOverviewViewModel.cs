@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
+using IronDev.Agent.Services;
 
 namespace IronDev.Agent.ViewModels.Workflow;
 
@@ -13,6 +14,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     private readonly global::IronDev.Services.ITicketService _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
     private readonly global::IronDev.Services.ICodeIndexService _indexService;
+    private readonly LocalIndexingService _indexingService;
+    private readonly global::IronDev.Data.Repository.IProjectRepository _projectRepository;
 
     private global::IronDev.Data.Models.Project? _currentProject;
 
@@ -30,11 +33,15 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     public ProjectOverviewViewModel(
         global::IronDev.Services.ITicketService ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
-        global::IronDev.Services.ICodeIndexService indexService)
+        global::IronDev.Services.ICodeIndexService indexService,
+        LocalIndexingService indexingService,
+        global::IronDev.Data.Repository.IProjectRepository projectRepository)
     {
         _ticketService   = ticketService;
         _memoryService   = memoryService;
         _indexService    = indexService;
+        _indexingService = indexingService;
+        _projectRepository = projectRepository;
     }
 
     internal async Task LoadAsync(global::IronDev.Data.Models.Project project)
@@ -117,5 +124,27 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         {
             IsIndexing = false;
         }
+    }
+
+    [RelayCommand]
+    private void IndexProject()
+    {
+        if (_currentProject == null) return;
+
+        var indexEntries = _indexingService.IndexProject(_currentProject.Id, _currentProject.Id, _currentProject.LocalPath);
+
+        // Save index entries to the database
+        foreach (var entry in indexEntries)
+        {
+            _projectRepository.SaveCodeIndexEntry(entry);
+        }
+
+        // Update project status and last indexed time
+        _currentProject.LastIndexed = DateTime.UtcNow.ToString("g");
+        _currentProject.Status = "Ready";
+        _projectRepository.UpdateProject(_currentProject);
+
+        // Notify UI of changes
+        OnPropertyChanged(nameof(_currentProject));
     }
 }

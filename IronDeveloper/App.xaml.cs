@@ -58,6 +58,7 @@ public partial class App : Application
 
                 // Mocks for pending features
                 services.AddTransient<IChatShellService, MockChatShellService>();
+                services.AddTransient<LocalIndexingService>();
             })
             .Build();
     }
