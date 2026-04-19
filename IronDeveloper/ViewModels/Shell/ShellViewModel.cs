@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
@@ -100,9 +101,9 @@ public sealed partial class ShellViewModel : ObservableObject
             NavigateToHub();
         };
 
-        _hubVm.OnOpenProject           = OpenProject;
+        _hubVm.OnOpenProject           = (p) => _ = OpenProjectAsync(p);
         _hubVm.OnCreateProject         = NavigateToCreateProject;
-        _createVm.OnProjectCreated     = CreateAndOpenProject;
+        _createVm.OnProjectCreated     = (p) => _ = CreateAndOpenProjectAsync(p);
         _createVm.OnCancel             = NavigateToHub;
 
         CurrentView = _loginVm;
@@ -140,14 +141,6 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void IndexNow()
-    {
-        IsStatusPopupOpen = false;
-        // TODO: trigger real indexing in a later sprint
-        ActiveStatus = "Indexing…";
-    }
-
-    [RelayCommand]
     private void OpenOverview()
     {
         IsStatusPopupOpen = false;
@@ -164,9 +157,9 @@ public sealed partial class ShellViewModel : ObservableObject
         CurrentView = _hubVm;
     }
 
-    private void OpenProject(global::IronDev.Data.Models.Project project)
+    private async Task OpenProjectAsync(global::IronDev.Data.Models.Project project)
     {
-        ActivateProject(project);
+        await ActivateProjectAsync(project);
         CurrentView = _overviewVm;
     }
 
@@ -176,13 +169,13 @@ public sealed partial class ShellViewModel : ObservableObject
         CurrentView = _createVm;
     }
 
-    private void CreateAndOpenProject(global::IronDev.Data.Models.Project project)
+    private async Task CreateAndOpenProjectAsync(global::IronDev.Data.Models.Project project)
     {
-        ActivateProject(project);
+        await ActivateProjectAsync(project);
         CurrentView = _overviewVm;
     }
 
-    private void ActivateProject(global::IronDev.Data.Models.Project project)
+    private async Task ActivateProjectAsync(global::IronDev.Data.Models.Project project)
     {
         HasActiveProject  = true;
         CurrentShellMode  = ShellMode.ProjectActive;
@@ -190,10 +183,17 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveProjectName = project.Name;
         ActiveProjectPath = project.LocalPath ?? string.Empty;
         
-        // Mocked for now until LLM/Indexing services are real
         ActiveModel       = "gpt-4o"; 
-        ActiveStatus      = "Needs Index";
+        ActiveStatus      = "Checking...";
         
+        // Populate child ViewModels with real data
+        await Task.WhenAll(
+            _overviewVm.LoadAsync(project),
+            _ticketsVm.LoadAsync(project),
+            _decisionsVm.LoadAsync(project)
+        );
+
+        ActiveStatus = _overviewVm.Status;
         OnPropertyChanged(nameof(StatusNeedsIndex));
     }
 }

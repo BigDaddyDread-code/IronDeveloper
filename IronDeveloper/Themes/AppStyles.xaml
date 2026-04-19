@@ -9,4 +9,30 @@
         keys already defined in IronDeveloperControls.
     -->
 
+    <Style x:Key="IronGhostButton" TargetType="ButtonBase">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ButtonBase">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IronSecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background"      Value="{StaticResource GlassControlBrush}" />
+        <Setter Property="BorderBrush"     Value="{StaticResource MidBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding"         Value="22,10" />
+        <Setter Property="Foreground"      Value="{StaticResource TextBrush}" />
+    </Style>
+
 </ResourceDictionary>

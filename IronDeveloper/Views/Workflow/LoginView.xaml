@@ -33,60 +33,117 @@
         <Grid Grid.Column="1">
             <Border Width="440" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <Border Style="{StaticResource IronCard}">
-                    <StackPanel>
-                        <TextBlock Text="SIGN IN" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
-                        
-                        <Grid>
-                            <!-- Stage 1: Credentials -->
-                            <StackPanel Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource InverseVisibilityConverter}}">
-                                <TextBlock Text="Enter your credentials" FontSize="24" FontWeight="Bold" Margin="0,0,0,32"/>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- 0: Eyebrow -->
+                            <RowDefinition Height="Auto"/> <!-- 1: Title -->
+                            <RowDefinition Height="*"/>    <!-- 2: Dynamic Stage Content -->
+                            <RowDefinition Height="Auto"/> <!-- 3: Global CTA Button -->
+                            <RowDefinition Height="Auto"/> <!-- 4: Footer -->
+                            <RowDefinition Height="Auto"/> <!-- 5: Busy indicator -->
+                        </Grid.RowDefinitions>
 
-                                <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
-                                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,2"/>
-                                <TextBlock Text="{Binding UsernameError}" Foreground="{StaticResource StatusErrorBrush}"
-                                           FontSize="11" Margin="4,2,0,16"
-                                           Visibility="{Binding UsernameError, Converter={StaticResource StringToVisibilityConverter}}"/>
+                        <!-- Row 0: Eyebrow -->
+                        <TextBlock Grid.Row="0" Text="SIGN IN" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
 
-                                <TextBlock Text="PASSWORD" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
-                                <PasswordBox x:Name="PasswordInput" Margin="0,0,0,2"/>
-                                <TextBlock Text="{Binding PasswordError}" Foreground="{StaticResource StatusErrorBrush}"
-                                           FontSize="11" Margin="4,2,0,16"
-                                           Visibility="{Binding PasswordError, Converter={StaticResource StringToVisibilityConverter}}"/>
-                            </StackPanel>
+                        <!-- Row 2 Content: Stage 1 (Workspace Selection) -->
+                        <Grid Grid.Row="1" Grid.RowSpan="2" 
+                              Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- 0: Title -->
+                                <RowDefinition Height="Auto"/> <!-- 1: Workspace Label -->
+                                <RowDefinition Height="Auto"/> <!-- 2: Workspace Selection -->
+                                <RowDefinition Height="Auto"/> <!-- 3: Auth Method Label -->
+                                <RowDefinition Height="Auto"/> <!-- 4: Auth Method Selection -->
+                                <RowDefinition Height="24"/>   <!-- 5: Spacer -->
+                                <RowDefinition Height="Auto"/> <!-- 6: Action Button -->
+                            </Grid.RowDefinitions>
 
-                            <!-- Stage 2: Tenant Selection -->
-                            <StackPanel Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="Select your workspace" FontSize="24" FontWeight="Bold" Margin="0,0,0,32"/>
+                            <TextBlock Grid.Row="0" Text="Select your workspace" FontSize="24" FontWeight="Bold" Margin="0,0,0,24"/>
 
-                                <TextBlock Text="WORKSPACE TENANT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
-                                <ComboBox ItemsSource="{Binding AvailableTenants}"
-                                          SelectedItem="{Binding SelectedTenant}"
-                                          DisplayMemberPath="Name"
-                                          Margin="0,0,0,32">
-                                </ComboBox>
-                                
-                                <Button Content="Change User" Style="{StaticResource IronGhostButton}"
-                                        HorizontalAlignment="Left" Margin="0,0,0,16"
-                                        Command="{Binding CancelTenantSelectionCommand}"/>
-                            </StackPanel>
+                            <TextBlock Grid.Row="1" Text="WORKSPACE TENANT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
+                            <ComboBox  Grid.Row="2" ItemsSource="{Binding AvailableTenants}"
+                                       SelectedItem="{Binding SelectedTenant, Mode=TwoWay}"
+                                       Margin="0,0,0,24">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="3" Text="AUTHENTICATION METHOD" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
+                            <ComboBox  Grid.Row="4" ItemsSource="{Binding AvailableAuthMethods}"
+                                       SelectedItem="{Binding SelectedAuthMethod}"
+                                       Margin="0,0,0,0"/>
+
+                            <Button Grid.Row="6" 
+                                    Content="SIGN IN TO WORKSPACE"
+                                    Command="{Binding ContinueFromWorkspaceCommand}"
+                                    Style="{StaticResource IronPrimaryButton}"
+                                    HorizontalAlignment="Stretch" Height="52"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
                         </Grid>
 
-                        <Button Content="{Binding IsTenantSelectorVisible, Converter={StaticResource LoginButtonTextConverter}}"
-                                Command="{Binding SignInCommand}"
-                                CommandParameter="{Binding Password, ElementName=PasswordInput}"
-                                Style="{StaticResource IronPrimaryButton}"
-                                HorizontalAlignment="Stretch" Height="52"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+                        <!-- Row 2 Content: Stage 2 (Credentials) -->
+                        <Grid Grid.Row="1" Grid.RowSpan="2"
+                              Visibility="{Binding IsCredentialsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- 0: Title -->
+                                <RowDefinition Height="Auto"/> <!-- 1: Email Label -->
+                                <RowDefinition Height="Auto"/> <!-- 2: Email Input -->
+                                <RowDefinition Height="Auto"/> <!-- 3: Email Error -->
+                                <RowDefinition Height="Auto"/> <!-- 4: Password Label -->
+                                <RowDefinition Height="Auto"/> <!-- 5: Password Input -->
+                                <RowDefinition Height="Auto"/> <!-- 6: Password Error -->
+                                <RowDefinition Height="Auto"/> <!-- 7: Actions -->
+                                <RowDefinition Height="12"/>   <!-- 8: Spacer -->
+                                <RowDefinition Height="Auto"/> <!-- 9: Action Button -->
+                            </Grid.RowDefinitions>
 
-                        <TextBlock Text="Forgot credentials?  Contact your Admin"
-                                   FontSize="11" Opacity="0.28" HorizontalAlignment="Center" Margin="0,18,0,0"/>
-                        
-                        <!-- Busy indicator -->
-                        <TextBlock Text="Authenticating…"
+                            <TextBlock Grid.Row="0" Text="Enter your credentials" FontSize="26" FontWeight="Bold" Margin="0,0,0,20"/>
+
+                            <TextBlock Grid.Row="1" Text="EMAIL ADDRESS" Style="{StaticResource IronEyebrow}" Opacity="0.7" Margin="0,0,0,6"/>
+                            <TextBox   Grid.Row="2" Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,2"/>
+                            <TextBlock Grid.Row="3" Text="{Binding EmailError}" Foreground="{StaticResource StatusErrorBrush}"
+                                       FontSize="11" Margin="4,2,0,14"
+                                       Visibility="{Binding EmailError, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+                            <TextBlock Grid.Row="4" Text="PASSWORD" Style="{StaticResource IronEyebrow}" Opacity="0.7" Margin="0,0,0,6"/>
+                            <PasswordBox Grid.Row="5" x:Name="PasswordInput" Margin="0,0,0,2"/>
+                            <TextBlock Grid.Row="6" Text="{Binding PasswordError}" Foreground="{StaticResource StatusErrorBrush}"
+                                       FontSize="11" Margin="4,0,0,8"
+                                       Visibility="{Binding PasswordError, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+                            <Button Grid.Row="7" Content="Change Workspace" 
+                                    Style="{StaticResource IronGhostButton}"
+                                    Foreground="{StaticResource FocusBorderBrush}"
+                                    FontSize="12"
+                                    HorizontalAlignment="Left" 
+                                    Margin="0,2,0,0"
+                                    Command="{Binding CancelTenantSelectionCommand}"/>
+
+                            <Button Grid.Row="9" 
+                                    Content="CONTINUE"
+                                    Command="{Binding SignInCommand}"
+                                    CommandParameter="{Binding ElementName=PasswordInput}"
+                                    Style="{StaticResource IronPrimaryButton}"
+                                    HorizontalAlignment="Stretch" Height="52"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+                        </Grid>
+
+
+
+                        <!-- Row 4: Footer -->
+                        <TextBlock Grid.Row="4" Text="Forgot credentials?  Contact your Admin"
+                                   FontSize="11" Opacity="0.45" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+
+                        <!-- Row 5: Busy indicator -->
+                        <TextBlock Grid.Row="5" Text="Authenticating…"
                                    Style="{StaticResource IronMetaLabel}"
                                    HorizontalAlignment="Center" Margin="0,14,0,0"
                                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                    </StackPanel>
+                    </Grid>
                 </Border>
             </Border>
         </Grid>

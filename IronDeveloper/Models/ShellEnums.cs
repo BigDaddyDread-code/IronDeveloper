@@ -22,3 +22,12 @@ public enum ProjectWorkspace
     Decisions,
     Settings
 }
+
+/// <summary>
+/// Workflow stages for the 2-stage login process.
+/// </summary>
+public enum LoginStage
+{
+    WorkspaceSelection,
+    Credentials
+}

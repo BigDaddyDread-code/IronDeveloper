@@ -59,6 +59,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
+        services.AddScoped<IUserService, UserService>();
 
         ServiceProvider = services.BuildServiceProvider();
 
@@ -72,12 +73,16 @@ public abstract class IntegrationTestBase
 
         // Delete in correct FK order: children before parents.
         var sql = """
+            IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             DELETE FROM dbo.ProjectDecisions;
-            DELETE FROM dbo.ProjectSummaries;
-            DELETE FROM dbo.ProjectTickets;
             DELETE FROM dbo.ProjectFiles;
             DELETE FROM dbo.ChatMessages;
+            DELETE FROM dbo.ProjectTickets;
+            DELETE FROM dbo.ProjectSummaries;
             DELETE FROM dbo.Projects;
+            DELETE FROM dbo.TenantUsers;
+            DELETE FROM dbo.Users;
+            DELETE FROM dbo.Tenants;
             """;
 
         await connection.ExecuteAsync(sql);
@@ -104,6 +109,28 @@ public abstract class IntegrationTestBase
                 SET IDENTITY_INSERT dbo.Users ON;
                 INSERT INTO dbo.Users (Id, Email, DisplayName) VALUES (1, 'test@test.com', 'Test');
                 SET IDENTITY_INSERT dbo.Users OFF;
+            END
+
+            IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL
+            BEGIN
+                -- Ensure table exists for tests
+                PRINT 'CodeIndexEntries already exists'
+            END
+            ELSE
+            BEGIN
+                CREATE TABLE dbo.CodeIndexEntries
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    FileId BIGINT NOT NULL,
+                    Namespace NVARCHAR(500) NULL,
+                    SymbolName NVARCHAR(500) NULL,
+                    SymbolType NVARCHAR(50) NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    ChunkText NVARCHAR(MAX) NOT NULL,
+                    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_CodeIndexEntries_CreatedDate DEFAULT SYSUTCDATETIME()
+                );
             END
             """;
         await connection.ExecuteAsync(setupSql);

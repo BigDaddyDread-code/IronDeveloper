@@ -37,6 +37,8 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.ITicketService, global::IronDev.Services.TicketService>();
                 services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
                 services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
+                services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
 
                 // ── Workflow ViewModels ───────────────────────────────────────
                 services.AddTransient<LoginViewModel>();

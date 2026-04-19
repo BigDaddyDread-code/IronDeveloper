@@ -43,9 +43,10 @@ public class ContextInjectionTests : IntegrationTestBase
         // 2. Build prompt with a keyword that matches
         var prompt = await promptBuilder.BuildAsync(projectId, Guid.NewGuid(), "How does the CodeWorkbenchWindow work?");
 
-        // 3. Verify the file content is in the prompt
+        // 3. Verify the fragment content is in the prompt
         Assert.IsTrue(prompt.Contains("CodeWorkbenchWindow.xaml.cs"), "Prompt should contain the filename");
-        Assert.IsTrue(prompt.Contains("public partial class CodeWorkbenchWindow"), "Prompt should contain the file content");
+        Assert.IsTrue(prompt.Contains("Symbol: .CodeWorkbenchWindow"), "Prompt should contain the symbol metadata");
+        Assert.IsTrue(prompt.Contains("public partial class CodeWorkbenchWindow"), "Prompt should contain the code fragment");
         Assert.IsTrue(prompt.Contains("## Relevant Code Context"), "Prompt should have the new context header");
     }
 

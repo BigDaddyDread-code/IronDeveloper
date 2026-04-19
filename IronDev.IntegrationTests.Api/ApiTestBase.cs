@@ -38,31 +38,60 @@ public abstract class ApiTestBase
     [ClassInitialize(InheritanceBehavior.BeforeEachDerivedClass)]
     public static async Task ClassInitialize(TestContext _)
     {
-        Factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Test");
-                builder.ConfigureAppConfiguration((_, cfg) =>
+        try
+        {
+            Factory = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder =>
                 {
-                    cfg.AddJsonFile("appsettings.Test.json", optional: false);
+                    builder.UseEnvironment("Test");
+                    // Force the configuration values into the builder so Program.cs picks them up
+                    builder.UseSetting("Jwt:Key", "irondev-super-secret-jwt-key-change-in-production-min32chars");
+                    builder.UseSetting("Jwt:Issuer", "irondev-api");
+                    builder.UseSetting("Jwt:Audience", "irondev-client");
+                    builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
+
+                    builder.ConfigureAppConfiguration((context, cfg) =>
+                    {
+                        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.Test.json");
+                        if (File.Exists(path))
+                        {
+                            cfg.AddJsonFile(path, optional: false);
+                        }
+                    });
                 });
-            });
 
-        Client = Factory.CreateClient();
+            Client = Factory.CreateClient();
 
-        // Resolve connection string from the factory's configuration.
-        var config = Factory.Services.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
-            as Microsoft.Extensions.Configuration.IConfiguration;
-        ConnectionString = config!.GetConnectionString("IronDeveloperDb")!;
+            // Resolve connection string from the factory's configuration.
+            var config = Factory.Services.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
+                as Microsoft.Extensions.Configuration.IConfiguration;
+            
+            if (config == null)
+            {
+                throw new InvalidOperationException("Could not resolve IConfiguration from Test Host.");
+            }
 
-        await SetupDatabaseAsync();
+            ConnectionString = config.GetConnectionString("IronDeveloperDb") 
+                ?? throw new InvalidOperationException("Connection string 'IronDeveloperDb' not found in appsettings.Test.json");
+
+            await SetupDatabaseAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log to console so it's visible in test output
+            Console.WriteLine($"FATAL: ClassInitialize failed: {ex}");
+            throw;
+        }
     }
 
     [ClassCleanup(InheritanceBehavior.BeforeEachDerivedClass)]
     public static async Task ClassCleanup()
     {
-        Client.Dispose();
-        await Factory.DisposeAsync();
+        Client?.Dispose();
+        if (Factory != null)
+        {
+            await Factory.DisposeAsync();
+        }
     }
 
     [TestInitialize]

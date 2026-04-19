@@ -120,5 +120,6 @@ Services resolve `ICurrentTenantContext` from the JWT claim per-request.
 | Dapper over EF Core | SQL-native, explicit queries, no migration complexity |
 | BCrypt for password hashing | Industry standard, no extra ASP.NET dependency |
 | JWT re-issue on tenant select | Tenant identity embedded in token, not a client-controlled header |
-| Sequential integration tests | Tests share a real SQL Server DB — parallelism causes FK conflicts |
+| Sequential integration tests | Tests share a real SQL Server DB — Workers=1 is required in runsettings to avoid FK/data conflicts |
 | No ASP.NET Core Identity | Too heavy for current phase; plain `UserService` + Dapper is sufficient |
+| Keyword-first context | Prompt builder prioritizes technical keywords extracted from user prompts |

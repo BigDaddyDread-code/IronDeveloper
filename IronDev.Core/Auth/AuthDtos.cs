@@ -12,7 +12,10 @@ public record LoginResponse(string Token, int UserId, string DisplayName);
 public record UserProfileDto(int UserId, string Email, string DisplayName, int? SelectedTenantId);
 
 /// <summary>A tenant the current user is a member of.</summary>
-public record TenantDto(int Id, string Name, string Slug);
+public record TenantDto(int Id, string Name, string Slug)
+{
+    public override string ToString() => Name;
+}
 
 /// <summary>Body for POST /api/tenants/select.</summary>
 public record SelectTenantRequest(int TenantId);

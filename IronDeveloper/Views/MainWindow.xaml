@@ -50,8 +50,9 @@
                                    FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8"/>
                     </StackPanel>
 
-                    <Button Content="✕" Margin="0,0,14,0" HorizontalAlignment="Right" VerticalAlignment="Center"
-                            Style="{StaticResource IronGhostButton}" Width="28" Height="28" 
+                    <Button Content="✕" Style="{StaticResource IronGhostButton}"
+                            Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Width="32" Height="32"
                             Foreground="{StaticResource TextBrush}" Opacity="0.4"
                             Click="CloseButton_Click"/>
                 </Grid>

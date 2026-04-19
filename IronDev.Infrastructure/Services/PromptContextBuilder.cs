@@ -55,15 +55,30 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         if (matchedFiles.Count > 0)
         {
             sb.AppendLine("## Relevant Code Context");
-            sb.AppendLine("The following files from the local repository match the current request context:");
+            sb.AppendLine("The following file fragments match the request context:");
             sb.AppendLine();
             foreach (var file in matchedFiles)
             {
                 sb.AppendLine($"### File: {file.FilePath}");
                 sb.AppendLine("```");
+                
                 var content = file.Content;
-                if (content.Length > 4000) content = content.Substring(0, 4000) + "\n...[TRUNCATED]...";
-                sb.AppendLine(content);
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    // Fallback to chunks
+                    var symbols = await _codeIndexService.GetSymbolsAsync(file.Id, cancellationToken);
+                    foreach (var s in symbols)
+                    {
+                        sb.AppendLine($"// Symbol: {s.Namespace}.{s.SymbolName} ({s.SymbolType})");
+                        sb.AppendLine(s.ChunkText);
+                        sb.AppendLine();
+                    }
+                }
+                else
+                {
+                    if (content.Length > 4000) content = content.Substring(0, 4000) + "\n...[TRUNCATED]...";
+                    sb.AppendLine(content);
+                }
                 sb.AppendLine("```");
                 sb.AppendLine();
             }

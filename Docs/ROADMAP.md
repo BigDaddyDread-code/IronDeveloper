@@ -28,8 +28,9 @@ Goal: establish multi-tenant schema and tenant-safe service layer without breaki
 - `TenantIsolationIntegrationTests` — 8 isolation + 2 ownership guard tests
 - `integration.runsettings` — sequential execution for shared DB tests
 
-### Test baseline at Sprint 1 close
-- `IronDev.IntegrationTests`: **21 passed, 0 failed**
+### Baseline: 30 integration/workflow tests passing as of 2026-04-17 ✅
+- Verified on branch `chore/stabilize-baseline` before Sprint 2 kickoff.
+- Tag: `milestone-sprint1_5-stabilized`
 
 ---
 
@@ -40,31 +41,27 @@ Goal: establish multi-tenant schema and tenant-safe service layer without breaki
 Goal: put the project in good stead before auth sprint.
 
 ### Delivered
-- Removed dead `IronDev.Memory` project and temp build scripts
-- Initialized git with `.gitignore` (bin/obj, secrets, NuGet artifacts)
-- `README.md` — what it is, how to run
-- `Docs/ARCHITECTURE.md` — layer map, tenancy model, local vs backend split
-- `Docs/ROADMAP.md` — this file
-- `Docs/TESTING.md` — test matrix and running instructions
-- Baseline git tag: `milestone/memory-workbench-tenancy`
+- Removed redundant DB scripts; `rebuild_db.sql` is the single source of truth.
+- Normalized configuration: generic `appsettings.json` with machine-specific `appsettings.Development.json` for API and WPF.
+- Updated `README.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `TESTING.md`.
+- Milestone: baseline project stability reached with workbench and code awareness.
 
 ---
 
 ## Sprint 2 — Auth, Login, JWT, Request-Scoped Tenancy
 
-**Status: In Progress 🔄**
+**Status: Planned 🔄**
 
 Goal: replace `DevelopmentTenantContext` in the API path with real JWT-authenticated, request-scoped tenant context.
 
-### Planned
-- `POST /api/auth/login` — BCrypt credential validation, issues base JWT
-- `GET /api/auth/me` — reads claims, returns user profile
-- `GET /api/tenants` — returns assigned tenants for the current user
-- `POST /api/tenants/select` — verifies membership, re-issues JWT with `tenant_id` claim
-- `JwtTenantContext` — request-scoped `ICurrentTenantContext` reading from JWT claims
-- `UserService` — credential validation and tenant membership queries
-- `IronDev.IntegrationTests.Api` — WebApplicationFactory-based API integration tests
-- Auth, harness, and tenant controller test suites
+### Backlog
+- [ ] **Auth Schema**: Add `Users`, `Tenants`, `TenantUsers` to production schema & seed dev user.
+- [ ] **Password Validation**: Implementation BCrypt hashing and user credential checks.
+- [ ] **Login Endpoint**: `POST /api/auth/login` to issue base JWT.
+- [ ] **Tenant Selection**: `POST /api/tenants/select` to re-issue JWT with `tenant_id` claim.
+- [ ] **Request Context**: Implement `JwtTenantContext` reading from token claims.
+- [ ] **Auth Integration Tests**: Verify login flow, tenant isolation, and blocked unauthenticated access.
+- [ ] **WPF Login Flow**: Add login dialog and token storage in the client.
 
 ### WPF stays on `DevelopmentTenantContext` this sprint
 Migration to HTTP calls is Sprint 3.

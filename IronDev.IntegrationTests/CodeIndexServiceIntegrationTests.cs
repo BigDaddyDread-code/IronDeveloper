@@ -96,7 +96,7 @@ public class CodeIndexServiceIntegrationTests : IntegrationTestBase
         await indexService.IndexDirectoryAsync(projectId, _testDirPath);
         
         var results = await indexService.SearchFilesAsync(projectId, "TestTwo");
-        Assert.IsTrue(results.Any(f => f.Content.Contains("TestTwo")));
+        Assert.IsTrue(results.Any(f => f.FilePath.EndsWith("file2.cs")), "Should find the file containing TestTwo symbol");
     }
 
     [TestMethod]

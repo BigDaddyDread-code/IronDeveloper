@@ -78,12 +78,12 @@ If you want parallelism in future, use isolated databases per test class instead
 
 ---
 
-## Test baseline (Sprint 1 close)
+## Test baseline (v1.5 Stabilized)
 
-| Project | Passed | Failed |
-|---|---|---|
-| `IronDev.IntegrationTests` | 21 | 0 |
-| `IronDev.IntegrationTests.Api` | TBD (Sprint 2) | — |
+| Project | Passed | Failed | Date |
+|---|---|---|---|
+| `IronDev.IntegrationTests` | 30 | 0 | 2026-04-17 |
+| `IronDev.IntegrationTests.Api` | TBD (Sprint 2) | — | — |
 
 ---
 
