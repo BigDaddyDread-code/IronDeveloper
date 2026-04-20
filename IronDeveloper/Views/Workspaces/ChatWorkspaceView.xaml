@@ -42,6 +42,41 @@
                                         <TextBlock Text="{Binding Timestamp, StringFormat=t}"
                                                    HorizontalAlignment="Right" FontSize="10"
                                                    Foreground="{StaticResource FaintBrush}" Margin="0,6,0,0"/>
+
+                                        <Expander Header="{Binding ContextHeader}"
+                                                  Visibility="{Binding HasContext, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                  Foreground="{StaticResource MutedBrush}"
+                                                  Margin="0,8,0,0">
+                                            <StackPanel Margin="0,8,0,0">
+                                                <ItemsControl ItemsSource="{Binding ContextPacket.Snippets}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#1f2937" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="11" Foreground="#d1d5db" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <ItemsControl ItemsSource="{Binding ContextPacket.Tickets}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#374151" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Foreground="#f3f4f6" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <ItemsControl ItemsSource="{Binding ContextPacket.Decisions}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#111827" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Foreground="#f9fafb" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Expander>
                                     </StackPanel>
                                 </Border>
                             </Grid>

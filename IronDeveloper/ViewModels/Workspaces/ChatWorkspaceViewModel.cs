@@ -61,30 +61,22 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
 
             var packet = await _promptContextBuilder.BuildPacketAsync(projectId, sessionId, text);
 
-            var contextStr = string.Empty;
-            if (packet.Snippets.Count > 0 || packet.Tickets.Count > 0 || packet.Decisions.Count > 0)
+            // Call the real LLM service with the formatted prompt
+            var responseText = string.Empty;
+            try
             {
-                contextStr = $"[Context Used: {packet.Snippets.Count} snippets, {packet.Tickets.Count} tickets, {packet.Decisions.Count} decisions]\n\n";
+                responseText = await _llmService.GetResponseAsync(packet.FormattedPrompt);
             }
-
-            // Using the real LLM service (could be Mock/Fake if that's what is injected)
-            // But since V1 asks for just grounding and local retrieval, we'll format the Mock explicitly if Fake is used
-            string responseText;
-            if (_llmService is Infrastructure.Services.FakeLlmService)
+            catch (System.Exception ex)
             {
-                await System.Threading.Tasks.Task.Delay(1200); // Fake LLM latency
-                responseText = $"{contextStr}(Mock) Here is the requested info grounded in {_activeProjectName}:\n\n";
-                if (packet.Snippets.Count > 0) responseText += $"Snippets:\n{string.Join("\n", packet.Snippets.Select(s => s.Substring(0, System.Math.Min(s.Length, 100)) + "..."))}\n";
-            }
-            else
-            {
-                responseText = contextStr + await _llmService.GetResponseAsync(packet.FormattedPrompt);
+                responseText = $"[LLM Error]: {ex.Message}";
             }
 
             Messages.Add(new ChatSummary
             {
-                Role    = "assistant",
-                Content = responseText
+                Role = "assistant",
+                Content = responseText,
+                ContextPacket = packet
             });
         }
         finally

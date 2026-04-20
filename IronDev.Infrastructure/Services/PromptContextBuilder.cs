@@ -46,11 +46,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var latestSummary = await _projectMemoryService.GetLatestSummaryAsync(projectId, cancellationToken);
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, 8, cancellationToken);
         
-        // Simple file search MVP: Find a word that might be a filename or keyword
-        var query = ExtractSearchQuery(userRequest);
+        var queries = ExtractSearchQueries(userRequest);
         var matchedFiles = new System.Collections.Generic.List<IronDev.Data.Models.ProjectFile>();
         
-        if (!string.IsNullOrWhiteSpace(query))
+        foreach (var query in queries.Take(3))
         {
             var results = await _codeIndexService.SearchFilesAsync(projectId, query, 3, cancellationToken);
             matchedFiles.AddRange(results);
@@ -132,17 +131,28 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
     public async Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
     {
         var packet = new ChatContextPacket();
-        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, 3, cancellationToken);
-        var tickets = await _ticketService.GetRecentTicketsAsync(projectId, 3, cancellationToken);
-        var query = ExtractSearchQuery(userRequest);
+        var isCodeQuery = IsCodeQuery(userRequest);
+        var ticketTake = isCodeQuery ? 2 : 5;
+        var decisionTake = isCodeQuery ? 2 : 5;
+        var snippetTake = isCodeQuery ? 5 : 3;
+
+        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
+        var tickets = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
+        var queries = ExtractSearchQueries(userRequest);
         
-        if (!string.IsNullOrWhiteSpace(query))
+        var snippetList = new System.Collections.Generic.List<IronDev.Data.Models.CodeIndexEntry>();
+
+        foreach (var query in queries)
         {
-            var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, query, 5, cancellationToken);
-            foreach (var r in results)
-            {
-                packet.Snippets.Add($"File: {r.FilePath}\nSymbol: {r.SymbolName}\n```\n{r.ChunkText}\n```");
-            }
+            var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, query, snippetTake, cancellationToken);
+            snippetList.AddRange(results);
+        }
+
+        var topSnippets = snippetList.GroupBy(x => x.Id).Select(g => g.First()).Take(snippetTake);
+
+        foreach (var r in topSnippets)
+        {
+            packet.Snippets.Add($"File: {r.FilePath}\nSymbol: {r.SymbolName}\n```\n{r.ChunkText}\n```");
         }
 
         foreach (var t in tickets)
@@ -160,25 +170,47 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         return packet;
     }
 
-
-    private static string ExtractSearchQuery(string text)
+    private static bool IsCodeQuery(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
-        
-        // Split by punctuation but keep dots for filenames
-        var words = text.Split(new[] { ' ', '\n', '\r', '\t', '?', '!', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-        
-        // 1. Look for explicit filenames
-        var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".xaml") || w.EndsWith(".sql") || w.EndsWith(".js") || w.EndsWith(".ts")));
-        if (fileLike != null) return fileLike.Trim('\'', '\"', '`');
-        
-        // 2. Look for CamelCase words that might be class names (e.g., CodeWorkbenchViewModel)
-        var camelCase = words.FirstOrDefault(w => w.Length > 8 && char.IsUpper(w[0]) && w.Any(char.IsLower));
-        if (camelCase != null) return camelCase.Trim('\'', '\"', '`');
+        var lower = text.ToLowerInvariant();
+        return lower.Contains("where is") || 
+               lower.Contains("what file") || 
+               lower.Contains("what code") || 
+               lower.Contains("summarize implementation") ||
+               lower.Contains("how does");
+    }
 
-        // 3. Fallback: longest technical-looking word
-        return words.Where(w => w.Length > 4)
-            .OrderByDescending(w => w.Length)
-            .FirstOrDefault() ?? string.Empty;
+
+    private static System.Collections.Generic.List<string> ExtractSearchQueries(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return new System.Collections.Generic.List<string>();
+        
+        var words = text.Split(new[] { ' ', '\n', '\r', '\t', '?', '!', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        var queries = new System.Collections.Generic.List<string>();
+        
+        // 1. Explicit filenames
+        var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".xaml") || w.EndsWith(".sql") || w.EndsWith(".js") || w.EndsWith(".ts")));
+        if (fileLike != null) queries.Add(fileLike.Trim('\'', '\"', '`'));
+        
+        // 2. CamelCase
+        var camelCase = words.FirstOrDefault(w => w.Length > 8 && char.IsUpper(w[0]) && w.Any(char.IsLower));
+        if (camelCase != null) queries.Add(camelCase.Trim('\'', '\"', '`'));
+
+        // 3. Keyword expansion
+        var lower = text.ToLowerInvariant();
+        if (lower.Contains("index")) queries.Add("index");
+        if (lower.Contains("login") || lower.Contains("auth")) queries.Add("auth");
+        if (lower.Contains("overview") || lower.Contains("dashboard")) queries.Add("overview");
+        if (lower.Contains("ticket") || lower.Contains("work item")) queries.Add("ticket");
+        if (lower.Contains("decision") || lower.Contains("architecture")) queries.Add("decision");
+
+        // 4. Fallback: longest technical-looking word
+        if (queries.Count == 0)
+        {
+            var fallback = words.Where(w => w.Length > 4).OrderByDescending(w => w.Length).FirstOrDefault();
+            if (fallback != null) queries.Add(fallback.Trim('\'', '\"', '`'));
+        }
+
+        return queries.Distinct().ToList();
     }
 }

@@ -344,8 +344,14 @@ public sealed class SqlCodeIndexService : ICodeIndexService
             FROM dbo.CodeIndexEntries e
             LEFT JOIN dbo.ProjectFiles f on e.FileId = f.Id
             WHERE e.TenantId = @TenantId AND e.ProjectId = @ProjectId
-              AND (e.SymbolName LIKE @Query OR e.ChunkText LIKE @Query)
-            ORDER BY e.Id DESC
+              AND (e.SymbolName LIKE @Query OR e.ChunkText LIKE @Query OR f.FilePath LIKE @Query OR e.Namespace LIKE @Query)
+            ORDER BY 
+                (
+                    CASE WHEN f.FilePath LIKE @Query THEN 10 ELSE 0 END +
+                    CASE WHEN e.SymbolName LIKE @Query THEN 8 ELSE 0 END +
+                    CASE WHEN e.Namespace LIKE @Query THEN 5 ELSE 0 END +
+                    CASE WHEN e.ChunkText LIKE @Query THEN 2 ELSE 0 END
+                ) DESC, e.Id DESC
             """;
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<CodeIndexEntry>(new CommandDefinition(
