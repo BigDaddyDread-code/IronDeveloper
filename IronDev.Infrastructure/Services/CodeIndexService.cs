@@ -21,6 +21,8 @@ public interface ICodeIndexService
     Task<ProjectFile?> GetByPathAsync(int projectId, string filePath, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProjectFile>> GetRecentFilesAsync(int projectId, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CodeIndexEntry>> GetSymbolsAsync(long fileId, CancellationToken cancellationToken = default);
+    Task<int> GetIndexedFileCountAsync(int projectId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CodeIndexEntry>> GetRelevantSnippetsAsync(int projectId, string query, int take = 10, CancellationToken cancellationToken = default);
 }
 
 public sealed class SqlCodeIndexService : ICodeIndexService
@@ -71,7 +73,12 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         if (project == null)
             throw new UnauthorizedAccessException($"Project {projectId} not found or access denied for tenant {_tenant.TenantId}.");
 
-        foreach (var fullPath in allFiles)
+        using var transaction = connection.BeginTransaction();
+        var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            foreach (var fullPath in allFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
             result.FilesScanned++;
@@ -84,15 +91,16 @@ public sealed class SqlCodeIndexService : ICodeIndexService
             }
 
             var relPath = Path.GetRelativePath(directoryPath, fullPath).Replace('\\', '/');
+            processedPaths.Add(relPath);
+
             var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
             var hash = ComputeHash(content);
 
             var existing = await connection.QuerySingleOrDefaultAsync<dynamic>(
                 "SELECT Id, ContentHash FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND FilePath = @FilePath",
-                new { TenantId = _tenant.TenantId, ProjectId = projectId, FilePath = relPath });
+                new { TenantId = _tenant.TenantId, ProjectId = projectId, FilePath = relPath }, transaction);
 
             long fileId;
-            bool wasUpdated = false;
 
             if (existing != null)
             {
@@ -106,11 +114,10 @@ public sealed class SqlCodeIndexService : ICodeIndexService
                 // Update metadata (Content is NULL for V1 per user req)
                 await connection.ExecuteAsync(
                     "UPDATE dbo.ProjectFiles SET ContentHash = @ContentHash, Content = '', LastIndexedDate = SYSUTCDATETIME() WHERE Id = @Id",
-                    new { Id = fileId, ContentHash = hash });
+                    new { Id = fileId, ContentHash = hash }, transaction);
                 
                 // Clear old symbols
-                await connection.ExecuteAsync("DELETE FROM dbo.CodeIndexEntries WHERE FileId = @FileId", new { FileId = fileId });
-                wasUpdated = true;
+                await connection.ExecuteAsync("DELETE FROM dbo.CodeIndexEntries WHERE FileId = @FileId", new { FileId = fileId }, transaction);
                 result.FilesUpdated++;
             }
             else
@@ -128,23 +135,45 @@ public sealed class SqlCodeIndexService : ICodeIndexService
                         FilePath = relPath,
                         FileExtension = fileInfo.Extension,
                         ContentHash = hash
-                    });
+                    }, transaction);
                 result.FilesAdded++;
             }
 
             // Symbol Extraction (V1 Regex)
-            await ExtractAndStoreSymbolsAsync(connection, projectId, fileId, content, cancellationToken);
+            await ExtractAndStoreSymbolsAsync(connection, projectId, fileId, content, transaction, cancellationToken);
+        }
+
+        // Cleanup stale files that weren't processed
+        if (processedPaths.Count > 0)
+        {
+            await connection.ExecuteAsync(
+                "DELETE FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND FilePath NOT IN @Paths",
+                new { TenantId = _tenant.TenantId, ProjectId = projectId, Paths = processedPaths }, transaction);
+        }
+        else
+        {
+            await connection.ExecuteAsync(
+                "DELETE FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId",
+                new { TenantId = _tenant.TenantId, ProjectId = projectId }, transaction);
         }
 
         // Update Project Status
         await connection.ExecuteAsync(
-            "UPDATE dbo.Projects SET UpdatedDate = SYSUTCDATETIME() WHERE Id = @ProjectId",
-            new { ProjectId = projectId });
+            "UPDATE dbo.Projects SET UpdatedDate = SYSUTCDATETIME(), LastIndexedUtc = SYSUTCDATETIME(), IndexingStatus = 'Ready' WHERE Id = @ProjectId",
+            new { ProjectId = projectId }, transaction);
+
+        transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
 
         return result;
     }
 
-    private async Task ExtractAndStoreSymbolsAsync(System.Data.IDbConnection connection, int projectId, long fileId, string content, CancellationToken ct)
+    private async Task ExtractAndStoreSymbolsAsync(System.Data.IDbConnection connection, int projectId, long fileId, string content, System.Data.IDbTransaction transaction, CancellationToken ct)
     {
         var lines = content.Split('\n');
         var nsMatch = NamespaceRegex.Match(content);
@@ -196,7 +225,7 @@ public sealed class SqlCodeIndexService : ICodeIndexService
                 INSERT INTO dbo.CodeIndexEntries (TenantId, ProjectId, FileId, Namespace, SymbolName, SymbolType, ChunkText)
                 VALUES (@TenantId, @ProjectId, @FileId, @Namespace, @SymbolName, @SymbolType, @ChunkText)
                 """;
-            await connection.ExecuteAsync(sql, entries);
+            await connection.ExecuteAsync(sql, entries, transaction);
         }
     }
 
@@ -205,10 +234,14 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         const string sql = """
             SELECT TOP (@Take) f.*
             FROM dbo.ProjectFiles f
-            LEFT JOIN dbo.CodeIndexEntries e ON f.Id = e.FileId
             WHERE f.TenantId = @TenantId
               AND f.ProjectId = @ProjectId
-              AND (f.FilePath LIKE @Query OR e.SymbolName LIKE @Query OR e.ChunkText LIKE @Query)
+              AND (f.FilePath LIKE @Query 
+                   OR EXISTS (
+                       SELECT 1 FROM dbo.CodeIndexEntries e 
+                       WHERE e.FileId = f.Id 
+                         AND (e.SymbolName LIKE @Query OR e.ChunkText LIKE @Query)
+                   ))
             ORDER BY f.LastIndexedDate DESC
             """;
 
@@ -228,6 +261,16 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         return await connection.QuerySingleOrDefaultAsync<ProjectFile>(new CommandDefinition(
             sql,
             new { TenantId = _tenant.TenantId, ProjectId = projectId, FilePath = filePath },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task<int> GetIndexedFileCountAsync(int projectId, CancellationToken cancellationToken = default)
+    {
+        const string sql = "SELECT COUNT(*) FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId";
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            sql,
+            new { TenantId = _tenant.TenantId, ProjectId = projectId },
             cancellationToken: cancellationToken));
     }
 
@@ -291,6 +334,22 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<CodeIndexEntry>(new CommandDefinition(
             sql, new { FileId = fileId }, cancellationToken: cancellationToken));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<CodeIndexEntry>> GetRelevantSnippetsAsync(int projectId, string query, int take = 10, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT TOP (@Take) e.*, f.FilePath 
+            FROM dbo.CodeIndexEntries e
+            LEFT JOIN dbo.ProjectFiles f on e.FileId = f.Id
+            WHERE e.TenantId = @TenantId AND e.ProjectId = @ProjectId
+              AND (e.SymbolName LIKE @Query OR e.ChunkText LIKE @Query)
+            ORDER BY e.Id DESC
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<CodeIndexEntry>(new CommandDefinition(
+            sql, new { TenantId = _tenant.TenantId, ProjectId = projectId, Query = $"%{query}%", Take = take }, cancellationToken: cancellationToken));
         return rows.ToList();
     }
 }

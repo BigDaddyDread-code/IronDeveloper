@@ -136,8 +136,22 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void ToggleStatusPopup()
     {
-        if (ActiveStatus == "Needs Index")
-            IsStatusPopupOpen = !IsStatusPopupOpen;
+        IsStatusPopupOpen = !IsStatusPopupOpen;
+    }
+
+    [RelayCommand]
+    private async Task IndexNow()
+    {
+        IsStatusPopupOpen = false;
+        
+        // Trigger the real indexing command on the overview VM
+        if (_overviewVm.IndexProjectCommand.CanExecute(null))
+        {
+            await _overviewVm.IndexProjectCommand.ExecuteAsync(null);
+            
+            // Sync status back to shell
+            ActiveStatus = _overviewVm.Status;
+        }
     }
 
     [RelayCommand]
@@ -189,6 +203,7 @@ public sealed partial class ShellViewModel : ObservableObject
         // Populate child ViewModels with real data
         await Task.WhenAll(
             _overviewVm.LoadAsync(project),
+            _chatVm.LoadAsync(project),
             _ticketsVm.LoadAsync(project),
             _decisionsVm.LoadAsync(project)
         );

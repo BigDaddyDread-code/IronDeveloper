@@ -11,6 +11,8 @@ public sealed class Project
     public string? LocalPath { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime? UpdatedDate { get; set; }
+    public DateTime? LastIndexedUtc { get; set; }
+    public string? IndexingStatus { get; set; }
 }
 
 public sealed class ProjectFile
@@ -66,6 +68,9 @@ public sealed class ProjectDecision
     public string Detail { get; set; } = string.Empty;
     public string? Reason { get; set; }
     public long? SourceChatMessageId { get; set; }
+    public string? LinkedFilePaths { get; set; }
+    public string? LinkedCodeIndexEntryIds { get; set; }
+    public string? LinkedSymbols { get; set; }
     public DateTime CreatedDate { get; set; }
 }
 
@@ -85,5 +90,8 @@ public sealed class ProjectTicket
     public string? TechnicalNotes { get; set; }
     public string Status { get; set; } = "Draft";
     public string Content { get; set; } = string.Empty;
+    public string? LinkedFilePaths { get; set; }
+    public string? LinkedCodeIndexEntryIds { get; set; }
+    public string? LinkedSymbols { get; set; }
     public DateTime CreatedDate { get; set; }
 }

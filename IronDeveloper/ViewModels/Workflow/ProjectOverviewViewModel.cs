@@ -13,9 +13,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 {
     private readonly global::IronDev.Services.ITicketService _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
-    private readonly global::IronDev.Services.ICodeIndexService _indexService;
-    private readonly LocalIndexingService _indexingService;
-    private readonly global::IronDev.Data.Repository.IProjectRepository _projectRepository;
+    private readonly global::IronDev.Agent.Services.Interfaces.ILocalIndexingService _indexingService;
 
     private global::IronDev.Data.Models.Project? _currentProject;
 
@@ -25,6 +23,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private string _status         = "Needs Index";
     [ObservableProperty] private string _description    = string.Empty;
     [ObservableProperty] private string _lastIndexed    = "Never";
+    [ObservableProperty] private string _indexingTime   = "-";
+    [ObservableProperty] private int    _fileCount;
     [ObservableProperty] private bool   _isIndexing;
 
     [ObservableProperty] private ObservableCollection<TicketItem>   _recentTickets   = [];
@@ -33,15 +33,11 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     public ProjectOverviewViewModel(
         global::IronDev.Services.ITicketService ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
-        global::IronDev.Services.ICodeIndexService indexService,
-        LocalIndexingService indexingService,
-        global::IronDev.Data.Repository.IProjectRepository projectRepository)
+        global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService)
     {
         _ticketService   = ticketService;
         _memoryService   = memoryService;
-        _indexService    = indexService;
         _indexingService = indexingService;
-        _projectRepository = projectRepository;
     }
 
     internal async Task LoadAsync(global::IronDev.Data.Models.Project project)
@@ -81,26 +77,35 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
             { 
                 Id = d.Id, 
                 Title = d.Title, 
-                Summary = d.Detail // Map Detail to Summary for UI
+                Detail = d.Detail 
             });
         }
 
-        // Load file counts for status
-        var files = await _indexService.GetRecentFilesAsync(_currentProject.Id, take: 1);
-        if (files.Any())
+        // Use LastIndexedUtc from project if available
+        if (_currentProject.LastIndexedUtc.HasValue)
         {
-            Status = "Ready";
-            LastIndexed = files.First().LastIndexedDate.ToLocalTime().ToString("g");
+            Status = _currentProject.IndexingStatus ?? "Ready";
+            LastIndexed = _currentProject.LastIndexedUtc.Value.ToLocalTime().ToString("g");
         }
         else
         {
             Status = "Needs Index";
             LastIndexed = "Never";
         }
+
+        // Fetch real indexed file count
+        try
+        {
+            FileCount = await _indexingService.GetIndexedFileCountAsync(_currentProject.Id);
+        }
+        catch (Exception)
+        {
+            FileCount = 0;
+        }
     }
 
     [RelayCommand]
-    private async Task IndexNowAsync()
+    private async Task IndexProjectAsync()
     {
         if (_currentProject == null || string.IsNullOrWhiteSpace(_currentProject.LocalPath))
         {
@@ -110,10 +115,21 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 
         IsIndexing = true;
         Status     = "Indexing...";
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
-            await _indexService.IndexDirectoryAsync(_currentProject.Id, _currentProject.LocalPath);
+            var result = await _indexingService.IndexProjectAsync(_currentProject);
+            sw.Stop();
+            
+            IndexingTime = $"{sw.Elapsed.TotalSeconds:F1}s";
+            FileCount = result.FilesScanned;
+            
+            // Note: In a real app, we'd reload the project from DB to get the new LastIndexedUtc
+            // but for now we just manually update the local object for UI
+            _currentProject.LastIndexedUtc = DateTime.UtcNow;
+            _currentProject.IndexingStatus = "Ready";
+
             await RefreshAsync();
         }
         catch (Exception ex)
@@ -127,24 +143,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void IndexProject()
+    private void ViewDetails()
     {
-        if (_currentProject == null) return;
-
-        var indexEntries = _indexingService.IndexProject(_currentProject.Id, _currentProject.Id, _currentProject.LocalPath);
-
-        // Save index entries to the database
-        foreach (var entry in indexEntries)
-        {
-            _projectRepository.SaveCodeIndexEntry(entry);
-        }
-
-        // Update project status and last indexed time
-        _currentProject.LastIndexed = DateTime.UtcNow.ToString("g");
-        _currentProject.Status = "Ready";
-        _projectRepository.UpdateProject(_currentProject);
-
-        // Notify UI of changes
-        OnPropertyChanged(nameof(_currentProject));
+        // Placeholder for future navigation to an "Index Details" screen
     }
 }

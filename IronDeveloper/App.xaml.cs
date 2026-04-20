@@ -38,7 +38,9 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
                 services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
                 services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
+                services.AddTransient<global::IronDev.Core.ILLMService, global::IronDev.Infrastructure.Services.FakeLlmService>();
 
                 // ── Workflow ViewModels ───────────────────────────────────────
                 services.AddTransient<LoginViewModel>();
@@ -58,7 +60,7 @@ public partial class App : Application
 
                 // Mocks for pending features
                 services.AddTransient<IChatShellService, MockChatShellService>();
-                services.AddTransient<LocalIndexingService>();
+                services.AddSingleton<global::IronDev.Agent.Services.Interfaces.IProjectShellService, global::IronDev.Agent.Services.Mock.MockProjectShellService>();
             })
             .Build();
     }

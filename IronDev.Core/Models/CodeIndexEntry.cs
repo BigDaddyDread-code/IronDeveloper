@@ -14,4 +14,7 @@ public sealed class CodeIndexEntry
     public string? Summary { get; set; }
     public string ChunkText { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }
+    
+    // Joined field
+    public string? FilePath { get; set; }
 }

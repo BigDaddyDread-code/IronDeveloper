@@ -7,9 +7,18 @@ using IronDev.Services;
 
 namespace IronDev.AI;
 
+public class ChatContextPacket
+{
+    public System.Collections.Generic.List<string> Snippets { get; init; } = new();
+    public System.Collections.Generic.List<string> Tickets { get; init; } = new();
+    public System.Collections.Generic.List<string> Decisions { get; init; } = new();
+    public string FormattedPrompt { get; set; } = string.Empty;
+}
+
 public interface IPromptContextBuilder
 {
     Task<string> BuildAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default);
+    Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default);
 }
 
 public sealed class PromptContextBuilder : IPromptContextBuilder
@@ -17,15 +26,18 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
     private readonly IChatHistoryService _chatHistoryService;
     private readonly IProjectMemoryService _projectMemoryService;
     private readonly ICodeIndexService _codeIndexService;
+    private readonly ITicketService _ticketService;
 
     public PromptContextBuilder(
         IChatHistoryService chatHistoryService,
         IProjectMemoryService projectMemoryService,
-        ICodeIndexService codeIndexService)
+        ICodeIndexService codeIndexService,
+        ITicketService ticketService)
     {
         _chatHistoryService = chatHistoryService;
         _projectMemoryService = projectMemoryService;
         _codeIndexService = codeIndexService;
+        _ticketService = ticketService;
     }
 
     public async Task<string> BuildAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
@@ -115,6 +127,37 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         sb.AppendLine(userRequest);
 
         return sb.ToString();
+    }
+
+    public async Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
+    {
+        var packet = new ChatContextPacket();
+        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, 3, cancellationToken);
+        var tickets = await _ticketService.GetRecentTicketsAsync(projectId, 3, cancellationToken);
+        var query = ExtractSearchQuery(userRequest);
+        
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, query, 5, cancellationToken);
+            foreach (var r in results)
+            {
+                packet.Snippets.Add($"File: {r.FilePath}\nSymbol: {r.SymbolName}\n```\n{r.ChunkText}\n```");
+            }
+        }
+
+        foreach (var t in tickets)
+        {
+            packet.Tickets.Add($"[{t.TicketType}] {t.Title} ({t.Status})");
+        }
+
+        foreach (var d in decisions)
+        {
+            packet.Decisions.Add($"{d.Title}: {d.Detail}");
+        }
+
+        packet.FormattedPrompt = await BuildAsync(projectId, sessionId, userRequest, cancellationToken);
+
+        return packet;
     }
 
 

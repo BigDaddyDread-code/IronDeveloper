@@ -46,12 +46,12 @@ public sealed class TicketService : ITicketService
             INSERT INTO dbo.ProjectTickets
                 (TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                  Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                 Status, Content)
+                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
             OUTPUT inserted.Id
             VALUES
                 (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
                  @Summary, @Background, @Problem, @AcceptanceCriteria, @TechnicalNotes,
-                 @Status, @Content);
+                 @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
             """;
 
         return await connection.QuerySingleAsync<long>(new CommandDefinition(
@@ -70,7 +70,10 @@ public sealed class TicketService : ITicketService
                 ticket.AcceptanceCriteria,
                 ticket.TechnicalNotes,
                 ticket.Status,
-                ticket.Content
+                ticket.Content,
+                ticket.LinkedFilePaths,
+                ticket.LinkedCodeIndexEntryIds,
+                ticket.LinkedSymbols
             },
             cancellationToken: cancellationToken));
     }
@@ -81,7 +84,7 @@ public sealed class TicketService : ITicketService
             SELECT TOP (@Take)
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                Status, Content, CreatedDate
+                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
             FROM dbo.ProjectTickets
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -104,7 +107,7 @@ public sealed class TicketService : ITicketService
             SELECT
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                Status, Content, CreatedDate
+                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
             FROM dbo.ProjectTickets
             WHERE Id = @TicketId
               AND TenantId = @TenantId;

@@ -51,7 +51,8 @@ public sealed class ProjectMemoryService : IProjectMemoryService
     {
         const string sql = """
             SELECT TOP (@Take)
-                Id, TenantId, ProjectId, Title, Detail, Reason, SourceChatMessageId, CreatedDate
+                Id, TenantId, ProjectId, Title, Detail, Reason, SourceChatMessageId, 
+                LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
             FROM dbo.ProjectDecisions
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -128,18 +129,36 @@ public sealed class ProjectMemoryService : IProjectMemoryService
 
         if (existingId.HasValue)
         {
-            const string updateSql = "UPDATE dbo.ProjectDecisions SET Detail = @Detail, Reason = @Reason WHERE Id = @Id";
+            const string updateSql = """
+                UPDATE dbo.ProjectDecisions 
+                SET Detail = @Detail, 
+                    Reason = @Reason,
+                    LinkedFilePaths = @LinkedFilePaths,
+                    LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds,
+                    LinkedSymbols = @LinkedSymbols
+                WHERE Id = @Id
+                """;
             await connection.ExecuteAsync(new CommandDefinition(
                 updateSql,
-                new { Id = existingId.Value, decision.Detail, decision.Reason },
+                new 
+                { 
+                    Id = existingId.Value, 
+                    decision.Detail, 
+                    decision.Reason,
+                    decision.LinkedFilePaths,
+                    decision.LinkedCodeIndexEntryIds,
+                    decision.LinkedSymbols
+                },
                 cancellationToken: cancellationToken));
             return existingId.Value;
         }
 
         const string sql = """
-            INSERT INTO dbo.ProjectDecisions (TenantId, ProjectId, Title, Detail, Reason, SourceChatMessageId)
+            INSERT INTO dbo.ProjectDecisions 
+                (TenantId, ProjectId, Title, Detail, Reason, SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
             OUTPUT inserted.Id
-            VALUES (@TenantId, @ProjectId, @Title, @Detail, @Reason, @SourceChatMessageId);
+            VALUES 
+                (@TenantId, @ProjectId, @Title, @Detail, @Reason, @SourceChatMessageId, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
             """;
 
         return await connection.QuerySingleAsync<long>(new CommandDefinition(
@@ -151,7 +170,10 @@ public sealed class ProjectMemoryService : IProjectMemoryService
                 decision.Title,
                 decision.Detail,
                 decision.Reason,
-                decision.SourceChatMessageId
+                decision.SourceChatMessageId,
+                decision.LinkedFilePaths,
+                decision.LinkedCodeIndexEntryIds,
+                decision.LinkedSymbols
             },
             cancellationToken: cancellationToken));
     }

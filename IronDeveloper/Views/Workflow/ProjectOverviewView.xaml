@@ -16,20 +16,66 @@
             <TextBlock Text="{Binding Description}" Style="{StaticResource IronMetaLabel}"
                        Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,32"/>
 
-            <!-- Meta strip -->
-            <Border Style="{StaticResource IronMetalPanel}" Margin="0,0,0,28" Padding="22,14">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="PATH" Style="{StaticResource IronMetaLabel}" Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding ProjectPath}" Style="{StaticResource IronMetaValue}"/>
-                    <TextBlock Text="MODEL" Style="{StaticResource IronMetaLabel}" Margin="16,0,8,0"/>
-                    <TextBlock Text="{Binding Model}" Style="{StaticResource IronMetaValue}"/>
-                    <TextBlock Text="STATUS" Style="{StaticResource IronMetaLabel}" Margin="16,0,8,0"/>
-                    <Border Style="{StaticResource IronStatusBadge}">
-                        <TextBlock Text="{Binding Status}" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{StaticResource StatusWarningBrush}"/>
-                    </Border>
-                </StackPanel>
-            </Border>
+            <!-- Dashboard Metrics row -->
+            <Grid Margin="0,0,0,28">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Project Info Card -->
+                <Border Grid.Column="0" Style="{StaticResource IronCard}" Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="INDEX STATUS" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
+                        <Border Style="{StaticResource IronStatusBadge}" HorizontalAlignment="Left">
+                            <TextBlock Text="{Binding Status}" FontSize="12" FontWeight="SemiBold"
+                                        Foreground="{StaticResource StatusReadyBrush}"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Indexed Files Card -->
+                <Border Grid.Column="2" Style="{StaticResource IronCard}" Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="INDEXED FILES" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding FileCount}" Style="{StaticResource IronMetaValue}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Last Indexed Card -->
+                <Border Grid.Column="4" Style="{StaticResource IronCard}" Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="LAST INDEXED" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding LastIndexed}" Style="{StaticResource IronMetaValue}"/>
+                    </StackPanel>
+                </Border>
+                
+                 <!-- Index Scope Card -->
+                <Border Grid.Column="6" Style="{StaticResource IronCard}" Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="SCOPE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding ProjectPath}" Style="{StaticResource IronMetaValue}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ProjectPath}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Actions Row -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,32">
+                <Button Content="INDEX PROJECT" 
+                        Command="{Binding IndexProjectCommand}" 
+                        IsEnabled="{Binding IsIndexing, Converter={StaticResource InverseBoolConverter}}"
+                        Style="{StaticResource IronPrimaryButton}"
+                        Margin="0,0,12,0" Width="140" Height="36"/>
+                <Button Content="VIEW DETAILS" 
+                        Command="{Binding ViewDetailsCommand}" 
+                        Style="{StaticResource IronSidebarButton}"
+                        Width="120" Height="36"/>
+            </StackPanel>
 
             <!-- Two-column: recent tickets + decisions -->
             <Grid>
@@ -96,20 +142,7 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Indexing Status -->
-            <TextBlock Text="Index Status:" FontWeight="Bold" />
-            <TextBlock Text="{Binding ActiveProject.IndexStatus}" />
-
-            <!-- Last Indexed Time -->
-            <TextBlock Text="Last Indexed:" FontWeight="Bold" />
-            <TextBlock Text="{Binding ActiveProject.LastIndexedUtc, StringFormat='{}{0:MM/dd/yyyy HH:mm:ss}'}" />
-
-            <!-- Indexed File Count -->
-            <TextBlock Text="Indexed File Count:" FontWeight="Bold" />
-            <TextBlock Text="{Binding ActiveProject.IndexedFileCount}" />
-
-            <!-- Index Button -->
-            <Button Content="Index Project" Command="{Binding IndexProjectCommand}" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+

@@ -56,6 +56,8 @@ CREATE TABLE dbo.Projects
     LocalPath NVARCHAR(500) NULL,
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_Projects_CreatedDate DEFAULT SYSUTCDATETIME(),
     UpdatedDate DATETIME2 NULL,
+    LastIndexedUtc DATETIME2 NULL,
+    IndexingStatus NVARCHAR(50) NULL,
     CONSTRAINT FK_Projects_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id)
 );
 
@@ -96,6 +98,9 @@ CREATE TABLE dbo.ProjectDecisions
     Detail NVARCHAR(MAX) NOT NULL,
     Reason NVARCHAR(MAX) NULL,
     SourceChatMessageId BIGINT NULL,
+    LinkedFilePaths NVARCHAR(MAX) NULL,
+    LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
+    LinkedSymbols NVARCHAR(MAX) NULL,
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectDecisions_CreatedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectDecisions_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectDecisions_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
@@ -118,6 +123,9 @@ CREATE TABLE dbo.ProjectTickets
     TechnicalNotes NVARCHAR(MAX) NULL,
     Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectTickets_Status DEFAULT 'Draft',
     Content NVARCHAR(MAX) NOT NULL,
+    LinkedFilePaths NVARCHAR(MAX) NULL,
+    LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
+    LinkedSymbols NVARCHAR(MAX) NULL,
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectTickets_CreatedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectTickets_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
