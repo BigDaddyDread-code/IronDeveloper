@@ -35,4 +35,28 @@
         <Setter Property="Foreground"      Value="{StaticResource TextBrush}" />
     </Style>
 
+    <!-- ── Sidebar dark-glass tooltip ─────────────────────────────────── -->
+    <Style x:Key="IronSidebarTooltip" TargetType="ToolTip">
+        <Setter Property="Placement"         Value="Right"/>
+        <Setter Property="HorizontalOffset"  Value="6"/>
+        <Setter Property="VerticalOffset"    Value="0"/>
+        <Setter Property="HasDropShadow"     Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="#CC0F1822" CornerRadius="6"
+                            BorderBrush="#3392400E" BorderThickness="1"
+                            Padding="12,6" Margin="4,0,0,0">
+                        <Border.Effect>
+                            <DropShadowEffect ShadowDepth="3" BlurRadius="8" Opacity="0.5" Color="#000000"/>
+                        </Border.Effect>
+                        <TextBlock Text="{TemplateBinding Content}"
+                                   Foreground="#E0E6ED" FontSize="12"
+                                   FontWeight="SemiBold" FontFamily="Segoe UI"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

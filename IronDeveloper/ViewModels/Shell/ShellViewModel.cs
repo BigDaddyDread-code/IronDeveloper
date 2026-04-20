@@ -105,6 +105,34 @@ public sealed partial class ShellViewModel : ObservableObject
         _hubVm.OnCreateProject         = NavigateToCreateProject;
         _createVm.OnProjectCreated     = (p) => _ = CreateAndOpenProjectAsync(p);
         _createVm.OnCancel             = NavigateToHub;
+        
+        // --- SYNC STATUS FROM OVERVIEW TO SHELL ---
+        _overviewVm.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(ProjectOverviewViewModel.Status))
+            {
+                ActiveStatus = _overviewVm.Status;
+                System.Diagnostics.Trace.WriteLine($"[Shell] Syncing status from Overview: {ActiveStatus}");
+            }
+            if (e.PropertyName == nameof(ProjectOverviewViewModel.Model))
+                ActiveModel = _overviewVm.Model;
+        };
+
+        // Chat → Ticket creation bridge
+        _chatVm.OnCreateTicketFromChat = (title, summary, linkedFilePaths, linkedSymbols) =>
+        {
+            _ticketsVm.PrefillFromChat(title, summary, linkedFilePaths, linkedSymbols);
+            CurrentWorkspace = ProjectWorkspace.Tickets;
+            CurrentView = _ticketsVm;
+        };
+
+        // Chat → Decision creation bridge
+        _chatVm.OnCreateDecisionFromChat = (title, detail, linkedFilePaths, linkedSymbols) =>
+        {
+            _decisionsVm.PrefillFromChat(title, detail, linkedFilePaths, linkedSymbols);
+            CurrentWorkspace = ProjectWorkspace.Decisions;
+            CurrentView = _decisionsVm;
+        };
 
         CurrentView = _loginVm;
     }
@@ -174,7 +202,6 @@ public sealed partial class ShellViewModel : ObservableObject
     private async Task OpenProjectAsync(global::IronDev.Data.Models.Project project)
     {
         await ActivateProjectAsync(project);
-        CurrentView = _overviewVm;
     }
 
     private void NavigateToCreateProject()
@@ -186,29 +213,49 @@ public sealed partial class ShellViewModel : ObservableObject
     private async Task CreateAndOpenProjectAsync(global::IronDev.Data.Models.Project project)
     {
         await ActivateProjectAsync(project);
-        CurrentView = _overviewVm;
     }
 
     private async Task ActivateProjectAsync(global::IronDev.Data.Models.Project project)
     {
+        System.Diagnostics.Trace.WriteLine($"[Shell] Activating project: {project.Name}");
+        
+        // Switch to project mode and show overview immediately
         HasActiveProject  = true;
         CurrentShellMode  = ShellMode.ProjectActive;
         CurrentWorkspace  = ProjectWorkspace.Overview;
+        CurrentView       = _overviewVm;
+        
         ActiveProjectName = project.Name;
         ActiveProjectPath = project.LocalPath ?? string.Empty;
-        
-        ActiveModel       = "gpt-4o"; 
+        ActiveModel       = _overviewVm.Model; 
         ActiveStatus      = "Checking...";
         
-        // Populate child ViewModels with real data
-        await Task.WhenAll(
-            _overviewVm.LoadAsync(project),
-            _chatVm.LoadAsync(project),
-            _ticketsVm.LoadAsync(project),
-            _decisionsVm.LoadAsync(project)
-        );
+        try
+        {
+            // Populate child ViewModels with real data
+            await Task.WhenAll(
+                _overviewVm.LoadAsync(project),
+                _chatVm.LoadAsync(project),
+                _ticketsVm.LoadAsync(project),
+                _decisionsVm.LoadAsync(project)
+            );
 
-        ActiveStatus = _overviewVm.Status;
-        OnPropertyChanged(nameof(StatusNeedsIndex));
+            // Fetch final status from the overview VM
+            ActiveStatus = _overviewVm.Status;
+            System.Diagnostics.Trace.WriteLine($"[Shell] Project activation complete. Status: {ActiveStatus}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[Shell] ERROR activating project {project.Name}: {ex.Message}");
+            ActiveStatus = "Error";
+        }
+        finally
+        {
+            // Safeguard: do not leave stuck on "Checking..." if success/fail didn't update it
+            if (ActiveStatus == "Checking...")
+                ActiveStatus = "Offline";
+
+            OnPropertyChanged(nameof(StatusNeedsIndex));
+        }
     }
 }

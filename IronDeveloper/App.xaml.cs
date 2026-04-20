@@ -38,9 +38,13 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
                 services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
                 services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
-                services.AddTransient<global::IronDev.Core.ILLMService, global::IronDev.Infrastructure.Services.FakeLlmService>();
+                var openAiKey = context.Configuration["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                var openAiModel = context.Configuration["OPENAI_MODEL"] ?? Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-4o";
+                services.AddTransient<global::IronDev.Core.ILLMService>(sp => 
+                    new global::IronDev.Infrastructure.Services.OpenAiLlmService(openAiKey, openAiModel));
 
                 // ── Workflow ViewModels ───────────────────────────────────────
                 services.AddTransient<LoginViewModel>();

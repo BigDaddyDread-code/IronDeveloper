@@ -22,6 +22,7 @@
             <!-- ── Shared converters ───────────────────────────────────── -->
             <cvt:WorkspaceActiveConverter x:Key="WorkspaceActiveConverter"/>
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <cvt:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
 
             <!-- InverseBoolConverter: IsEnabled="{Binding IsBusy, Converter=...}" -->
             <cvt:InverseBoolConverter x:Key="InverseBoolConverter"/>
@@ -68,6 +69,7 @@
                 <vws:SettingsWorkspaceView/>
             </DataTemplate>
 
+            <cvt:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

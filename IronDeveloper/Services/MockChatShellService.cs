@@ -10,7 +10,7 @@ public class MockChatShellService : IChatShellService
     {
         return new List<ChatSummary>
         {
-            new ChatSummary { Role = "assistant", Content = "Welcome to the chat!" }
+            new ChatSummary { Role = "assistant", MessageText = "Welcome to the chat!" }
         };
     }
 }

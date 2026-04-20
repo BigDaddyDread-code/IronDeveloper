@@ -13,6 +13,11 @@ public class ChatContextPacket
     public System.Collections.Generic.List<string> Tickets { get; init; } = new();
     public System.Collections.Generic.List<string> Decisions { get; init; } = new();
     public string FormattedPrompt { get; set; } = string.Empty;
+
+    /// <summary>Structured file paths from matched code snippets.</summary>
+    public System.Collections.Generic.List<string> MatchedFilePaths { get; init; } = new();
+    /// <summary>Structured symbol names from matched code snippets.</summary>
+    public System.Collections.Generic.List<string> MatchedSymbols { get; init; } = new();
 }
 
 public interface IPromptContextBuilder
@@ -42,55 +47,93 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
     public async Task<string> BuildAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
     {
-        var recentMessages = await _chatHistoryService.GetRecentMessagesAsync(projectId, sessionId, 8, cancellationToken);
-        var latestSummary = await _projectMemoryService.GetLatestSummaryAsync(projectId, cancellationToken);
-        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, 8, cancellationToken);
-        
+        var packet = await BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
+        return packet.FormattedPrompt;
+    }
+
+    public Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
+    {
+        return BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
+    }
+
+    private async Task<ChatContextPacket> BuildPacketDataAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken)
+    {
+        var packet = new ChatContextPacket();
+        var isCodeQuery = IsCodeQuery(userRequest);
+        var ticketTake = isCodeQuery ? 2 : 5;
+        var decisionTake = isCodeQuery ? 2 : 5;
+        var snippetTake = isCodeQuery ? 5 : 3;
+
+        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
+        var tickets = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
         var queries = ExtractSearchQueries(userRequest);
-        var matchedFiles = new System.Collections.Generic.List<IronDev.Data.Models.ProjectFile>();
         
-        foreach (var query in queries.Take(3))
+        var snippetList = new System.Collections.Generic.List<IronDev.Data.Models.CodeIndexEntry>();
+
+        foreach (var query in queries)
         {
-            var results = await _codeIndexService.SearchFilesAsync(projectId, query, 3, cancellationToken);
-            matchedFiles.AddRange(results);
+            var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, query, snippetTake, cancellationToken);
+            snippetList.AddRange(results);
         }
 
-        var sb = new StringBuilder();
+        var topSnippets = snippetList.GroupBy(x => x.Id).Select(g => g.First()).Take(snippetTake).ToList();
 
-        sb.AppendLine("You are assisting with the IronDev software project.");
+        foreach (var r in topSnippets)
+        {
+            var shortChunk = r.ChunkText;
+            if (shortChunk.Length > 800) shortChunk = shortChunk.Substring(0, 800) + "\n...[TRUNCATED]...";
+            packet.Snippets.Add($"File: {r.FilePath}\nSymbol: {r.SymbolName}\n```\n{shortChunk}\n```");
+
+            if (!string.IsNullOrWhiteSpace(r.FilePath) && !packet.MatchedFilePaths.Contains(r.FilePath))
+                packet.MatchedFilePaths.Add(r.FilePath);
+            if (!string.IsNullOrWhiteSpace(r.SymbolName) && !packet.MatchedSymbols.Contains(r.SymbolName))
+                packet.MatchedSymbols.Add(r.SymbolName);
+        }
+
+        foreach (var t in tickets)
+        {
+            packet.Tickets.Add($"[{t.TicketType}] {t.Title} ({t.Status})");
+        }
+
+        foreach (var d in decisions)
+        {
+            packet.Decisions.Add($"{d.Title}: {d.Detail}");
+        }
+
+        var recentMessages = await _chatHistoryService.GetRecentMessagesAsync(projectId, sessionId, 8, cancellationToken);
+        var latestSummary = await _projectMemoryService.GetLatestSummaryAsync(projectId, cancellationToken);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("You are an expert AI assistant integrated into the IronDev software project.");
+        sb.AppendLine("IMPORTANT INSTRUCTIONS:");
+        sb.AppendLine("1. Answer the user's question directly and concisely.");
+        sb.AppendLine("2. Do NOT dump raw context/code unless explicitly requested. Use the provided snippets, tickets, and decisions quietly as supporting evidence.");
+        sb.AppendLine("3. Summarize implementation flow in natural language.");
+        sb.AppendLine("4. List the main files/classes involved when relevant.");
+        sb.AppendLine("5. Mention uncertainty explicitly if the provided context is incomplete to fully answer the user's question.");
+        sb.AppendLine();
+        
+        if (isCodeQuery)
+        {
+            sb.AppendLine("Since the user is asking an implementation or codebase-oriented question, please structure your response exactly as follows:");
+            sb.AppendLine("- **Summary**: [High-level explanation of the code or system]");
+            sb.AppendLine("- **Main files/classes involved**: [List of key files/symbols]");
+            sb.AppendLine("- **How the flow works**: [Step by step natural language explanation]");
+            sb.AppendLine("- **What to inspect next**: [Suggestions for the next files, classes, or tickets to look at]");
+            sb.AppendLine();
+        }
+
         sb.AppendLine("IMPORTANT LOGIC RULE:");
         sb.AppendLine("If you and the user finalize a new technical rule, architectural choice, or project decision during this turn, output a hidden XML tag block anywhere in your response like this:");
         sb.AppendLine("<decision>Decision Title | The detailed rule</decision>");
         sb.AppendLine();
 
-        if (matchedFiles.Count > 0)
+        if (topSnippets.Count > 0)
         {
-            sb.AppendLine("## Relevant Code Context");
-            sb.AppendLine("The following file fragments match the request context:");
-            sb.AppendLine();
-            foreach (var file in matchedFiles)
+            sb.AppendLine("## Relevant Code Snippets");
+            foreach (var snippet in packet.Snippets)
             {
-                sb.AppendLine($"### File: {file.FilePath}");
-                sb.AppendLine("```");
-                
-                var content = file.Content;
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    // Fallback to chunks
-                    var symbols = await _codeIndexService.GetSymbolsAsync(file.Id, cancellationToken);
-                    foreach (var s in symbols)
-                    {
-                        sb.AppendLine($"// Symbol: {s.Namespace}.{s.SymbolName} ({s.SymbolType})");
-                        sb.AppendLine(s.ChunkText);
-                        sb.AppendLine();
-                    }
-                }
-                else
-                {
-                    if (content.Length > 4000) content = content.Substring(0, 4000) + "\n...[TRUNCATED]...";
-                    sb.AppendLine(content);
-                }
-                sb.AppendLine("```");
+                sb.AppendLine(snippet);
                 sb.AppendLine();
             }
         }
@@ -125,48 +168,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         sb.AppendLine("Current user request:");
         sb.AppendLine(userRequest);
 
-        return sb.ToString();
-    }
-
-    public async Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
-    {
-        var packet = new ChatContextPacket();
-        var isCodeQuery = IsCodeQuery(userRequest);
-        var ticketTake = isCodeQuery ? 2 : 5;
-        var decisionTake = isCodeQuery ? 2 : 5;
-        var snippetTake = isCodeQuery ? 5 : 3;
-
-        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
-        var tickets = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
-        var queries = ExtractSearchQueries(userRequest);
-        
-        var snippetList = new System.Collections.Generic.List<IronDev.Data.Models.CodeIndexEntry>();
-
-        foreach (var query in queries)
-        {
-            var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, query, snippetTake, cancellationToken);
-            snippetList.AddRange(results);
-        }
-
-        var topSnippets = snippetList.GroupBy(x => x.Id).Select(g => g.First()).Take(snippetTake);
-
-        foreach (var r in topSnippets)
-        {
-            packet.Snippets.Add($"File: {r.FilePath}\nSymbol: {r.SymbolName}\n```\n{r.ChunkText}\n```");
-        }
-
-        foreach (var t in tickets)
-        {
-            packet.Tickets.Add($"[{t.TicketType}] {t.Title} ({t.Status})");
-        }
-
-        foreach (var d in decisions)
-        {
-            packet.Decisions.Add($"{d.Title}: {d.Detail}");
-        }
-
-        packet.FormattedPrompt = await BuildAsync(projectId, sessionId, userRequest, cancellationToken);
-
+        packet.FormattedPrompt = sb.ToString();
         return packet;
     }
 

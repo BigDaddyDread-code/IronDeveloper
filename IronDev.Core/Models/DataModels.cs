@@ -67,6 +67,8 @@ public sealed class ProjectDecision
     public string Title { get; set; } = string.Empty;
     public string Detail { get; set; } = string.Empty;
     public string? Reason { get; set; }
+    public string? Category { get; set; }
+    public string Status { get; set; } = "Accepted";
     public long? SourceChatMessageId { get; set; }
     public string? LinkedFilePaths { get; set; }
     public string? LinkedCodeIndexEntryIds { get; set; }

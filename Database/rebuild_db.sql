@@ -9,6 +9,8 @@ GO
 
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTickets;
 IF OBJECT_ID('dbo.ProjectDecisions', 'U') IS NOT NULL DROP TABLE dbo.ProjectDecisions;
+IF OBJECT_ID('dbo.DecisionCategories', 'U') IS NOT NULL DROP TABLE dbo.DecisionCategories;
+IF OBJECT_ID('dbo.DecisionStatuses', 'U') IS NOT NULL DROP TABLE dbo.DecisionStatuses;
 IF OBJECT_ID('dbo.ProjectSummaries', 'U') IS NOT NULL DROP TABLE dbo.ProjectSummaries;
 IF OBJECT_ID('dbo.ChatMessages', 'U') IS NOT NULL DROP TABLE dbo.ChatMessages;
 IF OBJECT_ID('dbo.ProjectFiles', 'U') IS NOT NULL DROP TABLE dbo.ProjectFiles;
@@ -97,6 +99,8 @@ CREATE TABLE dbo.ProjectDecisions
     Title NVARCHAR(200) NOT NULL,
     Detail NVARCHAR(MAX) NOT NULL,
     Reason NVARCHAR(MAX) NULL,
+    Category NVARCHAR(100) NULL,
+    Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectDecisions_Status DEFAULT 'Accepted',
     SourceChatMessageId BIGINT NULL,
     LinkedFilePaths NVARCHAR(MAX) NULL,
     LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
@@ -187,4 +191,44 @@ GO
 
 INSERT INTO dbo.Projects (TenantId, Name, Description)
 VALUES (1, 'IronDev', 'AI-assisted development workflow project');
+GO
+
+-- ═══ Lookup Tables ══════════════════════════════════════════════════════════
+
+CREATE TABLE dbo.DecisionCategories
+(
+    Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL,
+    SortOrder INT NOT NULL CONSTRAINT DF_DecisionCategories_SortOrder DEFAULT 0,
+    IsActive BIT NOT NULL CONSTRAINT DF_DecisionCategories_IsActive DEFAULT 1
+);
+
+CREATE TABLE dbo.DecisionStatuses
+(
+    Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    Name NVARCHAR(50) NOT NULL,
+    SortOrder INT NOT NULL CONSTRAINT DF_DecisionStatuses_SortOrder DEFAULT 0,
+    IsActive BIT NOT NULL CONSTRAINT DF_DecisionStatuses_IsActive DEFAULT 1
+);
+GO
+
+-- Seed decision categories
+INSERT INTO dbo.DecisionCategories (Name, SortOrder) VALUES
+    ('Architecture',       1),
+    ('Code Standards',     2),
+    ('Product',            3),
+    ('Data',               4),
+    ('Infrastructure',     5),
+    ('AI / Prompting',     6),
+    ('UX / UI',            7),
+    ('Workflow / Process', 8),
+    ('Integration',        9),
+    ('Security',          10);
+
+-- Seed decision statuses
+INSERT INTO dbo.DecisionStatuses (Name, SortOrder) VALUES
+    ('Proposed',    1),
+    ('Accepted',    2),
+    ('Superseded',  3),
+    ('Rejected',    4);
 GO

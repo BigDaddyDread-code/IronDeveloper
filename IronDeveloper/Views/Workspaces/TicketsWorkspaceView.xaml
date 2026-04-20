@@ -14,52 +14,208 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="WORKSPACE" Style="{StaticResource IronEyebrow}"/>
-            <TextBlock Text="Tickets" Style="{StaticResource IronSectionTitle}"/>
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="TICKETS" Style="{StaticResource IronEyebrow}"/>
+                <TextBlock Text="Ticket Management" Style="{StaticResource IronSectionTitle}"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="＋ New Ticket"
+                    Command="{Binding NewTicketCommand}"
+                    Style="{StaticResource IronPrimaryButton}"
+                    Padding="20,8" VerticalAlignment="Center"/>
+        </Grid>
 
-        <!-- Ticket list -->
-        <ScrollViewer Grid.Row="1">
-            <ItemsControl ItemsSource="{Binding Tickets}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource IronCard}" Margin="0,0,0,8" Padding="20,14"
-                                Cursor="Hand">
-                            <Grid>
+        <!-- Master-Detail -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ═══ LEFT: Ticket List ═══ -->
+            <Border Grid.Column="0" Style="{StaticResource IronCard}" Margin="0,0,12,0" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ListBox ItemsSource="{Binding Tickets}"
+                             SelectedItem="{Binding SelectedTicket, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0"
+                             Padding="8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12,10" Margin="0,0,0,4" CornerRadius="6"
+                                        Background="#1A222C" Cursor="Hand">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Border Style="{StaticResource IronStatusBadge}" Margin="0,0,6,0">
+                                                <TextBlock Text="{Binding Status}" FontSize="10"
+                                                           Foreground="{StaticResource StatusReadyBrush}"/>
+                                            </Border>
+                                            <Border Style="{StaticResource IronStatusBadge}">
+                                                <TextBlock Text="{Binding Priority}" FontSize="10"
+                                                           Foreground="{StaticResource StatusWarningBrush}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Border" Background="Transparent"
+                                                    CornerRadius="6" Padding="2">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Border" Property="Background" Value="#2563EB30"/>
+                                                    <Setter TargetName="Border" Property="BorderBrush" Value="#2563EB"/>
+                                                    <Setter TargetName="Border" Property="BorderThickness" Value="1"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Border" Property="Background" Value="#1E3A5F20"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ═══ RIGHT: Detail/Editor ═══ -->
+            <Border Grid.Column="1" Style="{StaticResource IronCard}" Padding="0">
+
+                <!-- Empty state: no ticket selected -->
+                <Grid>
+                    <TextBlock Text="Select a ticket or create a new one"
+                               Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                    <!-- Editor panel -->
+                    <ScrollViewer Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"
+                                  VerticalScrollBarVisibility="Auto" Padding="24">
+                        <StackPanel>
+                            <!-- Title -->
+                            <TextBlock Text="TITLE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="16" FontWeight="SemiBold" Padding="10,8"
+                                     Margin="0,0,0,16"/>
+
+                            <!-- Status / Priority / Type row -->
+                            <Grid Margin="0,0,0,16">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                    <TextBlock Text="STATUS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                                    <ComboBox ItemsSource="{Binding StatusOptions}"
+                                              SelectedItem="{Binding EditStatus}"
+                                              Padding="8,6"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                    <TextBlock Text="PRIORITY" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                                    <ComboBox ItemsSource="{Binding PriorityOptions}"
+                                              SelectedItem="{Binding EditPriority}"
+                                              Padding="8,6"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="TYPE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                                    <ComboBox ItemsSource="{Binding TypeOptions}"
+                                              SelectedItem="{Binding EditTicketType}"
+                                              Padding="8,6"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Summary -->
+                            <TextBlock Text="SUMMARY" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Background -->
+                            <TextBlock Text="BACKGROUND" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditBackground, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Problem -->
+                            <TextBlock Text="PROBLEM" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditProblem, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Acceptance Criteria -->
+                            <TextBlock Text="ACCEPTANCE CRITERIA" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Technical Notes -->
+                            <TextBlock Text="TECHNICAL NOTES" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditTechnicalNotes, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Linked Context -->
+                            <Expander Header="Linked Code Context" Foreground="{StaticResource MutedBrush}"
+                                      Margin="0,0,0,16">
+                                <StackPanel Margin="0,8,0,0">
+                                    <TextBlock Text="LINKED FILE PATHS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}"
+                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36"
+                                             Padding="10,8" Margin="0,0,0,12"
+                                             FontSize="11" FontFamily="Consolas"/>
+
+                                    <TextBlock Text="LINKED SYMBOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}"
+                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36"
+                                             Padding="10,8"
+                                             FontSize="11" FontFamily="Consolas"/>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- Actions -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="{Binding Title}"
-                                               FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextBrush}"
-                                               TextTrimming="CharacterEllipsis"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <Border Style="{StaticResource IronStatusBadge}" Margin="0,0,8,0">
-                                            <TextBlock Text="{Binding Type}" FontSize="11"
-                                                       Foreground="{StaticResource StatusInfoBrush}"/>
-                                        </Border>
-                                        <Border Style="{StaticResource IronStatusBadge}" Margin="0,0,8,0">
-                                            <TextBlock Text="{Binding Priority}" FontSize="11"
-                                                       Foreground="{StaticResource StatusWarningBrush}"/>
-                                        </Border>
-                                        <Border Style="{StaticResource IronStatusBadge}">
-                                            <TextBlock Text="{Binding Status}" FontSize="11"
-                                                       Foreground="{StaticResource StatusReadyBrush}"/>
-                                        </Border>
-                                    </StackPanel>
-                                </StackPanel>
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding CreatedDate, StringFormat=d MMM yyyy}"
-                                           Style="{StaticResource IronMetaLabel}"
-                                           VerticalAlignment="Center"/>
+
+                                <Button Grid.Column="0" Content="Save Ticket"
+                                        Command="{Binding SaveTicketCommand}"
+                                        Style="{StaticResource IronPrimaryButton}"
+                                        Padding="24,8" Margin="0,0,8,0"
+                                        IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
+                                <Button Grid.Column="1" Content="Cancel"
+                                        Command="{Binding CancelEditCommand}"
+                                        Padding="16,8" Margin="0,0,8,0"/>
+
+                                <TextBlock Grid.Column="3" Text="{Binding SaveStatus}"
+                                           Foreground="{StaticResource StatusReadyBrush}"
+                                           VerticalAlignment="Center" FontSize="12"/>
                             </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

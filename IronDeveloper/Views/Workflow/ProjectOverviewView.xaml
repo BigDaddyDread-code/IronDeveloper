@@ -33,8 +33,9 @@
                     <StackPanel>
                         <TextBlock Text="INDEX STATUS" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
                         <Border Style="{StaticResource IronStatusBadge}" HorizontalAlignment="Left">
-                            <TextBlock Text="{Binding Status}" FontSize="12" FontWeight="SemiBold"
-                                        Foreground="{StaticResource StatusReadyBrush}"/>
+                            <TextBlock Text="{Binding Status}" 
+                                       Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                       FontSize="12" FontWeight="SemiBold"/>
                         </Border>
                     </StackPanel>
                 </Border>
@@ -107,8 +108,9 @@
                                                            Foreground="{StaticResource StatusWarningBrush}"/>
                                             </Border>
                                             <Border Style="{StaticResource IronStatusBadge}">
-                                                <TextBlock Text="{Binding Status}" FontSize="10"
-                                                           Foreground="{StaticResource StatusReadyBrush}"/>
+                                                <TextBlock Text="{Binding Status}" 
+                                                           Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                                           FontSize="10"/>
                                             </Border>
                                         </StackPanel>
                                     </Grid>
@@ -145,4 +147,3 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
-

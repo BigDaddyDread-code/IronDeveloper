@@ -68,8 +68,10 @@
 
                     <!-- Hub / Home button -->
                     <Button Margin="0,0,0,10" Width="56" Height="56"
-                            Command="{Binding NavigateWorkspaceCommand}" CommandParameter="ProjectHub"
-                            ToolTip="Project Hub">
+                            Command="{Binding NavigateWorkspaceCommand}" CommandParameter="ProjectHub">
+                        <Button.ToolTip>
+                            <ToolTip Content="Project Hub" Style="{StaticResource IronSidebarTooltip}"/>
+                        </Button.ToolTip>
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
                                 <Style.Triggers>
@@ -87,8 +89,10 @@
 
                         <!-- Overview -->
                         <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Overview"
-                                ToolTip="Project Overview">
+                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Overview">
+                            <Button.ToolTip>
+                                <ToolTip Content="Overview" Style="{StaticResource IronSidebarTooltip}"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
                                     <Style.Triggers>
@@ -103,8 +107,10 @@
 
                         <!-- Chat -->
                         <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Chat"
-                                ToolTip="Chat Architect">
+                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Chat">
+                            <Button.ToolTip>
+                                <ToolTip Content="Chat" Style="{StaticResource IronSidebarTooltip}"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
                                     <Style.Triggers>
@@ -119,8 +125,10 @@
 
                         <!-- Tickets -->
                         <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Tickets"
-                                ToolTip="Tickets">
+                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Tickets">
+                            <Button.ToolTip>
+                                <ToolTip Content="Tickets" Style="{StaticResource IronSidebarTooltip}"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
                                     <Style.Triggers>
@@ -135,8 +143,10 @@
 
                         <!-- Decisions -->
                         <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Decisions"
-                                ToolTip="Decisions">
+                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Decisions">
+                            <Button.ToolTip>
+                                <ToolTip Content="Decisions" Style="{StaticResource IronSidebarTooltip}"/>
+                            </Button.ToolTip>
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
                                     <Style.Triggers>
@@ -153,8 +163,10 @@
 
                     <!-- Settings — always shown when authenticated -->
                     <Button Width="56" Height="56"
-                            Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Settings"
-                            ToolTip="Settings">
+                            Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Settings">
+                        <Button.ToolTip>
+                            <ToolTip Content="Settings" Style="{StaticResource IronSidebarTooltip}"/>
+                        </Button.ToolTip>
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
                                 <Style.Triggers>
@@ -201,7 +213,8 @@
                             <!-- Actionable status pill -->
                             <ToggleButton x:Name="StatusPill" IsChecked="{Binding IsStatusPopupOpen}"
                                           Style="{StaticResource IronGhostButton}" Padding="8,4" Margin="8,0,0,0">
-                                <TextBlock Text="{Binding ActiveStatus}" Foreground="{StaticResource StatusReadyBrush}"
+                                <TextBlock Text="{Binding ActiveStatus}" 
+                                           Foreground="{Binding ActiveStatus, Converter={StaticResource StatusToBrushConverter}}"
                                            FontSize="12" FontWeight="Bold"/>
                             </ToggleButton>
                         </StackPanel>

@@ -14,6 +14,7 @@ public interface IProjectMemoryService
 {
     Task<ProjectSummary?> GetLatestSummaryAsync(int projectId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProjectDecision>> GetRecentDecisionsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
+    Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken cancellationToken = default);
     Task<long> SaveSummaryAsync(ProjectSummary summary, CancellationToken cancellationToken = default);
     Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken cancellationToken = default);
 }
@@ -51,8 +52,8 @@ public sealed class ProjectMemoryService : IProjectMemoryService
     {
         const string sql = """
             SELECT TOP (@Take)
-                Id, TenantId, ProjectId, Title, Detail, Reason, SourceChatMessageId, 
-                LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
+                Id, TenantId, ProjectId, Title, Detail, Reason, Category, Status,
+                SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
             FROM dbo.ProjectDecisions
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -102,6 +103,24 @@ public sealed class ProjectMemoryService : IProjectMemoryService
             cancellationToken: cancellationToken));
     }
 
+    public async Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                Id, TenantId, ProjectId, Title, Detail, Reason, Category, Status,
+                SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
+            FROM dbo.ProjectDecisions
+            WHERE Id = @DecisionId
+              AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QuerySingleOrDefaultAsync<ProjectDecision>(new CommandDefinition(
+            sql,
+            new { DecisionId = decisionId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+    }
+
     public async Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -117,64 +136,72 @@ public sealed class ProjectMemoryService : IProjectMemoryService
             throw new UnauthorizedAccessException(
                 $"Project {decision.ProjectId} does not belong to tenant {_tenant.TenantId}.");
 
-        // Deduplication: update existing decision with the same title rather than inserting duplicate.
-        const string checkSql = """
-            SELECT Id FROM dbo.ProjectDecisions
-            WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND Title = @Title
-            """;
-        var existingId = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
-            checkSql,
-            new { TenantId = _tenant.TenantId, decision.ProjectId, decision.Title },
-            cancellationToken: cancellationToken));
-
-        if (existingId.HasValue)
+        if (decision.Id > 0)
         {
+            // Update flow
             const string updateSql = """
                 UPDATE dbo.ProjectDecisions 
-                SET Detail = @Detail, 
-                    Reason = @Reason,
+                SET Title = @Title, Detail = @Detail, Reason = @Reason,
+                    Category = @Category, Status = @Status,
                     LinkedFilePaths = @LinkedFilePaths,
                     LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds,
                     LinkedSymbols = @LinkedSymbols
-                WHERE Id = @Id
+                WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
                 """;
-            await connection.ExecuteAsync(new CommandDefinition(
+
+            var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
                 updateSql,
                 new 
                 { 
-                    Id = existingId.Value, 
+                    decision.Id,
+                    TenantId = _tenant.TenantId,
+                    decision.ProjectId,
+                    decision.Title,
                     decision.Detail, 
                     decision.Reason,
+                    decision.Category,
+                    decision.Status,
                     decision.LinkedFilePaths,
                     decision.LinkedCodeIndexEntryIds,
                     decision.LinkedSymbols
                 },
                 cancellationToken: cancellationToken));
-            return existingId.Value;
+
+            if (rowsAffected == 0)
+                throw new InvalidOperationException("Decision update failed or decision not found/not owned.");
+
+            return decision.Id;
         }
+        else
+        {
+            // Insert flow
+            const string insertSql = """
+                INSERT INTO dbo.ProjectDecisions 
+                    (TenantId, ProjectId, Title, Detail, Reason, Category, Status,
+                     SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
+                OUTPUT inserted.Id
+                VALUES 
+                    (@TenantId, @ProjectId, @Title, @Detail, @Reason, @Category, @Status,
+                     @SourceChatMessageId, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
+                """;
 
-        const string sql = """
-            INSERT INTO dbo.ProjectDecisions 
-                (TenantId, ProjectId, Title, Detail, Reason, SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
-            OUTPUT inserted.Id
-            VALUES 
-                (@TenantId, @ProjectId, @Title, @Detail, @Reason, @SourceChatMessageId, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
-            """;
-
-        return await connection.QuerySingleAsync<long>(new CommandDefinition(
-            sql,
-            new
-            {
-                TenantId = _tenant.TenantId,
-                decision.ProjectId,
-                decision.Title,
-                decision.Detail,
-                decision.Reason,
-                decision.SourceChatMessageId,
-                decision.LinkedFilePaths,
-                decision.LinkedCodeIndexEntryIds,
-                decision.LinkedSymbols
-            },
-            cancellationToken: cancellationToken));
+            return await connection.QuerySingleAsync<long>(new CommandDefinition(
+                insertSql,
+                new
+                {
+                    TenantId = _tenant.TenantId,
+                    decision.ProjectId,
+                    decision.Title,
+                    decision.Detail,
+                    decision.Reason,
+                    decision.Category,
+                    decision.Status,
+                    decision.SourceChatMessageId,
+                    decision.LinkedFilePaths,
+                    decision.LinkedCodeIndexEntryIds,
+                    decision.LinkedSymbols
+                },
+                cancellationToken: cancellationToken));
+        }
     }
 }

@@ -8,7 +8,8 @@ namespace IronDev.Agent.Models;
 public sealed class ChatSummary
 {
     public string Role      { get; init; } = "assistant"; // "user" | "assistant"
-    public string Content   { get; init; } = string.Empty;
+    public string MessageText   { get; init; } = string.Empty;
+    public string FormattedPrompt { get; init; } = string.Empty;
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 
     public global::IronDev.AI.ChatContextPacket? ContextPacket { get; init; }

@@ -71,8 +71,9 @@
                                             <!-- Status + Model row -->
                                             <StackPanel Grid.Row="2" Orientation="Horizontal">
                                                 <Border Style="{StaticResource IronStatusBadge}" Margin="0,0,8,0">
-                                                    <TextBlock Text="Ready" FontSize="11"
-                                                               Foreground="{StaticResource StatusReadyBrush}"/>
+                                                    <TextBlock Text="{Binding IndexingStatus, TargetNullValue='Ready'}" 
+                                                               Foreground="{Binding IndexingStatus, Converter={StaticResource StatusToBrushConverter}}"
+                                                               FontSize="11"/>
                                                 </Border>
                                                 <Border Style="{StaticResource IronStatusBadge}">
                                                     <TextBlock Text="gpt-4o" FontSize="11"
