@@ -343,10 +343,16 @@
                                 <!-- Ticket name -->
                                 <TextBlock Text="{Binding CurrentBuildPreview.TicketTitle, FallbackValue='Ticket'}"
                                            FontSize="14" FontWeight="SemiBold"
-                                           Foreground="{StaticResource Text/Primary}" Margin="0,0,0,10"/>
+                                           Foreground="{StaticResource Text/Primary}" Margin="0,0,0,6"/>
+
+                                <!-- Context summary (Phase 2) -->
+                                <TextBlock Text="CONTEXT" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding CurrentBuildPreview.ContextSummary, FallbackValue=''}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="11"
+                                           TextWrapping="Wrap" FontStyle="Italic" Margin="0,0,0,10"/>
 
                                 <!-- Summary -->
-                                <TextBlock Text="SUMMARY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="PROPOSAL" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
                                 <TextBlock Text="{Binding CurrentBuildPreview.Proposal.Summary, FallbackValue=''}"
                                            Foreground="{StaticResource Text/Primary}" FontSize="12"
                                            TextWrapping="Wrap" Margin="0,0,0,10"/>
@@ -371,20 +377,54 @@
                                            Foreground="{StaticResource Text/Muted}" FontSize="12"
                                            TextWrapping="Wrap" Margin="0,0,0,10"/>
 
-                                <!-- Diff expander -->
-                                <Expander Header="▶ Preview Diff" Foreground="{StaticResource Text/Muted}"
-                                          Margin="0,0,0,10">
-                                    <TextBox IsReadOnly="True"
-                                             FontFamily="Consolas" FontSize="11"
-                                             Background="{StaticResource Background/App}"
-                                             Foreground="{StaticResource Text/Primary}"
-                                             BorderThickness="0"
-                                             TextWrapping="NoWrap" MinHeight="80" MaxHeight="300"
-                                             HorizontalScrollBarVisibility="Auto"
-                                             VerticalScrollBarVisibility="Auto"
-                                             Margin="0,6,0,0"
-                                             Text="{Binding CurrentBuildPreview.Proposal.FileChanges[0].Patch, FallbackValue='No diff generated in Phase 1.'}"/>
-                                </Expander>
+                                <!-- Test plan -->
+                                <TextBlock Text="TEST PLAN" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding CurrentBuildPreview.Proposal.TestPlan, FallbackValue=''}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <!-- Per-file diff view -->
+                                <TextBlock Text="CHANGES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <ItemsControl ItemsSource="{Binding CurrentBuildPreview.Proposal.FileChanges}"
+                                              Margin="0,0,0,10">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Expander Margin="0,0,0,6"
+                                                      Foreground="{StaticResource Text/Muted}">
+                                                <Expander.Header>
+                                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                                               Foreground="{StaticResource Text/Primary}">
+                                                        <Run Text="▸ "/><Run Text="{Binding FilePath}"/>
+                                                    </TextBlock>
+                                                </Expander.Header>
+                                                <StackPanel Margin="12,6,0,0">
+                                                    <!-- Change reason -->
+                                                    <TextBlock Text="{Binding ChangeReason}"
+                                                               Foreground="{StaticResource Text/Muted}"
+                                                               FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                                    <!-- Patch / Before+After -->
+                                                    <TextBox IsReadOnly="True"
+                                                             FontFamily="Consolas" FontSize="11"
+                                                             Background="{StaticResource Background/App}"
+                                                             Foreground="{StaticResource Text/Primary}"
+                                                             BorderThickness="0"
+                                                             TextWrapping="NoWrap" MinHeight="60" MaxHeight="280"
+                                                             HorizontalScrollBarVisibility="Auto"
+                                                             VerticalScrollBarVisibility="Auto">
+                                                        <TextBox.Text>
+                                                            <MultiBinding StringFormat="{}--- BEFORE ---{0}{1}{0}{0}+++ AFTER ---{0}{2}{0}{0}--- PATCH ---{0}{3}">
+                                                                <Binding Source="&#10;"/>
+                                                                <Binding Path="BeforeSnippet" FallbackValue="(none)"/>
+                                                                <Binding Path="AfterSnippet"  FallbackValue="(none)"/>
+                                                                <Binding Path="Patch"          FallbackValue="(no patch)"/>
+                                                            </MultiBinding>
+                                                        </TextBox.Text>
+                                                    </TextBox>
+                                                </StackPanel>
+                                            </Expander>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
 
                                 <!-- Build status -->
                                 <TextBlock Text="{Binding BuildStatusMessage}"
@@ -399,7 +439,7 @@
                                             Style="{StaticResource AppButton.Primary}"
                                             Padding="20,8" Margin="0,0,8,0"
                                             IsEnabled="False"
-                                            ToolTip="Apply not available in Phase 1"/>
+                                            ToolTip="Apply not available in Phase 3 — patch execution required (Phase 4)"/>
                                     <Button Content="Cancel"
                                             Command="{Binding CancelBuildPreviewCommand}"
                                             Style="{StaticResource AppButton.Ghost}"

@@ -65,6 +65,17 @@ public partial class App : Application
 
                 // Mocks for pending features
                 services.AddSingleton<global::IronDev.Agent.Services.Interfaces.IProjectShellService, global::IronDev.Agent.Services.Mock.MockProjectShellService>();
+
+                // ── Build Ticket MVP — Phase 2 + 3 ─────────────────────────────
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IBuilderContextService,
+                    global::IronDev.Infrastructure.Builder.BuilderContextService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ICodeChangeProposalService,
+                    global::IronDev.Infrastructure.Builder.CodeChangeProposalService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ITicketBuildOrchestrator,
+                    global::IronDev.Infrastructure.Builder.TicketBuildOrchestrator>();
             })
             .Build();
     }

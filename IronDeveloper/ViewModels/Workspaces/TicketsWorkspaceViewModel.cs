@@ -1,19 +1,22 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
 using IronDev.Core.Builder;
+using IronDev.Core.Interfaces;
 using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.ITicketService _ticketService;
-    private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
+    private readonly global::IronDev.Services.ITicketService         _ticketService;
+    private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
+    private readonly ITicketBuildOrchestrator                        _orchestrator;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
@@ -80,11 +83,13 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     public ObservableCollection<string> TypeOptions     { get; } = ["Task", "Bug", "Feature", "Spike", "Chore"];
 
     public TicketsWorkspaceViewModel(
-        global::IronDev.Services.ITicketService ticketService,
-        global::IronDev.Services.IProjectMemoryService memoryService)
+        global::IronDev.Services.ITicketService        ticketService,
+        global::IronDev.Services.IProjectMemoryService memoryService,
+        ITicketBuildOrchestrator                       orchestrator)
     {
         _ticketService = ticketService;
         _memoryService = memoryService;
+        _orchestrator  = orchestrator;
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
@@ -351,58 +356,39 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         OnAskAboutPlan?.Invoke(SelectedTicket.Id, SelectedTicket.Title, planSummary, PlanLinkedFilePaths, PlanLinkedSymbols);
     }
 
-    // ── Build Ticket (Phase 1 — scaffold + fake preview) ─────────────────────
+    // ── Build Ticket (Phase 2 — real context assembly via orchestrator) ────────
 
     [RelayCommand]
     private async Task BuildSelectedTicketAsync()
     {
         if (!CanBuildTicket) return;
 
-        IsBuildingTicket   = true;
-        HasBuildPreview    = false;
+        IsBuildingTicket    = true;
+        HasBuildPreview     = false;
         CurrentBuildPreview = null;
         CurrentBuildResult  = null;
-        BuildStatusMessage  = "Generating build preview…";
+        BuildStatusMessage  = "Assembling build context…";
         OnPropertyChanged(nameof(CanBuildTicket));
 
         try
         {
-            // Phase 1: return a fake preview — no LLM, no Weaviate, no file writes
-            await Task.Delay(400); // simulate brief async work
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
-            var fakeProposal = new CodeChangeProposal
-            {
-                TicketId  = EditId,
-                Summary   = "Preview scaffold only. No code changes generated yet.",
-                RiskNotes = "None — scaffold only.",
-                TestPlan  = "No test plan generated in Phase 1.",
-                FileChanges =
-                [
-                    new FileChangeProposal
-                    {
-                        FilePath      = "Not generated yet.",
-                        ChangeReason  = "Phase 1 scaffold — LLM not called.",
-                        BeforeSnippet = "",
-                        AfterSnippet  = "",
-                        Patch         = "No diff generated in Phase 1."
-                    }
-                ]
-            };
+            var preview = await _orchestrator.CreateBuildPreviewAsync(
+                _activeProjectId,
+                EditId,
+                cts.Token);
 
-            CurrentBuildPreview = new TicketBuildPreview
-            {
-                TicketId       = EditId,
-                TicketTitle    = EditTitle,
-                Proposal       = fakeProposal,
-                ContextSummary = $"Project: {_activeProjectPath}  |  Ticket: {EditTitle}"
-            };
+            CurrentBuildPreview = preview;
+            HasBuildPreview     = true;
 
-            HasBuildPreview   = true;
-            BuildStatusMessage = "Preview ready. Review and approve to apply.";
+            BuildStatusMessage = preview.IsEmpty
+                ? "No changes proposed."
+                : "AI proposal ready. Review and approve to apply.";
         }
         catch (Exception ex)
         {
-            BuildStatusMessage = $"Error: {ex.Message}";
+            BuildStatusMessage = $"AI proposal failed: {ex.Message}";
         }
         finally
         {
