@@ -26,6 +26,7 @@ public partial class App : Application
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((context, services) =>
             {
+                // ── Data & Infrastructure ─────────────────────────────────────
                 services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
                 // Scoped tenant context — DevelopmentTenantContext always returns TenantId=1 for local dev.
                 // Will be replaced by session/JWT context in Sprint 2 without changing any service code.
@@ -37,23 +38,37 @@ public partial class App : Application
                 services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
                 services.AddScoped<IWorkbenchGeneratorService, WorkbenchGeneratorService>();
                 services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
-                
+
                 var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
                 if (string.IsNullOrWhiteSpace(apiKey))
                     throw new InvalidOperationException("OPENAI_API_KEY is not set.");
-                
+
                 services.AddSingleton<ILLMService>(sp => new OpenAiLlmService(apiKey));
 
-                // ViewModels
+                // ── Original ViewModels ───────────────────────────────────────
                 services.AddTransient<ProjectPanelViewModel>();
                 services.AddTransient<ChatViewModel>();
                 services.AddTransient<OutputPanelViewModel>();
                 services.AddTransient<CodeWorkbenchViewModel>();
                 services.AddTransient<MainViewModel>();
 
-                // Views
+                // ── Views ─────────────────────────────────────────────────────
                 services.AddTransient<MainWindow>();
                 services.AddTransient<CodeWorkbenchWindow>();
+
+                // ── Workspace ViewModels (from builder branch) ────────────────
+                services.AddTransient<IronDev.Agent.ViewModels.Workspaces.TicketsWorkspaceViewModel>();
+
+                // ── Build Ticket MVP — Phase 2 + 3 ───────────────────────────
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IBuilderContextService,
+                    global::IronDev.Infrastructure.Builder.BuilderContextService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ICodeChangeProposalService,
+                    global::IronDev.Infrastructure.Builder.CodeChangeProposalService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ITicketBuildOrchestrator,
+                    global::IronDev.Infrastructure.Builder.TicketBuildOrchestrator>();
             })
             .Build();
     }
