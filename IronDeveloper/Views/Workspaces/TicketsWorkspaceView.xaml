@@ -114,6 +114,8 @@
                                            Style="{StaticResource TicketTabStyle}"/>
                                 <RadioButton Content="Code Context" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=CodeContext, Mode=TwoWay}"
                                            Style="{StaticResource TicketTabStyle}"/>
+                                <RadioButton Content="Tests" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Tests, Mode=TwoWay}"
+                                           Style="{StaticResource TicketTabStyle}"/>
                             </StackPanel>
                         </Border>
 
@@ -323,6 +325,91 @@
                                             </controls:FormField>
                                         </StackPanel>
                                     </controls:SurfacePanel>
+                                </StackPanel>
+
+                                <!-- ═══ TAB: Tests ═══ -->
+                                <!-- NOTE: Mapped to TechnicalNotes DB field (no schema change). -->
+                                <!-- Structure is free-text with labelled sections as a convention. -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ActiveTab}" Value="Tests">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <controls:SurfacePanel Variant="Subtle" Padding="24" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <TextBlock Text="Tests &amp; Validation"
+                                                       FontSize="14" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource Text/Primary}"
+                                                       Margin="0,0,0,4"/>
+                                            <TextBlock Text="Define how this ticket will be proven correct. The AI builder uses this section to know what tests to create or verify."
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,16"/>
+
+                                            <!-- FIELD NOTE: Stored in TechnicalNotes column. -->
+                                            <!-- Format convention: each section starts with a label line, e.g. "## Unit Tests" -->
+                                            <controls:FormField Label="UNIT TESTS">
+                                                <TextBox Text="{Binding EditTestsUnitTests, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
+                                                         FontFamily="Consolas" FontSize="12"
+                                                         ToolTip="Describe unit tests that must pass. One per line."/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="INTEGRATION TESTS">
+                                                <TextBox Text="{Binding EditTestsIntegrationTests, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                                         FontFamily="Consolas" FontSize="12"
+                                                         ToolTip="Integration tests to verify end-to-end flows."/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="UI / MANUAL TESTS">
+                                                <TextBox Text="{Binding EditTestsManualTests, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                                         ToolTip="Manual or UI verification steps."/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="REGRESSION TESTS">
+                                                <TextBox Text="{Binding EditTestsRegressionTests, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                                         ToolTip="Existing tests that must still pass after this change."/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="BUILD VALIDATION">
+                                                <TextBox Text="{Binding EditTestsBuildValidation, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                                         ToolTip="Build checks, e.g. 'dotnet build must pass with 0 errors'."/>
+                                            </controls:FormField>
+                                        </StackPanel>
+                                    </controls:SurfacePanel>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Content="Save Tests"
+                                                Command="{Binding SaveTicketCommand}"
+                                                Style="{StaticResource AppButton.Primary}"
+                                                Padding="24,8" Margin="0,0,8,0"
+                                                IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
+                                        <Button Grid.Column="1" Content="Cancel"
+                                                Command="{Binding CancelEditCommand}"
+                                                Style="{StaticResource AppButton.Secondary}"
+                                                Padding="16,8"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding SaveStatus}"
+                                                   Foreground="{StaticResource Success}"
+                                                   VerticalAlignment="Center" FontSize="12"/>
+                                    </Grid>
                                 </StackPanel>
                             </Grid>
                         </ScrollViewer>

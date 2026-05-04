@@ -18,6 +18,7 @@ public sealed class TicketBuildContext
     public string  TicketSummary             { get; set; } = "";
     public string? TicketAcceptanceCriteria  { get; set; }
     public string? TicketImplementationNotes { get; set; }
+    public string? TicketTestPlan            { get; set; }
     public string? TicketBackground          { get; set; }
     public string? TicketProblem             { get; set; }
 

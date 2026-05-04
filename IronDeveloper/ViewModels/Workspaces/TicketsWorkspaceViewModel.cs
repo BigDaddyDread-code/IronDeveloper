@@ -47,6 +47,48 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _editLinkedFilePaths = string.Empty;
     [ObservableProperty] private string _editLinkedSymbols = string.Empty;
 
+    // ── Tests sub-fields (parsed from / serialized to TechnicalNotes) ─────────
+    // DB: No schema change. All fields are packed into TechnicalNotes using a
+    // section-header convention: "## Unit Tests\n..."
+    private string _editTestsUnitTests        = string.Empty;
+    private string _editTestsIntegrationTests = string.Empty;
+    private string _editTestsManualTests      = string.Empty;
+    private string _editTestsRegressionTests  = string.Empty;
+    private string _editTestsBuildValidation  = string.Empty;
+
+    public string EditTestsUnitTests
+    {
+        get => _editTestsUnitTests;
+        set { if (SetProperty(ref _editTestsUnitTests, value)) SyncTestsToTechnicalNotes(); }
+    }
+    public string EditTestsIntegrationTests
+    {
+        get => _editTestsIntegrationTests;
+        set { if (SetProperty(ref _editTestsIntegrationTests, value)) SyncTestsToTechnicalNotes(); }
+    }
+    public string EditTestsManualTests
+    {
+        get => _editTestsManualTests;
+        set { if (SetProperty(ref _editTestsManualTests, value)) SyncTestsToTechnicalNotes(); }
+    }
+    public string EditTestsRegressionTests
+    {
+        get => _editTestsRegressionTests;
+        set { if (SetProperty(ref _editTestsRegressionTests, value)) SyncTestsToTechnicalNotes(); }
+    }
+    public string EditTestsBuildValidation
+    {
+        get => _editTestsBuildValidation;
+        set { if (SetProperty(ref _editTestsBuildValidation, value)) SyncTestsToTechnicalNotes(); }
+    }
+
+    /// <summary>Full formatted test plan — used by AI builder context.</summary>
+    public string FullTestPlan => EditTechnicalNotes;
+
+    // CommunityToolkit.Mvvm partial callback — called whenever [ObservableProperty]
+    // EditTechnicalNotes is set (including direct assignment from load methods).
+    partial void OnEditTechnicalNotesChanged(string value) => SyncTechnicalNotesToTests();
+
     // ── Implementation Plan ──
     [ObservableProperty] private TicketDetailTab _activeTab = TicketDetailTab.Overview;
     [ObservableProperty] private bool _hasPlan;
@@ -146,6 +188,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditProblem              = item.Problem ?? string.Empty;
         EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
         EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
+        SyncTechnicalNotesToTests();
         EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
         EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
 
@@ -209,6 +252,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditProblem            = string.Empty;
         EditAcceptanceCriteria = string.Empty;
         EditTechnicalNotes     = string.Empty;
+        ClearTestSubFields();
         EditLinkedFilePaths    = string.Empty;
         EditLinkedSymbols      = string.Empty;
 
@@ -475,6 +519,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditProblem       = string.Empty;
         EditAcceptanceCriteria = string.Empty;
         EditTechnicalNotes     = string.Empty;
+        ClearTestSubFields();
         EditLinkedFilePaths    = string.Empty;
         EditLinkedSymbols      = string.Empty;
         SaveStatus = string.Empty;
@@ -513,4 +558,108 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         LinkedSymbols          = t.LinkedSymbols,
         CreatedDate            = t.CreatedDate
     };
+
+    // ── Tests serialization helpers ───────────────────────────────────────────
+    // TechnicalNotes is stored as structured plain-text with section headers:
+    //   ## Unit Tests\n<content>\n## Integration Tests\n...
+    // This allows backward compatibility: existing TechnicalNotes values are shown
+    // under Unit Tests if no section headers are found.
+
+    private const string SecUnit        = "## Unit Tests";
+    private const string SecIntegration = "## Integration Tests";
+    private const string SecManual      = "## UI / Manual Tests";
+    private const string SecRegression  = "## Regression Tests";
+    private const string SecBuild       = "## Build Validation";
+
+    private static readonly string[] _sectionHeaders =
+        [SecUnit, SecIntegration, SecManual, SecRegression, SecBuild];
+
+    private void SyncTechnicalNotesToTests()
+    {
+        var raw = EditTechnicalNotes;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            ClearTestSubFields();
+            return;
+        }
+
+        // If no section headers are present, treat entire value as Unit Tests
+        // (backward compatibility for existing TechnicalNotes entries).
+        if (!_sectionHeaders.Any(h => raw.Contains(h, StringComparison.Ordinal)))
+        {
+            _editTestsUnitTests        = raw;
+            _editTestsIntegrationTests = string.Empty;
+            _editTestsManualTests      = string.Empty;
+            _editTestsRegressionTests  = string.Empty;
+            _editTestsBuildValidation  = string.Empty;
+            OnPropertyChanged(nameof(EditTestsUnitTests));
+            OnPropertyChanged(nameof(EditTestsIntegrationTests));
+            OnPropertyChanged(nameof(EditTestsManualTests));
+            OnPropertyChanged(nameof(EditTestsRegressionTests));
+            OnPropertyChanged(nameof(EditTestsBuildValidation));
+            return;
+        }
+
+        _editTestsUnitTests        = ExtractSection(raw, SecUnit);
+        _editTestsIntegrationTests = ExtractSection(raw, SecIntegration);
+        _editTestsManualTests      = ExtractSection(raw, SecManual);
+        _editTestsRegressionTests  = ExtractSection(raw, SecRegression);
+        _editTestsBuildValidation  = ExtractSection(raw, SecBuild);
+        OnPropertyChanged(nameof(EditTestsUnitTests));
+        OnPropertyChanged(nameof(EditTestsIntegrationTests));
+        OnPropertyChanged(nameof(EditTestsManualTests));
+        OnPropertyChanged(nameof(EditTestsRegressionTests));
+        OnPropertyChanged(nameof(EditTestsBuildValidation));
+    }
+
+    private void SyncTestsToTechnicalNotes()
+    {
+        var parts = new System.Text.StringBuilder();
+        AppendSection(parts, SecUnit,        _editTestsUnitTests);
+        AppendSection(parts, SecIntegration, _editTestsIntegrationTests);
+        AppendSection(parts, SecManual,      _editTestsManualTests);
+        AppendSection(parts, SecRegression,  _editTestsRegressionTests);
+        AppendSection(parts, SecBuild,       _editTestsBuildValidation);
+        EditTechnicalNotes = parts.ToString().TrimEnd();
+    }
+
+    private void ClearTestSubFields()
+    {
+        _editTestsUnitTests        = string.Empty;
+        _editTestsIntegrationTests = string.Empty;
+        _editTestsManualTests      = string.Empty;
+        _editTestsRegressionTests  = string.Empty;
+        _editTestsBuildValidation  = string.Empty;
+        OnPropertyChanged(nameof(EditTestsUnitTests));
+        OnPropertyChanged(nameof(EditTestsIntegrationTests));
+        OnPropertyChanged(nameof(EditTestsManualTests));
+        OnPropertyChanged(nameof(EditTestsRegressionTests));
+        OnPropertyChanged(nameof(EditTestsBuildValidation));
+    }
+
+    private static string ExtractSection(string raw, string header)
+    {
+        var start = raw.IndexOf(header, StringComparison.Ordinal);
+        if (start < 0) return string.Empty;
+        start += header.Length;
+        // Skip leading newline
+        while (start < raw.Length && raw[start] is '\r' or '\n') start++;
+        // Find next section header
+        var end = raw.Length;
+        foreach (var h in _sectionHeaders)
+        {
+            if (h == header) continue;
+            var idx = raw.IndexOf(h, start, StringComparison.Ordinal);
+            if (idx >= 0 && idx < end) end = idx;
+        }
+        return raw[start..end].TrimEnd();
+    }
+
+    private static void AppendSection(System.Text.StringBuilder sb, string header, string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return;
+        if (sb.Length > 0) sb.AppendLine();
+        sb.AppendLine(header);
+        sb.Append(content.TrimEnd());
+    }
 }
