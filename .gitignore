@@ -54,3 +54,8 @@ DbRebuildTest/
 ## Logs
 *.log
 logs/
+
+## WPF designer temp artifacts (can be 10MB+)
+*_wpftmp.csproj
+*_wpftmp.zip
+*.wpftmp.csproj
