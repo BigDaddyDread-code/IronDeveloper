@@ -170,3 +170,24 @@ public sealed class ProjectTicket
     public string? LinkedSymbols { get; set; }
     public DateTime CreatedDate { get; set; }
 }
+
+public sealed class ProjectImplementationPlan
+{
+    public long    Id                      { get; set; }
+    public int     TenantId               { get; set; }
+    public int     ProjectId              { get; set; }
+    public long?   TicketId              { get; set; }
+    public string  Title                  { get; set; } = string.Empty;
+    public string  Goal                   { get; set; } = string.Empty;
+    public string? Scope                  { get; set; }
+    public string? ProposedSteps          { get; set; }
+    public string? AffectedContext        { get; set; }
+    public string? RisksNotes             { get; set; }
+    public string  Status                 { get; set; } = "Draft";
+    public string? LinkedFilePaths        { get; set; }
+    public string? LinkedCodeIndexEntryIds { get; set; }
+    public string? LinkedSymbols          { get; set; }
+    public long?   SourceChatMessageId    { get; set; }
+    public DateTime  CreatedDate          { get; set; }
+    public DateTime? UpdatedDate          { get; set; }
+}

@@ -43,3 +43,13 @@ public enum TicketDetailTab
     ImplementationPlan,
     CodeContext
 }
+
+/// <summary>
+/// Navigation sections within the Ticket detail view.
+/// </summary>
+public enum TicketDetailTab
+{
+    Overview,
+    ImplementationPlan,
+    CodeContext
+}
