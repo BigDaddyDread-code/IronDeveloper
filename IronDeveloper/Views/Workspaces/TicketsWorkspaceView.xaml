@@ -4,28 +4,29 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
+             xmlns:controls="http://schemas.irondeveloper.com/controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:TicketsWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Background="{StaticResource AppBackgroundBrush}" Margin="24">
+    <Grid Background="{StaticResource Background/App}" Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,16">
+        <Grid Grid.Row="0" Margin="0,0,0,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="TICKETS" Style="{StaticResource IronEyebrow}"/>
-                <TextBlock Text="Ticket Management" Style="{StaticResource IronSectionTitle}"/>
+                <TextBlock Text="WORKFLOW" Style="{StaticResource Typography.Eyebrow}"/>
+                <TextBlock Text="Ticket Management" Style="{StaticResource Typography.ScreenTitle}"/>
             </StackPanel>
             <Button Grid.Column="1" Content="＋ New Ticket"
                     Command="{Binding NewTicketCommand}"
-                    Style="{StaticResource IronPrimaryButton}"
+                    Style="{StaticResource AppButton.Primary}"
                     Padding="20,8" VerticalAlignment="Center"/>
         </Grid>
 
@@ -37,183 +38,377 @@
             </Grid.ColumnDefinitions>
 
             <!-- ═══ LEFT: Ticket List ═══ -->
-            <Border Grid.Column="0" Style="{StaticResource IronCard}" Margin="0,0,12,0" Padding="0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ListBox ItemsSource="{Binding Tickets}"
-                             SelectedItem="{Binding SelectedTicket, Mode=TwoWay}"
-                             Background="Transparent" BorderThickness="0"
-                             Padding="8">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="12,10" Margin="0,0,0,4" CornerRadius="6"
-                                        Background="#1A222C" Cursor="Hand">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}"
-                                                   FontSize="13" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextBrush}"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                            <Border Style="{StaticResource IronStatusBadge}" Margin="0,0,6,0">
-                                                <TextBlock Text="{Binding Status}" FontSize="10"
-                                                           Foreground="{StaticResource StatusReadyBrush}"/>
-                                            </Border>
-                                            <Border Style="{StaticResource IronStatusBadge}">
-                                                <TextBlock Text="{Binding Priority}" FontSize="10"
-                                                           Foreground="{StaticResource StatusWarningBrush}"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="Border" Background="Transparent"
-                                                    CornerRadius="6" Padding="2">
-                                                <ContentPresenter/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="Border" Property="Background" Value="#2563EB30"/>
-                                                    <Setter TargetName="Border" Property="BorderBrush" Value="#2563EB"/>
-                                                    <Setter TargetName="Border" Property="BorderThickness" Value="1"/>
-                                                </Trigger>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Border" Property="Background" Value="#1E3A5F20"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
-                </ScrollViewer>
-            </Border>
+            <controls:WorkspaceListPane Grid.Column="0" Title="PROJECT TICKETS" Margin="0,0,16,0"
+                                        ItemsSource="{Binding Tickets}"
+                                        SelectedItem="{Binding SelectedTicket, Mode=TwoWay}">
+                <controls:WorkspaceListPane.ItemTemplate>
+                    <DataTemplate>
+                        <controls:WorkspaceListItem Title="{Binding Title}"
+                                                   Subtitle="{Binding Summary}"
+                                                   Metadata="{Binding Status}"
+                                                   IconData="{StaticResource Icon.Nav.Tickets}"
+                                                   IsSelected="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                    </DataTemplate>
+                </controls:WorkspaceListPane.ItemTemplate>
+            </controls:WorkspaceListPane>
 
             <!-- ═══ RIGHT: Detail/Editor ═══ -->
-            <Border Grid.Column="1" Style="{StaticResource IronCard}" Padding="0">
+            <Border Grid.Column="1"
+                    Background="{StaticResource Background/Panel}"
+                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                    CornerRadius="10" Padding="0">
 
                 <!-- Empty state: no ticket selected -->
                 <Grid>
-                    <TextBlock Text="Select a ticket or create a new one"
-                               Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                               Foreground="{StaticResource MutedBrush}"
-                               FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <controls:EmptyResultsState Title="No Ticket Selected" 
+                                               Description="Select a ticket from the list or create a new one with IronDev Architect to begin."
+                                               Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
-                    <!-- Editor panel -->
-                    <ScrollViewer Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"
-                                  VerticalScrollBarVisibility="Auto" Padding="24">
-                        <StackPanel>
-                            <!-- Title -->
-                            <TextBlock Text="TITLE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
-                                     FontSize="16" FontWeight="SemiBold" Padding="10,8"
-                                     Margin="0,0,0,16"/>
+                    <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                            <!-- Status / Priority / Type row -->
-                            <Grid Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                        <!-- Tab Header -->
+                        <Border Grid.Row="0" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1" Padding="16,0">
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel.Resources>
+                                    <Style x:Key="TicketTabStyle" TargetType="RadioButton">
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Setter Property="FontSize" Value="13"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="16,10"/>
+                                        <Setter Property="Margin" Value="0,0,8,0"/>
+                                        <Setter Property="Foreground" Value="{StaticResource Text/Muted}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="RadioButton">
+                                                    <Border x:Name="border" Background="Transparent" 
+                                                            BorderBrush="Transparent" BorderThickness="0,0,0,2"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource Text/Primary}"/>
+                                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource Accent/Primary}"/>
+                                                            <Setter TargetName="border" Property="Background" Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="border" Property="Background" Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </StackPanel.Resources>
+                                
+                                <RadioButton Content="Overview" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Overview, Mode=TwoWay}"
+                                           Style="{StaticResource TicketTabStyle}"/>
+                                <RadioButton Content="Implementation Plan" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ImplementationPlan, Mode=TwoWay}"
+                                           Style="{StaticResource TicketTabStyle}"/>
+                                <RadioButton Content="Code Context" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=CodeContext, Mode=TwoWay}"
+                                           Style="{StaticResource TicketTabStyle}"/>
+                            </StackPanel>
+                        </Border>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                    <TextBlock Text="STATUS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding StatusOptions}"
-                                              SelectedItem="{Binding EditStatus}"
-                                              Padding="8,6"/>
+                        <!-- Content Area -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24">
+                            <Grid>
+                                <!-- ═══ TAB: Overview ═══ -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ActiveTab}" Value="Overview">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    
+                                    <controls:SurfacePanel Variant="Subtle" Padding="24" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <controls:FormField Label="TICKET TITLE">
+                                                <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="16" FontWeight="SemiBold"/>
+                                            </controls:FormField>
+
+                                            <Grid Margin="0,0,0,16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <controls:SelectionField Grid.Column="0" Label="STATUS" Margin="0,0,8,0"
+                                                                       ItemsSource="{Binding StatusOptions}"
+                                                                       SelectedItem="{Binding EditStatus}"/>
+                                                
+                                                <controls:SelectionField Grid.Column="1" Label="PRIORITY" Margin="0,0,8,0"
+                                                                       ItemsSource="{Binding PriorityOptions}"
+                                                                       SelectedItem="{Binding EditPriority}"/>
+                                                
+                                                <controls:SelectionField Grid.Column="2" Label="TYPE"
+                                                                       ItemsSource="{Binding TypeOptions}"
+                                                                       SelectedItem="{Binding EditTicketType}"/>
+                                            </Grid>
+
+                                            <controls:FormField Label="SUMMARY">
+                                                <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="ACCEPTANCE CRITERIA">
+                                                <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"/>
+                                            </controls:FormField>
+                                        </StackPanel>
+                                    </controls:SurfacePanel>
+                                             
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Button Grid.Column="0" Content="Save Ticket"
+                                                Command="{Binding SaveTicketCommand}"
+                                                Style="{StaticResource AppButton.Primary}"
+                                                Padding="24,8" Margin="0,0,8,0"
+                                                IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
+                                        <Button Grid.Column="1" Content="Cancel"
+                                                Command="{Binding CancelEditCommand}"
+                                                Style="{StaticResource AppButton.Secondary}"
+                                                Padding="16,8" Margin="0,0,8,0"/>
+
+                                        <!-- Build This — Phase 1 scaffold -->
+                                        <Button Grid.Column="2" Content="⚙ Build This"
+                                                Command="{Binding BuildSelectedTicketCommand}"
+                                                Style="{StaticResource AppButton.Secondary}"
+                                                IsEnabled="{Binding CanBuildTicket}"
+                                                Padding="16,8" Margin="0,0,8,0"
+                                                ToolTip="Generate a code change proposal for this ticket"/>
+
+                                        <TextBlock Grid.Column="4" Text="{Binding SaveStatus}"
+                                                   Foreground="{StaticResource Success}"
+                                                   VerticalAlignment="Center" FontSize="12"/>
+                                    </Grid>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                                    <TextBlock Text="PRIORITY" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding PriorityOptions}"
-                                              SelectedItem="{Binding EditPriority}"
-                                              Padding="8,6"/>
+
+                                <!-- ═══ TAB: Plan ═══ -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ActiveTab}" Value="ImplementationPlan">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    
+                                    <!-- No plan yet -->
+                                    <controls:SurfacePanel Visibility="{Binding HasPlan, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                                          Variant="Subtle" Padding="48" Margin="0,0,0,16">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <controls:EmptyResultsState Title="No Implementation Plan" 
+                                                                       Description="Create a plan to outline the technical steps for this ticket."/>
+                                            <Button Content="＋ Create Implementation Plan"
+                                                    Command="{Binding CreatePlanCommand}"
+                                                    Style="{StaticResource AppButton.Primary}"
+                                                    Padding="20,10" Margin="0,24,0,0"/>
+                                        </StackPanel>
+                                    </controls:SurfacePanel>
+
+                                    <!-- Plan Editor -->
+                                    <StackPanel Visibility="{Binding HasPlan, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <controls:SurfacePanel Variant="Subtle" Padding="24" Margin="0,0,0,16">
+                                            <StackPanel>
+                                                <Grid Margin="0,0,0,16">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <controls:FormField Grid.Column="0" Label="PLAN TITLE">
+                                                        <TextBox Text="{Binding PlanTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="14" FontWeight="SemiBold"/>
+                                                    </controls:FormField>
+                                                    <Button Grid.Column="1" Content="Ask about this plan"
+                                                            Command="{Binding AskAboutPlanCommand}"
+                                                            Style="{StaticResource AppButton.Ghost}"
+                                                            Margin="12,0,0,0" VerticalAlignment="Bottom" Padding="12,6"/>
+                                                </Grid>
+
+                                                <controls:FormField Label="PLAN GOAL">
+                                                    <TextBox Text="{Binding PlanGoal, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
+                                                </controls:FormField>
+
+                                                <controls:FormField Label="PROPOSED STEPS">
+                                                    <TextBox Text="{Binding PlanProposedSteps, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="120" FontFamily="Consolas" FontSize="12"/>
+                                                </controls:FormField>
+
+                                                <controls:FormField Label="AFFECTED FILES / CLASSES">
+                                                    <TextBox Text="{Binding PlanAffectedContext, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
+                                                </controls:FormField>
+
+                                                <controls:FormField Label="RISKS &amp; NOTES">
+                                                    <TextBox Text="{Binding PlanRisksNotes, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
+                                                </controls:FormField>
+                                            </StackPanel>
+                                        </controls:SurfacePanel>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Content="Save Plan"
+                                                    Command="{Binding SavePlanCommand}"
+                                                    Style="{StaticResource AppButton.Primary}"
+                                                    Padding="24,8" Margin="0,0,8,0"
+                                                    IsEnabled="{Binding IsSavingPlan, Converter={StaticResource InverseBoolConverter}}"/>
+                                            <Button Grid.Column="1" Content="Reset"
+                                                    Command="{Binding CancelPlanEditCommand}"
+                                                    Style="{StaticResource AppButton.Secondary}"
+                                                    Padding="16,8"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding PlanSaveStatus}"
+                                                       Foreground="{StaticResource Success}"
+                                                       VerticalAlignment="Center" FontSize="12"/>
+                                        </Grid>
+                                    </StackPanel>
                                 </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="TYPE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding TypeOptions}"
-                                              SelectedItem="{Binding EditTicketType}"
-                                              Padding="8,6"/>
+
+                                <!-- ═══ TAB: Context ═══ -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ActiveTab}" Value="CodeContext">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    
+                                    <controls:SurfacePanel Variant="Subtle" Padding="24">
+                                        <StackPanel>
+                                            <controls:FormField Label="BACKGROUND">
+                                                <TextBox Text="{Binding EditBackground, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="PROBLEM">
+                                                <TextBox Text="{Binding EditProblem, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="TECHNICAL NOTES">
+                                                <TextBox Text="{Binding EditTechnicalNotes, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="LINKED FILE PATHS">
+                                                <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" FontSize="11" FontFamily="Consolas"/>
+                                            </controls:FormField>
+
+                                            <controls:FormField Label="LINKED SYMBOLS">
+                                                <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" FontSize="11" FontFamily="Consolas"/>
+                                            </controls:FormField>
+                                        </StackPanel>
+                                    </controls:SurfacePanel>
                                 </StackPanel>
                             </Grid>
+                        </ScrollViewer>
+                    </Grid>
 
-                            <!-- Summary -->
-                            <TextBlock Text="SUMMARY" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
-                                     Padding="10,8" Margin="0,0,0,16"/>
+                        <!-- ═══ BUILD PREVIEW PANEL ═══ -->
+                        <controls:SurfacePanel
+                            Grid.Row="2"
+                            Variant="Subtle"
+                            Margin="0,12,0,0"
+                            Padding="0"
+                            Visibility="{Binding HasBuildPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Margin="20,16,20,16">
 
-                            <!-- Background -->
-                            <TextBlock Text="BACKGROUND" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditBackground, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
-                                     Padding="10,8" Margin="0,0,0,16"/>
+                                <!-- Panel header -->
+                                <TextBlock Text="BUILD PREVIEW" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,10"/>
 
-                            <!-- Problem -->
-                            <TextBlock Text="PROBLEM" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditProblem, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
-                                     Padding="10,8" Margin="0,0,0,16"/>
+                                <!-- Ticket name -->
+                                <TextBlock Text="{Binding CurrentBuildPreview.TicketTitle, FallbackValue='Ticket'}"
+                                           FontSize="14" FontWeight="SemiBold"
+                                           Foreground="{StaticResource Text/Primary}" Margin="0,0,0,10"/>
 
-                            <!-- Acceptance Criteria -->
-                            <TextBlock Text="ACCEPTANCE CRITERIA" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
-                                     Padding="10,8" Margin="0,0,0,16"/>
+                                <!-- Summary -->
+                                <TextBlock Text="SUMMARY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding CurrentBuildPreview.Proposal.Summary, FallbackValue=''}"
+                                           Foreground="{StaticResource Text/Primary}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
 
-                            <!-- Technical Notes -->
-                            <TextBlock Text="TECHNICAL NOTES" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditTechnicalNotes, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
-                                     Padding="10,8" Margin="0,0,0,16"/>
+                                <!-- Files to change -->
+                                <TextBlock Text="FILES TO CHANGE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <ItemsControl ItemsSource="{Binding CurrentBuildPreview.Proposal.FileChanges}"
+                                              Margin="0,0,0,10">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Foreground="{StaticResource Text/Muted}"
+                                                       FontSize="11" FontFamily="Consolas">
+                                                <Run Text="• "/><Run Text="{Binding FilePath}"/>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
 
-                            <!-- Linked Context -->
-                            <Expander Header="Linked Code Context" Foreground="{StaticResource MutedBrush}"
-                                      Margin="0,0,0,16">
-                                <StackPanel Margin="0,8,0,0">
-                                    <TextBlock Text="LINKED FILE PATHS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                                    <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}"
-                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36"
-                                             Padding="10,8" Margin="0,0,0,12"
-                                             FontSize="11" FontFamily="Consolas"/>
+                                <!-- Risk -->
+                                <TextBlock Text="RISK" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding CurrentBuildPreview.Proposal.RiskNotes, FallbackValue=''}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
 
-                                    <TextBlock Text="LINKED SYMBOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                                    <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}"
-                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36"
-                                             Padding="10,8"
-                                             FontSize="11" FontFamily="Consolas"/>
+                                <!-- Diff expander -->
+                                <Expander Header="▶ Preview Diff" Foreground="{StaticResource Text/Muted}"
+                                          Margin="0,0,0,10">
+                                    <TextBox IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="11"
+                                             Background="{StaticResource Background/App}"
+                                             Foreground="{StaticResource Text/Primary}"
+                                             BorderThickness="0"
+                                             TextWrapping="NoWrap" MinHeight="80" MaxHeight="300"
+                                             HorizontalScrollBarVisibility="Auto"
+                                             VerticalScrollBarVisibility="Auto"
+                                             Margin="0,6,0,0"
+                                             Text="{Binding CurrentBuildPreview.Proposal.FileChanges[0].Patch, FallbackValue='No diff generated in Phase 1.'}"/>
+                                </Expander>
+
+                                <!-- Build status -->
+                                <TextBlock Text="{Binding BuildStatusMessage}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="11"
+                                           FontStyle="Italic" Margin="0,0,0,10"
+                                           Visibility="{Binding BuildStatusMessage, Converter={StaticResource ValueToVis}}"/>
+
+                                <!-- Actions -->
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Apply Changes"
+                                            Command="{Binding ApplyBuildPreviewCommand}"
+                                            Style="{StaticResource AppButton.Primary}"
+                                            Padding="20,8" Margin="0,0,8,0"
+                                            IsEnabled="False"
+                                            ToolTip="Apply not available in Phase 1"/>
+                                    <Button Content="Cancel"
+                                            Command="{Binding CancelBuildPreviewCommand}"
+                                            Style="{StaticResource AppButton.Ghost}"
+                                            Padding="14,8"/>
                                 </StackPanel>
-                            </Expander>
 
-                            <!-- Actions -->
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                            </StackPanel>
+                        </controls:SurfacePanel>
 
-                                <Button Grid.Column="0" Content="Save Ticket"
-                                        Command="{Binding SaveTicketCommand}"
-                                        Style="{StaticResource IronPrimaryButton}"
-                                        Padding="24,8" Margin="0,0,8,0"
-                                        IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
-                                <Button Grid.Column="1" Content="Cancel"
-                                        Command="{Binding CancelEditCommand}"
-                                        Padding="16,8" Margin="0,0,8,0"/>
-
-                                <TextBlock Grid.Column="3" Text="{Binding SaveStatus}"
-                                           Foreground="{StaticResource StatusReadyBrush}"
-                                           VerticalAlignment="Center" FontSize="12"/>
-                            </Grid>
-                        </StackPanel>
-                    </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>

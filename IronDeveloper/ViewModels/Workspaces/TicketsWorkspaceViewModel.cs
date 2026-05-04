@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
+using IronDev.Core.Builder;
 using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -12,9 +13,11 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 {
     private readonly global::IronDev.Services.ITicketService _ticketService;
+    private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
 
-    private int _activeProjectId;
-    private int? _activeTenantId;
+    private int    _activeProjectId;
+    private int?   _activeTenantId;
+    private string _activeProjectPath = string.Empty;
 
     // ── List panel ──────────────────────────────────────────────────────────
     [ObservableProperty] private ObservableCollection<TicketItem> _tickets = [];
@@ -41,22 +44,56 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _editLinkedFilePaths = string.Empty;
     [ObservableProperty] private string _editLinkedSymbols = string.Empty;
 
-    // Dropdown options
-    public ObservableCollection<string> StatusOptions { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
-    public ObservableCollection<string> PriorityOptions { get; } = ["Low", "Medium", "High", "Critical"];
-    public ObservableCollection<string> TypeOptions { get; } = ["Task", "Bug", "Feature", "Spike", "Chore"];
+    // ── Implementation Plan ──
+    [ObservableProperty] private TicketDetailTab _activeTab = TicketDetailTab.Overview;
+    [ObservableProperty] private bool _hasPlan;
+    [ObservableProperty] private long _planId;
+    [ObservableProperty] private string _planTitle = string.Empty;
+    [ObservableProperty] private string _planGoal = string.Empty;
+    [ObservableProperty] private string _planScope = string.Empty;
+    [ObservableProperty] private string _planProposedSteps = string.Empty;
+    [ObservableProperty] private string _planAffectedContext = string.Empty;
+    [ObservableProperty] private string _planRisksNotes = string.Empty;
+    [ObservableProperty] private string _planStatus = "Draft";
+    [ObservableProperty] private string _planLinkedFilePaths = string.Empty;
+    [ObservableProperty] private string _planLinkedSymbols = string.Empty;
+    [ObservableProperty] private string _planSaveStatus = string.Empty;
+    [ObservableProperty] private bool _isSavingPlan;
 
-    public TicketsWorkspaceViewModel(global::IronDev.Services.ITicketService ticketService)
+    // ── Build Ticket state ────────────────────────────────────────────────────
+    [ObservableProperty] private bool               _isBuildingTicket;
+    [ObservableProperty] private bool               _hasBuildPreview;
+    [ObservableProperty] private TicketBuildPreview? _currentBuildPreview;
+    [ObservableProperty] private TicketBuildResult?  _currentBuildResult;
+    [ObservableProperty] private string              _buildStatusMessage = string.Empty;
+
+    /// <summary>True when the Build This button should be enabled.</summary>
+    public bool CanBuildTicket =>
+        SelectedTicket != null
+        && !string.IsNullOrWhiteSpace(EditTitle)
+        && !string.IsNullOrWhiteSpace(_activeProjectPath)
+        && !IsBuildingTicket;
+
+    // Dropdown options
+    public ObservableCollection<string> StatusOptions   { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
+    public ObservableCollection<string> PriorityOptions { get; } = ["Low", "Medium", "High", "Critical"];
+    public ObservableCollection<string> TypeOptions     { get; } = ["Task", "Bug", "Feature", "Spike", "Chore"];
+
+    public TicketsWorkspaceViewModel(
+        global::IronDev.Services.ITicketService ticketService,
+        global::IronDev.Services.IProjectMemoryService memoryService)
     {
         _ticketService = ticketService;
+        _memoryService = memoryService;
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
 
     internal async Task LoadAsync(Project project)
     {
-        _activeProjectId = project.Id;
-        _activeTenantId = project.TenantId;
+        _activeProjectId   = project.Id;
+        _activeTenantId    = project.TenantId;
+        _activeProjectPath = project.LocalPath ?? string.Empty;
         await RefreshListAsync();
     }
 
@@ -82,14 +119,17 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             return;
         }
 
-        LoadTicketIntoEditor(value);
+        // Clear stale build state when switching tickets
+        ClearBuildState();
+        _ = LoadTicketIntoEditorAsync(value);
     }
 
-    private void LoadTicketIntoEditor(TicketItem item)
+    private async Task LoadTicketIntoEditorAsync(TicketItem item)
     {
         IsNewTicket = false;
         IsEditing = true;
         HasDetail = true;
+        ActiveTab = TicketDetailTab.Overview;
 
         EditId                   = item.Id;
         EditTitle                = item.Title;
@@ -105,6 +145,43 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
 
         SaveStatus = string.Empty;
+
+        // Load plan for this ticket
+        await RefreshPlanAsync(item.Id);
+    }
+
+    private async Task RefreshPlanAsync(long ticketId)
+    {
+        var plan = await _memoryService.GetPlanByTicketIdAsync(ticketId);
+        if (plan != null)
+        {
+            HasPlan = true;
+            PlanId = plan.Id;
+            PlanTitle = plan.Title;
+            PlanGoal = plan.Goal;
+            PlanScope = plan.Scope ?? string.Empty;
+            PlanProposedSteps = plan.ProposedSteps ?? string.Empty;
+            PlanAffectedContext = plan.AffectedContext ?? string.Empty;
+            PlanRisksNotes = plan.RisksNotes ?? string.Empty;
+            PlanStatus = plan.Status;
+            PlanLinkedFilePaths = plan.LinkedFilePaths ?? string.Empty;
+            PlanLinkedSymbols = plan.LinkedSymbols ?? string.Empty;
+        }
+        else
+        {
+            HasPlan = false;
+            PlanId = 0;
+            PlanTitle = string.Empty;
+            PlanGoal = string.Empty;
+            PlanScope = string.Empty;
+            PlanProposedSteps = string.Empty;
+            PlanAffectedContext = string.Empty;
+            PlanRisksNotes = string.Empty;
+            PlanStatus = "Draft";
+            PlanLinkedFilePaths = string.Empty;
+            PlanLinkedSymbols = string.Empty;
+        }
+        PlanSaveStatus = string.Empty;
     }
 
     // ── New Ticket ──────────────────────────────────────────────────────────
@@ -189,6 +266,174 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private void CreatePlan()
+    {
+        if (SelectedTicket == null) return;
+        HasPlan = true;
+        PlanId = 0;
+        PlanTitle = $"Implementation Plan for {SelectedTicket.Title}";
+        PlanGoal = SelectedTicket.Summary ?? string.Empty;
+        ActiveTab = TicketDetailTab.ImplementationPlan;
+    }
+
+    [RelayCommand]
+    private async Task SavePlanAsync()
+    {
+        if (SelectedTicket == null) return;
+        if (string.IsNullOrWhiteSpace(PlanTitle))
+        {
+            PlanSaveStatus = "Title is required.";
+            return;
+        }
+
+        IsSavingPlan = true;
+        PlanSaveStatus = "Saving Plan...";
+
+        try
+        {
+            var plan = new ProjectImplementationPlan
+            {
+                Id = PlanId,
+                ProjectId = _activeProjectId,
+                TicketId = SelectedTicket.Id,
+                Title = PlanTitle.Trim(),
+                Goal = PlanGoal.Trim(),
+                Scope = string.IsNullOrWhiteSpace(PlanScope) ? null : PlanScope.Trim(),
+                ProposedSteps = string.IsNullOrWhiteSpace(PlanProposedSteps) ? null : PlanProposedSteps.Trim(),
+                AffectedContext = string.IsNullOrWhiteSpace(PlanAffectedContext) ? null : PlanAffectedContext.Trim(),
+                RisksNotes = string.IsNullOrWhiteSpace(PlanRisksNotes) ? null : PlanRisksNotes.Trim(),
+                Status = PlanStatus,
+                LinkedFilePaths = string.IsNullOrWhiteSpace(PlanLinkedFilePaths) ? null : PlanLinkedFilePaths.Trim(),
+                LinkedSymbols = string.IsNullOrWhiteSpace(PlanLinkedSymbols) ? null : PlanLinkedSymbols.Trim()
+            };
+
+            var savedId = await _memoryService.SavePlanAsync(plan);
+            PlanId = savedId;
+            PlanSaveStatus = "Plan Saved ✓";
+        }
+        catch (Exception ex)
+        {
+            PlanSaveStatus = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsSavingPlan = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task CancelPlanEditAsync()
+    {
+        if (SelectedTicket != null)
+        {
+            await RefreshPlanAsync(SelectedTicket.Id);
+        }
+    }
+
+    // ── Ask about this plan ──────────────────────────────────────────────────
+
+    public Action<long, string, string, string, string>? OnAskAboutPlan { get; set; }
+
+    [RelayCommand]
+    private void AskAboutPlan()
+    {
+        if (SelectedTicket == null || !HasPlan) return;
+
+        // Bundle context: ticket title, plan goals/steps, linked files
+        var planSummary = $"""
+            TICKET: {SelectedTicket.Title}
+            GOAL: {PlanGoal}
+            STEPS:
+            {PlanProposedSteps}
+            """;
+
+        OnAskAboutPlan?.Invoke(SelectedTicket.Id, SelectedTicket.Title, planSummary, PlanLinkedFilePaths, PlanLinkedSymbols);
+    }
+
+    // ── Build Ticket (Phase 1 — scaffold + fake preview) ─────────────────────
+
+    [RelayCommand]
+    private async Task BuildSelectedTicketAsync()
+    {
+        if (!CanBuildTicket) return;
+
+        IsBuildingTicket   = true;
+        HasBuildPreview    = false;
+        CurrentBuildPreview = null;
+        CurrentBuildResult  = null;
+        BuildStatusMessage  = "Generating build preview…";
+        OnPropertyChanged(nameof(CanBuildTicket));
+
+        try
+        {
+            // Phase 1: return a fake preview — no LLM, no Weaviate, no file writes
+            await Task.Delay(400); // simulate brief async work
+
+            var fakeProposal = new CodeChangeProposal
+            {
+                TicketId  = EditId,
+                Summary   = "Preview scaffold only. No code changes generated yet.",
+                RiskNotes = "None — scaffold only.",
+                TestPlan  = "No test plan generated in Phase 1.",
+                FileChanges =
+                [
+                    new FileChangeProposal
+                    {
+                        FilePath      = "Not generated yet.",
+                        ChangeReason  = "Phase 1 scaffold — LLM not called.",
+                        BeforeSnippet = "",
+                        AfterSnippet  = "",
+                        Patch         = "No diff generated in Phase 1."
+                    }
+                ]
+            };
+
+            CurrentBuildPreview = new TicketBuildPreview
+            {
+                TicketId       = EditId,
+                TicketTitle    = EditTitle,
+                Proposal       = fakeProposal,
+                ContextSummary = $"Project: {_activeProjectPath}  |  Ticket: {EditTitle}"
+            };
+
+            HasBuildPreview   = true;
+            BuildStatusMessage = "Preview ready. Review and approve to apply.";
+        }
+        catch (Exception ex)
+        {
+            BuildStatusMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsBuildingTicket = false;
+            OnPropertyChanged(nameof(CanBuildTicket));
+        }
+    }
+
+    [RelayCommand]
+    private void CancelBuildPreview()
+    {
+        ClearBuildState();
+    }
+
+    [RelayCommand]
+    private void ApplyBuildPreview()
+    {
+        // Phase 1: apply is not implemented. No files written.
+        BuildStatusMessage = "Apply not implemented yet — Phase 2 required.";
+    }
+
+    private void ClearBuildState()
+    {
+        HasBuildPreview     = false;
+        CurrentBuildPreview = null;
+        CurrentBuildResult  = null;
+        BuildStatusMessage  = string.Empty;
+        IsBuildingTicket    = false;
+        OnPropertyChanged(nameof(CanBuildTicket));
+    }
+
     // ── Cancel ──────────────────────────────────────────────────────────────
 
     [RelayCommand]
@@ -196,7 +441,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     {
         if (SelectedTicket != null)
         {
-            LoadTicketIntoEditor(SelectedTicket);
+            _ = LoadTicketIntoEditorAsync(SelectedTicket);
         }
         else
         {
@@ -222,22 +467,37 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     private void ClearEditor()
     {
-        IsEditing = false;
+        IsEditing  = false;
         IsNewTicket = false;
-        HasDetail = false;
-        EditId = 0;
-        EditTitle = string.Empty;
+        HasDetail  = false;
+        EditId     = 0;
+        EditTitle  = string.Empty;
         EditStatus = "Draft";
-        EditPriority = "Medium";
-        EditTicketType = "Task";
-        EditSummary = string.Empty;
-        EditBackground = string.Empty;
-        EditProblem = string.Empty;
+        EditPriority      = "Medium";
+        EditTicketType    = "Task";
+        EditSummary       = string.Empty;
+        EditBackground    = string.Empty;
+        EditProblem       = string.Empty;
         EditAcceptanceCriteria = string.Empty;
-        EditTechnicalNotes = string.Empty;
-        EditLinkedFilePaths = string.Empty;
-        EditLinkedSymbols = string.Empty;
+        EditTechnicalNotes     = string.Empty;
+        EditLinkedFilePaths    = string.Empty;
+        EditLinkedSymbols      = string.Empty;
         SaveStatus = string.Empty;
+
+        HasPlan           = false;
+        PlanId            = 0;
+        PlanTitle         = string.Empty;
+        PlanGoal          = string.Empty;
+        PlanScope         = string.Empty;
+        PlanProposedSteps = string.Empty;
+        PlanAffectedContext = string.Empty;
+        PlanRisksNotes    = string.Empty;
+        PlanStatus        = "Draft";
+        PlanLinkedFilePaths = string.Empty;
+        PlanLinkedSymbols   = string.Empty;
+        PlanSaveStatus    = string.Empty;
+
+        ClearBuildState();
     }
 
     private static TicketItem MapToItem(ProjectTicket t) => new()
