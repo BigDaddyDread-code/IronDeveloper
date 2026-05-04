@@ -140,9 +140,10 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Ticket draft approved with plan → navigate to Plans after save
-        _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols) =>
+        // Receives: title, goal, steps, filePaths, symbols, scope, risksNotes
+        _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols, scope, risks) =>
         {
-            _plansVm.PrefillFromChat(title, goal, steps, filePaths, symbols);
+            _plansVm.PrefillFromChat(title, goal, steps, filePaths, symbols, scope, risks);
             CurrentWorkspace = ProjectWorkspace.Plans;
             CurrentView = _plansVm;
         };

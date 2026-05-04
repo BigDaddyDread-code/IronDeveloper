@@ -131,8 +131,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     // ── Shell navigation callbacks ────────────────────────────────────────────
     /// <summary>Called when the user cancels a draft — shell navigates back to Chat.</summary>
     public Action? OnCancelDraft { get; set; }
-    /// <summary>Called after a draft is approved with a plan — shell navigates to Plans.</summary>
-    public Action<string, string, string?, string?, string?>? OnApproveDraftWithPlan { get; set; }
+    /// <summary>Called after a draft is approved with a plan — shell navigates to Plans.
+    /// Params: title, goal, steps, linkedFilePaths, linkedSymbols, scope, risksNotes</summary>
+    public Action<string, string, string?, string?, string?, string?, string?>? OnApproveDraftWithPlan { get; set; }
 
     // Dropdown options
     public ObservableCollection<string> StatusOptions   { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
@@ -565,7 +566,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         }
     }
 
-    /// <summary>Saves the draft ticket and exits draft mode.</summary>
+    /// <summary>Saves the draft ticket, exits draft mode, and selects the new ticket in the list.</summary>
     [RelayCommand]
     private async Task ApproveDraftAsync()
     {
@@ -575,8 +576,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         IsDraftMode        = false;
         CurrentDraft       = null;
         DraftStatusMessage = string.Empty;
-        await RefreshListAsync();
-        SaveStatus = "Ticket created ✓";
+
+        await RefreshListAsync();  // ClearEditor() is called inside — resets HasDetail, fields, etc.
+
+        // Re-select the newly created ticket so the detail panel shows it
+        SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
+        SaveStatus     = "Ticket created ✓";
     }
 
     /// <summary>Saves the draft ticket and then navigates to Plans to create a plan.</summary>
@@ -586,19 +591,36 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         var savedId = await SaveDraftTicketAsync();
         if (savedId <= 0) return;
 
+        // ✓ SNAPSHOT all field values BEFORE RefreshListAsync calls ClearEditor() and blanks them
+        var planTitle       = $"{EditTitle.Trim()} — Implementation Plan";
+        var planGoal        = EditSummary.Trim();
+        var planScope       = string.IsNullOrWhiteSpace(EditAcceptanceCriteria)
+                                 ? null
+                                 : EditAcceptanceCriteria.Trim();
+        var planSteps       = string.IsNullOrWhiteSpace(EditBackground)
+                                 ? null
+                                 : EditBackground.Trim();
+        var planFiles       = string.IsNullOrWhiteSpace(EditLinkedFilePaths)
+                                 ? null
+                                 : EditLinkedFilePaths.Trim();
+        var planSymbols     = string.IsNullOrWhiteSpace(EditLinkedSymbols)
+                                 ? null
+                                 : EditLinkedSymbols.Trim();
+        var planRisksNotes  = string.IsNullOrWhiteSpace(EditTechnicalNotes)
+                                 ? null
+                                 : EditTechnicalNotes.Trim();   // carries Tests/Validation into plan
+
         IsDraftMode        = false;
         CurrentDraft       = null;
         DraftStatusMessage = string.Empty;
-        await RefreshListAsync();
 
-        // Build Plans prefill context from the ticket fields
-        var planTitle   = $"{EditTitle} — Implementation Plan";
-        var planGoal    = EditSummary;
-        var planSteps   = string.IsNullOrWhiteSpace(EditBackground) ? null : EditBackground;
-        var planFiles   = string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths;
-        var planSymbols = string.IsNullOrWhiteSpace(EditLinkedSymbols) ? null : EditLinkedSymbols;
+        await RefreshListAsync();  // ClearEditor() called here — field snapshots are already safe
 
-        OnApproveDraftWithPlan?.Invoke(planTitle, planGoal, planSteps, planFiles, planSymbols);
+        // Re-select the saved ticket
+        SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
+
+        // Navigate to Plans with full prefill (title, goal, steps, files, symbols, scope, risksNotes)
+        OnApproveDraftWithPlan?.Invoke(planTitle, planGoal, planSteps, planFiles, planSymbols, planScope, planRisksNotes);
     }
 
     /// <summary>Re-generates all draft fields from the original chat context.</summary>
