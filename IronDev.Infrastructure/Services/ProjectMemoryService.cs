@@ -23,12 +23,6 @@ public interface IProjectMemoryService
     Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken cancellationToken = default);
 
     Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken cancellationToken = default);
-
-    // Plan methods — required by TicketsWorkspaceViewModel (Phase 1 Build Ticket MVP)
-    Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
-    Task<ProjectImplementationPlan?> GetPlanByIdAsync(long planId, CancellationToken cancellationToken = default);
-    Task<ProjectImplementationPlan?> GetPlanByTicketIdAsync(long ticketId, CancellationToken cancellationToken = default);
-    Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken cancellationToken = default);
 }
 
 public sealed class ProjectMemoryService : IProjectMemoryService
@@ -361,15 +355,4 @@ public sealed class ProjectMemoryService : IProjectMemoryService
                 cancellationToken: cancellationToken));
         }
     }
-    public Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("GetRecentPlansAsync: full implementation in Phase 2 migration.");
-
-    public Task<ProjectImplementationPlan?> GetPlanByIdAsync(long planId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("GetPlanByIdAsync: full implementation in Phase 2 migration.");
-
-    public Task<ProjectImplementationPlan?> GetPlanByTicketIdAsync(long ticketId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("GetPlanByTicketIdAsync: full implementation in Phase 2 migration.");
-
-    public Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("SavePlanAsync: full implementation in Phase 2 migration.");
 }

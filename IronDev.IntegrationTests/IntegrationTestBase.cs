@@ -77,6 +77,8 @@ public abstract class IntegrationTestBase
             DELETE FROM dbo.ProjectDecisions;
             DELETE FROM dbo.ProjectFiles;
             DELETE FROM dbo.ChatMessages;
+            IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
+            IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
             DELETE FROM dbo.ProjectTickets;
             DELETE FROM dbo.ProjectSummaries;
             DELETE FROM dbo.Projects;
@@ -98,6 +100,7 @@ public abstract class IntegrationTestBase
         await connection.OpenAsync();
 
         var setupSql = $"""
+            -- Ensure Tenants and Users exist (Parents)
             IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = {tenantId})
             BEGIN
                 SET IDENTITY_INSERT dbo.Tenants ON;
@@ -111,12 +114,95 @@ public abstract class IntegrationTestBase
                 SET IDENTITY_INSERT dbo.Users OFF;
             END
 
-            IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL
+            -- Extend ProjectFiles (Grounding)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectFiles') AND name = 'LastIndexedUtc')
             BEGIN
-                -- Ensure table exists for tests
-                PRINT 'CodeIndexEntries already exists'
+                ALTER TABLE dbo.ProjectFiles ADD LastIndexedUtc DATETIME2 NULL;
+                ALTER TABLE dbo.ProjectFiles ADD IndexingStatus NVARCHAR(50) NULL;
             END
-            ELSE
+
+            -- Extend ProjectTickets (Structured Tickets)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Title')
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD Title NVARCHAR(200) NOT NULL DEFAULT '';
+                ALTER TABLE dbo.ProjectTickets ADD TicketType NVARCHAR(50) NOT NULL DEFAULT 'Task';
+                ALTER TABLE dbo.ProjectTickets ADD Priority NVARCHAR(50) NOT NULL DEFAULT 'Medium';
+                ALTER TABLE dbo.ProjectTickets ADD Summary NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD Background NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD Problem NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD AcceptanceCriteria NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD TechnicalNotes NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD Status NVARCHAR(50) NOT NULL DEFAULT 'Draft';
+            END
+            
+            -- Add Linked columns to ProjectTickets
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedFilePaths')
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD LinkedFilePaths NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD LinkedSymbols NVARCHAR(MAX) NULL;
+            END
+
+            -- Ensure ProjectChatSessions exists
+            IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectChatSessions
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    Title NVARCHAR(200) NOT NULL DEFAULT 'New Chat',
+                    Summary NVARCHAR(MAX) NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    PrimaryTicketId BIGINT NULL,
+                    PrimaryDecisionId BIGINT NULL,
+                    PrimaryPlanId BIGINT NULL,
+                    OriginTicketId BIGINT NULL,
+                    OriginDecisionId BIGINT NULL,
+                    OriginPlanId BIGINT NULL,
+                    CONSTRAINT FK_ProjectChatSessions_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ProjectChatSessions_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            -- Extend ChatMessages (Sessions & Grounding)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'ChatSessionId')
+            BEGIN
+                ALTER TABLE dbo.ChatMessages ADD ChatSessionId BIGINT NULL;
+                ALTER TABLE dbo.ChatMessages ADD ContextSummary NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ChatMessages ADD LinkedFilePaths NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ChatMessages ADD LinkedSymbols NVARCHAR(MAX) NULL;
+            END
+
+            -- Ensure ProjectImplementationPlans exists
+            IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectImplementationPlans
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    TicketId BIGINT NULL,
+                    Title NVARCHAR(200) NOT NULL,
+                    Goal NVARCHAR(MAX) NOT NULL,
+                    Scope NVARCHAR(MAX) NULL,
+                    ProposedSteps NVARCHAR(MAX) NULL,
+                    AffectedContext NVARCHAR(MAX) NULL,
+                    RisksNotes NVARCHAR(MAX) NULL,
+                    Status NVARCHAR(50) NOT NULL DEFAULT 'Draft',
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    SourceChatMessageId BIGINT NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_ProjectImplementationPlans_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ProjectImplementationPlans_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NULL
             BEGIN
                 CREATE TABLE dbo.CodeIndexEntries
                 (
@@ -131,6 +217,65 @@ public abstract class IntegrationTestBase
                     ChunkText NVARCHAR(MAX) NOT NULL,
                     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_CodeIndexEntries_CreatedDate DEFAULT SYSUTCDATETIME()
                 );
+            END
+
+            -- Add missing columns to ProjectFiles if needed (grounding work)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectFiles') AND name = 'LastIndexedUtc')
+            BEGIN
+                ALTER TABLE dbo.ProjectFiles ADD LastIndexedUtc DATETIME2 NULL;
+                ALTER TABLE dbo.ProjectFiles ADD IndexingStatus NVARCHAR(50) NULL;
+            END
+
+            -- Add missing tables for UI branch features
+            IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectChatSessions
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    Title NVARCHAR(200) NOT NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    PrimaryTicketId BIGINT NULL,
+                    PrimaryDecisionId BIGINT NULL,
+                    PrimaryPlanId BIGINT NULL,
+                    OriginTicketId BIGINT NULL,
+                    OriginDecisionId BIGINT NULL,
+                    OriginPlanId BIGINT NULL
+                );
+            END
+
+            IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectImplementationPlans
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    TicketId BIGINT NULL,
+                    Title NVARCHAR(200) NOT NULL,
+                    Goal NVARCHAR(MAX) NOT NULL,
+                    Scope NVARCHAR(MAX) NULL,
+                    ProposedSteps NVARCHAR(MAX) NULL,
+                    AffectedContext NVARCHAR(MAX) NULL,
+                    RisksNotes NVARCHAR(MAX) NULL,
+                    Status NVARCHAR(50) NOT NULL DEFAULT 'Draft',
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    SourceChatMessageId BIGINT NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                );
+            END
+
+            -- Ensure ChatMessages has ChatSessionId column (migration from legacy ChatMessages)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'ChatSessionId')
+            BEGIN
+                -- This is a simplified migration for tests; real migration script should be used for production.
+                ALTER TABLE dbo.ChatMessages ADD ChatSessionId BIGINT NULL;
             END
             """;
         await connection.ExecuteAsync(setupSql);
