@@ -98,6 +98,7 @@ public sealed class BuilderContextService : IBuilderContextService
             TicketSummary             = ticket.Summary ?? string.Empty,
             TicketAcceptanceCriteria  = ticket.AcceptanceCriteria,
             TicketImplementationNotes = ticket.TechnicalNotes,
+            TicketTestPlan            = ticket.TechnicalNotes,
             TicketBackground          = ticket.Background,
             TicketProblem             = ticket.Problem,
 

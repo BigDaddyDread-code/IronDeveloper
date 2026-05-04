@@ -41,5 +41,6 @@ public enum TicketDetailTab
 {
     Overview,
     ImplementationPlan,
-    CodeContext
+    CodeContext,
+    Tests
 }

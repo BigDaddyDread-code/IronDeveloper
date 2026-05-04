@@ -86,6 +86,11 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine($"  Background: {ctx.TicketBackground}");
         if (!string.IsNullOrWhiteSpace(ctx.TicketProblem))
             sb.AppendLine($"  Problem: {ctx.TicketProblem}");
+        if (!string.IsNullOrWhiteSpace(ctx.TicketTestPlan))
+        {
+            sb.AppendLine("  Test Plan:");
+            sb.AppendLine(ctx.TicketTestPlan);
+        }
         sb.AppendLine();
 
         if (ctx.PlanTitle != null)
