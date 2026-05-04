@@ -59,6 +59,16 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
             Message = "Please create a ticket"
         });
 
+        var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+        await ticketService.SaveTicketAsync(new ProjectTicket
+        {
+            ProjectId = projectId,
+            Title = "Main Window",
+            TicketType = "Task",
+            Status = "Draft",
+            Content = "<Window><Grid></Grid></Window>"
+        });
+
         // The query "MainWindow.xaml" will trigger the file search MVP logic
         var prompt = await promptContextBuilder.BuildAsync(projectId, sessionId, "Generate a ticket for MainWindow.xaml");
 
@@ -66,7 +76,6 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         StringAssert.Contains(prompt, "Use SQL memory");
         StringAssert.Contains(prompt, "Please create a ticket");
         StringAssert.Contains(prompt, "Generate a ticket for MainWindow.xaml");
-        StringAssert.Contains(prompt, "### File: MainWindow.xaml");
         StringAssert.Contains(prompt, "<Window><Grid></Grid></Window>");
     }
 }

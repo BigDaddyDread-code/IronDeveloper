@@ -127,45 +127,67 @@ public abstract class ApiTestBase
             IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Id = 1)
             BEGIN
                 SET IDENTITY_INSERT dbo.Users ON;
-                INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash)
-                VALUES (1, @Email, 'Admin User', @Hash);
+                INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash, IsActive)
+                VALUES (1, @Email, 'Admin User', @Hash, 1);
                 SET IDENTITY_INSERT dbo.Users OFF;
             END
             ELSE
             BEGIN
-                UPDATE dbo.Users SET PasswordHash = @Hash WHERE Id = 1;
+                UPDATE dbo.Users SET Email = @Email, PasswordHash = @Hash, IsActive = 1 WHERE Id = 1;
             END
             IF NOT EXISTS (SELECT 1 FROM dbo.TenantUsers WHERE TenantId = 1 AND UserId = 1)
                 INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (1, 1, 'Owner');
 
+            -- Extend Projects (Grounding)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = 'LastIndexedUtc')
+                ALTER TABLE dbo.Projects ADD LastIndexedUtc DATETIME2 NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = 'IndexingStatus')
+                ALTER TABLE dbo.Projects ADD IndexingStatus NVARCHAR(50) NULL;
+
             -- Extend ProjectFiles (Grounding)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectFiles') AND name = 'LastIndexedUtc')
-            BEGIN
                 ALTER TABLE dbo.ProjectFiles ADD LastIndexedUtc DATETIME2 NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectFiles') AND name = 'IndexingStatus')
                 ALTER TABLE dbo.ProjectFiles ADD IndexingStatus NVARCHAR(50) NULL;
-            END
 
             -- Extend ProjectTickets (Structured Tickets)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Title')
-            BEGIN
                 ALTER TABLE dbo.ProjectTickets ADD Title NVARCHAR(200) NOT NULL DEFAULT '';
-                ALTER TABLE dbo.ProjectTickets ADD TicketType NVARCHAR(50) NOT NULL DEFAULT 'Task';
-                ALTER TABLE dbo.ProjectTickets ADD Priority NVARCHAR(50) NOT NULL DEFAULT 'Medium';
-                ALTER TABLE dbo.ProjectTickets ADD Summary NVARCHAR(MAX) NULL;
-                ALTER TABLE dbo.ProjectTickets ADD Background NVARCHAR(MAX) NULL;
-                ALTER TABLE dbo.ProjectTickets ADD Problem NVARCHAR(MAX) NULL;
-                ALTER TABLE dbo.ProjectTickets ADD AcceptanceCriteria NVARCHAR(MAX) NULL;
-                ALTER TABLE dbo.ProjectTickets ADD TechnicalNotes NVARCHAR(MAX) NULL;
-                ALTER TABLE dbo.ProjectTickets ADD Status NVARCHAR(50) NOT NULL DEFAULT 'Draft';
-            END
             
-            -- Add Linked columns to ProjectTickets
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'TicketType')
+                ALTER TABLE dbo.ProjectTickets ADD TicketType NVARCHAR(50) NOT NULL DEFAULT 'Task';
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Priority')
+                ALTER TABLE dbo.ProjectTickets ADD Priority NVARCHAR(50) NOT NULL DEFAULT 'Medium';
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Summary')
+                ALTER TABLE dbo.ProjectTickets ADD Summary NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Background')
+                ALTER TABLE dbo.ProjectTickets ADD Background NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Problem')
+                ALTER TABLE dbo.ProjectTickets ADD Problem NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'AcceptanceCriteria')
+                ALTER TABLE dbo.ProjectTickets ADD AcceptanceCriteria NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'TechnicalNotes')
+                ALTER TABLE dbo.ProjectTickets ADD TechnicalNotes NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Status')
+                ALTER TABLE dbo.ProjectTickets ADD Status NVARCHAR(50) NOT NULL DEFAULT 'Draft';
+            
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedFilePaths')
-            BEGIN
                 ALTER TABLE dbo.ProjectTickets ADD LinkedFilePaths NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedCodeIndexEntryIds')
                 ALTER TABLE dbo.ProjectTickets ADD LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ProjectTickets ADD LinkedSymbols NVARCHAR(MAX) NULL;
-            END
 
             -- Ensure ProjectChatSessions exists
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NULL
@@ -192,12 +214,16 @@ public abstract class ApiTestBase
 
             -- Extend ChatMessages (Sessions & Grounding)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'ChatSessionId')
-            BEGIN
                 ALTER TABLE dbo.ChatMessages ADD ChatSessionId BIGINT NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'ContextSummary')
                 ALTER TABLE dbo.ChatMessages ADD ContextSummary NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'LinkedFilePaths')
                 ALTER TABLE dbo.ChatMessages ADD LinkedFilePaths NVARCHAR(MAX) NULL;
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ChatMessages ADD LinkedSymbols NVARCHAR(MAX) NULL;
-            END
             """, new { Email = AdminEmail, Hash = hash });
     }
 
@@ -208,13 +234,12 @@ public abstract class ApiTestBase
         await conn.OpenAsync();
         await conn.ExecuteAsync("""
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
-            DELETE FROM dbo.ProjectDecisions;
-            DELETE FROM dbo.ProjectSummaries;
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
-            DELETE FROM dbo.ProjectTickets;
-            DELETE FROM dbo.ProjectFiles;
             DELETE FROM dbo.ChatMessages;
+            DELETE FROM dbo.ProjectSummaries;
+            DELETE FROM dbo.ProjectFiles;
+            DELETE FROM dbo.ProjectTickets;
             DELETE FROM dbo.Projects;
             """);
     }

@@ -86,18 +86,20 @@ public sealed partial class LoginViewModel : ObservableObject
         IsBusy = true;
         try 
         {
-            // 1. Authenticate User
+            // 1. Transition to "Resolving" state early
+            CurrentStage = LoginStage.Resolving;
+
+            // 2. Authenticate User
             _authenticatedUser = await _userService.ValidateCredentialsAsync(Email, password!);
             
             if (_authenticatedUser == null)
             {
                 EmailError = "Invalid email or password.";
+                CurrentStage = LoginStage.Credentials;
                 return;
             }
 
-            // 2. Transition to "Resolving" state
-            CurrentStage = LoginStage.Resolving;
-            await Task.Delay(800); // UI feedback for "Loading your workspace..."
+            await Task.Delay(400); // UI feedback for "Loading your workspace..."
 
             // 3. Resolve Tenants for this user
             var tenants = await _userService.GetUserTenantsAsync(_authenticatedUser.Id);

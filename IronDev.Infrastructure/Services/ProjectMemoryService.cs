@@ -325,19 +325,31 @@ public sealed class ProjectMemoryService : IProjectMemoryService
         }
         else
         {
-            // Insert flow
-            const string insertSql = """
-                INSERT INTO dbo.ProjectDecisions 
-                    (TenantId, ProjectId, Title, Detail, Reason, Category, Status,
-                     SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
-                OUTPUT inserted.Id
-                VALUES 
-                    (@TenantId, @ProjectId, @Title, @Detail, @Reason, @Category, @Status,
-                     @SourceChatMessageId, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
+            // Insert or Update by Title flow (Upsert logic for tests/UX)
+            const string upsertSql = """
+                IF EXISTS (SELECT 1 FROM dbo.ProjectDecisions WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND Title = @Title)
+                BEGIN
+                    UPDATE dbo.ProjectDecisions 
+                    SET Detail = @Detail, Reason = @Reason, Category = @Category, Status = @Status,
+                        LinkedFilePaths = @LinkedFilePaths, LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds, LinkedSymbols = @LinkedSymbols
+                    WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND Title = @Title;
+                    
+                    SELECT Id FROM dbo.ProjectDecisions WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND Title = @Title;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO dbo.ProjectDecisions 
+                        (TenantId, ProjectId, Title, Detail, Reason, Category, Status,
+                         SourceChatMessageId, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
+                    OUTPUT inserted.Id
+                    VALUES 
+                        (@TenantId, @ProjectId, @Title, @Detail, @Reason, @Category, @Status,
+                         @SourceChatMessageId, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
+                END
                 """;
 
-            return await connection.QuerySingleAsync<long>(new CommandDefinition(
-                insertSql,
+            return await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+                upsertSql,
                 new
                 {
                     TenantId = _tenant.TenantId,

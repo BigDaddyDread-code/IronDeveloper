@@ -33,11 +33,11 @@ public class LoginIntegrationTests : IntegrationTestBase
         await connection.OpenAsync();
 
         var tenantId = await connection.ExecuteScalarAsync<int>(
-            "INSERT INTO dbo.Tenants (Name, Slug) OUTPUT inserted.Id VALUES (@Name, @Slug)",
+            "INSERT INTO dbo.Tenants (Name, Slug, IsActive) OUTPUT inserted.Id VALUES (@Name, @Slug, 1)",
             new { Name = tenantName, Slug = tenantName.ToLower().Replace(" ", "-") });
 
         var userId = await connection.ExecuteScalarAsync<int>(
-            "INSERT INTO dbo.Users (Email, DisplayName, PasswordHash) OUTPUT inserted.Id VALUES (@Email, @DisplayName, @Hash)",
+            "INSERT INTO dbo.Users (Email, DisplayName, PasswordHash, IsActive) OUTPUT inserted.Id VALUES (@Email, @DisplayName, @Hash, 1)",
             new { Email = email, DisplayName = "Test User", Hash = hash });
 
         if (mapped)
@@ -64,6 +64,7 @@ public class LoginIntegrationTests : IntegrationTestBase
         _vm.Email = "bob@test.com";
 
         var task = _vm.SignInCommand.ExecuteAsync("Pass123!");
+        await Task.Delay(50); // Allow it to transition to Resolving
         
         Assert.AreEqual(LoginStage.Resolving, _vm.CurrentStage);
         Assert.IsTrue(_vm.IsBusy);
@@ -80,11 +81,11 @@ public class LoginIntegrationTests : IntegrationTestBase
         await connection.OpenAsync();
 
         var userId = await connection.ExecuteScalarAsync<int>(
-            "INSERT INTO dbo.Users (Email, DisplayName, PasswordHash) OUTPUT inserted.Id VALUES ('multi@test.com', 'Multi User', @Hash)",
+            "INSERT INTO dbo.Users (Email, DisplayName, PasswordHash, IsActive) OUTPUT inserted.Id VALUES ('multi@test.com', 'Multi User', @Hash, 1)",
             new { Hash = hash });
 
-        var t1 = await connection.ExecuteScalarAsync<int>("INSERT INTO dbo.Tenants (Name, Slug) OUTPUT inserted.Id VALUES ('T1', 't1')");
-        var t2 = await connection.ExecuteScalarAsync<int>("INSERT INTO dbo.Tenants (Name, Slug) OUTPUT inserted.Id VALUES ('T2', 't2')");
+        var t1 = await connection.ExecuteScalarAsync<int>("INSERT INTO dbo.Tenants (Name, Slug, IsActive) OUTPUT inserted.Id VALUES ('T1', 't1', 1)");
+        var t2 = await connection.ExecuteScalarAsync<int>("INSERT INTO dbo.Tenants (Name, Slug, IsActive) OUTPUT inserted.Id VALUES ('T2', 't2', 1)");
 
         await connection.ExecuteAsync("INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (@T1, @UserId, 'Member')", new { T1 = t1, UserId = userId });
         await connection.ExecuteAsync("INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (@T2, @UserId, 'Member')", new { T2 = t2, UserId = userId });

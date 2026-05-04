@@ -92,7 +92,8 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         foreach (var t in tickets)
         {
-            packet.Tickets.Add($"[{t.TicketType}] {t.Title} ({t.Status})");
+            var content = string.IsNullOrWhiteSpace(t.Summary) ? t.Content : t.Summary;
+            packet.Tickets.Add($"[{t.TicketType}] {t.Title} ({t.Status}): {content}");
         }
 
         foreach (var d in decisions)
@@ -161,6 +162,16 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             foreach (var message in recentMessages)
             {
                 sb.AppendLine($"{message.Role}: {message.Message}");
+            }
+            sb.AppendLine();
+        }
+
+        if (packet.Tickets.Count > 0)
+        {
+            sb.AppendLine("Relevant tickets:");
+            foreach (var ticket in packet.Tickets)
+            {
+                sb.AppendLine($"- {ticket}");
             }
             sb.AppendLine();
         }

@@ -286,8 +286,8 @@ public class TenantIsolationIntegrationTests : IntegrationTestBase
         await using var conn = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
         await conn.OpenAsync();
         await conn.ExecuteAsync("""
-            INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content)
-            VALUES (@TenantId, @ProjectId, 'src/TenantBClass.cs', '.cs', 'hash-b', 'public class TenantBClass { }');
+            INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content, IndexingStatus)
+            VALUES (@TenantId, @ProjectId, 'src/TenantBClass.cs', '.cs', 'hash-b', 'public class TenantBClass { }', 'Indexed');
             """, new { TenantId = tenantId, ProjectId = projectId });
     }
 }

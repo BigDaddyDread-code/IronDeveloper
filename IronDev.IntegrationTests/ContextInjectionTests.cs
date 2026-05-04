@@ -45,7 +45,7 @@ public class ContextInjectionTests : IntegrationTestBase
 
         // 3. Verify the fragment content is in the prompt
         StringAssert.Contains(prompt, "CodeWorkbenchWindow.xaml.cs");
-        StringAssert.Contains(prompt, "Symbol: .CodeWorkbenchWindow");
+        StringAssert.Contains(prompt, "Symbol: CodeWorkbenchWindow");
         StringAssert.Contains(prompt, "public partial class CodeWorkbenchWindow");
         StringAssert.Contains(prompt, "## Relevant Code Snippets");
     }

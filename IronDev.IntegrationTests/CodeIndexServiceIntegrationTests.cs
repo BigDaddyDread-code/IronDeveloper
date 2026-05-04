@@ -19,8 +19,8 @@ public class CodeIndexServiceIntegrationTests : IntegrationTestBase
     {
         await base.TestInitialize();
         
-        // Ensure test directory exists
-        _testDirPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test_code_dir");
+        // Ensure unique test directory per test execution context to avoid locking issues
+        _testDirPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"test_code_dir_{Guid.NewGuid():N}");
         if (Directory.Exists(_testDirPath))
             Directory.Delete(_testDirPath, true);
             
@@ -28,6 +28,17 @@ public class CodeIndexServiceIntegrationTests : IntegrationTestBase
         await File.WriteAllTextAsync(Path.Combine(_testDirPath, "file1.cs"), "public class TestOne { }");
         await File.WriteAllTextAsync(Path.Combine(_testDirPath, "file2.cs"), "public class TestTwo { }");
         await File.WriteAllTextAsync(Path.Combine(_testDirPath, "readme.md"), "# IronDev Test");
+    }
+
+    [TestCleanup]
+    public void CleanupTestDir()
+    {
+        try
+        {
+            if (Directory.Exists(_testDirPath))
+                Directory.Delete(_testDirPath, true);
+        }
+        catch { /* Ignore cleanup errors in tests */ }
     }
 
     [TestMethod]
