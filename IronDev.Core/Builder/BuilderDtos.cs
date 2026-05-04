@@ -60,10 +60,11 @@ public sealed class CodeChangeProposal
 
 public sealed class TicketBuildPreview
 {
-    public long               TicketId       { get; set; }
-    public string             TicketTitle    { get; set; } = "";
-    public CodeChangeProposal Proposal       { get; set; } = new();
-    public string             ContextSummary { get; set; } = "";
+    public long                  TicketId         { get; set; }
+    public string                TicketTitle      { get; set; } = "";
+    public CodeChangeProposal    Proposal         { get; set; } = new();
+    public string                ContextSummary   { get; set; } = "";
+    public PatchValidationResult ValidationResult { get; set; } = new();
 
     public bool IsEmpty => Proposal.FileChanges.Count == 0;
 }
@@ -124,4 +125,19 @@ public sealed class PatchApplyResult
 
     public static PatchApplyResult Failure(string error) =>
         new() { Succeeded = false, ErrorMessage = error };
+}
+
+public sealed class FilePatchValidation
+{
+    public string FilePath    { get; set; } = "";
+    public bool   IsValid     { get; set; }
+    public string Message     { get; set; } = "";
+    public string ResolvedPath { get; set; } = "";
+}
+
+public sealed class PatchValidationResult
+{
+    public bool                      AllValid    { get; set; }
+    public string                    Summary     { get; set; } = "";
+    public List<FilePatchValidation> FileResults { get; set; } = [];
 }

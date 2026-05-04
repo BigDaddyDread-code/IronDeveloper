@@ -29,6 +29,11 @@ internal sealed class StubOrchestrator : ITicketBuildOrchestrator
             TicketId       = ticketId,
             TicketTitle    = "Stub Ticket",
             ContextSummary = LastContextSummary,
+            ValidationResult = new IronDev.Core.Builder.PatchValidationResult
+            {
+                AllValid = true,
+                Summary  = "Validation passed: 1 file change ready to apply."
+            },
             Proposal       = new CodeChangeProposal
             {
                 TicketId  = ticketId,
@@ -257,7 +262,7 @@ public sealed class TicketsBuildScaffoldingTests
 
         await vm.BuildSelectedTicketCommand.ExecuteAsync(null);
 
-        StringAssert.Contains(vm.BuildStatusMessage, "proposal ready");
+        StringAssert.Contains(vm.BuildStatusMessage, "Validation passed");
     }
 
     [TestMethod]
@@ -846,8 +851,10 @@ public sealed class OrchestratorPhase3Tests
 
     private static IronDev.Infrastructure.Builder.TicketBuildOrchestrator MakeOrchestrator(
         IronDev.Core.Interfaces.IBuilderContextService?     ctxSvc      = null,
-        IronDev.Core.Interfaces.ICodeChangeProposalService? proposalSvc = null)
-        => new(ctxSvc ?? new StubContextSvc(), proposalSvc ?? new StubProposalSvc());
+        IronDev.Core.Interfaces.ICodeChangeProposalService? proposalSvc = null,
+        IronDev.Core.Interfaces.ICodePatchService?          patchSvc    = null)
+        => new(ctxSvc ?? new StubContextSvc(), proposalSvc ?? new StubProposalSvc(),
+               patchSvc ?? new IronDev.Infrastructure.Builder.CodePatchService());
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
@@ -929,7 +936,7 @@ public sealed class OrchestratorPhase3Tests
         Assert.IsTrue(vm.HasBuildPreview);
         Assert.AreEqual("Replace header text.", vm.CurrentBuildPreview!.Proposal.Summary);
         Assert.AreEqual(1, vm.CurrentBuildPreview.Proposal.FileChanges.Count);
-        StringAssert.Contains(vm.BuildStatusMessage, "proposal ready");
+        StringAssert.Contains(vm.BuildStatusMessage, "Validation");
     }
 
     [TestMethod]

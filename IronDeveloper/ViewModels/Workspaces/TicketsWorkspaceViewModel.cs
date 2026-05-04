@@ -356,7 +356,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         OnAskAboutPlan?.Invoke(SelectedTicket.Id, SelectedTicket.Title, planSummary, PlanLinkedFilePaths, PlanLinkedSymbols);
     }
 
-    // ── Build Ticket (Phase 2 — real context assembly via orchestrator) ────────
+    // ── Build Ticket (Phase 3+4A — real context, LLM proposal, dry-run validation) ──
 
     [RelayCommand]
     private async Task BuildSelectedTicketAsync()
@@ -382,9 +382,18 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             CurrentBuildPreview = preview;
             HasBuildPreview     = true;
 
-            BuildStatusMessage = preview.IsEmpty
-                ? "No changes proposed."
-                : "AI proposal ready. Review and approve to apply.";
+            if (preview.IsEmpty)
+            {
+                BuildStatusMessage = "No changes proposed.";
+            }
+            else if (preview.ValidationResult.AllValid)
+            {
+                BuildStatusMessage = $"Validation passed — {preview.ValidationResult.Summary}";
+            }
+            else
+            {
+                BuildStatusMessage = $"Validation failed: {preview.ValidationResult.Summary}";
+            }
         }
         catch (Exception ex)
         {
