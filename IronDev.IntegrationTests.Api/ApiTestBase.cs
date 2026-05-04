@@ -100,44 +100,15 @@ public abstract class ApiTestBase
     // ── Database helpers ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Ensures the seed user has a BCrypt password hash and the test tenants exist.
+    /// Ensures the required schema extensions exist.
     /// Called once per test class.
     /// </summary>
     private static async Task SetupDatabaseAsync()
     {
-        var hash = BCrypt.Net.BCrypt.HashPassword(AdminPassword, workFactor: 4); // Low cost for speed in tests.
-
         await using var conn = new SqlConnection(ConnectionString);
         await conn.OpenAsync();
 
-        // Ensure both test tenants exist.
         await conn.ExecuteAsync("""
-            IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = 1)
-            BEGIN
-                SET IDENTITY_INSERT dbo.Tenants ON;
-                INSERT INTO dbo.Tenants (Id, Name, Slug) VALUES (1, 'Default Tenant', 'default');
-                SET IDENTITY_INSERT dbo.Tenants OFF;
-            END
-            IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = 2)
-            BEGIN
-                SET IDENTITY_INSERT dbo.Tenants ON;
-                INSERT INTO dbo.Tenants (Id, Name, Slug) VALUES (2, 'Other Tenant', 'other');
-                SET IDENTITY_INSERT dbo.Tenants OFF;
-            END
-            IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Id = 1)
-            BEGIN
-                SET IDENTITY_INSERT dbo.Users ON;
-                INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash, IsActive)
-                VALUES (1, @Email, 'Admin User', @Hash, 1);
-                SET IDENTITY_INSERT dbo.Users OFF;
-            END
-            ELSE
-            BEGIN
-                UPDATE dbo.Users SET Email = @Email, PasswordHash = @Hash, IsActive = 1 WHERE Id = 1;
-            END
-            IF NOT EXISTS (SELECT 1 FROM dbo.TenantUsers WHERE TenantId = 1 AND UserId = 1)
-                INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (1, 1, 'Owner');
-
             -- Extend Projects (Grounding)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = 'LastIndexedUtc')
                 ALTER TABLE dbo.Projects ADD LastIndexedUtc DATETIME2 NULL;
@@ -224,14 +195,16 @@ public abstract class ApiTestBase
             
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ChatMessages ADD LinkedSymbols NVARCHAR(MAX) NULL;
-            """, new { Email = AdminEmail, Hash = hash });
+            """);
     }
 
-    /// <summary>Clears domain data between tests; tenant/user seed is preserved.</summary>
+    /// <summary>Clears domain data between tests; tenant/user seed is preserved and synchronized.</summary>
     private static async Task ResetDomainDataAsync()
     {
         await using var conn = new SqlConnection(ConnectionString);
         await conn.OpenAsync();
+        
+        // 1. Wipe domain data
         await conn.ExecuteAsync("""
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
@@ -242,6 +215,53 @@ public abstract class ApiTestBase
             DELETE FROM dbo.ProjectTickets;
             DELETE FROM dbo.Projects;
             """);
+
+        // 2. Synchronize test tenants and users (resetting any changes from other test suites)
+        var hash = BCrypt.Net.BCrypt.HashPassword(AdminPassword, workFactor: 4);
+        
+        await conn.ExecuteAsync("""
+            -- Ensure Tenants and Users exist with expected names and status
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Tenants') AND name = 'IsActive')
+                ALTER TABLE dbo.Tenants ADD IsActive BIT NOT NULL DEFAULT 1;
+
+            IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = 1)
+            BEGIN
+                SET IDENTITY_INSERT dbo.Tenants ON;
+                INSERT INTO dbo.Tenants (Id, Name, Slug, IsActive) VALUES (1, 'Default Tenant', 'default', 1);
+                SET IDENTITY_INSERT dbo.Tenants OFF;
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.Tenants SET Name = 'Default Tenant', Slug = 'default', IsActive = 1 WHERE Id = 1;
+            END
+
+            IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = 2)
+            BEGIN
+                SET IDENTITY_INSERT dbo.Tenants ON;
+                INSERT INTO dbo.Tenants (Id, Name, Slug, IsActive) VALUES (2, 'Other Tenant', 'other', 1);
+                SET IDENTITY_INSERT dbo.Tenants OFF;
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.Tenants SET Name = 'Other Tenant', Slug = 'other', IsActive = 1 WHERE Id = 2;
+            END
+
+            IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Id = 1)
+            BEGIN
+                SET IDENTITY_INSERT dbo.Users ON;
+                INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash, IsActive)
+                VALUES (1, @Email, 'Admin User', @Hash, 1);
+                SET IDENTITY_INSERT dbo.Users OFF;
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.Users SET Email = @Email, DisplayName = 'Admin User', PasswordHash = @Hash, IsActive = 1 WHERE Id = 1;
+            END
+
+            -- Isolated membership: Admin is ONLY a member of Tenant 1.
+            DELETE FROM dbo.TenantUsers WHERE UserId = 1;
+            INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (1, 1, 'Owner');
+            """, new { Email = AdminEmail, Hash = hash });
     }
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────
