@@ -79,6 +79,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.ITicketBuildOrchestrator,
                     global::IronDev.Infrastructure.Builder.TicketBuildOrchestrator>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDraftTicketService,
+                    global::IronDev.Infrastructure.Builder.DraftTicketService>();
             })
             .Build();
     }

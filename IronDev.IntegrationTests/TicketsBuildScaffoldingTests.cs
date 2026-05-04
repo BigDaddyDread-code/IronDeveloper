@@ -73,8 +73,74 @@ internal sealed class FailingOrchestrator : ITicketBuildOrchestrator
         TicketBuildApproval approval, CancellationToken ct = default)
         => Task.FromResult(new TicketBuildResult());
 }
+/// <summary>
+/// Minimal stub IDraftTicketService — returns a deterministic DraftTicket.
+/// Used by ViewModel tests; no LLM called.
+/// </summary>
+internal sealed class StubDraftTicketService : IDraftTicketService
+{
+    public string LastTitle { get; private set; } = string.Empty;
 
-// ─── Test class ───────────────────────────────────────────────────────────────
+    public Task<DraftTicket> GenerateDraftAsync(
+        int    projectId,
+        string projectName,
+        string proposedTitle,
+        string messageText,
+        string? linkedFilePaths,
+        string? linkedSymbols,
+        CancellationToken ct = default)
+    {
+        LastTitle = proposedTitle;
+        return Task.FromResult(new DraftTicket
+        {
+            Title              = string.IsNullOrWhiteSpace(proposedTitle) ? "Stub Ticket" : proposedTitle,
+            TicketType         = "Task",
+            Priority           = "Medium",
+            Status             = "Draft",
+            Summary            = messageText.Length > 100 ? messageText[..100] : messageText,
+            Background         = "Stub requirements.",
+            AcceptanceCriteria = "- Stub AC.",
+            LinkedFilePaths    = linkedFilePaths,
+            LinkedSymbols      = linkedSymbols,
+            UnitTests          = "Stub unit tests.",
+            IntegrationTests   = "Stub integration tests.",
+            ManualTests        = "Stub manual tests.",
+            RegressionTests    = "Stub regression tests.",
+            BuildValidation    = "dotnet build",
+            IsGenerated        = true,
+            GenerationNote     = "Stub draft service."
+        });
+    }
+
+    public Task<DraftTicket> RegenerateTestsAsync(
+        int         projectId,
+        DraftTicket current,
+        CancellationToken ct = default)
+        => Task.FromResult(new DraftTicket
+        {
+            // Preserve non-test fields
+            Title              = current.Title,
+            TicketType         = current.TicketType,
+            Priority           = current.Priority,
+            Status             = current.Status,
+            Summary            = current.Summary,
+            Background         = current.Background,
+            AcceptanceCriteria = current.AcceptanceCriteria,
+            LinkedFilePaths    = current.LinkedFilePaths,
+            LinkedSymbols      = current.LinkedSymbols,
+            SourceChatSessionId = current.SourceChatSessionId,
+            SourceMessageId     = current.SourceMessageId,
+            SourceMessageText   = current.SourceMessageText,
+            // New test fields
+            UnitTests        = current.UnitTests + " [regenerated]",
+            IntegrationTests = current.IntegrationTests + " [regenerated]",
+            ManualTests      = current.ManualTests,
+            RegressionTests  = current.RegressionTests,
+            BuildValidation  = current.BuildValidation,
+            IsGenerated      = true,
+            GenerationNote   = "Stub tests regenerated."
+        });
+}
 
 /// <summary>
 /// ViewModel unit tests for Build Ticket MVP — Phases 1 and 2.
@@ -86,7 +152,7 @@ public sealed class TicketsBuildScaffoldingTests
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static TicketsWorkspaceViewModel CreateVm(ITicketBuildOrchestrator? orchestrator = null)
-        => new(null!, null!, orchestrator ?? new StubOrchestrator());
+        => new(null!, null!, orchestrator ?? new StubOrchestrator(), new StubDraftTicketService());
 
     private static void SetProjectPath(TicketsWorkspaceViewModel vm, string path = @"C:\repo\test")
         => typeof(TicketsWorkspaceViewModel)
@@ -911,7 +977,7 @@ public sealed class OrchestratorPhase3Tests
     public async Task ViewModel_BuildCommand_SetsAIProposalPreview()
     {
         var orch = MakeOrchestrator();
-        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch);
+        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService());
 
         typeof(TicketsWorkspaceViewModel)
             .GetField("_activeProjectPath",
@@ -944,7 +1010,7 @@ public sealed class OrchestratorPhase3Tests
     public async Task ViewModel_LlmFailure_SetsBuildFailedMessage()
     {
         var orch = MakeOrchestrator(proposalSvc: new FailingProposalSvc());
-        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch);
+        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService());
 
         typeof(TicketsWorkspaceViewModel)
             .GetField("_activeProjectPath",
@@ -975,7 +1041,7 @@ public sealed class OrchestratorPhase3Tests
     public void ApplyBuildPreview_DoesNotWriteFiles()
     {
         var orch = MakeOrchestrator();
-        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch);
+        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService());
 
         // Simulate a preview already loaded
         vm.CurrentBuildPreview = new TicketBuildPreview

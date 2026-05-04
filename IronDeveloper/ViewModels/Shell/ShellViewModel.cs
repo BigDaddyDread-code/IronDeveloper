@@ -122,12 +122,29 @@ public sealed partial class ShellViewModel : ObservableObject
                 ActiveModel = _overviewVm.Model;
         };
 
-        // Chat → Ticket creation bridge
-        _chatVm.OnCreateTicketFromChat = (title, summary, linkedFilePaths, linkedSymbols) =>
+        // Chat → Ticket draft review bridge
+        // Phase 1-3: navigates to Tickets in draft mode with stub-generated draft.
+        // Phase 4: DraftTicketService will call the real LLM.
+        _chatVm.OnCreateTicketFromChat = (ctx) =>
         {
-            _ticketsVm.PrefillFromChat(title, summary, linkedFilePaths, linkedSymbols);
+            _ = _ticketsVm.BeginDraftFromChatAsync(ctx);
             CurrentWorkspace = ProjectWorkspace.Tickets;
             CurrentView = _ticketsVm;
+        };
+
+        // Ticket draft cancelled → navigate back to Chat
+        _ticketsVm.OnCancelDraft = () =>
+        {
+            CurrentWorkspace = ProjectWorkspace.Chat;
+            CurrentView = _chatVm;
+        };
+
+        // Ticket draft approved with plan → navigate to Plans after save
+        _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols) =>
+        {
+            _plansVm.PrefillFromChat(title, goal, steps, filePaths, symbols);
+            CurrentWorkspace = ProjectWorkspace.Plans;
+            CurrentView = _plansVm;
         };
 
         // Chat → Plan creation bridge: navigate to Plans workspace and prefill editor

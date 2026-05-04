@@ -17,10 +17,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private readonly global::IronDev.Services.ITicketService         _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
     private readonly ITicketBuildOrchestrator                        _orchestrator;
+    private readonly IDraftTicketService                             _draftService;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
     private string _activeProjectPath = string.Empty;
+    private string _activeProjectName = string.Empty;
 
     // ── List panel ──────────────────────────────────────────────────────────
     [ObservableProperty] private ObservableCollection<TicketItem> _tickets = [];
@@ -117,7 +119,20 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         SelectedTicket != null
         && !string.IsNullOrWhiteSpace(EditTitle)
         && !string.IsNullOrWhiteSpace(_activeProjectPath)
-        && !IsBuildingTicket;
+        && !IsBuildingTicket
+        && !IsDraftMode;   // Build This is unavailable while reviewing a draft
+
+    // ── Draft Ticket state ────────────────────────────────────────────────────
+    [ObservableProperty] private bool       _isDraftMode;
+    [ObservableProperty] private bool       _isDraftGenerating;
+    [ObservableProperty] private string     _draftStatusMessage = string.Empty;
+    [ObservableProperty] private DraftTicket? _currentDraft;
+
+    // ── Shell navigation callbacks ────────────────────────────────────────────
+    /// <summary>Called when the user cancels a draft — shell navigates back to Chat.</summary>
+    public Action? OnCancelDraft { get; set; }
+    /// <summary>Called after a draft is approved with a plan — shell navigates to Plans.</summary>
+    public Action<string, string, string?, string?, string?>? OnApproveDraftWithPlan { get; set; }
 
     // Dropdown options
     public ObservableCollection<string> StatusOptions   { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
@@ -127,20 +142,23 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     public TicketsWorkspaceViewModel(
         global::IronDev.Services.ITicketService        ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
-        ITicketBuildOrchestrator                       orchestrator)
+        ITicketBuildOrchestrator                       orchestrator,
+        IDraftTicketService                            draftService)
     {
         _ticketService = ticketService;
         _memoryService = memoryService;
         _orchestrator  = orchestrator;
+        _draftService  = draftService;
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
 
-    internal async Task LoadAsync(Project project)
+    internal async Task LoadAsync(IronDev.Data.Models.Project project)
     {
         _activeProjectId   = project.Id;
         _activeTenantId    = project.TenantId;
         _activeProjectPath = project.LocalPath ?? string.Empty;
+        _activeProjectName = project.Name;
         await RefreshListAsync();
     }
 
@@ -500,6 +518,258 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditSummary         = summary;
         EditLinkedFilePaths = linkedFilePaths ?? string.Empty;
         EditLinkedSymbols   = linkedSymbols ?? string.Empty;
+    }
+
+    // ── Draft Ticket — entry point and commands ──────────────────────────────
+
+    /// <summary>
+    /// Called by ShellViewModel when the user clicks Ticket in Chat.
+    /// Calls IDraftTicketService to generate a DraftTicket (stub in Phase 1-3,
+    /// real LLM in Phase 4), then loads it into the editor in draft mode.
+    /// </summary>
+    public async Task BeginDraftFromChatAsync(ChatTicketContext ctx)
+    {
+        IsDraftMode        = true;
+        IsDraftGenerating  = true;
+        DraftStatusMessage = "Generating draft…";
+        HasDetail          = true;
+        IsEditing          = true;
+        IsNewTicket        = true;
+        ActiveTab          = TicketDetailTab.Overview;
+
+        try
+        {
+            var draft = await _draftService.GenerateDraftAsync(
+                _activeProjectId,
+                _activeProjectName,
+                ctx.ProposedTitle,
+                ctx.MessageText,
+                ctx.LinkedFilePaths,
+                ctx.LinkedSymbols);
+
+            draft.SourceChatSessionId = ctx.SessionId;
+            draft.SourceMessageId     = ctx.MessageId;
+            draft.SourceMessageText   = ctx.MessageText;
+            CurrentDraft = draft;
+
+            LoadDraftIntoEditor(draft);
+            DraftStatusMessage = draft.GenerationNote;
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Draft generation failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
+    /// <summary>Saves the draft ticket and exits draft mode.</summary>
+    [RelayCommand]
+    private async Task ApproveDraftAsync()
+    {
+        var savedId = await SaveDraftTicketAsync();
+        if (savedId <= 0) return;
+
+        IsDraftMode        = false;
+        CurrentDraft       = null;
+        DraftStatusMessage = string.Empty;
+        await RefreshListAsync();
+        SaveStatus = "Ticket created ✓";
+    }
+
+    /// <summary>Saves the draft ticket and then navigates to Plans to create a plan.</summary>
+    [RelayCommand]
+    private async Task ApproveDraftWithPlanAsync()
+    {
+        var savedId = await SaveDraftTicketAsync();
+        if (savedId <= 0) return;
+
+        IsDraftMode        = false;
+        CurrentDraft       = null;
+        DraftStatusMessage = string.Empty;
+        await RefreshListAsync();
+
+        // Build Plans prefill context from the ticket fields
+        var planTitle   = $"{EditTitle} — Implementation Plan";
+        var planGoal    = EditSummary;
+        var planSteps   = string.IsNullOrWhiteSpace(EditBackground) ? null : EditBackground;
+        var planFiles   = string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths;
+        var planSymbols = string.IsNullOrWhiteSpace(EditLinkedSymbols) ? null : EditLinkedSymbols;
+
+        OnApproveDraftWithPlan?.Invoke(planTitle, planGoal, planSteps, planFiles, planSymbols);
+    }
+
+    /// <summary>Re-generates all draft fields from the original chat context.</summary>
+    [RelayCommand]
+    private async Task RegenerateAllAsync()
+    {
+        if (CurrentDraft == null) return;
+
+        IsDraftGenerating  = true;
+        DraftStatusMessage = "Regenerating…";
+
+        try
+        {
+            var draft = await _draftService.GenerateDraftAsync(
+                _activeProjectId,
+                _activeProjectName,
+                CurrentDraft.SourceMessageText.Length > 80
+                    ? CurrentDraft.SourceMessageText[..80]
+                    : CurrentDraft.SourceMessageText,
+                CurrentDraft.SourceMessageText,
+                CurrentDraft.LinkedFilePaths,
+                CurrentDraft.LinkedSymbols);
+
+            draft.SourceChatSessionId = CurrentDraft.SourceChatSessionId;
+            draft.SourceMessageId     = CurrentDraft.SourceMessageId;
+            draft.SourceMessageText   = CurrentDraft.SourceMessageText;
+            CurrentDraft = draft;
+
+            LoadDraftIntoEditor(draft);
+            DraftStatusMessage = "Regenerated. " + draft.GenerationNote;
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Regeneration failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
+    /// <summary>Re-generates only the Tests sub-fields; other fields are preserved.</summary>
+    [RelayCommand]
+    private async Task RegenerateTestsAsync()
+    {
+        if (CurrentDraft == null) return;
+
+        IsDraftGenerating  = true;
+        DraftStatusMessage = "Regenerating tests…";
+
+        try
+        {
+            var updated = await _draftService.RegenerateTestsAsync(_activeProjectId, CurrentDraft);
+            CurrentDraft = updated;
+
+            // Update only test sub-fields; other fields are untouched
+            EditTestsUnitTests        = updated.UnitTests;
+            EditTestsIntegrationTests = updated.IntegrationTests;
+            EditTestsManualTests      = updated.ManualTests;
+            EditTestsRegressionTests  = updated.RegressionTests;
+            EditTestsBuildValidation  = updated.BuildValidation;
+
+            DraftStatusMessage = "Tests regenerated. " + updated.GenerationNote;
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Test regeneration failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
+    /// <summary>Discards the draft and navigates back to Chat.</summary>
+    [RelayCommand]
+    private void CancelDraft()
+    {
+        IsDraftMode        = false;
+        CurrentDraft       = null;
+        DraftStatusMessage = string.Empty;
+        ClearEditor();
+        OnCancelDraft?.Invoke();
+    }
+
+    // ── Private draft helpers ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shared save path used by both ApproveDraftAsync and ApproveDraftWithPlanAsync.
+    /// Packs test sub-fields into TechnicalNotes, then calls the existing SaveTicketAsync.
+    /// Returns the saved ticket ID, or 0 on failure.
+    /// </summary>
+    private async Task<long> SaveDraftTicketAsync()
+    {
+        if (string.IsNullOrWhiteSpace(EditTitle))
+        {
+            SaveStatus = "Title is required.";
+            return 0;
+        }
+
+        IsSaving   = true;
+        SaveStatus = "Saving…";
+
+        try
+        {
+            // Pack test sub-fields into TechnicalNotes before save
+            SyncTestsToTechnicalNotes();
+
+            var ticket = new IronDev.Data.Models.ProjectTicket
+            {
+                Id                     = 0,            // always a new ticket
+                ProjectId              = _activeProjectId,
+                SessionId              = Guid.NewGuid(),
+                Title                  = EditTitle.Trim(),
+                TicketType             = EditTicketType,
+                Priority               = EditPriority,
+                Summary                = string.IsNullOrWhiteSpace(EditSummary)              ? null : EditSummary.Trim(),
+                Background             = string.IsNullOrWhiteSpace(EditBackground)           ? null : EditBackground.Trim(),
+                Problem                = string.IsNullOrWhiteSpace(EditProblem)              ? null : EditProblem.Trim(),
+                AcceptanceCriteria     = string.IsNullOrWhiteSpace(EditAcceptanceCriteria)   ? null : EditAcceptanceCriteria.Trim(),
+                TechnicalNotes         = string.IsNullOrWhiteSpace(EditTechnicalNotes)       ? null : EditTechnicalNotes.Trim(),
+                Status                 = EditStatus,
+                Content                = EditSummary?.Trim() ?? string.Empty,
+                LinkedFilePaths        = string.IsNullOrWhiteSpace(EditLinkedFilePaths)      ? null : EditLinkedFilePaths.Trim(),
+                LinkedCodeIndexEntryIds = null,
+                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols)        ? null : EditLinkedSymbols.Trim()
+            };
+
+            var savedId = await _ticketService.SaveTicketAsync(ticket);
+            EditId      = savedId;
+            IsNewTicket = false;
+            SaveStatus  = "Saved ✓";
+            return savedId;
+        }
+        catch (Exception ex)
+        {
+            SaveStatus = $"Save failed: {ex.Message}";
+            return 0;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    /// <summary>
+    /// Loads all fields from a DraftTicket into the editor properties,
+    /// including the Tests sub-fields (which trigger TechnicalNotes sync).
+    /// </summary>
+    private void LoadDraftIntoEditor(DraftTicket draft)
+    {
+        EditId                 = 0;
+        EditTitle              = draft.Title;
+        EditStatus             = draft.Status;
+        EditPriority           = draft.Priority;
+        EditTicketType         = draft.TicketType;
+        EditSummary            = draft.Summary;
+        EditBackground         = draft.Background         ?? string.Empty;
+        EditProblem            = string.Empty;
+        EditAcceptanceCriteria = draft.AcceptanceCriteria ?? string.Empty;
+        EditLinkedFilePaths    = draft.LinkedFilePaths    ?? string.Empty;
+        EditLinkedSymbols      = draft.LinkedSymbols      ?? string.Empty;
+
+        // Set test sub-fields directly — each setter calls SyncTestsToTechnicalNotes
+        EditTestsUnitTests        = draft.UnitTests;
+        EditTestsIntegrationTests = draft.IntegrationTests;
+        EditTestsManualTests      = draft.ManualTests;
+        EditTestsRegressionTests  = draft.RegressionTests;
+        EditTestsBuildValidation  = draft.BuildValidation;
+
+        SaveStatus = string.Empty;
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

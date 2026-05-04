@@ -66,13 +66,55 @@
 
                     <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>  <!-- 0: draft banner -->
+                            <RowDefinition Height="Auto"/>  <!-- 1: tab header -->
+                            <RowDefinition Height="*"/>     <!-- 2: content -->
+                            <RowDefinition Height="Auto"/>  <!-- 3: footer -->
                         </Grid.RowDefinitions>
 
-                        <!-- Tab Header -->
-                        <Border Grid.Row="0" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1" Padding="16,0">
+                        <!-- ══ Draft Ticket Banner (shown only in IsDraftMode) ══ -->
+                        <Border Grid.Row="0"
+                                Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Background="#1A7C6BE8"
+                                BorderBrush="#7C6BE8"
+                                BorderThickness="0,0,0,1"
+                                Padding="16,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Draft icon + title -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="✦" Foreground="#7C6BE8" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Draft Ticket From Chat — review before saving."
+                                               Foreground="#7C6BE8" FontWeight="SemiBold" FontSize="13"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <!-- Status message / generating indicator -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DraftStatusMessage}"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12" VerticalAlignment="Center"
+                                               Visibility="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                    <TextBlock Text="⟳ Generating…"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12" FontStyle="Italic" VerticalAlignment="Center"
+                                               Visibility="{Binding IsDraftGenerating, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </StackPanel>
+
+                                <!-- AI badge -->
+                                <Border Grid.Column="2" Background="#7C6BE8" CornerRadius="3" Padding="8,3">
+                                    <TextBlock Text="AI GENERATED" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Tab Header (shifted to row 1 when draft banner shown) -->
+                        <Border Grid.Row="1" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1" Padding="16,0">
                             <StackPanel Orientation="Horizontal">
                                 <StackPanel.Resources>
                                     <Style x:Key="TicketTabStyle" TargetType="RadioButton">
@@ -120,7 +162,7 @@
                         </Border>
 
                         <!-- Content Area -->
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24">
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="24">
                             <Grid>
                                 <!-- ═══ TAB: Overview ═══ -->
                                 <StackPanel>
@@ -171,7 +213,8 @@
                                         </StackPanel>
                                     </controls:SurfacePanel>
                                              
-                                    <Grid Margin="0,8,0,0">
+                                    <Grid Margin="0,8,0,0"
+                                          Visibility="{Binding IsDraftMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
@@ -190,7 +233,7 @@
                                                 Style="{StaticResource AppButton.Secondary}"
                                                 Padding="16,8" Margin="0,0,8,0"/>
 
-                                        <!-- Build This — Phase 1 scaffold -->
+                                        <!-- Build This -->
                                         <Button Grid.Column="2" Content="⚙ Build This"
                                                 Command="{Binding BuildSelectedTicketCommand}"
                                                 Style="{StaticResource AppButton.Secondary}"
@@ -413,11 +456,70 @@
                                 </StackPanel>
                             </Grid>
                         </ScrollViewer>
+
+                        <!-- ══ Draft Action Bar (Grid.Row 3, visible only in IsDraftMode) ══ -->
+                        <Border Grid.Row="3"
+                                Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Background="{StaticResource Background/Surface}"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="0,1,0,0"
+                                Padding="16,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Regenerate buttons -->
+                                <Button Grid.Column="0" Content="↺ Regenerate All"
+                                        Command="{Binding RegenerateAllCommand}"
+                                        Style="{StaticResource AppButton.Ghost}"
+                                        IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
+                                        Padding="14,7" Margin="0,0,6,0"
+                                        ToolTip="Re-generate all draft fields from the original chat context"/>
+                                <Button Grid.Column="1" Content="↺ Regenerate Tests"
+                                        Command="{Binding RegenerateTestsCommand}"
+                                        Style="{StaticResource AppButton.Ghost}"
+                                        IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
+                                        Padding="14,7" Margin="0,0,0,0"
+                                        ToolTip="Re-generate only the Tests / Validation fields"/>
+
+                                <!-- Status -->
+                                <TextBlock Grid.Column="2" Text="{Binding SaveStatus}"
+                                           Foreground="{StaticResource Success}"
+                                           VerticalAlignment="Center" FontSize="12"
+                                           HorizontalAlignment="Center"/>
+
+                                <!-- Approve buttons -->
+                                <Button Grid.Column="3" Content="✕ Cancel"
+                                        Command="{Binding CancelDraftCommand}"
+                                        Style="{StaticResource AppButton.Secondary}"
+                                        Padding="14,7" Margin="0,0,8,0"
+                                        ToolTip="Discard draft and return to Chat"/>
+                                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                                    <Button Content="✓ Create Ticket"
+                                            Command="{Binding ApproveDraftCommand}"
+                                            Style="{StaticResource AppButton.Primary}"
+                                            IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
+                                            Padding="18,7" Margin="0,0,6,0"
+                                            ToolTip="Save this ticket to the database"/>
+                                    <Button Content="✓ Create Ticket + Plan"
+                                            Command="{Binding ApproveDraftWithPlanCommand}"
+                                            Style="{StaticResource AppButton.Secondary}"
+                                            IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
+                                            Padding="18,7"
+                                            ToolTip="Save ticket and navigate to Plans to create an implementation plan"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </Grid>
 
                         <!-- ═══ BUILD PREVIEW PANEL ═══ -->
                         <controls:SurfacePanel
-                            Grid.Row="2"
+                            Grid.Row="3"
                             Variant="Subtle"
                             Margin="0,12,0,0"
                             Padding="0"
