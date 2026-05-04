@@ -9,12 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\IronDeveloper.Controls\IronDeveloperControls\IronDeveloperControls.csproj" />
     <ProjectReference Include="..\IronDev.Core\IronDev.Core.csproj" />
     <ProjectReference Include="..\IronDev.Infrastructure\IronDev.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
   </ItemGroup>

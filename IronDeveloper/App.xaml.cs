@@ -1,17 +1,15 @@
 using System;
 using System.Windows;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
-using IronDev.AI;
-using IronDev.Core.Auth;
-using IronDev.Data;
-using IronDev.Infrastructure.Auth;
-using IronDev.Services;
-using IronDev.Agent.Services;
-using IronDev.Core;
-using IronDev.Agent.ViewModels;
+using IronDev.Agent.ViewModels.Shell;
+using IronDev.Agent.ViewModels.Workflow;
+using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Agent.Views;
+using IronDev.Agent.Services;
+using IronDev.Agent.Services.Interfaces;
+using IronDev.Agent.Services.Mock;
 
 namespace IronDev.Agent;
 
@@ -27,39 +25,48 @@ public partial class App : Application
             .ConfigureServices((context, services) =>
             {
                 // ── Data & Infrastructure ─────────────────────────────────────
-                services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
-                // Scoped tenant context — DevelopmentTenantContext always returns TenantId=1 for local dev.
-                // Will be replaced by session/JWT context in Sprint 2 without changing any service code.
-                services.AddScoped<ICurrentTenantContext, DevelopmentTenantContext>();
-                services.AddScoped<IProjectService, ProjectService>();
-                services.AddScoped<IChatHistoryService, ChatHistoryService>();
-                services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
-                services.AddScoped<ITicketService, TicketService>();
-                services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
-                services.AddScoped<IWorkbenchGeneratorService, WorkbenchGeneratorService>();
-                services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
+                services.AddSingleton<global::IronDev.Data.IDbConnectionFactory, global::IronDev.Data.SqlConnectionFactory>();
+                
+                // Tenancy Bridge
+                services.AddSingleton<AgentTenantContext>();
+                services.AddSingleton<global::IronDev.Core.Auth.ICurrentTenantContext>(sp => sp.GetRequiredService<AgentTenantContext>());
+                
+                // Real Services from Infrastructure
+                services.AddTransient<global::IronDev.Services.IUserService, global::IronDev.Services.UserService>();
+                services.AddTransient<global::IronDev.Services.IProjectService, global::IronDev.Services.ProjectService>();
+                services.AddTransient<global::IronDev.Services.ITicketService, global::IronDev.Services.TicketService>();
+                services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
+                services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
+                services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
+                services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
+                services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
+                var openAiKey = context.Configuration["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                var openAiModel = context.Configuration["OPENAI_MODEL"] ?? Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-4o";
+                services.AddTransient<global::IronDev.Core.ILLMService>(sp => 
+                    new global::IronDev.Infrastructure.Services.OpenAiLlmService(openAiKey, openAiModel));
 
-                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                if (string.IsNullOrWhiteSpace(apiKey))
-                    throw new InvalidOperationException("OPENAI_API_KEY is not set.");
+                // ── Workflow ViewModels ───────────────────────────────────────
+                services.AddTransient<LoginViewModel>();
+                services.AddTransient<ProjectHubViewModel>();
+                services.AddTransient<CreateProjectViewModel>();
+                services.AddTransient<ProjectOverviewViewModel>();
 
-                services.AddSingleton<ILLMService>(sp => new OpenAiLlmService(apiKey));
+                // ── Workspace ViewModels ──────────────────────────────────────
+                services.AddTransient<ChatWorkspaceViewModel>();
+                services.AddTransient<TicketsWorkspaceViewModel>();
+                services.AddTransient<DecisionsWorkspaceViewModel>();
+                services.AddTransient<ImplementationPlansWorkspaceViewModel>();
+                services.AddTransient<SettingsWorkspaceViewModel>();
 
-                // ── Original ViewModels ───────────────────────────────────────
-                services.AddTransient<ProjectPanelViewModel>();
-                services.AddTransient<ChatViewModel>();
-                services.AddTransient<OutputPanelViewModel>();
-                services.AddTransient<CodeWorkbenchViewModel>();
-                services.AddTransient<MainViewModel>();
+                // Shell
+                services.AddSingleton<ShellViewModel>();
+                services.AddSingleton<MainWindow>();
 
-                // ── Views ─────────────────────────────────────────────────────
-                services.AddTransient<MainWindow>();
-                services.AddTransient<CodeWorkbenchWindow>();
+                // Mocks for pending features
+                services.AddSingleton<global::IronDev.Agent.Services.Interfaces.IProjectShellService, global::IronDev.Agent.Services.Mock.MockProjectShellService>();
 
-                // ── Workspace ViewModels (from builder branch) ────────────────
-                services.AddTransient<IronDev.Agent.ViewModels.Workspaces.TicketsWorkspaceViewModel>();
-
-                // ── Build Ticket MVP — Phase 2 + 3 ───────────────────────────
+                // ── Build Ticket MVP — Phase 2 + 3 ─────────────────────────────
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IBuilderContextService,
                     global::IronDev.Infrastructure.Builder.BuilderContextService>();
@@ -86,9 +93,7 @@ public partial class App : Application
     protected override async void OnExit(ExitEventArgs e)
     {
         using (_host)
-        {
             await _host.StopAsync(TimeSpan.FromSeconds(5));
-        }
 
         base.OnExit(e);
     }

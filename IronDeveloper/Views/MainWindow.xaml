@@ -3,487 +3,366 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:viewmodels="clr-namespace:IronDev.Agent.ViewModels"
+        xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Shell"
+        xmlns:conv="clr-namespace:IronDev.Agent.Converters"
+        xmlns:controls="http://schemas.irondeveloper.com/controls"
         mc:Ignorable="d"
-        Title="IronDeveloper Agent" Height="900" Width="1450"
+        Title="IronDev" 
+        Height="860" Width="1300"
         WindowStartupLocation="CenterScreen"
-        d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel, IsDesignTimeCreatable=False}">
-    
-    <Grid Margin="10">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="310" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="380" />
-        </Grid.ColumnDefinitions>
+        WindowStyle="None"
+        Background="{StaticResource Background/App}">
 
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- Left Panel: Project Memory                                    -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel DataContext="{Binding ProjectPanel}">
-                    <TextBlock Text="Project Memory" Style="{StaticResource CardTitleStyle}" />
-                    
-                    <TextBlock Text="Selected Project:" Style="{StaticResource LabelStyle}" />
-                    <TextBlock Text="{Binding SelectedProject}" Style="{StaticResource BodyTextStyle}" Margin="0,0,0,10" />
-                    
-                    <TextBlock Text="Local Path:" Style="{StaticResource LabelStyle}" />
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0" Text="{Binding LocalPath}" Style="{StaticResource ModernTextBoxStyle}" MinHeight="36" Margin="0,0,8,0" />
-                        <Button Grid.Column="1" Content="Index Project" Command="{Binding IndexProjectCommand}" Style="{StaticResource SecondaryButtonStyle}" MinHeight="36" MinWidth="100" Padding="12,5" />
-                    </Grid>
-                    
-                    <TextBlock Text="Summary:" Style="{StaticResource LabelStyle}" />
-                    <Border Background="{StaticResource SoftPanelBrush}"
-                            BorderBrush="{StaticResource BorderSoftBrush}"
-                            BorderThickness="1" CornerRadius="12" Padding="12"
-                            Margin="0,0,0,8" MinHeight="60">
-                        <Grid>
-                            <TextBlock Text="{Binding ProjectSummary}" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap" />
-                            <TextBlock Text="'No summary has been generated for this project yet. Start chatting to build context.'"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="12,20,12,20">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
-                                        <Setter Property="FontStyle" Value="Italic" />
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ProjectSummary}" Value="">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding ProjectSummary}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </Grid>
-                    </Border>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="38" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      ResizeBorderThickness="4"/>
+    </WindowChrome.WindowChrome>
 
-                    <!-- Recent Decisions -->
-                    <TextBlock Text="Recent Decisions:" Style="{StaticResource LabelStyle}" />
-                    <Border Background="{StaticResource SoftPanelBrush}"
-                            BorderBrush="{StaticResource BorderSoftBrush}"
-                            BorderThickness="1" CornerRadius="12" Padding="8"
-                            MinHeight="60">
-                        <Grid>
-                            <ItemsControl ItemsSource="{Binding Decisions}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="White"
-                                                BorderBrush="{StaticResource BorderSoftBrush}"
-                                                BorderThickness="1" CornerRadius="10"
-                                                Padding="10" Margin="0,0,0,6">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{StaticResource HeadingBrush}" />
-                                                <TextBlock Text="{Binding Detail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="No recent decisions captured yet." HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,20,0,20">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Decisions.Count}" Value="0">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Decisions}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </Grid>
-                    </Border>
+    <Window.Resources>
+        <!-- Window Command Buttons Style -->
+        <Style x:Key="WindowControlButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#20FFFFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
-                    <!-- Recent Tickets -->
-                    <TextBlock Text="Recent Tickets:" Style="{StaticResource LabelStyle}" Margin="0,16,0,4" />
-                    <Border Background="{StaticResource SoftPanelBrush}"
-                            BorderBrush="{StaticResource BorderSoftBrush}"
-                            BorderThickness="1" CornerRadius="12" Padding="8"
-                            MinHeight="60">
-                        <Grid>
-                            <ItemsControl ItemsSource="{Binding Tickets}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="White"
-                                                BorderBrush="{StaticResource BorderSoftBrush}"
-                                                BorderThickness="1" CornerRadius="10"
-                                                Padding="10" Margin="0,0,0,6"
-                                                Cursor="Hand"
-                                                MouseLeftButtonUp="Ticket_MouseLeftButtonUp"
-                                                Tag="{Binding}">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
-                                                           Foreground="{StaticResource HeadingBrush}"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                    <!-- Priority badge -->
-                                                    <Border Background="#DBEAFE" CornerRadius="6" Padding="6,2" Margin="0,0,6,0">
-                                                        <TextBlock Text="{Binding Priority}" FontSize="11" FontWeight="SemiBold" Foreground="#1E40AF" />
-                                                    </Border>
-                                                    <!-- Status badge -->
-                                                    <Border Background="#DDF7E8" CornerRadius="6" Padding="6,2" Margin="0,0,6,0">
-                                                        <TextBlock Text="{Binding Status}" FontSize="11" FontWeight="SemiBold" Foreground="#117A42" />
-                                                    </Border>
-                                                    <TextBlock Text="{Binding CreatedDate, StringFormat=d MMM yyyy}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="No tickets saved yet." HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,20,0,20">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Tickets.Count}" Value="0">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Tickets}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </Grid>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
+        <Style x:Key="WindowCloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E81123"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
 
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- Center Panel: Chat                                            -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-            <Grid DataContext="{Binding Chat}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+    <Border CornerRadius="14" ClipToBounds="True" BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="1">
+        <Grid Background="{StaticResource Background/App}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="38"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Conversation" Style="{StaticResource CardTitleStyle}" />
-
-                <Border Grid.Row="1" Background="{StaticResource SoftPanelBrush}"
-                        BorderBrush="{StaticResource BorderSoftBrush}"
-                        BorderThickness="1" CornerRadius="14" Padding="12" Margin="0,0,0,14">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Messages}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="0,0,0,12">
-                                        <Border x:Name="Bubble" MaxWidth="430" Padding="12" CornerRadius="14"
-                                                HorizontalAlignment="Left"
-                                                Background="{StaticResource AssistantBubbleBrush}"
-                                                BorderBrush="{StaticResource BorderSoftBrush}" BorderThickness="1">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Role}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" />
-                                                <TextBlock Text="{Binding Message}" Margin="0,4,0,6" TextWrapping="Wrap" Foreground="{StaticResource BodyBrush}" FontSize="14" />
-                                                <TextBlock Text="{Binding CreatedDate, StringFormat=t}" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource MutedBrush}" />
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                    <DataTemplate.Triggers>
-                                        <DataTrigger Binding="{Binding Role}" Value="user">
-                                            <Setter TargetName="Bubble" Property="HorizontalAlignment" Value="Right" />
-                                            <Setter TargetName="Bubble" Property="Background" Value="#2563EB" />
-                                            <Setter TargetName="Bubble" Property="BorderThickness" Value="0" />
-                                            <Setter TargetName="Bubble" Property="TextElement.Foreground" Value="White" />
-                                        </DataTrigger>
-                                    </DataTemplate.Triggers>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Border>
-
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBox Grid.Column="0" Text="{Binding PromptText, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource ModernTextBoxStyle}" MinHeight="44"
-                             AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0" />
-
-                    <Button Grid.Column="1" Content="Send" Command="{Binding SendMessageCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" MinWidth="90" Margin="0,0,12,0"/>
-
-                    <Button Grid.Column="2" Content="Create Ticket" Command="{Binding GenerateTicketCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" MinWidth="120" Margin="0,0,12,0" />
-
-                    <Button Grid.Column="3" Content="Save Decision" Command="{Binding SaveDecisionCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" MinWidth="120" />
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- Right Panel: Structured Ticket Display                        -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-            <Grid DataContext="{Binding OutputPanel}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0" Text="Ticket Details" Style="{StaticResource CardTitleStyle}" />
-
-                <!-- Status bar -->
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock Text="Status:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <Border Background="{StaticResource ReadyBadgeBrush}" CornerRadius="10" Padding="8,3">
-                        <TextBlock Text="{Binding StatusText}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ReadyBadgeTextBrush}" />
-                    </Border>
-                </StackPanel>
-
-                <!-- Ticket content (scrollable) -->
-                <Border Grid.Row="2" Background="{StaticResource SoftPanelBrush}"
-                        BorderBrush="{StaticResource BorderSoftBrush}"
-                        BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,0,12">
-                    <Grid>
-                        <!-- Structured ticket view -->
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <ScrollViewer.Style>
-                                <Style TargetType="ScrollViewer">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasTicket}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ScrollViewer.Style>
-                            <StackPanel>
-                                <!-- Title -->
-                                <TextBlock Text="{Binding TicketTitle}" FontSize="16" FontWeight="Bold"
-                                           Foreground="{StaticResource HeadingBrush}" TextWrapping="Wrap"
-                                           Margin="0,0,0,10" />
-
-                                <!-- Type / Priority / Status badges -->
-                                <WrapPanel Margin="0,0,0,14">
-                                    <Border Background="#DBEAFE" CornerRadius="6" Padding="8,3" Margin="0,0,6,4">
-                                        <TextBlock Text="{Binding TicketType}" FontSize="11" FontWeight="SemiBold" Foreground="#1E40AF" />
-                                    </Border>
-                                    <Border Background="#FEF3C7" CornerRadius="6" Padding="8,3" Margin="0,0,6,4">
-                                        <TextBlock Text="{Binding TicketPriority}" FontSize="11" FontWeight="SemiBold" Foreground="#92400E" />
-                                    </Border>
-                                    <Border Background="#DDF7E8" CornerRadius="6" Padding="8,3" Margin="0,0,6,4">
-                                        <TextBlock Text="{Binding TicketStatus}" FontSize="11" FontWeight="SemiBold" Foreground="#117A42" />
-                                    </Border>
-                                </WrapPanel>
-
-                                <!-- Summary -->
-                                <Border BorderBrush="{StaticResource BorderSoftBrush}" BorderThickness="0,1,0,0" Margin="0,4,0,12" />
-                                <TextBlock Text="Summary" FontSize="13" FontWeight="Bold"
-                                           Foreground="{StaticResource HeadingBrush}" Margin="0,0,0,6">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketSummary}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding TicketSummary}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                            <Setter Property="Margin" Value="0,0,0,12" />
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketSummary}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <!-- Background -->
-                                <TextBlock Text="Background" FontSize="13" FontWeight="Bold"
-                                           Foreground="{StaticResource HeadingBrush}" Margin="0,16,0,6">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketBackground}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding TicketBackground}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                            <Setter Property="Margin" Value="0,0,0,12" />
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketBackground}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <!-- Problem -->
-                                <TextBlock Text="Problem" FontSize="13" FontWeight="Bold"
-                                           Foreground="{StaticResource HeadingBrush}" Margin="0,16,0,6">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketProblem}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding TicketProblem}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                            <Setter Property="Margin" Value="0,0,0,12" />
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketProblem}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <!-- Acceptance Criteria -->
-                                <TextBlock Text="Acceptance Criteria" FontSize="13" FontWeight="Bold"
-                                           Foreground="{StaticResource HeadingBrush}" Margin="0,16,0,6">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketAcceptanceCriteria}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding TicketAcceptanceCriteria}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                            <Setter Property="Margin" Value="0,0,0,12" />
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketAcceptanceCriteria}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <!-- Technical Notes -->
-                                <TextBlock Text="Technical Notes" FontSize="13" FontWeight="Bold"
-                                           Foreground="{StaticResource HeadingBrush}" Margin="0,16,0,6">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketTechnicalNotes}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding TicketTechnicalNotes}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                            <Setter Property="Margin" Value="0,0,0,12" />
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketTechnicalNotes}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <!-- Created Date -->
-                                <TextBlock Text="{Binding TicketCreatedDate, StringFormat='Created: {0}'}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
-                                            <Setter Property="Margin" Value="0,4,0,0" />
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding TicketCreatedDate}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                        </ScrollViewer>
-
-                        <!-- Empty state -->
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20,40">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasTicket}" Value="False">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
-                            <TextBlock Text="No Ticket Selected" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource HeadingBrush}" HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="Select a ticket from the left panel or generate one from the chat to view the details here."
-                                       TextAlignment="Center" Style="{StaticResource MutedTextStyle}" MaxWidth="280" />
+            <!-- ══ TITLE BAR ══════════════════════════════════════════════════ -->
+            <Border Grid.Row="0" Grid.ColumnSpan="2"
+                    Background="{StaticResource MetalBrush}"
+                    BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <!-- Branding & Tenant (Left) -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
+                        <Image Source="pack://application:,,,/IronDeveloperControls;component/Icons/logo.png" 
+                               Width="18" Height="18" Margin="0,0,10,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="IronDev" 
+                                   Foreground="{StaticResource Text/Secondary}" 
+                                   FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsAuthenticated, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Border Background="{StaticResource Background/Interactive}" Padding="6,2" CornerRadius="4" Margin="12,0,0,0">
+                                <TextBlock Text="PREVIEW" Foreground="{StaticResource Accent/Primary}" FontSize="9" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Text="  ·  " Foreground="{StaticResource TextBrush}" FontSize="12" Opacity="0.3" Margin="10,0"/>
+                            <TextBlock Text="{Binding CurrentTenant.Name}" Foreground="{StaticResource Accent/Primary}" 
+                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8"/>
                         </StackPanel>
+                    </StackPanel>
+
+                    <!-- User Menu & Window Controls (Right) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        
+                        <!-- User Menu Dropdown -->
+                        <Grid Visibility="{Binding IsAuthenticated, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Margin="0,0,10,0" VerticalAlignment="Center">
+                            <ToggleButton x:Name="UserMenuButton"
+                                          Padding="8,4"
+                                          Cursor="Hand"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          FocusVisualStyle="{x:Null}"
+                                          WindowChrome.IsHitTestVisibleInChrome="True">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{TemplateBinding Background}"
+                                                            BorderThickness="0"
+                                                            CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ToggleButton.Style>
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource Icon.Nav.Settings}" Fill="{StaticResource Text/Secondary}"
+                                          Width="14" Height="14" Margin="0,0,8,0" Stretch="Uniform" Opacity="0.7"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding CurrentUser.DisplayName}"
+                                                   Foreground="{StaticResource Text/Secondary}"
+                                                   FontSize="11" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding CurrentUser.Email}"
+                                                   Foreground="{StaticResource Text/Muted}"
+                                                   FontSize="10" Opacity="0.7"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ToggleButton>
+
+                            <Popup IsOpen="{Binding IsChecked, ElementName=UserMenuButton}" 
+                                   PlacementTarget="{Binding ElementName=UserMenuButton}"
+                                   Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                <Border Style="{StaticResource IronMetalPanel}" Padding="8" Margin="0,8,0,0" Width="220">
+                                    <StackPanel>
+                                        <!-- Identity header -->
+                                        <Border Padding="12,10,12,10"
+                                                BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1"
+                                                Margin="0,0,0,4">
+                                            <StackPanel>
+                                                <TextBlock Text="SIGNED IN AS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,6"/>
+                                                <TextBlock Text="{Binding CurrentUser.DisplayName}"
+                                                           Foreground="{StaticResource Text/Primary}"
+                                                           FontSize="13" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding CurrentUser.Email, FallbackValue='Email not available'}"
+                                                           Foreground="{StaticResource Text/Muted}"
+                                                           FontSize="11" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding CurrentTenant.Name, FallbackValue='No tenant'}"
+                                                           Foreground="{StaticResource Accent/Primary}"
+                                                           FontSize="10" Margin="0,4,0,0" Opacity="0.8"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Actions -->
+                                        <Button Content="My Account" Command="{Binding OpenMyAccountCommand}" 
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
+                                        <Button Content="Settings" Command="{Binding OpenSettingsCommand}" 
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
+                                        <Separator Background="{StaticResource DarkBorderBrush}" Margin="4,4"/>
+                                        <Button Content="Switch Project" Command="{Binding NavigateWorkspaceCommand}" CommandParameter="SwitchProject"
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
+                                        <Button Content="Sign out" Command="{Binding SignOutCommand}" 
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"
+                                                Foreground="{StaticResource StatusErrorBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <!-- Window Controls -->
+                        <Button Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click">
+                            <Path Data="{StaticResource Icon.Window.Minimize}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                        <Button Style="{StaticResource WindowControlButton}" Click="MaximizeButton_Click">
+                            <Path Data="{StaticResource Icon.Window.Maximize}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                        <Button Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click">
+                            <Path Data="{StaticResource Icon.Window.Close}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══ SIDEBAR ════════════════════════════════════════════════════ -->
+            <Border Grid.Row="1" Grid.Column="0" Width="100"
+                    Visibility="{Binding ShowSidebar, Converter={StaticResource BoolToVisibilityConverter}}"
+                    Margin="12,12,0,12"
+                    Style="{StaticResource IronMetalPanel}">
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel HorizontalAlignment="Center" Margin="0,18,0,18">
+
+                        <TextBlock Text="CORE" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="0,0,0,10" Opacity="0.5"/>
+                        
+                        <!-- Hub / Home button -->
+                        <controls:NavRailItem IconData="{StaticResource Icon.Nav.Projects}" 
+                                             Command="{Binding NavigateWorkspaceCommand}" CommandParameter="ProjectHub"
+                                             ToolTip="Project Hub"
+                                             IsActive="{Binding CurrentShellMode, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=ProjectHub}"
+                                             Margin="0,0,0,20"/>
+
+                        <!-- Project-active navigation buttons -->
+                        <StackPanel Visibility="{Binding HasActiveProject, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="PROJECT" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="0,0,0,10" Opacity="0.5"/>
+                            
+                            <!-- Overview -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Branch}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Overview"
+                                                 ToolTip="Overview"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Overview}"
+                                                 Margin="0,0,0,10"/>
+
+                            <!-- Chat -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Chat}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Chat"
+                                                 ToolTip="Chat"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Chat}"
+                                                 Margin="0,0,0,10"/>
+
+                            <!-- Tickets -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Tickets}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Tickets"
+                                                 ToolTip="Tickets"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Tickets}"
+                                                 Margin="0,0,0,10"/>
+
+                            <!-- Plans -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Layers}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Plans"
+                                                 ToolTip="Plans"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Plans}"
+                                                 Margin="0,0,0,10"/>
+
+                            <!-- Decisions -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Decisions}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Decisions"
+                                                 ToolTip="Decisions"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}"
+                                                 Margin="0,0,0,10"/>
+
+                        </StackPanel>
+
+                        <TextBlock Text="SYSTEM" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="10,10,0,10" Opacity="0.5"/>
+                        
+                        <!-- Settings — always shown when authenticated -->
+                        <controls:NavRailItem IconData="{StaticResource Icon.Nav.Settings}" 
+                                             Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Settings"
+                                             ToolTip="Settings"
+                                             IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Settings}"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ══ WORKSPACE AREA ══════════════════════════════════════════════ -->
+            <Grid Grid.Row="1" Grid.Column="1" Margin="24,14,24,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- PROJECT CONTEXT STRIP -->
+                <Border Grid.Row="0" Margin="0,0,0,20" Padding="20,14"
+                        Background="{StaticResource Background/Panel}" CornerRadius="10"
+                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                        Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="PROJECT" Style="{StaticResource IronMetaLabel}"/>
+                            <TextBlock Text="{Binding ActiveProjectName}" Style="{StaticResource IronMetaValue}"
+                                       FontSize="15" FontWeight="Bold"/>
+
+                            <TextBlock Text="PATH"    Style="{StaticResource IronMetaLabel}"/>
+                            <TextBlock Text="{Binding ActiveProjectPath}" Style="{StaticResource IronMetaValue}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="350"/>
+
+                            <TextBlock Text="MODEL"   Style="{StaticResource IronMetaLabel}"/>
+                            <TextBlock Text="{Binding ActiveModel}" Style="{StaticResource IronMetaValue}"
+                                       Foreground="{StaticResource Accent/Primary}" FontWeight="Bold"/>
+
+                            <TextBlock Text="STATUS"  Style="{StaticResource IronMetaLabel}"/>
+                            
+                            <!-- Actionable status pill -->
+                            <ToggleButton x:Name="StatusPill" IsChecked="{Binding IsStatusPopupOpen}"
+                                          Padding="8,4" Margin="8,0,0,0" Cursor="Hand"
+                                          FocusVisualStyle="{x:Null}">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{TemplateBinding Background}"
+                                                            BorderThickness="0" CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ToggleButton.Style>
+                                <TextBlock Text="{Binding ActiveStatus}"
+                                           Foreground="{Binding ActiveStatus, Converter={StaticResource StatusToBrushConverter}}"
+                                           FontSize="12" FontWeight="Bold"/>
+                            </ToggleButton>
+                        </StackPanel>
+
+                        <!-- Status Popup -->
+                        <Popup IsOpen="{Binding IsStatusPopupOpen}"
+                               PlacementTarget="{Binding ElementName=StatusPill}"
+                               Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                            <Border Style="{StaticResource IronMetalPanel}" Padding="16" Margin="0,8,0,0" Width="200">
+                                <StackPanel>
+                                    <TextBlock Text="Workflow Actions" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,12"/>
+                                    
+                                    <Button Content="Index Now" Command="{Binding IndexNowCommand}" 
+                                            Style="{StaticResource AppButton.Primary}" Margin="0,0,0,8"
+                                            Visibility="{Binding StatusNeedsIndex, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    
+                                    <Button Content="Open Overview" Command="{Binding OpenOverviewCommand}"
+                                            Style="{StaticResource AppButton.Secondary}"/>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
                     </Grid>
                 </Border>
 
-                <!-- Action Buttons Bottom -->
-                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Open in Workbench" Command="{Binding OpenWorkbenchCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" MinWidth="130" Margin="0,0,10,0" />
-                            
-                    <Button Content="Save Ticket" Command="{Binding SaveTicketCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" MinWidth="130">
-                        <Button.Visibility>
-                            <Binding Path="IsNewPreview">
-                                <Binding.Converter>
-                                    <BooleanToVisibilityConverter />
-                                </Binding.Converter>
-                            </Binding>
-                        </Button.Visibility>
-                    </Button>
-                </StackPanel>
+                <!-- DYNAMIC CONTENT HOST -->
+                <ContentControl Grid.Row="1" Content="{Binding CurrentView}"/>
             </Grid>
-        </Border>
-    </Grid>
+        </Grid>
+    </Border>
 </Window>

@@ -31,7 +31,7 @@ public sealed class TicketService : ITicketService
     {
         using var connection = _connectionFactory.CreateConnection();
 
-        // Ownership guard: reject inserts where the project belongs to a different tenant.
+        // Ownership guard: reject operations where the project belongs to a different tenant.
         const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
         var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
             ownerSql,
@@ -42,37 +42,85 @@ public sealed class TicketService : ITicketService
             throw new System.UnauthorizedAccessException(
                 $"Project {ticket.ProjectId} does not belong to tenant {_tenant.TenantId}.");
 
-        const string sql = """
-            INSERT INTO dbo.ProjectTickets
-                (TenantId, ProjectId, SessionId, Title, TicketType, Priority,
-                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                 Status, Content)
-            OUTPUT inserted.Id
-            VALUES
-                (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
-                 @Summary, @Background, @Problem, @AcceptanceCriteria, @TechnicalNotes,
-                 @Status, @Content);
-            """;
+        if (ticket.Id > 0)
+        {
+            // Update flow
+            const string updateSql = """
+                UPDATE dbo.ProjectTickets
+                SET Title = @Title, TicketType = @TicketType, Priority = @Priority,
+                    Summary = @Summary, Background = @Background, Problem = @Problem,
+                    AcceptanceCriteria = @AcceptanceCriteria, TechnicalNotes = @TechnicalNotes,
+                    Status = @Status, Content = @Content, LinkedFilePaths = @LinkedFilePaths,
+                    LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds, LinkedSymbols = @LinkedSymbols
+                WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
+                """;
 
-        return await connection.QuerySingleAsync<long>(new CommandDefinition(
-            sql,
-            new
-            {
-                TenantId = _tenant.TenantId,
-                ticket.ProjectId,
-                ticket.SessionId,
-                ticket.Title,
-                ticket.TicketType,
-                ticket.Priority,
-                ticket.Summary,
-                ticket.Background,
-                ticket.Problem,
-                ticket.AcceptanceCriteria,
-                ticket.TechnicalNotes,
-                ticket.Status,
-                ticket.Content
-            },
-            cancellationToken: cancellationToken));
+            var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
+                updateSql,
+                new
+                {
+                    ticket.Id,
+                    TenantId = _tenant.TenantId,
+                    ticket.ProjectId,
+                    ticket.Title,
+                    ticket.TicketType,
+                    ticket.Priority,
+                    ticket.Summary,
+                    ticket.Background,
+                    ticket.Problem,
+                    ticket.AcceptanceCriteria,
+                    ticket.TechnicalNotes,
+                    ticket.Status,
+                    ticket.Content,
+                    ticket.LinkedFilePaths,
+                    ticket.LinkedCodeIndexEntryIds,
+                    ticket.LinkedSymbols
+                },
+                cancellationToken: cancellationToken));
+                
+            if (rowsAffected == 0)
+                throw new System.InvalidOperationException("Ticket update failed or ticket not found/not owned.");
+
+            return ticket.Id;
+        }
+        else
+        {
+            // Insert flow
+            const string insertSql = """
+                INSERT INTO dbo.ProjectTickets
+                    (TenantId, ProjectId, SessionId, Title, TicketType, Priority,
+                     Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
+                     Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
+                OUTPUT inserted.Id
+                VALUES
+                    (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
+                     @Summary, @Background, @Problem, @AcceptanceCriteria, @TechnicalNotes,
+                     @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
+                """;
+
+            return await connection.QuerySingleAsync<long>(new CommandDefinition(
+                insertSql,
+                new
+                {
+                    TenantId = _tenant.TenantId,
+                    ticket.ProjectId,
+                    ticket.SessionId,
+                    ticket.Title,
+                    ticket.TicketType,
+                    ticket.Priority,
+                    ticket.Summary,
+                    ticket.Background,
+                    ticket.Problem,
+                    ticket.AcceptanceCriteria,
+                    ticket.TechnicalNotes,
+                    ticket.Status,
+                    ticket.Content,
+                    ticket.LinkedFilePaths,
+                    ticket.LinkedCodeIndexEntryIds,
+                    ticket.LinkedSymbols
+                },
+                cancellationToken: cancellationToken));
+        }
     }
 
     public async Task<IReadOnlyList<ProjectTicket>> GetRecentTicketsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default)
@@ -81,7 +129,7 @@ public sealed class TicketService : ITicketService
             SELECT TOP (@Take)
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                Status, Content, CreatedDate
+                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
             FROM dbo.ProjectTickets
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -104,7 +152,7 @@ public sealed class TicketService : ITicketService
             SELECT
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                Status, Content, CreatedDate
+                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
             FROM dbo.ProjectTickets
             WHERE Id = @TicketId
               AND TenantId = @TenantId;

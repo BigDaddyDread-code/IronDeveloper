@@ -21,6 +21,8 @@ public interface IUserService
 
     Task<IReadOnlyList<TenantDto>> GetUserTenantsAsync(int userId, CancellationToken ct = default);
 
+    Task<IReadOnlyList<TenantDto>> GetAllActiveTenantsAsync(CancellationToken ct = default);
+
     Task<bool> IsMemberOfTenantAsync(int userId, int tenantId, CancellationToken ct = default);
 }
 
@@ -77,6 +79,21 @@ public sealed class UserService : IUserService
         using var connection = _connectionFactory.CreateConnection();
         return await connection.QuerySingleOrDefaultAsync<User>(new CommandDefinition(
             sql, new { UserId = userId }, cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<TenantDto>> GetAllActiveTenantsAsync(CancellationToken ct = default)
+    {
+        const string sql = """
+            SELECT Id, Name, Slug
+            FROM dbo.Tenants
+            WHERE IsActive = 1;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<TenantDto>(new CommandDefinition(
+            sql, cancellationToken: ct));
+
+        return rows.AsList();
     }
 
     public async Task<IReadOnlyList<TenantDto>> GetUserTenantsAsync(int userId, CancellationToken ct = default)

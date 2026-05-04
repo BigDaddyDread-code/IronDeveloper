@@ -97,8 +97,10 @@ public class TenantIsolationIntegrationTests : IntegrationTestBase
     [TestMethod]
     public async Task TenantA_ShouldNotSeeTenantB_ChatMessages()
     {
-        var sessionId = Guid.NewGuid();
         var tenantBProjectId = await SeedProjectAsync(tenantId: 2);
+        
+        // Seed a session and message directly under Tenant 2
+        var sessionId = await DirectInsertChatSessionAsync(tenantId: 2, projectId: tenantBProjectId, title: "Tenant B Session");
         await DirectInsertChatMessageAsync(tenantId: 2, projectId: tenantBProjectId, sessionId: sessionId);
 
         TenantContext.TenantId = 1;
@@ -106,6 +108,7 @@ public class TenantIsolationIntegrationTests : IntegrationTestBase
         using var scope = ServiceProvider.CreateScope();
         var chatService = scope.ServiceProvider.GetRequiredService<IChatHistoryService>();
 
+        // Attempting to read Tenant 2's session messages from Tenant 1 context
         var messages = await chatService.GetRecentMessagesAsync(tenantBProjectId, sessionId, 10);
 
         Assert.AreEqual(0, messages.Count, "Tenant 1 should not see Tenant 2 chat messages.");
@@ -208,7 +211,7 @@ public class TenantIsolationIntegrationTests : IntegrationTestBase
         var message = new ChatMessage
         {
             ProjectId = tenantBProjectId,
-            SessionId = Guid.NewGuid(),
+            ChatSessionId = 1, // Dummy ID
             Role = "user",
             Message = "Should be rejected"
         };
@@ -237,12 +240,23 @@ public class TenantIsolationIntegrationTests : IntegrationTestBase
             """, new { TenantId = tenantId, ProjectId = projectId });
     }
 
-    private async Task DirectInsertChatMessageAsync(int tenantId, int projectId, Guid sessionId)
+    private async Task<long> DirectInsertChatSessionAsync(int tenantId, int projectId, string title)
+    {
+        await using var conn = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
+        await conn.OpenAsync();
+        return await conn.QuerySingleAsync<long>("""
+            INSERT INTO dbo.ProjectChatSessions (TenantId, ProjectId, Title)
+            OUTPUT inserted.Id
+            VALUES (@TenantId, @ProjectId, @Title);
+            """, new { TenantId = tenantId, ProjectId = projectId, Title = title });
+    }
+
+    private async Task DirectInsertChatMessageAsync(int tenantId, int projectId, long sessionId)
     {
         await using var conn = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
         await conn.OpenAsync();
         await conn.ExecuteAsync("""
-            INSERT INTO dbo.ChatMessages (TenantId, ProjectId, SessionId, Role, Message)
+            INSERT INTO dbo.ChatMessages (TenantId, ProjectId, ChatSessionId, Role, Message)
             VALUES (@TenantId, @ProjectId, @SessionId, 'user', 'Hello from Tenant B');
             """, new { TenantId = tenantId, ProjectId = projectId, SessionId = sessionId });
     }

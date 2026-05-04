@@ -21,9 +21,9 @@ Database/                      SQL schema — rebuild_db.sql
 Docs/                          Architecture, roadmap, testing docs
 IronDev.Api/                   ASP.NET Core REST backend
 IronDev.Core/                  Shared models, interfaces, DTOs
-IronDev.Infrastructure/        Dapper SQL services, auth contexts
-IronDev.IntegrationTests/      DB-backed integration tests (sequential)
-IronDev.IntegrationTests.Api/  API-level integration tests (WebApplicationFactory)
+IronDev.Infrastructure/        Dapper SQL services (Chat, Project, Ticket, Auth)
+IronDev.IntegrationTests/      Infrastructure & DB integration tests (30 tests)
+IronDev.IntegrationTests.Api/  API-level integration tests (Auth, Tenants)
 IronDeveloper/                 WPF desktop client
 IronDev.slnx                   Root solution file
 ```

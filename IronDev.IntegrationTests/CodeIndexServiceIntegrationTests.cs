@@ -96,7 +96,7 @@ public class CodeIndexServiceIntegrationTests : IntegrationTestBase
         await indexService.IndexDirectoryAsync(projectId, _testDirPath);
         
         var results = await indexService.SearchFilesAsync(projectId, "TestTwo");
-        Assert.IsTrue(results.Any(f => f.Content.Contains("TestTwo")));
+        Assert.IsTrue(results.Any(f => f.FilePath.EndsWith("file2.cs")), "Should find the file containing TestTwo symbol");
     }
 
     [TestMethod]
@@ -126,6 +126,6 @@ public class CodeIndexServiceIntegrationTests : IntegrationTestBase
 
         // Search T2 for T1 secret
         var results = await indexServiceT2.SearchFilesAsync(proj2, "secret1");
-        Assert.AreEqual(0, results.Count, "Tenant 2 should not see Tenant 1 files");
+        Assert.IsEmpty(results, "Tenant 2 should not see Tenant 1 files");
     }
 }
