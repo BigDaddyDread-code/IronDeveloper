@@ -128,12 +128,28 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string     _draftStatusMessage = string.Empty;
     [ObservableProperty] private DraftTicket? _currentDraft;
 
+    // ── Project index state ───────────────────────────────────────────────────
+    /// <summary>
+    /// True when the project code index is Ready. False means Needs Index / unknown.
+    /// Defaults to true so no warnings flash before project loads.
+    /// Updated by ShellViewModel whenever ActiveStatus changes.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBuildTicket))]
+    private bool _isProjectIndexed = true;
+
+    /// <summary>Derived: true when index is absent and context quality is limited.</summary>
+    public bool IsContextLimited => !IsProjectIndexed;
+
     // ── Shell navigation callbacks ────────────────────────────────────────────
     /// <summary>Called when the user cancels a draft — shell navigates back to Chat.</summary>
     public Action? OnCancelDraft { get; set; }
     /// <summary>Called after a draft is approved with a plan — shell navigates to Plans.
     /// Params: title, goal, steps, linkedFilePaths, linkedSymbols, scope, risksNotes</summary>
     public Action<string, string, string?, string?, string?, string?, string?>? OnApproveDraftWithPlan { get; set; }
+    /// <summary>Called when user clicks "Index Project" from within the Tickets workspace.
+    /// Shell wires this to IndexNowCommand on ProjectOverviewViewModel.</summary>
+    public Action? OnRequestIndex { get; set; }
 
     // Dropdown options
     public ObservableCollection<string> StatusOptions   { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
@@ -445,6 +461,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             CurrentBuildPreview = preview;
             HasBuildPreview     = true;
 
+            // Prepend index warning to context summary when code context is limited
+            if (IsContextLimited)
+            {
+                preview.ContextSummary =
+                    $"\u26a0\ufe0f Limited context: project is not indexed. Code snippets may be unavailable.\n\n{preview.ContextSummary}";
+                CurrentBuildPreview = preview;   // re-assign to fire PropertyChanged
+            }
+
             if (preview.IsEmpty)
             {
                 BuildStatusMessage = "No changes proposed.";
@@ -473,6 +497,26 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private void CancelBuildPreview()
     {
         ClearBuildState();
+    }
+
+    /// <summary>
+    /// Invokes OnRequestIndex so ShellViewModel can trigger the real indexing command.
+    /// Safe to call even if no callback is wired — no-op in that case.
+    /// </summary>
+    [RelayCommand]
+    private void RequestIndex()
+    {
+        OnRequestIndex?.Invoke();
+    }
+
+    /// <summary>
+    /// Called by ShellViewModel whenever ActiveStatus changes so the Tickets workspace
+    /// stays in sync with the project’s index readiness without needing a service reference.
+    /// </summary>
+    public void SetIndexStatus(string status)
+    {
+        IsProjectIndexed = status == "Ready";
+        OnPropertyChanged(nameof(IsContextLimited));
     }
 
     [RelayCommand]
@@ -554,7 +598,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             CurrentDraft = draft;
 
             LoadDraftIntoEditor(draft);
-            DraftStatusMessage = draft.GenerationNote;
+
+            // Prepend index-missing warning when code context is limited
+            var generationNote = draft.GenerationNote;
+            DraftStatusMessage = IsContextLimited
+                ? $"⚠️ Limited context — project not indexed. {generationNote}"
+                : generationNote;
         }
         catch (Exception ex)
         {

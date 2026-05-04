@@ -72,45 +72,74 @@
                             <RowDefinition Height="Auto"/>  <!-- 3: footer -->
                         </Grid.RowDefinitions>
 
-                        <!-- ══ Draft Ticket Banner (shown only in IsDraftMode) ══ -->
+                        <!-- Draft Ticket Banner + optional index warning, both visible only when IsDraftMode -->
                         <Border Grid.Row="0"
                                 Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Background="#1A7C6BE8"
                                 BorderBrush="#7C6BE8"
                                 BorderThickness="0,0,0,1"
-                                Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                                Padding="0">
+                            <StackPanel>
+                                <!-- Row 1: Purple draft header -->
+                                <Grid Margin="16,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <!-- Draft icon + title -->
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="✦" Foreground="#7C6BE8" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock Text="Draft Ticket From Chat — review before saving."
-                                               Foreground="#7C6BE8" FontWeight="SemiBold" FontSize="13"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="✦" Foreground="#7C6BE8" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Draft Ticket From Chat — review before saving."
+                                                   Foreground="#7C6BE8" FontWeight="SemiBold" FontSize="13"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
 
-                                <!-- Status message / generating indicator -->
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding DraftStatusMessage}"
-                                               Foreground="{StaticResource Text/Muted}"
-                                               FontSize="12" VerticalAlignment="Center"
-                                               Visibility="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
-                                    <TextBlock Text="⟳ Generating…"
-                                               Foreground="{StaticResource Text/Muted}"
-                                               FontSize="12" FontStyle="Italic" VerticalAlignment="Center"
-                                               Visibility="{Binding IsDraftGenerating, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DraftStatusMessage}"
+                                                   Foreground="{StaticResource Text/Muted}"
+                                                   FontSize="12" VerticalAlignment="Center"
+                                                   Visibility="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                        <TextBlock Text="⟳ Generating…"
+                                                   Foreground="{StaticResource Text/Muted}"
+                                                   FontSize="12" FontStyle="Italic" VerticalAlignment="Center"
+                                                   Visibility="{Binding IsDraftGenerating, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </StackPanel>
 
-                                <!-- AI badge -->
-                                <Border Grid.Column="2" Background="#7C6BE8" CornerRadius="3" Padding="8,3">
-                                    <TextBlock Text="AI GENERATED" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                    <Border Grid.Column="2" Background="#7C6BE8" CornerRadius="3" Padding="8,3">
+                                        <TextBlock Text="AI GENERATED" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Row 2: Amber index warning — only when project not indexed -->
+                                <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Background="#18F59E0B"
+                                        BorderBrush="#F59E0B"
+                                        BorderThickness="0,1,0,0"
+                                        Padding="16,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="⚠️ Project is not indexed. AI context may be incomplete."
+                                                   Foreground="#F59E0B" FontSize="12" VerticalAlignment="Center"
+                                                   Margin="0,0,12,0"/>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <Button Content="🗂 Index Project"
+                                                    Command="{Binding RequestIndexCommand}"
+                                                    Style="{StaticResource AppButton.Secondary}"
+                                                    Padding="12,4" Margin="0,0,8,0" FontSize="11"
+                                                    ToolTip="Index the project to improve AI code context"/>
+                                            <TextBlock Text="or continue without index"
+                                                       Foreground="{StaticResource Text/Muted}" FontSize="11"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
-                            </Grid>
+                            </StackPanel>
                         </Border>
 
                         <!-- Tab Header (shifted to row 1 when draft banner shown) -->
@@ -241,6 +270,17 @@
                                                 Padding="16,8" Margin="0,0,8,0"
                                                 ToolTip="Generate a code change proposal for this ticket"/>
 
+                                        <!-- Limited-context chip: shown when project is not indexed -->
+                                        <Border Grid.Column="2"
+                                                Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
+                                                CornerRadius="4" Padding="8,4" Margin="0,0,0,-28"
+                                                VerticalAlignment="Bottom" HorizontalAlignment="Left"
+                                                ToolTip="Project not indexed — code context will be limited. Click Index Project in Code Context tab to improve results.">
+                                            <TextBlock Text="⚠ limited context" Foreground="#F59E0B"
+                                                       FontSize="9" FontWeight="SemiBold"/>
+                                        </Border>
+
                                         <TextBlock Grid.Column="4" Text="{Binding SaveStatus}"
                                                    Foreground="{StaticResource Success}"
                                                    VerticalAlignment="Center" FontSize="12"/>
@@ -347,7 +387,28 @@
                                     
                                     <controls:SurfacePanel Variant="Subtle" Padding="24">
                                         <StackPanel>
-                                            <controls:FormField Label="BACKGROUND">
+                                            <!-- ⚠ Not-indexed warning for Code Context tab -->
+                                    <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
+                                            Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
+                                            CornerRadius="6" Padding="14,10" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <TextBlock Text="⚠️ Project is not indexed"
+                                                       Foreground="#F59E0B" FontWeight="SemiBold" FontSize="13"
+                                                       Margin="0,0,0,4"/>
+                                            <TextBlock TextWrapping="Wrap" FontSize="12"
+                                                       Foreground="{StaticResource Text/Muted}"
+                                                       Margin="0,0,0,8"
+                                                       Text="Linked file paths and symbols below are entered manually. No indexed code snippets are available until the project is indexed."/>
+                                            <Button Content="🗂 Index Project Now"
+                                                    Command="{Binding RequestIndexCommand}"
+                                                    Style="{StaticResource AppButton.Secondary}"
+                                                    Padding="14,6" HorizontalAlignment="Left"
+                                                    FontSize="12"
+                                                    ToolTip="Run the local code indexer on this project"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <controls:FormField Label="BACKGROUND">
                                                 <TextBox Text="{Binding EditBackground, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
                                             </controls:FormField>
 

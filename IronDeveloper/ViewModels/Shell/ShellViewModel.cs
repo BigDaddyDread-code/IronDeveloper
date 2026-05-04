@@ -110,16 +110,25 @@ public sealed partial class ShellViewModel : ObservableObject
         _createVm.OnProjectCreated     = (p) => _ = CreateAndOpenProjectAsync(p);
         _createVm.OnCancel             = NavigateToHub;
         
-        // --- SYNC STATUS FROM OVERVIEW TO SHELL ---
+        // ——— SYNC STATUS FROM OVERVIEW TO SHELL AND WORKSPACE VMs ———
         _overviewVm.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(ProjectOverviewViewModel.Status))
             {
                 ActiveStatus = _overviewVm.Status;
                 System.Diagnostics.Trace.WriteLine($"[Shell] Syncing status from Overview: {ActiveStatus}");
+
+                // Keep Tickets workspace index-awareness in sync
+                _ticketsVm.SetIndexStatus(ActiveStatus);
             }
             if (e.PropertyName == nameof(ProjectOverviewViewModel.Model))
                 ActiveModel = _overviewVm.Model;
+        };
+
+        // Tickets workspace → Index Project: delegate to the existing IndexNowCommand
+        _ticketsVm.OnRequestIndex = () =>
+        {
+            _ = IndexNow();   // existing command — pops status popup and calls overviewVm.IndexProjectCommand
         };
 
         // Chat → Ticket draft review bridge
@@ -334,6 +343,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
             // Fetch final status from the overview VM
             ActiveStatus = _overviewVm.Status;
+            _ticketsVm.SetIndexStatus(ActiveStatus);   // propagate initial index state
             System.Diagnostics.Trace.WriteLine($"[Shell] Project activation complete. Status: {ActiveStatus}");
         }
         catch (Exception ex)
