@@ -63,6 +63,15 @@ public interface ICodePatchService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Validates each FileChangeProposal without writing any files.
+    /// Checks path safety, file existence, and snippet uniqueness.
+    /// </summary>
+    Task<PatchValidationResult> DryRunValidateAsync(
+        string projectPath,
+        System.Collections.Generic.IReadOnlyList<FileChangeProposal> changes,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Apply all FileChangeProposals to disk via BeforeSnippet→AfterSnippet replacement.
     /// Only writes if the before snippet is found exactly once.
     /// </summary>
