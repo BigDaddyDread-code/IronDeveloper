@@ -16,6 +16,12 @@ public interface IProjectMemoryService
     Task<IReadOnlyList<ProjectDecision>> GetRecentDecisionsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
     Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken cancellationToken = default);
     Task<long> SaveSummaryAsync(ProjectSummary summary, CancellationToken cancellationToken = default);
+    
+    Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
+    Task<ProjectImplementationPlan?> GetPlanByIdAsync(long planId, CancellationToken cancellationToken = default);
+    Task<ProjectImplementationPlan?> GetPlanByTicketIdAsync(long ticketId, CancellationToken cancellationToken = default);
+    Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken cancellationToken = default);
+
     Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken cancellationToken = default);
 }
 
@@ -119,6 +125,151 @@ public sealed class ProjectMemoryService : IProjectMemoryService
             sql,
             new { DecisionId = decisionId, TenantId = _tenant.TenantId },
             cancellationToken: cancellationToken));
+    }
+
+    public async Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT TOP (@Take)
+                Id, TenantId, ProjectId, Title, Goal, Status, CreatedDate
+            FROM dbo.ProjectImplementationPlans
+            WHERE TenantId = @TenantId
+              AND ProjectId = @ProjectId
+            ORDER BY CreatedDate DESC;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<ProjectImplementationPlan>(new CommandDefinition(
+            sql,
+            new { TenantId = _tenant.TenantId, ProjectId = projectId, Take = take },
+            cancellationToken: cancellationToken));
+
+        return rows.ToList();
+    }
+
+    public async Task<ProjectImplementationPlan?> GetPlanByIdAsync(long planId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                Id, TenantId, ProjectId, Title, Goal, Scope, ProposedSteps, AffectedContext, RisksNotes,
+                Status, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, SourceChatMessageId, CreatedDate
+            FROM dbo.ProjectImplementationPlans
+            WHERE Id = @PlanId
+              AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QuerySingleOrDefaultAsync<ProjectImplementationPlan>(new CommandDefinition(
+            sql,
+            new { PlanId = planId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task<ProjectImplementationPlan?> GetPlanByTicketIdAsync(long ticketId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                Id, TenantId, ProjectId, TicketId, Title, Goal, Scope, ProposedSteps, AffectedContext, RisksNotes,
+                Status, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, SourceChatMessageId, CreatedDate
+            FROM dbo.ProjectImplementationPlans
+            WHERE TicketId = @TicketId
+              AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QuerySingleOrDefaultAsync<ProjectImplementationPlan>(new CommandDefinition(
+            sql,
+            new { TicketId = ticketId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+
+        // Ownership guard
+        const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
+        var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            ownerSql,
+            new { plan.ProjectId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+
+        if (owns == 0)
+            throw new UnauthorizedAccessException($"Project {plan.ProjectId} does not belong to tenant {_tenant.TenantId}.");
+
+        if (plan.Id > 0)
+        {
+            const string updateSql = """
+                UPDATE dbo.ProjectImplementationPlans 
+                SET Title = @Title, Goal = @Goal, Scope = @Scope, 
+                    ProposedSteps = @ProposedSteps, AffectedContext = @AffectedContext, 
+                    RisksNotes = @RisksNotes, Status = @Status,
+                    LinkedFilePaths = @LinkedFilePaths,
+                    LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds,
+                    LinkedSymbols = @LinkedSymbols,
+                    TicketId = @TicketId,
+                    UpdatedDate = SYSUTCDATETIME()
+                WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
+                """;
+
+            await connection.ExecuteAsync(new CommandDefinition(
+                updateSql,
+                new 
+                { 
+                    plan.Id,
+                    TenantId = _tenant.TenantId,
+                    plan.ProjectId,
+                    plan.Title,
+                    plan.Goal,
+                    plan.Scope,
+                    plan.ProposedSteps,
+                    plan.AffectedContext,
+                    plan.RisksNotes,
+                    plan.Status,
+                    plan.LinkedFilePaths,
+                    plan.LinkedCodeIndexEntryIds,
+                    plan.LinkedSymbols,
+                    plan.TicketId
+                },
+                cancellationToken: cancellationToken));
+
+            return plan.Id;
+        }
+        else
+        {
+            const string insertSql = """
+                INSERT INTO dbo.ProjectImplementationPlans 
+                    (TenantId, ProjectId, TicketId, Title, Goal, Scope, ProposedSteps, AffectedContext, 
+                     RisksNotes, Status, SourceChatMessageId, LinkedFilePaths, 
+                     LinkedCodeIndexEntryIds, LinkedSymbols)
+                OUTPUT inserted.Id
+                VALUES 
+                    (@TenantId, @ProjectId, @TicketId, @Title, @Goal, @Scope, @ProposedSteps, 
+                     @AffectedContext, @RisksNotes, @Status, @SourceChatMessageId, 
+                     @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
+                """;
+
+            return await connection.QuerySingleAsync<long>(new CommandDefinition(
+                insertSql,
+                new
+                {
+                    TenantId = _tenant.TenantId,
+                    plan.ProjectId,
+                    plan.Title,
+                    plan.Goal,
+                    plan.Scope,
+                    plan.ProposedSteps,
+                    plan.AffectedContext,
+                    plan.RisksNotes,
+                    plan.Status,
+                    plan.SourceChatMessageId,
+                    plan.LinkedFilePaths,
+                    plan.LinkedCodeIndexEntryIds,
+                    plan.LinkedSymbols,
+                    plan.TicketId
+                },
+                cancellationToken: cancellationToken));
+        }
     }
 
     public async Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken cancellationToken = default)

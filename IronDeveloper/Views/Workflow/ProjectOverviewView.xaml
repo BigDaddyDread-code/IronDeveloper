@@ -4,17 +4,19 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workflow"
+             xmlns:controls="http://schemas.irondeveloper.com/controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ProjectOverviewViewModel, IsDesignTimeCreatable=False}">
 
-    <ScrollViewer Background="{StaticResource AppBackgroundBrush}">
+    <ScrollViewer Background="{StaticResource Background/App}">
         <StackPanel Margin="40,36,40,40">
 
             <!-- Page header -->
-            <TextBlock Text="PROJECT OVERVIEW" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-            <TextBlock Text="{Binding ProjectName}" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,6"/>
-            <TextBlock Text="{Binding Description}" Style="{StaticResource IronMetaLabel}"
-                       Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,32"/>
+            <TextBlock Text="PROJECT OVERVIEW" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding ProjectName}" Style="{StaticResource Typography.ScreenTitle}" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding Description}"
+                       Foreground="{StaticResource Text/Muted}"
+                       FontSize="13" TextWrapping="Wrap" Margin="0,0,0,32"/>
 
             <!-- Dashboard Metrics row -->
             <Grid Margin="0,0,0,28">
@@ -28,55 +30,202 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Project Info Card -->
-                <Border Grid.Column="0" Style="{StaticResource IronCard}" Padding="16,12">
+                <!-- Index Status Card -->
+                <Border Grid.Column="0"
+                        Background="{StaticResource Background/Panel}"
+                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                        CornerRadius="10" Padding="16,12">
                     <StackPanel>
-                        <TextBlock Text="INDEX STATUS" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
-                        <Border Style="{StaticResource IronStatusBadge}" HorizontalAlignment="Left">
-                            <TextBlock Text="{Binding Status}" 
-                                       Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
-                                       FontSize="12" FontWeight="SemiBold"/>
-                        </Border>
+                        <TextBlock Text="INDEX STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding Status}"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Indexed Files Card -->
-                <Border Grid.Column="2" Style="{StaticResource IronCard}" Padding="16,12">
+                <Border Grid.Column="2"
+                        Background="{StaticResource Background/Panel}"
+                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                        CornerRadius="10" Padding="16,12">
                     <StackPanel>
-                        <TextBlock Text="INDEXED FILES" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding FileCount}" Style="{StaticResource IronMetaValue}"/>
+                        <TextBlock Text="INDEXED FILES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding FileCount}"
+                                   FontSize="20" FontWeight="Bold"
+                                   Foreground="{StaticResource Text/Primary}"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Last Indexed Card -->
-                <Border Grid.Column="4" Style="{StaticResource IronCard}" Padding="16,12">
+                <Border Grid.Column="4"
+                        Background="{StaticResource Background/Panel}"
+                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                        CornerRadius="10" Padding="16,12">
                     <StackPanel>
-                        <TextBlock Text="LAST INDEXED" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding LastIndexed}" Style="{StaticResource IronMetaValue}"/>
+                        <TextBlock Text="LAST INDEXED" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding LastIndexed}"
+                                   FontSize="13" Foreground="{StaticResource Text/Secondary}"/>
                     </StackPanel>
                 </Border>
-                
-                 <!-- Index Scope Card -->
-                <Border Grid.Column="6" Style="{StaticResource IronCard}" Padding="16,12">
+
+                <!-- Scope Card -->
+                <Border Grid.Column="6"
+                        Background="{StaticResource Background/Panel}"
+                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                        CornerRadius="10" Padding="16,12">
                     <StackPanel>
-                        <TextBlock Text="SCOPE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding ProjectPath}" Style="{StaticResource IronMetaValue}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ProjectPath}"/>
+                        <TextBlock Text="SCOPE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding ProjectPath}"
+                                   FontSize="11" FontFamily="Consolas"
+                                   Foreground="{StaticResource Text/Muted}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding ProjectPath}"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
             <!-- Actions Row -->
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,32">
-                <Button Content="INDEX PROJECT" 
-                        Command="{Binding IndexProjectCommand}" 
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,28">
+                <Button Content="INDEX PROJECT"
+                        Command="{Binding IndexProjectCommand}"
                         IsEnabled="{Binding IsIndexing, Converter={StaticResource InverseBoolConverter}}"
-                        Style="{StaticResource IronPrimaryButton}"
+                        Style="{StaticResource AppButton.Primary}"
                         Margin="0,0,12,0" Width="140" Height="36"/>
-                <Button Content="VIEW DETAILS" 
-                        Command="{Binding ViewDetailsCommand}" 
-                        Style="{StaticResource IronSidebarButton}"
+                <Button Content="VIEW DETAILS"
+                        Command="{Binding ViewDetailsCommand}"
+                        Style="{StaticResource AppButton.Secondary}"
                         Width="120" Height="36"/>
             </StackPanel>
+
+            <!-- Current State Panel -->
+            <Border Background="{StaticResource Background/Panel}"
+                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                    CornerRadius="10" Padding="20,16" Margin="0,0,0,28">
+                <StackPanel>
+                    <TextBlock Text="CURRENT STATE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,14"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Left column -->
+                        <StackPanel Grid.Column="0">
+                            <!-- User -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="User" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentUserDisplayName, FallbackValue='Unknown'}"
+                                           Foreground="{StaticResource Text/Primary}" FontSize="12" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <!-- Email -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Email" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentUserEmail, FallbackValue='Not available'}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="12"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <!-- Tenant -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Tenant" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentTenantName, FallbackValue='No tenant'}"
+                                           Foreground="{StaticResource Accent/Primary}" FontSize="12"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <!-- Project -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Project" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding ProjectName}"
+                                           Foreground="{StaticResource Text/Primary}" FontSize="12" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <!-- Path -->
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Path" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding ProjectPath}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="11" FontFamily="Consolas"
+                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding ProjectPath}"/>
+                            </Grid>
+                        </StackPanel>
+                        <!-- Right column -->
+                        <StackPanel Grid.Column="2">
+                            <!-- Model -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Model" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Model}"
+                                           Foreground="{StaticResource Accent/Primary}" FontSize="12" FontWeight="SemiBold"/>
+                            </Grid>
+                            <!-- Index Status -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Index Status" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Status}"
+                                           Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                           FontSize="12" FontWeight="SemiBold"/>
+                            </Grid>
+                            <!-- Last Indexed -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Last Indexed" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LastIndexed}"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                            </Grid>
+                            <!-- Last Ticket -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Last Ticket" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LastTicketTitle}"
+                                           Foreground="{StaticResource Text/Primary}" FontSize="12"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <!-- Last Decision -->
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Last Decision" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LastDecisionTitle}"
+                                           Foreground="{StaticResource Text/Primary}" FontSize="12"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
             <!-- Two-column: recent tickets + decisions -->
             <Grid>
@@ -88,11 +237,14 @@
 
                 <!-- Recent Tickets -->
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="RECENT TICKETS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
+                    <TextBlock Text="RECENT TICKETS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,10"/>
                     <ItemsControl ItemsSource="{Binding RecentTickets}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Style="{StaticResource IronCard}" Margin="0,0,0,8" Padding="16,12">
+                                <Border Margin="0,0,0,8" Padding="16,12"
+                                        Background="{StaticResource Background/Panel}"
+                                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                                        CornerRadius="8">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
@@ -100,18 +252,17 @@
                                         </Grid.RowDefinitions>
                                         <TextBlock Grid.Row="0" Text="{Binding Title}"
                                                    FontWeight="SemiBold" FontSize="13"
-                                                   Foreground="{StaticResource TextBrush}"
+                                                   Foreground="{StaticResource Text/Primary}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,6,0,0">
-                                            <Border Style="{StaticResource IronStatusBadge}" Margin="0,0,6,0">
-                                                <TextBlock Text="{Binding Priority}" FontSize="10"
-                                                           Foreground="{StaticResource StatusWarningBrush}"/>
-                                            </Border>
-                                            <Border Style="{StaticResource IronStatusBadge}">
-                                                <TextBlock Text="{Binding Status}" 
-                                                           Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
-                                                           FontSize="10"/>
-                                            </Border>
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+                                            <TextBlock Text="{Binding Priority}"
+                                                       FontSize="10" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource Warning}"
+                                                       Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Status}"
+                                                       FontSize="10" FontWeight="SemiBold"
+                                                       Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                                       VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -122,20 +273,25 @@
 
                 <!-- Recent Decisions -->
                 <StackPanel Grid.Column="2">
-                    <TextBlock Text="RECENT DECISIONS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
+                    <TextBlock Text="RECENT DECISIONS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,10"/>
                     <ItemsControl ItemsSource="{Binding RecentDecisions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Style="{StaticResource IronCard}" Margin="0,0,0,8" Padding="16,12">
+                                <Border Margin="0,0,0,8" Padding="16,12"
+                                        Background="{StaticResource Background/Panel}"
+                                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                                        CornerRadius="8">
                                     <StackPanel>
                                         <TextBlock Text="{Binding Title}"
                                                    FontWeight="SemiBold" FontSize="13"
-                                                   Foreground="{StaticResource TextBrush}"
+                                                   Foreground="{StaticResource Text/Primary}"
                                                    TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Text="{Binding Detail}"
-                                                   Style="{StaticResource IronMetaLabel}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource Text/Muted}"
                                                    TextWrapping="Wrap" Margin="0,6,0,0"
-                                                   Opacity="0.65"/>
+                                                   MaxHeight="36"
+                                                   TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

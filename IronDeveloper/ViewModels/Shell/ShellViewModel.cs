@@ -25,6 +25,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly ChatWorkspaceViewModel   _chatVm;
     private readonly TicketsWorkspaceViewModel _ticketsVm;
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
+    private readonly ImplementationPlansWorkspaceViewModel _plansVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
     private readonly AgentTenantContext          _tenantContext;
 
@@ -78,7 +79,8 @@ public sealed partial class ShellViewModel : ObservableObject
         ProjectOverviewViewModel   overviewVm,
         ChatWorkspaceViewModel     chatVm,
         TicketsWorkspaceViewModel  ticketsVm,
-        DecisionsWorkspaceViewModel decisionsVm,
+        DecisionsWorkspaceViewModel         decisionsVm,
+        ImplementationPlansWorkspaceViewModel plansVm,
         SettingsWorkspaceViewModel  settingsVm,
         AgentTenantContext          tenantContext)
     {
@@ -89,6 +91,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _chatVm      = chatVm;
         _ticketsVm   = ticketsVm;
         _decisionsVm = decisionsVm;
+        _plansVm     = plansVm;
         _settingsVm  = settingsVm;
         _tenantContext = tenantContext;
 
@@ -97,6 +100,7 @@ public sealed partial class ShellViewModel : ObservableObject
         {
             CurrentUser = user;
             CurrentTenant = tenant;
+            IsAuthenticated = true;
             _tenantContext.SetTenant(tenant.Id);
             NavigateToHub();
         };
@@ -126,10 +130,44 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentView = _ticketsVm;
         };
 
+        // Chat → Plan creation bridge: navigate to Plans workspace and prefill editor
+        _chatVm.OnCreatePlanFromChat = (title, goal, steps, linkedFilePaths, linkedSymbols) =>
+        {
+            _plansVm.PrefillFromChat(title, goal, steps, linkedFilePaths, linkedSymbols);
+            CurrentWorkspace = ProjectWorkspace.Plans;
+            CurrentView = _plansVm;
+        };
+
+        // Ticket → Plan refinement bridge
+        _ticketsVm.OnAskAboutPlan = (ticketId, ticketTitle, planContent, linkedFilePaths, linkedSymbols) =>
+        {
+            var prompt = $"I am looking at the implementation plan for ticket '{ticketTitle}'.\n\nPLAN DETAILS:\n{planContent}\n\nCan you help me refine this plan, check for risks, or identify missing steps?";
+            _chatVm.PromptText = prompt;
+            CurrentWorkspace = ProjectWorkspace.Chat;
+            CurrentView = _chatVm;
+        };
+
         // Chat → Decision creation bridge
         _chatVm.OnCreateDecisionFromChat = (title, detail, linkedFilePaths, linkedSymbols) =>
         {
             _decisionsVm.PrefillFromChat(title, detail, linkedFilePaths, linkedSymbols);
+            CurrentWorkspace = ProjectWorkspace.Decisions;
+            CurrentView = _decisionsVm;
+        };
+
+        // Chat quick-nav: Plans / Tickets / Decisions
+        _chatVm.OnNavigateToPlan = () =>
+        {
+            CurrentWorkspace = ProjectWorkspace.Plans;
+            CurrentView = _plansVm;
+        };
+        _chatVm.OnNavigateToTicket = () =>
+        {
+            CurrentWorkspace = ProjectWorkspace.Tickets;
+            CurrentView = _ticketsVm;
+        };
+        _chatVm.OnNavigateToDecision = () =>
+        {
             CurrentWorkspace = ProjectWorkspace.Decisions;
             CurrentView = _decisionsVm;
         };
@@ -142,7 +180,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void NavigateWorkspace(string workspaceName)
     {
-        if (workspaceName == "ProjectHub")
+        if (workspaceName == "ProjectHub" || workspaceName == "SwitchProject")
         {
             NavigateToHub();
             return;
@@ -155,10 +193,39 @@ public sealed partial class ShellViewModel : ObservableObject
             ProjectWorkspace.Overview   => _overviewVm,
             ProjectWorkspace.Chat       => _chatVm,
             ProjectWorkspace.Tickets    => _ticketsVm,
+            ProjectWorkspace.Plans      => _plansVm,
             ProjectWorkspace.Decisions  => _decisionsVm,
             ProjectWorkspace.Settings   => _settingsVm,
             _                           => _overviewVm
         };
+    }
+
+    [RelayCommand]
+    private void SignOut()
+    {
+        IsAuthenticated = false;
+        CurrentUser = null;
+        CurrentTenant = null;
+        HasActiveProject = false;
+        ActiveProjectName = string.Empty;
+        ActiveProjectPath = string.Empty;
+        
+        _tenantContext.SetTenant(0);
+        CurrentShellMode = ShellMode.Login;
+        CurrentView = _loginVm;
+    }
+
+    [RelayCommand]
+    private void OpenMyAccount()
+    {
+        // Placeholder for My Account
+        MessageBox.Show("My Account details coming soon.", "IronDev", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        NavigateWorkspace("Settings");
     }
 
     [RelayCommand]
@@ -229,6 +296,12 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveProjectPath = project.LocalPath ?? string.Empty;
         ActiveModel       = _overviewVm.Model; 
         ActiveStatus      = "Checking...";
+
+        // Push user/tenant context into overview VM for the Current State card
+        _overviewVm.CurrentUserDisplayName = CurrentUser?.DisplayName ?? "Unknown";
+        _overviewVm.CurrentUserEmail       = CurrentUser?.Email       ?? "Email not available";
+        _overviewVm.CurrentTenantName      = CurrentTenant?.Name      ?? "No tenant";
+        _overviewVm.CurrentWorkspaceName   = "Overview";
         
         try
         {
@@ -237,7 +310,8 @@ public sealed partial class ShellViewModel : ObservableObject
                 _overviewVm.LoadAsync(project),
                 _chatVm.LoadAsync(project),
                 _ticketsVm.LoadAsync(project),
-                _decisionsVm.LoadAsync(project)
+                _decisionsVm.LoadAsync(project),
+                _plansVm.LoadAsync(project)
             );
 
             // Fetch final status from the overview VM

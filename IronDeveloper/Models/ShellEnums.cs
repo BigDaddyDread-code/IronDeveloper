@@ -19,6 +19,7 @@ public enum ProjectWorkspace
     Overview,
     Chat,
     Tickets,
+    Plans,
     Decisions,
     Settings
 }
@@ -28,6 +29,17 @@ public enum ProjectWorkspace
 /// </summary>
 public enum LoginStage
 {
-    WorkspaceSelection,
-    Credentials
+    Credentials,
+    Resolving,
+    TenantSelection
+}
+
+/// <summary>
+/// Navigation sections within the Ticket detail view.
+/// </summary>
+public enum TicketDetailTab
+{
+    Overview,
+    ImplementationPlan,
+    CodeContext
 }

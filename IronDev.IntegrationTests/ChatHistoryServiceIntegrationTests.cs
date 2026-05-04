@@ -17,12 +17,22 @@ public class ChatHistoryServiceIntegrationTests : IntegrationTestBase
         var chatHistoryService = scope.ServiceProvider.GetRequiredService<IChatHistoryService>();
 
         var projectId = await SeedProjectAsync();
-        var sessionId = Guid.NewGuid();
+        
+        // 1. Create a session
+        var session = new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Test Session",
+            CreatedDate = DateTime.UtcNow,
+            UpdatedDate = DateTime.UtcNow
+        };
+        var sessionId = await chatHistoryService.SaveSessionAsync(session);
 
+        // 2. Save messages
         await chatHistoryService.SaveMessageAsync(new ChatMessage
         {
             ProjectId = projectId,
-            SessionId = sessionId,
+            ChatSessionId = sessionId,
             Role = "user",
             Message = "Hello IronDev",
             Tags = "tag1"
@@ -31,12 +41,13 @@ public class ChatHistoryServiceIntegrationTests : IntegrationTestBase
         await chatHistoryService.SaveMessageAsync(new ChatMessage
         {
             ProjectId = projectId,
-            SessionId = sessionId,
+            ChatSessionId = sessionId,
             Role = "assistant",
             Message = "Hello back",
             Tags = "tag2"
         });
 
+        // 3. Verify retrieval
         var messages = await chatHistoryService.GetRecentMessagesAsync(projectId, sessionId, 10);
 
         Assert.HasCount(2, messages);

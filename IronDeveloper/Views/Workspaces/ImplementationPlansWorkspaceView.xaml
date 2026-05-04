@@ -1,4 +1,4 @@
-<UserControl x:Class="IronDev.Agent.Views.Workspaces.DecisionsWorkspaceView"
+<UserControl x:Class="IronDev.Agent.Views.Workspaces.ImplementationPlansWorkspaceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,7 +6,7 @@
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
              xmlns:controls="http://schemas.irondeveloper.com/controls"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance Type=vm:DecisionsWorkspaceViewModel, IsDesignTimeCreatable=False}">
+             d:DataContext="{d:DesignInstance Type=vm:ImplementationPlansWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
     <Grid Background="{StaticResource Background/App}" Margin="24">
         <Grid.RowDefinitions>
@@ -21,11 +21,11 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="DECISIONS" Style="{StaticResource Typography.Eyebrow}"/>
-                <TextBlock Text="Decision Management" Style="{StaticResource Typography.ScreenTitle}"/>
+                <TextBlock Text="PLANS" Style="{StaticResource Typography.Eyebrow}"/>
+                <TextBlock Text="Implementation Plans" Style="{StaticResource Typography.ScreenTitle}"/>
             </StackPanel>
-            <Button Grid.Column="1" Content="＋ New Decision"
-                    Command="{Binding NewDecisionCommand}"
+            <Button Grid.Column="1" Content="＋ New Plan"
+                    Command="{Binding NewPlanCommand}"
                     Style="{StaticResource AppButton.Primary}"
                     Padding="20,8" VerticalAlignment="Center"/>
         </Grid>
@@ -37,21 +37,21 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ═══ LEFT: Decision List — WorkspaceListPane ═══ -->
+            <!-- ═══ LEFT: Plan List — WorkspaceListPane ═══ -->
             <controls:WorkspaceListPane
                 Grid.Column="0"
-                Title="DECISIONS"
+                Title="PLANS"
                 Margin="0,0,12,0"
-                ItemsSource="{Binding Decisions}"
-                SelectedItem="{Binding SelectedDecision, Mode=TwoWay}">
+                ItemsSource="{Binding Plans}"
+                SelectedItem="{Binding SelectedPlanSummary, Mode=TwoWay}">
 
                 <controls:WorkspaceListPane.ItemTemplate>
                     <DataTemplate>
                         <controls:WorkspaceListItem
                             Title="{Binding Title}"
-                            Subtitle="{Binding Detail}"
+                            Subtitle="{Binding Goal}"
                             Metadata="{Binding Status}"
-                            IconData="{StaticResource Icon.Nav.Decisions}"/>
+                            IconData="{StaticResource Icon.Nav.Layers}"/>
                     </DataTemplate>
                 </controls:WorkspaceListPane.ItemTemplate>
 
@@ -62,12 +62,11 @@
                     Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
                     CornerRadius="10">
-
                 <Grid>
-                    <!-- Empty state: no decision selected -->
+                    <!-- Empty state: no plan selected -->
                     <controls:EmptyResultsState
-                        Title="No Decision Selected"
-                        Description="Select a decision or create a new one to capture an architectural choice."
+                        Title="No Plan Selected"
+                        Description="Select a plan or create a new one to get started."
                         Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
                     <!-- Editor panel -->
@@ -81,37 +80,44 @@
                                      FontSize="16" FontWeight="SemiBold" Padding="10,8"
                                      Margin="0,0,0,16"/>
 
-                            <!-- Status / Category row -->
-                            <Grid Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                            <!-- Status -->
+                            <StackPanel Margin="0,0,0,16">
+                                <TextBlock Text="STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <ComboBox ItemsSource="{Binding StatusOptions}"
+                                          SelectedItem="{Binding EditStatus}"
+                                          Width="200" HorizontalAlignment="Left"
+                                          Padding="8,6"/>
+                            </StackPanel>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                    <TextBlock Text="STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding StatusOptions}"
-                                              SelectedItem="{Binding EditStatus}"
-                                              Padding="8,6"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="CATEGORY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding CategoryOptions}"
-                                              SelectedItem="{Binding EditCategory}"
-                                              Padding="8,6"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Detail -->
-                            <TextBlock Text="DETAIL" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditDetail, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
+                            <!-- Goal -->
+                            <TextBlock Text="PLAN GOAL" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditGoal, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
                                      Padding="10,8" Margin="0,0,0,16"/>
 
-                            <!-- Rationale -->
-                            <TextBlock Text="RATIONALE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditReason, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                            <!-- Scope -->
+                            <TextBlock Text="SCOPE / OBJECTIVES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditScope, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Proposed Steps -->
+                            <TextBlock Text="PROPOSED STEPS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditProposedSteps, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="100"
+                                     Padding="10,8" Margin="0,0,0,16"
+                                     FontFamily="Consolas" FontSize="12"/>
+
+                            <!-- Affected Context -->
+                            <TextBlock Text="AFFECTED FILES / CLASSES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditAffectedContext, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
+                                     Padding="10,8" Margin="0,0,0,16"/>
+
+                            <!-- Risks / Notes -->
+                            <TextBlock Text="RISKS &amp; NOTES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding EditRisksNotes, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"
                                      Padding="10,8" Margin="0,0,0,16"/>
 
                             <!-- Linked Code Context (collapsible) -->
@@ -142,8 +148,8 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Button Grid.Column="0" Content="Save Decision"
-                                        Command="{Binding SaveDecisionCommand}"
+                                <Button Grid.Column="0" Content="Save Plan"
+                                        Command="{Binding SavePlanCommand}"
                                         Style="{StaticResource AppButton.Primary}"
                                         Padding="24,8" Margin="0,0,8,0"
                                         IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>

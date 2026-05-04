@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -26,12 +28,12 @@ public sealed partial class LoginViewModel : ObservableObject
     [ObservableProperty] private string _selectedAuthMethod = "Direct Email/Password";
 
     [ObservableProperty] 
-    [NotifyPropertyChangedFor(nameof(IsTenantSelectorVisible), nameof(IsCredentialsVisible))]
-    private LoginStage _currentStage = LoginStage.WorkspaceSelection;
+    [NotifyPropertyChangedFor(nameof(IsCredentialsVisible), nameof(IsResolvingVisible), nameof(IsTenantSelectorVisible))]
+    private LoginStage _currentStage = LoginStage.Credentials;
 
-    // Helper for XAML visibility bindings (backward compat or simplicity)
-    public bool IsTenantSelectorVisible => CurrentStage == LoginStage.WorkspaceSelection;
     public bool IsCredentialsVisible => CurrentStage == LoginStage.Credentials;
+    public bool IsResolvingVisible => CurrentStage == LoginStage.Resolving;
+    public bool IsTenantSelectorVisible => CurrentStage == LoginStage.TenantSelection;
 
     private global::IronDev.Services.User? _authenticatedUser;
 
@@ -41,39 +43,35 @@ public sealed partial class LoginViewModel : ObservableObject
     public LoginViewModel(global::IronDev.Services.IUserService userService)
     {
         _userService = userService;
-        _ = InitializeAsync();
+        Email = LoadLastEmail();
     }
 
-    private async Task InitializeAsync()
+    private static string LoadLastEmail()
     {
-        IsBusy = true;
         try
         {
-            var tenants = await _userService.GetAllActiveTenantsAsync();
-            AvailableTenants.Clear();
-            foreach (var t in tenants) AvailableTenants.Add(t);
-            
-            SelectedTenant = AvailableTenants.FirstOrDefault(t => t.Name == "IronDev Project") 
-                          ?? AvailableTenants.FirstOrDefault();
+            using var store = IsolatedStorageFile.GetUserStoreForAssembly();
+            if (!store.FileExists("irondev_last_user.txt")) return string.Empty;
+            using var reader = new StreamReader(new IsolatedStorageFileStream("irondev_last_user.txt", FileMode.Open, store));
+            return reader.ReadLine() ?? string.Empty;
         }
-        finally { IsBusy = false; }
+        catch { return string.Empty; }
     }
 
-    [RelayCommand]
-    private void ContinueFromWorkspace()
+    private static void SaveLastEmail(string email)
     {
-        if (SelectedTenant == null) return;
-        
-        EmailError = string.Empty;
-        PasswordError = string.Empty;
-        HasAttemptedSignIn = false;
-        CurrentStage = LoginStage.Credentials;
+        try
+        {
+            using var store = IsolatedStorageFile.GetUserStoreForAssembly();
+            using var writer = new StreamWriter(new IsolatedStorageFileStream("irondev_last_user.txt", FileMode.Create, store));
+            writer.WriteLine(email);
+        }
+        catch { /* non-critical */ }
     }
 
     [RelayCommand]
     private async Task SignInAsync(object? parameter)
     {
-        // Stage 2: Actual Authentication (Expected to be in Credentials stage)
         EmailError = string.Empty;
         PasswordError = string.Empty;
         HasAttemptedSignIn = true;
@@ -88,7 +86,7 @@ public sealed partial class LoginViewModel : ObservableObject
         IsBusy = true;
         try 
         {
-            // a) Validate credentials
+            // 1. Authenticate User
             _authenticatedUser = await _userService.ValidateCredentialsAsync(Email, password!);
             
             if (_authenticatedUser == null)
@@ -97,32 +95,68 @@ public sealed partial class LoginViewModel : ObservableObject
                 return;
             }
 
-            // b) Check membership for selected tenant
-            if (SelectedTenant == null) return;
-            var isMember = await _userService.IsMemberOfTenantAsync(_authenticatedUser.Id, SelectedTenant.Id);
-            
-            if (!isMember)
+            // 2. Transition to "Resolving" state
+            CurrentStage = LoginStage.Resolving;
+            await Task.Delay(800); // UI feedback for "Loading your workspace..."
+
+            // 3. Resolve Tenants for this user
+            var tenants = await _userService.GetUserTenantsAsync(_authenticatedUser.Id);
+            AvailableTenants.Clear();
+            foreach (var t in tenants) AvailableTenants.Add(t);
+
+            if (AvailableTenants.Count == 0)
             {
-                EmailError = "User is not assigned to this workspace.";
+                EmailError = "This account is not associated with any IronDev workspaces.";
+                CurrentStage = LoginStage.Credentials;
                 return;
             }
 
-            // Success
-            var profile = new global::IronDev.Core.Auth.UserProfileDto(
-                _authenticatedUser.Id, 
-                _authenticatedUser.Email, 
-                _authenticatedUser.DisplayName, 
-                SelectedTenant.Id);
-
-            OnSignIn?.Invoke(profile, SelectedTenant);
+            if (AvailableTenants.Count == 1)
+            {
+                // Auto-skip selection
+                CompleteSignIn(AvailableTenants[0]);
+            }
+            else
+            {
+                // Must choose
+                SelectedTenant = AvailableTenants.FirstOrDefault(t => t.Name.Contains("IronDev")) ?? AvailableTenants[0];
+                CurrentStage = LoginStage.TenantSelection;
+            }
+        }
+        catch (Exception ex)
+        {
+            EmailError = $"Connection error: {ex.Message}";
+            CurrentStage = LoginStage.Credentials;
         }
         finally { IsBusy = false; }
     }
 
     [RelayCommand]
-    private void CancelTenantSelection()
+    private void SelectTenant()
     {
-        CurrentStage = LoginStage.WorkspaceSelection;
+        if (SelectedTenant == null) return;
+        CompleteSignIn(SelectedTenant);
+    }
+
+    private void CompleteSignIn(global::IronDev.Core.Auth.TenantDto tenant)
+    {
+        if (_authenticatedUser == null) return;
+
+        SaveLastEmail(_authenticatedUser.Email);
+
+        var profile = new global::IronDev.Core.Auth.UserProfileDto(
+            _authenticatedUser.Id, 
+            _authenticatedUser.Email, 
+            _authenticatedUser.DisplayName, 
+            tenant.Id);
+
+        OnSignIn?.Invoke(profile, tenant);
+    }
+
+    [RelayCommand]
+    private void BackToLogin()
+    {
+        CurrentStage = LoginStage.Credentials;
         _authenticatedUser = null;
         HasAttemptedSignIn = false;
         EmailError = string.Empty;

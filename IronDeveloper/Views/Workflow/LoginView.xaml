@@ -4,149 +4,137 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workflow"
+             xmlns:controls="http://schemas.irondeveloper.com/controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:LoginViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid>
+    <Grid Background="#060D16">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="420"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- ── Left Side: Brand Panel ──────────────────────────────────── -->
-        <Border Grid.Column="0" Background="#060D16">
-            <StackPanel VerticalAlignment="Center" Margin="48,0">
-                <TextBlock Text="IRONDEV" FontSize="40" FontWeight="Black"
-                           Foreground="{StaticResource FocusBorderBrush}" Margin="0,0,0,10"/>
-                <TextBlock Text="AI-Powered Engineering Platform" FontSize="13" Opacity="0.4" Margin="0,0,0,48"/>
+        <Border Grid.Column="0" Background="#04080F" BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="0,0,1,0">
+            <StackPanel VerticalAlignment="Center" Margin="60,0">
+                <TextBlock Text="IRONDEV" FontSize="44" FontWeight="Black"
+                           Foreground="{StaticResource Accent/Primary}" Margin="0,0,0,12"/>
+                <TextBlock Text="AI-Powered Engineering Platform" FontSize="14" Opacity="0.5" Margin="0,0,0,60"
+                           FontWeight="Medium"/>
                 
-                <StackPanel Opacity="0.4">
-                    <TextBlock Text="• Intelligent code indexing"          FontSize="13" Margin="0,0,0,8"/>
-                    <TextBlock Text="• Architecture-aware AI chat"          FontSize="13" Margin="0,0,0,8"/>
-                    <TextBlock Text="• Automated ticket generation"         FontSize="13" Margin="0,0,0,8"/>
-                    <TextBlock Text="• Architectural decision audit log"    FontSize="13"/>
+                <StackPanel Opacity="0.6">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Path Data="{StaticResource Icon.Nav.Projects}" Fill="{StaticResource Accent/Primary}" Width="14" Height="14" Margin="0,0,12,0" Stretch="Uniform"/>
+                        <TextBlock Text="Intelligent code indexing" FontSize="13"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Path Data="{StaticResource Icon.Nav.Chat}" Fill="{StaticResource Accent/Primary}" Width="14" Height="14" Margin="0,0,12,0" Stretch="Uniform"/>
+                        <TextBlock Text="Architecture-aware AI chat" FontSize="13"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Path Data="{StaticResource Icon.Nav.Tickets}" Fill="{StaticResource Accent/Primary}" Width="14" Height="14" Margin="0,0,12,0" Stretch="Uniform"/>
+                        <TextBlock Text="Automated ticket generation" FontSize="13"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon.Nav.Decisions}" Fill="{StaticResource Accent/Primary}" Width="14" Height="14" Margin="0,0,12,0" Stretch="Uniform"/>
+                        <TextBlock Text="Architectural decision audit" FontSize="13"/>
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
         </Border>
 
         <!-- ── Right Side: Login Form ──────────────────────────────────── -->
-        <Grid Grid.Column="1">
-            <Border Width="440" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Border Style="{StaticResource IronCard}">
+        <Grid Grid.Column="1" Background="{StaticResource AppBackgroundBrush}">
+            <Border Width="460" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Border Style="{StaticResource IronCard}" Padding="40">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- 0: Eyebrow -->
-                            <RowDefinition Height="Auto"/> <!-- 1: Title -->
-                            <RowDefinition Height="*"/>    <!-- 2: Dynamic Stage Content -->
-                            <RowDefinition Height="Auto"/> <!-- 3: Global CTA Button -->
-                            <RowDefinition Height="Auto"/> <!-- 4: Footer -->
-                            <RowDefinition Height="Auto"/> <!-- 5: Busy indicator -->
+                            <RowDefinition Height="Auto"/> <!-- Title -->
+                            <RowDefinition Height="*"/>    <!-- Content -->
+                            <RowDefinition Height="Auto"/> <!-- Footer -->
                         </Grid.RowDefinitions>
 
-                        <!-- Row 0: Eyebrow -->
-                        <TextBlock Grid.Row="0" Text="SIGN IN" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
+                        <!-- Stage 1: Credentials (START) -->
+                        <StackPanel Grid.Row="0" Grid.RowSpan="2"
+                                    Visibility="{Binding IsCredentialsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            
+                            <TextBlock Text="Sign in to IronDev" FontSize="28" FontWeight="Bold" Margin="0,0,0,8" Foreground="{StaticResource Text/Primary}"/>
+                            <TextBlock Text="Enter your workspace credentials to continue" FontSize="14" Opacity="0.6" Margin="0,0,0,32"/>
 
-                        <!-- Row 2 Content: Stage 1 (Workspace Selection) -->
-                        <Grid Grid.Row="1" Grid.RowSpan="2" 
-                              Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- 0: Title -->
-                                <RowDefinition Height="Auto"/> <!-- 1: Workspace Label -->
-                                <RowDefinition Height="Auto"/> <!-- 2: Workspace Selection -->
-                                <RowDefinition Height="Auto"/> <!-- 3: Auth Method Label -->
-                                <RowDefinition Height="Auto"/> <!-- 4: Auth Method Selection -->
-                                <RowDefinition Height="24"/>   <!-- 5: Spacer -->
-                                <RowDefinition Height="Auto"/> <!-- 6: Action Button -->
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Select your workspace" FontSize="24" FontWeight="Bold" Margin="0,0,0,24"/>
-
-                            <TextBlock Grid.Row="1" Text="WORKSPACE TENANT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
-                            <ComboBox  Grid.Row="2" ItemsSource="{Binding AvailableTenants}"
-                                       SelectedItem="{Binding SelectedTenant, Mode=TwoWay}"
-                                       Margin="0,0,0,24">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-
-                            <TextBlock Grid.Row="3" Text="AUTHENTICATION METHOD" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
-                            <ComboBox  Grid.Row="4" ItemsSource="{Binding AvailableAuthMethods}"
-                                       SelectedItem="{Binding SelectedAuthMethod}"
-                                       Margin="0,0,0,0"/>
-
-                            <Button Grid.Row="6" 
-                                    Content="SIGN IN TO WORKSPACE"
-                                    Command="{Binding ContinueFromWorkspaceCommand}"
-                                    Style="{StaticResource IronPrimaryButton}"
-                                    HorizontalAlignment="Stretch" Height="52"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
-                        </Grid>
-
-                        <!-- Row 2 Content: Stage 2 (Credentials) -->
-                        <Grid Grid.Row="1" Grid.RowSpan="2"
-                              Visibility="{Binding IsCredentialsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- 0: Title -->
-                                <RowDefinition Height="Auto"/> <!-- 1: Email Label -->
-                                <RowDefinition Height="Auto"/> <!-- 2: Email Input -->
-                                <RowDefinition Height="Auto"/> <!-- 3: Email Error -->
-                                <RowDefinition Height="Auto"/> <!-- 4: Password Label -->
-                                <RowDefinition Height="Auto"/> <!-- 5: Password Input -->
-                                <RowDefinition Height="Auto"/> <!-- 6: Password Error -->
-                                <RowDefinition Height="Auto"/> <!-- 7: Actions -->
-                                <RowDefinition Height="12"/>   <!-- 8: Spacer -->
-                                <RowDefinition Height="Auto"/> <!-- 9: Action Button -->
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Enter your credentials" FontSize="26" FontWeight="Bold" Margin="0,0,0,20"/>
-
-                            <TextBlock Grid.Row="1" Text="EMAIL ADDRESS" Style="{StaticResource IronEyebrow}" Opacity="0.7" Margin="0,0,0,6"/>
-                            <TextBox   Grid.Row="2" Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,2"/>
-                            <TextBlock Grid.Row="3" Text="{Binding EmailError}" Foreground="{StaticResource StatusErrorBrush}"
-                                       FontSize="11" Margin="4,2,0,14"
+                            <!-- Email -->
+                            <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource IronEyebrow}" Opacity="0.7" Margin="0,0,0,8"/>
+                            <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding EmailError}" Foreground="{StaticResource StatusErrorBrush}"
+                                       FontSize="11" Margin="4,0,0,20"
                                        Visibility="{Binding EmailError, Converter={StaticResource StringToVisibilityConverter}}"/>
 
-                            <TextBlock Grid.Row="4" Text="PASSWORD" Style="{StaticResource IronEyebrow}" Opacity="0.7" Margin="0,0,0,6"/>
-                            <PasswordBox Grid.Row="5" x:Name="PasswordInput" Margin="0,0,0,2"/>
-                            <TextBlock Grid.Row="6" Text="{Binding PasswordError}" Foreground="{StaticResource StatusErrorBrush}"
-                                       FontSize="11" Margin="4,0,0,8"
+                            <!-- Password -->
+                            <TextBlock Text="PASSWORD" Style="{StaticResource IronEyebrow}" Opacity="0.7" Margin="0,0,0,8"/>
+                            <PasswordBox x:Name="PasswordInput" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding PasswordError}" Foreground="{StaticResource StatusErrorBrush}"
+                                       FontSize="11" Margin="4,0,0,24"
                                        Visibility="{Binding PasswordError, Converter={StaticResource StringToVisibilityConverter}}"/>
 
-                            <Button Grid.Row="7" Content="Change Workspace" 
-                                    Style="{StaticResource IronGhostButton}"
-                                    Foreground="{StaticResource FocusBorderBrush}"
-                                    FontSize="12"
-                                    HorizontalAlignment="Left" 
-                                    Margin="0,2,0,0"
-                                    Command="{Binding CancelTenantSelectionCommand}"/>
-
-                            <Button Grid.Row="9" 
-                                    Content="CONTINUE"
+                            <Button Content="Continue"
                                     Command="{Binding SignInCommand}"
                                     CommandParameter="{Binding ElementName=PasswordInput}"
                                     Style="{StaticResource IronPrimaryButton}"
-                                    HorizontalAlignment="Stretch" Height="52"
+                                    HorizontalAlignment="Stretch" Height="50"
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+                        </StackPanel>
+
+                        <!-- Stage 2: Resolving / Loading -->
+                        <Grid Grid.Row="1" MinHeight="300"
+                               Visibility="{Binding IsResolvingVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <ProgressBar IsIndeterminate="True" Width="240" Height="4" Margin="0,0,0,24"
+                                             Background="#1E293B" Foreground="{StaticResource Accent/Primary}" BorderThickness="0"/>
+                                <TextBlock Text="Loading your workspace..." FontSize="16" Opacity="0.8" HorizontalAlignment="Center" FontWeight="Medium"/>
+                                <TextBlock Text="Checking tenant associations..." FontSize="13" Opacity="0.4" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                            </StackPanel>
                         </Grid>
 
+                        <!-- Stage 3: Tenant Selection -->
+                        <StackPanel Grid.Row="1"
+                                    Visibility="{Binding IsTenantSelectorVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            
+                            <TextBlock Text="Select Workspace" FontSize="28" FontWeight="Bold" Margin="0,0,0,8" Foreground="{StaticResource Text/Primary}"/>
+                            <TextBlock Text="Choose the tenant you'd like to access" FontSize="14" Opacity="0.6" Margin="0,0,0,32"/>
 
+                             <controls:SelectionField 
+                                   Label="AVAILABLE TENANTS"
+                                   ItemsSource="{Binding AvailableTenants}"
+                                   SelectedItem="{Binding SelectedTenant, Mode=TwoWay}"
+                                   Margin="0,0,0,32"/>
+
+                            <Button Content="Access Workspace"
+                                    Command="{Binding SelectTenantCommand}"
+                                    Style="{StaticResource IronPrimaryButton}"
+                                    HorizontalAlignment="Stretch" Height="50"
+                                    Margin="0,0,0,12"/>
+
+                            <Button Content="Back to login" 
+                                    Style="{StaticResource IronGhostButton}"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding BackToLoginCommand}"/>
+                        </StackPanel>
 
                         <!-- Row 4: Footer -->
-                        <TextBlock Grid.Row="4" Text="Forgot credentials?  Contact your Admin"
-                                   FontSize="11" Opacity="0.45" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+                        <TextBlock Grid.Row="2" Text="Forgot credentials? Contact your Admin"
+                                   FontSize="12" Opacity="0.5" HorizontalAlignment="Center" Margin="0,32,0,0"/>
 
-                        <!-- Row 5: Busy indicator -->
-                        <TextBlock Grid.Row="5" Text="Authenticating…"
-                                   Style="{StaticResource IronMetaLabel}"
-                                   HorizontalAlignment="Center" Margin="0,14,0,0"
-                                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
                     </Grid>
                 </Border>
             </Border>
         </Grid>
+
+        <!-- Global Busy Overlay -->
+        <Border Grid.ColumnSpan="2" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="100" Height="2" Background="Transparent" Foreground="{StaticResource Accent/Primary}" BorderThickness="0"/>
+                <TextBlock Text="AUTHENTICATING" Style="{StaticResource IronEyebrow}" HorizontalAlignment="Center" Margin="0,12,0,0" Foreground="{StaticResource Accent/Primary}"/>
+             </StackPanel>
+        </Border>
     </Grid>
 </UserControl>
 

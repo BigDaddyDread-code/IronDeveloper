@@ -27,8 +27,18 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private int    _fileCount;
     [ObservableProperty] private bool   _isIndexing;
 
+    // ── Session context (set by ShellViewModel on project activation) ─────────
+    [ObservableProperty] private string _currentUserDisplayName = string.Empty;
+    [ObservableProperty] private string _currentUserEmail       = string.Empty;
+    [ObservableProperty] private string _currentTenantName      = string.Empty;
+    [ObservableProperty] private string _currentWorkspaceName   = string.Empty;
+
     [ObservableProperty] private ObservableCollection<TicketItem>   _recentTickets   = [];
     [ObservableProperty] private ObservableCollection<DecisionItem> _recentDecisions = [];
+
+    // ── Derived state card properties ─────────────────────────────────────────
+    public string LastTicketTitle    => RecentTickets.Count > 0   ? RecentTickets[0].Title   : "None yet";
+    public string LastDecisionTitle  => RecentDecisions.Count > 0 ? RecentDecisions[0].Title : "None yet";
 
     public ProjectOverviewViewModel(
         global::IronDev.Services.ITicketService ticketService,

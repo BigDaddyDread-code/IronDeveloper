@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,8 +25,23 @@ public sealed partial class ProjectHubViewModel : ObservableObject
     {
         RecentProjects.Clear();
         var projects = await _projectService.GetProjectsAsync();
-        foreach (var p in projects)
+        
+        // Order by most recently updated/created to find "sensible default"
+        var sortedProjects = projects
+            .OrderByDescending(p => p.UpdatedDate ?? p.CreatedDate)
+            .ToList();
+
+        foreach (var p in sortedProjects)
             RecentProjects.Add(p);
+
+        // Auto-select rule: If only one project is available, enter it automatically.
+        if (RecentProjects.Count == 1)
+        {
+            OpenProject(RecentProjects[0]);
+        }
+        // NOTE: We could also implement "Prefer last-used if count > 1" but usually 
+        // the user wants to see the Hub if they have multiple projects, 
+        // unless they specifically set a "Default Project" setting later.
     }
 
     [RelayCommand]

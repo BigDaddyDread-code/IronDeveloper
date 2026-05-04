@@ -23,6 +23,22 @@ public sealed class DecisionItem
     public DateTime CreatedDate { get; set; }
 }
 
+public sealed class PlanItem
+{
+    public long Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Goal { get; set; } = string.Empty;
+    public string? Scope { get; set; }
+    public string? ProposedSteps { get; set; }
+    public string? AffectedContext { get; set; }
+    public string? RisksNotes { get; set; }
+    public string Status { get; set; } = "Draft";
+    public string? LinkedFilePaths { get; set; }
+    public string? LinkedCodeIndexEntryIds { get; set; }
+    public string? LinkedSymbols { get; set; }
+    public DateTime CreatedDate { get; set; }
+}
+
 public sealed class TicketItem
 {
     public long Id { get; set; }

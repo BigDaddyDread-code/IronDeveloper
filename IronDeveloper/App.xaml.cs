@@ -56,14 +56,14 @@ public partial class App : Application
                 services.AddTransient<ChatWorkspaceViewModel>();
                 services.AddTransient<TicketsWorkspaceViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
+                services.AddTransient<ImplementationPlansWorkspaceViewModel>();
                 services.AddTransient<SettingsWorkspaceViewModel>();
 
-                // ── Shell ─────────────────────────────────────────────────────
+                // Shell
                 services.AddSingleton<ShellViewModel>();
                 services.AddSingleton<MainWindow>();
 
                 // Mocks for pending features
-                services.AddTransient<IChatShellService, MockChatShellService>();
                 services.AddSingleton<global::IronDev.Agent.Services.Interfaces.IProjectShellService, global::IronDev.Agent.Services.Mock.MockProjectShellService>();
             })
             .Build();

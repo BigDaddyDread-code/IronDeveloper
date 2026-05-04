@@ -41,13 +41,13 @@ public class ContextInjectionTests : IntegrationTestBase
         await indexService.IndexDirectoryAsync(projectId, _testDirPath);
 
         // 2. Build prompt with a keyword that matches
-        var prompt = await promptBuilder.BuildAsync(projectId, Guid.NewGuid(), "How does the CodeWorkbenchWindow work?");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How does the CodeWorkbenchWindow work?");
 
         // 3. Verify the fragment content is in the prompt
-        Assert.IsTrue(prompt.Contains("CodeWorkbenchWindow.xaml.cs"), "Prompt should contain the filename");
-        Assert.IsTrue(prompt.Contains("Symbol: .CodeWorkbenchWindow"), "Prompt should contain the symbol metadata");
-        Assert.IsTrue(prompt.Contains("public partial class CodeWorkbenchWindow"), "Prompt should contain the code fragment");
-        Assert.IsTrue(prompt.Contains("## Relevant Code Context"), "Prompt should have the new context header");
+        StringAssert.Contains(prompt, "CodeWorkbenchWindow.xaml.cs");
+        StringAssert.Contains(prompt, "Symbol: .CodeWorkbenchWindow");
+        StringAssert.Contains(prompt, "public partial class CodeWorkbenchWindow");
+        StringAssert.Contains(prompt, "## Relevant Code Snippets");
     }
 
     [TestMethod]
@@ -57,7 +57,7 @@ public class ContextInjectionTests : IntegrationTestBase
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
         var projectId = await SeedProjectAsync();
 
-        var prompt = await promptBuilder.BuildAsync(projectId, Guid.NewGuid(), "Hello, how are you?");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "Hello, how are you?");
 
         Assert.IsFalse(prompt.Contains("## Relevant Code Context"), "Generic prompt should not trigger code injection");
     }

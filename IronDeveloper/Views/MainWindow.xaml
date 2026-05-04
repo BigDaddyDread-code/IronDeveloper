@@ -5,21 +5,58 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Shell"
         xmlns:conv="clr-namespace:IronDev.Agent.Converters"
+        xmlns:controls="http://schemas.irondeveloper.com/controls"
         mc:Ignorable="d"
-        Title="IronDev Architect" 
+        Title="IronDev" 
         Height="860" Width="1300"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent">
+        Background="{StaticResource Background/App}">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="38" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      ResizeBorderThickness="4"/>
+    </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <conv:WorkspaceActiveConverter x:Key="WorkspaceActiveConverter"/>
-        <conv:InverseBoolConverter x:Key="InverseBoolConverter"/>
+        <!-- Window Command Buttons Style -->
+        <Style x:Key="WindowControlButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#20FFFFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WindowCloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E81123"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Border CornerRadius="14" ClipToBounds="True" BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="1">
-        <Grid Background="{StaticResource AppBackgroundBrush}">
+        <Grid Background="{StaticResource Background/App}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="38"/>
                 <RowDefinition Height="*"/>
@@ -32,154 +69,206 @@
             <!-- ══ TITLE BAR ══════════════════════════════════════════════════ -->
             <Border Grid.Row="0" Grid.ColumnSpan="2"
                     Background="{StaticResource MetalBrush}"
-                    BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="0,0,0,1"
-                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="0,0,0,1">
                 <Grid>
-                    <!-- macOS style traffic lights -->
+                    <!-- Branding & Tenant (Left) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
-                        <Ellipse Width="10" Height="10" Fill="#FF5F57" Margin="0,0,7,0"/>
-                        <Ellipse Width="10" Height="10" Fill="#FFBD2E" Margin="0,0,7,0"/>
-                        <Ellipse Width="10" Height="10" Fill="#27C93F"/>
+                        <Image Source="pack://application:,,,/IronDeveloperControls;component/Icons/logo.png" 
+                               Width="18" Height="18" Margin="0,0,10,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="IronDev" 
+                                   Foreground="{StaticResource Text/Secondary}" 
+                                   FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsAuthenticated, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Border Background="{StaticResource Background/Interactive}" Padding="6,2" CornerRadius="4" Margin="12,0,0,0">
+                                <TextBlock Text="PREVIEW" Foreground="{StaticResource Accent/Primary}" FontSize="9" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Text="  ·  " Foreground="{StaticResource TextBrush}" FontSize="12" Opacity="0.3" Margin="10,0"/>
+                            <TextBlock Text="{Binding CurrentTenant.Name}" Foreground="{StaticResource Accent/Primary}" 
+                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8"/>
+                        </StackPanel>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="IronDev Architect" FontWeight="Bold" 
-                                   Foreground="{StaticResource TextBrush}" FontSize="12" Opacity="0.6"/>
-                        <TextBlock Text="  ·  " Foreground="{StaticResource TextBrush}" FontSize="12" Opacity="0.3"/>
-                        <TextBlock Text="{Binding CurrentTenant.Name}" Foreground="{StaticResource AccentBrush}" 
-                                   FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8"/>
-                    </StackPanel>
+                    <!-- User Menu & Window Controls (Right) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        
+                        <!-- User Menu Dropdown -->
+                        <Grid Visibility="{Binding IsAuthenticated, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Margin="0,0,10,0" VerticalAlignment="Center">
+                            <ToggleButton x:Name="UserMenuButton"
+                                          Padding="8,4"
+                                          Cursor="Hand"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          FocusVisualStyle="{x:Null}"
+                                          WindowChrome.IsHitTestVisibleInChrome="True">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{TemplateBinding Background}"
+                                                            BorderThickness="0"
+                                                            CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ToggleButton.Style>
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource Icon.Nav.Settings}" Fill="{StaticResource Text/Secondary}"
+                                          Width="14" Height="14" Margin="0,0,8,0" Stretch="Uniform" Opacity="0.7"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding CurrentUser.DisplayName}"
+                                                   Foreground="{StaticResource Text/Secondary}"
+                                                   FontSize="11" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding CurrentUser.Email}"
+                                                   Foreground="{StaticResource Text/Muted}"
+                                                   FontSize="10" Opacity="0.7"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ToggleButton>
 
-                    <Button Content="✕" Style="{StaticResource IronGhostButton}"
-                            Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center"
-                            Width="32" Height="32"
-                            Foreground="{StaticResource TextBrush}" Opacity="0.4"
-                            Click="CloseButton_Click"/>
+                            <Popup IsOpen="{Binding IsChecked, ElementName=UserMenuButton}" 
+                                   PlacementTarget="{Binding ElementName=UserMenuButton}"
+                                   Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                <Border Style="{StaticResource IronMetalPanel}" Padding="8" Margin="0,8,0,0" Width="220">
+                                    <StackPanel>
+                                        <!-- Identity header -->
+                                        <Border Padding="12,10,12,10"
+                                                BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1"
+                                                Margin="0,0,0,4">
+                                            <StackPanel>
+                                                <TextBlock Text="SIGNED IN AS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,6"/>
+                                                <TextBlock Text="{Binding CurrentUser.DisplayName}"
+                                                           Foreground="{StaticResource Text/Primary}"
+                                                           FontSize="13" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding CurrentUser.Email, FallbackValue='Email not available'}"
+                                                           Foreground="{StaticResource Text/Muted}"
+                                                           FontSize="11" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding CurrentTenant.Name, FallbackValue='No tenant'}"
+                                                           Foreground="{StaticResource Accent/Primary}"
+                                                           FontSize="10" Margin="0,4,0,0" Opacity="0.8"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Actions -->
+                                        <Button Content="My Account" Command="{Binding OpenMyAccountCommand}" 
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
+                                        <Button Content="Settings" Command="{Binding OpenSettingsCommand}" 
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
+                                        <Separator Background="{StaticResource DarkBorderBrush}" Margin="4,4"/>
+                                        <Button Content="Switch Project" Command="{Binding NavigateWorkspaceCommand}" CommandParameter="SwitchProject"
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
+                                        <Button Content="Sign out" Command="{Binding SignOutCommand}" 
+                                                Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"
+                                                Foreground="{StaticResource StatusErrorBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <!-- Window Controls -->
+                        <Button Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click">
+                            <Path Data="{StaticResource Icon.Window.Minimize}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                        <Button Style="{StaticResource WindowControlButton}" Click="MaximizeButton_Click">
+                            <Path Data="{StaticResource Icon.Window.Maximize}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                        <Button Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click">
+                            <Path Data="{StaticResource Icon.Window.Close}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
             <!-- ══ SIDEBAR ════════════════════════════════════════════════════ -->
-            <Border Grid.Row="1" Grid.Column="0" Width="92"
+            <Border Grid.Row="1" Grid.Column="0" Width="100"
                     Visibility="{Binding ShowSidebar, Converter={StaticResource BoolToVisibilityConverter}}"
                     Margin="12,12,0,12"
                     Style="{StaticResource IronMetalPanel}">
 
-                <StackPanel HorizontalAlignment="Center" Margin="0,18,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel HorizontalAlignment="Center" Margin="0,18,0,18">
 
-                    <!-- Hub / Home button -->
-                    <Button Margin="0,0,0,10" Width="56" Height="56"
-                            Command="{Binding NavigateWorkspaceCommand}" CommandParameter="ProjectHub">
-                        <Button.ToolTip>
-                            <ToolTip Content="Project Hub" Style="{StaticResource IronSidebarTooltip}"/>
-                        </Button.ToolTip>
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding CurrentShellMode}" Value="ProjectHub">
-                                        <Setter Property="Tag" Value="Active"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="22"/>
-                    </Button>
+                        <TextBlock Text="CORE" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="0,0,0,10" Opacity="0.5"/>
+                        
+                        <!-- Hub / Home button -->
+                        <controls:NavRailItem IconData="{StaticResource Icon.Nav.Projects}" 
+                                             Command="{Binding NavigateWorkspaceCommand}" CommandParameter="ProjectHub"
+                                             ToolTip="Project Hub"
+                                             IsActive="{Binding CurrentShellMode, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=ProjectHub}"
+                                             Margin="0,0,0,20"/>
 
-                    <!-- Project-active navigation buttons -->
-                    <StackPanel Visibility="{Binding HasActiveProject, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <!-- Project-active navigation buttons -->
+                        <StackPanel Visibility="{Binding HasActiveProject, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="PROJECT" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="0,0,0,10" Opacity="0.5"/>
+                            
+                            <!-- Overview -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Branch}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Overview"
+                                                 ToolTip="Overview"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Overview}"
+                                                 Margin="0,0,0,10"/>
 
-                        <!-- Overview -->
-                        <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Overview">
-                            <Button.ToolTip>
-                                <ToolTip Content="Overview" Style="{StaticResource IronSidebarTooltip}"/>
-                            </Button.ToolTip>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Overview}" Value="True">
-                                            <Setter Property="Tag" Value="Active"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE71D;" FontSize="22"/>
-                        </Button>
+                            <!-- Chat -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Chat}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Chat"
+                                                 ToolTip="Chat"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Chat}"
+                                                 Margin="0,0,0,10"/>
 
-                        <!-- Chat -->
-                        <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Chat">
-                            <Button.ToolTip>
-                                <ToolTip Content="Chat" Style="{StaticResource IronSidebarTooltip}"/>
-                            </Button.ToolTip>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Chat}" Value="True">
-                                            <Setter Property="Tag" Value="Active"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8BD;" FontSize="22"/>
-                        </Button>
+                            <!-- Tickets -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Tickets}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Tickets"
+                                                 ToolTip="Tickets"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Tickets}"
+                                                 Margin="0,0,0,10"/>
 
-                        <!-- Tickets -->
-                        <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Tickets">
-                            <Button.ToolTip>
-                                <ToolTip Content="Tickets" Style="{StaticResource IronSidebarTooltip}"/>
-                            </Button.ToolTip>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Tickets}" Value="True">
-                                            <Setter Property="Tag" Value="Active"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA37;" FontSize="22"/>
-                        </Button>
+                            <!-- Plans -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Layers}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Plans"
+                                                 ToolTip="Plans"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Plans}"
+                                                 Margin="0,0,0,10"/>
 
-                        <!-- Decisions -->
-                        <Button Margin="0,0,0,10" Width="56" Height="56"
-                                Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Decisions">
-                            <Button.ToolTip>
-                                <ToolTip Content="Decisions" Style="{StaticResource IronSidebarTooltip}"/>
-                            </Button.ToolTip>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}" Value="True">
-                                            <Setter Property="Tag" Value="Active"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE9D2;" FontSize="22"/>
-                        </Button>
+                            <!-- Decisions -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Decisions}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Decisions"
+                                                 ToolTip="Decisions"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}"
+                                                 Margin="0,0,0,10"/>
+
+                        </StackPanel>
+
+                        <TextBlock Text="SYSTEM" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="10,10,0,10" Opacity="0.5"/>
+                        
+                        <!-- Settings — always shown when authenticated -->
+                        <controls:NavRailItem IconData="{StaticResource Icon.Nav.Settings}" 
+                                             Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Settings"
+                                             ToolTip="Settings"
+                                             IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Settings}"/>
 
                     </StackPanel>
-
-                    <!-- Settings — always shown when authenticated -->
-                    <Button Width="56" Height="56"
-                            Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Settings">
-                        <Button.ToolTip>
-                            <ToolTip Content="Settings" Style="{StaticResource IronSidebarTooltip}"/>
-                        </Button.ToolTip>
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource IronSidebarButton}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Settings}" Value="True">
-                                        <Setter Property="Tag" Value="Active"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="22"/>
-                    </Button>
-
-                </StackPanel>
+                </ScrollViewer>
             </Border>
 
             <!-- ══ WORKSPACE AREA ══════════════════════════════════════════════ -->
@@ -191,8 +280,8 @@
 
                 <!-- PROJECT CONTEXT STRIP -->
                 <Border Grid.Row="0" Margin="0,0,0,20" Padding="20,14"
-                        Background="#0F1822" CornerRadius="10"
-                        BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="1"
+                        Background="{StaticResource Background/Panel}" CornerRadius="10"
+                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
                         Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -206,14 +295,46 @@
 
                             <TextBlock Text="MODEL"   Style="{StaticResource IronMetaLabel}"/>
                             <TextBlock Text="{Binding ActiveModel}" Style="{StaticResource IronMetaValue}"
-                                       Foreground="{StaticResource FocusBorderBrush}" FontWeight="Bold"/>
+                                       Foreground="{StaticResource Accent/Primary}" FontWeight="Bold"/>
 
                             <TextBlock Text="STATUS"  Style="{StaticResource IronMetaLabel}"/>
                             
                             <!-- Actionable status pill -->
                             <ToggleButton x:Name="StatusPill" IsChecked="{Binding IsStatusPopupOpen}"
-                                          Style="{StaticResource IronGhostButton}" Padding="8,4" Margin="8,0,0,0">
-                                <TextBlock Text="{Binding ActiveStatus}" 
+                                          Padding="8,4" Margin="8,0,0,0" Cursor="Hand"
+                                          FocusVisualStyle="{x:Null}">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{TemplateBinding Background}"
+                                                            BorderThickness="0" CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background"
+                                                                    Value="{StaticResource Background/Interactive}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ToggleButton.Style>
+                                <TextBlock Text="{Binding ActiveStatus}"
                                            Foreground="{Binding ActiveStatus, Converter={StaticResource StatusToBrushConverter}}"
                                            FontSize="12" FontWeight="Bold"/>
                             </ToggleButton>
@@ -225,14 +346,14 @@
                                Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
                             <Border Style="{StaticResource IronMetalPanel}" Padding="16" Margin="0,8,0,0" Width="200">
                                 <StackPanel>
-                                    <TextBlock Text="Workflow Actions" Style="{StaticResource IronEyebrow}" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Workflow Actions" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,12"/>
                                     
                                     <Button Content="Index Now" Command="{Binding IndexNowCommand}" 
-                                            Style="{StaticResource IronPrimaryButton}" Margin="0,0,0,8"
+                                            Style="{StaticResource AppButton.Primary}" Margin="0,0,0,8"
                                             Visibility="{Binding StatusNeedsIndex, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     
                                     <Button Content="Open Overview" Command="{Binding OpenOverviewCommand}"
-                                            Style="{StaticResource IronSecondaryButton}"/>
+                                            Style="{StaticResource AppButton.Secondary}"/>
                                 </StackPanel>
                             </Border>
                         </Popup>

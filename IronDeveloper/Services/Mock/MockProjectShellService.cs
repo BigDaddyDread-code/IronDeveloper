@@ -16,7 +16,7 @@ public sealed class MockProjectShellService : IProjectShellService
     [
         new()
         {
-            Name        = "IronDeveloper",
+            Name        = "IronDev",
             LocalPath   = @"C:\repos\AIDeveloper",
             Model       = "gpt-4o",
             Status      = "Needs Index",

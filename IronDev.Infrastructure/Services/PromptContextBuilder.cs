@@ -22,8 +22,8 @@ public class ChatContextPacket
 
 public interface IPromptContextBuilder
 {
-    Task<string> BuildAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default);
-    Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default);
+    Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default);
+    Task<ChatContextPacket> BuildPacketAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default);
 }
 
 public sealed class PromptContextBuilder : IPromptContextBuilder
@@ -45,18 +45,18 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         _ticketService = ticketService;
     }
 
-    public async Task<string> BuildAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
+    public async Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default)
     {
         var packet = await BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
         return packet.FormattedPrompt;
     }
 
-    public Task<ChatContextPacket> BuildPacketAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken = default)
+    public Task<ChatContextPacket> BuildPacketAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default)
     {
         return BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
     }
 
-    private async Task<ChatContextPacket> BuildPacketDataAsync(int projectId, Guid sessionId, string userRequest, CancellationToken cancellationToken)
+    private async Task<ChatContextPacket> BuildPacketDataAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken)
     {
         var packet = new ChatContextPacket();
         var isCodeQuery = IsCodeQuery(userRequest);
@@ -104,7 +104,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var latestSummary = await _projectMemoryService.GetLatestSummaryAsync(projectId, cancellationToken);
 
         var sb = new StringBuilder();
-        sb.AppendLine("You are an expert AI assistant integrated into the IronDev software project.");
+        sb.AppendLine("You are IronDev Architect, an expert AI assistant integrated into the IronDev engineering platform.");
         sb.AppendLine("IMPORTANT INSTRUCTIONS:");
         sb.AppendLine("1. Answer the user's question directly and concisely.");
         sb.AppendLine("2. Do NOT dump raw context/code unless explicitly requested. Use the provided snippets, tickets, and decisions quietly as supporting evidence.");

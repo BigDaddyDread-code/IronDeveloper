@@ -49,95 +49,72 @@ public class LoginIntegrationTests : IntegrationTestBase
     }
 
     [TestMethod]
-    public void Login_starts_on_workspace_selection()
+    public void Login_starts_on_credentials_stage()
     {
-        Assert.AreEqual(LoginStage.WorkspaceSelection, _vm.CurrentStage);
-        Assert.IsTrue(_vm.IsTenantSelectorVisible);
-        Assert.IsFalse(_vm.IsCredentialsVisible);
-    }
-
-    [TestMethod]
-    public async Task Tenant_loading_contains_expected_tenants()
-    {
-        await SeedUserAndTenantAsync("bob@test.com", "Pass123!", "IronDev Project");
-        
-        // We need to re-init or wait for the async init in constructor
-        // Since constructor fires Task.Run or similar, we might need a way to wait.
-        // In the VM: _ = InitializeAsync();
-        
-        // Let's manually trigger init or wait for it.
-        // A better pattern for tests is to have a Task we can await.
-        // For now, let's just wait a bit or re-call it.
-        
-        var tenants = await _userService.GetAllActiveTenantsAsync();
-        Assert.IsTrue(tenants.Any(t => t.Name == "IronDev Project"));
-    }
-
-    [TestMethod]
-    public async Task Workspace_continue_moves_to_credentials()
-    {
-        await SeedUserAndTenantAsync("bob@test.com", "Pass123!", "IronDev Project");
-        
-        // Refresh tenants
-        var tenants = await _userService.GetAllActiveTenantsAsync();
-        _vm.AvailableTenants.Clear();
-        foreach(var t in tenants) _vm.AvailableTenants.Add(t);
-        _vm.SelectedTenant = _vm.AvailableTenants.First();
-
-        _vm.ContinueFromWorkspaceCommand.Execute(null);
-
         Assert.AreEqual(LoginStage.Credentials, _vm.CurrentStage);
+        Assert.IsTrue(_vm.IsCredentialsVisible);
+        Assert.IsFalse(_vm.IsTenantSelectorVisible);
+        Assert.IsFalse(_vm.IsResolvingVisible);
     }
 
     [TestMethod]
-    public async Task Selected_tenant_is_preserved_between_login_stages()
+    public async Task Login_with_valid_credentials_moves_to_resolving()
     {
         await SeedUserAndTenantAsync("bob@test.com", "Pass123!", "IronDev Project");
+        _vm.Email = "bob@test.com";
+
+        var task = _vm.SignInCommand.ExecuteAsync("Pass123!");
         
-        var tenants = await _userService.GetAllActiveTenantsAsync();
-        _vm.AvailableTenants.Clear();
-        foreach(var t in tenants) _vm.AvailableTenants.Add(t);
-        var expectedTenant = _vm.AvailableTenants.First();
-        _vm.SelectedTenant = expectedTenant;
-
-        _vm.ContinueFromWorkspaceCommand.Execute(null);
-
-        Assert.AreEqual(expectedTenant, _vm.SelectedTenant);
+        Assert.AreEqual(LoginStage.Resolving, _vm.CurrentStage);
+        Assert.IsTrue(_vm.IsBusy);
+        
+        await task;
     }
 
     [TestMethod]
-    public async Task Login_with_valid_credentials_and_tenant_succeeds()
+    public async Task Login_with_multiple_tenants_shows_selection_after_resolution()
+    {
+        // Seed two tenants for the same user
+        var hash = BCrypt.Net.BCrypt.HashPassword("Pass123!", 11);
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        var userId = await connection.ExecuteScalarAsync<int>(
+            "INSERT INTO dbo.Users (Email, DisplayName, PasswordHash) OUTPUT inserted.Id VALUES ('multi@test.com', 'Multi User', @Hash)",
+            new { Hash = hash });
+
+        var t1 = await connection.ExecuteScalarAsync<int>("INSERT INTO dbo.Tenants (Name, Slug) OUTPUT inserted.Id VALUES ('T1', 't1')");
+        var t2 = await connection.ExecuteScalarAsync<int>("INSERT INTO dbo.Tenants (Name, Slug) OUTPUT inserted.Id VALUES ('T2', 't2')");
+
+        await connection.ExecuteAsync("INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (@T1, @UserId, 'Member')", new { T1 = t1, UserId = userId });
+        await connection.ExecuteAsync("INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (@T2, @UserId, 'Member')", new { T2 = t2, UserId = userId });
+
+        _vm.Email = "multi@test.com";
+        await _vm.SignInCommand.ExecuteAsync("Pass123!");
+
+        Assert.AreEqual(LoginStage.TenantSelection, _vm.CurrentStage);
+        Assert.IsTrue(_vm.IsTenantSelectorVisible);
+        Assert.AreEqual(2, _vm.AvailableTenants.Count);
+    }
+
+    [TestMethod]
+    public async Task Login_with_valid_credentials_and_single_tenant_succeeds_directly()
     {
         await SeedUserAndTenantAsync("bob@test.com", "Pass123!", "IronDev Project");
         
-        var tenants = await _userService.GetAllActiveTenantsAsync();
-        _vm.AvailableTenants.Clear();
-        foreach(var t in tenants) _vm.AvailableTenants.Add(t);
-        _vm.SelectedTenant = _vm.AvailableTenants.First();
-        _vm.ContinueFromWorkspaceCommand.Execute(null);
-
         _vm.Email = "bob@test.com";
         bool successCalled = false;
         _vm.OnSignIn = (u, t) => { successCalled = true; };
 
         await _vm.SignInCommand.ExecuteAsync("Pass123!");
 
-        Assert.IsTrue(successCalled, "OnSignIn should have been invoked.");
-        Assert.IsFalse(_vm.IsBusy);
-        Assert.AreEqual(string.Empty, _vm.EmailError);
+        Assert.IsTrue(successCalled, "OnSignIn should have been invoked immediately as there is only one tenant.");
     }
 
     [TestMethod]
-    public async Task Login_with_invalid_password_fails()
+    public async Task Login_with_invalid_password_stays_on_credentials_with_error()
     {
         await SeedUserAndTenantAsync("bob@test.com", "Pass123!", "IronDev Project");
-        
-        var tenants = await _userService.GetAllActiveTenantsAsync();
-        _vm.AvailableTenants.Clear();
-        foreach(var t in tenants) _vm.AvailableTenants.Add(t);
-        _vm.SelectedTenant = _vm.AvailableTenants.First();
-        _vm.ContinueFromWorkspaceCommand.Execute(null);
-
         _vm.Email = "bob@test.com";
 
         await _vm.SignInCommand.ExecuteAsync("WrongPass");
@@ -147,36 +124,23 @@ public class LoginIntegrationTests : IntegrationTestBase
     }
 
     [TestMethod]
-    public async Task Login_with_missing_password_fails()
+    public async Task Login_with_missing_password_shows_error()
     {
         _vm.Email = "bob@test.com";
-        _vm.CurrentStage = LoginStage.Credentials;
-
         await _vm.SignInCommand.ExecuteAsync("");
 
         Assert.AreEqual("Password is required.", _vm.PasswordError);
+        Assert.AreEqual(LoginStage.Credentials, _vm.CurrentStage);
     }
 
     [TestMethod]
-    public async Task Login_with_wrong_tenant_membership_fails()
+    public async Task Back_to_login_from_tenant_selection_resets_to_credentials()
     {
-        // Seed user into one tenant, but select another
-        await SeedUserAndTenantAsync("bob@test.com", "Pass123!", "IronDev Project", mapped: false);
+        // Setup state to be in selection
+        _vm.CurrentStage = LoginStage.TenantSelection;
         
-        await using var connection = new SqlConnection(ConnectionString);
-        await connection.OpenAsync();
-        await connection.ExecuteAsync("INSERT INTO dbo.Tenants (Name, Slug) VALUES ('Other Project', 'other-project')");
+        _vm.BackToLoginCommand.Execute(null);
 
-        var tenants = await _userService.GetAllActiveTenantsAsync();
-        _vm.AvailableTenants.Clear();
-        foreach(var t in tenants) _vm.AvailableTenants.Add(t);
-        _vm.SelectedTenant = _vm.AvailableTenants.First(t => t.Name == "IronDev Project");
-        _vm.ContinueFromWorkspaceCommand.Execute(null);
-
-        _vm.Email = "bob@test.com";
-
-        await _vm.SignInCommand.ExecuteAsync("Pass123!");
-
-        Assert.AreEqual("User is not assigned to this workspace.", _vm.EmailError);
+        Assert.AreEqual(LoginStage.Credentials, _vm.CurrentStage);
     }
 }

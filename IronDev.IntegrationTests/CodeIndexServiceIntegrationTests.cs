@@ -126,6 +126,6 @@ public class CodeIndexServiceIntegrationTests : IntegrationTestBase
 
         // Search T2 for T1 secret
         var results = await indexServiceT2.SearchFilesAsync(proj2, "secret1");
-        Assert.AreEqual(0, results.Count, "Tenant 2 should not see Tenant 1 files");
+        Assert.IsEmpty(results, "Tenant 2 should not see Tenant 1 files");
     }
 }

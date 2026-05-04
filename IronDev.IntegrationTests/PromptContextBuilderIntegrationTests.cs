@@ -20,7 +20,16 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         var promptContextBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
 
         var projectId = await SeedProjectAsync();
-        var sessionId = Guid.NewGuid();
+        
+        // 1. Create a session
+        var session = new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Test Integration Session",
+            CreatedDate = DateTime.UtcNow,
+            UpdatedDate = DateTime.UtcNow
+        };
+        var sessionId = await chatHistoryService.SaveSessionAsync(session);
 
         await memoryService.SaveSummaryAsync(new ProjectSummary
         {
@@ -45,7 +54,7 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         await chatHistoryService.SaveMessageAsync(new ChatMessage
         {
             ProjectId = projectId,
-            SessionId = sessionId,
+            ChatSessionId = sessionId,
             Role = "user",
             Message = "Please create a ticket"
         });

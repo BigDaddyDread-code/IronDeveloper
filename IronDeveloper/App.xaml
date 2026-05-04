@@ -21,8 +21,12 @@
 
             <!-- ── Shared converters ───────────────────────────────────── -->
             <cvt:WorkspaceActiveConverter x:Key="WorkspaceActiveConverter"/>
+            <cvt:EnumToBooleanConverter x:Key="EnumToBooleanConverter"/>
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <cvt:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+            <cvt:RoleToDisplayNameConverter x:Key="RoleToDisplayNameConverter"/>
+            <cvt:RoleToInitialConverter x:Key="RoleToInitialConverter"/>
+            <cvt:StringToInitialsConverter x:Key="StringToInitialsConverter"/>
 
             <!-- InverseBoolConverter: IsEnabled="{Binding IsBusy, Converter=...}" -->
             <cvt:InverseBoolConverter x:Key="InverseBoolConverter"/>
@@ -59,6 +63,10 @@
 
             <DataTemplate DataType="{x:Type ws:TicketsWorkspaceViewModel}">
                 <vws:TicketsWorkspaceView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type ws:ImplementationPlansWorkspaceViewModel}">
+                <vws:ImplementationPlansWorkspaceView/>
             </DataTemplate>
 
             <DataTemplate DataType="{x:Type ws:DecisionsWorkspaceViewModel}">
