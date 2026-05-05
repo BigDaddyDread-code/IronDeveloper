@@ -1,36 +1,27 @@
 using IronDev.Core;
-using OpenAI;
+using IronDev.Core.Models;
 using OpenAI.Chat;
 using System;
 using System.Threading.Tasks;
 
 namespace IronDev.Infrastructure.Services;
 
-public class OpenAiLlmService : ILLMService
+public sealed class OpenAiLlmService : ILLMService
 {
-    private readonly ChatClient? _chatClient;
-    private readonly string _model;
-    private readonly bool _hasKey;
+    private readonly ChatClient _chatClient;
 
-    public OpenAiLlmService(string? apiKey, string model)
+    public OpenAiLlmService(LlmOptions options)
     {
-        _model = model;
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
         {
-            _hasKey = false;
+            throw new ArgumentException("API key is required for OpenAI provider. Please configure Ai:ApiKey in appsettings.");
         }
-        else
-        {
-            _hasKey = true;
-            _chatClient = new ChatClient(model, apiKey);
-        }
+
+        _chatClient = new ChatClient(options.Model, options.ApiKey);
     }
 
     public async Task<string> GetResponseAsync(string prompt)
     {
-        if (!_hasKey || _chatClient == null)
-            throw new InvalidOperationException("OPENAI_API_KEY is missing. Please configure it to use chat.");
-
         try
         {
             var completion = await _chatClient.CompleteChatAsync(prompt);

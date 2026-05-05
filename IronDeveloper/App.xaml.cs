@@ -41,10 +41,27 @@ public partial class App : Application
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
-                var openAiKey = context.Configuration["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                var openAiModel = context.Configuration["OPENAI_MODEL"] ?? Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-4o";
-                services.AddTransient<global::IronDev.Core.ILLMService>(sp => 
-                    new global::IronDev.Infrastructure.Services.OpenAiLlmService(openAiKey, openAiModel));
+                var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
+                                ?? new global::IronDev.Core.Models.LlmOptions();
+
+                // Environment variable fallback for API key if not in config
+                if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
+                {
+                    aiOptions.ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                }
+
+                services.AddTransient<global::IronDev.Core.ILLMService>(sp =>
+                {
+                    var provider = aiOptions.Provider?.ToLowerInvariant() ?? "openai";
+                    return provider switch
+                    {
+                        "openai"      => new global::IronDev.Infrastructure.Services.OpenAiLlmService(aiOptions),
+                        "localopenai" => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
+                        "ollama"      => new global::IronDev.Infrastructure.Services.OllamaLlmService(aiOptions),
+                        "custom"      => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
+                        _ => throw new InvalidOperationException($"Unsupported AI provider: {aiOptions.Provider}. Check appsettings.json.")
+                    };
+                });
 
                 // ── Workflow ViewModels ───────────────────────────────────────
                 services.AddTransient<LoginViewModel>();
