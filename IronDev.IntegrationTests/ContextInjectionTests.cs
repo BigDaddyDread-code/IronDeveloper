@@ -47,7 +47,7 @@ public class ContextInjectionTests : IntegrationTestBase
         StringAssert.Contains(prompt, "CodeWorkbenchWindow.xaml.cs");
         StringAssert.Contains(prompt, "Symbol: CodeWorkbenchWindow");
         StringAssert.Contains(prompt, "public partial class CodeWorkbenchWindow");
-        StringAssert.Contains(prompt, "## Relevant Code Snippets");
+        StringAssert.Contains(prompt, "## Code Snippets");
     }
 
     [TestMethod]

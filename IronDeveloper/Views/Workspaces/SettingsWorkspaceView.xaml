@@ -4,11 +4,12 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
+             xmlns:views="clr-namespace:IronDev.Agent.Views.Workspaces"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:SettingsWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
     <ScrollViewer Background="{StaticResource AppBackgroundBrush}">
-        <StackPanel Margin="40,36,40,40" MaxWidth="600">
+        <StackPanel Margin="40,36,40,40" MaxWidth="900">
 
             <!-- Header -->
             <TextBlock Text="WORKSPACE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
@@ -61,6 +62,45 @@
                         <ToggleButton Grid.Column="1" IsChecked="{Binding AutoIndex}"
                                       VerticalAlignment="Center"/>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Developer Tools / Prompt Playground -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="0">
+                <StackPanel>
+
+                    <!-- Expand / Collapse toggle -->
+                    <Button x:Name="DevToolsToggleBtn"
+                            Command="{Binding ToggleDevToolsCommand}"
+                            Background="Transparent" BorderThickness="0"
+                            Padding="22,14" HorizontalContentAlignment="Stretch"
+                            Cursor="Hand">
+                        <Grid>
+                            <TextBlock Text="DEVELOPER TOOLS" Style="{StaticResource IronEyebrow}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontSize="12" Opacity="0.45"
+                                       Foreground="{StaticResource TextBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="▶  Show Prompt Playground"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDevToolsExpanded}" Value="True">
+                                                <Setter Property="Text" Value="▼  Hide Prompt Playground"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Button>
+
+                    <!-- Prompt Playground view — DataContext bound to the sub-VM -->
+                    <views:PromptPlaygroundView
+                        x:Name="PlaygroundView"
+                        DataContext="{Binding PromptPlayground}"
+                        Visibility="{Binding IsDevToolsExpanded, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
                 </StackPanel>
             </Border>
 

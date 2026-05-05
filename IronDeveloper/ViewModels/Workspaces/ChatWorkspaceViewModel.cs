@@ -19,10 +19,11 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class ChatWorkspaceViewModel : ObservableObject
 {
-    private readonly IChatHistoryService _chatHistoryService;
-    private readonly IPromptContextBuilder _promptContextBuilder;
-    private readonly ILLMService _llmService;
-    private readonly IProjectMemoryService _memoryService;
+    private readonly IChatHistoryService    _chatHistoryService;
+    private readonly IPromptContextBuilder  _promptContextBuilder;
+    private readonly ILLMService            _llmService;
+    private readonly IProjectMemoryService  _memoryService;
+    private readonly IChatFeedbackService   _feedbackService;
 
     private int _activeProjectId;
     private string _activeProjectName = string.Empty;
@@ -60,15 +61,17 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public Action? OnNavigateToDecision { get; set; }
 
     public ChatWorkspaceViewModel(
-        IChatHistoryService chatHistoryService,
+        IChatHistoryService   chatHistoryService,
         IPromptContextBuilder promptContextBuilder,
-        ILLMService llmService,
-        IProjectMemoryService memoryService)
+        ILLMService           llmService,
+        IProjectMemoryService memoryService,
+        IChatFeedbackService  feedbackService)
     {
-        _chatHistoryService = chatHistoryService;
+        _chatHistoryService   = chatHistoryService;
         _promptContextBuilder = promptContextBuilder;
-        _llmService = llmService;
-        _memoryService = memoryService;
+        _llmService           = llmService;
+        _memoryService        = memoryService;
+        _feedbackService      = feedbackService;
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
@@ -240,17 +243,18 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             Messages.Add(assistantMsg);
             RefreshContextChips();
 
-            // Persist assistant message
-            await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+            // Persist assistant message and capture its DB Id
+            var assistantDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
             {
-                ProjectId = projectId,
-                ChatSessionId = sessionId,
-                Role = "assistant",
-                Message = responseText,
+                ProjectId      = projectId,
+                ChatSessionId  = sessionId,
+                Role           = "assistant",
+                Message        = responseText,
                 ContextSummary = assistantMsg.ContextHeader,
                 LinkedFilePaths = string.Join("\n", packet.MatchedFilePaths),
-                LinkedSymbols = string.Join("\n", packet.MatchedSymbols)
+                LinkedSymbols   = string.Join("\n", packet.MatchedSymbols)
             });
+            assistantMsg.PersistedMessageId = assistantDbId;
 
             // Update session's UpdatedDate
             SelectedSession.UpdatedDate = DateTime.UtcNow;
@@ -442,6 +446,91 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     {
         if (message == null || string.IsNullOrEmpty(message.MessageText)) return;
         Clipboard.SetText(message.MessageText);
+    }
+
+    // ── Feedback ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called from the UI with a "rating|reason" string, e.g. "Useful|Good file grounding".
+    /// Saves the feedback to the database and marks the message as rated.
+    /// </summary>
+    [RelayCommand]
+    private async Task SubmitFeedbackAsync(string parameter)
+    {
+        if (string.IsNullOrWhiteSpace(parameter) || _activeProjectId <= 0) return;
+
+        // Find the message that corresponds to this feedback via AwaitingReason state
+        // Parameter format: "<rating>|<reason>" — passed from a combined CommandParameter
+        var parts  = parameter.Split('|', 2);
+        var rating = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+        var reason = parts.Length > 1 ? parts[1].Trim() : null;
+
+        if (string.IsNullOrWhiteSpace(rating)) return;
+
+        // Find the in-memory message that was rated (has AwaitingReason = true or FeedbackRating set)
+        var msg = Messages.LastOrDefault(m =>
+            m.Role == "assistant" &&
+            m.FeedbackRating == rating &&
+            !m.FeedbackSaved);
+
+        if (msg == null) return;
+
+        try
+        {
+            await _feedbackService.SaveFeedbackAsync(new global::IronDev.Data.Models.ChatMessageFeedback
+            {
+                ProjectId     = _activeProjectId,
+                ChatSessionId = SelectedSession?.Id,
+                ChatMessageId = msg.PersistedMessageId,
+                Rating        = rating,
+                Reason        = reason
+            });
+
+            msg.FeedbackReason = reason;
+            msg.FeedbackSaved  = true;
+            msg.AwaitingReason = false;
+
+            StatusMessage    = "Feedback saved.";
+            HasStatusMessage = true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[Feedback] Save failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Marks a message as having a pending rating and opens the reason picker.
+    /// Parameter: "Useful" or "Weak".
+    /// </summary>
+    [RelayCommand]
+    private void BeginFeedback(string parameter)
+    {
+        if (string.IsNullOrWhiteSpace(parameter)) return;
+
+        // Clear any other pending messages
+        foreach (var m in Messages.Where(m => m.Role == "assistant" && m.AwaitingReason && !m.FeedbackSaved))
+        {
+            m.AwaitingReason  = false;
+            m.FeedbackRating  = null;
+        }
+
+        // Find the last unrated assistant message to attach this rating to
+        // (In practice the button CommandParameter will include message index)
+        var parts      = parameter.Split('|', 2);
+        var rating     = parts[0].Trim();
+        var msgIndexStr = parts.Length > 1 ? parts[1] : null;
+
+        ChatSummary? target = null;
+        if (int.TryParse(msgIndexStr, out var idx) && idx >= 0 && idx < Messages.Count)
+            target = Messages[idx];
+        else
+            target = Messages.LastOrDefault(m => m.Role == "assistant" && !m.FeedbackSaved);
+
+        if (target == null) return;
+
+        target.FeedbackRating  = rating;
+        target.AwaitingReason  = true;
     }
 
     // ── Workspace navigation shortcuts ────────────────────────────────────────

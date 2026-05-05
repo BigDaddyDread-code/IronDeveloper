@@ -1,0 +1,210 @@
+<UserControl x:Class="IronDev.Agent.Views.Workspaces.PromptPlaygroundView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:PromptPlaygroundViewModel, IsDesignTimeCreatable=False}">
+
+    <ScrollViewer Background="{StaticResource AppBackgroundBrush}"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,36,40,40" MaxWidth="900">
+
+            <!-- ── Header ──────────────────────────────────────────────── -->
+            <TextBlock Text="DEVELOPER TOOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+            <TextBlock Text="Prompt Playground" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,6"/>
+            <TextBlock Margin="0,0,0,28"
+                       TextWrapping="Wrap"
+                       FontSize="13" Opacity="0.55"
+                       Foreground="{StaticResource TextBrush}">
+                Inspect what PromptContextBuilder generates for any user message.
+                No LLM call is made. Use the test case dropdown to validate grounding quality.
+            </TextBlock>
+
+            <!-- ── Input Card ──────────────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <StackPanel>
+                    <TextBlock Text="INPUT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,14"/>
+
+                    <!-- Test Case Dropdown -->
+                    <TextBlock Text="Grounding Test Case" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox x:Name="TestCaseCombo"
+                              ItemsSource="{Binding TestCases}"
+                              SelectedItem="{Binding SelectedTestCase}"
+                              DisplayMemberPath="DisplayName"
+                              Margin="0,0,0,14"/>
+
+                    <!-- Sample Message -->
+                    <TextBlock Text="Sample User Message" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <TextBox x:Name="UserMessageBox"
+                             Text="{Binding SampleUserMessage, UpdateSourceTrigger=PropertyChanged}"
+                             TextWrapping="Wrap"
+                             MinHeight="72"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,0,0,18"/>
+
+                    <!-- Action Buttons -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button x:Name="BuildPromptBtn"
+                                Content="⚡  Build Prompt"
+                                Command="{Binding BuildPromptCommand}"
+                                Style="{StaticResource IronPrimaryButton}"
+                                Margin="0,0,10,0"
+                                MinWidth="148"/>
+                        <Button x:Name="CopyPromptBtn"
+                                Content="Copy Prompt"
+                                Command="{Binding CopyPromptCommand}"
+                                Style="{StaticResource IronSecondaryButton}"
+                                MinWidth="120"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Result Badges ───────────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Detected Intent -->
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="DETECTED INTENT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding DetectedIntent}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Expected Intent -->
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <TextBlock Text="EXPECTED INTENT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding ExpectedIntent}" FontSize="14"
+                                   Foreground="{StaticResource TextBrush}" Opacity="0.7" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Index Status + Quality -->
+                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                        <TextBlock Text="INDEX STATUS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}">
+                            <Run Text="{Binding ProjectIndexStatus}"/>
+                            <Run Text=" · "/>
+                            <Run Text="{Binding ContextQuality}"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- PASS/FAIL Badge -->
+                    <Border Grid.Column="3" CornerRadius="6" Padding="14,8"
+                            Background="#1AFFFFFF" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding IntentMatchBadge}"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="{StaticResource TextBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ── Error Banner ────────────────────────────────────────── -->
+            <Border CornerRadius="6" Padding="14,10" Margin="0,0,0,16"
+                    Background="#33FF4444"
+                    Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}">
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#FFDD6666"
+                           FontSize="13" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- ── Expanded Queries ────────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <StackPanel>
+                    <TextBlock Text="EXPANDED SEARCH QUERIES" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding ExpandedQueries}"
+                               FontFamily="Consolas, Courier New"
+                               FontSize="12"
+                               Foreground="{StaticResource TextBrush}"
+                               Opacity="0.8"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Retrieved Context ───────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <StackPanel>
+                    <TextBlock Text="RETRIEVED CONTEXT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
+                    <ItemsControl ItemsSource="{Binding RetrievedItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,4" Padding="10,6"
+                                        Background="#0AFFFFFF" CornerRadius="4">
+                                    <StackPanel>
+                                        <TextBlock FontFamily="Consolas, Courier New" FontSize="12"
+                                                   Foreground="{StaticResource TextBrush}"
+                                                   FontWeight="SemiBold">
+                                            <Run Text="{Binding FilePath}"/>
+                                            <Run Text="  →  " Foreground="#80FFFFFF"/>
+                                            <Run Text="{Binding SymbolName}" Foreground="#FFB8C4D8"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Preview}"
+                                                   FontFamily="Consolas, Courier New"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource TextBrush}"
+                                                   Opacity="0.5"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Margin="0,8,0,0"
+                               Text="(no context retrieved)"
+                               FontSize="13" Opacity="0.35"
+                               Foreground="{StaticResource TextBrush}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RetrievedItems.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Full Prompt ─────────────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="FULL GENERATED PROMPT" Style="{StaticResource IronEyebrow}"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="(read-only)" FontSize="11" Opacity="0.4"
+                                   Foreground="{StaticResource TextBrush}"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                    </Grid>
+                    <TextBox Text="{Binding PromptText, Mode=OneWay}"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             MinHeight="300"
+                             MaxHeight="600"
+                             VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas, Courier New"
+                             FontSize="12"
+                             Padding="10"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Loading indicator ───────────────────────────────────── -->
+            <Border Padding="14,8" CornerRadius="6" Margin="0,0,0,16"
+                    Background="#22FFFFFF"
+                    Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Building prompt…" FontSize="13" Opacity="0.6"
+                           Foreground="{StaticResource TextBrush}"/>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

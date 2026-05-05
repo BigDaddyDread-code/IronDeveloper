@@ -38,6 +38,7 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
                 services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
                 services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
@@ -74,7 +75,14 @@ public partial class App : Application
                 services.AddTransient<TicketsWorkspaceViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();
-                services.AddTransient<SettingsWorkspaceViewModel>();
+                services.AddTransient<PromptPlaygroundViewModel>();
+                services.AddTransient<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
+                {
+                    // Deferred: PromptPlaygroundViewModel (and its DB deps) are only
+                    // instantiated when the user first expands Developer Tools —
+                    // never at app startup.
+                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>()
+                });
 
                 // Shell
                 services.AddSingleton<ShellViewModel>();

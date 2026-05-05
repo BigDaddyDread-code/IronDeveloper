@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -9,8 +10,8 @@ namespace IronDev.AI;
 
 public class ChatContextPacket
 {
-    public System.Collections.Generic.List<string> Snippets { get; init; } = new();
-    public System.Collections.Generic.List<string> Tickets { get; init; } = new();
+    public System.Collections.Generic.List<string> Snippets  { get; init; } = new();
+    public System.Collections.Generic.List<string> Tickets   { get; init; } = new();
     public System.Collections.Generic.List<string> Decisions { get; init; } = new();
     public string FormattedPrompt { get; set; } = string.Empty;
 
@@ -18,31 +19,85 @@ public class ChatContextPacket
     public System.Collections.Generic.List<string> MatchedFilePaths { get; init; } = new();
     /// <summary>Structured symbol names from matched code snippets.</summary>
     public System.Collections.Generic.List<string> MatchedSymbols { get; init; } = new();
+
+    /// <summary>Chat intent inferred from the user request.</summary>
+    public ChatIntent Intent { get; set; } = ChatIntent.General;
+
+    /// <summary>True when the project has no code index (IndexingStatus != 'Ready').</summary>
+    public bool IsProjectNotIndexed { get; set; }
+}
+
+/// <summary>
+/// Result returned by BuildFullPromptForTestingAsync — used by the Prompt Playground
+/// to display intent, retrieved context, and the full prompt without an LLM call.
+/// </summary>
+public sealed class PromptPreviewResult
+{
+    public string PromptText        { get; set; } = string.Empty;
+    public string DetectedIntent    { get; set; } = string.Empty;
+    public string ProjectIndexStatus{ get; set; } = string.Empty;
+    public string ContextQuality    { get; set; } = string.Empty;
+    public List<IronDev.Data.Models.CodeIndexEntry> RetrievedItems { get; init; } = new();
+}
+
+/// <summary>
+/// Classifies the high-level intent of a user chat message so that retrieval
+/// and prompt assembly can be tailored to the right area of the codebase.
+/// </summary>
+public enum ChatIntent
+{
+    General,
+    CodeQuery,
+    /// <summary>
+    /// User is asking about saved/persisted ticket management
+    /// (e.g. delete tickets, archive tickets, list tickets, ticket persistence).
+    /// These questions relate to ProjectTicket / TicketsWorkspaceViewModel —
+    /// NOT to DraftTicket / the Chat→Draft Ticket review flow.
+    /// </summary>
+    SavedTicketManagement,
+    /// <summary>
+    /// User is asking about the Chat→Draft Ticket generation/review flow,
+    /// DraftTicket models, regenerating drafts, etc.
+    /// </summary>
+    DraftTicketFlow,
 }
 
 public interface IPromptContextBuilder
 {
     Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default);
     Task<ChatContextPacket> BuildPacketAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Developer-only: builds the full prompt for a sample user message and returns
+    /// the intent, retrieved context, and prompt text without making an LLM call.
+    /// Used by the Prompt Playground.
+    /// </summary>
+    Task<PromptPreviewResult> BuildFullPromptForTestingAsync(int projectId, string userMessage, CancellationToken ct = default);
 }
 
 public sealed class PromptContextBuilder : IPromptContextBuilder
 {
-    private readonly IChatHistoryService _chatHistoryService;
-    private readonly IProjectMemoryService _projectMemoryService;
-    private readonly ICodeIndexService _codeIndexService;
-    private readonly ITicketService _ticketService;
+    private readonly IChatHistoryService    _chatHistoryService;
+    private readonly IProjectMemoryService  _projectMemoryService;
+    private readonly ICodeIndexService      _codeIndexService;
+    private readonly ITicketService         _ticketService;
+    private readonly IChatFeedbackService   _feedbackService;
+    private readonly IProjectService        _projectService;
 
     public PromptContextBuilder(
-        IChatHistoryService chatHistoryService,
+        IChatHistoryService   chatHistoryService,
         IProjectMemoryService projectMemoryService,
-        ICodeIndexService codeIndexService,
-        ITicketService ticketService)
+        ICodeIndexService     codeIndexService,
+        ITicketService        ticketService,
+        IChatFeedbackService  feedbackService,
+        IProjectService       projectService)
     {
-        _chatHistoryService = chatHistoryService;
+        _chatHistoryService   = chatHistoryService;
         _projectMemoryService = projectMemoryService;
-        _codeIndexService = codeIndexService;
-        _ticketService = ticketService;
+        _codeIndexService     = codeIndexService;
+        _ticketService        = ticketService;
+        _feedbackService      = feedbackService;
+        _projectService       = projectService;
     }
 
     public async Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default)
@@ -56,29 +111,78 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         return BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<PromptPreviewResult> BuildFullPromptForTestingAsync(int projectId, string userMessage, CancellationToken ct = default)
+    {
+        // Reuse the same context-building pipeline with session 0 (no history needed for testing)
+        var packet = await BuildPacketDataAsync(projectId, sessionId: 0, userRequest: userMessage, cancellationToken: ct);
+
+        var project     = await _projectService.GetByIdAsync(projectId, ct);
+        var indexStatus = project?.IndexingStatus ?? "Unknown";
+        var quality     = string.Equals(indexStatus, "Ready", StringComparison.OrdinalIgnoreCase) ? "Indexed" : "Limited";
+
+        // Retrieve and rank raw snippets for the playground list view
+        var intent   = ClassifyIntent(userMessage);
+        var queries  = ExpandSearchQueries(userMessage, intent);
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry>();
+        foreach (var q in queries.Take(4))
+        {
+            var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, q, 4, ct);
+            snippets.AddRange(results);
+        }
+        var ranked = RankSnippetsByIntent(snippets, intent, 12);
+
+        var preview = new PromptPreviewResult
+        {
+            PromptText         = packet.FormattedPrompt,
+            DetectedIntent     = intent.ToString(),
+            ProjectIndexStatus = indexStatus,
+            ContextQuality     = quality,
+        };
+        preview.RetrievedItems.AddRange(ranked);
+        return preview;
+    }
+
     private async Task<ChatContextPacket> BuildPacketDataAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken)
     {
         var packet = new ChatContextPacket();
-        var isCodeQuery = IsCodeQuery(userRequest);
-        var ticketTake = isCodeQuery ? 2 : 5;
+
+        // 1. Classify intent
+        var intent = ClassifyIntent(userRequest);
+        packet.Intent = intent;
+
+        var isCodeQuery = intent == ChatIntent.CodeQuery || intent == ChatIntent.SavedTicketManagement;
+        var ticketTake   = isCodeQuery ? 2 : 5;
         var decisionTake = isCodeQuery ? 2 : 5;
-        var snippetTake = isCodeQuery ? 5 : 3;
+        var snippetTake  = isCodeQuery ? 8 : 3;
+
+        // 2. Check project index status
+        var project = await _projectService.GetByIdAsync(projectId, cancellationToken);
+        var isNotIndexed = project?.IndexingStatus == null ||
+                           !string.Equals(project.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase);
+        packet.IsProjectNotIndexed = isNotIndexed;
 
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
-        var tickets = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
-        var queries = ExtractSearchQueries(userRequest);
-        
-        var snippetList = new System.Collections.Generic.List<IronDev.Data.Models.CodeIndexEntry>();
+        var tickets   = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
 
+        // 3. Build expanded search queries for the intent
+        var queries = ExpandSearchQueries(userRequest, intent);
+
+        // Fetch feedback preferences concurrently with snippet retrieval
+        var feedbackTask = _feedbackService.GetProjectFeedbackSummaryAsync(projectId, cancellationToken);
+
+        var snippetList = new List<IronDev.Data.Models.CodeIndexEntry>();
         foreach (var query in queries)
         {
             var results = await _codeIndexService.GetRelevantSnippetsAsync(projectId, query, snippetTake, cancellationToken);
             snippetList.AddRange(results);
         }
 
-        var topSnippets = snippetList.GroupBy(x => x.Id).Select(g => g.First()).Take(snippetTake).ToList();
+        // 4. Deduplicate, then rank snippets by intent relevance
+        var deduped = snippetList.GroupBy(x => x.Id).Select(g => g.First()).ToList();
+        var rankedSnippets = RankSnippetsByIntent(deduped, intent, snippetTake);
 
-        foreach (var r in topSnippets)
+        foreach (var r in rankedSnippets)
         {
             var shortChunk = r.ChunkText;
             if (shortChunk.Length > 800) shortChunk = shortChunk.Substring(0, 800) + "\n...[TRUNCATED]...";
@@ -102,8 +206,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         }
 
         var recentMessages = await _chatHistoryService.GetRecentMessagesAsync(projectId, sessionId, 8, cancellationToken);
-        var latestSummary = await _projectMemoryService.GetLatestSummaryAsync(projectId, cancellationToken);
+        var latestSummary  = await _projectMemoryService.GetLatestSummaryAsync(projectId, cancellationToken);
+        var feedbackPrefs  = await feedbackTask;
 
+        // 5. Assemble the prompt
         var sb = new StringBuilder();
         sb.AppendLine("You are IronDev Architect, an expert AI assistant integrated into the IronDev engineering platform.");
         sb.AppendLine("IMPORTANT INSTRUCTIONS:");
@@ -113,7 +219,15 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         sb.AppendLine("4. List the main files/classes involved when relevant.");
         sb.AppendLine("5. Mention uncertainty explicitly if the provided context is incomplete to fully answer the user's question.");
         sb.AppendLine();
-        
+
+        // Anti-wrong-context rule (always present)
+        sb.AppendLine("ARCHITECTURAL CONTEXT RULE:");
+        sb.AppendLine("Do not assume DraftTicket is the saved ticket model.");
+        sb.AppendLine("DraftTicket is ONLY for the Chat → Draft Ticket review flow (generating draft tickets from chat).");
+        sb.AppendLine("For saved ticket management (delete, archive, list, select tickets), prefer: ProjectTicket / TicketsWorkspaceViewModel / TicketsWorkspaceView / TicketService / ticket persistence services.");
+        sb.AppendLine("Do not recommend changing DraftTicketDtos.cs or CodebaseTicketGeneratorModels.cs for saved ticket operations.");
+        sb.AppendLine();
+
         if (isCodeQuery)
         {
             sb.AppendLine("Since the user is asking an implementation or codebase-oriented question, please structure your response exactly as follows:");
@@ -124,14 +238,58 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine();
         }
 
+        if (intent == ChatIntent.SavedTicketManagement)
+        {
+            sb.AppendLine("SAVED TICKET MANAGEMENT CONTEXT:");
+            sb.AppendLine("The user is asking about saved/persisted ticket management (e.g. deleting, archiving, listing tickets).");
+            sb.AppendLine("Focus your answer on: TicketsWorkspaceViewModel, TicketsWorkspaceView.xaml, ProjectTicket, TicketService, GetTickets, SaveTicket, ticket persistence.");
+            sb.AppendLine("After giving your grounded answer, suggest using the Create Ticket feature if the user needs to track this work as a ticket.");
+            sb.AppendLine();
+        }
+
         sb.AppendLine("IMPORTANT LOGIC RULE:");
         sb.AppendLine("If you and the user finalize a new technical rule, architectural choice, or project decision during this turn, output a hidden XML tag block anywhere in your response like this:");
         sb.AppendLine("<decision>Decision Title | The detailed rule</decision>");
         sb.AppendLine();
 
-        if (topSnippets.Count > 0)
+        // Not-indexed warning
+        if (isNotIndexed)
         {
-            sb.AppendLine("## Relevant Code Snippets");
+            sb.AppendLine("⚠️ LIMITED CONTEXT WARNING: Project is not indexed (IndexingStatus is not 'Ready'), so affected files are best-effort.");
+            sb.AppendLine("Do not present weak context as authoritative. Explicitly acknowledge that results may be incomplete.");
+            sb.AppendLine();
+        }
+
+        // Ranked context section
+        if (rankedSnippets.Count > 0)
+        {
+            var highConf = rankedSnippets.Take(Math.Min(3, rankedSnippets.Count)).ToList();
+            var lowConf  = rankedSnippets.Skip(3).ToList();
+
+            sb.AppendLine("## Relevant project files (high confidence):");
+            for (int i = 0; i < highConf.Count; i++)
+            {
+                var r = highConf[i];
+                sb.AppendLine($"{i + 1}. {r.FilePath}");
+                if (!string.IsNullOrWhiteSpace(r.SymbolName)) sb.AppendLine($"   Symbol: {r.SymbolName}");
+                sb.AppendLine($"   Matched via: {GetMatchReason(r, intent)}");
+            }
+            sb.AppendLine();
+
+            if (lowConf.Count > 0)
+            {
+                sb.AppendLine("## Potentially lower-confidence files:");
+                for (int i = 0; i < lowConf.Count; i++)
+                {
+                    var r = lowConf[i];
+                    sb.AppendLine($"{i + 1}. {r.FilePath}");
+                    sb.AppendLine($"   Reason: lower priority match for this query intent");
+                }
+                sb.AppendLine("Use high-confidence files first. Do not recommend changing lower-confidence files unless the user explicitly asked about that area.");
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("## Code Snippets");
             foreach (var snippet in packet.Snippets)
             {
                 sb.AppendLine(snippet);
@@ -176,6 +334,12 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine();
         }
 
+        if (!string.IsNullOrWhiteSpace(feedbackPrefs))
+        {
+            sb.AppendLine(feedbackPrefs);
+            sb.AppendLine();
+        }
+
         sb.AppendLine("Current user request:");
         sb.AppendLine(userRequest);
 
@@ -183,39 +347,163 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         return packet;
     }
 
-    private static bool IsCodeQuery(string text)
+    // ────────────────────────────────────────────────────────────────────
+    // Intent Classification
+    // ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Classifies the user's chat message into a <see cref="ChatIntent"/>.
+    ///
+    /// SavedTicketManagement is detected FIRST to ensure that queries like
+    /// "delete tickets affected files" are not misclassified as general
+    /// ticket queries that would pull DraftTicket files.
+    /// </summary>
+    public static ChatIntent ClassifyIntent(string text)
     {
+        if (string.IsNullOrWhiteSpace(text)) return ChatIntent.General;
         var lower = text.ToLowerInvariant();
-        return lower.Contains("where is") || 
-               lower.Contains("what file") || 
-               lower.Contains("what code") || 
-               lower.Contains("summarize implementation") ||
-               lower.Contains("how does");
+
+        // Draft ticket flow (check before saved-ticket because "draft ticket" is specific)
+        if (IsDraftTicketQuery(lower)) return ChatIntent.DraftTicketFlow;
+
+        // Saved ticket management — broad set of signals
+        if (IsSavedTicketManagementQuery(lower)) return ChatIntent.SavedTicketManagement;
+
+        // Generic code / implementation query
+        if (IsCodeQuery(lower)) return ChatIntent.CodeQuery;
+
+        return ChatIntent.General;
     }
 
+    private static bool IsDraftTicketQuery(string lower) =>
+        lower.Contains("draft ticket") ||
+        lower.Contains("chat to ticket") ||
+        lower.Contains("chat → ticket") ||
+        lower.Contains("chat -> ticket") ||
+        lower.Contains("ticket generation") ||
+        lower.Contains("regenerate ticket") ||
+        lower.Contains("draft review") ||
+        lower.Contains("approve draft") ||
+        lower.Contains("draftticket");
 
-    private static System.Collections.Generic.List<string> ExtractSearchQueries(string text)
+    public static bool IsSavedTicketManagementQuery(string lower) =>
+        (lower.Contains("ticket") || lower.Contains("tickets")) &&
+        (lower.Contains("delete") ||
+         lower.Contains("remove") ||
+         lower.Contains("archive") ||
+         lower.Contains("ticket management") ||
+         lower.Contains("ticket list") ||
+         lower.Contains("ticket persistence") ||
+         lower.Contains("saved ticket") ||
+         lower.Contains("affect") ||         // "affected files for tickets"
+         lower.Contains("implement ticket") ||
+         lower.Contains("implement delete") ||
+         lower.Contains("select ticket") ||
+         lower.Contains("selected ticket") ||
+         lower.Contains("list ticket") ||
+         lower.Contains("workspace"));
+
+    private static bool IsCodeQuery(string lower) =>
+        lower.Contains("where is") ||
+        lower.Contains("what file") ||
+        lower.Contains("what code") ||
+        lower.Contains("affected file") ||
+        lower.Contains("summarize implementation") ||
+        lower.Contains("how does") ||
+        lower.Contains("how do i") ||
+        lower.Contains("how can") ||
+        lower.Contains("what does") ||
+        lower.Contains("what do ") ||
+        lower.Contains("what would") ||
+        lower.Contains("what should") ||
+        lower.Contains("what files") ||
+        lower.Contains("implement") ||
+        lower.Contains("what class") ||
+        lower.Contains("which class") ||
+        lower.Contains("set up") ||
+        lower.Contains("configure") ||
+        lower.Contains("fix grounding") ||
+        lower.Contains("run with") ||
+        lower.Contains("run irondev");
+
+    // ────────────────────────────────────────────────────────────────────
+    // Query Expansion
+    // ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a prioritised list of search terms to issue against the code
+    /// index. For SavedTicketManagement queries the list is seeded with the
+    /// known high-priority saved-ticket symbols so weak raw words (e.g.
+    /// "ticket") do not dominate and pull in DraftTicket files.
+    /// </summary>
+    public static List<string> ExpandSearchQueries(string text, ChatIntent intent)
     {
-        if (string.IsNullOrWhiteSpace(text)) return new System.Collections.Generic.List<string>();
-        
+        var queries = new List<string>();
+
+        if (intent == ChatIntent.SavedTicketManagement)
+        {
+            // High-priority saved-ticket terms come first
+            queries.AddRange(new[]
+            {
+                "TicketsWorkspaceViewModel",
+                "TicketsWorkspaceView",
+                "ProjectTicket",
+                "ProjectTickets",
+                "TicketService",
+                "SaveTicket",
+                "GetTickets",
+                "selected ticket",
+                "ticket list",
+                "ticket persistence",
+                "delete ticket",
+                "archive ticket",
+            });
+        }
+        else if (intent == ChatIntent.DraftTicketFlow)
+        {
+            queries.AddRange(new[]
+            {
+                "DraftTicket",
+                "DraftTicketService",
+                "IDraftTicketService",
+                "GenerateDraft",
+                "ApproveDraft",
+                "ChatTicketContext",
+            });
+        }
+
+        // Always append the raw user terms as lower-priority fallbacks
+        queries.AddRange(ExtractRawSearchTerms(text));
+
+        return queries.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static List<string> ExtractRawSearchTerms(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return new List<string>();
+
         var words = text.Split(new[] { ' ', '\n', '\r', '\t', '?', '!', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-        var queries = new System.Collections.Generic.List<string>();
-        
+        var queries = new List<string>();
+
         // 1. Explicit filenames
         var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".xaml") || w.EndsWith(".sql") || w.EndsWith(".js") || w.EndsWith(".ts")));
         if (fileLike != null) queries.Add(fileLike.Trim('\'', '\"', '`'));
-        
-        // 2. CamelCase
+
+        // 2. CamelCase identifiers in the query
         var camelCase = words.FirstOrDefault(w => w.Length > 8 && char.IsUpper(w[0]) && w.Any(char.IsLower));
         if (camelCase != null) queries.Add(camelCase.Trim('\'', '\"', '`'));
 
         // 3. Keyword expansion
         var lower = text.ToLowerInvariant();
-        if (lower.Contains("index")) queries.Add("index");
-        if (lower.Contains("login") || lower.Contains("auth")) queries.Add("auth");
-        if (lower.Contains("overview") || lower.Contains("dashboard")) queries.Add("overview");
-        if (lower.Contains("ticket") || lower.Contains("work item")) queries.Add("ticket");
-        if (lower.Contains("decision") || lower.Contains("architecture")) queries.Add("decision");
+        if (lower.Contains("index"))                                        queries.Add("index");
+        if (lower.Contains("login") || lower.Contains("auth"))              queries.Add("auth");
+        if (lower.Contains("overview") || lower.Contains("dashboard"))      queries.Add("overview");
+        if (lower.Contains("ticket") || lower.Contains("work item"))        queries.Add("ticket");
+        if (lower.Contains("decision") || lower.Contains("architecture"))   queries.Add("decision");
+        if (lower.Contains("chat") || lower.Contains("history"))            queries.Add("chat");
+        if (lower.Contains("llm") || lower.Contains("ollama") || lower.Contains("provider")) queries.Add("LlmOptions");
+        if (lower.Contains("grounding") || lower.Contains("context retrieval"))             queries.Add("PromptContextBuilder");
+        if (lower.Contains("database") || lower.Contains("set up") || lower.Contains("setup")) queries.Add("local_dev_setup");
 
         // 4. Fallback: longest technical-looking word
         if (queries.Count == 0)
@@ -226,4 +514,92 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         return queries.Distinct().ToList();
     }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Snippet Ranking
+    // ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Re-ranks snippets returned by the SQL index so that high-priority
+    /// symbols for the detected intent appear first and low-priority symbols
+    /// (e.g. DraftTicket files for a saved-ticket query) appear last.
+    /// </summary>
+    public static List<IronDev.Data.Models.CodeIndexEntry> RankSnippetsByIntent(
+        List<IronDev.Data.Models.CodeIndexEntry> snippets,
+        ChatIntent intent,
+        int take)
+    {
+        if (intent == ChatIntent.SavedTicketManagement)
+        {
+            return snippets
+                .OrderByDescending(s => ScoreSavedTicketRelevance(s))
+                .Take(take)
+                .ToList();
+        }
+
+        if (intent == ChatIntent.DraftTicketFlow)
+        {
+            return snippets
+                .OrderByDescending(s => ScoreDraftTicketRelevance(s))
+                .Take(take)
+                .ToList();
+        }
+
+        return snippets.Take(take).ToList();
+    }
+
+    private static int ScoreSavedTicketRelevance(IronDev.Data.Models.CodeIndexEntry e)
+    {
+        var path   = e.FilePath   ?? string.Empty;
+        var symbol = e.SymbolName ?? string.Empty;
+        int score  = 0;
+
+        // High priority
+        if (ContainsAny(symbol, "TicketsWorkspaceViewModel", "TicketsWorkspaceView", "ProjectTicket", "TicketService", "SaveTicket", "GetTicket", "GetTickets"))
+            score += 100;
+        if (ContainsAny(path, "TicketsWorkspaceView", "TicketsWorkspace"))
+            score += 80;
+        if (ContainsAny(symbol, "ProjectTickets", "SelectedTicket", "TicketList", "DeleteTicket", "ArchiveTicket"))
+            score += 70;
+
+        // Medium priority
+        if (ContainsAny(path, "ProjectMemoryService", "DataModels", "Database/"))
+            score += 40;
+        if (ContainsAny(symbol, "ProjectMemoryService"))
+            score += 30;
+
+        // Low priority — penalise DraftTicket files when not asked about them
+        if (ContainsAny(path, "DraftTicketDto", "CodebaseTicketGenerator"))
+            score -= 50;
+        if (ContainsAny(symbol, "DraftTicket", "CodebaseTicketGeneratorModels", "DraftTicketService"))
+            score -= 30;
+
+        return score;
+    }
+
+    private static int ScoreDraftTicketRelevance(IronDev.Data.Models.CodeIndexEntry e)
+    {
+        var path   = e.FilePath   ?? string.Empty;
+        var symbol = e.SymbolName ?? string.Empty;
+        int score  = 0;
+
+        if (ContainsAny(symbol, "DraftTicket", "DraftTicketService", "IDraftTicketService", "GenerateDraft", "ApproveDraft", "ChatTicketContext"))
+            score += 100;
+        if (ContainsAny(path, "DraftTicketDto", "CodebaseTicketGenerator"))
+            score += 80;
+
+        return score;
+    }
+
+    private static bool ContainsAny(string source, params string[] terms) =>
+        terms.Any(t => source.Contains(t, StringComparison.OrdinalIgnoreCase));
+
+    private static string GetMatchReason(IronDev.Data.Models.CodeIndexEntry e, ChatIntent intent) =>
+        intent switch
+        {
+            ChatIntent.SavedTicketManagement => "saved ticket management — symbol/path matched ticket persistence terms",
+            ChatIntent.DraftTicketFlow       => "draft ticket flow — symbol/path matched draft ticket terms",
+            ChatIntent.CodeQuery             => "code query — matched implementation terms",
+            _                               => "general match"
+        };
 }

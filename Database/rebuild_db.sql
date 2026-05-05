@@ -7,13 +7,16 @@ GO
 USE [IronDeveloper];
 GO
 
+IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DROP TABLE dbo.ChatMessageFeedback;
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTickets;
 IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DROP TABLE dbo.ProjectImplementationPlans;
 IF OBJECT_ID('dbo.ProjectDecisions', 'U') IS NOT NULL DROP TABLE dbo.ProjectDecisions;
 IF OBJECT_ID('dbo.DecisionCategories', 'U') IS NOT NULL DROP TABLE dbo.DecisionCategories;
 IF OBJECT_ID('dbo.DecisionStatuses', 'U') IS NOT NULL DROP TABLE dbo.DecisionStatuses;
 IF OBJECT_ID('dbo.ProjectSummaries', 'U') IS NOT NULL DROP TABLE dbo.ProjectSummaries;
+IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DROP TABLE dbo.CodeIndexEntries;
 IF OBJECT_ID('dbo.ChatMessages', 'U') IS NOT NULL DROP TABLE dbo.ChatMessages;
+IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DROP TABLE dbo.ProjectChatSessions;
 IF OBJECT_ID('dbo.ProjectFiles', 'U') IS NOT NULL DROP TABLE dbo.ProjectFiles;
 IF OBJECT_ID('dbo.Projects', 'U') IS NOT NULL DROP TABLE dbo.Projects;
 IF OBJECT_ID('dbo.TenantUsers', 'U') IS NOT NULL DROP TABLE dbo.TenantUsers;
@@ -100,6 +103,23 @@ CREATE TABLE dbo.ChatMessages
     CONSTRAINT FK_ChatMessages_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ChatMessages_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
     CONSTRAINT FK_ChatMessages_Sessions FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id)
+);
+
+CREATE TABLE dbo.ChatMessageFeedback
+(
+    Id            BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId      INT NOT NULL,
+    ProjectId     INT NOT NULL,
+    ChatSessionId BIGINT NULL,
+    ChatMessageId BIGINT NOT NULL,
+    Rating        NVARCHAR(20) NOT NULL,
+    Reason        NVARCHAR(100) NULL,
+    Comment       NVARCHAR(MAX) NULL,
+    CreatedDate   DATETIME2 NOT NULL CONSTRAINT DF_ChatMessageFeedback_CreatedDate DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ChatMessageFeedback_Tenants      FOREIGN KEY (TenantId)      REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ChatMessageFeedback_Projects     FOREIGN KEY (ProjectId)     REFERENCES dbo.Projects(Id),
+    CONSTRAINT FK_ChatMessageFeedback_Sessions     FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id),
+    CONSTRAINT FK_ChatMessageFeedback_ChatMessages FOREIGN KEY (ChatMessageId) REFERENCES dbo.ChatMessages(Id)
 );
 
 CREATE TABLE dbo.ProjectSummaries
@@ -248,6 +268,9 @@ CREATE INDEX IX_ProjectFiles_ProjectId_FileExtension
 
 CREATE UNIQUE INDEX UX_ProjectFiles_ProjectId_FilePath
     ON dbo.ProjectFiles(ProjectId, FilePath);
+
+CREATE INDEX IX_ChatMessageFeedback_ProjectId_CreatedDate
+    ON dbo.ChatMessageFeedback(ProjectId, CreatedDate DESC);
 GO
 
 -- Tenant 1: Default

@@ -250,6 +250,26 @@ BEGIN
     );
 END
 
+IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ChatMessageFeedback
+    (
+        Id            BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TenantId      INT NOT NULL,
+        ProjectId     INT NOT NULL,
+        ChatSessionId BIGINT NULL,
+        ChatMessageId BIGINT NOT NULL,
+        Rating        NVARCHAR(20) NOT NULL,
+        Reason        NVARCHAR(100) NULL,
+        Comment       NVARCHAR(MAX) NULL,
+        CreatedDate   DATETIME2 NOT NULL CONSTRAINT DF_ChatMessageFeedback_CreatedDate DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_ChatMessageFeedback_Tenants      FOREIGN KEY (TenantId)      REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ChatMessageFeedback_Projects     FOREIGN KEY (ProjectId)     REFERENCES dbo.Projects(Id),
+        CONSTRAINT FK_ChatMessageFeedback_Sessions     FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id),
+        CONSTRAINT FK_ChatMessageFeedback_ChatMessages FOREIGN KEY (ChatMessageId) REFERENCES dbo.ChatMessages(Id)
+    );
+END
+
 IF OBJECT_ID('dbo.DecisionCategories', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.DecisionCategories
