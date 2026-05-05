@@ -16,7 +16,7 @@ namespace IronDev.IntegrationTests;
 public class TicketTestsPlanTests
 {
     private static TicketsWorkspaceViewModel CreateVm()
-        => new(null!, null!, new StubOrchestrator());
+        => new(null!, null!, new StubOrchestrator(), new StubDraftTicketService());
 
     // ── Parsing: structured TechnicalNotes → sub-fields ─────────────────────
 
@@ -158,7 +158,12 @@ public class TicketTestsPlanTests
         vm.EditTestsBuildValidation  = "dotnet build";
 
         Assert.IsTrue(vm.CanBuildTicket,
-            "CanBuildTicket must remain true after populating test fields.");
+            "CanBuildTicket must remain true after populating test fields (IsDraftMode=false).");
+
+        // When in draft mode, Build This must be disabled
+        vm.IsDraftMode = true;
+        Assert.IsFalse(vm.CanBuildTicket,
+            "CanBuildTicket must be false while IsDraftMode=true.");
     }
 
     [TestMethod]

@@ -17,10 +17,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private readonly global::IronDev.Services.ITicketService         _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
     private readonly ITicketBuildOrchestrator                        _orchestrator;
+    private readonly IDraftTicketService                             _draftService;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
     private string _activeProjectPath = string.Empty;
+    private string _activeProjectName = string.Empty;
 
     // ── List panel ──────────────────────────────────────────────────────────
     [ObservableProperty] private ObservableCollection<TicketItem> _tickets = [];
@@ -117,7 +119,59 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         SelectedTicket != null
         && !string.IsNullOrWhiteSpace(EditTitle)
         && !string.IsNullOrWhiteSpace(_activeProjectPath)
-        && !IsBuildingTicket;
+        && !IsBuildingTicket
+        && !IsDraftMode;   // Build This is unavailable while reviewing a draft
+
+    // ── Draft Ticket state ────────────────────────────────────────────────────
+    [ObservableProperty] private bool       _isDraftMode;
+    [ObservableProperty] private bool       _isDraftGenerating;
+    [ObservableProperty] private string     _draftStatusMessage = string.Empty;
+    [ObservableProperty] private DraftTicket? _currentDraft;
+
+    // ── Draft Preflight state ─────────────────────────────────────────────────
+    /// <summary>
+    /// Tracks the preflight gate shown when the user clicks Ticket from Chat
+    /// but the project is not yet indexed. None = no preflight active.
+    /// </summary>
+    [ObservableProperty] private DraftPreflightState _draftPreflight = DraftPreflightState.None;
+
+    /// <summary>True while indexing is running after "Index Project First" was clicked.</summary>
+    [ObservableProperty] private bool _isDraftIndexing;
+
+    /// <summary>Status/progress text shown inside the preflight panel.</summary>
+    [ObservableProperty] private string _draftPreflightMessage = string.Empty;
+
+    /// <summary>Pending context held while the user decides on the preflight choice.</summary>
+    private ChatTicketContext? _pendingChatContext;
+
+    /// <summary>
+    /// True when "Index Project First" was clicked and we should auto-generate
+    /// the draft once SetIndexStatus("Ready") arrives.
+    /// </summary>
+    private bool _shouldGenerateDraftAfterIndex;
+
+    // ── Project index state ───────────────────────────────────────────────────
+    /// <summary>
+    /// True when the project code index is Ready. False means Needs Index / unknown.
+    /// Defaults to true so no warnings flash before project loads.
+    /// Updated by ShellViewModel whenever ActiveStatus changes.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBuildTicket))]
+    private bool _isProjectIndexed = true;
+
+    /// <summary>Derived: true when index is absent and context quality is limited.</summary>
+    public bool IsContextLimited => !IsProjectIndexed;
+
+    // ── Shell navigation callbacks ────────────────────────────────────────────
+    /// <summary>Called when the user cancels a draft — shell navigates back to Chat.</summary>
+    public Action? OnCancelDraft { get; set; }
+    /// <summary>Called after a draft is approved with a plan — shell navigates to Plans.
+    /// Params: title, goal, steps, linkedFilePaths, linkedSymbols, scope, risksNotes</summary>
+    public Action<string, string, string?, string?, string?, string?, string?>? OnApproveDraftWithPlan { get; set; }
+    /// <summary>Called when user clicks "Index Project" from within the Tickets workspace.
+    /// Shell wires this to IndexNowCommand on ProjectOverviewViewModel.</summary>
+    public Action? OnRequestIndex { get; set; }
 
     // Dropdown options
     public ObservableCollection<string> StatusOptions   { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
@@ -127,20 +181,23 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     public TicketsWorkspaceViewModel(
         global::IronDev.Services.ITicketService        ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
-        ITicketBuildOrchestrator                       orchestrator)
+        ITicketBuildOrchestrator                       orchestrator,
+        IDraftTicketService                            draftService)
     {
         _ticketService = ticketService;
         _memoryService = memoryService;
         _orchestrator  = orchestrator;
+        _draftService  = draftService;
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
 
-    internal async Task LoadAsync(Project project)
+    internal async Task LoadAsync(IronDev.Data.Models.Project project)
     {
         _activeProjectId   = project.Id;
         _activeTenantId    = project.TenantId;
         _activeProjectPath = project.LocalPath ?? string.Empty;
+        _activeProjectName = project.Name;
         await RefreshListAsync();
     }
 
@@ -165,6 +222,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             ClearEditor();
             return;
         }
+
+        // Guard: if this ticket is already loaded into the editor, skip the reload.
+        // This prevents a double-load when ApproveDraftAsync explicitly calls
+        // LoadTicketIntoEditorAsync and then sets SelectedTicket for list highlighting.
+        if (HasDetail && EditId == value.Id)
+            return;
 
         // Clear stale build state when switching tickets
         ClearBuildState();
@@ -426,6 +489,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             CurrentBuildPreview = preview;
             HasBuildPreview     = true;
 
+            // Prepend index warning to context summary when code context is limited
+            if (IsContextLimited)
+            {
+                preview.ContextSummary =
+                    $"\u26a0\ufe0f Limited context: project is not indexed. Code snippets may be unavailable.\n\n{preview.ContextSummary}";
+                CurrentBuildPreview = preview;   // re-assign to fire PropertyChanged
+            }
+
             if (preview.IsEmpty)
             {
                 BuildStatusMessage = "No changes proposed.";
@@ -454,6 +525,78 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private void CancelBuildPreview()
     {
         ClearBuildState();
+    }
+
+    /// <summary>
+    /// Invokes OnRequestIndex so ShellViewModel can trigger the real indexing command.
+    /// Safe to call even if no callback is wired — no-op in that case.
+    /// </summary>
+    [RelayCommand]
+    private void RequestIndex()
+    {
+        OnRequestIndex?.Invoke();
+    }
+
+    /// <summary>
+    /// Called by ShellViewModel whenever ActiveStatus changes so the Tickets workspace
+    /// stays in sync with the project's index readiness without needing a service reference.
+    ///
+    /// Preflight auto-generate logic:
+    /// - If we are in the Indexing state (user clicked "Index Project First") AND status is now
+    ///   Ready, automatically generate the draft from the pending context. This is the happy path.
+    /// - If we are in the Indexing state AND status is NOT Ready (indexing failed or was skipped),
+    ///   transition to IndexFailed so the user can retry or continue without index.
+    /// - Any other state: just update IsProjectIndexed normally.
+    /// </summary>
+    public void SetIndexStatus(string status)
+    {
+        IsProjectIndexed = status == "Ready";
+        OnPropertyChanged(nameof(IsContextLimited));
+
+        if (DraftPreflight == DraftPreflightState.Indexing)
+        {
+            if (IsProjectIndexed)
+            {
+                // Happy path: indexing completed, auto-generate the draft.
+                if (_shouldGenerateDraftAfterIndex && _pendingChatContext != null)
+                {
+                    IsDraftIndexing               = false;
+                    _shouldGenerateDraftAfterIndex = false;
+                    DraftPreflightMessage         = string.Empty;
+                    var ctx = _pendingChatContext;
+                    // Fire-and-forget on the UI thread; GeneratePendingDraftAsync transitions
+                    // DraftPreflight to None and sets HasDetail=true when it completes.
+                    _ = GeneratePendingDraftAsync(ctx);
+                }
+            }
+            else if (status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase))
+            {
+                // Explicit failure captured from the status string.
+                FailIndexing(status.Substring(4).Trim());
+            }
+            else if (status != "Indexing..." && status != "Needs Index" && status != "Checking...")
+            {
+                // Some other non-ready state that isn't a known progress state.
+                FailIndexing(string.Empty);
+            }
+            // else: status is "Indexing...", "Needs Index", etc. -- stay in Indexing state and wait.
+        }
+    }
+
+    private void FailIndexing(string? message)
+    {
+        IsDraftIndexing               = false;
+        _shouldGenerateDraftAfterIndex = false;
+        DraftPreflight                = DraftPreflightState.IndexFailed;
+        
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            DraftPreflightMessage = "Indexing did not complete. You can try again or continue without index.";
+        }
+        else
+        {
+            DraftPreflightMessage = $"Indexing failed: {message}. You can try again or continue without index.";
+        }
     }
 
     [RelayCommand]
@@ -500,6 +643,362 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditSummary         = summary;
         EditLinkedFilePaths = linkedFilePaths ?? string.Empty;
         EditLinkedSymbols   = linkedSymbols ?? string.Empty;
+    }
+
+    // ── Draft Ticket — entry point and commands ──────────────────────────────
+
+    /// <summary>
+    /// Called by ShellViewModel when the user clicks Ticket in Chat.
+    /// If the project is indexed (Ready), generates the draft immediately.
+    /// If not indexed (Needs Index), stores the pending context and shows the
+    /// preflight choice panel (Index Project First / Continue Without Index / Cancel).
+    /// </summary>
+    public async Task BeginDraftFromChatAsync(ChatTicketContext ctx)
+    {
+        if (IsContextLimited)
+        {
+            // Project is not indexed — show preflight choice instead of generating.
+            _pendingChatContext = ctx;
+            DraftPreflight      = DraftPreflightState.NeedsChoice;
+            HasDetail           = false;   // don't show the editor yet
+            return;
+        }
+
+        // Project is indexed — proceed immediately.
+        await GeneratePendingDraftAsync(ctx);
+    }
+
+    /// <summary>Inner generation path — shared by BeginDraftFromChatAsync and PreflightContinue.</summary>
+    private async Task GeneratePendingDraftAsync(ChatTicketContext ctx)
+    {
+        IsDraftMode        = true;
+        IsDraftGenerating  = true;
+        DraftStatusMessage = "Generating draft…";
+        HasDetail          = true;
+        IsEditing          = true;
+        IsNewTicket        = true;
+        ActiveTab          = TicketDetailTab.Overview;
+
+        // Clear any preflight state before generating
+        DraftPreflight      = DraftPreflightState.None;
+        _pendingChatContext  = null;
+
+        try
+        {
+            var draft = await _draftService.GenerateDraftAsync(
+                _activeProjectId,
+                _activeProjectName,
+                ctx.ProposedTitle,
+                ctx.MessageText,
+                ctx.LinkedFilePaths,
+                ctx.LinkedSymbols);
+
+            draft.SourceChatSessionId = ctx.SessionId;
+            draft.SourceMessageId     = ctx.MessageId;
+            draft.SourceMessageText   = ctx.MessageText;
+            CurrentDraft = draft;
+
+            LoadDraftIntoEditor(draft);
+
+            // Short status note in the banner — keep it concise
+            DraftStatusMessage = IsContextLimited
+                ? "⚠ Limited context — project not indexed"
+                : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Draft generation failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
+    // ── Preflight commands ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Preflight: "Continue Without Index" — generate draft immediately with limited context.
+    /// Guard: no-op while indexing is in progress (belt-and-suspenders; button is also disabled in UI).
+    /// </summary>
+    [RelayCommand]
+    private async Task PreflightContinueAsync()
+    {
+        if (_pendingChatContext == null || IsDraftIndexing) return;
+        var ctx = _pendingChatContext;
+        await GeneratePendingDraftAsync(ctx);
+    }
+
+    /// <summary>
+    /// Preflight: "Index Project First" — disables Continue/Index buttons, shows indexing progress
+    /// text, and fires OnRequestIndex. When ShellViewModel calls SetIndexStatus("Ready"), the
+    /// pending draft is auto-generated. If indexing fails, state falls back to IndexFailed.
+    /// </summary>
+    [RelayCommand]
+    private void PreflightIndexProject()
+    {
+        if (_pendingChatContext == null) return;
+
+        IsDraftIndexing              = true;
+        _shouldGenerateDraftAfterIndex = true;
+        DraftPreflight               = DraftPreflightState.Indexing;
+        DraftPreflightMessage        = "Indexing project…";
+
+        OnRequestIndex?.Invoke();
+    }
+
+    /// <summary>
+    /// Preflight: "Cancel" — discard the pending chat context and return to normal state.
+    /// Invokes OnCancelDraft so the shell can navigate back to Chat.
+    /// </summary>
+    [RelayCommand]
+    private void PreflightCancel()
+    {
+        _pendingChatContext           = null;
+        _shouldGenerateDraftAfterIndex = false;
+        IsDraftIndexing              = false;
+        DraftPreflight               = DraftPreflightState.None;
+        DraftPreflightMessage        = string.Empty;
+        HasDetail                    = false;
+        OnCancelDraft?.Invoke();
+    }
+
+    /// <summary>Saves the draft ticket, exits draft mode, and selects the new ticket in the list.</summary>
+    [RelayCommand]
+    private async Task ApproveDraftAsync()
+    {
+        var savedId = await SaveDraftTicketAsync();
+        if (savedId <= 0) return;
+
+        IsDraftMode        = false;
+        CurrentDraft       = null;
+        DraftStatusMessage = string.Empty;
+
+        await RefreshListAsync();  // ClearEditor() is called inside — resets HasDetail, fields, etc.
+
+        // Re-select the newly created ticket so the detail panel shows it.
+        // Set SelectedTicket first (triggers list highlight), then directly
+        // load the editor so we can set SaveStatus AFTER the load completes.
+        var created = Tickets.FirstOrDefault(t => t.Id == savedId);
+        if (created != null)
+        {
+            // Suppress OnSelectedTicketChanged from clearing SaveStatus by
+            // directly loading the editor ourselves, then setting SelectedTicket.
+            await LoadTicketIntoEditorAsync(created);
+            SelectedTicket = created;          // list highlight (no double-load: HasDetail already true)
+        }
+
+        SaveStatus = "Ticket created \u2713";
+    }
+
+    /// <summary>Saves the draft ticket and then navigates to Plans to create a plan.</summary>
+    [RelayCommand]
+    private async Task ApproveDraftWithPlanAsync()
+    {
+        var savedId = await SaveDraftTicketAsync();
+        if (savedId <= 0) return;
+
+        // ✓ SNAPSHOT all field values BEFORE RefreshListAsync calls ClearEditor() and blanks them
+        var planTitle       = $"{EditTitle.Trim()} — Implementation Plan";
+        var planGoal        = EditSummary.Trim();
+        var planScope       = string.IsNullOrWhiteSpace(EditAcceptanceCriteria)
+                                 ? null
+                                 : EditAcceptanceCriteria.Trim();
+        var planSteps       = string.IsNullOrWhiteSpace(EditBackground)
+                                 ? null
+                                 : EditBackground.Trim();
+        var planFiles       = string.IsNullOrWhiteSpace(EditLinkedFilePaths)
+                                 ? null
+                                 : EditLinkedFilePaths.Trim();
+        var planSymbols     = string.IsNullOrWhiteSpace(EditLinkedSymbols)
+                                 ? null
+                                 : EditLinkedSymbols.Trim();
+        var planRisksNotes  = string.IsNullOrWhiteSpace(EditTechnicalNotes)
+                                 ? null
+                                 : EditTechnicalNotes.Trim();   // carries Tests/Validation into plan
+
+        IsDraftMode        = false;
+        CurrentDraft       = null;
+        DraftStatusMessage = string.Empty;
+
+        await RefreshListAsync();  // ClearEditor() called here — field snapshots are already safe
+
+        // Re-select the saved ticket
+        SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
+
+        // Navigate to Plans with full prefill (title, goal, steps, files, symbols, scope, risksNotes)
+        OnApproveDraftWithPlan?.Invoke(planTitle, planGoal, planSteps, planFiles, planSymbols, planScope, planRisksNotes);
+    }
+
+    /// <summary>Re-generates all draft fields from the original chat context.</summary>
+    [RelayCommand]
+    private async Task RegenerateAllAsync()
+    {
+        if (CurrentDraft == null) return;
+
+        IsDraftGenerating  = true;
+        DraftStatusMessage = "Regenerating…";
+
+        try
+        {
+            var draft = await _draftService.GenerateDraftAsync(
+                _activeProjectId,
+                _activeProjectName,
+                CurrentDraft.SourceMessageText.Length > 80
+                    ? CurrentDraft.SourceMessageText[..80]
+                    : CurrentDraft.SourceMessageText,
+                CurrentDraft.SourceMessageText,
+                CurrentDraft.LinkedFilePaths,
+                CurrentDraft.LinkedSymbols);
+
+            draft.SourceChatSessionId = CurrentDraft.SourceChatSessionId;
+            draft.SourceMessageId     = CurrentDraft.SourceMessageId;
+            draft.SourceMessageText   = CurrentDraft.SourceMessageText;
+            CurrentDraft = draft;
+
+            LoadDraftIntoEditor(draft);
+            DraftStatusMessage = "Draft regenerated — review before saving";
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Regeneration failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
+    /// <summary>Re-generates only the Tests sub-fields; other fields are preserved.</summary>
+    [RelayCommand]
+    private async Task RegenerateTestsAsync()
+    {
+        if (CurrentDraft == null) return;
+
+        IsDraftGenerating  = true;
+        DraftStatusMessage = "Regenerating tests…";
+
+        try
+        {
+            var updated = await _draftService.RegenerateTestsAsync(_activeProjectId, CurrentDraft);
+            CurrentDraft = updated;
+
+            // Update only test sub-fields; other fields are untouched
+            EditTestsUnitTests        = updated.UnitTests;
+            EditTestsIntegrationTests = updated.IntegrationTests;
+            EditTestsManualTests      = updated.ManualTests;
+            EditTestsRegressionTests  = updated.RegressionTests;
+            EditTestsBuildValidation  = updated.BuildValidation;
+
+            DraftStatusMessage = "Tests regenerated. " + updated.GenerationNote;
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Test regeneration failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
+    /// <summary>Discards the draft and navigates back to Chat.</summary>
+    [RelayCommand]
+    private void CancelDraft()
+    {
+        IsDraftMode        = false;
+        CurrentDraft       = null;
+        DraftStatusMessage = string.Empty;
+        ClearEditor();
+        OnCancelDraft?.Invoke();
+    }
+
+    // ── Private draft helpers ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shared save path used by both ApproveDraftAsync and ApproveDraftWithPlanAsync.
+    /// Packs test sub-fields into TechnicalNotes, then calls the existing SaveTicketAsync.
+    /// Returns the saved ticket ID, or 0 on failure.
+    /// </summary>
+    private async Task<long> SaveDraftTicketAsync()
+    {
+        if (string.IsNullOrWhiteSpace(EditTitle))
+        {
+            SaveStatus = "Title is required.";
+            return 0;
+        }
+
+        IsSaving   = true;
+        SaveStatus = "Saving…";
+
+        try
+        {
+            // Pack test sub-fields into TechnicalNotes before save
+            SyncTestsToTechnicalNotes();
+
+            var ticket = new IronDev.Data.Models.ProjectTicket
+            {
+                Id                     = 0,            // always a new ticket
+                ProjectId              = _activeProjectId,
+                SessionId              = Guid.NewGuid(),
+                Title                  = EditTitle.Trim(),
+                TicketType             = EditTicketType,
+                Priority               = EditPriority,
+                Summary                = string.IsNullOrWhiteSpace(EditSummary)              ? null : EditSummary.Trim(),
+                Background             = string.IsNullOrWhiteSpace(EditBackground)           ? null : EditBackground.Trim(),
+                Problem                = string.IsNullOrWhiteSpace(EditProblem)              ? null : EditProblem.Trim(),
+                AcceptanceCriteria     = string.IsNullOrWhiteSpace(EditAcceptanceCriteria)   ? null : EditAcceptanceCriteria.Trim(),
+                TechnicalNotes         = string.IsNullOrWhiteSpace(EditTechnicalNotes)       ? null : EditTechnicalNotes.Trim(),
+                Status                 = EditStatus,
+                Content                = EditSummary?.Trim() ?? string.Empty,
+                LinkedFilePaths        = string.IsNullOrWhiteSpace(EditLinkedFilePaths)      ? null : EditLinkedFilePaths.Trim(),
+                LinkedCodeIndexEntryIds = null,
+                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols)        ? null : EditLinkedSymbols.Trim()
+            };
+
+            var savedId = await _ticketService.SaveTicketAsync(ticket);
+            EditId      = savedId;
+            IsNewTicket = false;
+            SaveStatus  = "Saved ✓";
+            return savedId;
+        }
+        catch (Exception ex)
+        {
+            SaveStatus = $"Save failed: {ex.Message}";
+            return 0;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    /// <summary>
+    /// Loads all fields from a DraftTicket into the editor properties,
+    /// including the Tests sub-fields (which trigger TechnicalNotes sync).
+    /// </summary>
+    private void LoadDraftIntoEditor(DraftTicket draft)
+    {
+        EditId                 = 0;
+        EditTitle              = draft.Title;
+        EditStatus             = draft.Status;
+        EditPriority           = draft.Priority;
+        EditTicketType         = draft.TicketType;
+        EditSummary            = draft.Summary;
+        EditBackground         = draft.Background         ?? string.Empty;
+        EditProblem            = string.Empty;
+        EditAcceptanceCriteria = draft.AcceptanceCriteria ?? string.Empty;
+        EditLinkedFilePaths    = draft.LinkedFilePaths    ?? string.Empty;
+        EditLinkedSymbols      = draft.LinkedSymbols      ?? string.Empty;
+
+        // Set test sub-fields directly — each setter calls SyncTestsToTechnicalNotes
+        EditTestsUnitTests        = draft.UnitTests;
+        EditTestsIntegrationTests = draft.IntegrationTests;
+        EditTestsManualTests      = draft.ManualTests;
+        EditTestsRegressionTests  = draft.RegressionTests;
+        EditTestsBuildValidation  = draft.BuildValidation;
+
+        SaveStatus = string.Empty;
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

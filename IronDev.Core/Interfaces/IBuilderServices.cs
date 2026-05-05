@@ -2,6 +2,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core.Builder;
 
+// Note: ChatTicketContext lives in IronDev.Agent (the WPF host project).
+// IDraftTicketService is defined here in Core to keep the interface layer clean;
+// the concrete service in Infrastructure references the Agent assembly.
+// The ViewModel (also in Agent) depends only on this interface.
+
 namespace IronDev.Core.Interfaces;
 
 /// <summary>
@@ -100,4 +105,38 @@ public interface IBuildResultMemoryService
         TicketBuildResult result,
         TicketBuildContext context,
         CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Generates a DraftTicket from a chat context.
+/// Does NOT persist anything — the draft is held in ViewModel memory
+/// until the user explicitly approves via ApproveDraftCommand.
+///
+/// Phase 1-3: stub implementation (no LLM).
+/// Phase 4: real LLM implementation.
+/// </summary>
+public interface IDraftTicketService
+{
+    /// <summary>
+    /// Generates a complete DraftTicket from the supplied chat context.
+    /// Stub: returns a deterministic draft derived from the context fields.
+    /// LLM phase: calls ILLMService and parses structured JSON response.
+    /// </summary>
+    Task<DraftTicket> GenerateDraftAsync(
+        int    projectId,
+        string projectName,
+        string proposedTitle,
+        string messageText,
+        string? linkedFilePaths,
+        string? linkedSymbols,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Regenerates only the test sub-fields (UnitTests … BuildValidation).
+    /// Other DraftTicket fields from <paramref name="current"/> are returned unchanged.
+    /// </summary>
+    Task<DraftTicket> RegenerateTestsAsync(
+        int        projectId,
+        DraftTicket current,
+        CancellationToken ct = default);
 }

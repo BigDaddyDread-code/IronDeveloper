@@ -110,24 +110,51 @@ public sealed partial class ShellViewModel : ObservableObject
         _createVm.OnProjectCreated     = (p) => _ = CreateAndOpenProjectAsync(p);
         _createVm.OnCancel             = NavigateToHub;
         
-        // --- SYNC STATUS FROM OVERVIEW TO SHELL ---
+        // ——— SYNC STATUS FROM OVERVIEW TO SHELL AND WORKSPACE VMs ———
         _overviewVm.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(ProjectOverviewViewModel.Status))
             {
                 ActiveStatus = _overviewVm.Status;
                 System.Diagnostics.Trace.WriteLine($"[Shell] Syncing status from Overview: {ActiveStatus}");
+
+                // Keep Tickets workspace index-awareness in sync
+                _ticketsVm.SetIndexStatus(ActiveStatus);
             }
             if (e.PropertyName == nameof(ProjectOverviewViewModel.Model))
                 ActiveModel = _overviewVm.Model;
         };
 
-        // Chat → Ticket creation bridge
-        _chatVm.OnCreateTicketFromChat = (title, summary, linkedFilePaths, linkedSymbols) =>
+        // Tickets workspace → Index Project: delegate to the existing IndexNowCommand
+        _ticketsVm.OnRequestIndex = () =>
         {
-            _ticketsVm.PrefillFromChat(title, summary, linkedFilePaths, linkedSymbols);
+            _ = IndexNow();   // existing command — pops status popup and calls overviewVm.IndexProjectCommand
+        };
+
+        // Chat → Ticket draft review bridge
+        // Phase 1-3: navigates to Tickets in draft mode with stub-generated draft.
+        // Phase 4: DraftTicketService will call the real LLM.
+        _chatVm.OnCreateTicketFromChat = (ctx) =>
+        {
+            _ = _ticketsVm.BeginDraftFromChatAsync(ctx);
             CurrentWorkspace = ProjectWorkspace.Tickets;
             CurrentView = _ticketsVm;
+        };
+
+        // Ticket draft cancelled → navigate back to Chat
+        _ticketsVm.OnCancelDraft = () =>
+        {
+            CurrentWorkspace = ProjectWorkspace.Chat;
+            CurrentView = _chatVm;
+        };
+
+        // Ticket draft approved with plan → navigate to Plans after save
+        // Receives: title, goal, steps, filePaths, symbols, scope, risksNotes
+        _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols, scope, risks) =>
+        {
+            _plansVm.PrefillFromChat(title, goal, steps, filePaths, symbols, scope, risks);
+            CurrentWorkspace = ProjectWorkspace.Plans;
+            CurrentView = _plansVm;
         };
 
         // Chat → Plan creation bridge: navigate to Plans workspace and prefill editor
@@ -316,6 +343,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
             // Fetch final status from the overview VM
             ActiveStatus = _overviewVm.Status;
+            _ticketsVm.SetIndexStatus(ActiveStatus);   // propagate initial index state
             System.Diagnostics.Trace.WriteLine($"[Shell] Project activation complete. Status: {ActiveStatus}");
         }
         catch (Exception ex)

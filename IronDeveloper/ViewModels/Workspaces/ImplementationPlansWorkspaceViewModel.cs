@@ -204,14 +204,24 @@ public sealed partial class ImplementationPlansWorkspaceViewModel : ObservableOb
 
     // ── Prefill from chat (called by ShellViewModel) ────────────────────────
 
-    public void PrefillFromChat(string title, string goal, string? steps, string? linkedFilePaths, string? linkedSymbols)
+    public void PrefillFromChat(
+        string  title,
+        string  goal,
+        string? steps,
+        string? linkedFilePaths,
+        string? linkedSymbols,
+        string? scope      = null,
+        string? risksNotes = null)
     {
         NewPlan();
         EditTitle           = title;
         EditGoal            = goal;
-        EditProposedSteps   = steps ?? string.Empty;
+        EditScope           = scope          ?? string.Empty;
+        EditProposedSteps   = steps          ?? string.Empty;
+        EditAffectedContext = string.Empty;   // caller can set via linked files context if needed
+        EditRisksNotes      = risksNotes     ?? string.Empty;
         EditLinkedFilePaths = linkedFilePaths ?? string.Empty;
-        EditLinkedSymbols   = linkedSymbols ?? string.Empty;
+        EditLinkedSymbols   = linkedSymbols  ?? string.Empty;
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

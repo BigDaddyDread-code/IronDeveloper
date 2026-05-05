@@ -2,6 +2,21 @@ using System;
 
 namespace IronDev.Agent.Models;
 
+/// <summary>
+/// Carries the chat context needed to generate a DraftTicket.
+/// Populated by ChatWorkspaceViewModel and passed to the shell bridge.
+/// Not persisted.
+/// </summary>
+public sealed class ChatTicketContext
+{
+    public long   SessionId       { get; set; }
+    public long   MessageId       { get; set; }
+    public string MessageText     { get; set; } = string.Empty;
+    public string ProposedTitle   { get; set; } = string.Empty;
+    public string? LinkedFilePaths { get; set; }
+    public string? LinkedSymbols   { get; set; }
+}
+
 public sealed class ChatMessageItem
 {
     public string Role { get; set; } = string.Empty;

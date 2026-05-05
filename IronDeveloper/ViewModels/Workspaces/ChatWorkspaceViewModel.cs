@@ -48,7 +48,9 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     [ObservableProperty] private bool _hasContextChips;
     [ObservableProperty] private string _activeModel = "gpt-4o";
 
-    public Action<string, string, string?, string?>? OnCreateTicketFromChat { get; set; }
+    // Ticket creation now passes a ChatTicketContext so the shell can
+    // initiate the draft review flow instead of directly prefilling.
+    public Action<IronDev.Agent.Models.ChatTicketContext>? OnCreateTicketFromChat { get; set; }
     public Action<string, string, string?, string?, string?>? OnCreatePlanFromChat { get; set; }
     public Action<string, string, string?, string?>? OnCreateDecisionFromChat { get; set; }
 
@@ -308,16 +310,12 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         if (message == null || OnCreateTicketFromChat == null) return;
 
         var idx = Messages.IndexOf(message);
-        var userQuestion = "Chat-generated ticket";
+        var proposedTitle = "Chat-generated ticket";
         if (idx > 0 && Messages[idx - 1].Role == "user")
         {
             var q = Messages[idx - 1].MessageText;
-            userQuestion = q.Length > 80 ? q.Substring(0, 80) + "..." : q;
+            proposedTitle = q.Length > 80 ? q[..80] + "..." : q;
         }
-
-        var summary = message.MessageText;
-        if (summary.Length > 2000)
-            summary = summary.Substring(0, 2000) + "\n...[truncated]";
 
         string? linkedFilePaths = null;
         string? linkedSymbols = null;
@@ -329,7 +327,21 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 linkedSymbols = string.Join("\n", message.ContextPacket.MatchedSymbols);
         }
 
-        OnCreateTicketFromChat.Invoke(userQuestion, summary, linkedFilePaths, linkedSymbols);
+        var messageText = message.MessageText.Length > 2000
+            ? message.MessageText[..2000] + "\n...[truncated]"
+            : message.MessageText;
+
+        var ctx = new IronDev.Agent.Models.ChatTicketContext
+        {
+            SessionId       = SelectedSession?.Id ?? 0,
+            MessageId       = (long)idx,  // proxy: index in Messages; no Id on ChatSummary
+            MessageText     = messageText,
+            ProposedTitle   = proposedTitle,
+            LinkedFilePaths = linkedFilePaths,
+            LinkedSymbols   = linkedSymbols,
+        };
+
+        OnCreateTicketFromChat.Invoke(ctx);
     }
 
     [RelayCommand]

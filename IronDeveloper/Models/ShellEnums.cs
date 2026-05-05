@@ -44,3 +44,18 @@ public enum TicketDetailTab
     CodeContext,
     Tests
 }
+
+/// <summary>
+/// Tracks the preflight gate state before a draft ticket is generated.
+/// None        — no preflight active; draft flows normally.
+/// NeedsChoice — project is not indexed; waiting for user choice (Index / Continue / Cancel).
+/// Indexing    — user clicked "Index Project First"; indexing is in progress (buttons disabled).
+/// IndexFailed — indexing completed but status is not Ready; user can retry or continue.
+/// </summary>
+public enum DraftPreflightState
+{
+    None,
+    NeedsChoice,
+    Indexing,
+    IndexFailed
+}
