@@ -75,8 +75,8 @@ public partial class App : Application
                 services.AddTransient<TicketsWorkspaceViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();
-                services.AddTransient<PromptPlaygroundViewModel>();
-                services.AddTransient<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
+                services.AddSingleton<PromptPlaygroundViewModel>();
+                services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
                 {
                     // Deferred: PromptPlaygroundViewModel (and its DB deps) are only
                     // instantiated when the user first expands Developer Tools —

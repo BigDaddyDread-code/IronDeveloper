@@ -145,35 +145,58 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 
         try
         {
-            // ── 1. Intent classification (pure static — no DB) ───────────────
+            // ── 1. Intent classification (static, no DB) ─────────────────────
             var intent = PromptContextBuilder.ClassifyIntent(question);
             DetectedIntent = intent.ToString();
 
             var expanded = PromptContextBuilder.ExpandSearchQueries(question, intent);
-            ExpandedQueries = string.Join(", ", expanded);
+            ExpandedQueries = string.Join("\n", expanded);
 
-            // ── 2. Initial intent badge ──────────────────────────────────────
-            if (SelectedTestCase is not null && !string.IsNullOrWhiteSpace(SelectedTestCase.ExpectedIntent))
-            {
-                var intentOk = string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase);
-                IntentMatchBadge = intentOk ? "✅ Match" : "⚠️ Mismatch";
-            }
-            else
-            {
-                IntentMatchBadge = "—";
-            }
+            // ── 2. Intent match badge ────────────────────────────────────────
+            var intentOk = SelectedTestCase is not null
+                && string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase);
+            IntentMatchBadge = SelectedTestCase is not null
+                ? (intentOk ? "✅ Match" : "⚠️ Mismatch") : "—";
 
-            // ── 3. Resolve active project ────────────────────────────────────
-            var projects = await _projectService.GetProjectsAsync(ct);
-            var project  = projects?.Count > 0 ? projects[0] : null;
+            // ── 3. Try to resolve a project (best-effort — never fatal) ──────
+            IronDev.Data.Models.Project? project = null;
+            string projectError = string.Empty;
+            try
+            {
+                var projects = await _projectService.GetProjectsAsync(ct);
+                project = projects?.Count > 0 ? projects[0] : null;
+            }
+            catch (Exception ex)
+            {
+                projectError = ex.Message;
+            }
 
             if (project is null)
             {
-                ProjectIndexStatus = "No project";
-                ContextQuality     = "Missing";
-                PromptText = $"[No project loaded — intent data only]\n\nDetected intent: {DetectedIntent}\n\nExpanded queries:\n{ExpandedQueries}";
-                ResultStatus = EvaluateScore(intentOk: string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase),
-                                             hasMustInclude: false, badLead: false, hasProject: false);
+                ProjectIndexStatus = string.IsNullOrEmpty(projectError) ? "No active project" : "Error";
+                ContextQuality     = "Intent-only";
+
+                // Always produce output so the TextBox is not blank
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("═══════════════════════════════════════════════════════════════");
+                sb.AppendLine("  INTENT ANALYSIS  (no project context — DB not queried)");
+                sb.AppendLine("═══════════════════════════════════════════════════════════════");
+                sb.AppendLine();
+                sb.AppendLine($"Detected Intent : {DetectedIntent}");
+                if (SelectedTestCase is not null)
+                    sb.AppendLine($"Expected Intent : {ExpectedIntent}  {(intentOk ? "✅ MATCH" : "⚠️ MISMATCH")}");
+                sb.AppendLine();
+                sb.AppendLine("Expanded Search Queries:");
+                foreach (var q in expanded)
+                    sb.AppendLine($"  • {q}");
+                if (!string.IsNullOrEmpty(projectError))
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"Project error   : {projectError}");
+                    sb.AppendLine("Hint: Open a project first, then re-open Settings → Developer Tools.");
+                }
+                PromptText = sb.ToString();
+                ResultStatus = intentOk ? "✅ PASS (intent)" : "⚠️ WARNING — intent only";
                 return;
             }
 
@@ -181,9 +204,13 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
             ContextQuality     = string.Equals(project.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase)
                                      ? "Indexed" : "Limited";
 
-            // ── 4. Full prompt build ─────────────────────────────────────────
+            // ── 4. Full prompt build (uses DB) ───────────────────────────────
             var result = await _builder.BuildFullPromptForTestingAsync(project.Id, question, ct);
             PromptText = result.PromptText ?? string.Empty;
+
+            // If the builder returned an empty prompt, say why
+            if (string.IsNullOrWhiteSpace(PromptText))
+                PromptText = $"[Builder returned empty prompt — IndexingStatus: {project.IndexingStatus}]";
 
             foreach (var item in result.RetrievedItems)
             {
@@ -192,7 +219,7 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                     FilePath   = item.FilePath   ?? string.Empty,
                     SymbolName = item.SymbolName  ?? string.Empty,
                     Preview    = item.ChunkText is { Length: > 0 } s
-                                     ? s[..Math.Min(100, s.Length)].Replace('\n', ' ')
+                                     ? s[..Math.Min(120, s.Length)].Replace('\n', ' ')
                                      : string.Empty
                 });
             }
@@ -200,19 +227,18 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
             // ── 5. Score against selected test case ──────────────────────────
             if (SelectedTestCase is not null)
             {
-                var intentOk      = string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase);
-                var mustTerms     = SplitTerms(SelectedTestCase.MustIncludeAny);
-                var mustNotTerms  = SplitTerms(SelectedTestCase.MustNotLeadWith);
+                var mustTerms    = SplitTerms(SelectedTestCase.MustIncludeAny);
+                var mustNotTerms = SplitTerms(SelectedTestCase.MustNotLeadWith);
 
-                // Check expanded queries + retrieved files for must-include terms
                 var allRetrieved = RetrievedItems.Select(i => i.FilePath + " " + i.SymbolName).ToList();
                 allRetrieved.Add(ExpandedQueries);
                 var hasMustInclude = mustTerms.Any(t =>
                     allRetrieved.Any(r => r.Contains(t, StringComparison.OrdinalIgnoreCase)));
 
-                // Check if a must-not-lead-with term appears in the top file
-                var topFile   = RetrievedItems.Count > 0 ? RetrievedItems[0].FilePath + " " + RetrievedItems[0].SymbolName : string.Empty;
-                var badLead   = mustNotTerms.Any(t => topFile.Contains(t, StringComparison.OrdinalIgnoreCase));
+                var topFile = RetrievedItems.Count > 0
+                    ? RetrievedItems[0].FilePath + " " + RetrievedItems[0].SymbolName
+                    : string.Empty;
+                var badLead = mustNotTerms.Any(t => topFile.Contains(t, StringComparison.OrdinalIgnoreCase));
 
                 IntentMatchBadge = intentOk ? "✅ Match" : "⚠️ Mismatch";
                 ResultStatus     = EvaluateScore(intentOk, hasMustInclude, badLead, hasProject: true);
@@ -225,6 +251,9 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = $"Error: {ex.Message}";
+            // Even on error, show intent data if we got that far
+            if (string.IsNullOrEmpty(PromptText) && !string.IsNullOrEmpty(DetectedIntent))
+                PromptText = $"[Error during prompt build — intent analysis only]\n\nDetected: {DetectedIntent}\nExpanded: {ExpandedQueries}\n\nError: {ex.Message}";
             ResultStatus = "—";
         }
         finally
