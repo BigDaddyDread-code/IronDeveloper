@@ -63,9 +63,9 @@
                                     <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
                                                Foreground="{StaticResource Text/Primary}"
                                                TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Summary}" FontSize="11"
+                                    <TextBlock Text="{Binding Summary, Converter={StaticResource MarkdownPreviewConverter}}" FontSize="11"
                                                Foreground="{StaticResource Text/Muted}"
-                                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="9999" Margin="0,2,0,0"
                                                Visibility="{Binding Summary, Converter={StaticResource ValueToVis}}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0">
@@ -244,7 +244,8 @@
                                 </StackPanel>
                                 <!-- Generating / status -->
                                 <TextBlock Grid.Column="1"
-                                           Foreground="{StaticResource Text/Muted}" FontSize="11" VerticalAlignment="Center" Margin="12,0">
+                                           Foreground="{StaticResource Text/Muted}" FontSize="11" VerticalAlignment="Center" Margin="12,0"
+                                           MaxWidth="400" TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Text" Value="{Binding DraftStatusMessage}"/>
@@ -336,39 +337,39 @@
                                         </Style>
                                     </StackPanel.Style>
                                     
-                                    <controls:SurfacePanel Variant="Subtle" Padding="24" Margin="0,0,0,16">
+                                    <controls:SurfacePanel Variant="Subtle" Padding="20,16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <controls:FormField Label="TICKET TITLE">
                                                 <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="16" FontWeight="SemiBold"/>
                                             </controls:FormField>
 
-                                            <!-- Status / Priority / Type: fixed-width columns so values never clip -->
-                                            <Grid Margin="0,0,0,16">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/><!-- absorbs remaining space -->
-                                                </Grid.ColumnDefinitions>
-
-                                                <controls:SelectionField Grid.Column="0" Label="STATUS"
-                                                                       MinWidth="145" Margin="0,0,12,0"
-                                                                       FocusVisualStyle="{x:Null}"
-                                                                       ItemsSource="{Binding StatusOptions}"
-                                                                       SelectedItem="{Binding EditStatus}"/>
-
-                                                <controls:SelectionField Grid.Column="1" Label="PRIORITY"
-                                                                       MinWidth="145" Margin="0,0,12,0"
-                                                                       FocusVisualStyle="{x:Null}"
-                                                                       ItemsSource="{Binding PriorityOptions}"
-                                                                       SelectedItem="{Binding EditPriority}"/>
-
-                                                <controls:SelectionField Grid.Column="2" Label="TYPE"
-                                                                       MinWidth="145"
-                                                                       FocusVisualStyle="{x:Null}"
-                                                                       ItemsSource="{Binding TypeOptions}"
-                                                                       SelectedItem="{Binding EditTicketType}"/>
-                                            </Grid>
+                                            <!-- Status / Priority / Type — native ComboBox for reliable text display -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Text="STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,6"/>
+                                                    <ComboBox ItemsSource="{Binding StatusOptions}"
+                                                              SelectedItem="{Binding EditStatus}"
+                                                              MinWidth="170" Height="38"
+                                                              Foreground="{StaticResource Input.Foreground}"
+                                                              Background="{StaticResource Input.Background}"/>
+                                                </StackPanel>
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Text="PRIORITY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,6"/>
+                                                    <ComboBox ItemsSource="{Binding PriorityOptions}"
+                                                              SelectedItem="{Binding EditPriority}"
+                                                              MinWidth="170" Height="38"
+                                                              Foreground="{StaticResource Input.Foreground}"
+                                                              Background="{StaticResource Input.Background}"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="TYPE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,6"/>
+                                                    <ComboBox ItemsSource="{Binding TypeOptions}"
+                                                              SelectedItem="{Binding EditTicketType}"
+                                                              MinWidth="170" Height="38"
+                                                              Foreground="{StaticResource Input.Foreground}"
+                                                              Background="{StaticResource Input.Background}"/>
+                                                </StackPanel>
+                                            </StackPanel>
 
                                             <controls:FormField Label="SUMMARY">
                                                 <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
@@ -556,16 +557,50 @@
                                     <controls:SurfacePanel Variant="Subtle" Padding="16" Margin="0,0,0,12">
                                         <StackPanel>
                                             <controls:FormField Label="AFFECTED FILE PATHS">
-                                                <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}"
-                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="56"
-                                                         FontSize="11" FontFamily="Consolas"
-                                                         ToolTip="One file path per line. Used by Build This for context retrieval."/>
+                                                <Grid>
+                                                    <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}"
+                                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="56"
+                                                             FontSize="11" FontFamily="Consolas"
+                                                             ToolTip="One file path per line. Used by Build This for context retrieval."/>
+                                                    <TextBlock Text="No affected files linked yet."
+                                                               Foreground="{StaticResource Text/Muted}" FontSize="11" FontStyle="Italic"
+                                                               VerticalAlignment="Top" Margin="6,6,0,0"
+                                                               IsHitTestVisible="False">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding EditLinkedFilePaths, Converter={StaticResource ValueToVis}}" Value="Collapsed">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
                                             </controls:FormField>
                                             <controls:FormField Label="LINKED SYMBOLS / CLASSES">
-                                                <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}"
-                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="40"
-                                                         FontSize="11" FontFamily="Consolas"
-                                                         ToolTip="Class names, method names, interfaces relevant to this ticket."/>
+                                                <Grid>
+                                                    <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}"
+                                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="40"
+                                                             FontSize="11" FontFamily="Consolas"
+                                                             ToolTip="Class names, method names, interfaces relevant to this ticket."/>
+                                                    <TextBlock Text="No linked symbols or classes yet."
+                                                               Foreground="{StaticResource Text/Muted}" FontSize="11" FontStyle="Italic"
+                                                               VerticalAlignment="Top" Margin="6,6,0,0"
+                                                               IsHitTestVisible="False">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding EditLinkedSymbols, Converter={StaticResource ValueToVis}}" Value="Collapsed">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
                                             </controls:FormField>
                                         </StackPanel>
                                     </controls:SurfacePanel>

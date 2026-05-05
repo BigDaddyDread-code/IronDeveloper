@@ -78,6 +78,9 @@
             </DataTemplate>
 
             <cvt:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
+            <!-- Strips markdown from Summary for compact list row previews -->
+            <cvt:MarkdownPreviewConverter x:Key="MarkdownPreviewConverter"/>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -680,11 +680,10 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
             LoadDraftIntoEditor(draft);
 
-            // Prepend index-missing warning when code context is limited
-            var generationNote = draft.GenerationNote;
+            // Short status note in the banner — keep it concise
             DraftStatusMessage = IsContextLimited
-                ? $"⚠️ Limited context — project not indexed. {generationNote}"
-                : generationNote;
+                ? "⚠ Limited context — project not indexed"
+                : string.Empty;
         }
         catch (Exception ex)
         {
@@ -838,7 +837,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             CurrentDraft = draft;
 
             LoadDraftIntoEditor(draft);
-            DraftStatusMessage = "Regenerated. " + draft.GenerationNote;
+            DraftStatusMessage = "Draft regenerated — review before saving";
         }
         catch (Exception ex)
         {
