@@ -18,6 +18,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
     private readonly ITicketBuildOrchestrator                        _orchestrator;
     private readonly IDraftTicketService                             _draftService;
+    private readonly ICodebaseTicketGeneratorService                 _generatorService;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
@@ -128,6 +129,10 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string     _draftStatusMessage = string.Empty;
     [ObservableProperty] private DraftTicket? _currentDraft;
 
+    // ── Codebase Ticket Generation state ──────────────────────────────────────
+    [ObservableProperty] private bool _isGeneratingCodebaseTickets;
+
+
     // ── Draft Preflight state ─────────────────────────────────────────────────
     /// <summary>
     /// Tracks the preflight gate shown when the user clicks Ticket from Chat
@@ -182,12 +187,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         global::IronDev.Services.ITicketService        ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
         ITicketBuildOrchestrator                       orchestrator,
-        IDraftTicketService                            draftService)
+        IDraftTicketService                            draftService,
+        ICodebaseTicketGeneratorService                generatorService)
     {
-        _ticketService = ticketService;
-        _memoryService = memoryService;
-        _orchestrator  = orchestrator;
-        _draftService  = draftService;
+        _ticketService    = ticketService;
+        _memoryService    = memoryService;
+        _orchestrator     = orchestrator;
+        _draftService     = draftService;
+        _generatorService = generatorService;
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
@@ -223,15 +230,53 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             return;
         }
 
+        // Handle in-list drafts from Codebase Generator
+        if (value.IsDraft)
+        {
+            IsDraftMode        = true;
+            IsDraftGenerating  = false;
+            DraftStatusMessage = "Draft Codebase Ticket";
+            HasDetail          = true;
+            IsEditing          = true;
+            IsNewTicket        = true;
+            ActiveTab          = TicketDetailTab.Overview;
+
+            LoadTicketIntoEditor(value);
+            return;
+        }
+
         // Guard: if this ticket is already loaded into the editor, skip the reload.
-        // This prevents a double-load when ApproveDraftAsync explicitly calls
-        // LoadTicketIntoEditorAsync and then sets SelectedTicket for list highlighting.
-        if (HasDetail && EditId == value.Id)
+        if (HasDetail && EditId == value.Id && !IsDraftMode)
             return;
 
+        IsDraftMode = false;
         // Clear stale build state when switching tickets
         ClearBuildState();
         _ = LoadTicketIntoEditorAsync(value);
+    }
+
+    private void LoadTicketIntoEditor(TicketItem item)
+    {
+        IsNewTicket = item.Id == 0;
+        IsEditing = true;
+        HasDetail = true;
+        ActiveTab = TicketDetailTab.Overview;
+
+        EditId                   = item.Id;
+        EditTitle                = item.Title;
+        EditStatus               = item.Status;
+        EditPriority             = item.Priority;
+        EditTicketType           = item.TicketType;
+        EditSummary              = item.Summary ?? string.Empty;
+        EditBackground           = item.Background ?? string.Empty;
+        EditProblem              = item.Problem ?? string.Empty;
+        EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
+        EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
+        SyncTechnicalNotesToTests();
+        EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
+        EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+
+        SaveStatus = string.Empty;
     }
 
     private async Task LoadTicketIntoEditorAsync(TicketItem item)
@@ -906,11 +951,89 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void CancelDraft()
     {
+        // If this was an in-list draft, we might want to remove it,
+        // but for now let's just exit draft mode and clear selection.
+        if (SelectedTicket?.IsDraft == true)
+        {
+            Tickets.Remove(SelectedTicket);
+        }
+
         IsDraftMode        = false;
         CurrentDraft       = null;
         DraftStatusMessage = string.Empty;
         ClearEditor();
         OnCancelDraft?.Invoke();
+    }
+
+    // ── Codebase Ticket Generator ───────────────────────────────────────────
+
+    [RelayCommand]
+    private async Task GenerateCodebaseTicketsAsync()
+    {
+        if (IsGeneratingCodebaseTickets) return;
+
+        IsGeneratingCodebaseTickets = true;
+        DraftStatusMessage = "Analyzing codebase...";
+
+        try
+        {
+            // Remove any existing (unsaved) drafts from the list first
+            var existingDrafts = Tickets.Where(t => t.IsDraft).ToList();
+            foreach (var d in existingDrafts) Tickets.Remove(d);
+
+            var result = await _generatorService.GenerateTicketsAsync(_activeProjectId);
+            if (result.Success)
+            {
+                foreach (var draft in result.Drafts)
+                {
+                    var item = new TicketItem
+                    {
+                        Id                 = 0,
+                        Title              = draft.Title,
+                        Summary            = draft.Summary,
+                        Background         = draft.Background,
+                        AcceptanceCriteria = draft.AcceptanceCriteria,
+                        Priority           = draft.Priority,
+                        TicketType         = draft.TicketType,
+                        IsDraft            = true,
+                        Status             = "Draft",
+                        TechnicalNotes     = PackTechnicalNotes(draft)
+                    };
+                    Tickets.Insert(0, item);
+                }
+
+                DraftStatusMessage = $"Generated {result.Drafts.Count} codebase improvement drafts.";
+                
+                // Select the first one to start review
+                if (Tickets.Count > 0 && Tickets[0].IsDraft)
+                {
+                    SelectedTicket = Tickets[0];
+                }
+            }
+            else
+            {
+                DraftStatusMessage = $"Generation failed: {result.ErrorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsGeneratingCodebaseTickets = false;
+        }
+    }
+
+    private string PackTechnicalNotes(CodebaseTicketDraft draft)
+    {
+        var sb = new System.Text.StringBuilder();
+        if (!string.IsNullOrWhiteSpace(draft.UnitTests))        { sb.AppendLine(SecUnit); sb.AppendLine(draft.UnitTests); }
+        if (!string.IsNullOrWhiteSpace(draft.IntegrationTests)) { sb.AppendLine(SecIntegration); sb.AppendLine(draft.IntegrationTests); }
+        if (!string.IsNullOrWhiteSpace(draft.ManualTests))      { sb.AppendLine(SecManual); sb.AppendLine(draft.ManualTests); }
+        if (!string.IsNullOrWhiteSpace(draft.RegressionTests))  { sb.AppendLine(SecRegression); sb.AppendLine(draft.RegressionTests); }
+        if (!string.IsNullOrWhiteSpace(draft.BuildValidation))  { sb.AppendLine(SecBuild); sb.AppendLine(draft.BuildValidation); }
+        return sb.ToString();
     }
 
     // ── Private draft helpers ────────────────────────────────────────────────

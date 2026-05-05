@@ -39,7 +39,7 @@ public sealed class DraftTicketService : IDraftTicketService
         string rawJson;
         try
         {
-            rawJson = await _llm.GetResponseAsync(prompt);
+            rawJson = await _llm.GetResponseAsync(prompt, ct);
         }
         catch (Exception ex)
         {
@@ -67,7 +67,7 @@ public sealed class DraftTicketService : IDraftTicketService
         string rawJson;
         try
         {
-            rawJson = await _llm.GetResponseAsync(prompt);
+            rawJson = await _llm.GetResponseAsync(prompt, ct);
         }
         catch (Exception ex)
         {

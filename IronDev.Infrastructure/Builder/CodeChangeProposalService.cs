@@ -43,7 +43,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         string rawJson;
         try
         {
-            rawJson = await _llm.GetResponseAsync(prompt);
+            rawJson = await _llm.GetResponseAsync(prompt, cancellationToken);
         }
         catch (Exception ex)
         {

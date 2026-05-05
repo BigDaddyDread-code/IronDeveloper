@@ -20,11 +20,11 @@ public sealed class OpenAiLlmService : ILLMService
         _chatClient = new ChatClient(options.Model, options.ApiKey);
     }
 
-    public async Task<string> GetResponseAsync(string prompt)
+    public async Task<string> GetResponseAsync(string prompt, System.Threading.CancellationToken ct = default)
     {
         try
         {
-            var completion = await _chatClient.CompleteChatAsync(prompt);
+            var completion = await _chatClient.CompleteChatAsync(new UserChatMessage[] { new(prompt) }, cancellationToken: ct);
             return completion.Value.Content[0].Text;
         }
         catch (Exception ex)

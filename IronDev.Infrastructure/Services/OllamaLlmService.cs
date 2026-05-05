@@ -28,7 +28,7 @@ public sealed class OllamaLlmService : ILLMService
         _model = options.Model;
     }
 
-    public async Task<string> GetResponseAsync(string prompt)
+    public async Task<string> GetResponseAsync(string prompt, System.Threading.CancellationToken ct = default)
     {
         var request = new OllamaRequest
         {
@@ -39,10 +39,10 @@ public sealed class OllamaLlmService : ILLMService
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("/api/generate", request);
+            var response = await _httpClient.PostAsJsonAsync("/api/generate", request, ct);
             response.EnsureSuccessStatusCode();
 
-            var body = await response.Content.ReadFromJsonAsync<OllamaResponse>();
+            var body = await response.Content.ReadFromJsonAsync<OllamaResponse>(cancellationToken: ct);
             return body?.Response ?? string.Empty;
         }
         catch (Exception ex)

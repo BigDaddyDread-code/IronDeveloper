@@ -16,7 +16,7 @@ namespace IronDev.IntegrationTests;
 public class TicketTestsPlanTests
 {
     private static TicketsWorkspaceViewModel CreateVm()
-        => new(null!, null!, new StubOrchestrator(), new StubDraftTicketService());
+        => new(null!, null!, new StubOrchestrator(), new StubDraftTicketService(), null!);
 
     // ── Parsing: structured TechnicalNotes → sub-fields ─────────────────────
 

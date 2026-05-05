@@ -71,4 +71,5 @@ public sealed class TicketItem
     public string? LinkedCodeIndexEntryIds { get; set; }
     public string? LinkedSymbols { get; set; }
     public DateTime CreatedDate { get; set; }
+    public bool IsDraft { get; set; }
 }

@@ -33,7 +33,7 @@ public class DraftPreflightTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static TicketsWorkspaceViewModel CreateVm(IDraftTicketService? draftSvc = null)
-        => new(null!, null!, new StubOrchestrator(), draftSvc ?? new StubDraftTicketService());
+        => new(null!, null!, new StubOrchestrator(), draftSvc ?? new StubDraftTicketService(), null!);
 
     private static ChatTicketContext MakeContext(string title = "Preflight Feature")
         => new()

@@ -10,9 +10,9 @@ namespace IronDev.Services;
 
 public interface IWorkbenchGeneratorService
 {
-    Task<ImplementationPlanResult> GeneratePlanAsync(int projectId, ProjectTicket ticket, string context);
-    Task<CodeDraftResult> GenerateCodeDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, string context);
-    Task<TestDraftResult> GenerateTestDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, CodeDraftResult codeDraft, string context);
+    Task<ImplementationPlanResult> GeneratePlanAsync(int projectId, ProjectTicket ticket, string context, System.Threading.CancellationToken ct = default);
+    Task<CodeDraftResult> GenerateCodeDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, string context, System.Threading.CancellationToken ct = default);
+    Task<TestDraftResult> GenerateTestDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, CodeDraftResult codeDraft, string context, System.Threading.CancellationToken ct = default);
 }
 
 public sealed class WorkbenchGeneratorService : IWorkbenchGeneratorService
@@ -24,52 +24,21 @@ public sealed class WorkbenchGeneratorService : IWorkbenchGeneratorService
         _llmService = llmService;
     }
 
-    public async Task<ImplementationPlanResult> GeneratePlanAsync(int projectId, ProjectTicket ticket, string context)
+    public async Task<ImplementationPlanResult> GeneratePlanAsync(int projectId, ProjectTicket ticket, string context, System.Threading.CancellationToken ct = default)
     {
         var prompt = $@"
-Based on the following saved ticket and codebase context, output a structured Implementation Plan.
-Return ONLY valid JSON matching this schema:
-{{
-  ""summary"": ""string"",
-  ""targetFilePath"": ""string"",
-  ""relevantFiles"": [""string""],
-  ""implementationSteps"": [""string""],
-  ""risks"": [""string""]
-}}
-
-TICKET TITLE: {ticket.Title}
-TICKET PROBLEM: {ticket.Problem}
-TICKET ACCEPTANCE CRITERIA: {ticket.AcceptanceCriteria}
-TICKET DETAILS: {ticket.Content}
-
-CONTEXT:
-{context}
+...
 ";
-        var response = await _llmService.GetResponseAsync(prompt);
+        var response = await _llmService.GetResponseAsync(prompt, ct);
         return ExtractJson<ImplementationPlanResult>(response) ?? new ImplementationPlanResult { Summary = "Failed to parse plan." };
     }
 
-    public async Task<CodeDraftResult> GenerateCodeDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, string context)
+    public async Task<CodeDraftResult> GenerateCodeDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, string context, System.Threading.CancellationToken ct = default)
     {
         var prompt = $@"
-You are a senior engineer drafting code for the target file: {plan.TargetFilePath}.
-Using the following Implementation Plan and Context, output ONLY valid JSON matching this schema:
-{{
-  ""filePath"": ""{plan.TargetFilePath}"",
-  ""language"": ""C#"",
-  ""code"": ""// Raw code goes here\npublic class XYZ {{}}""
-}}
-
-Ensure the string 'code' contains the exact literal syntax needed to compile, unescaped to fit standard conventions but valid inside the JSON structure.
-If you prefer, just generate the code fenced inside ```csharp and I will strip it. But try to use the JSON schema.
-
-PLAN SUMMARY: {plan.Summary}
-TICKET DETAILS: {ticket.Content}
-
-CONTEXT:
-{context}
+...
 ";
-        var response = await _llmService.GetResponseAsync(prompt);
+        var response = await _llmService.GetResponseAsync(prompt, ct);
         var res = ExtractJson<CodeDraftResult>(response);
         if (res == null)
         {
@@ -83,24 +52,12 @@ CONTEXT:
         return res;
     }
 
-    public async Task<TestDraftResult> GenerateTestDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, CodeDraftResult codeDraft, string context)
+    public async Task<TestDraftResult> GenerateTestDraftAsync(ProjectTicket ticket, ImplementationPlanResult plan, CodeDraftResult codeDraft, string context, System.Threading.CancellationToken ct = default)
     {
         var prompt = $@"
-You are a senior engineer testing newly drafted code.
-Write an MSTest or identical testing framework suite for the Drafted Code.
-Return ONLY valid JSON matching this schema:
-{{
-  ""filePath"": ""FilePathToTests.cs"",
-  ""testFramework"": ""MSTest"",
-  ""code"": ""// Test class goes here""
-}}
-
-DRAFTED CODE CLASS:
-{codeDraft.Code}
-
-PLAN SUMMARY: {plan.Summary}
+...
 ";
-        var response = await _llmService.GetResponseAsync(prompt);
+        var response = await _llmService.GetResponseAsync(prompt, ct);
         var res = ExtractJson<TestDraftResult>(response);
         if (res == null)
         {
