@@ -40,14 +40,15 @@ IronDev.slnx                   Root solution file
 
 ### Database setup
 
-Run `Database/rebuild_db.sql` against your local SQL Server to create the `IronDeveloper` database with the full schema and seed data.
+For a fresh local environment, run `Database/local_dev_setup.sql`. This script is idempotent and safely initializes the database with the current schema and default developer seed data.
 
-```sql
--- In SSMS or sqlcmd, run:
-Database/rebuild_db.sql
+```bash
+# See docs/local-development.md for full instructions
 ```
 
-For the **test database**, run the same script with the database name replaced to `IronDeveloper_Test`. Integration tests do this automatically via the test base class seeding logic.
+For the **test database**, ensure a database named `IronDeveloper_Test` exists. Integration tests manage schema and data synchronization automatically via the test bootstrap logic.
+
+See [local-development.md](docs/local-development.md) for a complete onboarding guide.
 
 ### Run the WPF client
 
