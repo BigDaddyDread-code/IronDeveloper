@@ -4,7 +4,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
-             xmlns:views="clr-namespace:IronDev.Agent.Views.Workspaces"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:SettingsWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
@@ -95,11 +94,12 @@
                         </Grid>
                     </Button>
 
-                    <!-- Prompt Playground view — DataContext bound to the sub-VM -->
-                    <views:PromptPlaygroundView
-                        x:Name="PlaygroundView"
-                        DataContext="{Binding PromptPlayground}"
-                        Visibility="{Binding IsDevToolsExpanded, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <!-- Prompt Playground — rendered via DataTemplate in App.xaml.
+                         ContentControl only instantiates the view when Content is non-null,
+                         so the DB is never touched at startup. -->
+                    <ContentControl x:Name="PlaygroundHost"
+                                    Content="{Binding PromptPlayground}"
+                                    Visibility="{Binding IsDevToolsExpanded, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                 </StackPanel>
             </Border>

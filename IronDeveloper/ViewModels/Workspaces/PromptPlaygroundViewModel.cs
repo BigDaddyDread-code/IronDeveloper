@@ -57,6 +57,13 @@ public sealed class GroundingTestCase
     public string MustNotLeadWithDisplay => MustNotLeadWith.Replace(",", " · ");
     public string MustMentionDisplay     => MustMention.Replace(",",     " · ");
     public string MustNotMentionDisplay  => MustNotMention.Replace(",",  " · ");
+
+    /// <summary>
+    /// WPF ComboBox custom templates that use SelectionBoxItem via ContentPresenter
+    /// render the object's ToString() for the selected-item header.
+    /// Return DisplayName so the header shows correctly without needing SelectionBoxItemTemplate.
+    /// </summary>
+    public override string ToString() => DisplayName;
 }
 
 /// <summary>
