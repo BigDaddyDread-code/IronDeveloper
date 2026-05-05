@@ -351,4 +351,63 @@ public class ChatGroundingTests : IntegrationTestBase
     public void IsSavedTicketManagementQuery_DraftTicketQuery_ReturnsFalse()
         => Assert.IsFalse(PromptContextBuilder.IsSavedTicketManagementQuery("how does draft ticket generation work"),
             "Draft ticket generation query must NOT be classified as saved ticket management.");
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Task 1 (Issue 1): ChatMessageFeedback missing-table defensive fallback
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task GetProjectFeedbackSummary_WhenTableMissing_ReturnsEmptyString()
+    {
+        // Arrange: seed a project so we have a valid projectId
+        var projectId = await SeedProjectAsync();
+
+        // Simulate an older local DB by dropping ChatMessageFeedback if present
+        await using var rawConnection = new SqlConnection(ConnectionString);
+        await rawConnection.OpenAsync();
+        await rawConnection.ExecuteAsync(
+            "IF OBJECT_ID('dbo.ChatMessageFeedback','U') IS NOT NULL DROP TABLE dbo.ChatMessageFeedback;");
+
+        var svc = ServiceProvider.GetRequiredService<IChatFeedbackService>();
+
+        // Act — must NOT throw; must return empty string
+        string result = null!;
+        Exception? thrown = null;
+        try
+        {
+            result = await svc.GetProjectFeedbackSummaryAsync(projectId);
+        }
+        catch (Exception ex)
+        {
+            thrown = ex;
+        }
+
+        // Assert
+        Assert.IsNull(thrown,
+            $"GetProjectFeedbackSummaryAsync must not throw when ChatMessageFeedback table is missing. " +
+            $"Got: {thrown?.Message}");
+        Assert.AreEqual(string.Empty, result,
+            "Must return empty string when the feedback table does not exist.");
+
+        // Cleanup: recreate the table so subsequent tests are not broken
+        await rawConnection.ExecuteAsync("""
+            IF OBJECT_ID('dbo.ChatMessageFeedback','U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatMessageFeedback
+                (
+                    Id            BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId      INT NOT NULL,
+                    ProjectId     INT NOT NULL,
+                    ChatSessionId BIGINT NULL,
+                    ChatMessageId BIGINT NULL,
+                    Rating        NVARCHAR(50) NOT NULL,
+                    Reason        NVARCHAR(200) NULL,
+                    Comment       NVARCHAR(MAX) NULL,
+                    CreatedDate   DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_CMF_Tenants  FOREIGN KEY (TenantId)  REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_CMF_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+            """);
+    }
 }

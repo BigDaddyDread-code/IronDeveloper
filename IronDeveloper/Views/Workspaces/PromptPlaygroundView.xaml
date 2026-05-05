@@ -9,61 +9,137 @@
 
     <ScrollViewer Background="{StaticResource AppBackgroundBrush}"
                   VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="40,36,40,40" MaxWidth="900">
+        <StackPanel Margin="32,28,32,36" MaxWidth="900">
 
             <!-- ── Header ──────────────────────────────────────────────── -->
             <TextBlock Text="DEVELOPER TOOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
             <TextBlock Text="Prompt Playground" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,6"/>
-            <TextBlock Margin="0,0,0,28"
-                       TextWrapping="Wrap"
-                       FontSize="13" Opacity="0.55"
+            <TextBlock Margin="0,0,0,24"
+                       TextWrapping="Wrap" FontSize="13" Opacity="0.55"
                        Foreground="{StaticResource TextBrush}">
                 Inspect what PromptContextBuilder generates for any user message.
-                No LLM call is made. Use the test case dropdown to validate grounding quality.
+                No LLM call is made. Select a grounding test case to validate retrieval quality.
             </TextBlock>
 
             <!-- ── Input Card ──────────────────────────────────────────── -->
-            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,14" Padding="22">
                 <StackPanel>
                     <TextBlock Text="INPUT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,14"/>
 
-                    <!-- Test Case Dropdown -->
                     <TextBlock Text="Grounding Test Case" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
                     <ComboBox x:Name="TestCaseCombo"
                               ItemsSource="{Binding TestCases}"
                               SelectedItem="{Binding SelectedTestCase}"
                               DisplayMemberPath="DisplayName"
-                              Margin="0,0,0,14"/>
+                              Margin="0,0,0,16"/>
 
-                    <!-- Sample Message -->
-                    <TextBlock Text="Sample User Message" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <TextBlock Text="User Message" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
                     <TextBox x:Name="UserMessageBox"
                              Text="{Binding SampleUserMessage, UpdateSourceTrigger=PropertyChanged}"
-                             TextWrapping="Wrap"
-                             MinHeight="72"
-                             AcceptsReturn="True"
+                             TextWrapping="Wrap" MinHeight="68" AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto"
                              Margin="0,0,0,18"/>
 
-                    <!-- Action Buttons -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
                         <Button x:Name="BuildPromptBtn"
                                 Content="⚡  Build Prompt"
                                 Command="{Binding BuildPromptCommand}"
                                 Style="{StaticResource IronPrimaryButton}"
-                                Margin="0,0,10,0"
-                                MinWidth="148"/>
+                                MinWidth="148" Margin="0,0,10,0"/>
                         <Button x:Name="CopyPromptBtn"
                                 Content="Copy Prompt"
                                 Command="{Binding CopyPromptCommand}"
                                 Style="{StaticResource IronSecondaryButton}"
-                                MinWidth="120"/>
+                                MinWidth="110" Margin="0,0,10,0"/>
+                        <Button x:Name="ClearBtn"
+                                Content="Clear"
+                                Command="{Binding ClearAllCommand}"
+                                Style="{StaticResource IronSecondaryButton}"
+                                MinWidth="80"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- ── Result Badges ───────────────────────────────────────── -->
-            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+            <!-- ── Test Case Metadata ─────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,14" Padding="22">
+                <StackPanel>
+                    <TextBlock Text="EXPECTED BEHAVIOUR" Style="{StaticResource IronEyebrow}" Margin="0,0,0,14"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Expected Intent -->
+                        <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,16,12">
+                            <TextBlock Text="Expected Intent" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,3"/>
+                            <TextBlock Text="{Binding ExpectedIntent}"
+                                       FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- Must Include Any -->
+                        <StackPanel Grid.Column="1" Grid.Row="0" Margin="0,0,0,12">
+                            <TextBlock Text="Expected Files / Classes" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,3"/>
+                            <TextBlock Text="{Binding ExpectedFilesClasses}"
+                                       FontSize="12" Foreground="{StaticResource TextBrush}"
+                                       Opacity="0.8" TextWrapping="Wrap"
+                                       FontFamily="Consolas, Courier New"/>
+                        </StackPanel>
+
+                        <!-- Must Not Lead With -->
+                        <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,16,12">
+                            <TextBlock Text="Must NOT Lead With" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,3"/>
+                            <TextBlock Text="{Binding MustNotLeadWith}"
+                                       FontSize="12" Foreground="#FFCC6666"
+                                       TextWrapping="Wrap"
+                                       FontFamily="Consolas, Courier New"/>
+                        </StackPanel>
+
+                        <!-- Must Mention -->
+                        <StackPanel Grid.Column="1" Grid.Row="1" Margin="0,0,0,12">
+                            <TextBlock Text="Must Mention" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,3"/>
+                            <TextBlock Text="{Binding MustMention}"
+                                       FontSize="12" Foreground="{StaticResource TextBrush}"
+                                       Opacity="0.75" TextWrapping="Wrap"
+                                       FontFamily="Consolas, Courier New"/>
+                        </StackPanel>
+
+                        <!-- Must Not Mention -->
+                        <StackPanel Grid.Column="0" Grid.Row="2" Margin="0,0,16,0">
+                            <TextBlock Text="Must NOT Mention" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,3"/>
+                            <TextBlock Text="{Binding MustNotMention}"
+                                       FontSize="12" Foreground="#FFCC6666"
+                                       TextWrapping="Wrap"
+                                       FontFamily="Consolas, Courier New"/>
+                        </StackPanel>
+
+                        <!-- Pass / Fail rules -->
+                        <StackPanel Grid.Column="1" Grid.Row="2">
+                            <TextBlock Text="Pass / Fail Rule" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,3"/>
+                            <TextBlock FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextBrush}" Opacity="0.75">
+                                <Run Text="✅ " Foreground="#FF66BB66"/>
+                                <Run Text="{Binding PassRule}"/>
+                            </TextBlock>
+                            <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0"
+                                       Foreground="{StaticResource TextBrush}" Opacity="0.75">
+                                <Run Text="❌ " Foreground="#FFCC6666"/>
+                                <Run Text="{Binding FailRule}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Result Row ─────────────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,14" Padding="22">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -72,64 +148,84 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Detected Intent -->
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="DETECTED INTENT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding DetectedIntent}" FontSize="14" FontWeight="SemiBold"
+                        <TextBlock Text="{Binding DetectedIntent, FallbackValue='—'}"
+                                   FontSize="14" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
                     </StackPanel>
 
-                    <!-- Expected Intent -->
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                        <TextBlock Text="EXPECTED INTENT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding ExpectedIntent}" FontSize="14"
-                                   Foreground="{StaticResource TextBrush}" Opacity="0.7" TextWrapping="Wrap"/>
+                        <TextBlock Text="INTENT MATCH" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding IntentMatchBadge, FallbackValue='—'}"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}"/>
                     </StackPanel>
 
-                    <!-- Index Status + Quality -->
                     <StackPanel Grid.Column="2" Margin="0,0,16,0">
                         <TextBlock Text="INDEX STATUS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                        <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}">
-                            <Run Text="{Binding ProjectIndexStatus}"/>
+                        <TextBlock FontSize="13" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap">
+                            <Run Text="{Binding ProjectIndexStatus, FallbackValue='—'}"/>
                             <Run Text=" · "/>
                             <Run Text="{Binding ContextQuality}"/>
                         </TextBlock>
                     </StackPanel>
 
-                    <!-- PASS/FAIL Badge -->
-                    <Border Grid.Column="3" CornerRadius="6" Padding="14,8"
-                            Background="#1AFFFFFF" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding IntentMatchBadge}"
-                                   FontSize="15" FontWeight="Bold"
-                                   Foreground="{StaticResource TextBrush}"
-                                   HorizontalAlignment="Center"/>
+                    <!-- PASS / WARNING / FAIL -->
+                    <Border Grid.Column="3" CornerRadius="6" Padding="16,8"
+                            VerticalAlignment="Center">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#22FFFFFF"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="✅ PASS">
+                                        <Setter Property="Background" Value="#2266BB66"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL">
+                                        <Setter Property="Background" Value="#22BB4444"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL — wrong context leads">
+                                        <Setter Property="Background" Value="#22BB4444"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding ResultStatus, FallbackValue='—'}"
+                                   FontSize="13" FontWeight="Bold"
+                                   Foreground="{StaticResource TextBrush}"/>
                     </Border>
                 </Grid>
             </Border>
 
-            <!-- ── Error Banner ────────────────────────────────────────── -->
-            <Border CornerRadius="6" Padding="14,10" Margin="0,0,0,16"
+            <!-- ── Error Banner ───────────────────────────────────────── -->
+            <Border CornerRadius="6" Padding="14,10" Margin="0,0,0,14"
                     Background="#33FF4444"
                     Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="#FFDD6666"
                            FontSize="13" TextWrapping="Wrap"/>
             </Border>
 
-            <!-- ── Expanded Queries ────────────────────────────────────── -->
-            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+            <!-- ── Loading indicator ──────────────────────────────────── -->
+            <Border Padding="14,8" CornerRadius="6" Margin="0,0,0,14"
+                    Background="#22FFFFFF"
+                    Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Building prompt…" FontSize="13" Opacity="0.6"
+                           Foreground="{StaticResource TextBrush}"/>
+            </Border>
+
+            <!-- ── Expanded Queries ───────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,14" Padding="22">
                 <StackPanel>
                     <TextBlock Text="EXPANDED SEARCH QUERIES" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
-                    <TextBlock Text="{Binding ExpandedQueries}"
-                               FontFamily="Consolas, Courier New"
-                               FontSize="12"
-                               Foreground="{StaticResource TextBrush}"
-                               Opacity="0.8"
+                    <TextBlock Text="{Binding ExpandedQueries, FallbackValue='(run Build Prompt to populate)'}"
+                               FontFamily="Consolas, Courier New" FontSize="12"
+                               Foreground="{StaticResource TextBrush}" Opacity="0.85"
                                TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
-            <!-- ── Retrieved Context ───────────────────────────────────── -->
-            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+            <!-- ── Retrieved Context ──────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,14" Padding="22">
                 <StackPanel>
                     <TextBlock Text="RETRIEVED CONTEXT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
                     <ItemsControl ItemsSource="{Binding RetrievedItems}">
@@ -139,26 +235,22 @@
                                         Background="#0AFFFFFF" CornerRadius="4">
                                     <StackPanel>
                                         <TextBlock FontFamily="Consolas, Courier New" FontSize="12"
-                                                   Foreground="{StaticResource TextBrush}"
-                                                   FontWeight="SemiBold">
+                                                   Foreground="{StaticResource TextBrush}" FontWeight="SemiBold">
                                             <Run Text="{Binding FilePath}"/>
-                                            <Run Text="  →  " Foreground="#80FFFFFF"/>
+                                            <Run Text="  →  " Foreground="#60FFFFFF"/>
                                             <Run Text="{Binding SymbolName}" Foreground="#FFB8C4D8"/>
                                         </TextBlock>
                                         <TextBlock Text="{Binding Preview}"
-                                                   FontFamily="Consolas, Courier New"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource TextBrush}"
-                                                   Opacity="0.5"
+                                                   FontFamily="Consolas, Courier New" FontSize="11"
+                                                   Foreground="{StaticResource TextBrush}" Opacity="0.45"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Margin="0,8,0,0"
-                               Text="(no context retrieved)"
-                               FontSize="13" Opacity="0.35"
+                    <TextBlock Margin="0,6,0,0" Text="(no context retrieved — run Build Prompt)"
+                               FontSize="12" Opacity="0.35"
                                Foreground="{StaticResource TextBrush}">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -174,35 +266,24 @@
                 </StackPanel>
             </Border>
 
-            <!-- ── Full Prompt ─────────────────────────────────────────── -->
-            <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="22">
+            <!-- ── Full Prompt ────────────────────────────────────────── -->
+            <Border Style="{StaticResource IronCard}" Margin="0,0,0,14" Padding="22">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
                         <TextBlock Text="FULL GENERATED PROMPT" Style="{StaticResource IronEyebrow}"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="(read-only)" FontSize="11" Opacity="0.4"
+                        <TextBlock Text="read-only" FontSize="11" Opacity="0.35"
                                    Foreground="{StaticResource TextBrush}"
                                    HorizontalAlignment="Right" VerticalAlignment="Center"/>
                     </Grid>
                     <TextBox Text="{Binding PromptText, Mode=OneWay}"
                              IsReadOnly="True"
-                             TextWrapping="Wrap"
-                             AcceptsReturn="True"
-                             MinHeight="300"
-                             MaxHeight="600"
+                             TextWrapping="Wrap" AcceptsReturn="True"
+                             MinHeight="260" MaxHeight="560"
                              VerticalScrollBarVisibility="Auto"
                              FontFamily="Consolas, Courier New"
-                             FontSize="12"
-                             Padding="10"/>
+                             FontSize="12" Padding="10"/>
                 </StackPanel>
-            </Border>
-
-            <!-- ── Loading indicator ───────────────────────────────────── -->
-            <Border Padding="14,8" CornerRadius="6" Margin="0,0,0,16"
-                    Background="#22FFFFFF"
-                    Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVisibilityConverter}}">
-                <TextBlock Text="Building prompt…" FontSize="13" Opacity="0.6"
-                           Foreground="{StaticResource TextBrush}"/>
             </Border>
 
         </StackPanel>

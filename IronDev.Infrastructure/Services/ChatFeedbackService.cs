@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -6,6 +7,7 @@ using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Data;
 using IronDev.Data.Models;
+using Microsoft.Data.SqlClient;
 
 namespace IronDev.Services;
 
@@ -32,6 +34,9 @@ public sealed class ChatFeedbackService : IChatFeedbackService
 
     // How many recent feedback rows to inspect when building the preference summary
     private const int PreferenceLookback = 30;
+
+    // SQL Server error number for "Invalid object name" (table does not exist)
+    private const int SqlErrorInvalidObjectName = 208;
 
     public ChatFeedbackService(IDbConnectionFactory db, ICurrentTenantContext tenant)
     {
@@ -78,11 +83,27 @@ public sealed class ChatFeedbackService : IChatFeedbackService
             ORDER BY CreatedDate DESC;
             """;
 
-        using var con = _db.CreateConnection();
-        var rows = (await con.QueryAsync<(string Rating, string? Reason)>(new CommandDefinition(
-            sql,
-            new { TenantId = _tenant.TenantId, ProjectId = projectId, Take = PreferenceLookback },
-            cancellationToken: ct))).ToList();
+        List<(string Rating, string? Reason)> rows;
+
+        try
+        {
+            using var con = _db.CreateConnection();
+            rows = (await con.QueryAsync<(string Rating, string? Reason)>(new CommandDefinition(
+                sql,
+                new { TenantId = _tenant.TenantId, ProjectId = projectId, Take = PreferenceLookback },
+                cancellationToken: ct))).ToList();
+        }
+        catch (SqlException ex) when (ex.Number == SqlErrorInvalidObjectName
+            && ex.Message.Contains("ChatMessageFeedback", StringComparison.OrdinalIgnoreCase))
+        {
+            // dbo.ChatMessageFeedback does not exist on this local database yet.
+            // Return empty preferences instead of crashing Prompt Playground or Chat.
+            // Run Database/local_dev_setup.sql to create the table.
+            System.Diagnostics.Trace.TraceWarning(
+                "[ChatFeedbackService] dbo.ChatMessageFeedback table not found. " +
+                "Run Database/local_dev_setup.sql to create it. Returning empty preferences.");
+            return string.Empty;
+        }
 
         if (rows.Count == 0)
             return string.Empty;
