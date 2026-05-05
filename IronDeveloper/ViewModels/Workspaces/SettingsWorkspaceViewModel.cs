@@ -6,31 +6,38 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class SettingsWorkspaceViewModel : ObservableObject
 {
-    [ObservableProperty] private string _selectedModel    = "gpt-4o";
-    [ObservableProperty] private string _apiEndpoint      = "https://api.openai.com/v1";
-    [ObservableProperty] private bool   _streamResponses  = true;
-    [ObservableProperty] private bool   _autoIndex        = false;
-    [ObservableProperty] private int    _maxContextTokens = 8000;
+    [ObservableProperty] private string _selectedModel      = "gpt-4o";
+    [ObservableProperty] private string _apiEndpoint        = "https://api.openai.com/v1";
+    [ObservableProperty] private bool   _streamResponses    = true;
+    [ObservableProperty] private bool   _autoIndex          = false;
+    [ObservableProperty] private int    _maxContextTokens   = 8000;
     [ObservableProperty] private bool   _isDevToolsExpanded = false;
 
+    // ── Lazy Prompt Playground ────────────────────────────────────────────────
+    //
+    // PromptPlaygroundViewModel pulls in IPromptContextBuilder → IChatFeedbackService
+    // → SqlConnectionFactory, so it MUST NOT be resolved at app startup.
+    //
+    // The factory is wired by App.xaml.cs. The VM is created only the first time
+    // the user expands Developer Tools. WPF is notified via OnPropertyChanged so
+    // the DataContext binding on PromptPlaygroundView updates correctly.
+
     /// <summary>
-    /// Deferred factory for the Prompt Playground VM.
-    /// Resolved lazily on first expand so that SqlConnectionFactory
-    /// is never touched until the user explicitly opens Developer Tools.
+    /// Deferred factory — set by App.xaml.cs DI registration.
+    /// Never resolved until the user opens Developer Tools.
     /// </summary>
     public Func<PromptPlaygroundViewModel>? PromptPlaygroundFactory { get; init; }
 
     private PromptPlaygroundViewModel? _promptPlayground;
 
-    /// <summary>The Playground VM — created on first access.</summary>
+    /// <summary>
+    /// The Prompt Playground VM, created on first access.
+    /// Raises PropertyChanged so WPF DataContext bindings refresh.
+    /// </summary>
     public PromptPlaygroundViewModel? PromptPlayground
     {
-        get
-        {
-            if (_promptPlayground is null && PromptPlaygroundFactory is not null)
-                _promptPlayground = PromptPlaygroundFactory();
-            return _promptPlayground;
-        }
+        get => _promptPlayground;
+        private set => SetProperty(ref _promptPlayground, value);
     }
 
     public IReadOnlyList<string> AvailableModels { get; } =
@@ -45,9 +52,12 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void ToggleDevTools()
     {
-        // Trigger lazy creation of the Playground VM before we show it
-        if (!IsDevToolsExpanded)
-            _ = PromptPlayground; // ensures VM is instantiated before binding fires
+        if (!IsDevToolsExpanded && PromptPlayground is null && PromptPlaygroundFactory is not null)
+        {
+            // Lazy-create, then notify WPF before flipping Visibility
+            PromptPlayground = PromptPlaygroundFactory();
+        }
+
         IsDevToolsExpanded = !IsDevToolsExpanded;
     }
 }
