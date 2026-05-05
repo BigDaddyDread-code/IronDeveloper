@@ -1,4 +1,4 @@
-<UserControl x:Class="IronDev.Agent.Views.Workspaces.TicketsWorkspaceView"
+﻿<UserControl x:Class="IronDev.Agent.Views.Workspaces.TicketsWorkspaceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -105,7 +105,8 @@
                         </controls:EmptyResultsState.Style>
                     </controls:EmptyResultsState>
 
-                    <!-- ══ PREFLIGHT: Index Choice Panel ══ -->
+                    <!-- Preflight: Index Choice Panel -->
+                    <!-- Visible when DraftPreflight is NeedsChoice, Indexing, or IndexFailed -->
                     <Grid>
                         <Grid.Style>
                             <Style TargetType="Grid">
@@ -114,7 +115,10 @@
                                     <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=NeedsChoice}" Value="True">
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
-                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
+                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Indexing}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=IndexFailed}" Value="True">
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -125,10 +129,48 @@
                                                VerticalAlignment="Center" HorizontalAlignment="Center"
                                                MaxWidth="520">
                             <StackPanel>
-                                <TextBlock Text="⚠ Project Not Indexed"
-                                           FontSize="16" FontWeight="SemiBold"
-                                           Foreground="#F59E0B"
-                                           Margin="0,0,0,8"/>
+
+                                <!-- Header: changes per state -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Margin="0,0,8,0" FontSize="16" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="&#x26A0;"/>
+                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Indexing}" Value="True">
+                                                        <Setter Property="Text" Value="&#x23F3;"/>
+                                                        <Setter Property="Foreground" Value="#7C6BE8"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=IndexFailed}" Value="True">
+                                                        <Setter Property="Text" Value="&#x2716;"/>
+                                                        <Setter Property="Foreground" Value="#EF4444"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="Project Not Indexed"/>
+                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Indexing}" Value="True">
+                                                        <Setter Property="Text" Value="Indexing Project..."/>
+                                                        <Setter Property="Foreground" Value="#7C6BE8"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=IndexFailed}" Value="True">
+                                                        <Setter Property="Text" Value="Indexing Did Not Complete"/>
+                                                        <Setter Property="Foreground" Value="#EF4444"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <!-- Body text: static for NeedsChoice; bound for Indexing/IndexFailed -->
                                 <TextBlock TextWrapping="Wrap" FontSize="13"
                                            Foreground="{StaticResource Text/Secondary}"
                                            Margin="0,0,0,20">
@@ -137,63 +179,39 @@
                                             <Setter Property="Text"
                                                     Value="This project is not indexed. AI context may be incomplete, reducing draft quality.&#x0a;&#x0a;What would you like to do?"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
-                                                    <Setter Property="Text"
-                                                            Value="✓ Project indexed successfully. The draft will now use full code context."/>
+                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Indexing}" Value="True">
+                                                    <Setter Property="Text" Value="{Binding DraftPreflightMessage}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=IndexFailed}" Value="True">
+                                                    <Setter Property="Text" Value="{Binding DraftPreflightMessage}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <StackPanel Orientation="Vertical" Margin="0,0,0,0">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-
-                                    <Button Content="🗂 Index Project First"
-                                            Command="{Binding PreflightIndexProjectCommand}"
-                                            Style="{StaticResource AppButton.Primary}"
-                                            Padding="20,10" Margin="0,0,0,8"
-                                            HorizontalAlignment="Stretch"
-                                            ToolTip="Run the local code indexer, then generate the draft with full context"/>
-                                    <Button Content="⚡ Continue Without Index"
-                                            Command="{Binding PreflightContinueCommand}"
-                                            Style="{StaticResource AppButton.Secondary}"
-                                            Padding="20,10" Margin="0,0,0,8"
-                                            HorizontalAlignment="Stretch"
-                                            ToolTip="Generate draft now using limited context (no code snippets)"/>
-                                    <Button Content="✕ Cancel"
-                                            Command="{Binding PreflightCancelCommand}"
-                                            Style="{StaticResource AppButton.Ghost}"
-                                            Padding="20,8"
-                                            HorizontalAlignment="Stretch"
-                                            ToolTip="Discard and return to Chat"/>
-                                </StackPanel>
-
-                                <Button Content="✓ Generate Draft"
-                                        Command="{Binding PreflightGenerateCommand}"
-                                        Padding="20,10"
+                                <!-- Action buttons: Index First and Continue disabled while Indexing -->
+                                <Button Content="&#x1F5C2; Index Project First"
+                                        Command="{Binding PreflightIndexProjectCommand}"
+                                        Style="{StaticResource AppButton.Primary}"
+                                        Padding="20,10" Margin="0,0,0,8"
                                         HorizontalAlignment="Stretch"
-                                        ToolTip="Generate the draft ticket with indexed code context">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource AppButton.Primary}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
+                                        IsEnabled="{Binding IsDraftIndexing, Converter={StaticResource InverseBoolConverter}}"
+                                        ToolTip="Run the local code indexer, then automatically generate the draft with full context"/>
+                                <Button Content="&#x26A1; Continue Without Index"
+                                        Command="{Binding PreflightContinueCommand}"
+                                        Style="{StaticResource AppButton.Secondary}"
+                                        Padding="20,10" Margin="0,0,0,8"
+                                        HorizontalAlignment="Stretch"
+                                        IsEnabled="{Binding IsDraftIndexing, Converter={StaticResource InverseBoolConverter}}"
+                                        ToolTip="Generate draft now using limited context (no code snippets)"/>
+                                <Button Content="&#x2715; Cancel"
+                                        Command="{Binding PreflightCancelCommand}"
+                                        Style="{StaticResource AppButton.Ghost}"
+                                        Padding="20,8"
+                                        HorizontalAlignment="Stretch"
+                                        ToolTip="Discard and return to Chat"/>
+
                             </StackPanel>
                         </controls:SurfacePanel>
                     </Grid>

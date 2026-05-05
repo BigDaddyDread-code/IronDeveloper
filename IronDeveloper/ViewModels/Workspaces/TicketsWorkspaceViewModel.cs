@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -135,8 +135,20 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     /// </summary>
     [ObservableProperty] private DraftPreflightState _draftPreflight = DraftPreflightState.None;
 
+    /// <summary>True while indexing is running after "Index Project First" was clicked.</summary>
+    [ObservableProperty] private bool _isDraftIndexing;
+
+    /// <summary>Status/progress text shown inside the preflight panel.</summary>
+    [ObservableProperty] private string _draftPreflightMessage = string.Empty;
+
     /// <summary>Pending context held while the user decides on the preflight choice.</summary>
     private ChatTicketContext? _pendingChatContext;
+
+    /// <summary>
+    /// True when "Index Project First" was clicked and we should auto-generate
+    /// the draft once SetIndexStatus("Ready") arrives.
+    /// </summary>
+    private bool _shouldGenerateDraftAfterIndex;
 
     // ── Project index state ───────────────────────────────────────────────────
     /// <summary>
@@ -527,20 +539,43 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>
     /// Called by ShellViewModel whenever ActiveStatus changes so the Tickets workspace
-    /// stays in sync with the project’s index readiness without needing a service reference.
-    /// Also auto-advances the preflight gate: if indexing completes while a context is
-    /// pending (NeedsChoice), moves to ReadyToGenerate so the user sees a "Generate Draft" button.
+    /// stays in sync with the project's index readiness without needing a service reference.
+    ///
+    /// Preflight auto-generate logic:
+    /// - If we are in the Indexing state (user clicked "Index Project First") AND status is now
+    ///   Ready, automatically generate the draft from the pending context. This is the happy path.
+    /// - If we are in the Indexing state AND status is NOT Ready (indexing failed or was skipped),
+    ///   transition to IndexFailed so the user can retry or continue without index.
+    /// - Any other state: just update IsProjectIndexed normally.
     /// </summary>
     public void SetIndexStatus(string status)
     {
         IsProjectIndexed = status == "Ready";
         OnPropertyChanged(nameof(IsContextLimited));
 
-        // Advance preflight: if we were waiting for the user's index choice and the
-        // project just became Ready, move to ReadyToGenerate so the user can proceed.
-        if (IsProjectIndexed && DraftPreflight == DraftPreflightState.NeedsChoice)
+        if (DraftPreflight == DraftPreflightState.Indexing)
         {
-            DraftPreflight = DraftPreflightState.ReadyToGenerate;
+            if (IsProjectIndexed && _shouldGenerateDraftAfterIndex && _pendingChatContext != null)
+            {
+                // Happy path: indexing completed, auto-generate the draft.
+                IsDraftIndexing               = false;
+                _shouldGenerateDraftAfterIndex = false;
+                DraftPreflightMessage         = string.Empty;
+                var ctx = _pendingChatContext;
+                // Fire-and-forget on the UI thread; GeneratePendingDraftAsync transitions
+                // DraftPreflight to None and sets HasDetail=true when it completes.
+                _ = GeneratePendingDraftAsync(ctx);
+            }
+            else if (!IsProjectIndexed)
+            {
+                // Indexing ran but project is still not Ready -- surface the failure.
+                IsDraftIndexing               = false;
+                _shouldGenerateDraftAfterIndex = false;
+                DraftPreflight                = DraftPreflightState.IndexFailed;
+                DraftPreflightMessage         =
+                    "Indexing did not complete. You can try again or continue without index.";
+            }
+            // else: IsProjectIndexed=true but no pending context -- fall through, nothing to do.
         }
     }
 
@@ -665,35 +700,32 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>
     /// Preflight: "Continue Without Index" — generate draft immediately with limited context.
+    /// Guard: no-op while indexing is in progress (belt-and-suspenders; button is also disabled in UI).
     /// </summary>
     [RelayCommand]
     private async Task PreflightContinueAsync()
     {
-        if (_pendingChatContext == null) return;
+        if (_pendingChatContext == null || IsDraftIndexing) return;
         var ctx = _pendingChatContext;
         await GeneratePendingDraftAsync(ctx);
     }
 
     /// <summary>
-    /// Preflight: "Index Project First" — delegates to the existing OnRequestIndex callback
-    /// (same path as RequestIndex in Code Context tab). State advances to ReadyToGenerate
-    /// once SetIndexStatus("Ready") is called by ShellViewModel.
+    /// Preflight: "Index Project First" — disables Continue/Index buttons, shows indexing progress
+    /// text, and fires OnRequestIndex. When ShellViewModel calls SetIndexStatus("Ready"), the
+    /// pending draft is auto-generated. If indexing fails, state falls back to IndexFailed.
     /// </summary>
     [RelayCommand]
     private void PreflightIndexProject()
     {
-        OnRequestIndex?.Invoke();
-    }
-
-    /// <summary>
-    /// Preflight: "Generate Draft" — available after indexing completes while in ReadyToGenerate state.
-    /// </summary>
-    [RelayCommand]
-    private async Task PreflightGenerateAsync()
-    {
         if (_pendingChatContext == null) return;
-        var ctx = _pendingChatContext;
-        await GeneratePendingDraftAsync(ctx);
+
+        IsDraftIndexing              = true;
+        _shouldGenerateDraftAfterIndex = true;
+        DraftPreflight               = DraftPreflightState.Indexing;
+        DraftPreflightMessage        = "Indexing project…";
+
+        OnRequestIndex?.Invoke();
     }
 
     /// <summary>
@@ -703,9 +735,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void PreflightCancel()
     {
-        _pendingChatContext = null;
-        DraftPreflight      = DraftPreflightState.None;
-        HasDetail           = false;
+        _pendingChatContext           = null;
+        _shouldGenerateDraftAfterIndex = false;
+        IsDraftIndexing              = false;
+        DraftPreflight               = DraftPreflightState.None;
+        DraftPreflightMessage        = string.Empty;
+        HasDetail                    = false;
         OnCancelDraft?.Invoke();
     }
 
