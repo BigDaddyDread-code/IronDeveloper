@@ -61,6 +61,7 @@ CREATE TABLE dbo.Projects
     UpdatedDate DATETIME2 NULL,
     LastIndexedUtc DATETIME2 NULL,
     IndexingStatus NVARCHAR(50) NULL,
+    IndexedFileCount INT NULL,
     CONSTRAINT FK_Projects_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id)
 );
 
@@ -171,7 +172,7 @@ CREATE TABLE dbo.ProjectTickets
     Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     TenantId INT NOT NULL CONSTRAINT DF_ProjectTickets_Tenant DEFAULT 1,
     ProjectId INT NOT NULL,
-    SessionId UNIQUEIDENTIFIER NOT NULL,
+    SessionId UNIQUEIDENTIFIER NULL, -- Made NULLable for modern flows
     Title NVARCHAR(200) NOT NULL CONSTRAINT DF_ProjectTickets_Title DEFAULT '',
     TicketType NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectTickets_TicketType DEFAULT 'Task',
     Priority NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectTickets_Priority DEFAULT 'Medium',
@@ -181,7 +182,7 @@ CREATE TABLE dbo.ProjectTickets
     AcceptanceCriteria NVARCHAR(MAX) NULL,
     TechnicalNotes NVARCHAR(MAX) NULL,
     Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectTickets_Status DEFAULT 'Draft',
-    Content NVARCHAR(MAX) NOT NULL,
+    Content NVARCHAR(MAX) NOT NULL CONSTRAINT DF_ProjectTickets_Content DEFAULT '',
     LinkedFilePaths NVARCHAR(MAX) NULL,
     LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
     LinkedSymbols NVARCHAR(MAX) NULL,
@@ -202,6 +203,23 @@ CREATE TABLE dbo.ProjectFiles
     LastIndexedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectFiles_LastIndexedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectFiles_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectFiles_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+);
+
+CREATE TABLE dbo.CodeIndexEntries
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL CONSTRAINT DF_CodeIndexEntries_Tenant DEFAULT 1,
+    ProjectId INT NOT NULL,
+    FileId BIGINT NOT NULL,
+    Namespace NVARCHAR(500) NULL,
+    SymbolName NVARCHAR(500) NULL,
+    SymbolType NVARCHAR(50) NULL,
+    Summary NVARCHAR(MAX) NULL,
+    ChunkText NVARCHAR(MAX) NOT NULL,
+    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_CodeIndexEntries_CreatedDate DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_CodeIndexEntries_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_CodeIndexEntries_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
+    CONSTRAINT FK_CodeIndexEntries_Files FOREIGN KEY (FileId) REFERENCES dbo.ProjectFiles(Id) ON DELETE CASCADE
 );
 
 CREATE INDEX IX_ChatMessages_ProjectId_ChatSessionId_CreatedDate
@@ -232,16 +250,15 @@ CREATE UNIQUE INDEX UX_ProjectFiles_ProjectId_FilePath
     ON dbo.ProjectFiles(ProjectId, FilePath);
 GO
 
--- Tenant 1: Default (admin is a member)
+-- Tenant 1: Default
 INSERT INTO dbo.Tenants (Name, Slug) VALUES ('Default Tenant', 'default');
--- Tenant 2: Isolation (admin is NOT a member — used for cross-tenant isolation tests)
+-- Tenant 2: Isolation
 INSERT INTO dbo.Tenants (Name, Slug) VALUES ('Other Tenant', 'other');
 
--- Admin user — password: 'password123' (BCrypt hash, cost factor 11)
--- Hash: $2a$11$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cj1USGKp3R1LrS9hcNaSUna
--- NOTE: Integration tests compute & inject the real hash at test setup time.
+-- Admin user — password: 'password123'
+DECLARE @PassHash NVARCHAR(MAX) = '$2a$11$FYTpo427b7HP/56mYM/eqeVCaTfJ48BaZDj40vU0BTWouGwDRhiFS';
 INSERT INTO dbo.Users (Email, DisplayName, PasswordHash)
-VALUES ('admin@irondev.local', 'Admin User', NULL);
+VALUES ('admin@irondev.local', 'Admin User', @PassHash);
 
 -- Admin only belongs to Tenant 1, NOT Tenant 2.
 INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (1, 1, 'Owner');
@@ -251,8 +268,7 @@ INSERT INTO dbo.Projects (TenantId, Name, Description)
 VALUES (1, 'IronDev', 'AI-assisted development workflow project');
 GO
 
--- ═══ Lookup Tables ══════════════════════════════════════════════════════════
-
+-- Lookup Tables
 CREATE TABLE dbo.DecisionCategories
 (
     Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -270,23 +286,9 @@ CREATE TABLE dbo.DecisionStatuses
 );
 GO
 
--- Seed decision categories
 INSERT INTO dbo.DecisionCategories (Name, SortOrder) VALUES
-    ('Architecture',       1),
-    ('Code Standards',     2),
-    ('Product',            3),
-    ('Data',               4),
-    ('Infrastructure',     5),
-    ('AI / Prompting',     6),
-    ('UX / UI',            7),
-    ('Workflow / Process', 8),
-    ('Integration',        9),
-    ('Security',          10);
+    ('Architecture', 1), ('Code Standards', 2), ('Product', 3), ('Data', 4), ('Infrastructure', 5), ('AI / Prompting', 6), ('UX / UI', 7), ('Workflow / Process', 8), ('Integration', 9), ('Security', 10);
 
--- Seed decision statuses
 INSERT INTO dbo.DecisionStatuses (Name, SortOrder) VALUES
-    ('Proposed',    1),
-    ('Accepted',    2),
-    ('Superseded',  3),
-    ('Rejected',    4);
+    ('Proposed', 1), ('Accepted', 2), ('Superseded', 3), ('Rejected', 4);
 GO

@@ -113,8 +113,11 @@ public abstract class ApiTestBase
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = 'LastIndexedUtc')
                 ALTER TABLE dbo.Projects ADD LastIndexedUtc DATETIME2 NULL;
             
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = 'IndexingStatus')
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = N'IndexingStatus')
                 ALTER TABLE dbo.Projects ADD IndexingStatus NVARCHAR(50) NULL;
+
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Projects') AND name = N'IndexedFileCount')
+                ALTER TABLE dbo.Projects ADD IndexedFileCount INT NULL;
 
             -- Extend ProjectFiles (Grounding)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectFiles') AND name = 'LastIndexedUtc')
@@ -139,7 +142,7 @@ public abstract class ApiTestBase
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Background')
                 ALTER TABLE dbo.ProjectTickets ADD Background NVARCHAR(MAX) NULL;
             
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'Problem')
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = N'Problem')
                 ALTER TABLE dbo.ProjectTickets ADD Problem NVARCHAR(MAX) NULL;
             
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'AcceptanceCriteria')
