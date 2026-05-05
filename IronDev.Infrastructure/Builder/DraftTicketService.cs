@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,6 +9,7 @@ using System.Threading.Tasks;
 using IronDev.Core;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Services;
 
 namespace IronDev.Infrastructure.Builder;
 
@@ -18,11 +21,13 @@ namespace IronDev.Infrastructure.Builder;
 /// </summary>
 public sealed class DraftTicketService : IDraftTicketService
 {
-    private readonly ILLMService _llm;
+    private readonly ILLMService            _llm;
+    private readonly IProjectMemoryService  _memory;
 
-    public DraftTicketService(ILLMService llm)
+    public DraftTicketService(ILLMService llm, IProjectMemoryService memory)
     {
-        _llm = llm;
+        _llm    = llm;
+        _memory = memory;
     }
 
     public async Task<DraftTicket> GenerateDraftAsync(
@@ -34,7 +39,27 @@ public sealed class DraftTicketService : IDraftTicketService
         string? linkedSymbols,
         CancellationToken ct = default)
     {
-        var prompt = BuildDraftPrompt(projectName, proposedTitle, messageText, linkedFilePaths, linkedSymbols);
+        // Fetch project context to ground the prompt in real architectural memory
+        var decisions  = await _memory.GetRecentDecisionsAsync(projectId, 8, ct);
+        var summary    = await _memory.GetLatestSummaryAsync(projectId, ct);
+
+        var recentDecisions  = decisions.Count > 0
+            ? string.Join("\n", decisions.Select(d => $"- {d.Title}: {d.Detail}"))
+            : "No decisions recorded yet.";
+
+        var codeIndexSummary = summary?.Summary ?? "No codebase summary available yet.";
+
+        // Chat history includes the proposed title + message text
+        var chatHistory = string.IsNullOrWhiteSpace(proposedTitle)
+            ? messageText
+            : $"Proposed title: {proposedTitle}\n\n{messageText}";
+
+        if (!string.IsNullOrWhiteSpace(linkedFilePaths))
+            chatHistory += $"\n\nLinked files: {linkedFilePaths}";
+        if (!string.IsNullOrWhiteSpace(linkedSymbols))
+            chatHistory += $"\nLinked symbols: {linkedSymbols}";
+
+        var prompt = BuildDraftPrompt(projectName, chatHistory, recentDecisions, codeIndexSummary);
 
         string rawJson;
         try
@@ -106,40 +131,51 @@ public sealed class DraftTicketService : IDraftTicketService
 
     private static string BuildDraftPrompt(
         string projectName,
-        string proposedTitle,
-        string messageText,
-        string? linkedFilePaths,
-        string? linkedSymbols)
+        string chatHistory,
+        string recentDecisions,
+        string codeIndexSummary)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("You are IronDev AI, a senior software architect.");
-        sb.AppendLine($"Project: {projectName}");
-        sb.AppendLine();
-        sb.AppendLine("CONTEXT FROM CHAT:");
-        sb.AppendLine($"Proposed Title: {proposedTitle}");
-        sb.AppendLine($"Discussion: {messageText}");
-        if (!string.IsNullOrWhiteSpace(linkedFilePaths)) sb.AppendLine($"Linked Files: {linkedFilePaths}");
-        if (!string.IsNullOrWhiteSpace(linkedSymbols))   sb.AppendLine($"Linked Symbols: {linkedSymbols}");
-        sb.AppendLine();
-        sb.AppendLine("TASK:");
-        sb.AppendLine("Convert the discussion into a high-quality, structured ticket draft.");
-        sb.AppendLine("Return ONLY a JSON object. No prose. No markdown fences.");
-        sb.AppendLine();
-        sb.AppendLine("SCHEMA:");
-        sb.AppendLine("""
-            {
-              "title": "Concise and descriptive title",
-              "summary": "One-line executive summary",
-              "background": "Requirements and technical context",
-              "acceptanceCriteria": "Markdown list of criteria",
-              "unitTests": "Suggested unit tests",
-              "integrationTests": "Suggested integration tests",
-              "manualTests": "How to verify manually",
-              "regressionTests": "What to check for regressions",
-              "buildValidation": "dotnet build <project>.slnx"
-            }
-            """);
-        return sb.ToString();
+        return $$"""
+You are IronDev — a senior .NET architect and persistent teammate for this exact project.
+
+Project: {{projectName}}
+
+Recent decisions & memory:
+{{recentDecisions}}
+
+Indexed codebase summary:
+{{codeIndexSummary}}
+
+Chat history that triggered this ticket:
+{{chatHistory}}
+
+Task:
+Turn the above chat into a **high-quality, actionable ticket**.
+
+Requirements for every ticket you create:
+- Title must be specific and actionable
+- Description must reference real files/classes from the indexed codebase when relevant
+- Acceptance criteria must be concrete and testable
+- Suggest exact files that will be affected or need changing
+- Never give generic advice — always tie it back to {{projectName}}'s actual architecture
+
+Return ONLY a clean JSON object. No prose. No markdown fences.
+
+{
+  "title": "...",
+  "summary": "One-line executive summary",
+  "description": "Full background and technical context referencing real files/classes",
+  "acceptanceCriteria": ["...", "..."],
+  "type": "Feature|TechDebt|Bug|Improvement",
+  "priority": "High|Medium|Low",
+  "affectedFiles": ["path/to/file1.cs", "path/to/file2.cs"],
+  "unitTests": "Suggested unit tests",
+  "integrationTests": "Suggested integration tests",
+  "manualTests": "How to verify manually",
+  "regressionTests": "What to check for regressions",
+  "buildValidation": "dotnet build IronDev.slnx"
+}
+""";
     }
 
     private static string BuildTestRegenPrompt(DraftTicket current)
@@ -174,17 +210,32 @@ public sealed class DraftTicketService : IDraftTicketService
         var dto = JsonSerializer.Deserialize<DraftTicketJson>(StripFences(json), JsonOptions)
                   ?? throw new InvalidOperationException("Failed to parse ticket JSON.");
 
+        // acceptanceCriteria can be a JSON array or a plain string
+        var criteria = dto.AcceptanceCriteriaArray is { Count: > 0 }
+            ? string.Join("\n", dto.AcceptanceCriteriaArray.Select(c => $"- {c}"))
+            : dto.AcceptanceCriteria ?? string.Empty;
+
+        // description maps to Background; fall back to Background if description absent
+        var background = dto.Description ?? dto.Background ?? string.Empty;
+
+        // Append affected files to Background (the context/requirements field)
+        if (dto.AffectedFiles is { Count: > 0 })
+        {
+            var fileList = "\n\n**Affected files:**\n" + string.Join("\n", dto.AffectedFiles.Select(f => $"- {f}"));
+            background += fileList;
+        }
+
         return new DraftTicket
         {
             Title              = dto.Title              ?? "Untitled Ticket",
             Summary            = dto.Summary            ?? string.Empty,
-            Background         = dto.Background         ?? string.Empty,
-            AcceptanceCriteria = dto.AcceptanceCriteria ?? string.Empty,
+            Background         = background,
+            AcceptanceCriteria = criteria,
             UnitTests          = dto.UnitTests          ?? string.Empty,
             IntegrationTests   = dto.IntegrationTests   ?? string.Empty,
             ManualTests        = dto.ManualTests        ?? string.Empty,
             RegressionTests    = dto.RegressionTests    ?? string.Empty,
-            BuildValidation    = dto.BuildValidation    ?? "dotnet build"
+            BuildValidation    = dto.BuildValidation    ?? "dotnet build IronDev.slnx"
         };
     }
 
@@ -211,15 +262,25 @@ public sealed class DraftTicketService : IDraftTicketService
 
     private sealed class DraftTicketJson
     {
-        public string? Title { get; set; }
-        public string? Summary { get; set; }
-        public string? Background { get; set; }
-        public string? AcceptanceCriteria { get; set; }
-        public string? UnitTests { get; set; }
-        public string? IntegrationTests { get; set; }
-        public string? ManualTests { get; set; }
-        public string? RegressionTests { get; set; }
-        public string? BuildValidation { get; set; }
+        public string?       Title { get; set; }
+        public string?       Summary { get; set; }
+        /// <summary>Maps to Background. The new prompt uses 'description' for this field.</summary>
+        public string?       Description { get; set; }
+        public string?       Background { get; set; }
+        /// <summary>Accepts the old string form (joined with newlines on parse).</summary>
+        public string?       AcceptanceCriteria { get; set; }
+        /// <summary>Accepts the new array form from the upgraded prompt schema.</summary>
+        [JsonPropertyName("acceptanceCriteria")]
+        public List<string>? AcceptanceCriteriaArray { get; set; }
+        public string?       Type { get; set; }
+        public string?       Priority { get; set; }
+        [JsonPropertyName("affectedFiles")]
+        public List<string>? AffectedFiles { get; set; }
+        public string?       UnitTests { get; set; }
+        public string?       IntegrationTests { get; set; }
+        public string?       ManualTests { get; set; }
+        public string?       RegressionTests { get; set; }
+        public string?       BuildValidation { get; set; }
     }
 
     private sealed class TestPlanJson

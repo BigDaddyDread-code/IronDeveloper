@@ -1,10 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using IronDev.Core;
 using IronDev.Core.Models;
-using IronDev.Infrastructure.Services;
+using IronDev.Data.Models;
 using IronDev.Infrastructure.Builder;
+using IronDev.Infrastructure.Services;
+using IronDev.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Threading.Tasks;
 
 namespace IronDev.IntegrationTests;
 
@@ -70,8 +74,9 @@ public class LlmProviderTests
     {
         // This test verifies that DraftTicketService can be instantiated with an ILLMService
         // and doesn't know about the provider.
-        var mockLlm = new StubLlmService();
-        var draftService = new DraftTicketService(mockLlm);
+        var mockLlm    = new StubLlmService();
+        var mockMemory = new NullProjectMemoryService();
+        var draftService = new DraftTicketService(mockLlm, mockMemory);
         Assert.IsNotNull(draftService);
     }
 
@@ -90,6 +95,20 @@ public class LlmProviderTests
 
     private class StubLlmService : ILLMService
     {
-        public Task<string> GetResponseAsync(string prompt, System.Threading.CancellationToken ct = default) => Task.FromResult("{}");
+        public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default) => Task.FromResult("{}");
+    }
+
+    /// <summary>No-op memory service for tests that don't require real DB context.</summary>
+    private class NullProjectMemoryService : IProjectMemoryService
+    {
+        public Task<ProjectSummary?> GetLatestSummaryAsync(int projectId, CancellationToken ct = default) => Task.FromResult<ProjectSummary?>(null);
+        public Task<IReadOnlyList<ProjectDecision>> GetRecentDecisionsAsync(int projectId, int take = 10, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectDecision>>(new List<ProjectDecision>());
+        public Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken ct = default) => Task.FromResult<ProjectDecision?>(null);
+        public Task<long> SaveSummaryAsync(ProjectSummary summary, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectImplementationPlan>>(new List<ProjectImplementationPlan>());
+        public Task<ProjectImplementationPlan?> GetPlanByIdAsync(long planId, CancellationToken ct = default) => Task.FromResult<ProjectImplementationPlan?>(null);
+        public Task<ProjectImplementationPlan?> GetPlanByTicketIdAsync(long ticketId, CancellationToken ct = default) => Task.FromResult<ProjectImplementationPlan?>(null);
+        public Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken ct = default) => Task.FromResult(0L);
     }
 }
