@@ -43,11 +43,40 @@
                                         SelectedItem="{Binding SelectedTicket, Mode=TwoWay}">
                 <controls:WorkspaceListPane.ItemTemplate>
                     <DataTemplate>
-                        <controls:WorkspaceListItem Title="{Binding Title}"
-                                                   Subtitle="{Binding Summary}"
-                                                   Metadata="{Binding Status}"
-                                                   IconData="{StaticResource Icon.Nav.Tickets}"
-                                                   IsSelected="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                        <Border Padding="10,8" CornerRadius="6" Margin="0,1">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource Background/Interactive}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource Text/Primary}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Summary}" FontSize="11"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
+                                               Visibility="{Binding Summary, Converter={StaticResource ValueToVis}}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0">
+                                    <TextBlock Text="{Binding Status}" FontSize="9" FontWeight="SemiBold"
+                                               Foreground="{StaticResource Text/Muted}" Opacity="0.8"/>
+                                    <TextBlock Text="{Binding Priority}" FontSize="9"
+                                               Foreground="{StaticResource Text/Muted}" Opacity="0.6"
+                                               Margin="0,1,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </DataTemplate>
                 </controls:WorkspaceListPane.ItemTemplate>
             </controls:WorkspaceListPane>
@@ -72,74 +101,52 @@
                             <RowDefinition Height="Auto"/>  <!-- 3: footer -->
                         </Grid.RowDefinitions>
 
-                        <!-- Draft Ticket Banner + optional index warning, both visible only when IsDraftMode -->
+                        <!-- ══ Draft Banner: compact single row ══ -->
                         <Border Grid.Row="0"
                                 Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Background="#1A7C6BE8"
-                                BorderBrush="#7C6BE8"
-                                BorderThickness="0,0,0,1"
-                                Padding="0">
-                            <StackPanel>
-                                <!-- Row 1: Purple draft header -->
-                                <Grid Margin="16,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="✦" Foreground="#7C6BE8" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Text="Draft Ticket From Chat — review before saving."
-                                                   Foreground="#7C6BE8" FontWeight="SemiBold" FontSize="13"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding DraftStatusMessage}"
-                                                   Foreground="{StaticResource Text/Muted}"
-                                                   FontSize="12" VerticalAlignment="Center"
-                                                   Visibility="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
-                                        <TextBlock Text="⟳ Generating…"
-                                                   Foreground="{StaticResource Text/Muted}"
-                                                   FontSize="12" FontStyle="Italic" VerticalAlignment="Center"
-                                                   Visibility="{Binding IsDraftGenerating, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    </StackPanel>
-
-                                    <Border Grid.Column="2" Background="#7C6BE8" CornerRadius="3" Padding="8,3">
-                                        <TextBlock Text="AI GENERATED" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                                    </Border>
-                                </Grid>
-
-                                <!-- Row 2: Amber index warning — only when project not indexed -->
-                                <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        Background="#18F59E0B"
-                                        BorderBrush="#F59E0B"
-                                        BorderThickness="0,1,0,0"
-                                        Padding="16,8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0"
-                                                   Text="⚠️ Project is not indexed. AI context may be incomplete."
-                                                   Foreground="#F59E0B" FontSize="12" VerticalAlignment="Center"
-                                                   Margin="0,0,12,0"/>
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                            <Button Content="🗂 Index Project"
-                                                    Command="{Binding RequestIndexCommand}"
-                                                    Style="{StaticResource AppButton.Secondary}"
-                                                    Padding="12,4" Margin="0,0,8,0" FontSize="11"
-                                                    ToolTip="Index the project to improve AI code context"/>
-                                            <TextBlock Text="or continue without index"
-                                                       Foreground="{StaticResource Text/Muted}" FontSize="11"
-                                                       VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Grid>
+                                Background="#1A7C6BE8" BorderBrush="#7C6BE8" BorderThickness="0,0,0,1"
+                                Padding="16,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Icon + label -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="✦" Foreground="#7C6BE8" FontSize="13" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Draft Ticket — review before saving"
+                                               Foreground="#7C6BE8" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <!-- Generating / status -->
+                                <TextBlock Grid.Column="1"
+                                           Foreground="{StaticResource Text/Muted}" FontSize="11" VerticalAlignment="Center" Margin="12,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding DraftStatusMessage}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDraftGenerating}" Value="True">
+                                                    <Setter Property="Text" Value="⟳ Generating…"/>
+                                                    <Setter Property="FontStyle" Value="Italic"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <!-- Limited context inline chip -->
+                                <Border Grid.Column="2"
+                                        Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
+                                        CornerRadius="3" Padding="7,2" Margin="0,0,8,0"
+                                        ToolTip="Project not indexed — see Code Context tab">
+                                    <TextBlock Text="⚠ Limited context" Foreground="#F59E0B" FontSize="10" FontWeight="SemiBold"/>
                                 </Border>
-                            </StackPanel>
+                                <!-- AI badge -->
+                                <Border Grid.Column="3" Background="#7C6BE8" CornerRadius="3" Padding="7,2">
+                                    <TextBlock Text="AI GENERATED" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                            </Grid>
                         </Border>
 
                         <!-- Tab Header (shifted to row 1 when draft banner shown) -->
@@ -191,7 +198,7 @@
                         </Border>
 
                         <!-- Content Area -->
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="24">
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="16">
                             <Grid>
                                 <!-- ═══ TAB: Overview ═══ -->
                                 <StackPanel>
@@ -212,32 +219,40 @@
                                                 <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="16" FontWeight="SemiBold"/>
                                             </controls:FormField>
 
+                                            <!-- Status / Priority / Type: fixed-width columns so values never clip -->
                                             <Grid Margin="0,0,0,16">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/><!-- absorbs remaining space -->
                                                 </Grid.ColumnDefinitions>
 
-                                                <controls:SelectionField Grid.Column="0" Label="STATUS" Margin="0,0,8,0"
+                                                <controls:SelectionField Grid.Column="0" Label="STATUS"
+                                                                       MinWidth="145" Margin="0,0,12,0"
+                                                                       FocusVisualStyle="{x:Null}"
                                                                        ItemsSource="{Binding StatusOptions}"
                                                                        SelectedItem="{Binding EditStatus}"/>
-                                                
-                                                <controls:SelectionField Grid.Column="1" Label="PRIORITY" Margin="0,0,8,0"
+
+                                                <controls:SelectionField Grid.Column="1" Label="PRIORITY"
+                                                                       MinWidth="145" Margin="0,0,12,0"
+                                                                       FocusVisualStyle="{x:Null}"
                                                                        ItemsSource="{Binding PriorityOptions}"
                                                                        SelectedItem="{Binding EditPriority}"/>
-                                                
+
                                                 <controls:SelectionField Grid.Column="2" Label="TYPE"
+                                                                       MinWidth="145"
+                                                                       FocusVisualStyle="{x:Null}"
                                                                        ItemsSource="{Binding TypeOptions}"
                                                                        SelectedItem="{Binding EditTicketType}"/>
                                             </Grid>
 
                                             <controls:FormField Label="SUMMARY">
-                                                <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"/>
+                                                <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
                                             </controls:FormField>
 
                                             <controls:FormField Label="ACCEPTANCE CRITERIA">
-                                                <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"/>
+                                                <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
                                             </controls:FormField>
                                         </StackPanel>
                                     </controls:SurfacePanel>
@@ -269,17 +284,6 @@
                                                 IsEnabled="{Binding CanBuildTicket}"
                                                 Padding="16,8" Margin="0,0,8,0"
                                                 ToolTip="Generate a code change proposal for this ticket"/>
-
-                                        <!-- Limited-context chip: shown when project is not indexed -->
-                                        <Border Grid.Column="2"
-                                                Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
-                                                CornerRadius="4" Padding="8,4" Margin="0,0,0,-28"
-                                                VerticalAlignment="Bottom" HorizontalAlignment="Left"
-                                                ToolTip="Project not indexed — code context will be limited. Click Index Project in Code Context tab to improve results.">
-                                            <TextBlock Text="⚠ limited context" Foreground="#F59E0B"
-                                                       FontSize="9" FontWeight="SemiBold"/>
-                                        </Border>
 
                                         <TextBlock Grid.Column="4" Text="{Binding SaveStatus}"
                                                    Foreground="{StaticResource Success}"
@@ -317,19 +321,18 @@
                                     <StackPanel Visibility="{Binding HasPlan, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <controls:SurfacePanel Variant="Subtle" Padding="24" Margin="0,0,0,16">
                                             <StackPanel>
-                                                <Grid Margin="0,0,0,16">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <controls:FormField Grid.Column="0" Label="PLAN TITLE">
-                                                        <TextBox Text="{Binding PlanTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="14" FontWeight="SemiBold"/>
-                                                    </controls:FormField>
-                                                    <Button Grid.Column="1" Content="Ask about this plan"
+                                                <!-- Plan Title: full width, no floating button beside it -->
+                                                <controls:FormField Label="PLAN TITLE" Margin="0,0,0,8">
+                                                    <TextBox Text="{Binding PlanTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="14" FontWeight="SemiBold"/>
+                                                </controls:FormField>
+
+                                                <!-- Ask about this plan: secondary action row, sits below title -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16" HorizontalAlignment="Left">
+                                                    <Button Content="💬 Ask about this plan"
                                                             Command="{Binding AskAboutPlanCommand}"
                                                             Style="{StaticResource AppButton.Ghost}"
-                                                            Margin="12,0,0,0" VerticalAlignment="Bottom" Padding="12,6"/>
-                                                </Grid>
+                                                            Padding="12,5"/>
+                                                </StackPanel>
 
                                                 <controls:FormField Label="PLAN GOAL">
                                                     <TextBox Text="{Binding PlanGoal, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
@@ -372,7 +375,7 @@
                                     </StackPanel>
                                 </StackPanel>
 
-                                <!-- ═══ TAB: Context ═══ -->
+                                <!-- ═══ TAB: Code Context ═══ -->
                                 <StackPanel>
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
@@ -384,49 +387,90 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    
-                                    <controls:SurfacePanel Variant="Subtle" Padding="24">
+
+                                    <!-- Index status card -->
+                                    <controls:SurfacePanel Variant="Subtle" Padding="16" Margin="0,0,0,12">
                                         <StackPanel>
-                                            <!-- ⚠ Not-indexed warning for Code Context tab -->
-                                    <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
-                                            Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
-                                            CornerRadius="6" Padding="14,10" Margin="0,0,0,16">
-                                        <StackPanel>
-                                            <TextBlock Text="⚠️ Project is not indexed"
-                                                       Foreground="#F59E0B" FontWeight="SemiBold" FontSize="13"
-                                                       Margin="0,0,0,4"/>
-                                            <TextBlock TextWrapping="Wrap" FontSize="12"
-                                                       Foreground="{StaticResource Text/Muted}"
-                                                       Margin="0,0,0,8"
-                                                       Text="Linked file paths and symbols below are entered manually. No indexed code snippets are available until the project is indexed."/>
-                                            <Button Content="🗂 Index Project Now"
-                                                    Command="{Binding RequestIndexCommand}"
-                                                    Style="{StaticResource AppButton.Secondary}"
-                                                    Padding="14,6" HorizontalAlignment="Left"
-                                                    FontSize="12"
-                                                    ToolTip="Run the local code indexer on this project"/>
+                                            <!-- Not-indexed warning -->
+                                            <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                    Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
+                                                    CornerRadius="6" Padding="14,10" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="⚠️ Project is not indexed"
+                                                                   Foreground="#F59E0B" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                                                        <TextBlock TextWrapping="Wrap" FontSize="12"
+                                                                   Foreground="{StaticResource Text/Muted}"
+                                                                   Text="Code context may be incomplete. Index the project to enable code retrieval and improve AI output quality."/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                        <Button Content="🗂 Index Project"
+                                                                Command="{Binding RequestIndexCommand}"
+                                                                Style="{StaticResource AppButton.Secondary}"
+                                                                Padding="14,6" FontSize="12"
+                                                                ToolTip="Run the local code indexer on this project"/>
+                                                        <TextBlock Text="or continue without index"
+                                                                   Foreground="{StaticResource Text/Muted}" FontSize="10"
+                                                                   HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                            <!-- Indexed OK state -->
+                                            <Border Visibility="{Binding IsContextLimited, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                                    Background="#1234D16A" BorderBrush="#34D16A" BorderThickness="1"
+                                                    CornerRadius="6" Padding="12,8">
+                                                <TextBlock Text="✓ Project is indexed — code context is available"
+                                                           Foreground="#34D16A" FontSize="12" FontWeight="SemiBold"/>
+                                            </Border>
                                         </StackPanel>
-                                    </Border>
+                                    </controls:SurfacePanel>
 
-                                    <controls:FormField Label="BACKGROUND">
-                                                <TextBox Text="{Binding EditBackground, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
+                                    <!-- File paths + symbols -->
+                                    <controls:SurfacePanel Variant="Subtle" Padding="16" Margin="0,0,0,12">
+                                        <StackPanel>
+                                            <controls:FormField Label="AFFECTED FILE PATHS">
+                                                <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="56"
+                                                         FontSize="11" FontFamily="Consolas"
+                                                         ToolTip="One file path per line. Used by Build This for context retrieval."/>
                                             </controls:FormField>
+                                            <controls:FormField Label="LINKED SYMBOLS / CLASSES">
+                                                <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="40"
+                                                         FontSize="11" FontFamily="Consolas"
+                                                         ToolTip="Class names, method names, interfaces relevant to this ticket."/>
+                                            </controls:FormField>
+                                        </StackPanel>
+                                    </controls:SurfacePanel>
 
-                                            <controls:FormField Label="PROBLEM">
-                                                <TextBox Text="{Binding EditProblem, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
-                                            </controls:FormField>
-
-                                            <controls:FormField Label="TECHNICAL NOTES">
-                                                <TextBox Text="{Binding EditTechnicalNotes, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="48"/>
-                                            </controls:FormField>
-
-                                            <controls:FormField Label="LINKED FILE PATHS">
-                                                <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" FontSize="11" FontFamily="Consolas"/>
-                                            </controls:FormField>
-
-                                            <controls:FormField Label="LINKED SYMBOLS">
-                                                <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" FontSize="11" FontFamily="Consolas"/>
-                                            </controls:FormField>
+                                    <!-- Builder context summary (populated after Build This) -->
+                                    <controls:SurfacePanel Variant="Subtle" Padding="16" Margin="0,0,0,12">
+                                        <StackPanel>
+                                            <TextBlock Text="BUILDER CONTEXT SUMMARY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                            <!-- Has preview -->
+                                            <TextBlock Text="{Binding CurrentBuildPreview.ContextSummary}"
+                                                       Foreground="{StaticResource Text/Muted}" FontSize="12"
+                                                       TextWrapping="Wrap" FontStyle="Italic"
+                                                       Visibility="{Binding HasBuildPreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <!-- No preview yet -->
+                                            <TextBlock Foreground="{StaticResource Text/Muted}" FontSize="12" FontStyle="Italic"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="{Binding HasBuildPreview, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="No context summary yet. Run ⚙ Build This to assemble code context."/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsContextLimited}" Value="True">
+                                                                <Setter Property="Text" Value="No indexed snippets available. Index the project to enable code retrieval."/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </StackPanel>
                                     </controls:SurfacePanel>
                                 </StackPanel>

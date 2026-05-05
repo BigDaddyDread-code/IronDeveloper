@@ -201,6 +201,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             return;
         }
 
+        // Guard: if this ticket is already loaded into the editor, skip the reload.
+        // This prevents a double-load when ApproveDraftAsync explicitly calls
+        // LoadTicketIntoEditorAsync and then sets SelectedTicket for list highlighting.
+        if (HasDetail && EditId == value.Id)
+            return;
+
         // Clear stale build state when switching tickets
         ClearBuildState();
         _ = LoadTicketIntoEditorAsync(value);
@@ -628,9 +634,19 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         await RefreshListAsync();  // ClearEditor() is called inside — resets HasDetail, fields, etc.
 
-        // Re-select the newly created ticket so the detail panel shows it
-        SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
-        SaveStatus     = "Ticket created ✓";
+        // Re-select the newly created ticket so the detail panel shows it.
+        // Set SelectedTicket first (triggers list highlight), then directly
+        // load the editor so we can set SaveStatus AFTER the load completes.
+        var created = Tickets.FirstOrDefault(t => t.Id == savedId);
+        if (created != null)
+        {
+            // Suppress OnSelectedTicketChanged from clearing SaveStatus by
+            // directly loading the editor ourselves, then setting SelectedTicket.
+            await LoadTicketIntoEditorAsync(created);
+            SelectedTicket = created;          // list highlight (no double-load: HasDetail already true)
+        }
+
+        SaveStatus = "Ticket created \u2713";
     }
 
     /// <summary>Saves the draft ticket and then navigates to Plans to create a plan.</summary>
