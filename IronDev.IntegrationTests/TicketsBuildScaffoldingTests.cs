@@ -152,7 +152,7 @@ public sealed class TicketsBuildScaffoldingTests
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static TicketsWorkspaceViewModel CreateVm(ITicketBuildOrchestrator? orchestrator = null)
-        => new(null!, null!, orchestrator ?? new StubOrchestrator(), new StubDraftTicketService());
+        => new(null!, null!, orchestrator ?? new StubOrchestrator(), new StubDraftTicketService(), null!);
 
     private static void SetProjectPath(TicketsWorkspaceViewModel vm, string path = @"C:\repo\test")
         => typeof(TicketsWorkspaceViewModel)
@@ -686,14 +686,14 @@ public sealed class CodeChangeProposalServiceTests
     {
         private readonly string _response;
         public FakeLlm(string response) => _response = response;
-        public Task<string> GetResponseAsync(string prompt) => Task.FromResult(_response);
+        public Task<string> GetResponseAsync(string prompt, System.Threading.CancellationToken ct = default) => Task.FromResult(_response);
     }
 
     private sealed class ThrowingLlm : IronDev.Core.ILLMService
     {
         private readonly string _message;
         public ThrowingLlm(string message = "Network error") => _message = message;
-        public Task<string> GetResponseAsync(string prompt) =>
+        public Task<string> GetResponseAsync(string prompt, System.Threading.CancellationToken ct = default) =>
             throw new InvalidOperationException(_message);
     }
 
@@ -977,7 +977,7 @@ public sealed class OrchestratorPhase3Tests
     public async Task ViewModel_BuildCommand_SetsAIProposalPreview()
     {
         var orch = MakeOrchestrator();
-        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService());
+        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService(), null!);
 
         typeof(TicketsWorkspaceViewModel)
             .GetField("_activeProjectPath",
@@ -1010,7 +1010,7 @@ public sealed class OrchestratorPhase3Tests
     public async Task ViewModel_LlmFailure_SetsBuildFailedMessage()
     {
         var orch = MakeOrchestrator(proposalSvc: new FailingProposalSvc());
-        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService());
+        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService(), null!);
 
         typeof(TicketsWorkspaceViewModel)
             .GetField("_activeProjectPath",
@@ -1041,7 +1041,7 @@ public sealed class OrchestratorPhase3Tests
     public void ApplyBuildPreview_DoesNotWriteFiles()
     {
         var orch = MakeOrchestrator();
-        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService());
+        var vm   = new TicketsWorkspaceViewModel(null!, null!, orch, new StubDraftTicketService(), null!);
 
         // Simulate a preview already loaded
         vm.CurrentBuildPreview = new TicketBuildPreview

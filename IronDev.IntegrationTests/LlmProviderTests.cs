@@ -90,6 +90,6 @@ public class LlmProviderTests
 
     private class StubLlmService : ILLMService
     {
-        public Task<string> GetResponseAsync(string prompt) => Task.FromResult("{}");
+        public Task<string> GetResponseAsync(string prompt, System.Threading.CancellationToken ct = default) => Task.FromResult("{}");
     }
 }

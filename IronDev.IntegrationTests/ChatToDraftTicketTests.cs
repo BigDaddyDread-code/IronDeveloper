@@ -21,7 +21,7 @@ public class ChatToDraftTicketTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static TicketsWorkspaceViewModel CreateVm(IDraftTicketService? draftService = null)
-        => new(null!, null!, new StubOrchestrator(), draftService ?? new StubDraftTicketService());
+        => new(null!, null!, new StubOrchestrator(), draftService ?? new StubDraftTicketService(), null!);
 
     private static void SetProjectPath(TicketsWorkspaceViewModel vm, string path = @"C:\repo\test")
         => typeof(TicketsWorkspaceViewModel)
@@ -331,7 +331,7 @@ public class ChatToDraftTicketTests
     {
         var draftSvc = new StubDraftTicketService();
         var ticketSvc = new StubTicketService();
-        var vm = new TicketsWorkspaceViewModel(ticketSvc, null!, new StubOrchestrator(), draftSvc);
+        var vm = new TicketsWorkspaceViewModel(ticketSvc, null!, new StubOrchestrator(), draftSvc, null!);
 
         string? receivedTitle = null;
         string? receivedGoal  = null;
@@ -359,7 +359,7 @@ public class ChatToDraftTicketTests
     public async Task ApproveDraftAsync_WithStubService_ExitsDraftModeAndShowsStatus()
     {
         var vm = new TicketsWorkspaceViewModel(
-            new StubTicketService(), null!, new StubOrchestrator(), new StubDraftTicketService());
+            new StubTicketService(), null!, new StubOrchestrator(), new StubDraftTicketService(), null!);
 
         await vm.BeginDraftFromChatAsync(MakeContext());
         await vm.ApproveDraftCommand.ExecuteAsync(null);

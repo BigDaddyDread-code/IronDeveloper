@@ -29,7 +29,8 @@ public class IndexAwarenessTests
             null!,
             null!,
             orchestrator ?? new StubOrchestrator(),
-            draftSvc     ?? new StubDraftTicketService());
+            draftSvc     ?? new StubDraftTicketService(),
+            null!);
 
     private static void SetProjectPath(TicketsWorkspaceViewModel vm, string path = @"C:\repo\test")
         => typeof(TicketsWorkspaceViewModel)
@@ -154,7 +155,7 @@ public class IndexAwarenessTests
     {
         var orch = new StubOrchestrator();
         var vm   = new TicketsWorkspaceViewModel(
-            new StubTicketService(), null!, orch, new StubDraftTicketService());
+            new StubTicketService(), null!, orch, new StubDraftTicketService(), null!);
 
         SetProjectPath(vm);
         vm.SetIndexStatus("Needs Index");   // not indexed
@@ -191,7 +192,7 @@ public class IndexAwarenessTests
     {
         var orch = new StubOrchestrator();
         var vm   = new TicketsWorkspaceViewModel(
-            new StubTicketService(), null!, orch, new StubDraftTicketService());
+            new StubTicketService(), null!, orch, new StubDraftTicketService(), null!);
 
         SetProjectPath(vm);
         vm.SetIndexStatus("Ready");   // indexed

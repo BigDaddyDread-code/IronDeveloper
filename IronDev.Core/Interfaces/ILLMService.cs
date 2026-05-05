@@ -1,6 +1,9 @@
-﻿namespace IronDev.Core;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace IronDev.Core;
 
 public interface ILLMService
 {
-    Task<string> GetResponseAsync(string prompt);
+    Task<string> GetResponseAsync(string prompt, CancellationToken ct = default);
 }

@@ -99,6 +99,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IDraftTicketService,
                     global::IronDev.Infrastructure.Builder.DraftTicketService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ICodebaseTicketGeneratorService,
+                    global::IronDev.Infrastructure.Services.CodebaseTicketGeneratorService>();
             })
             .Build();
     }
