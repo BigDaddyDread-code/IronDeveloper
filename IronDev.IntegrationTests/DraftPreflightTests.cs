@@ -342,12 +342,12 @@ public class DraftPreflightTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // P14: SetIndexStatus("Needs Index") while in Indexing state → IndexFailed
+    // P14: SetIndexStatus("Needs Index") while in Indexing state → IGNORED (waiting)
     // ════════════════════════════════════════════════════════════════════════
 
     [TestMethod]
-    [Description("P14: When SetIndexStatus arrives with non-Ready status while DraftPreflight=Indexing, transitions to IndexFailed with error message.")]
-    public async Task SetIndexStatus_NotReady_WhileIndexing_TransitionsToIndexFailed()
+    [Description("P14: When SetIndexStatus arrives with 'Needs Index' status while DraftPreflight=Indexing, it is ignored (waits for indexing to start/finish).")]
+    public async Task SetIndexStatus_NeedsIndex_WhileIndexing_IsIgnored()
     {
         var vm = CreateVm();
         vm.SetIndexStatus("Needs Index");
@@ -358,19 +358,84 @@ public class DraftPreflightTests
 
         Assert.AreEqual(DraftPreflightState.Indexing, vm.DraftPreflight, "Sanity: must be Indexing.");
 
-        // Simulate indexing completing but status is still Needs Index (indexing failed)
+        // Simulate status update that hasn't changed yet (still Needs Index)
         vm.SetIndexStatus("Needs Index");
 
+        Assert.AreEqual(DraftPreflightState.Indexing, vm.DraftPreflight,
+            "DraftPreflight must remain Indexing (Needs Index is ignored while waiting).");
+        Assert.IsTrue(vm.IsDraftIndexing, "IsDraftIndexing must remain true.");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // P16: SetIndexStatus("Indexing...") while in Indexing state → IGNORED (progress)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [TestMethod]
+    [Description("P16: When SetIndexStatus arrives with 'Indexing...' status while DraftPreflight=Indexing, it is ignored (progress update).")]
+    public async Task SetIndexStatus_IndexingProgress_WhileIndexing_IsIgnored()
+    {
+        var vm = CreateVm();
+        vm.SetIndexStatus("Needs Index");
+        vm.OnRequestIndex = () => { };
+
+        await vm.BeginDraftFromChatAsync(MakeContext());
+        vm.PreflightIndexProjectCommand.Execute(null);
+
+        // Simulate indexing started
+        vm.SetIndexStatus("Indexing...");
+
+        Assert.AreEqual(DraftPreflightState.Indexing, vm.DraftPreflight,
+            "DraftPreflight must remain Indexing (Indexing... is ignored as progress).");
+        Assert.IsTrue(vm.IsDraftIndexing, "IsDraftIndexing must remain true.");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // P17: SetIndexStatus("Err: ...") while in Indexing state → IndexFailed with specific message
+    // ════════════════════════════════════════════════════════════════════════
+
+    [TestMethod]
+    [Description("P17: When SetIndexStatus arrives with 'Err:' status while DraftPreflight=Indexing, transitions to IndexFailed and captures the error message.")]
+    public async Task SetIndexStatus_Error_WhileIndexing_TransitionsToIndexFailedWithMessage()
+    {
+        var vm = CreateVm();
+        vm.SetIndexStatus("Needs Index");
+        vm.OnRequestIndex = () => { };
+
+        await vm.BeginDraftFromChatAsync(MakeContext());
+        vm.PreflightIndexProjectCommand.Execute(null);
+
+        // Simulate explicit indexing error
+        vm.SetIndexStatus("Err: Path not found");
+
         Assert.AreEqual(DraftPreflightState.IndexFailed, vm.DraftPreflight,
-            "DraftPreflight must be IndexFailed when indexing did not result in Ready.");
-        Assert.IsFalse(vm.IsDraftIndexing,
-            "IsDraftIndexing must be false after failed indexing.");
-        Assert.IsFalse(string.IsNullOrWhiteSpace(vm.DraftPreflightMessage),
-            "DraftPreflightMessage must describe the failure.");
+            "DraftPreflight must be IndexFailed on explicit error.");
+        Assert.IsFalse(vm.IsDraftIndexing, "IsDraftIndexing must be false.");
+        StringAssert.Contains(vm.DraftPreflightMessage, "Path not found",
+            "DraftPreflightMessage must contain the specific error message.");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // P18: SetIndexStatus("Offline") while in Indexing state → IndexFailed (fallback)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [TestMethod]
+    [Description("P18: When SetIndexStatus arrives with an unexpected non-ready status while DraftPreflight=Indexing, transitions to IndexFailed.")]
+    public async Task SetIndexStatus_Unexpected_WhileIndexing_TransitionsToIndexFailed()
+    {
+        var vm = CreateVm();
+        vm.SetIndexStatus("Needs Index");
+        vm.OnRequestIndex = () => { };
+
+        await vm.BeginDraftFromChatAsync(MakeContext());
+        vm.PreflightIndexProjectCommand.Execute(null);
+
+        // Simulate unexpected status (e.g. system went offline)
+        vm.SetIndexStatus("Offline");
+
+        Assert.AreEqual(DraftPreflightState.IndexFailed, vm.DraftPreflight,
+            "DraftPreflight must be IndexFailed on unexpected status.");
         StringAssert.Contains(vm.DraftPreflightMessage, "did not complete",
-            "DraftPreflightMessage must say indexing did not complete.");
-        Assert.IsNull(vm.CurrentDraft,
-            "CurrentDraft must remain null — no draft was generated.");
+            "DraftPreflightMessage must show fallback failure message.");
     }
 
     // ════════════════════════════════════════════════════════════════════════

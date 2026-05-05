@@ -555,27 +555,47 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         if (DraftPreflight == DraftPreflightState.Indexing)
         {
-            if (IsProjectIndexed && _shouldGenerateDraftAfterIndex && _pendingChatContext != null)
+            if (IsProjectIndexed)
             {
                 // Happy path: indexing completed, auto-generate the draft.
-                IsDraftIndexing               = false;
-                _shouldGenerateDraftAfterIndex = false;
-                DraftPreflightMessage         = string.Empty;
-                var ctx = _pendingChatContext;
-                // Fire-and-forget on the UI thread; GeneratePendingDraftAsync transitions
-                // DraftPreflight to None and sets HasDetail=true when it completes.
-                _ = GeneratePendingDraftAsync(ctx);
+                if (_shouldGenerateDraftAfterIndex && _pendingChatContext != null)
+                {
+                    IsDraftIndexing               = false;
+                    _shouldGenerateDraftAfterIndex = false;
+                    DraftPreflightMessage         = string.Empty;
+                    var ctx = _pendingChatContext;
+                    // Fire-and-forget on the UI thread; GeneratePendingDraftAsync transitions
+                    // DraftPreflight to None and sets HasDetail=true when it completes.
+                    _ = GeneratePendingDraftAsync(ctx);
+                }
             }
-            else if (!IsProjectIndexed)
+            else if (status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase))
             {
-                // Indexing ran but project is still not Ready -- surface the failure.
-                IsDraftIndexing               = false;
-                _shouldGenerateDraftAfterIndex = false;
-                DraftPreflight                = DraftPreflightState.IndexFailed;
-                DraftPreflightMessage         =
-                    "Indexing did not complete. You can try again or continue without index.";
+                // Explicit failure captured from the status string.
+                FailIndexing(status.Substring(4).Trim());
             }
-            // else: IsProjectIndexed=true but no pending context -- fall through, nothing to do.
+            else if (status != "Indexing..." && status != "Needs Index" && status != "Checking...")
+            {
+                // Some other non-ready state that isn't a known progress state.
+                FailIndexing(string.Empty);
+            }
+            // else: status is "Indexing...", "Needs Index", etc. -- stay in Indexing state and wait.
+        }
+    }
+
+    private void FailIndexing(string? message)
+    {
+        IsDraftIndexing               = false;
+        _shouldGenerateDraftAfterIndex = false;
+        DraftPreflight                = DraftPreflightState.IndexFailed;
+        
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            DraftPreflightMessage = "Indexing did not complete. You can try again or continue without index.";
+        }
+        else
+        {
+            DraftPreflightMessage = $"Indexing failed: {message}. You can try again or continue without index.";
         }
     }
 
