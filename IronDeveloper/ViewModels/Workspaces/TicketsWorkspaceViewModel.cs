@@ -128,6 +128,16 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string     _draftStatusMessage = string.Empty;
     [ObservableProperty] private DraftTicket? _currentDraft;
 
+    // ── Draft Preflight state ─────────────────────────────────────────────────
+    /// <summary>
+    /// Tracks the preflight gate shown when the user clicks Ticket from Chat
+    /// but the project is not yet indexed. None = no preflight active.
+    /// </summary>
+    [ObservableProperty] private DraftPreflightState _draftPreflight = DraftPreflightState.None;
+
+    /// <summary>Pending context held while the user decides on the preflight choice.</summary>
+    private ChatTicketContext? _pendingChatContext;
+
     // ── Project index state ───────────────────────────────────────────────────
     /// <summary>
     /// True when the project code index is Ready. False means Needs Index / unknown.
@@ -518,11 +528,20 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     /// <summary>
     /// Called by ShellViewModel whenever ActiveStatus changes so the Tickets workspace
     /// stays in sync with the project’s index readiness without needing a service reference.
+    /// Also auto-advances the preflight gate: if indexing completes while a context is
+    /// pending (NeedsChoice), moves to ReadyToGenerate so the user sees a "Generate Draft" button.
     /// </summary>
     public void SetIndexStatus(string status)
     {
         IsProjectIndexed = status == "Ready";
         OnPropertyChanged(nameof(IsContextLimited));
+
+        // Advance preflight: if we were waiting for the user's index choice and the
+        // project just became Ready, move to ReadyToGenerate so the user can proceed.
+        if (IsProjectIndexed && DraftPreflight == DraftPreflightState.NeedsChoice)
+        {
+            DraftPreflight = DraftPreflightState.ReadyToGenerate;
+        }
     }
 
     [RelayCommand]
@@ -575,10 +594,27 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>
     /// Called by ShellViewModel when the user clicks Ticket in Chat.
-    /// Calls IDraftTicketService to generate a DraftTicket (stub in Phase 1-3,
-    /// real LLM in Phase 4), then loads it into the editor in draft mode.
+    /// If the project is indexed (Ready), generates the draft immediately.
+    /// If not indexed (Needs Index), stores the pending context and shows the
+    /// preflight choice panel (Index Project First / Continue Without Index / Cancel).
     /// </summary>
     public async Task BeginDraftFromChatAsync(ChatTicketContext ctx)
+    {
+        if (IsContextLimited)
+        {
+            // Project is not indexed — show preflight choice instead of generating.
+            _pendingChatContext = ctx;
+            DraftPreflight      = DraftPreflightState.NeedsChoice;
+            HasDetail           = false;   // don't show the editor yet
+            return;
+        }
+
+        // Project is indexed — proceed immediately.
+        await GeneratePendingDraftAsync(ctx);
+    }
+
+    /// <summary>Inner generation path — shared by BeginDraftFromChatAsync and PreflightContinue.</summary>
+    private async Task GeneratePendingDraftAsync(ChatTicketContext ctx)
     {
         IsDraftMode        = true;
         IsDraftGenerating  = true;
@@ -587,6 +623,10 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         IsEditing          = true;
         IsNewTicket        = true;
         ActiveTab          = TicketDetailTab.Overview;
+
+        // Clear any preflight state before generating
+        DraftPreflight      = DraftPreflightState.None;
+        _pendingChatContext  = null;
 
         try
         {
@@ -619,6 +659,54 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         {
             IsDraftGenerating = false;
         }
+    }
+
+    // ── Preflight commands ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Preflight: "Continue Without Index" — generate draft immediately with limited context.
+    /// </summary>
+    [RelayCommand]
+    private async Task PreflightContinueAsync()
+    {
+        if (_pendingChatContext == null) return;
+        var ctx = _pendingChatContext;
+        await GeneratePendingDraftAsync(ctx);
+    }
+
+    /// <summary>
+    /// Preflight: "Index Project First" — delegates to the existing OnRequestIndex callback
+    /// (same path as RequestIndex in Code Context tab). State advances to ReadyToGenerate
+    /// once SetIndexStatus("Ready") is called by ShellViewModel.
+    /// </summary>
+    [RelayCommand]
+    private void PreflightIndexProject()
+    {
+        OnRequestIndex?.Invoke();
+    }
+
+    /// <summary>
+    /// Preflight: "Generate Draft" — available after indexing completes while in ReadyToGenerate state.
+    /// </summary>
+    [RelayCommand]
+    private async Task PreflightGenerateAsync()
+    {
+        if (_pendingChatContext == null) return;
+        var ctx = _pendingChatContext;
+        await GeneratePendingDraftAsync(ctx);
+    }
+
+    /// <summary>
+    /// Preflight: "Cancel" — discard the pending chat context and return to normal state.
+    /// Invokes OnCancelDraft so the shell can navigate back to Chat.
+    /// </summary>
+    [RelayCommand]
+    private void PreflightCancel()
+    {
+        _pendingChatContext = null;
+        DraftPreflight      = DraftPreflightState.None;
+        HasDetail           = false;
+        OnCancelDraft?.Invoke();
     }
 
     /// <summary>Saves the draft ticket, exits draft mode, and selects the new ticket in the list.</summary>

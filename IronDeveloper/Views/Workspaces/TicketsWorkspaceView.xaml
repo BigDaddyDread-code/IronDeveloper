@@ -86,12 +86,117 @@
                     Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
                     CornerRadius="10" Padding="0">
-
-                <!-- Empty state: no ticket selected -->
                 <Grid>
                     <controls:EmptyResultsState Title="No Ticket Selected" 
-                                               Description="Select a ticket from the list or create a new one with IronDev Architect to begin."
-                                               Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                               Description="Select a ticket from the list or create a new one with IronDev Architect to begin.">
+                        <controls:EmptyResultsState.Style>
+                            <Style TargetType="controls:EmptyResultsState">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding HasDetail}" Value="False"/>
+                                            <Condition Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=None}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </controls:EmptyResultsState.Style>
+                    </controls:EmptyResultsState>
+
+                    <!-- ══ PREFLIGHT: Index Choice Panel ══ -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=NeedsChoice}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <controls:SurfacePanel Variant="Subtle" Padding="40" Margin="48"
+                                               VerticalAlignment="Center" HorizontalAlignment="Center"
+                                               MaxWidth="520">
+                            <StackPanel>
+                                <TextBlock Text="⚠ Project Not Indexed"
+                                           FontSize="16" FontWeight="SemiBold"
+                                           Foreground="#F59E0B"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="13"
+                                           Foreground="{StaticResource Text/Secondary}"
+                                           Margin="0,0,0,20">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text"
+                                                    Value="This project is not indexed. AI context may be incomplete, reducing draft quality.&#x0a;&#x0a;What would you like to do?"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
+                                                    <Setter Property="Text"
+                                                            Value="✓ Project indexed successfully. The draft will now use full code context."/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <StackPanel Orientation="Vertical" Margin="0,0,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <Button Content="🗂 Index Project First"
+                                            Command="{Binding PreflightIndexProjectCommand}"
+                                            Style="{StaticResource AppButton.Primary}"
+                                            Padding="20,10" Margin="0,0,0,8"
+                                            HorizontalAlignment="Stretch"
+                                            ToolTip="Run the local code indexer, then generate the draft with full context"/>
+                                    <Button Content="⚡ Continue Without Index"
+                                            Command="{Binding PreflightContinueCommand}"
+                                            Style="{StaticResource AppButton.Secondary}"
+                                            Padding="20,10" Margin="0,0,0,8"
+                                            HorizontalAlignment="Stretch"
+                                            ToolTip="Generate draft now using limited context (no code snippets)"/>
+                                    <Button Content="✕ Cancel"
+                                            Command="{Binding PreflightCancelCommand}"
+                                            Style="{StaticResource AppButton.Ghost}"
+                                            Padding="20,8"
+                                            HorizontalAlignment="Stretch"
+                                            ToolTip="Discard and return to Chat"/>
+                                </StackPanel>
+
+                                <Button Content="✓ Generate Draft"
+                                        Command="{Binding PreflightGenerateCommand}"
+                                        Padding="20,10"
+                                        HorizontalAlignment="Stretch"
+                                        ToolTip="Generate the draft ticket with indexed code context">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource AppButton.Primary}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ReadyToGenerate}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                        </controls:SurfacePanel>
+                    </Grid>
 
                     <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid.RowDefinitions>

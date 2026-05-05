@@ -98,22 +98,31 @@ public class IndexAwarenessTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // Test 4: Draft mode — DraftStatusMessage contains warning when not indexed
+    // Test 4: Not indexed → preflight gate shown, draft NOT generated
+    // (New behaviour: preflight gate replaces immediate draft generation)
     // ════════════════════════════════════════════════════════════════════════
 
     [TestMethod]
-    [Description("When project is not indexed, BeginDraftFromChatAsync prepends a context-limited warning to DraftStatusMessage.")]
-    public async Task BeginDraftFromChatAsync_NotIndexed_DraftStatusMessageContainsWarning()
+    [Description("When project is not indexed, BeginDraftFromChatAsync shows the preflight gate (DraftPreflight=NeedsChoice) and does NOT generate a draft immediately.")]
+    public async Task BeginDraftFromChatAsync_NotIndexed_ShowsPreflightGateInsteadOfGenerating()
     {
         var vm = CreateVm();
         vm.SetIndexStatus("Needs Index");   // mark as not indexed BEFORE starting draft
 
         await vm.BeginDraftFromChatAsync(MakeContext());
 
-        Assert.IsFalse(string.IsNullOrWhiteSpace(vm.DraftStatusMessage),
-            "DraftStatusMessage must not be empty after draft generation.");
+        // New contract: preflight gate is active, draft not yet generated
+        Assert.AreEqual(DraftPreflightState.NeedsChoice, vm.DraftPreflight,
+            "DraftPreflight must be NeedsChoice when project is not indexed.");
+        Assert.IsFalse(vm.IsDraftMode,
+            "IsDraftMode must NOT be true — draft is gated behind the preflight choice.");
+        Assert.IsNull(vm.CurrentDraft,
+            "CurrentDraft must be null — draft has not been generated yet.");
+
+        // After continuing without index, the warning does appear in DraftStatusMessage
+        await vm.PreflightContinueCommand.ExecuteAsync(null);
         StringAssert.Contains(vm.DraftStatusMessage, "not indexed",
-            "DraftStatusMessage must contain 'not indexed' warning when project index is missing.");
+            "DraftStatusMessage must contain 'not indexed' after user chooses Continue Without Index.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
