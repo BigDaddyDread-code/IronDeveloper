@@ -55,6 +55,7 @@ public abstract class IntegrationTestBase
 
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
+        services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
         services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
@@ -73,6 +74,7 @@ public abstract class IntegrationTestBase
 
         // Delete in correct FK order: children before parents.
         var sql = """
+            IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
@@ -280,6 +282,25 @@ public abstract class IntegrationTestBase
                     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_CodeIndexEntries_CreatedDate DEFAULT SYSUTCDATETIME(),
                     CONSTRAINT FK_CodeIndexEntries_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
                     CONSTRAINT FK_CodeIndexEntries_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            -- Ensure ChatMessageFeedback table exists
+            IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatMessageFeedback
+                (
+                    Id             BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId       INT NOT NULL,
+                    ProjectId      INT NOT NULL,
+                    ChatSessionId  BIGINT NULL,
+                    ChatMessageId  BIGINT NULL,
+                    Rating         NVARCHAR(50) NOT NULL,
+                    Reason         NVARCHAR(200) NULL,
+                    Comment        NVARCHAR(MAX) NULL,
+                    CreatedDate    DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_ChatMessageFeedback_Tenants   FOREIGN KEY (TenantId)  REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ChatMessageFeedback_Projects  FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
                 );
             END
             """;

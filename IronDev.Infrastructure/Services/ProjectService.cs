@@ -63,7 +63,8 @@ public sealed class ProjectService : IProjectService
     public async Task<Project?> GetByIdAsync(int projectId, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate
+            SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate,
+                   LastIndexedUtc, IndexingStatus
             FROM dbo.Projects
             WHERE Id = @ProjectId
               AND TenantId = @TenantId;

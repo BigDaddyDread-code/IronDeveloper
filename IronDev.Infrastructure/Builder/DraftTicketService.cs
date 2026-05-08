@@ -14,15 +14,31 @@ using IronDev.Services;
 namespace IronDev.Infrastructure.Builder;
 
 /// <summary>
+/// Assembles a rich ProjectContext from memory, decisions, and index data
+/// before asking the LLM to produce a structured IronDev ticket.
+/// </summary>
+internal sealed record ProjectContext
+{
+    public string CodeStandards               { get; init; } = string.Empty;
+    public string RecentDecisions             { get; init; } = string.Empty;
+    public string RelevantImplementationPlans { get; init; } = string.Empty;
+    public string CodeIndexSummary            { get; init; } = string.Empty;
+    public string RelevantFiles               { get; init; } = string.Empty;
+    public string RelevantSymbols             { get; init; } = string.Empty;
+    public string ProjectIndexStatus          { get; init; } = string.Empty;
+    public string ContextQuality              { get; init; } = "Missing";
+}
+
+/// <summary>
 /// Phase 4 implementation of IDraftTicketService.
-/// 
-/// Uses ILLMService to generate structured ticket drafts and test plans
-/// based on chat context.
+///
+/// Assembles rich ProjectContext (decisions, summaries, code index) and uses
+/// ILLMService to generate IronDev-specific structured ticket drafts.
 /// </summary>
 public sealed class DraftTicketService : IDraftTicketService
 {
-    private readonly ILLMService            _llm;
-    private readonly IProjectMemoryService  _memory;
+    private readonly ILLMService           _llm;
+    private readonly IProjectMemoryService _memory;
 
     public DraftTicketService(ILLMService llm, IProjectMemoryService memory)
     {
@@ -39,27 +55,48 @@ public sealed class DraftTicketService : IDraftTicketService
         string? linkedSymbols,
         CancellationToken ct = default)
     {
-        // Fetch project context to ground the prompt in real architectural memory
-        var decisions  = await _memory.GetRecentDecisionsAsync(projectId, 8, ct);
-        var summary    = await _memory.GetLatestSummaryAsync(projectId, ct);
+        // ── Build ProjectContext ──────────────────────────────────────────────
+        var decisions = await _memory.GetRecentDecisionsAsync(projectId, 8, ct);
+        var summary   = await _memory.GetLatestSummaryAsync(projectId, ct);
 
-        var recentDecisions  = decisions.Count > 0
+        var recentDecisions = decisions.Count > 0
             ? string.Join("\n", decisions.Select(d => $"- {d.Title}: {d.Detail}"))
             : "No decisions recorded yet.";
 
-        var codeIndexSummary = summary?.Summary ?? "No codebase summary available yet.";
+        var codeIndexSummary = summary?.Summary ?? string.Empty;
+        var hasIndex         = !string.IsNullOrWhiteSpace(codeIndexSummary);
 
-        // Chat history includes the proposed title + message text
+        // Derive relevant files/symbols from linkedFilePaths and linkedSymbols
+        // (provided by the Chat grounding pipeline via ChatTicketContext)
+        var relevantFiles = !string.IsNullOrWhiteSpace(linkedFilePaths)
+            ? string.Join("\n", linkedFilePaths.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(f => $"- {f.Trim()}"))
+            : "(no indexed file context available)";
+        var relevantSymbols = !string.IsNullOrWhiteSpace(linkedSymbols)
+            ? string.Join("\n", linkedSymbols.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => $"- {s.Trim()}"))
+            : "(no indexed symbol context available)";
+
+        var contextQuality = hasIndex && !string.IsNullOrWhiteSpace(linkedFilePaths)
+            ? "Indexed"
+            : hasIndex ? "Limited" : "Missing";
+
+        var context = new ProjectContext
+        {
+            CodeStandards               = "C# 12 / .NET 10 / WPF MVVM. Dapper for SQL. No EF Core. No Weaviate. Tenant-scoped data access.",
+            RecentDecisions             = recentDecisions,
+            RelevantImplementationPlans = "(not loaded in this context)",
+            CodeIndexSummary            = hasIndex ? codeIndexSummary : "Project has not been indexed yet.",
+            RelevantFiles               = relevantFiles,
+            RelevantSymbols             = relevantSymbols,
+            ProjectIndexStatus          = hasIndex ? "Ready" : "Not Indexed",
+            ContextQuality              = contextQuality,
+        };
+
+        // ── Build Chat History ───────────────────────────────────────────────
         var chatHistory = string.IsNullOrWhiteSpace(proposedTitle)
             ? messageText
             : $"Proposed title: {proposedTitle}\n\n{messageText}";
 
-        if (!string.IsNullOrWhiteSpace(linkedFilePaths))
-            chatHistory += $"\n\nLinked files: {linkedFilePaths}";
-        if (!string.IsNullOrWhiteSpace(linkedSymbols))
-            chatHistory += $"\nLinked symbols: {linkedSymbols}";
-
-        var prompt = BuildDraftPrompt(projectName, chatHistory, recentDecisions, codeIndexSummary);
+        var prompt = BuildDraftPrompt(projectName, chatHistory, context);
 
         string rawJson;
         try
@@ -72,12 +109,14 @@ public sealed class DraftTicketService : IDraftTicketService
         }
 
         var draft = ParseDraft(rawJson);
-        
+
         // Enrich with context-specific data not derived from LLM
         draft.LinkedFilePaths = linkedFilePaths;
         draft.LinkedSymbols   = linkedSymbols;
-        draft.IsGenerated    = true;
-        draft.GenerationNote = "Generated by AI.";
+        draft.IsGenerated     = true;
+        draft.GenerationNote  = contextQuality == "Missing"
+            ? "⚠️ Generated without indexed context. File/class names may not be accurate."
+            : "Generated by AI.";
 
         return draft;
     }
@@ -100,7 +139,7 @@ public sealed class DraftTicketService : IDraftTicketService
         }
 
         var testPlan = ParseTestPlan(rawJson);
-        
+
         return new DraftTicket
         {
             SourceChatSessionId = current.SourceChatSessionId,
@@ -116,11 +155,11 @@ public sealed class DraftTicketService : IDraftTicketService
             LinkedFilePaths     = current.LinkedFilePaths,
             LinkedSymbols       = current.LinkedSymbols,
 
-            UnitTests        = testPlan.UnitTests ?? string.Empty,
+            UnitTests        = testPlan.UnitTests        ?? string.Empty,
             IntegrationTests = testPlan.IntegrationTests ?? string.Empty,
-            ManualTests      = testPlan.ManualTests ?? string.Empty,
-            RegressionTests  = testPlan.RegressionTests ?? string.Empty,
-            BuildValidation  = testPlan.BuildValidation ?? string.Empty,
+            ManualTests      = testPlan.ManualTests      ?? string.Empty,
+            RegressionTests  = testPlan.RegressionTests  ?? string.Empty,
+            BuildValidation  = testPlan.BuildValidation  ?? string.Empty,
 
             IsGenerated    = true,
             GenerationNote = "Tests regenerated by AI."
@@ -129,52 +168,106 @@ public sealed class DraftTicketService : IDraftTicketService
 
     // ── Prompt Building ──────────────────────────────────────────────────────
 
-    private static string BuildDraftPrompt(
+    internal static string BuildDraftPrompt(
         string projectName,
         string chatHistory,
-        string recentDecisions,
-        string codeIndexSummary)
+        ProjectContext context)
     {
         return $$"""
-You are IronDev — a senior .NET architect and persistent teammate for this exact project.
+You are IronDev Architect — a senior .NET/WPF architect and persistent teammate for this exact project.
 
-Project: {{projectName}}
+Project:
+{{projectName}} — a persistent AI development cockpit for chat, project memory, structured tickets,
+decisions, implementation plans, local code indexing, and safe build proposals.
 
-Recent decisions & memory:
-{{recentDecisions}}
+You are NOT a generic coding assistant.
+You are working inside this specific {{projectName}} codebase.
+
+Current standards and rules:
+{{context.CodeStandards}}
+
+Recent decisions and project memory:
+{{context.RecentDecisions}}
+
+Relevant implementation plans, if any:
+{{context.RelevantImplementationPlans}}
 
 Indexed codebase summary:
-{{codeIndexSummary}}
+{{context.CodeIndexSummary}}
+
+Relevant files from the local code index:
+{{context.RelevantFiles}}
+
+Relevant symbols/classes from the local code index:
+{{context.RelevantSymbols}}
+
+Project index status:
+{{context.ProjectIndexStatus}}
+
+Context quality:
+{{context.ContextQuality}}
 
 Chat history that triggered this ticket:
 {{chatHistory}}
 
 Task:
-Turn the above chat into a **high-quality, actionable ticket**.
+Turn the above chat into one high-quality, actionable {{projectName}} ticket.
 
-Requirements for every ticket you create:
-- Title must be specific and actionable
-- Description must reference real files/classes from the indexed codebase when relevant
-- Acceptance criteria must be concrete and testable
-- Suggest exact files that will be affected or need changing
-- Never give generic advice — always tie it back to {{projectName}}'s actual architecture
+Critical rules:
+- Never give generic advice.
+- Always tie the ticket back to {{projectName}}'s actual architecture.
+- Use real files/classes from the indexed codebase when available.
+- Do not invent file names, class names, service names, or database tables.
+- Do not assume DraftTicket is the saved ticket model. DraftTicket is only for Chat → Draft Ticket review.
+  For saved ticket management, prefer ProjectTicket, TicketsWorkspaceViewModel, and TicketService when available.
+- If indexed context is missing or limited, say so clearly in contextWarning. Do not pretend to have file-level context.
+- Keep the ticket small enough for one feature branch.
+- The ticket must be suitable for the Build This workflow.
+- Include tests/validation expectations.
+- Do not include Weaviate as a required dependency.
 
-Return ONLY a clean JSON object. No prose. No markdown fences.
+Requirements for the ticket:
+- Title must be specific and actionable.
+- Summary must describe the problem clearly in one line.
+- Requirements must describe what the solution must do.
+- Acceptance criteria must be concrete and testable.
+- Implementation notes must reference real files/classes where relevant.
+- Affected files must use actual paths from the indexed context when available.
+- Linked symbols must use actual symbols/classes from the indexed context when available.
+- Test plan must include unit, integration, UI/manual, regression, and build validation.
+- Include risks and non-goals.
+
+Return ONLY a valid JSON object.
+No markdown fences.
+No commentary before or after the JSON.
 
 {
   "title": "...",
-  "summary": "One-line executive summary",
-  "description": "Full background and technical context referencing real files/classes",
-  "acceptanceCriteria": ["...", "..."],
+  "summary": "...",
+  "requirements": ["..."],
+  "acceptanceCriteria": ["..."],
+  "implementationNotes": "...",
+  "affectedFiles": ["path/to/real/file.cs"],
+  "linkedSymbols": ["RealClassName"],
+  "testPlan": {
+    "unitTests": ["..."],
+    "integrationTests": ["..."],
+    "manualTests": ["..."],
+    "regressionTests": ["..."],
+    "buildValidation": [
+      "dotnet build IronDev.slnx",
+      "dotnet test IronDev.IntegrationTests/IronDev.IntegrationTests.csproj --settings IronDev.IntegrationTests/integration.runsettings"
+    ]
+  },
   "type": "Feature|TechDebt|Bug|Improvement",
   "priority": "High|Medium|Low",
-  "affectedFiles": ["path/to/file1.cs", "path/to/file2.cs"],
-  "unitTests": "Suggested unit tests",
-  "integrationTests": "Suggested integration tests",
-  "manualTests": "How to verify manually",
-  "regressionTests": "What to check for regressions",
-  "buildValidation": "dotnet build IronDev.slnx"
+  "risks": ["..."],
+  "nonGoals": ["..."],
+  "contextQuality": "Indexed|Limited|Missing",
+  "contextWarning": ""
 }
+
+Be concise, professional, and extremely specific to this {{projectName}} codebase.
 """;
     }
 
@@ -197,7 +290,7 @@ Return ONLY a clean JSON object. No prose. No markdown fences.
               "integrationTests": "Markdown list",
               "manualTests": "Steps to verify",
               "regressionTests": "Potential impact areas",
-              "buildValidation": "Build command"
+              "buildValidation": "dotnet build IronDev.slnx"
             }
             """);
         return sb.ToString();
@@ -210,20 +303,34 @@ Return ONLY a clean JSON object. No prose. No markdown fences.
         var dto = JsonSerializer.Deserialize<DraftTicketJson>(StripFences(json), JsonOptions)
                   ?? throw new InvalidOperationException("Failed to parse ticket JSON.");
 
-        // acceptanceCriteria can be a JSON array or a plain string
+        // acceptanceCriteria — accept array (new) or plain string (legacy)
         var criteria = dto.AcceptanceCriteriaArray is { Count: > 0 }
             ? string.Join("\n", dto.AcceptanceCriteriaArray.Select(c => $"- {c}"))
             : dto.AcceptanceCriteria ?? string.Empty;
 
-        // description maps to Background; fall back to Background if description absent
-        var background = dto.Description ?? dto.Background ?? string.Empty;
+        // requirements → Background; fall back to description/background legacy fields
+        var background = dto.Requirements is { Count: > 0 }
+            ? string.Join("\n", dto.Requirements.Select(r => $"- {r}"))
+            : dto.Description ?? dto.Background ?? string.Empty;
 
-        // Append affected files to Background (the context/requirements field)
+        // Append affected files to Background
         if (dto.AffectedFiles is { Count: > 0 })
         {
             var fileList = "\n\n**Affected files:**\n" + string.Join("\n", dto.AffectedFiles.Select(f => $"- {f}"));
             background += fileList;
         }
+
+        // Implementation notes + optional context warning
+        var technicalNotes = dto.ImplementationNotes ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(dto.ContextWarning))
+            technicalNotes = $"⚠️ {dto.ContextWarning}\n\n{technicalNotes}".TrimEnd();
+
+        // Flatten testPlan from new schema; fall back to flat legacy fields
+        var unitTests        = dto.TestPlan?.UnitTestsList        is { Count: > 0 } ? string.Join("\n", dto.TestPlan.UnitTestsList.Select(t        => $"- {t}")) : dto.UnitTests        ?? string.Empty;
+        var integrationTests = dto.TestPlan?.IntegrationTestsList is { Count: > 0 } ? string.Join("\n", dto.TestPlan.IntegrationTestsList.Select(t => $"- {t}")) : dto.IntegrationTests ?? string.Empty;
+        var manualTests      = dto.TestPlan?.ManualTestsList      is { Count: > 0 } ? string.Join("\n", dto.TestPlan.ManualTestsList.Select(t      => $"- {t}")) : dto.ManualTests      ?? string.Empty;
+        var regressionTests  = dto.TestPlan?.RegressionTestsList  is { Count: > 0 } ? string.Join("\n", dto.TestPlan.RegressionTestsList.Select(t  => $"- {t}")) : dto.RegressionTests  ?? string.Empty;
+        var buildValidation  = dto.TestPlan?.BuildValidationList  is { Count: > 0 } ? string.Join("\n", dto.TestPlan.BuildValidationList)                         : dto.BuildValidation  ?? "dotnet build IronDev.slnx";
 
         return new DraftTicket
         {
@@ -231,11 +338,11 @@ Return ONLY a clean JSON object. No prose. No markdown fences.
             Summary            = dto.Summary            ?? string.Empty,
             Background         = background,
             AcceptanceCriteria = criteria,
-            UnitTests          = dto.UnitTests          ?? string.Empty,
-            IntegrationTests   = dto.IntegrationTests   ?? string.Empty,
-            ManualTests        = dto.ManualTests        ?? string.Empty,
-            RegressionTests    = dto.RegressionTests    ?? string.Empty,
-            BuildValidation    = dto.BuildValidation    ?? "dotnet build IronDev.slnx"
+            UnitTests          = unitTests,
+            IntegrationTests   = integrationTests,
+            ManualTests        = manualTests,
+            RegressionTests    = regressionTests,
+            BuildValidation    = buildValidation,
         };
     }
 
@@ -251,7 +358,7 @@ Return ONLY a clean JSON object. No prose. No markdown fences.
         if (text.StartsWith("```"))
         {
             var start = text.IndexOf('\n');
-            var end = text.LastIndexOf("```");
+            var end   = text.LastIndexOf("```");
             if (start != -1 && end != -1 && end > start)
                 return text.Substring(start + 1, end - start - 1).Trim();
         }
@@ -262,33 +369,57 @@ Return ONLY a clean JSON object. No prose. No markdown fences.
 
     private sealed class DraftTicketJson
     {
-        public string?       Title { get; set; }
-        public string?       Summary { get; set; }
-        /// <summary>Maps to Background. The new prompt uses 'description' for this field.</summary>
-        public string?       Description { get; set; }
-        public string?       Background { get; set; }
-        /// <summary>Accepts the old string form (joined with newlines on parse).</summary>
-        public string?       AcceptanceCriteria { get; set; }
-        /// <summary>Accepts the new array form from the upgraded prompt schema.</summary>
+        public string?       Title               { get; set; }
+        public string?       Summary             { get; set; }
+        // New schema fields
+        [JsonPropertyName("requirements")]
+        public List<string>? Requirements        { get; set; }
+        public string?       ImplementationNotes { get; set; }
+        public string?       ContextQuality      { get; set; }
+        public string?       ContextWarning      { get; set; }
+        // Legacy fallback fields
+        public string?       Description         { get; set; }
+        public string?       Background          { get; set; }
+        public string?       AcceptanceCriteria  { get; set; }
         [JsonPropertyName("acceptanceCriteria")]
         public List<string>? AcceptanceCriteriaArray { get; set; }
-        public string?       Type { get; set; }
-        public string?       Priority { get; set; }
+        public string?       Type                { get; set; }
+        public string?       Priority            { get; set; }
         [JsonPropertyName("affectedFiles")]
-        public List<string>? AffectedFiles { get; set; }
-        public string?       UnitTests { get; set; }
-        public string?       IntegrationTests { get; set; }
-        public string?       ManualTests { get; set; }
-        public string?       RegressionTests { get; set; }
-        public string?       BuildValidation { get; set; }
+        public List<string>? AffectedFiles       { get; set; }
+        [JsonPropertyName("linkedSymbols")]
+        public List<string>? LinkedSymbols       { get; set; }
+        // New structured testPlan (replaces flat fields)
+        [JsonPropertyName("testPlan")]
+        public TestPlanJsonNested? TestPlan      { get; set; }
+        // Legacy flat test fields (kept for backward compat with old LLM responses)
+        public string?       UnitTests           { get; set; }
+        public string?       IntegrationTests    { get; set; }
+        public string?       ManualTests         { get; set; }
+        public string?       RegressionTests     { get; set; }
+        public string?       BuildValidation     { get; set; }
+    }
+
+    private sealed class TestPlanJsonNested
+    {
+        [JsonPropertyName("unitTests")]
+        public List<string>? UnitTestsList        { get; set; }
+        [JsonPropertyName("integrationTests")]
+        public List<string>? IntegrationTestsList { get; set; }
+        [JsonPropertyName("manualTests")]
+        public List<string>? ManualTestsList      { get; set; }
+        [JsonPropertyName("regressionTests")]
+        public List<string>? RegressionTestsList  { get; set; }
+        [JsonPropertyName("buildValidation")]
+        public List<string>? BuildValidationList  { get; set; }
     }
 
     private sealed class TestPlanJson
     {
-        public string? UnitTests { get; set; }
+        public string? UnitTests        { get; set; }
         public string? IntegrationTests { get; set; }
-        public string? ManualTests { get; set; }
-        public string? RegressionTests { get; set; }
-        public string? BuildValidation { get; set; }
+        public string? ManualTests      { get; set; }
+        public string? RegressionTests  { get; set; }
+        public string? BuildValidation  { get; set; }
     }
 }

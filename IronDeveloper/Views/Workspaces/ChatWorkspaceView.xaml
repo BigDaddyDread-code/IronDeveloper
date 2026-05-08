@@ -433,7 +433,167 @@
                                                 Style="{StaticResource AppButton.Ghost}"
                                                 Height="22" Padding="9,0" FontSize="10"
                                                 ToolTip="Copy to clipboard"/>
+
+                                        <!-- Separator -->
+                                        <TextBlock Text="|" Foreground="{StaticResource Border/Subtle}"
+                                                   VerticalAlignment="Center" Margin="4,0" FontSize="11" Opacity="0.5">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!-- 👍 Useful button -->
+                                        <Button Height="22" Padding="7,0" FontSize="10" Margin="0,0,2,0"
+                                                Command="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="Useful"
+                                                ToolTip="This was useful">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource AppButton.Ghost}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <TextBlock Text="👍" FontSize="11"/>
+                                        </Button>
+
+                                        <!-- 👎 Weak button -->
+                                        <Button Height="22" Padding="7,0" FontSize="10" Margin="0,0,3,0"
+                                                Command="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="Weak"
+                                                ToolTip="This needs improvement">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource AppButton.Ghost}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <TextBlock Text="👎" FontSize="11"/>
+                                        </Button>
+
+                                        <!-- "Feedback saved" confirmation -->
+                                        <TextBlock Text="✓ Feedback saved" FontSize="10"
+                                                   Foreground="{StaticResource Text/Muted}" Opacity="0.7"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </WrapPanel>
+
+                                    <!-- Reason picker — shown when AwaitingReason is true -->
+                                    <Border Margin="38,4,0,0" Padding="8,5"
+                                            Background="{StaticResource Background/Surface}"
+                                            BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                                            CornerRadius="5">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AwaitingReason}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <TextBlock Text="Why?" FontSize="10" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource Text/Muted}" Margin="0,0,0,4"/>
+                                            <WrapPanel>
+                                                <!-- Useful reasons -->
+                                                <WrapPanel>
+                                                    <WrapPanel.Style>
+                                                        <Style TargetType="WrapPanel">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding FeedbackRating}" Value="Useful">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </WrapPanel.Style>
+                                                    <Button Content="Good file grounding" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Useful|Good file grounding"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Clear answer" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Useful|Clear answer"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Good ticket detail" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Useful|Good ticket detail"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Good implementation guidance" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Useful|Good implementation guidance"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Other" Height="20" Padding="7,0" FontSize="10" Margin="0,0,0,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Useful|Other"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                </WrapPanel>
+                                                <!-- Weak reasons -->
+                                                <WrapPanel>
+                                                    <WrapPanel.Style>
+                                                        <Style TargetType="WrapPanel">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding FeedbackRating}" Value="Weak">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </WrapPanel.Style>
+                                                    <Button Content="Too generic" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Weak|Too generic"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Wrong files/classes" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Weak|Wrong files/classes"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Missed project context" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Weak|Missed project context"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Too verbose" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Weak|Too verbose"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Not actionable" Height="20" Padding="7,0" FontSize="10" Margin="0,0,3,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Weak|Not actionable"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                    <Button Content="Other" Height="20" Padding="7,0" FontSize="10" Margin="0,0,0,3"
+                                                            Command="{Binding DataContext.SubmitFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="Weak|Other"
+                                                            Style="{StaticResource AppButton.Ghost}"/>
+                                                </WrapPanel>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

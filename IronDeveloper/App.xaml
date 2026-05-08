@@ -77,6 +77,10 @@
                 <vws:SettingsWorkspaceView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type ws:PromptPlaygroundViewModel}">
+                <vws:PromptPlaygroundView/>
+            </DataTemplate>
+
             <cvt:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
             <!-- Strips markdown from Summary for compact list row previews -->
             <cvt:MarkdownPreviewConverter x:Key="MarkdownPreviewConverter"/>
