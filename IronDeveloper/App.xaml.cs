@@ -75,7 +75,11 @@ public partial class App : Application
                 services.AddTransient<TicketsWorkspaceViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();
-                services.AddSingleton<PromptPlaygroundViewModel>();
+                services.AddSingleton<PromptPlaygroundViewModel>(sp =>
+                    new PromptPlaygroundViewModel(
+                        sp.GetRequiredService<global::IronDev.AI.IPromptContextBuilder>(),
+                        sp.GetRequiredService<global::IronDev.Services.IProjectService>(),
+                        sp.GetRequiredService<global::IronDev.Core.ILLMService>()));
                 services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
                 {
                     // Deferred: PromptPlaygroundViewModel (and its DB deps) are only

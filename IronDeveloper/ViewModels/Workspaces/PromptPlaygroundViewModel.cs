@@ -8,6 +8,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.AI;
+using IronDev.Core;
 using IronDev.Services;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -84,6 +85,7 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 {
     private readonly IPromptContextBuilder _builder;
     private readonly IProjectService        _projectService;
+    private readonly ILLMService            _llmService;
 
     // ── Observable Properties ─────────────────────────────────────────────
 
@@ -109,8 +111,17 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     [ObservableProperty] private string _expandedQueries    = string.Empty;
     [ObservableProperty] private string _promptText         = string.Empty;
     [ObservableProperty] private string _errorMessage       = string.Empty;
-    [ObservableProperty] private string _resultStatus       = string.Empty; // PASS / WARNING / FAIL / —
+    [ObservableProperty] private string _resultStatus       = "—"; // ✅ PASS / ⚠️ WARNING / ❌ FAIL / —
     [ObservableProperty] private bool   _isBuilding         = false;
+
+    // ── Run Grounding Test results ────────────────────────────────────────
+    [ObservableProperty] private bool   _isRunningTest         = false;
+    [ObservableProperty] private string _runStatusMessage      = string.Empty;
+    [ObservableProperty] private string _aiResponse            = string.Empty;
+    [ObservableProperty] private string _mustMentionStatus     = "—";
+    [ObservableProperty] private string _mustNotMentionStatus  = "—";
+    [ObservableProperty] private string _expectedFilesStatus   = "—";
+    [ObservableProperty] private string _providerInfo          = string.Empty;
 
     public ObservableCollection<RetrievedContextItem> RetrievedItems { get; } = new();
     public IReadOnlyList<GroundingTestCase>            TestCases      { get; } = BuildTestCases();
@@ -119,10 +130,12 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 
     public PromptPlaygroundViewModel(
         IPromptContextBuilder builder,
-        IProjectService        projectService)
+        IProjectService        projectService,
+        ILLMService            llmService)
     {
         _builder        = builder;
         _projectService = projectService;
+        _llmService     = llmService;
     }
 
     // ── Commands ──────────────────────────────────────────────────────────
@@ -262,6 +275,93 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         }
     }
 
+    // ── Run Grounding Test ────────────────────────────────────────────────
+
+    [RelayCommand(CanExecute = nameof(CanRunGroundingTest))]
+    private async Task RunGroundingTestAsync(CancellationToken ct)
+    {
+        // Ensure we have a prompt first
+        if (string.IsNullOrWhiteSpace(PromptText))
+            await BuildPromptAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(PromptText))
+        {
+            ErrorMessage = "Build Prompt failed — cannot run test.";
+            return;
+        }
+
+        IsRunningTest    = true;
+        RunStatusMessage = "Running grounding test…";
+        AiResponse       = string.Empty;
+        MustMentionStatus    = "—";
+        MustNotMentionStatus = "—";
+        ExpectedFilesStatus  = "—";
+        ErrorMessage     = string.Empty;
+
+        try
+        {
+            // Identify provider for display
+            ProviderInfo = _llmService.GetType().Name.Replace("LlmService", string.Empty);
+
+            var response = await _llmService.GetResponseAsync(PromptText, ct);
+            AiResponse = response ?? string.Empty;
+
+            // Evaluate response against selected test case
+            if (SelectedTestCase is not null && !string.IsNullOrWhiteSpace(AiResponse))
+            {
+                var responseLower = AiResponse.ToLowerInvariant();
+
+                // Expected files/classes check
+                var fileTerms   = SplitTerms(SelectedTestCase.MustIncludeAny);
+                var filesFound  = fileTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
+                ExpectedFilesStatus = filesFound ? "✅ Found" : "⚠️ Not found";
+
+                // Must mention check
+                var mustTerms   = SplitTerms(SelectedTestCase.MustMention);
+                var mustFound   = mustTerms.Length == 0 || mustTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
+                MustMentionStatus = mustTerms.Length == 0 ? "—" : (mustFound ? "✅ Found" : "❌ Missing");
+
+                // Must NOT mention check
+                var mustNotTerms  = SplitTerms(SelectedTestCase.MustNotMention);
+                var violated      = mustNotTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
+                MustNotMentionStatus = mustNotTerms.Length == 0 ? "—" : (violated ? "❌ Violation" : "✅ Clean");
+
+                // Re-evaluate overall result including AI response
+                var intentOk = string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase);
+                if (!intentOk || violated)
+                    ResultStatus = "❌ FAIL";
+                else if (!filesFound || !mustFound)
+                    ResultStatus = "⚠️ WARNING — response weak";
+                else
+                    ResultStatus = "✅ PASS";
+            }
+
+            RunStatusMessage = string.Empty;
+        }
+        catch (OperationCanceledException)
+        {
+            RunStatusMessage = "Cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage     = $"Run test error ({ProviderInfo}): {ex.Message}";
+            RunStatusMessage = string.Empty;
+
+            // Diagnosis hints
+            var msg = ex.Message.ToLowerInvariant();
+            if (msg.Contains("api key") || msg.Contains("unauthorized") || msg.Contains("401"))
+                ErrorMessage += "\nHint: Check your API key in appsettings.json or OPENAI_API_KEY env variable.";
+            else if (msg.Contains("connection") || msg.Contains("refused") || msg.Contains("timeout"))
+                ErrorMessage += "\nHint: Local LLM endpoint may be unreachable. Check appsettings.json Ai:BaseUrl.";
+        }
+        finally
+        {
+            IsRunningTest = false;
+        }
+    }
+
+    private bool CanRunGroundingTest() => !IsRunningTest && !IsBuilding;
+
     [RelayCommand]
     private void CopyPrompt()
     {
@@ -287,6 +387,12 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         PromptText           = string.Empty;
         ErrorMessage         = string.Empty;
         ResultStatus         = "—";
+        AiResponse           = string.Empty;
+        RunStatusMessage     = string.Empty;
+        MustMentionStatus    = "—";
+        MustNotMentionStatus = "—";
+        ExpectedFilesStatus  = "—";
+        ProviderInfo         = string.Empty;
         RetrievedItems.Clear();
     }
 

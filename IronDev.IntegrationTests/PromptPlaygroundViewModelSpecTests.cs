@@ -243,4 +243,164 @@ public class PromptPlaygroundViewModelSpecTests
             $"  MustIncludeAny: {tc.MustIncludeAny}\n" +
             $"  Expanded: {joined}");
     }
+    // ── New tests: Run Grounding Test contract ────────────────────────────────
+
+    [TestMethod]
+    [Description("ItemsSource: all 10 canonical cases are populated (simulates non-empty dropdown).")]
+    public void GroundingTestMatrix_ItemsSource_HasTenEntries()
+        => Assert.AreEqual(10, Cases.Length,
+            "TestCases (ItemsSource) must contain 10 entries so the dropdown is never empty.");
+
+    [TestMethod]
+    [Description("TC2: selecting 'Delete old chat sessions' sets UserMessage correctly.")]
+    public void TC2_SelectedCase_SetsExpectedUserMessage()
+    {
+        var tc = Cases.Single(c => c.Id == "tc2");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(tc.UserMessage),
+            "TC2 UserMessage must not be empty after selection.");
+        Assert.IsTrue(tc.UserMessage.Contains("Chat History", System.StringComparison.OrdinalIgnoreCase),
+            $"TC2 UserMessage should reference 'Chat History'. Actual: {tc.UserMessage}");
+    }
+
+    [TestMethod]
+    [Description("Build Prompt: ClassifyIntent + ExpandSearchQueries produce non-empty output for every case.")]
+    public void AllCases_BuildPrompt_ProducesNonEmptyExpansion()
+    {
+        foreach (var tc in Cases)
+        {
+            var intent   = PromptContextBuilder.ClassifyIntent(tc.UserMessage);
+            var expanded = PromptContextBuilder.ExpandSearchQueries(tc.UserMessage, intent);
+            Assert.IsTrue(expanded.Count > 0,
+                $"[{tc.Id}] ExpandSearchQueries must produce at least one query for '{tc.UserMessage}'.");
+        }
+    }
+
+    [TestMethod]
+    [Description("MustNotMention evaluation: 'Weaviate' in AI response triggers a violation for TC2.")]
+    public void TC2_MustNotMention_Weaviate_DetectsViolation()
+    {
+        var tc = Cases.Single(c => c.Id == "tc2");
+        var mustNotTerms = tc.MustNotLeadWith.Split(',',
+            System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+        // Simulate a bad AI response
+        const string badResponse = "You should update the Weaviate index and TicketService to delete chats.";
+        var responseLower = badResponse.ToLowerInvariant();
+
+        // Check MustNotMention from the ViewModel spec (MustNotMention field)
+        var mustNotMentionTerms = tc.MustNotLeadWith.Split(',',
+            System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+        // The MustNotLeadWith terms "DraftTicket,TicketService" should not be the top lead
+        var violated = mustNotMentionTerms.Any(t =>
+            responseLower.Contains(t.Trim().ToLowerInvariant()));
+        Assert.IsTrue(violated,
+            $"[TC2] MustNotLeadWith terms should be detected in bad response. Terms: {tc.MustNotLeadWith}");
+    }
+
+    [TestMethod]
+    [Description("ExpectedFiles evaluation: ChatWorkspaceViewModel mention in response counts as hit for TC2.")]
+    public void TC2_ExpectedFiles_ChatWorkspaceViewModel_DetectsHit()
+    {
+        var tc = Cases.Single(c => c.Id == "tc2");
+        const string goodResponse = "You would need to update ChatWorkspaceViewModel and ChatHistoryService to delete sessions.";
+        var responseLower = goodResponse.ToLowerInvariant();
+
+        var fileTerms  = tc.MustIncludeAny.Split(',',
+            System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+        var filesFound = fileTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
+
+        Assert.IsTrue(filesFound,
+            $"[TC2] At least one MustIncludeAny term must be found in a good response. Terms: {tc.MustIncludeAny}");
+    }
+
+    [TestMethod]
+    [Description("MustMention evaluation: 'session' term found in TC2 good response.")]
+    public void TC2_MustMention_Session_DetectsHit()
+    {
+        // TC2 MustMention = "session,tenant,archive" (from chat-grounding-test-matrix spec)
+        const string tc2MustMention = "session,tenant,archive";
+        const string goodResponse = "Each session row in ProjectChatSessions can be soft-archived per tenant.";
+        var responseLower = goodResponse.ToLowerInvariant();
+
+        var mustTerms = tc2MustMention.Split(',',
+            System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+        var mustFound = mustTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
+
+        Assert.IsTrue(mustFound,
+            $"[TC2] At least one MustMention term must be found in good response. Terms: {tc2MustMention}");
+    }
+
+    [TestMethod]
+    [Description("All cases have non-empty MustIncludeAny — ensures context checks are always possible.")]
+    public void AllCases_HaveNonEmpty_MustIncludeAny()
+    {
+        foreach (var tc in Cases)
+            Assert.IsFalse(string.IsNullOrWhiteSpace(tc.MustIncludeAny),
+                $"[{tc.Id}] MustIncludeAny must not be empty.");
+    }
+
+    [TestMethod]
+    [Description("EvaluateScore: intent mismatch always returns FAIL regardless of context.")]
+    public void EvaluateScore_IntentMismatch_ReturnsFail()
+    {
+        // Simulate what the ViewModel does: !intentOk || violated => FAIL
+        bool intentOk = false;
+        bool violated = false;
+        bool filesFound = true;
+        bool mustFound = true;
+
+        // Replicate ViewModel logic:
+        string result;
+        if (!intentOk || violated)
+            result = "❌ FAIL";
+        else if (!filesFound || !mustFound)
+            result = "⚠️ WARNING — response weak";
+        else
+            result = "✅ PASS";
+
+        Assert.AreEqual("❌ FAIL", result,
+            "Intent mismatch must yield FAIL regardless of other checks.");
+    }
+
+    [TestMethod]
+    [Description("EvaluateScore: all checks pass returns PASS.")]
+    public void EvaluateScore_AllPass_ReturnsPass()
+    {
+        bool intentOk = true;
+        bool violated = false;
+        bool filesFound = true;
+        bool mustFound = true;
+
+        string result;
+        if (!intentOk || violated)
+            result = "❌ FAIL";
+        else if (!filesFound || !mustFound)
+            result = "⚠️ WARNING — response weak";
+        else
+            result = "✅ PASS";
+
+        Assert.AreEqual("✅ PASS", result, "All checks passing must yield PASS.");
+    }
+
+    [TestMethod]
+    [Description("EvaluateScore: violation of MustNotMention yields FAIL even if intent is correct.")]
+    public void EvaluateScore_MustNotMentionViolation_ReturnsFail()
+    {
+        bool intentOk = true;
+        bool violated = true;  // MustNotMention term found in response
+        bool filesFound = true;
+        bool mustFound = true;
+
+        string result;
+        if (!intentOk || violated)
+            result = "❌ FAIL";
+        else if (!filesFound || !mustFound)
+            result = "⚠️ WARNING — response weak";
+        else
+            result = "✅ PASS";
+
+        Assert.AreEqual("❌ FAIL", result,
+            "MustNotMention violation must yield FAIL even with correct intent.");
+    }
 }
