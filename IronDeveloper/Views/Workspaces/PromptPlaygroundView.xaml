@@ -67,7 +67,7 @@
                 <TextBlock Margin="0,0,0,12" FontSize="12" Opacity="0.45"
                            Foreground="{StaticResource TextBrush}">
                     <Run Text="Test cases loaded: "/>
-                    <Run Text="{Binding TestCases.Count, FallbackValue='0'}"/>
+                    <Run Text="{Binding TestCases.Count, Mode=OneWay, FallbackValue='0'}"/>
                 </TextBlock>
 
                 <StackPanel Orientation="Horizontal">
