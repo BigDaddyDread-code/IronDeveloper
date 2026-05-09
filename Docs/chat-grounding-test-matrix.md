@@ -181,21 +181,23 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 |---|---|
 | High | `IronDeveloper/Views/Workspaces/TicketsWorkspaceView.xaml` |
 | High | `IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs` |
-| Medium | Any `MarkdownPreviewConverter` / text sanitiser converter if indexed |
+| High | `IronDev.Core/Models/DataModels.cs` → `ProjectTicket` |
+| Medium | `MarkdownPreviewConverter` (in `IronDeveloper/Converters/`) if indexed |
 | Low | `WorkspaceListItem` / controls library |
 
 **Answer must include:**
 - Fix ticket list `DataTemplate` in `TicketsWorkspaceView.xaml`
-- Use `Title` as the primary display line
-- Use a one-line summary preview (truncated)
-- Apply `TextTrimming="CharacterEllipsis"`
+- Identify the `ProjectTicket` field used as the preview (`Summary` or `Description`)
+- Strip or sanitise markdown fragments — e.g. via `MarkdownPreviewConverter` or inline
+- One-line preview using `TextTrimming="CharacterEllipsis"`
 - Keep status/priority compact
 - Do not change database schema
 
 **Answer must NOT include:**
-- Backend ticket deletion logic
-- `DraftTicketService`
-- `CodebaseTicketGeneratorModels` (unless specifically relevant)
+- Generic markdown parser library as first recommendation
+- Markdown-to-HTML conversion pipeline
+- Database schema change or storage/retrieval change as the primary fix
+- `DraftTicketService` as primary recommendation
 
 **Automated spec:**
 ```json
@@ -204,17 +206,28 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "intent": "SavedTicketManagement",
   "mustIncludeAny": [
     "TicketsWorkspaceView.xaml",
+    "TicketsWorkspaceViewModel",
+    "ProjectTicket",
+    "MarkdownPreviewConverter",
     "DataTemplate",
     "TextTrimming"
   ],
-  "mustNotLeadWith": ["DraftTicketService", "database", "schema"],
-  "mustMention": ["DataTemplate", "Title", "summary"],
+  "mustNotLeadWith": [
+    "DraftTicketService",
+    "database",
+    "schema",
+    "markdown parser",
+    "markdown-to-HTML",
+    "html conversion",
+    "storage"
+  ],
+  "mustMention": ["DataTemplate", "ticket list", "preview", "strip", "sanitise", "TextTrimming", "one-line"],
   "mustNotMention": ["Weaviate", "schema change"]
 }
 ```
 
-**Pass:** Answer focuses on XAML list template / converter fix.  
-**Fail:** Answer recommends changing a model or database first.
+**Pass:** Pass only if the answer identifies ticket row/list preview rendering as the problem and gives a concrete UI binding or converter fix (e.g. `MarkdownPreviewConverter`, `TextTrimming`, `DataTemplate` change in `TicketsWorkspaceView.xaml`).  
+**Fail:** Fail if answer recommends a generic markdown parser library, markdown-to-HTML conversion, database schema change, or storage/retrieval change as the primary fix.
 
 ---
 
