@@ -433,6 +433,97 @@
             </StackPanel>
         </Border>
 
+
+        <!-- ── Retrieval Diagnostics ─────────────────────────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding HasDiagnostics, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel>
+                <TextBlock Text="RETRIEVAL DIAGNOSTICS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
+
+                <!-- Row 1: ProjectId / TenantId / ProjectFiles / CodeIndexEntries -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="Project ID" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding RetrievalProjectId}" FontSize="13"
+                                   FontFamily="Consolas, Courier New"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="Tenant ID" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding RetrievalTenantId}" FontSize="13"
+                                   FontFamily="Consolas, Courier New"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                        <TextBlock Text="ProjectFiles" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock FontSize="13" Foreground="{StaticResource TextBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="{Binding ProjectFilesCount}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ProjectFilesCount}" Value="-1">
+                                            <Setter Property="Text" Value="—"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Retrieved" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding RetrievedSnippetCount}" FontSize="13"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 2: Expanded queries / distinct files / sources -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="2*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="Queries" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding ExpandedQueryCount}" FontSize="13"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="Distinct Files" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding RetrievedFileCount}" FontSize="13"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Sources" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding RetrievalSources, FallbackValue='—'}" FontSize="12"
+                                   Foreground="{StaticResource TextBrush}" Opacity="0.8"
+                                   FontFamily="Consolas, Courier New" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Empty reason (only when no snippets) -->
+                <Border Margin="0,10,0,0" Padding="10,6" CornerRadius="4" Background="#18FFAA00"
+                        Visibility="{Binding RetrievalEmptyReason, Converter={StaticResource StringToVisibilityConverter}}">
+                    <TextBlock FontSize="12" Foreground="#FFDDAA44" TextWrapping="Wrap">
+                        <Run Text="⚠️ "/><Run Text="{Binding RetrievalEmptyReason}"/>
+                    </TextBlock>
+                </Border>
+            </StackPanel>
+        </Border>
+
         <!-- ── Retrieved Context ───────────────────────────────────────────── -->
         <!-- Only shown once retrieved items are populated -->
         <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
@@ -461,9 +552,10 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock Margin="0,6,0,0"
-                           Text="(no context retrieved — project may not be indexed)"
-                           FontSize="12" Opacity="0.35"
-                           Foreground="{StaticResource TextBrush}">
+                           Text="{Binding RetrievalEmptyReason, FallbackValue='(no context retrieved — project may not be indexed)'}"
+                           FontSize="12" Opacity="0.5"
+                           Foreground="#FFDDAA44"
+                           TextWrapping="Wrap">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
