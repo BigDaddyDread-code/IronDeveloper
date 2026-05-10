@@ -37,24 +37,137 @@
                 <TextBlock Text="Grounding Test Case" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
 
                 <!--
-                    ItemTemplate is used explicitly because the custom ComboBox ControlTemplate
-                    (in IronDeveloperControls/Themes/ControlStyles.xaml) binds the selected-item
-                    header via:
-                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"/>
-                    Without ItemTemplate, this renders GroundingTestCase.ToString().
-                    We override ToString() → DisplayName, which fixes the header.
-                    The ItemTemplate here also ensures the dropdown list rows show DisplayName.
+                    Local dark-theme ComboBox for Prompt Playground.
+                    Does NOT use SelectionField (deferred) nor Style="{x:Null}" (bare Windows chrome).
+                    Uses an inline ControlTemplate so:
+                      • the global pill-switch ToggleButton style cannot clobber PART_ToggleButton
+                      • the popup is dark glass matching IronDev theme
+                      • DisplayMemberPath="DisplayName" renders "2 — Delete old chat sessions"
                 -->
                 <ComboBox x:Name="TestCaseCombo"
                           ItemsSource="{Binding TestCases}"
                           SelectedItem="{Binding SelectedTestCase, Mode=TwoWay}"
-                          Margin="0,0,0,16">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:GroundingTestCase}">
-                            <TextBlock Text="{Binding DisplayName}" Padding="2,0"/>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
+                          DisplayMemberPath="DisplayName"
+                          Margin="0,0,0,6">
+                    <ComboBox.Style>
+                        <Style TargetType="ComboBox">
+                            <Setter Property="Foreground"            Value="{StaticResource TextBrush}"/>
+                            <Setter Property="Background"            Value="{StaticResource GlassControlBrush}"/>
+                            <Setter Property="BorderBrush"           Value="{StaticResource DarkBorderBrush}"/>
+                            <Setter Property="BorderThickness"       Value="1"/>
+                            <Setter Property="FontSize"              Value="14"/>
+                            <Setter Property="MinHeight"             Value="42"/>
+                            <Setter Property="MinWidth"              Value="500"/>
+                            <Setter Property="Padding"               Value="14,0,44,0"/>
+                            <Setter Property="OverridesDefaultStyle" Value="True"/>
+                            <Setter Property="FocusVisualStyle"      Value="{x:Null}"/>
+                            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ComboBox">
+                                        <Grid SnapsToDevicePixels="True">
+
+                                            <!-- Dark glass border -->
+                                            <Border x:Name="Outer"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="8"/>
+
+                                            <!-- Selected item text -->
+                                            <ContentPresenter x:Name="ContentSite"
+                                                              Margin="{TemplateBinding Padding}"
+                                                              VerticalAlignment="Center"
+                                                              HorizontalAlignment="Left"
+                                                              Content="{TemplateBinding SelectionBoxItem}"
+                                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                              IsHitTestVisible="False"/>
+
+                                            <!-- Arrow chevron -->
+                                            <Border x:Name="ArrowBox"
+                                                    Width="34" Margin="0,6,8,6"
+                                                    HorizontalAlignment="Right"
+                                                    CornerRadius="6"
+                                                    Background="#18FFFFFF"
+                                                    BorderBrush="#33FFFFFF"
+                                                    BorderThickness="1"
+                                                    IsHitTestVisible="False">
+                                                <Path x:Name="Arrow"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Fill="{StaticResource TextBrush}"
+                                                      Data="M 0 0 L 4 4 L 8 0"
+                                                      Stroke="{StaticResource TextBrush}"
+                                                      StrokeThickness="1.5"
+                                                      Width="10" Height="6"
+                                                      Stretch="Uniform"/>
+                                            </Border>
+
+                                            <!--
+                                                PART_ToggleButton — transparent click surface.
+                                                Style="{x:Null}" + OverridesDefaultStyle="True" prevents
+                                                the global implicit ToggleButton pill-switch style from
+                                                replacing the inline Template below.
+                                            -->
+                                            <ToggleButton x:Name="PART_ToggleButton"
+                                                          Style="{x:Null}"
+                                                          OverridesDefaultStyle="True"
+                                                          Background="Transparent"
+                                                          BorderThickness="0"
+                                                          Focusable="False"
+                                                          ClickMode="Press"
+                                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                                <ToggleButton.Template>
+                                                    <ControlTemplate TargetType="ToggleButton">
+                                                        <Border Background="Transparent"/>
+                                                    </ControlTemplate>
+                                                </ToggleButton.Template>
+                                            </ToggleButton>
+
+                                            <!-- Dark popup -->
+                                            <Popup x:Name="PART_Popup"
+                                                   Placement="Bottom"
+                                                   AllowsTransparency="True"
+                                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                                   StaysOpen="False"
+                                                   PopupAnimation="Fade">
+                                                <Border Margin="0,4,0,0"
+                                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                                        CornerRadius="10"
+                                                        Background="{StaticResource Background/Panel}"
+                                                        BorderBrush="{StaticResource MidBorderBrush}"
+                                                        BorderThickness="1"
+                                                        Padding="6">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect Color="Black" BlurRadius="16" ShadowDepth="4" Opacity="0.4"/>
+                                                    </Border.Effect>
+                                                    <ScrollViewer SnapsToDevicePixels="True" MaxHeight="340">
+                                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                                    </ScrollViewer>
+                                                </Border>
+                                            </Popup>
+
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Outer" Property="BorderBrush" Value="{StaticResource MidBorderBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsDropDownOpen" Value="True">
+                                                <Setter TargetName="Outer" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}"/>
+                                                <Setter TargetName="Arrow" Property="Data" Value="M 0 4 L 4 0 L 8 4"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.45"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ComboBox.Style>
                 </ComboBox>
+
+
 
                 <TextBlock Text="User Message" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
                 <TextBox x:Name="UserMessageBox"
@@ -62,13 +175,6 @@
                          TextWrapping="Wrap" MinHeight="68" AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto"
                          Margin="0,0,0,18"/>
-
-                <!-- Loaded test case count (diagnostic) -->
-                <TextBlock Margin="0,0,0,12" FontSize="12" Opacity="0.45"
-                           Foreground="{StaticResource TextBrush}">
-                    <Run Text="Test cases loaded: "/>
-                    <Run Text="{Binding TestCases.Count, Mode=OneWay, FallbackValue='0'}"/>
-                </TextBlock>
 
                 <StackPanel Orientation="Horizontal">
                     <!-- PRIMARY: Run Grounding Test -->
@@ -99,8 +205,61 @@
             </StackPanel>
         </Border>
 
-        <!-- ── Expected Behaviour Panel ───────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <!-- ── Prompt Context Quality Diagnostics (Fix 2) ────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="18,14"
+                Visibility="{Binding ContextQualityBadge, Converter={StaticResource StringToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="PROMPT CONTEXT QUALITY"
+                           Style="{StaticResource IronEyebrow}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                <!-- Badge: Clean / Polluted -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ContextQualityBadge}"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+
+                <!-- Filtered count pill -->
+                <Border Grid.Column="2" CornerRadius="4" Padding="10,4" Margin="12,0,0,0"
+                        VerticalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#1AFFFFFF"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ContextPolluted}" Value="True">
+                                    <Setter Property="Background" Value="#33BB4444"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
+                                   Text="{Binding FilteredMemoryCount, StringFormat='Filtered: {0}'}"/>
+                        <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.4"/>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
+                                   Text="{Binding IncludedMemoryCount, StringFormat='Included: {0}'}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Polluted terms -->
+                <TextBlock Grid.Column="3"
+                           Text="{Binding PollutedTermsSummary, StringFormat='Poison terms: {0}'}"
+                           FontSize="11" Foreground="#FFCC5555" Opacity="0.85"
+                           VerticalAlignment="Center" Margin="12,0,0,0" FontFamily="Consolas, Courier New"
+                           Visibility="{Binding PollutedTermsSummary, Converter={StaticResource StringToVisibilityConverter}}"/>
+            </Grid>
+        </Border>
+
+        <!-- ── Expected Behaviour Panel ────────────────────────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding SelectedTestCase, Converter={StaticResource ValueToVis}}">
             <StackPanel>
                 <TextBlock Text="EXPECTED BEHAVIOUR" Style="{StaticResource IronEyebrow}" Margin="0,0,0,14"/>
 
@@ -177,8 +336,9 @@
             </StackPanel>
         </Border>
 
-        <!-- ── Result / Status Row ────────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <!-- ── Result / Status Row ───────────────────────────────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding SelectedTestCase, Converter={StaticResource ValueToVis}}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -266,10 +426,11 @@
         </Border>
 
         <!-- ── Expanded Search Queries ────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding ExpandedQueries, Converter={StaticResource StringToVisibilityConverter}}">
             <StackPanel>
                 <TextBlock Text="EXPANDED SEARCH QUERIES" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
-                <TextBlock Text="{Binding ExpandedQueries, FallbackValue='(run Build Prompt to populate)'}"
+                <TextBlock Text="{Binding ExpandedQueries}"
                            FontFamily="Consolas, Courier New" FontSize="12"
                            Foreground="{StaticResource TextBrush}" Opacity="0.85"
                            TextWrapping="Wrap"/>
@@ -277,7 +438,9 @@
         </Border>
 
         <!-- ── Retrieved Context ───────────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <!-- Only shown once retrieved items are populated -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding HasRetrievedItems, Converter={StaticResource BoolToVisibilityConverter}}">
             <StackPanel>
                 <TextBlock Text="RETRIEVED CONTEXT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
                 <ItemsControl ItemsSource="{Binding RetrievedItems}">
@@ -302,7 +465,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock Margin="0,6,0,0"
-                           Text="(no context retrieved — run Build Prompt or Run Grounding Test)"
+                           Text="(no context retrieved — project may not be indexed)"
                            FontSize="12" Opacity="0.35"
                            Foreground="{StaticResource TextBrush}">
                     <TextBlock.Style>
@@ -396,14 +559,15 @@
                 <Grid Margin="0,0,0,10">
                     <TextBlock Text="FULL GENERATED PROMPT" Style="{StaticResource IronEyebrow}"
                                VerticalAlignment="Center"/>
-                    <TextBlock Text="read-only · no LLM call" FontSize="11" Opacity="0.35"
+                    <TextBlock Text="read-only · prompt sent to AI after Build Prompt / Run Grounding Test"
+                               FontSize="11" Opacity="0.35"
                                Foreground="{StaticResource TextBrush}"
                                HorizontalAlignment="Right" VerticalAlignment="Center"/>
                 </Grid>
                 <TextBox Text="{Binding PromptText, Mode=OneWay}"
                          IsReadOnly="True"
                          TextWrapping="Wrap" AcceptsReturn="True"
-                         MinHeight="240" MaxHeight="560"
+                         MinHeight="80" MaxHeight="560"
                          VerticalScrollBarVisibility="Auto"
                          FontFamily="Consolas, Courier New"
                          FontSize="12" Padding="10"/>
