@@ -25,6 +25,14 @@ public class ChatContextPacket
 
     /// <summary>True when the project has no code index (IndexingStatus != 'Ready').</summary>
     public bool IsProjectNotIndexed { get; set; }
+
+    // ── Memory filter diagnostics (populated by BuildPacketDataAsync) ────────
+    /// <summary>Items excluded by IsJunkMemory across decisions + tickets + summary.</summary>
+    public int FilteredMemoryCount { get; set; }
+    /// <summary>Items that passed the filter and were included in the prompt.</summary>
+    public int IncludedMemoryCount { get; set; }
+    /// <summary>Arch-poison terms found in excluded memory items.</summary>
+    public System.Collections.Generic.List<string> PollutedTermsFound { get; init; } = new();
 }
 
 /// <summary>
@@ -124,7 +132,8 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
     /// <inheritdoc />
     public async Task<PromptPreviewResult> BuildFullPromptForTestingAsync(int projectId, string userMessage, CancellationToken ct = default)
     {
-        // Reuse the same context-building pipeline with session 0 (no history needed for testing)
+        // Single pipeline pass — BuildPacketDataAsync fetches all DB data, runs the
+        // memory filter, and records diagnostics on the packet. No extra DB calls here.
         var packet = await BuildPacketDataAsync(projectId, sessionId: 0, userRequest: userMessage, cancellationToken: ct);
 
         var project     = await _projectService.GetByIdAsync(projectId, ct);
@@ -132,7 +141,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var quality     = string.Equals(indexStatus, "Ready", StringComparison.OrdinalIgnoreCase) ? "Indexed" : "Limited";
 
         // Retrieve and rank raw snippets for the playground list view
-        var intent   = ClassifyIntent(userMessage);
+        var intent   = packet.Intent;
         var queries  = ExpandSearchQueries(userMessage, intent);
         var snippets = new List<IronDev.Data.Models.CodeIndexEntry>();
         foreach (var q in queries.Take(4))
@@ -142,54 +151,21 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         }
         var ranked = RankSnippetsByIntent(snippets, intent, 12);
 
-        // ── Fix 2: Compute prompt pollution diagnostics ───────────────────────
-        // Scan all candidate memory items (decisions + tickets + summary) for
-        // forbidden/generic architectural terms BEFORE the filter runs.
-        var pollutedTermsFound = new List<string>();
-        int filteredCount  = 0;
-        int includedCount  = 0;
-
-        // Re-check tickets (already filtered in BuildPacketDataAsync but re-evaluated here for diagnostics)
-        var ticketService = await _ticketService.GetRecentTicketsAsync(projectId, take: 5, ct);
-        foreach (var t in ticketService)
-        {
-            var raw = string.IsNullOrWhiteSpace(t.Summary) ? t.Content : t.Summary;
-            var entry = $"[{t.TicketType}] {t.Title}: {raw}";
-            var (junk, terms) = IsJunkMemory(entry);
-            if (junk) { filteredCount++;  pollutedTermsFound.AddRange(terms); }
-            else       { includedCount++; }
-        }
-
-        // Re-check decisions
-        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, take: 5, ct);
-        foreach (var d in decisions)
-        {
-            var entry = $"{d.Title}: {d.Detail}";
-            var (junk, terms) = IsJunkMemory(entry);
-            if (junk) { filteredCount++;  pollutedTermsFound.AddRange(terms); }
-            else       { includedCount++; }
-        }
-
-        // Re-check summary
-        var summary = await _projectMemoryService.GetLatestSummaryAsync(projectId, ct);
-        if (!string.IsNullOrWhiteSpace(summary?.Summary))
-        {
-            var (junk, terms) = IsJunkMemory(summary.Summary);
-            if (junk) { filteredCount++;  pollutedTermsFound.AddRange(terms); }
-            else       { includedCount++; }
-        }
-
-        var distinctPolluted = pollutedTermsFound.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        // Diagnostics are already recorded on the packet by BuildPacketDataAsync
+        // at each IsJunkMemory filter site — no extra DB calls needed here.
+        var distinctPolluted = packet.PollutedTermsFound
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var preview = new PromptPreviewResult
         {
-            PromptText         = packet.FormattedPrompt,
-            DetectedIntent     = intent.ToString(),
-            ProjectIndexStatus = indexStatus,
-            ContextQuality     = quality,
-            ContextPolluted    = distinctPolluted.Count > 0,
-            FilteredMemoryCount = filteredCount,
-            IncludedMemoryCount = includedCount,
+            PromptText          = packet.FormattedPrompt,
+            DetectedIntent      = intent.ToString(),
+            ProjectIndexStatus  = indexStatus,
+            ContextQuality      = quality,
+            ContextPolluted     = distinctPolluted.Count > 0,
+            FilteredMemoryCount = packet.FilteredMemoryCount,
+            IncludedMemoryCount = packet.IncludedMemoryCount,
         };
         preview.RetrievedItems.AddRange(ranked);
         preview.PollutedTermsFound.AddRange(distinctPolluted);
@@ -375,12 +351,18 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         if (!string.IsNullOrWhiteSpace(latestSummary?.Summary))
         {
             var summary = latestSummary!.Summary.Trim();
-            var (isJunkSummary, _) = IsJunkMemory(summary);
+            var (isJunkSummary, summaryTerms) = IsJunkMemory(summary);
             if (!isJunkSummary)
             {
+                packet.IncludedMemoryCount++;
                 sb.AppendLine("Project summary:");
                 sb.AppendLine(summary);
                 sb.AppendLine();
+            }
+            else
+            {
+                packet.FilteredMemoryCount++;
+                packet.PollutedTermsFound.AddRange(summaryTerms);
             }
         }
 
@@ -391,9 +373,17 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             {
                 var detail = (decision.Detail ?? string.Empty).Trim();
                 var title  = (decision.Title  ?? string.Empty).Trim();
-                var (isJunk, _) = IsJunkMemory($"{title}: {detail}");
+                var (isJunk, decisionTerms) = IsJunkMemory($"{title}: {detail}");
                 if (!isJunk)
+                {
+                    packet.IncludedMemoryCount++;
                     sb.AppendLine($"- {title}: {detail}");
+                }
+                else
+                {
+                    packet.FilteredMemoryCount++;
+                    packet.PollutedTermsFound.AddRange(decisionTerms);
+                }
             }
             sb.AppendLine();
         }
@@ -413,9 +403,17 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine("Relevant tickets:");
             foreach (var ticket in packet.Tickets)
             {
-                var (isJunk, _) = IsJunkMemory(ticket);
+                var (isJunk, ticketTerms) = IsJunkMemory(ticket);
                 if (!isJunk)
+                {
+                    packet.IncludedMemoryCount++;
                     sb.AppendLine($"- {ticket}");
+                }
+                else
+                {
+                    packet.FilteredMemoryCount++;
+                    packet.PollutedTermsFound.AddRange(ticketTerms);
+                }
             }
             sb.AppendLine();
         }
