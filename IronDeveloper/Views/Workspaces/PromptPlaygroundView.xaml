@@ -248,15 +248,11 @@
                         </Style>
                     </Border.Style>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7">
-                            <Run Text="Filtered: "/>
-                            <Run Text="{Binding FilteredMemoryCount}"/>
-                        </TextBlock>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
+                                   Text="{Binding FilteredMemoryCount, StringFormat='Filtered: {0}'}"/>
                         <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.4"/>
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7">
-                            <Run Text="Included: "/>
-                            <Run Text="{Binding IncludedMemoryCount}"/>
-                        </TextBlock>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
+                                   Text="{Binding IncludedMemoryCount, StringFormat='Included: {0}'}"/>
                     </StackPanel>
                 </Border>
 

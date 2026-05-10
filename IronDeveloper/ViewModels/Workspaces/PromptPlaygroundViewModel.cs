@@ -120,7 +120,7 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     [ObservableProperty] private int    _filteredMemoryCount   = 0;
     [ObservableProperty] private int    _includedMemoryCount   = 0;
     /// <summary>Human-readable badge: Clean / ⚠️ Polluted (×N filtered)</summary>
-    [ObservableProperty] private string _contextQualityBadge   = "—";
+    [ObservableProperty] private string _contextQualityBadge   = string.Empty;
 
     // ── Run Grounding Test results ────────────────────────────────────────
     [ObservableProperty] private bool   _isRunningTest         = false;
