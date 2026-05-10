@@ -167,15 +167,7 @@
                     </ComboBox.Style>
                 </ComboBox>
 
-                <!-- Diagnostic: count and selection (keep until global style verified) -->
-                <TextBlock Text="{Binding TestCases.Count, StringFormat='Cases loaded: {0}'}"
-                           FontSize="12" Opacity="0.45"
-                           Foreground="{StaticResource TextBrush}"
-                           Margin="0,0,0,2"/>
-                <TextBlock Text="{Binding SelectedTestCase.DisplayName, StringFormat='Selected: {0}', FallbackValue='Selected: (none)'}"
-                           FontSize="12" Opacity="0.45"
-                           Foreground="{StaticResource TextBrush}"
-                           Margin="0,0,0,16"/>
+
 
                 <TextBlock Text="User Message" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
                 <TextBox x:Name="UserMessageBox"
@@ -265,8 +257,9 @@
             </Grid>
         </Border>
 
-        <!-- ── Expected Behaviour Panel ───────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <!-- ── Expected Behaviour Panel ────────────────────────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding SelectedTestCase, Converter={StaticResource ValueToVis}}">
             <StackPanel>
                 <TextBlock Text="EXPECTED BEHAVIOUR" Style="{StaticResource IronEyebrow}" Margin="0,0,0,14"/>
 
@@ -343,8 +336,9 @@
             </StackPanel>
         </Border>
 
-        <!-- ── Result / Status Row ────────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <!-- ── Result / Status Row ───────────────────────────────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding SelectedTestCase, Converter={StaticResource ValueToVis}}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -432,10 +426,11 @@
         </Border>
 
         <!-- ── Expanded Search Queries ────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding ExpandedQueries, Converter={StaticResource StringToVisibilityConverter}}">
             <StackPanel>
                 <TextBlock Text="EXPANDED SEARCH QUERIES" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
-                <TextBlock Text="{Binding ExpandedQueries, FallbackValue='(run Build Prompt to populate)'}"
+                <TextBlock Text="{Binding ExpandedQueries}"
                            FontFamily="Consolas, Courier New" FontSize="12"
                            Foreground="{StaticResource TextBrush}" Opacity="0.85"
                            TextWrapping="Wrap"/>
@@ -443,7 +438,9 @@
         </Border>
 
         <!-- ── Retrieved Context ───────────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
+        <!-- Only shown once retrieved items are populated -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
+                Visibility="{Binding HasRetrievedItems, Converter={StaticResource BoolToVisibilityConverter}}">
             <StackPanel>
                 <TextBlock Text="RETRIEVED CONTEXT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"/>
                 <ItemsControl ItemsSource="{Binding RetrievedItems}">
@@ -468,7 +465,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock Margin="0,6,0,0"
-                           Text="(no context retrieved — run Build Prompt or Run Grounding Test)"
+                           Text="(no context retrieved — project may not be indexed)"
                            FontSize="12" Opacity="0.35"
                            Foreground="{StaticResource TextBrush}">
                     <TextBlock.Style>
@@ -570,7 +567,7 @@
                 <TextBox Text="{Binding PromptText, Mode=OneWay}"
                          IsReadOnly="True"
                          TextWrapping="Wrap" AcceptsReturn="True"
-                         MinHeight="240" MaxHeight="560"
+                         MinHeight="80" MaxHeight="560"
                          VerticalScrollBarVisibility="Auto"
                          FontFamily="Consolas, Courier New"
                          FontSize="12" Padding="10"/>

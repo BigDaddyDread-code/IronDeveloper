@@ -134,6 +134,9 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     public ObservableCollection<RetrievedContextItem> RetrievedItems { get; } = new();
     public IReadOnlyList<GroundingTestCase>            TestCases      { get; } = BuildTestCases();
 
+    /// <summary>True when at least one item has been retrieved — drives card visibility.</summary>
+    public bool HasRetrievedItems => RetrievedItems.Count > 0;
+
     // ── Constructor ───────────────────────────────────────────────────────
 
     public PromptPlaygroundViewModel(
@@ -144,6 +147,8 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         _builder        = builder;
         _projectService = projectService;
         _llmService     = llmService;
+
+        RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRetrievedItems));
     }
 
     // ── Commands ──────────────────────────────────────────────────────────
