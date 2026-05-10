@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,23 @@ public partial class App : Application
 
     public App()
     {
+        // Surface fatal crashes as a readable MessageBox instead of silent ExecutionEngineException
+        DispatcherUnhandledException += (_, e) =>
+        {
+            MessageBox.Show(
+                $"Unhandled error:\n\n{e.Exception.GetType().Name}: {e.Exception.Message}\n\n" +
+                $"{e.Exception.StackTrace?.Split('\n').FirstOrDefault()}",
+                "IronDev — Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            e.Handled = true; // keep app alive for diagnostics
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            var ex = e.ExceptionObject as Exception;
+            MessageBox.Show(
+                $"Fatal unhandled exception:\n\n{ex?.GetType().Name}: {ex?.Message}",
+                "IronDev — Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        };
+
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((context, services) =>
             {
@@ -53,15 +71,24 @@ public partial class App : Application
 
                 services.AddTransient<global::IronDev.Core.ILLMService>(sp =>
                 {
-                    var provider = aiOptions.Provider?.ToLowerInvariant() ?? "openai";
-                    return provider switch
+                    try
                     {
-                        "openai"      => new global::IronDev.Infrastructure.Services.OpenAiLlmService(aiOptions),
-                        "localopenai" => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
-                        "ollama"      => new global::IronDev.Infrastructure.Services.OllamaLlmService(aiOptions),
-                        "custom"      => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
-                        _ => throw new InvalidOperationException($"Unsupported AI provider: {aiOptions.Provider}. Check appsettings.json.")
-                    };
+                        var provider = aiOptions.Provider?.ToLowerInvariant() ?? "openai";
+                        return provider switch
+                        {
+                            "openai"      => new global::IronDev.Infrastructure.Services.OpenAiLlmService(aiOptions),
+                            "localopenai" => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
+                            "ollama"      => new global::IronDev.Infrastructure.Services.OllamaLlmService(aiOptions),
+                            "custom"      => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
+                            _ => throw new InvalidOperationException($"Unsupported AI provider: {aiOptions.Provider}. Check appsettings.json.")
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        // API key missing or provider misconfigured — return a stub so the
+                        // app starts normally. Run Grounding Test will surface the error message.
+                        return new NullLlmService($"LLM not configured: {ex.Message}\nCheck Ai:ApiKey / Ai:Provider in appsettings.json.");
+                    }
                 });
 
                 // ── Workflow ViewModels ───────────────────────────────────────
@@ -134,5 +161,20 @@ public partial class App : Application
             await _host.StopAsync(TimeSpan.FromSeconds(5));
 
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// Stub LLM service returned when the AI provider is not configured.
+    /// Prevents the DI container from throwing during Singleton construction
+    /// and surfaces a clear error message when the user tries to run a test.
+    /// </summary>
+    private sealed class NullLlmService : global::IronDev.Core.ILLMService
+    {
+        private readonly string _reason;
+        public NullLlmService(string reason) => _reason = reason;
+        public System.Threading.Tasks.Task<string> GetResponseAsync(
+            string prompt,
+            System.Threading.CancellationToken ct = default)
+            => System.Threading.Tasks.Task.FromResult($"[AI not available] {_reason}");
     }
 }
