@@ -106,13 +106,14 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     [ObservableProperty] private string _failRule             = string.Empty;
 
     // Build results
-    [ObservableProperty] private string _projectIndexStatus = string.Empty;
-    [ObservableProperty] private string _contextQuality     = string.Empty;
-    [ObservableProperty] private string _expandedQueries    = string.Empty;
-    [ObservableProperty] private string _promptText         = string.Empty;
-    [ObservableProperty] private string _errorMessage       = string.Empty;
-    [ObservableProperty] private string _resultStatus       = "—"; // ✅ PASS / ⚠️ WARNING / ❌ FAIL / —
-    [ObservableProperty] private bool   _isBuilding         = false;
+    [ObservableProperty] private string _projectIndexStatus      = string.Empty;
+    [ObservableProperty] private string _contextRetrievalStatus  = string.Empty; // Retrieved / Empty / Limited
+    [ObservableProperty] private string _contextQuality          = string.Empty;
+    [ObservableProperty] private string _expandedQueries         = string.Empty;
+    [ObservableProperty] private string _promptText              = string.Empty;
+    [ObservableProperty] private string _errorMessage            = string.Empty;
+    [ObservableProperty] private string _resultStatus            = "—"; // ✅ PASS / ⚠️ WARNING / ❌ FAIL / —
+    [ObservableProperty] private bool   _isBuilding              = false;
 
     // ── Prompt Pollution Diagnostics (Fix 2) ───────────────────────────────
     [ObservableProperty] private bool   _contextPolluted       = false;
@@ -137,6 +138,11 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     /// <summary>True when at least one item has been retrieved — drives card visibility.</summary>
     public bool HasRetrievedItems => RetrievedItems.Count > 0;
 
+    /// <summary>Character count of the generated prompt — shown in the Expander header.</summary>
+    public string PromptCharCount => PromptText.Length == 0
+        ? "(empty)"
+        : $"{PromptText.Length:N0} chars";
+
     // ── Constructor ───────────────────────────────────────────────────────
 
     public PromptPlaygroundViewModel(
@@ -149,6 +155,7 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         _llmService     = llmService;
 
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRetrievedItems));
+        RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ContextRetrievalStatus));
     }
 
     // ── Commands ──────────────────────────────────────────────────────────
@@ -163,9 +170,10 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
             return;
         }
 
-        IsBuilding    = true;
-        ErrorMessage  = string.Empty;
-        PromptText    = string.Empty;
+        IsBuilding               = true;
+        ErrorMessage             = string.Empty;
+        PromptText               = string.Empty;
+        ContextRetrievalStatus   = string.Empty;
         ResultStatus  = "—";
         RetrievedItems.Clear();
 
@@ -199,8 +207,9 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 
             if (project is null)
             {
-                ProjectIndexStatus = string.IsNullOrEmpty(projectError) ? "No active project" : "Error";
-                ContextQuality     = "Intent-only";
+                ProjectIndexStatus     = string.IsNullOrEmpty(projectError) ? "No active project" : "Error";
+                ContextRetrievalStatus = "Empty";
+                ContextQuality         = "Intent-only";
 
                 // Always produce output so the TextBox is not blank
                 var sb = new System.Text.StringBuilder();
@@ -222,11 +231,13 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                     sb.AppendLine("Hint: Open a project first, then re-open Settings → Developer Tools.");
                 }
                 PromptText = sb.ToString();
-                ResultStatus = intentOk ? "✅ PASS (intent)" : "⚠️ WARNING — intent only";
+                OnPropertyChanged(nameof(PromptCharCount));
+                ResultStatus = intentOk ? "⚠️ WARNING — intent only, no project" : "❌ FAIL — no project + intent mismatch";
                 return;
             }
 
-            ProjectIndexStatus = project.IndexingStatus ?? "Unknown";
+            // ProjectIndexStatus reflects what the project reports — never substitute Unknown
+            ProjectIndexStatus = project.IndexingStatus is { Length: > 0 } s ? s : "Not indexed";
             ContextQuality     = string.Equals(project.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase)
                                      ? "Indexed" : "Limited";
 
@@ -238,17 +249,26 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
             if (string.IsNullOrWhiteSpace(PromptText))
                 PromptText = $"[Builder returned empty prompt — IndexingStatus: {project.IndexingStatus}]";
 
+            OnPropertyChanged(nameof(PromptCharCount));
+
             foreach (var item in result.RetrievedItems)
             {
                 RetrievedItems.Add(new RetrievedContextItem
                 {
                     FilePath   = item.FilePath   ?? string.Empty,
                     SymbolName = item.SymbolName  ?? string.Empty,
-                    Preview    = item.ChunkText is { Length: > 0 } s
-                                     ? s[..Math.Min(120, s.Length)].Replace('\n', ' ')
+                    Preview    = item.ChunkText is { Length: > 0 } s2
+                                     ? s2[..Math.Min(120, s2.Length)].Replace('\n', ' ')
                                      : string.Empty
                 });
             }
+
+            // Separate context retrieval status from project index status
+            ContextRetrievalStatus = RetrievedItems.Count > 0
+                ? $"Retrieved {RetrievedItems.Count} snippet(s)"
+                : string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                    ? "Empty — project indexed but no snippets matched"
+                    : "Limited — project not yet indexed";
 
             // ── Fix 2: Populate pollution diagnostics ────────────────────
             ContextPolluted      = result.ContextPolluted;
@@ -279,9 +299,8 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                     : string.Empty;
                 var badLead = mustNotTerms.Any(t => topFile.Contains(t, StringComparison.OrdinalIgnoreCase));
 
-                // Fix 3: PASS only if index is Ready OR at least one snippet retrieved
-                var contextIsReady = string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
-                                     || RetrievedItems.Count > 0;
+                // PASS requires actual retrieved snippets — index being Ready is necessary but not sufficient
+                var contextIsReady = RetrievedItems.Count > 0;
 
                 IntentMatchBadge = intentOk ? "✅ Match" : "⚠️ Mismatch";
                 ResultStatus     = EvaluateScore(intentOk, hasMustInclude, badLead,
@@ -357,16 +376,15 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                 var violated      = mustNotTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
                 MustNotMentionStatus = mustNotTerms.Length == 0 ? "—" : (violated ? "❌ Violation" : "✅ Clean");
 
-                // Re-evaluate overall result including AI response (Fix 3: account for context quality)
+                // PASS requires actual retrieved snippets — index status alone is not sufficient
                 var intentOk = string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase);
-                var contextIsReady = string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
-                                     || RetrievedItems.Count > 0;
+                var hasSnippets = RetrievedItems.Count > 0;
                 if (!intentOk || violated)
                     ResultStatus = "❌ FAIL";
                 else if (!filesFound || !mustFound)
                     ResultStatus = "⚠️ WARNING — response weak";
-                else if (!contextIsReady)
-                    ResultStatus = "⚠️ WARNING — correct answer, limited context";
+                else if (!hasSnippets)
+                    ResultStatus = "⚠️ WARNING — correct answer, no retrieved context";
                 else
                     ResultStatus = "✅ PASS";
             }
@@ -418,22 +436,24 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         MustNotMention       = string.Empty;
         PassRule             = string.Empty;
         FailRule             = string.Empty;
-        ExpandedQueries      = string.Empty;
-        PromptText           = string.Empty;
-        ErrorMessage         = string.Empty;
-        ResultStatus         = "—";
-        ContextPolluted      = false;
-        PollutedTermsSummary = string.Empty;
-        FilteredMemoryCount  = 0;
-        IncludedMemoryCount  = 0;
-        ContextQualityBadge  = string.Empty;
-        AiResponse           = string.Empty;
-        RunStatusMessage     = string.Empty;
-        MustMentionStatus    = "—";
-        MustNotMentionStatus = "—";
-        ExpectedFilesStatus  = "—";
-        ProviderInfo         = string.Empty;
+        ExpandedQueries        = string.Empty;
+        PromptText             = string.Empty;
+        ErrorMessage           = string.Empty;
+        ResultStatus           = "—";
+        ContextPolluted        = false;
+        PollutedTermsSummary   = string.Empty;
+        FilteredMemoryCount    = 0;
+        IncludedMemoryCount    = 0;
+        ContextQualityBadge    = string.Empty;
+        ContextRetrievalStatus = string.Empty;
+        AiResponse             = string.Empty;
+        RunStatusMessage       = string.Empty;
+        MustMentionStatus      = "—";
+        MustNotMentionStatus   = "—";
+        ExpectedFilesStatus    = "—";
+        ProviderInfo           = string.Empty;
         RetrievedItems.Clear();
+        OnPropertyChanged(nameof(PromptCharCount));
     }
 
     // ── Selection change ──────────────────────────────────────────────────
@@ -441,18 +461,20 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     partial void OnSelectedTestCaseChanged(GroundingTestCase? value)
     {
         // Clear previous build state
-        DetectedIntent       = string.Empty;
-        IntentMatchBadge     = "—";
-        ExpandedQueries      = string.Empty;
-        PromptText           = string.Empty;
-        ErrorMessage         = string.Empty;
-        ResultStatus         = "—";
-        ContextPolluted      = false;
-        PollutedTermsSummary = string.Empty;
-        FilteredMemoryCount  = 0;
-        IncludedMemoryCount  = 0;
-        ContextQualityBadge  = string.Empty;
+        DetectedIntent         = string.Empty;
+        IntentMatchBadge       = "—";
+        ExpandedQueries        = string.Empty;
+        PromptText             = string.Empty;
+        ErrorMessage           = string.Empty;
+        ResultStatus           = "—";
+        ContextPolluted        = false;
+        PollutedTermsSummary   = string.Empty;
+        FilteredMemoryCount    = 0;
+        IncludedMemoryCount    = 0;
+        ContextQualityBadge    = string.Empty;
+        ContextRetrievalStatus = string.Empty;
         RetrievedItems.Clear();
+        OnPropertyChanged(nameof(PromptCharCount));
 
         if (value is null)
         {

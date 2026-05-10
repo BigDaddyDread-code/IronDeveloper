@@ -205,57 +205,6 @@
             </StackPanel>
         </Border>
 
-        <!-- ── Prompt Context Quality Diagnostics (Fix 2) ────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="18,14"
-                Visibility="{Binding ContextQualityBadge, Converter={StaticResource StringToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0" Text="PROMPT CONTEXT QUALITY"
-                           Style="{StaticResource IronEyebrow}" VerticalAlignment="Center" Margin="0,0,20,0"/>
-
-                <!-- Badge: Clean / Polluted -->
-                <TextBlock Grid.Column="1"
-                           Text="{Binding ContextQualityBadge}"
-                           FontSize="13" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextBrush}"
-                           VerticalAlignment="Center" TextWrapping="Wrap"/>
-
-                <!-- Filtered count pill -->
-                <Border Grid.Column="2" CornerRadius="4" Padding="10,4" Margin="12,0,0,0"
-                        VerticalAlignment="Center">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Background" Value="#1AFFFFFF"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ContextPolluted}" Value="True">
-                                    <Setter Property="Background" Value="#33BB4444"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
-                                   Text="{Binding FilteredMemoryCount, StringFormat='Filtered: {0}'}"/>
-                        <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.4"/>
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
-                                   Text="{Binding IncludedMemoryCount, StringFormat='Included: {0}'}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Polluted terms -->
-                <TextBlock Grid.Column="3"
-                           Text="{Binding PollutedTermsSummary, StringFormat='Poison terms: {0}'}"
-                           FontSize="11" Foreground="#FFCC5555" Opacity="0.85"
-                           VerticalAlignment="Center" Margin="12,0,0,0" FontFamily="Consolas, Courier New"
-                           Visibility="{Binding PollutedTermsSummary, Converter={StaticResource StringToVisibilityConverter}}"/>
-            </Grid>
-        </Border>
 
         <!-- ── Expected Behaviour Panel ────────────────────────────────────── -->
         <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
@@ -328,74 +277,121 @@
                         </TextBlock>
                         <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0"
                                    Foreground="{StaticResource TextBrush}" Opacity="0.75">
-                            <Run Text="❌ " Foreground="#FFCC6666"/>
-                            <Run Text="{Binding FailRule, FallbackValue='—'}"/>
-                        </TextBlock>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+                                <Run Text="❌ " Foreground="#FFCC6666"/>
+                                <Run Text="{Binding FailRule, FallbackValue='—'}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
-        <!-- ── Result / Status Row ───────────────────────────────────────────── -->
+        <!-- ── Result / Status Row ─────────────────────────────────────────────── -->
         <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22"
                 Visibility="{Binding SelectedTestCase, Converter={StaticResource ValueToVis}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <StackPanel>
+                <!-- Row 1: Intent + Result badge -->
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                    <TextBlock Text="DETECTED INTENT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                    <TextBlock Text="{Binding DetectedIntent, FallbackValue='—'}"
-                               FontSize="14" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
-                </StackPanel>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="DETECTED INTENT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding DetectedIntent, FallbackValue='—'}"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                    <TextBlock Text="INTENT MATCH" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                    <TextBlock Text="{Binding IntentMatchBadge, FallbackValue='—'}"
-                               FontSize="14" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}"/>
-                </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <TextBlock Text="INTENT MATCH" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding IntentMatchBadge, FallbackValue='—'}"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="2" Margin="0,0,16,0">
-                    <TextBlock Text="INDEX STATUS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                    <TextBlock FontSize="13" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap">
-                        <Run Text="{Binding ProjectIndexStatus, FallbackValue='—'}"/>
-                        <Run Text=" · "/>
-                        <Run Text="{Binding ContextQuality}"/>
-                    </TextBlock>
-                </StackPanel>
+                    <!-- PASS / WARNING / FAIL badge -->
+                    <Border Grid.Column="2" CornerRadius="6" Padding="16,8" VerticalAlignment="Center">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#22FFFFFF"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="✅ PASS">
+                                        <Setter Property="Background" Value="#2266BB66"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL">
+                                        <Setter Property="Background" Value="#22BB4444"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL — wrong context leads">
+                                        <Setter Property="Background" Value="#22BB4444"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL — no project + intent mismatch">
+                                        <Setter Property="Background" Value="#22BB4444"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding ResultStatus, FallbackValue='—'}"
+                                   FontSize="13" FontWeight="Bold"
+                                   Foreground="{StaticResource TextBrush}"/>
+                    </Border>
+                </Grid>
 
-                <!-- PASS / WARNING / FAIL badge -->
-                <Border Grid.Column="3" CornerRadius="6" Padding="16,8" VerticalAlignment="Center">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Background" Value="#22FFFFFF"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ResultStatus}" Value="✅ PASS">
-                                    <Setter Property="Background" Value="#2266BB66"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL">
-                                    <Setter Property="Background" Value="#22BB4444"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL — wrong context leads">
-                                    <Setter Property="Background" Value="#22BB4444"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding ResultStatus}" Value="❌ FAIL — no project + intent mismatch">
-                                    <Setter Property="Background" Value="#22BB4444"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <TextBlock Text="{Binding ResultStatus, FallbackValue='—'}"
-                               FontSize="13" FontWeight="Bold"
-                               Foreground="{StaticResource TextBrush}"/>
-                </Border>
-            </Grid>
+                <!-- Separator -->
+                <Border Height="1" Background="#14FFFFFF" Margin="0,0,0,12"
+                        Visibility="{Binding ProjectIndexStatus, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+                <!-- Row 2: Project Index + Context Retrieved + Quality (compact, only when populated) -->
+                <Grid Visibility="{Binding ProjectIndexStatus, Converter={StaticResource StringToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="PROJECT INDEX" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding ProjectIndexStatus}"
+                                   FontSize="13" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <TextBlock Text="CONTEXT RETRIEVED" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding ContextRetrievalStatus}"
+                                   FontSize="13" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Inline quality pill (compact) -->
+                    <Border Grid.Column="2" CornerRadius="4" Padding="10,4" VerticalAlignment="Center"
+                            Visibility="{Binding ContextQualityBadge, Converter={StaticResource StringToVisibilityConverter}}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#1AFFFFFF"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ContextPolluted}" Value="True">
+                                        <Setter Property="Background" Value="#33BB4444"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
+                                           Text="{Binding FilteredMemoryCount, StringFormat='Filtered: {0}'}"/>
+                                <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.4"/>
+                                <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7"
+                                           Text="{Binding IncludedMemoryCount, StringFormat='Included: {0}'}"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding PollutedTermsSummary, StringFormat='Poison: {0}'}"
+                                       FontSize="10" Foreground="#FFCC5555"
+                                       FontFamily="Consolas, Courier New"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding PollutedTermsSummary, Converter={StaticResource StringToVisibilityConverter}}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
         </Border>
 
         <!-- ── Error Banner ───────────────────────────────────────────────── -->
@@ -553,26 +549,43 @@
             </StackPanel>
         </Border>
 
-        <!-- ── Full Generated Prompt ─────────────────────────────────────── -->
-        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
-            <StackPanel>
-                <Grid Margin="0,0,0,10">
-                    <TextBlock Text="FULL GENERATED PROMPT" Style="{StaticResource IronEyebrow}"
-                               VerticalAlignment="Center"/>
-                    <TextBlock Text="read-only · prompt sent to AI after Build Prompt / Run Grounding Test"
-                               FontSize="11" Opacity="0.35"
-                               Foreground="{StaticResource TextBrush}"
-                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                </Grid>
+        <!-- ── Full Generated Prompt (collapsed by default) ────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="0"
+                Visibility="{Binding PromptText, Converter={StaticResource StringToVisibilityConverter}}">
+            <Expander IsExpanded="False" Padding="22,14">
+                <Expander.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="FULL GENERATED PROMPT"
+                                   Style="{StaticResource IronEyebrow}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding PromptCharCount}"
+                                   FontSize="11" Opacity="0.4"
+                                   Foreground="{StaticResource TextBrush}"
+                                   VerticalAlignment="Center" Margin="12,0,12,0"/>
+                        <Button Grid.Column="2"
+                                Content="Copy"
+                                Command="{Binding CopyPromptCommand}"
+                                Style="{StaticResource IronSecondaryButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Expander.Header>
                 <TextBox Text="{Binding PromptText, Mode=OneWay}"
                          IsReadOnly="True"
                          TextWrapping="Wrap" AcceptsReturn="True"
-                         MinHeight="80" MaxHeight="560"
+                         MinHeight="80" MaxHeight="480"
                          VerticalScrollBarVisibility="Auto"
                          FontFamily="Consolas, Courier New"
-                         FontSize="12" Padding="10"/>
-            </StackPanel>
+                         FontSize="12" Padding="10"
+                         Margin="0,10,0,0"/>
+            </Expander>
         </Border>
 
     </StackPanel>
 </UserControl>
+
