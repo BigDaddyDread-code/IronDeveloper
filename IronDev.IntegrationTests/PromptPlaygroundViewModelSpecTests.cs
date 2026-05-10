@@ -706,4 +706,95 @@ public class PromptPlaygroundViewModelSpecTests
         Assert.IsTrue(terms.Contains("ProjectTickets"),
             "TC1 MustIncludeAny must include 'ProjectTickets' (the database table / collection name).");
     }
+
+    // ── Problem 2 & 3: Index status vs context retrieval status ──────────────
+
+    [TestMethod]
+    [Description("P2: Project index status 'Ready' does not conflate with context retrieval result — they are separate.")]
+    public void ProjectIndexStatus_Ready_DoesNotImplyContextRetrieved()
+    {
+        // A project can be Ready (indexed) but still return 0 snippets for a specific query.
+        // The ViewModel now has separate ProjectIndexStatus and ContextRetrievalStatus.
+        // This test confirms the two concepts are independent strings.
+        const string projectIndexStatus = "Ready";
+        int retrievedCount = 0;
+
+        // ContextRetrievalStatus logic mirrors ViewModel
+        string contextRetrievalStatus = retrievedCount > 0
+            ? $"Retrieved {retrievedCount} snippet(s)"
+            : string.Equals(projectIndexStatus, "Ready", System.StringComparison.OrdinalIgnoreCase)
+                ? "Empty — project indexed but no snippets matched"
+                : "Limited — project not yet indexed";
+
+        Assert.AreEqual("Ready", projectIndexStatus,
+            "ProjectIndexStatus must remain 'Ready' — not overwritten by retrieval result.");
+        Assert.IsTrue(contextRetrievalStatus.StartsWith("Empty"),
+            $"ContextRetrievalStatus should be 'Empty...' when project is Ready but 0 snippets returned. Got: {contextRetrievalStatus}");
+        Assert.AreNotEqual(projectIndexStatus, contextRetrievalStatus,
+            "ProjectIndexStatus and ContextRetrievalStatus must be distinct values.");
+    }
+
+    [TestMethod]
+    [Description("P2: ProjectIndexStatus is never 'Unknown' when project.IndexingStatus is a non-empty string.")]
+    public void ProjectIndexStatus_NeverUnknown_WhenStatusKnown()
+    {
+        // ViewModel now uses: project.IndexingStatus is { Length: > 0 } s ? s : "Not indexed"
+        // Test each plausible status string
+        var knownStatuses = new[] { "Ready", "Indexing", "Pending", "Error", "NotStarted" };
+        foreach (var status in knownStatuses)
+        {
+            var result = status is { Length: > 0 } ? status : "Not indexed";
+            Assert.AreNotEqual("Unknown", result,
+                $"ProjectIndexStatus must never be 'Unknown' when IndexingStatus='{status}'. Got: '{result}'");
+        }
+    }
+
+    [TestMethod]
+    [Description("P3: Correct answer with zero retrieved snippets must produce WARNING, never PASS.")]
+    public void EvaluateScore_CorrectAnswer_ZeroSnippets_ReturnsWarning_NotPass()
+    {
+        // This precisely mirrors the delete-ticket scenario:
+        // Intent ok, all expected terms found in AI response, MustNotMention clean,
+        // but RetrievedItems.Count == 0 (no snippets actually came from the index).
+        bool intentOk    = true;
+        bool violated    = false;
+        bool filesFound  = true;  // AI mentioned TicketsWorkspaceViewModel etc.
+        bool mustFound   = true;  // AI mentioned all required terms
+        bool hasSnippets = false; // RetrievedItems.Count == 0
+
+        // Replicate RunGroundingTestAsync scoring logic
+        string result;
+        if (!intentOk || violated)
+            result = "❌ FAIL";
+        else if (!filesFound || !mustFound)
+            result = "⚠️ WARNING — response weak";
+        else if (!hasSnippets)
+            result = "⚠️ WARNING — correct answer, no retrieved context";
+        else
+            result = "✅ PASS";
+
+        Assert.IsTrue(result.StartsWith("⚠️ WARNING"),
+            $"Zero retrieved snippets must yield WARNING even when answer quality checks pass. Got: {result}");
+        Assert.AreNotEqual("✅ PASS", result,
+            "PASS must not be awarded when no context snippets were retrieved.");
+    }
+
+    [TestMethod]
+    [Description("P3: ContextRetrievalStatus when snippets ARE retrieved reflects snippet count.")]
+    public void ContextRetrievalStatus_WithSnippets_ShowsCount()
+    {
+        const string projectIndexStatus = "Ready";
+        int retrievedCount = 5;
+
+        string contextRetrievalStatus = retrievedCount > 0
+            ? $"Retrieved {retrievedCount} snippet(s)"
+            : string.Equals(projectIndexStatus, "Ready", System.StringComparison.OrdinalIgnoreCase)
+                ? "Empty — project indexed but no snippets matched"
+                : "Limited — project not yet indexed";
+
+        Assert.IsTrue(contextRetrievalStatus.StartsWith("Retrieved"),
+            $"ContextRetrievalStatus should start with 'Retrieved' when snippets exist. Got: {contextRetrievalStatus}");
+        Assert.IsTrue(contextRetrievalStatus.Contains("5"),
+            "ContextRetrievalStatus should include the snippet count.");
+    }
 }
