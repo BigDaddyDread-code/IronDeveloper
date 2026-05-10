@@ -38,6 +38,16 @@ public sealed class PromptPreviewResult
     public string ProjectIndexStatus{ get; set; } = string.Empty;
     public string ContextQuality    { get; set; } = string.Empty;
     public List<IronDev.Data.Models.CodeIndexEntry> RetrievedItems { get; init; } = new();
+
+    // ── Prompt Pollution Diagnostics (Fix 2) ──────────────────────────────
+    /// <summary>True if any injected memory contained forbidden generic terms.</summary>
+    public bool   ContextPolluted      { get; set; }
+    /// <summary>Which forbidden terms were found in injected memory (before filtering).</summary>
+    public List<string> PollutedTermsFound { get; init; } = new();
+    /// <summary>How many memory items (decisions + tickets + summary) were filtered out.</summary>
+    public int FilteredMemoryCount  { get; set; }
+    /// <summary>How many memory items passed the filter and were included in the prompt.</summary>
+    public int IncludedMemoryCount  { get; set; }
 }
 
 /// <summary>
@@ -132,14 +142,57 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         }
         var ranked = RankSnippetsByIntent(snippets, intent, 12);
 
+        // ── Fix 2: Compute prompt pollution diagnostics ───────────────────────
+        // Scan all candidate memory items (decisions + tickets + summary) for
+        // forbidden/generic architectural terms BEFORE the filter runs.
+        var pollutedTermsFound = new List<string>();
+        int filteredCount  = 0;
+        int includedCount  = 0;
+
+        // Re-check tickets (already filtered in BuildPacketDataAsync but re-evaluated here for diagnostics)
+        var ticketService = await _ticketService.GetRecentTicketsAsync(projectId, take: 5, ct);
+        foreach (var t in ticketService)
+        {
+            var raw = string.IsNullOrWhiteSpace(t.Summary) ? t.Content : t.Summary;
+            var entry = $"[{t.TicketType}] {t.Title}: {raw}";
+            var (junk, terms) = IsJunkMemory(entry);
+            if (junk) { filteredCount++;  pollutedTermsFound.AddRange(terms); }
+            else       { includedCount++; }
+        }
+
+        // Re-check decisions
+        var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, take: 5, ct);
+        foreach (var d in decisions)
+        {
+            var entry = $"{d.Title}: {d.Detail}";
+            var (junk, terms) = IsJunkMemory(entry);
+            if (junk) { filteredCount++;  pollutedTermsFound.AddRange(terms); }
+            else       { includedCount++; }
+        }
+
+        // Re-check summary
+        var summary = await _projectMemoryService.GetLatestSummaryAsync(projectId, ct);
+        if (!string.IsNullOrWhiteSpace(summary?.Summary))
+        {
+            var (junk, terms) = IsJunkMemory(summary.Summary);
+            if (junk) { filteredCount++;  pollutedTermsFound.AddRange(terms); }
+            else       { includedCount++; }
+        }
+
+        var distinctPolluted = pollutedTermsFound.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
         var preview = new PromptPreviewResult
         {
             PromptText         = packet.FormattedPrompt,
             DetectedIntent     = intent.ToString(),
             ProjectIndexStatus = indexStatus,
             ContextQuality     = quality,
+            ContextPolluted    = distinctPolluted.Count > 0,
+            FilteredMemoryCount = filteredCount,
+            IncludedMemoryCount = includedCount,
         };
         preview.RetrievedItems.AddRange(ranked);
+        preview.PollutedTermsFound.AddRange(distinctPolluted);
         return preview;
     }
 
@@ -220,12 +273,25 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         sb.AppendLine("5. Mention uncertainty explicitly if the provided context is incomplete to fully answer the user's question.");
         sb.AppendLine();
 
+        // Grounding-first rule — forces the model to answer from retrieved IronDev context only
+        sb.AppendLine("GROUNDING-FIRST RULE (mandatory):");
+        sb.AppendLine("You must answer ONLY from the retrieved IronDev project context provided below.");
+        sb.AppendLine("Do NOT answer from general software engineering knowledge when the user is asking about this codebase.");
+        sb.AppendLine("If the retrieved context does not prove that a method, class, or file exists in IronDev:");
+        sb.AppendLine("  - Say 'inspect X to confirm' or 'add Y if missing' — do NOT say it exists.");
+        sb.AppendLine("  - Do NOT use hedging language like 'likely', 'possibly', 'often something like', 'typically'.");
+        sb.AppendLine("  - Do NOT invent file or method names not present in the retrieved snippets.");
+        sb.AppendLine("If no snippets were retrieved, state clearly: 'Project context is limited — index the project for precise file recommendations.'");
+        sb.AppendLine();
+
         // Anti-wrong-context rule (always present)
         sb.AppendLine("ARCHITECTURAL CONTEXT RULE:");
         sb.AppendLine("Do not assume DraftTicket is the saved ticket model.");
         sb.AppendLine("DraftTicket is ONLY for the Chat → Draft Ticket review flow (generating draft tickets from chat).");
         sb.AppendLine("For saved ticket management (delete, archive, list, select tickets), prefer: ProjectTicket / TicketsWorkspaceViewModel / TicketsWorkspaceView / TicketService / ticket persistence services.");
         sb.AppendLine("Do not recommend changing DraftTicketDtos.cs or CodebaseTicketGeneratorModels.cs for saved ticket operations.");
+        sb.AppendLine("IronDev is a WPF application — do NOT mention Controllers, Repositories, TicketModel, TicketController, or ASP.NET MVC patterns.");
+        sb.AppendLine("These terms do not exist in IronDev. Using them is a grounding failure.");
         sb.AppendLine();
 
         if (isCodeQuery)
@@ -243,6 +309,15 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine("SAVED TICKET MANAGEMENT CONTEXT:");
             sb.AppendLine("The user is asking about saved/persisted ticket management (e.g. deleting, archiving, listing tickets).");
             sb.AppendLine("Focus your answer on: TicketsWorkspaceViewModel, TicketsWorkspaceView.xaml, ProjectTicket, TicketService, GetTickets, SaveTicket, ticket persistence.");
+            sb.AppendLine("For any delete/archive feature, a complete grounded answer MUST address all of:");
+            sb.AppendLine("  1. Whether TicketService already has DeleteTicketAsync/ArchiveTicketAsync — say 'inspect to confirm, add if missing'.");
+            sb.AppendLine("  2. A tenant/project ownership guard must be applied in TicketService before any destructive operation.");
+            sb.AppendLine("  3. Prefer soft-delete (archive) before offering hard delete — explain the safety tradeoff.");
+            sb.AppendLine("  4. A UI confirmation step in TicketsWorkspaceView.xaml before the command fires.");
+            sb.AppendLine("  5. A command (e.g. ArchiveSelectedTicketCommand / DeleteSelectedTicketCommand) in TicketsWorkspaceViewModel.");
+            sb.AppendLine("  6. Refresh the ticket list and clear SelectedTicket after deletion.");
+            sb.AppendLine("  7. Check for linked ProjectImplementationPlans before hard delete.");
+            sb.AppendLine("Do NOT use vague language like 'likely', 'usually', 'often something like'. Use 'inspect' or 'add if missing'.");
             sb.AppendLine("After giving your grounded answer, suggest using the Create Ticket feature if the user needs to track this work as a ticket.");
             sb.AppendLine();
         }
@@ -299,9 +374,14 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         if (!string.IsNullOrWhiteSpace(latestSummary?.Summary))
         {
-            sb.AppendLine("Project summary:");
-            sb.AppendLine(latestSummary.Summary);
-            sb.AppendLine();
+            var summary = latestSummary!.Summary.Trim();
+            var (isJunkSummary, _) = IsJunkMemory(summary);
+            if (!isJunkSummary)
+            {
+                sb.AppendLine("Project summary:");
+                sb.AppendLine(summary);
+                sb.AppendLine();
+            }
         }
 
         if (decisions.Count > 0)
@@ -309,7 +389,11 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine("Important project decisions:");
             foreach (var decision in decisions.OrderBy(x => x.CreatedDate))
             {
-                sb.AppendLine($"- {decision.Title}: {decision.Detail}");
+                var detail = (decision.Detail ?? string.Empty).Trim();
+                var title  = (decision.Title  ?? string.Empty).Trim();
+                var (isJunk, _) = IsJunkMemory($"{title}: {detail}");
+                if (!isJunk)
+                    sb.AppendLine($"- {title}: {detail}");
             }
             sb.AppendLine();
         }
@@ -329,7 +413,9 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine("Relevant tickets:");
             foreach (var ticket in packet.Tickets)
             {
-                sb.AppendLine($"- {ticket}");
+                var (isJunk, _) = IsJunkMemory(ticket);
+                if (!isJunk)
+                    sb.AppendLine($"- {ticket}");
             }
             sb.AppendLine();
         }
@@ -345,6 +431,56 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         packet.FormattedPrompt = sb.ToString();
         return packet;
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Memory Quality Filter
+    // ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Determines whether a memory item (ticket body, decision detail, summary)
+    /// should be excluded from the prompt because it is junk, a placeholder response,
+    /// or contains forbidden generic architectural terms that would pollute the context.
+    /// Returns (isJunk: bool, pollutedTerms: list of matched forbidden terms).
+    /// </summary>
+    public static (bool isJunk, IReadOnlyList<string> pollutedTerms) IsJunkMemory(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 20)
+            return (true, Array.Empty<string>());
+
+        var polluted = new List<string>();
+
+        // ── Placeholder / AI-generated filler phrases ────────────────────────
+        if (text.StartsWith("It seems",       StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("Could you",      StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("Please provide", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("It seems you",                StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("If you have a specific",      StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("feel free to provide",        StringComparison.OrdinalIgnoreCase))
+            return (true, Array.Empty<string>());
+
+        // ── Architectural poison terms — generic MVC/ORM concepts that do not exist in IronDev
+        //    Detect BEFORE deciding to filter; if any are found the item is excluded
+        //    AND the terms are reported to PromptPreviewResult.PollutedTermsFound.
+        var archPoisonTerms = new[]
+        {
+            "TicketModel",
+            "TicketController",
+            "View Templates",
+            "Repository",
+            "typically include",
+            "typically represented",
+        };
+        foreach (var term in archPoisonTerms)
+        {
+            if (text.Contains(term, StringComparison.OrdinalIgnoreCase))
+                polluted.Add(term);
+        }
+
+        if (polluted.Count > 0)
+            return (true, polluted);
+
+        return (false, Array.Empty<string>());
     }
 
     // ────────────────────────────────────────────────────────────────────

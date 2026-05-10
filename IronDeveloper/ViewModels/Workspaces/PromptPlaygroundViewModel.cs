@@ -114,6 +114,14 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     [ObservableProperty] private string _resultStatus       = "—"; // ✅ PASS / ⚠️ WARNING / ❌ FAIL / —
     [ObservableProperty] private bool   _isBuilding         = false;
 
+    // ── Prompt Pollution Diagnostics (Fix 2) ───────────────────────────────
+    [ObservableProperty] private bool   _contextPolluted       = false;
+    [ObservableProperty] private string _pollutedTermsSummary  = string.Empty;
+    [ObservableProperty] private int    _filteredMemoryCount   = 0;
+    [ObservableProperty] private int    _includedMemoryCount   = 0;
+    /// <summary>Human-readable badge: Clean / ⚠️ Polluted (×N filtered)</summary>
+    [ObservableProperty] private string _contextQualityBadge   = "—";
+
     // ── Run Grounding Test results ────────────────────────────────────────
     [ObservableProperty] private bool   _isRunningTest         = false;
     [ObservableProperty] private string _runStatusMessage      = string.Empty;
@@ -237,7 +245,20 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                 });
             }
 
-            // ── 5. Score against selected test case ──────────────────────────
+            // ── Fix 2: Populate pollution diagnostics ────────────────────
+            ContextPolluted      = result.ContextPolluted;
+            FilteredMemoryCount  = result.FilteredMemoryCount;
+            IncludedMemoryCount  = result.IncludedMemoryCount;
+            PollutedTermsSummary = result.PollutedTermsFound.Count > 0
+                ? string.Join(", ", result.PollutedTermsFound)
+                : string.Empty;
+            ContextQualityBadge = result.ContextPolluted
+                ? $"⚠️ Polluted — {result.FilteredMemoryCount} item(s) filtered: {PollutedTermsSummary}"
+                : result.FilteredMemoryCount > 0
+                    ? $"✅ Clean ({result.FilteredMemoryCount} junk item(s) filtered)"
+                    : "✅ Clean";
+
+            // ── 5. Score against selected test case (Fix 3: require retrieved context) ──
             if (SelectedTestCase is not null)
             {
                 var mustTerms    = SplitTerms(SelectedTestCase.MustIncludeAny);
@@ -253,8 +274,13 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                     : string.Empty;
                 var badLead = mustNotTerms.Any(t => topFile.Contains(t, StringComparison.OrdinalIgnoreCase));
 
+                // Fix 3: PASS only if index is Ready OR at least one snippet retrieved
+                var contextIsReady = string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                                     || RetrievedItems.Count > 0;
+
                 IntentMatchBadge = intentOk ? "✅ Match" : "⚠️ Mismatch";
-                ResultStatus     = EvaluateScore(intentOk, hasMustInclude, badLead, hasProject: true);
+                ResultStatus     = EvaluateScore(intentOk, hasMustInclude, badLead,
+                                                 hasProject: true, contextIsReady: contextIsReady);
             }
             else
             {
@@ -326,12 +352,16 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                 var violated      = mustNotTerms.Any(t => responseLower.Contains(t.ToLowerInvariant()));
                 MustNotMentionStatus = mustNotTerms.Length == 0 ? "—" : (violated ? "❌ Violation" : "✅ Clean");
 
-                // Re-evaluate overall result including AI response
+                // Re-evaluate overall result including AI response (Fix 3: account for context quality)
                 var intentOk = string.Equals(DetectedIntent, ExpectedIntent, StringComparison.OrdinalIgnoreCase);
+                var contextIsReady = string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                                     || RetrievedItems.Count > 0;
                 if (!intentOk || violated)
                     ResultStatus = "❌ FAIL";
                 else if (!filesFound || !mustFound)
                     ResultStatus = "⚠️ WARNING — response weak";
+                else if (!contextIsReady)
+                    ResultStatus = "⚠️ WARNING — correct answer, limited context";
                 else
                     ResultStatus = "✅ PASS";
             }
@@ -387,6 +417,11 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         PromptText           = string.Empty;
         ErrorMessage         = string.Empty;
         ResultStatus         = "—";
+        ContextPolluted      = false;
+        PollutedTermsSummary = string.Empty;
+        FilteredMemoryCount  = 0;
+        IncludedMemoryCount  = 0;
+        ContextQualityBadge  = "—";
         AiResponse           = string.Empty;
         RunStatusMessage     = string.Empty;
         MustMentionStatus    = "—";
@@ -436,12 +471,14 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     // ── Scoring logic ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// MVP scoring:
-    ///   PASS    — intent matches AND at least one must-include term is present AND no bad lead.
-    ///   WARNING — intent matches but no must-include term found (limited context).
-    ///   FAIL    — intent mismatch OR bad-lead AND intent mismatch.
+    /// Scoring rules (Fix 3):
+    ///   PASS    — intent ok AND must-include found AND no bad lead AND context is non-empty/ready.
+    ///   WARNING — intent ok, no bad lead, but context is limited/empty (index not ready, no snippets).
+    ///   WARNING — intent ok, no bad lead, context ready but no must-include term found.
+    ///   FAIL    — intent mismatch OR bad lead (wrong context leading).
     /// </summary>
-    private static string EvaluateScore(bool intentOk, bool hasMustInclude, bool badLead, bool hasProject)
+    private static string EvaluateScore(bool intentOk, bool hasMustInclude, bool badLead,
+                                        bool hasProject, bool contextIsReady = false)
     {
         if (!hasProject)
             return intentOk ? "⚠️ WARNING — no project" : "❌ FAIL — no project + intent mismatch";
@@ -452,8 +489,13 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         if (badLead)
             return "❌ FAIL — wrong context leads";
 
-        if (hasMustInclude)
+        // PASS requires both correct terms AND real project context
+        if (hasMustInclude && contextIsReady)
             return "✅ PASS";
+
+        // Good terms found but index not ready / no snippets retrieved
+        if (hasMustInclude && !contextIsReady)
+            return "⚠️ WARNING — terms matched, context limited";
 
         return "⚠️ WARNING — intent ok, context limited";
     }
@@ -470,12 +512,12 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
             DisplayName    = "1 — Delete saved tickets",
             UserMessage    = "What do I have to do to delete tickets? What files are affected?",
             ExpectedIntent = "SavedTicketManagement",
-            MustIncludeAny = "TicketsWorkspaceViewModel,TicketsWorkspaceView.xaml,ProjectTicket,TicketService",
-            MustNotLeadWith= "DraftTicketDtos.cs,DraftTicket,CodebaseTicketGeneratorModels.cs",
-            MustMention    = "soft delete,tenant,confirmation",
-            MustNotMention = "Weaviate",
-            PassRule       = "References real saved-ticket files/classes. Avoids treating DraftTicket as the saved ticket model.",
-            FailRule       = "DraftTicketDtos.cs is the primary affected file cited.",
+            MustIncludeAny = "TicketsWorkspaceViewModel,TicketsWorkspaceView.xaml,ProjectTicket,TicketService,ProjectTickets",
+            MustNotLeadWith= "DraftTicketDtos.cs,DraftTicket,CodebaseTicketGeneratorModels.cs,TicketController,TicketModel,Repository,Controller",
+            MustMention    = "inspect DeleteTicketAsync,ArchiveTicketAsync,add if missing,tenant,project ownership,soft delete,archive,confirmation,refresh,SelectedTicket,ProjectImplementationPlans",
+            MustNotMention = "Weaviate,TicketController,TicketModel,Repository,Controller,likely,possibly,typically",
+            PassRule       = "References real IronDev files + covers all 7 checklist items (archive/delete, tenant guard, confirmation, command, list refresh, SelectedTicket clear, linked plan check). Context must be non-empty.",
+            FailRule       = "DraftTicketDtos.cs cited, generic MVC terms used, or entirely hedged language with no IronDev-specific context.",
         },
         new() {
             Id             = "tc2",

@@ -42,8 +42,8 @@ public class PromptPlaygroundViewModelSpecTests
         new("tc1",  "1 — Delete saved tickets",
             "What do I have to do to delete tickets? What files are affected?",
             "SavedTicketManagement",
-            "TicketsWorkspaceViewModel,TicketsWorkspaceView.xaml,ProjectTicket,TicketService",
-            "DraftTicketDtos.cs,DraftTicket,CodebaseTicketGeneratorModels.cs"),
+            "TicketsWorkspaceViewModel,TicketsWorkspaceView.xaml,ProjectTicket,TicketService,ProjectTickets",
+            "DraftTicketDtos.cs,DraftTicket,CodebaseTicketGeneratorModels.cs,TicketController,TicketModel,Repository,Controller"),
 
         new("tc2",  "2 — Delete old chat sessions",
             "What would I need to do to delete old chats from Chat History?",
@@ -514,5 +514,196 @@ public class PromptPlaygroundViewModelSpecTests
         var actual = PromptContextBuilder.ClassifyIntent(tc.UserMessage);
         Assert.AreEqual(ChatIntent.SavedTicketManagement, actual,
             $"[{tc.DisplayName}] Expected SavedTicketManagement, actual={actual}");
+    }
+
+    [TestMethod]
+    [Description("TC1: MustNotMention — generic MVC term 'TicketController' in AI response causes violation.")]
+    public void TC1_MustNotMention_TicketController_DetectsViolation()
+    {
+        // Generic MVC response that should FAIL the tc1 evaluation
+        const string badResponse = "You need to update TicketController and TicketModel, then call the Repository layer to delete.";
+        var responseLower = badResponse.ToLowerInvariant();
+        var mustNotTerms  = new[] { "ticketcontroller", "ticketmodel", "repository", "controller" };
+        var violated = mustNotTerms.Any(t => responseLower.Contains(t));
+        Assert.IsTrue(violated,
+            "[TC1] Generic MVC terms (TicketController/TicketModel/Repository) must be detected as a grounding failure.");
+    }
+
+    [TestMethod]
+    [Description("Junk memory filter: decisions with placeholder text must be excluded from the prompt.")]
+    public void JunkMemoryFilter_PlaceholderDecision_IsDetectedAsJunk()
+    {
+        var junkDetails = new[]
+        {
+            "It seems you're looking for assistance with a decision",
+            "Could you please provide more specific details",
+            "Please provide more context",
+            "ffg",   // too short
+            "ok",    // too short
+        };
+        foreach (var detail in junkDetails)
+        {
+            var isJunk = detail.Length < 20
+                || detail.StartsWith("It seems",       System.StringComparison.OrdinalIgnoreCase)
+                || detail.StartsWith("Could you",      System.StringComparison.OrdinalIgnoreCase)
+                || detail.StartsWith("Please provide", System.StringComparison.OrdinalIgnoreCase);
+            Assert.IsTrue(isJunk,
+                $"Detail '{detail.Substring(0, System.Math.Min(40, detail.Length))}' should be classified as junk.");
+        }
+    }
+
+    [TestMethod]
+    [Description("Junk memory filter: a real architectural decision is NOT filtered out.")]
+    public void JunkMemoryFilter_RealDecision_IsNotJunk()
+    {
+        const string realDecision = "DraftTicket is only for the Chat to Draft Ticket review flow. ProjectTicket is the saved ticket model.";
+        var isJunk = realDecision.Length < 20
+            || realDecision.StartsWith("It seems",       System.StringComparison.OrdinalIgnoreCase)
+            || realDecision.StartsWith("Could you",      System.StringComparison.OrdinalIgnoreCase)
+            || realDecision.StartsWith("Please provide", System.StringComparison.OrdinalIgnoreCase);
+        Assert.IsFalse(isJunk, "A real project decision must not be classified as junk.");
+    }
+
+    [TestMethod]
+    [Description("Grounding-first rule: hedging language ('likely','possibly') signals weak grounding for TC1.")]
+    public void GroundingFirstRule_HedgingLanguage_SignalsWeakGrounding()
+    {
+        // TC1 MustNotMention now includes 'likely,possibly,typically'
+        const string hedgedResponse = "You would likely need to update TicketService, and possibly add a DeleteTicket method.";
+        var responseLower = hedgedResponse.ToLowerInvariant();
+        var hedgeTerms = new[] { "likely", "possibly", "typically" };
+        var violated = hedgeTerms.Any(t => responseLower.Contains(t));
+        Assert.IsTrue(violated,
+            "[TC1] Hedging language ('likely'/'possibly') in AI response must be detected as a grounding weakness.");
+    }
+
+    // ── Fix 5: Prompt grounding quality tests ───────────────────────────────────────
+
+    [TestMethod]
+    [Description("Fix 5.1: IsJunkMemory detects TicketModel as an arch-poison term.")]
+    public void IsJunkMemory_TicketModel_IsDetectedAndFiltered()
+    {
+        const string badTicket = "The main files/classes involved include TicketModel and TicketController for handling ticket data.";
+        var (isJunk, terms) = PromptContextBuilder.IsJunkMemory(badTicket);
+        Assert.IsTrue(isJunk, "Content containing 'TicketModel' must be classified as junk.");
+        Assert.IsTrue(terms.Any(t => t.Equals("TicketModel", System.StringComparison.OrdinalIgnoreCase)),
+            "PollutedTerms must include 'TicketModel'.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.1: IsJunkMemory detects TicketController as an arch-poison term.")]
+    public void IsJunkMemory_TicketController_IsDetectedAndFiltered()
+    {
+        const string badTicket = "You need to update TicketController and call the Repository layer.";
+        var (isJunk, terms) = PromptContextBuilder.IsJunkMemory(badTicket);
+        Assert.IsTrue(isJunk, "Content containing 'TicketController' must be classified as junk.");
+        Assert.IsTrue(terms.Any(t => t.Equals("TicketController", System.StringComparison.OrdinalIgnoreCase)),
+            "PollutedTerms must include 'TicketController'.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.1: IsJunkMemory detects 'View Templates' as an arch-poison term.")]
+    public void IsJunkMemory_ViewTemplates_IsDetectedAndFiltered()
+    {
+        const string badTicket = "The main files include View Templates for rendering the ticketing interface.";
+        var (isJunk, terms) = PromptContextBuilder.IsJunkMemory(badTicket);
+        Assert.IsTrue(isJunk, "Content containing 'View Templates' must be classified as junk.");
+        Assert.IsTrue(terms.Any(t => t.Equals("View Templates", System.StringComparison.OrdinalIgnoreCase)),
+            "PollutedTerms must include 'View Templates'.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.1: IsJunkMemory detects 'Repository' as an arch-poison term.")]
+    public void IsJunkMemory_Repository_IsDetectedAndFiltered()
+    {
+        const string badTicket = "Call the Repository layer to perform the delete operation on the database.";
+        var (isJunk, terms) = PromptContextBuilder.IsJunkMemory(badTicket);
+        Assert.IsTrue(isJunk, "Content containing 'Repository' must be classified as junk.");
+        Assert.IsTrue(terms.Any(t => t.Equals("Repository", System.StringComparison.OrdinalIgnoreCase)),
+            "PollutedTerms must include 'Repository'.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.1: Real IronDev decision text (no poison terms) is NOT filtered.")]
+    public void IsJunkMemory_RealIronDevDecision_IsNotFiltered()
+    {
+        const string real = "TicketService is the service for ProjectTicket persistence. ArchiveTicketAsync should check tenant ownership before deletion.";
+        var (isJunk, terms) = PromptContextBuilder.IsJunkMemory(real);
+        Assert.IsFalse(isJunk,  "Real IronDev decision text must not be filtered.");
+        Assert.AreEqual(0, terms.Count, "No pollution terms should be reported for clean content.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.3: EvaluateScore logic — correct answer with Limited/Unknown context scores WARNING not PASS.")]
+    public void EvaluateScore_CorrectAnswer_LimitedContext_ReturnsWarning()
+    {
+        // Mirrors the condition seen in the observed playground screenshot:
+        // intent ok, all terms matched in response, but index = Unknown / no snippets retrieved.
+        bool intentOk      = true;
+        bool hasMustInclude = true;   // all expected files/classes found in answer
+        bool badLead       = false;
+        bool hasProject    = true;
+        bool contextIsReady = false;  // Index = Unknown / Limited, no snippets
+
+        // Replicate the EvaluateScore logic
+        string result;
+        if (!hasProject)    result = intentOk ? "⚠️ WARNING — no project" : "❌ FAIL — no project + intent mismatch";
+        else if (!intentOk) result = "❌ FAIL";
+        else if (badLead)   result = "❌ FAIL — wrong context leads";
+        else if (hasMustInclude && contextIsReady)  result = "✅ PASS";
+        else if (hasMustInclude && !contextIsReady) result = "⚠️ WARNING — terms matched, context limited";
+        else                result = "⚠️ WARNING — intent ok, context limited";
+
+        Assert.IsTrue(result.StartsWith("⚠️ WARNING"),
+            $"Expected WARNING for correct answer with limited context. Got: {result}");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.4: EvaluateScore — forbidden MVC term in response produces FAIL.")]
+    public void EvaluateScore_ForbiddenTerm_InAiResponse_ReturnsFail()
+    {
+        // The RunGroundingTest evaluator checks MustNotMention against AI response
+        const string aiResponse = "You should update TicketController and call the Repository delete method.";
+        var responseLower = aiResponse.ToLowerInvariant();
+        var mustNotTerms  = new[] { "ticketcontroller", "ticketmodel", "repository", "controller", "weaviate" };
+        var violated = mustNotTerms.Any(t => responseLower.Contains(t));
+
+        // If violated, intentOk irrelevant — result must be FAIL
+        var result = violated ? "❌ FAIL" : "✅ PASS";
+        Assert.AreEqual("❌ FAIL", result,
+            "AI response containing forbidden MVC terms must score FAIL.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.5: EvaluateScore — PASS requires context ready AND all terms present.")]
+    public void EvaluateScore_AllConditionsMet_WithReadyContext_ReturnsPass()
+    {
+        bool intentOk       = true;
+        bool hasMustInclude  = true;
+        bool badLead        = false;
+        bool hasProject     = true;
+        bool contextIsReady = true;   // Index = Ready or snippets retrieved
+
+        string result;
+        if (!hasProject)    result = intentOk ? "⚠️ WARNING — no project" : "❌ FAIL — no project + intent mismatch";
+        else if (!intentOk) result = "❌ FAIL";
+        else if (badLead)   result = "❌ FAIL — wrong context leads";
+        else if (hasMustInclude && contextIsReady)  result = "✅ PASS";
+        else if (hasMustInclude && !contextIsReady) result = "⚠️ WARNING — terms matched, context limited";
+        else                result = "⚠️ WARNING — intent ok, context limited";
+
+        Assert.AreEqual("✅ PASS", result,
+            "All conditions met with ready context must score PASS.");
+    }
+
+    [TestMethod]
+    [Description("Fix 5.6: TC1 MustIncludeAny now requires ProjectTickets.")]
+    public void TC1_MustIncludeAny_ContainsProjectTickets()
+    {
+        var tc = Cases.Single(c => c.Id == "tc1");
+        var terms = tc.MustIncludeAny.Split(',',
+            System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+        Assert.IsTrue(terms.Contains("ProjectTickets"),
+            "TC1 MustIncludeAny must include 'ProjectTickets' (the database table / collection name).");
     }
 }

@@ -213,6 +213,62 @@
             </StackPanel>
         </Border>
 
+        <!-- ── Prompt Context Quality Diagnostics (Fix 2) ────────────────── -->
+        <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="18,14"
+                Visibility="{Binding ContextQualityBadge, Converter={StaticResource StringToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="PROMPT CONTEXT QUALITY"
+                           Style="{StaticResource IronEyebrow}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                <!-- Badge: Clean / Polluted -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ContextQualityBadge}"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+
+                <!-- Filtered count pill -->
+                <Border Grid.Column="2" CornerRadius="4" Padding="10,4" Margin="12,0,0,0"
+                        VerticalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#1AFFFFFF"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ContextPolluted}" Value="True">
+                                    <Setter Property="Background" Value="#33BB4444"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7">
+                            <Run Text="Filtered: "/>
+                            <Run Text="{Binding FilteredMemoryCount}"/>
+                        </TextBlock>
+                        <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.4"/>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextBrush}" Opacity="0.7">
+                            <Run Text="Included: "/>
+                            <Run Text="{Binding IncludedMemoryCount}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- Polluted terms -->
+                <TextBlock Grid.Column="3"
+                           Text="{Binding PollutedTermsSummary, StringFormat='Poison terms: {0}'}"
+                           FontSize="11" Foreground="#FFCC5555" Opacity="0.85"
+                           VerticalAlignment="Center" Margin="12,0,0,0" FontFamily="Consolas, Courier New"
+                           Visibility="{Binding PollutedTermsSummary, Converter={StaticResource StringToVisibilityConverter}}"/>
+            </Grid>
+        </Border>
+
         <!-- ── Expected Behaviour Panel ───────────────────────────────────── -->
         <Border Style="{StaticResource IronCard}" Margin="0,0,0,12" Padding="22">
             <StackPanel>
