@@ -421,7 +421,7 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         PollutedTermsSummary = string.Empty;
         FilteredMemoryCount  = 0;
         IncludedMemoryCount  = 0;
-        ContextQualityBadge  = "—";
+        ContextQualityBadge  = string.Empty;
         AiResponse           = string.Empty;
         RunStatusMessage     = string.Empty;
         MustMentionStatus    = "—";
@@ -436,12 +436,17 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     partial void OnSelectedTestCaseChanged(GroundingTestCase? value)
     {
         // Clear previous build state
-        DetectedIntent   = string.Empty;
-        IntentMatchBadge = "—";
-        ExpandedQueries  = string.Empty;
-        PromptText       = string.Empty;
-        ErrorMessage     = string.Empty;
-        ResultStatus     = "—";
+        DetectedIntent       = string.Empty;
+        IntentMatchBadge     = "—";
+        ExpandedQueries      = string.Empty;
+        PromptText           = string.Empty;
+        ErrorMessage         = string.Empty;
+        ResultStatus         = "—";
+        ContextPolluted      = false;
+        PollutedTermsSummary = string.Empty;
+        FilteredMemoryCount  = 0;
+        IncludedMemoryCount  = 0;
+        ContextQualityBadge  = string.Empty;
         RetrievedItems.Clear();
 
         if (value is null)
