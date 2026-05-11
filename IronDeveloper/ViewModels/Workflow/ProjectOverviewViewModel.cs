@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -119,32 +120,74 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     {
         if (_currentProject == null || string.IsNullOrWhiteSpace(_currentProject.LocalPath))
         {
-            Status = "Err: Invalid Path";
+            Status = "Err: No path configured";
             return;
         }
 
         IsIndexing = true;
-        Status     = "Indexing...";
+        Status     = "Indexing…";
         var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // ── Pre-index diagnostics (visible in Visual Studio Output → Debug) ───
+        var path      = _currentProject.LocalPath;
+        var pathExists = Directory.Exists(path);
+        System.Diagnostics.Trace.WriteLine("╔══════════════════════════════════════════════╗");
+        System.Diagnostics.Trace.WriteLine("  [Index] Starting Index Project");
+        System.Diagnostics.Trace.WriteLine($"  ProjectId  : {_currentProject.Id}");
+        System.Diagnostics.Trace.WriteLine($"  Name       : {_currentProject.Name}");
+        System.Diagnostics.Trace.WriteLine($"  LocalPath  : [{path}]");
+        System.Diagnostics.Trace.WriteLine($"  PathLength : {path.Length} chars");
+        System.Diagnostics.Trace.WriteLine($"  PathExists : {pathExists}");
+        if (pathExists)
+        {
+            var slnFiles = Directory.GetFiles(path, "*.sln*", SearchOption.TopDirectoryOnly);
+            System.Diagnostics.Trace.WriteLine($"  SolutionFiles: {slnFiles.Length} ({string.Join(", ", slnFiles.Select(Path.GetFileName))})");
+            var csFiles = Directory.GetFiles(path, "*.cs", SearchOption.AllDirectories).Take(5).ToArray();
+            System.Diagnostics.Trace.WriteLine($"  First .cs files: {string.Join(" | ", csFiles.Select(Path.GetFileName))}");
+            var csTotal = Directory.GetFiles(path, "*.cs", SearchOption.AllDirectories).Length;
+            System.Diagnostics.Trace.WriteLine($"  Total .cs files (all dirs): {csTotal}");
+        }
+        System.Diagnostics.Trace.WriteLine("╚══════════════════════════════════════════════╝");
 
         try
         {
             var result = await _indexingService.IndexProjectAsync(_currentProject);
             sw.Stop();
-            
             IndexingTime = $"{sw.Elapsed.TotalSeconds:F1}s";
-            FileCount = result.FilesScanned;
-            
-            // Note: In a real app, we'd reload the project from DB to get the new LastIndexedUtc
-            // but for now we just manually update the local object for UI
-            _currentProject.LastIndexedUtc = DateTime.UtcNow;
-            _currentProject.IndexingStatus = "Ready";
 
+            // Post-index diagnostics
+            System.Diagnostics.Trace.WriteLine(
+                $"[Index] Result: Scanned={result.FilesScanned} Added={result.FilesAdded} Updated={result.FilesUpdated} " +
+                $"Unchanged={result.FilesUnchanged} Skipped={result.FilesSkipped} Stored={result.StoredFileCount} " +
+                $"DirNotFound={result.DirectoryNotFound} Error=[{result.ErrorMessage ?? "none"}]");
+
+            if (result.DirectoryNotFound)
+            {
+                Status    = $"❌ Path not found: [{path}]";
+                FileCount = 0;
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(result.ErrorMessage) && result.StoredFileCount == 0)
+            {
+                Status    = $"⚠️ {result.ErrorMessage}";
+                FileCount = 0;
+                await RefreshAsync();
+                return;
+            }
+
+            // Success — use StoredFileCount (actual DB rows) not FilesScanned (just disk walk)
+            FileCount = result.StoredFileCount;
+
+            // Reload from DB so that LastIndexedUtc, IndexingStatus come from the DB update
+            // performed by CodeIndexService, not from a manual local mutation
             await RefreshAsync();
         }
         catch (Exception ex)
         {
-            Status = $"Err: {ex.Message}";
+            sw.Stop();
+            System.Diagnostics.Trace.WriteLine($"[Index] EXCEPTION: {ex}");
+            Status = $"❌ Index failed: {ex.Message}";
         }
         finally
         {

@@ -74,7 +74,7 @@ public class ChatGroundingSpecTests
     }
 
     [TestMethod]
-    [Description("TC1-C: TicketsWorkspaceViewModel ranked above DraftTicketDtos for saved-ticket query.")]
+    [Description("TC1-C: DraftTicketDtos excluded entirely from SavedTicketManagement results; TicketsWorkspaceViewModel still present.")]
     public void TC1_Ranking_TicketsWorkspaceAboveDraftTicketDtos()
     {
         var snippets = MakeSnippets(
@@ -84,8 +84,17 @@ public class ChatGroundingSpecTests
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
 
-        AssertRankedBefore(ranked, "TicketsWorkspaceViewModel", "DraftTicketDtos",
-            "TC1: TicketsWorkspaceViewModel must appear before DraftTicketDtos.");
+        var paths = ranked.Select(r => (r.FilePath ?? string.Empty) + "|" + (r.SymbolName ?? string.Empty)).ToList();
+
+        // DraftTicket snippets must be absent (hard-excluded)
+        Assert.IsFalse(paths.Any(p => p.Contains("DraftTicketDtos", System.StringComparison.OrdinalIgnoreCase)),
+            "TC1: DraftTicketDtos must be completely absent from SavedTicketManagement ranked results.");
+        Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", System.StringComparison.OrdinalIgnoreCase)),
+            "TC1: CodebaseTicketGeneratorModels must be completely absent from SavedTicketManagement ranked results.");
+
+        // TicketsWorkspaceViewModel must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceViewModel", System.StringComparison.OrdinalIgnoreCase)),
+            "TC1: TicketsWorkspaceViewModel must be present in ranked results.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -167,7 +176,7 @@ public class ChatGroundingSpecTests
     }
 
     [TestMethod]
-    [Description("TC3-C: TicketsWorkspaceView ranked above CodebaseTicketGeneratorModels for ticket list UI query.")]
+    [Description("TC3-C: CodebaseTicketGeneratorModels excluded from SavedTicketManagement; TicketsWorkspaceView present.")]
     public void TC3_Ranking_TicketsWorkspaceViewAboveGeneratorModels()
     {
         var snippets = MakeSnippets(
@@ -176,8 +185,15 @@ public class ChatGroundingSpecTests
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
 
-        AssertRankedBefore(ranked, "TicketsWorkspaceView", "CodebaseTicketGeneratorModels",
-            "TC3: TicketsWorkspaceView.xaml must appear before CodebaseTicketGeneratorModels.");
+        var paths = ranked.Select(r => r.FilePath ?? string.Empty).ToList();
+
+        // CodebaseTicketGeneratorModels is a DraftTicket subsystem file — must be excluded
+        Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", System.StringComparison.OrdinalIgnoreCase)),
+            "TC3: CodebaseTicketGeneratorModels must be absent from SavedTicketManagement results.");
+
+        // TicketsWorkspaceView must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceView", System.StringComparison.OrdinalIgnoreCase)),
+            "TC3: TicketsWorkspaceView.xaml must be present in ranked results.");
     }
 
     // ════════════════════════════════════════════════════════════════════════

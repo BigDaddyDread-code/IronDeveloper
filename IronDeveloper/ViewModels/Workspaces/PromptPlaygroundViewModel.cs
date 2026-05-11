@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.AI;
 using IronDev.Core;
+using IronDev.Core.Auth;
 using IronDev.Services;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -83,9 +84,11 @@ public sealed class GroundingTestCase
 /// </summary>
 public sealed partial class PromptPlaygroundViewModel : ObservableObject
 {
-    private readonly IPromptContextBuilder _builder;
-    private readonly IProjectService        _projectService;
-    private readonly ILLMService            _llmService;
+    private readonly IPromptContextBuilder  _builder;
+    private readonly IProjectService         _projectService;
+    private readonly ILLMService             _llmService;
+    private readonly ICodeIndexService       _codeIndexService;
+    private readonly ICurrentTenantContext   _tenantContext;
 
     // ── Observable Properties ─────────────────────────────────────────────
 
@@ -132,6 +135,21 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     [ObservableProperty] private string _expectedFilesStatus   = "—";
     [ObservableProperty] private string _providerInfo          = string.Empty;
 
+    // ── Retrieval Diagnostics ──────────────────────────────────────────────
+    [ObservableProperty] private int    _retrievalProjectId       = 0;
+    [ObservableProperty] private int    _retrievalTenantId        = 0;
+    [ObservableProperty] private int    _projectFilesCount        = -1; // -1 = not yet queried
+    [ObservableProperty] private int    _codeIndexEntriesCount    = -1;
+    [ObservableProperty] private int    _expandedQueryCount       = 0;
+    [ObservableProperty] private int    _retrievedSnippetCount    = 0;
+    [ObservableProperty] private int    _retrievedFileCount       = 0;
+    [ObservableProperty] private string _retrievalSources         = string.Empty;
+    [ObservableProperty] private string _retrievalEmptyReason     = string.Empty;
+    [ObservableProperty] private bool   _hasDiagnostics           = false;
+    /// <summary>Set when project status is Ready but ProjectFiles count is 0 — indicates a stale/inconsistent index.</summary>
+    [ObservableProperty] private bool   _indexInconsistent        = false;
+    [ObservableProperty] private string _indexInconsistencyReason = string.Empty;
+
     public ObservableCollection<RetrievedContextItem> RetrievedItems { get; } = new();
     public IReadOnlyList<GroundingTestCase>            TestCases      { get; } = BuildTestCases();
 
@@ -146,13 +164,17 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     // ── Constructor ───────────────────────────────────────────────────────
 
     public PromptPlaygroundViewModel(
-        IPromptContextBuilder builder,
+        IPromptContextBuilder  builder,
         IProjectService        projectService,
-        ILLMService            llmService)
+        ILLMService            llmService,
+        ICodeIndexService      codeIndexService,
+        ICurrentTenantContext  tenantContext)
     {
-        _builder        = builder;
-        _projectService = projectService;
-        _llmService     = llmService;
+        _builder          = builder;
+        _projectService   = projectService;
+        _llmService       = llmService;
+        _codeIndexService = codeIndexService;
+        _tenantContext    = tenantContext;
 
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRetrievedItems));
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ContextRetrievalStatus));
@@ -193,12 +215,40 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                 ? (intentOk ? "✅ Match" : "⚠️ Mismatch") : "—";
 
             // ── 3. Try to resolve a project (best-effort — never fatal) ──────
+            // Priority: use the project the user has actively opened (tracked via AgentTenantContext.ActiveProjectId).
+            // Fall back to listing only when no project is active (e.g. Playground opened cold).
             IronDev.Data.Models.Project? project = null;
             string projectError = string.Empty;
             try
             {
-                var projects = await _projectService.GetProjectsAsync(ct);
-                project = projects?.Count > 0 ? projects[0] : null;
+                // Resolve active project ID from the tenant context (set by ShellViewModel on open)
+                int activeProjectId = (_tenantContext is IronDev.Agent.Services.AgentTenantContext agentCtx)
+                    ? agentCtx.ActiveProjectId
+                    : 0;
+
+                if (activeProjectId > 0)
+                {
+                    // Direct lookup — always returns IndexingStatus + IndexedFileCount
+                    project = await _projectService.GetByIdAsync(activeProjectId, ct);
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[Playground] Resolved active project via ActiveProjectId={activeProjectId}: " +
+                        $"{project?.Name} | Path=[{project?.LocalPath}] | Status={project?.IndexingStatus} | Files={project?.IndexedFileCount}");
+                }
+                else
+                {
+                    // Fallback: no project open yet — take the first Ready project, or just the first
+                    var projects = await _projectService.GetProjectsAsync(ct);
+                    if (projects?.Count > 0)
+                    {
+                        var bestMatch = projects.FirstOrDefault(p =>
+                            string.Equals(p.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                            && (p.IndexedFileCount ?? 0) > 0)
+                            ?? projects[0];
+                        project = await _projectService.GetByIdAsync(bestMatch.Id, ct);
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[Playground] No ActiveProjectId — fell back to project: {project?.Name} (Id={project?.Id})");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -242,6 +292,26 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                                      ? "Indexed" : "Limited";
 
             // ── 4. Full prompt build (uses DB) ───────────────────────────────
+            // Populate retrieval diagnostic identifiers
+            RetrievalProjectId = project.Id;
+            RetrievalTenantId  = _tenantContext.TenantId;
+            HasDiagnostics     = true;
+
+            // Counts for diagnostics (best-effort)
+            try
+            {
+                ProjectFilesCount     = await _codeIndexService.GetIndexedFileCountAsync(project.Id, ct);
+                // CodeIndexEntries count via snippet probe: count entries for this project
+                // We don't have a dedicated count method, so use a probe on a broad term
+                // and note that -1 means "not available"
+                CodeIndexEntriesCount = -1; // will be set after retrieval by inspecting RetrievedItems
+            }
+            catch
+            {
+                ProjectFilesCount     = -1;
+                CodeIndexEntriesCount = -1;
+            }
+
             var result = await _builder.BuildFullPromptForTestingAsync(project.Id, question, ct);
             PromptText = result.PromptText ?? string.Empty;
 
@@ -258,17 +328,60 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                     FilePath   = item.FilePath   ?? string.Empty,
                     SymbolName = item.SymbolName  ?? string.Empty,
                     Preview    = item.ChunkText is { Length: > 0 } s2
-                                     ? s2[..Math.Min(120, s2.Length)].Replace('\n', ' ')
+                                     ? s2[..Math.Min(160, s2.Length)].Replace('\n', ' ')
                                      : string.Empty
                 });
+            }
+
+            // ── Retrieval diagnostics ──────────────────────────────────────────
+            ExpandedQueryCount    = PromptContextBuilder.ExpandSearchQueries(question, PromptContextBuilder.ClassifyIntent(question)).Count;
+            RetrievedSnippetCount = RetrievedItems.Count;
+            RetrievedFileCount    = RetrievedItems.Select(i => i.FilePath).Where(p => !string.IsNullOrEmpty(p)).Distinct().Count();
+            CodeIndexEntriesCount = RetrievedItems.Count; // actual retrieved count; overall DB count not available without extra query
+
+            // Which sources contributed
+            var sources = new List<string>();
+            if (RetrievedItems.Count > 0)
+                sources.Add("CodeIndexEntries");
+            if (result.IncludedMemoryCount > 0)
+                sources.Add("Decisions/Tickets");
+            RetrievalSources = sources.Count > 0 ? string.Join(", ", sources) : "none";
+
+            // Empty reason — distinguish inconsistent state (Ready + 0 files) from genuine miss
+            bool isReadyStatus  = string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase);
+            bool zeroFiles      = ProjectFilesCount == 0;
+
+            IndexInconsistent = isReadyStatus && zeroFiles;
+            IndexInconsistencyReason = IndexInconsistent
+                ? "Project status is Ready but dbo.ProjectFiles is empty — re-run Index Project to rebuild the index"
+                : string.Empty;
+
+            if (RetrievedItems.Count == 0)
+            {
+                RetrievalEmptyReason =
+                    _tenantContext.TenantId == 0
+                        ? "TenantId = 0 — tenant context not set (open a project first)" :
+                    IndexInconsistent
+                        ? "IndexingStatus = Ready but ProjectFiles = 0 — index is stale. Re-run Index Project." :
+                    zeroFiles
+                        ? "No ProjectFiles found — run Index Project first" :
+                    ProjectFilesCount == -1
+                        ? "Could not query ProjectFiles count" :
+                    "No CodeIndexEntry matched the expanded queries — check project path and re-index if needed";
+            }
+            else
+            {
+                RetrievalEmptyReason = string.Empty;
             }
 
             // Separate context retrieval status from project index status
             ContextRetrievalStatus = RetrievedItems.Count > 0
                 ? $"Retrieved {RetrievedItems.Count} snippet(s)"
-                : string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
-                    ? "Empty — project indexed but no snippets matched"
-                    : "Limited — project not yet indexed";
+                : IndexInconsistent
+                    ? "⚠️ Inconsistent — Ready but no ProjectFiles"
+                    : string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                        ? "Empty — project indexed but no snippets matched"
+                        : "Limited — project not yet indexed";
 
             // ── Fix 2: Populate pollution diagnostics ────────────────────
             ContextPolluted      = result.ContextPolluted;
@@ -454,6 +567,19 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         ProviderInfo           = string.Empty;
         RetrievedItems.Clear();
         OnPropertyChanged(nameof(PromptCharCount));
+        // Retrieval diagnostics
+        RetrievalProjectId       = 0;
+        RetrievalTenantId        = 0;
+        ProjectFilesCount        = -1;
+        CodeIndexEntriesCount    = -1;
+        ExpandedQueryCount       = 0;
+        RetrievedSnippetCount    = 0;
+        RetrievedFileCount       = 0;
+        RetrievalSources         = string.Empty;
+        RetrievalEmptyReason     = string.Empty;
+        HasDiagnostics           = false;
+        IndexInconsistent        = false;
+        IndexInconsistencyReason = string.Empty;
     }
 
     // ── Selection change ──────────────────────────────────────────────────
@@ -475,6 +601,19 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         ContextRetrievalStatus = string.Empty;
         RetrievedItems.Clear();
         OnPropertyChanged(nameof(PromptCharCount));
+        // Retrieval diagnostics
+        RetrievalProjectId       = 0;
+        RetrievalTenantId        = 0;
+        ProjectFilesCount        = -1;
+        CodeIndexEntriesCount    = -1;
+        ExpandedQueryCount       = 0;
+        RetrievedSnippetCount    = 0;
+        RetrievedFileCount       = 0;
+        RetrievalSources         = string.Empty;
+        RetrievalEmptyReason     = string.Empty;
+        HasDiagnostics           = false;
+        IndexInconsistent        = false;
+        IndexInconsistencyReason = string.Empty;
 
         if (value is null)
         {
