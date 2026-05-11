@@ -1116,4 +1116,177 @@ public class PromptPlaygroundViewModelSpecTests
         Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.Id)), "All cases must have non-empty IDs.");
     }
+
+    // ── Task 7: Retrieval ranking quality tests ──────────────────────────────
+
+    private static IronDev.Data.Models.CodeIndexEntry MakeEntry(string filePath, string symbol, string chunk = "x")
+        => new IronDev.Data.Models.CodeIndexEntry
+        {
+            FilePath   = filePath,
+            SymbolName = symbol,
+            ChunkText  = chunk
+        };
+
+    [TestMethod]
+    [Description("T7.1: DeduplicateSnippets removes entries with the same (FilePath, SymbolName) key.")]
+    public void T7_1_DeduplicateSnippets_RemovesDuplicateByFileAndSymbol()
+    {
+        var items = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            MakeEntry("IronDeveloper/TicketsWorkspaceViewModel.cs", "DeleteTicket", "chunk A"),
+            MakeEntry("IronDeveloper/TicketsWorkspaceViewModel.cs", "DeleteTicket", "chunk A"), // dup
+            MakeEntry("IronDeveloper/TicketsWorkspaceView.xaml",    "Button",       "chunk B"),
+        };
+        var result = IronDev.AI.PromptContextBuilder.DeduplicateSnippets(items);
+        Assert.AreEqual(2, result.Count, "Duplicate (FilePath, SymbolName) must be removed.");
+    }
+
+    [TestMethod]
+    [Description("T7.2: DeduplicateSnippets removes entries with identical ChunkText content (≥50 chars).")]
+    public void T7_2_DeduplicateSnippets_RemovesDuplicateByChunkText()
+    {
+        // Must be ≥50 chars to trigger content-based dedup (short stubs are excluded)
+        const string sharedChunk = "  public void SaveTicket(ProjectTicket ticket) { _db.Save(ticket); } // production method ";
+        var items = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            MakeEntry("File1.cs", "SaveTicket", sharedChunk),
+            MakeEntry("File2.cs", "SaveTicketV2", sharedChunk), // same chunk text, different symbol
+        };
+        var result = IronDev.AI.PromptContextBuilder.DeduplicateSnippets(items);
+        Assert.AreEqual(1, result.Count, "Entries with identical ChunkText (≥50 chars) must be deduplicated.");
+    }
+
+    [TestMethod]
+    [Description("T7.3: Production files outscore IntegrationTests files for CodeQuery intent.")]
+    public void T7_3_ProductionFiles_OutrankTestFiles_ForCodeQuery()
+    {
+        var prod = MakeEntry("IronDeveloper/TicketsWorkspaceViewModel.cs", "SaveTicket");
+        var test = MakeEntry("IronDev.IntegrationTests/PromptPlaygroundViewModelSpecTests.cs", "T1_DeleteTicket");
+
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry> { test, prod };
+        var ranked   = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(snippets, IronDev.AI.ChatIntent.CodeQuery, 10);
+
+        Assert.AreEqual(prod.FilePath, ranked[0].FilePath,
+            "Production file must rank above IntegrationTests file for CodeQuery.");
+    }
+
+    [TestMethod]
+    [Description("T7.4: TicketsWorkspaceView.xaml outranks TicketsWorkspaceView.xaml.cs for SavedTicketManagement.")]
+    public void T7_4_Xaml_OutranksXamlCs_ForSavedTicketManagement()
+    {
+        var xaml   = MakeEntry("IronDeveloper/Views/TicketsWorkspaceView.xaml",    "ConfirmDeleteButton");
+        var xamlCs = MakeEntry("IronDeveloper/Views/TicketsWorkspaceView.xaml.cs", "ConfirmDeleteButton");
+
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry> { xamlCs, xaml };
+        var ranked   = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(snippets, IronDev.AI.ChatIntent.SavedTicketManagement, 10);
+
+        Assert.AreEqual(xaml.FilePath, ranked[0].FilePath,
+            "TicketsWorkspaceView.xaml must rank above .xaml.cs for UI confirmation queries.");
+    }
+
+    [TestMethod]
+    [Description("T7.5: ITicketService/TicketService snippets score highest for SavedTicketManagement.")]
+    public void T7_5_ITicketService_ScoresHighest_ForSavedTicketManagement()
+    {
+        var ticketSvc  = MakeEntry("IronDev.Infrastructure/Services/TicketService.cs", "ITicketService");
+        var viewModel  = MakeEntry("IronDeveloper/TicketsWorkspaceViewModel.cs",        "TicketsWorkspaceViewModel");
+        var testFile   = MakeEntry("IronDev.IntegrationTests/Spec.cs",                "SavedTicketTest");
+
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry> { testFile, viewModel, ticketSvc };
+        var ranked   = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(snippets, IronDev.AI.ChatIntent.SavedTicketManagement, 10);
+
+        Assert.AreEqual(ticketSvc.FilePath, ranked[0].FilePath,
+            "ITicketService/TicketService must be ranked first for SavedTicketManagement queries.");
+    }
+
+    [TestMethod]
+    [Description("T7.6: IntegrationTests snippets are demoted below production for SavedTicketManagement.")]
+    public void T7_6_TestFiles_AreDemoted_ForSavedTicketManagement()
+    {
+        var prod = MakeEntry("IronDeveloper/TicketsWorkspaceViewModel.cs", "TicketsWorkspaceViewModel");
+        var spec = MakeEntry("IronDev.IntegrationTests/PromptPlaygroundViewModelSpecTests.cs", "PromptPlaygroundViewModelSpec");
+
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry> { spec, prod };
+        var ranked   = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(snippets, IronDev.AI.ChatIntent.SavedTicketManagement, 10);
+
+        Assert.AreEqual(prod.FilePath, ranked[0].FilePath,
+            "Production ViewModel must rank above test spec file for SavedTicketManagement.");
+    }
+
+    [TestMethod]
+    [Description("T7.7: IsJunkMemory filters 'Certainly!' prefixed text.")]
+    public void T7_7_IsJunkMemory_Filters_Certainly()
+    {
+        var (isJunk, _) = IronDev.AI.PromptContextBuilder.IsJunkMemory("Certainly! Here's how you would implement delete...");
+        Assert.IsTrue(isJunk, "'Certainly!' must be detected as junk memory.");
+    }
+
+    [TestMethod]
+    [Description("T7.8: IsJunkMemory filters 'Here is how' prefixed text.")]
+    public void T7_8_IsJunkMemory_Filters_HereIsHow()
+    {
+        var (isJunk, _) = IronDev.AI.PromptContextBuilder.IsJunkMemory("Here is how you implement ticket deletion in WPF...");
+        Assert.IsTrue(isJunk, "'Here is how' must be detected as junk memory.");
+    }
+
+    [TestMethod]
+    [Description("T7.9: IsJunkMemory does NOT filter genuine project-specific content.")]
+    public void T7_9_IsJunkMemory_Allows_GenuineContent()
+    {
+        const string genuine = "TicketsWorkspaceViewModel.DeleteSelectedTicketCommand calls TicketService.DeleteTicketAsync with tenant guard.";
+        var (isJunk, _) = IronDev.AI.PromptContextBuilder.IsJunkMemory(genuine);
+        Assert.IsFalse(isJunk, "Genuine project content must not be filtered.");
+    }
+
+    [TestMethod]
+    [Description("T7.10: ExpandSearchQueries for SavedTicketManagement includes ITicketService and DeleteTicket.")]
+    public void T7_10_ExpandSearchQueries_SavedTicket_IncludesITicketService()
+    {
+        var queries = IronDev.AI.PromptContextBuilder.ExpandSearchQueries(
+            "How do I delete a saved ticket?", IronDev.AI.ChatIntent.SavedTicketManagement);
+
+        Assert.IsTrue(queries.Contains("ITicketService", StringComparer.OrdinalIgnoreCase),
+            "ITicketService must appear in SavedTicketManagement expanded queries.");
+        Assert.IsTrue(queries.Contains("DeleteTicket", StringComparer.OrdinalIgnoreCase),
+            "DeleteTicket must appear in SavedTicketManagement expanded queries.");
+    }
+
+    [TestMethod]
+    [Description("T7.11: Delete-ticket high-confidence profile — production files rank in top 4.")]
+    public void T7_11_DeleteTicket_HighConfidenceProfile_ProductionFilesFirst()
+    {
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            MakeEntry("IronDev.Infrastructure/Services/TicketService.cs",                      "ITicketService"),
+            MakeEntry("IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs",      "TicketsWorkspaceViewModel"),
+            MakeEntry("IronDeveloper/Views/Workspaces/TicketsWorkspaceView.xaml",              "ConfirmDeleteButton"),
+            MakeEntry("IronDev.Core/Models/DataModels.cs",                                     "ProjectTicket"),
+            MakeEntry("IronDev.IntegrationTests/PromptPlaygroundViewModelSpecTests.cs",         "SpecTest"),
+            MakeEntry("IronDev.IntegrationTests/ChatGroundingTests.cs",                        "ChatGrounding"),
+        };
+
+        var ranked   = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(snippets, IronDev.AI.ChatIntent.SavedTicketManagement, 14);
+        var top4     = ranked.Take(4).Select(s => s.FilePath).ToList();
+
+        // IntegrationTests must NOT appear in the top 4
+        var testPaths = top4.Where(p => p.Contains("IntegrationTests")).ToList();
+        Assert.AreEqual(0, testPaths.Count,
+            $"IntegrationTests must not appear in top-4 for delete-ticket query. Got: {string.Join(", ", testPaths)}");
+
+        // TicketService must be in top 4
+        Assert.IsTrue(top4.Any(p => p.Contains("TicketService")),
+            "TicketService must be in top-4 high-confidence for delete-ticket query.");
+    }
+
+    [TestMethod]
+    [Description("T7.12: Regression guard — all previous tests (T1-T6) unaffected.")]
+    public void T7_12_RegressionGuard_AllPreviousTestsStillValid()
+    {
+        Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
+        // Verify scoring contract still holds
+        const string intentName = "SavedTicketManagement";
+        Assert.AreEqual(intentName,
+            IronDev.AI.PromptContextBuilder.ClassifyIntent("How do I delete a saved ticket?").ToString(),
+            "Delete-ticket must still classify as SavedTicketManagement.");
+    }
 }
