@@ -324,6 +324,10 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveModel       = _overviewVm.Model; 
         ActiveStatus      = "Checking...";
 
+        // Track active project so cross-cutting VMs (e.g. Playground) resolve the right project
+        _tenantContext.SetProject(project.Id);
+        System.Diagnostics.Trace.WriteLine($"[Shell] ActiveProjectId set to {project.Id} ({project.Name})");
+
         // Push user/tenant context into overview VM for the Current State card
         _overviewVm.CurrentUserDisplayName = CurrentUser?.DisplayName ?? "Unknown";
         _overviewVm.CurrentUserEmail       = CurrentUser?.Email       ?? "Email not available";

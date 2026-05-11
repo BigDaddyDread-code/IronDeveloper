@@ -55,11 +55,19 @@ public sealed class SqlCodeIndexService : ICodeIndexService
     {
         var result = new CodeIndexResult();
 
+        // ── Service-level diagnostics ─────────────────────────────────────────
+        System.Diagnostics.Trace.WriteLine(
+            $"[CodeIndexService] IndexDirectoryAsync called: ProjectId={projectId} TenantId={_tenant.TenantId} " +
+            $"Path=[{directoryPath}] Exists={Directory.Exists(directoryPath)}");
+
         // ── Guard: directory must exist ───────────────────────────────────────
         if (!Directory.Exists(directoryPath))
         {
             result.DirectoryNotFound = true;
             result.ErrorMessage      = $"Directory not found: {directoryPath}";
+
+            System.Diagnostics.Trace.WriteLine(
+                $"[CodeIndexService] PATH NOT FOUND: [{directoryPath}] — marking project as failed.");
 
             // Mark the project status as failed — do NOT leave it as Ready
             using var conn0 = _connectionFactory.CreateConnection();
@@ -76,6 +84,10 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         }
 
         var allFiles = GetFilesToProcess(directoryPath).ToList();
+        System.Diagnostics.Trace.WriteLine(
+            $"[CodeIndexService] Directory found. allFiles={allFiles.Count} (after excludes). " +
+            $"First 5: {string.Join(" | ", allFiles.Take(5).Select(Path.GetFileName))}");
+
 
         using var connection = _connectionFactory.CreateConnection();
         if (connection is System.Data.Common.DbConnection dbConn)

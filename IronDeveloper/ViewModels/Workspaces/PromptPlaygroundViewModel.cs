@@ -215,17 +215,39 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                 ? (intentOk ? "✅ Match" : "⚠️ Mismatch") : "—";
 
             // ── 3. Try to resolve a project (best-effort — never fatal) ──────
-            // Use GetByIdAsync if we have a project, otherwise fall back to listing.
-            // GetProjectsAsync does NOT return IndexingStatus — GetByIdAsync does.
+            // Priority: use the project the user has actively opened (tracked via AgentTenantContext.ActiveProjectId).
+            // Fall back to listing only when no project is active (e.g. Playground opened cold).
             IronDev.Data.Models.Project? project = null;
             string projectError = string.Empty;
             try
             {
-                var projects = await _projectService.GetProjectsAsync(ct);
-                if (projects?.Count > 0)
+                // Resolve active project ID from the tenant context (set by ShellViewModel on open)
+                int activeProjectId = (_tenantContext is IronDev.Agent.Services.AgentTenantContext agentCtx)
+                    ? agentCtx.ActiveProjectId
+                    : 0;
+
+                if (activeProjectId > 0)
                 {
-                    // Re-query with GetByIdAsync to get IndexingStatus + LastIndexedUtc
-                    project = await _projectService.GetByIdAsync(projects[0].Id, ct);
+                    // Direct lookup — always returns IndexingStatus + IndexedFileCount
+                    project = await _projectService.GetByIdAsync(activeProjectId, ct);
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[Playground] Resolved active project via ActiveProjectId={activeProjectId}: " +
+                        $"{project?.Name} | Path=[{project?.LocalPath}] | Status={project?.IndexingStatus} | Files={project?.IndexedFileCount}");
+                }
+                else
+                {
+                    // Fallback: no project open yet — take the first Ready project, or just the first
+                    var projects = await _projectService.GetProjectsAsync(ct);
+                    if (projects?.Count > 0)
+                    {
+                        var bestMatch = projects.FirstOrDefault(p =>
+                            string.Equals(p.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                            && (p.IndexedFileCount ?? 0) > 0)
+                            ?? projects[0];
+                        project = await _projectService.GetByIdAsync(bestMatch.Id, ct);
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[Playground] No ActiveProjectId — fell back to project: {project?.Name} (Id={project?.Id})");
+                    }
                 }
             }
             catch (Exception ex)
