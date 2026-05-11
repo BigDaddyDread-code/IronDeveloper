@@ -420,6 +420,53 @@ public class ChatToDraftTicketTests
         StringAssert.Contains(vm.EditTechnicalNotes, "## Unit Tests",
             "TechnicalNotes must still have the section header.");
     }
+
+    [TestMethod]
+    [Description("GenerateImplementationPlanCommand populates PlanProposedSteps and sets HasPlan=true.")]
+    public async Task GenerateImplementationPlanCommand_PopulatesPlanFields()
+    {
+        var vm = CreateVm();
+        await vm.BeginDraftFromChatAsync(MakeContext());
+
+        // Ensure plan is empty initially (stub might not populate it in GenerateDraftAsync yet)
+        vm.HasPlan = false;
+        vm.PlanProposedSteps = string.Empty;
+
+        await vm.GenerateImplementationPlanCommand.ExecuteAsync(null);
+
+        Assert.IsTrue(vm.HasPlan, "HasPlan must be true after GenerateImplementationPlanCommand.");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(vm.PlanProposedSteps),
+            "PlanProposedSteps must be populated after generation.");
+        StringAssert.Contains(vm.PlanProposedSteps, "Step 1",
+            "PlanProposedSteps must contain content from the stub.");
+    }
+
+    [TestMethod]
+    [Description("ApproveDraftWithPlanAsync automatically generates a plan if HasPlan is false.")]
+    public async Task ApproveDraftWithPlanAsync_GeneratesPlanIfMissing()
+    {
+        var draftSvc = new StubDraftTicketService();
+        var ticketSvc = new StubTicketService();
+        var vm = new TicketsWorkspaceViewModel(ticketSvc, null!, new StubOrchestrator(), draftSvc, null!);
+
+        string? receivedSteps = null;
+        vm.OnApproveDraftWithPlan = (t, g, steps, fp, sym, sc, rn) =>
+        {
+            receivedSteps = steps;
+        };
+
+        await vm.BeginDraftFromChatAsync(MakeContext());
+        vm.HasPlan = false; // Force missing plan
+        vm.PlanProposedSteps = string.Empty;
+
+        await vm.ApproveDraftWithPlanCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(receivedSteps, "OnApproveDraftWithPlan callback must be invoked.");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(receivedSteps),
+            "Implementation plan should have been auto-generated before callback.");
+        StringAssert.Contains(receivedSteps, "Step 1",
+            "Received steps must contain content from the auto-generated plan.");
+    }
 }
 
 /// <summary>
@@ -462,4 +509,9 @@ internal sealed class FailingDraftTicketService : IDraftTicketService
         int projectId, DraftTicket current,
         System.Threading.CancellationToken ct = default)
         => throw new InvalidOperationException("Simulated regeneration failure.");
+
+    public Task<DraftTicket> GeneratePlanAsync(
+        int projectId, DraftTicket current,
+        System.Threading.CancellationToken ct = default)
+        => throw new InvalidOperationException("Simulated plan generation failure.");
 }

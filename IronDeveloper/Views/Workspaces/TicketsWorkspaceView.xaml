@@ -461,8 +461,8 @@
                                         <StackPanel HorizontalAlignment="Center">
                                             <controls:EmptyResultsState Title="No Implementation Plan" 
                                                                        Description="Create a plan to outline the technical steps for this ticket."/>
-                                            <Button Content="＋ Create Implementation Plan"
-                                                    Command="{Binding CreatePlanCommand}"
+                                            <Button Content="＋ Generate Implementation Plan"
+                                                    Command="{Binding GenerateImplementationPlanCommand}"
                                                     Style="{StaticResource AppButton.Primary}"
                                                     Padding="20,10" Margin="0,24,0,0"/>
                                         </StackPanel>
@@ -542,6 +542,7 @@
                                     <!-- Index status card -->
                                     <controls:SurfacePanel Variant="Subtle" Padding="16" Margin="0,0,0,12">
                                         <StackPanel>
+                                            <TextBlock Text="OPTIONAL BUILDER CONTEXT" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                                             <!-- Not-indexed warning -->
                                             <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
                                                     Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"

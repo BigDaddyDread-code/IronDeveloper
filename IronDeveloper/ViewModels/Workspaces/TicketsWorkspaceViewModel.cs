@@ -424,14 +424,44 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CreatePlan()
+    private async Task GenerateImplementationPlanAsync()
     {
-        if (SelectedTicket == null) return;
-        HasPlan = true;
-        PlanId = 0;
-        PlanTitle = $"Implementation Plan for {SelectedTicket.Title}";
-        PlanGoal = SelectedTicket.Summary ?? string.Empty;
-        ActiveTab = TicketDetailTab.ImplementationPlan;
+        if (IsDraftMode && CurrentDraft != null)
+        {
+            IsDraftGenerating  = true;
+            DraftStatusMessage = "Generating implementation plan…";
+
+            try
+            {
+                var updated = await _draftService.GeneratePlanAsync(_activeProjectId, CurrentDraft);
+                CurrentDraft = updated;
+
+                // Update only plan fields; other fields are untouched
+                HasPlan           = true;
+                PlanTitle         = $"{updated.Title} — Implementation Plan";
+                PlanGoal          = updated.Summary;
+                PlanProposedSteps = updated.ImplementationPlan ?? string.Empty;
+                PlanAffectedContext = updated.LinkedFilePaths ?? string.Empty;
+
+                DraftStatusMessage = "Implementation plan generated.";
+            }
+            catch (Exception ex)
+            {
+                DraftStatusMessage = $"Plan generation failed: {ex.Message}";
+            }
+            finally
+            {
+                IsDraftGenerating = false;
+            }
+        }
+        else if (SelectedTicket != null)
+        {
+            HasPlan = true;
+            PlanId = 0;
+            PlanTitle = $"Implementation Plan for {SelectedTicket.Title}";
+            PlanGoal = SelectedTicket.Summary ?? string.Empty;
+            ActiveTab = TicketDetailTab.ImplementationPlan;
+        }
     }
 
     [RelayCommand]
@@ -840,21 +870,32 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task ApproveDraftWithPlanAsync()
     {
+        // If plan is empty, generate it first
+        if (!HasPlan || string.IsNullOrWhiteSpace(PlanProposedSteps))
+        {
+            await GenerateImplementationPlanAsync();
+            if (!HasPlan || string.IsNullOrWhiteSpace(PlanProposedSteps))
+            {
+                SaveStatus = "Warning: Implementation plan is empty.";
+                // We'll continue anyway but show warning
+            }
+        }
+
         var savedId = await SaveDraftTicketAsync();
         if (savedId <= 0) return;
 
         // ✓ SNAPSHOT all field values BEFORE RefreshListAsync calls ClearEditor() and blanks them
-        var planTitle       = $"{EditTitle.Trim()} — Implementation Plan";
-        var planGoal        = EditSummary.Trim();
+        var planTitle       = string.IsNullOrWhiteSpace(PlanTitle) ? $"{EditTitle.Trim()} — Implementation Plan" : PlanTitle.Trim();
+        var planGoal        = string.IsNullOrWhiteSpace(PlanGoal) ? EditSummary.Trim() : PlanGoal.Trim();
         var planScope       = string.IsNullOrWhiteSpace(EditAcceptanceCriteria)
                                  ? null
                                  : EditAcceptanceCriteria.Trim();
-        var planSteps       = string.IsNullOrWhiteSpace(EditBackground)
-                                 ? null
-                                 : EditBackground.Trim();
-        var planFiles       = string.IsNullOrWhiteSpace(EditLinkedFilePaths)
-                                 ? null
-                                 : EditLinkedFilePaths.Trim();
+        var planSteps       = string.IsNullOrWhiteSpace(PlanProposedSteps)
+                                 ? (string.IsNullOrWhiteSpace(EditBackground) ? null : EditBackground.Trim())
+                                 : PlanProposedSteps.Trim();
+        var planFiles       = string.IsNullOrWhiteSpace(PlanAffectedContext)
+                                 ? (string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths.Trim())
+                                 : PlanAffectedContext.Trim();
         var planSymbols     = string.IsNullOrWhiteSpace(EditLinkedSymbols)
                                  ? null
                                  : EditLinkedSymbols.Trim();
@@ -1120,6 +1161,20 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditTestsManualTests      = draft.ManualTests;
         EditTestsRegressionTests  = draft.RegressionTests;
         EditTestsBuildValidation  = draft.BuildValidation;
+
+        // Populate Implementation Plan tab if data exists
+        if (!string.IsNullOrWhiteSpace(draft.ImplementationPlan))
+        {
+            HasPlan           = true;
+            PlanTitle         = $"{draft.Title} — Implementation Plan";
+            PlanGoal          = draft.Summary;
+            PlanProposedSteps = draft.ImplementationPlan;
+            PlanAffectedContext = draft.LinkedFilePaths ?? string.Empty;
+        }
+        else
+        {
+            HasPlan = false;
+        }
 
         SaveStatus = string.Empty;
     }
