@@ -790,13 +790,13 @@
                                         Padding="14,7" Margin="0,0,8,0"
                                         ToolTip="Discard draft and return to Chat"/>
                                 <StackPanel Grid.Column="4" Orientation="Horizontal">
-                                    <Button Content="✓ Create Ticket"
+                                    <Button Content="✓ Save Ticket"
                                             Command="{Binding ApproveDraftCommand}"
                                             Style="{StaticResource AppButton.Primary}"
                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
                                             Padding="18,7" Margin="0,0,6,0"
                                             ToolTip="Save this ticket to the database"/>
-                                    <Button Content="✓ Create Ticket + Plan"
+                                    <Button Content="✓ Save Ticket + Plan"
                                             Command="{Binding ApproveDraftWithPlanCommand}"
                                             Style="{StaticResource AppButton.Secondary}"
                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"

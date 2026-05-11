@@ -88,10 +88,31 @@ Focus on actionable, specific improvements. Avoid generic advice.
             
             // 4. Parse
             var cleaned = CleanJsonResponse(response);
-            var result = JsonSerializer.Deserialize<GenerationWrapper>(cleaned, new JsonSerializerOptions
+
+            // Diagnostics before deserialisation
+            System.Diagnostics.Trace.WriteLine("[CodebaseTicketGeneratorService.GenerateTicketsAsync] LLM response received.");
+            System.Diagnostics.Trace.WriteLine($"[CodebaseTicketGenerator] Response empty: {string.IsNullOrWhiteSpace(cleaned)}");
+            var preview = cleaned.Length > 300 ? cleaned[..300] + "..." : cleaned;
+            System.Diagnostics.Trace.WriteLine($"[CodebaseTicketGenerator] Raw preview: {preview}");
+
+            GenerationWrapper? result;
+            try
             {
-                PropertyNameCaseInsensitive = true
-            });
+                result = JsonSerializer.Deserialize<GenerationWrapper>(cleaned, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (Exception jsonEx)
+            {
+                System.Diagnostics.Trace.WriteLine(
+                    $"[CodebaseTicketGenerator] Deserialisation failed — target: GenerationWrapper — error: {jsonEx.Message}");
+                return new CodebaseTicketGenerationResult
+                {
+                    Success      = false,
+                    ErrorMessage = $"Draft generation failed: {jsonEx.Message}. Raw response preview: {preview}"
+                };
+            }
 
             if (result?.Drafts == null || result.Drafts.Count == 0)
             {

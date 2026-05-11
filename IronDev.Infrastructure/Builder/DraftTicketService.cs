@@ -108,7 +108,25 @@ public sealed class DraftTicketService : IDraftTicketService
             throw new InvalidOperationException($"AI draft generation failed: {ex.Message}", ex);
         }
 
-        var draft = ParseDraft(rawJson);
+        // ── Diagnostics before deserialisation ──────────────────────────────
+        System.Diagnostics.Trace.WriteLine("[DraftTicketService.GenerateDraftAsync] LLM response received.");
+        System.Diagnostics.Trace.WriteLine($"[DraftTicketService] Response empty: {string.IsNullOrWhiteSpace(rawJson)}");
+        var preview = rawJson?.Length > 300 ? rawJson[..300] + "..." : rawJson ?? "(null)";
+        System.Diagnostics.Trace.WriteLine($"[DraftTicketService] Raw preview: {preview}");
+
+        DraftTicket draft;
+        try
+        {
+            draft = ParseDraft(rawJson ?? string.Empty);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[DraftTicketService] Deserialisation failed — target: DraftTicketJson — error: {ex.Message}");
+            throw new InvalidOperationException(
+                $"Draft ticket JSON deserialization failed: {ex.Message}. " +
+                $"Raw response preview: {preview}", ex);
+        }
 
         // Enrich with context-specific data not derived from LLM
         draft.LinkedFilePaths = linkedFilePaths;
@@ -303,47 +321,144 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
         var dto = JsonSerializer.Deserialize<DraftTicketJson>(StripFences(json), JsonOptions)
                   ?? throw new InvalidOperationException("Failed to parse ticket JSON.");
 
-        // acceptanceCriteria — accept array (new) or plain string (legacy)
-        var criteria = dto.AcceptanceCriteriaArray is { Count: > 0 }
-            ? string.Join("\n", dto.AcceptanceCriteriaArray.Select(c => $"- {c}"))
-            : dto.AcceptanceCriteria ?? string.Empty;
+        // ── acceptanceCriteria — accepts string, array, or legacy acceptanceCriteriaText ─
+        var criteria = ResolveStringOrArray(dto.AcceptanceCriteriaRaw, prefix: "- ")
+                       ?? dto.AcceptanceCriteriaText
+                       ?? string.Empty;
 
-        // requirements → Background; fall back to description/background legacy fields
+        // ── requirements → Background; fall back to implementationPlan[], description, background ─
         var background = dto.Requirements is { Count: > 0 }
             ? string.Join("\n", dto.Requirements.Select(r => $"- {r}"))
             : dto.Description ?? dto.Background ?? string.Empty;
 
-        // Append affected files to Background
-        if (dto.AffectedFiles is { Count: > 0 })
+        // implementationPlan (new schema: array) → append to background
+        var implPlanText = ResolveStringOrArray(dto.ImplementationPlanRaw, prefix: "- ");
+        if (!string.IsNullOrWhiteSpace(implPlanText))
         {
-            var fileList = "\n\n**Affected files:**\n" + string.Join("\n", dto.AffectedFiles.Select(f => $"- {f}"));
+            if (string.IsNullOrWhiteSpace(background))
+                background = $"**Implementation Plan:**\n{implPlanText}";
+            else
+                background += $"\n\n**Implementation Plan:**\n{implPlanText}";
+        }
+
+        // affectedFiles — from top-level or codeContext.affectedFiles
+        var affectedFiles = dto.AffectedFiles
+            ?? dto.CodeContext?.AffectedFiles;
+        if (affectedFiles is { Count: > 0 })
+        {
+            var fileList = "\n\n**Affected files:**\n" + string.Join("\n", affectedFiles.Select(f => $"- {f}"));
             background += fileList;
         }
 
-        // Implementation notes + optional context warning
-        var technicalNotes = dto.ImplementationNotes ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(dto.ContextWarning))
-            technicalNotes = $"⚠️ {dto.ContextWarning}\n\n{technicalNotes}".TrimEnd();
+        // codeContext.notes → append to background
+        if (!string.IsNullOrWhiteSpace(dto.CodeContext?.Notes))
+            background += $"\n\n**Notes:** {dto.CodeContext.Notes}";
 
-        // Flatten testPlan from new schema; fall back to flat legacy fields
+        // linkedSymbols — join list to newline-separated string for the DraftTicket field
+        var linkedSymbolsText = dto.LinkedSymbolsList is { Count: > 0 }
+            ? string.Join("\n", dto.LinkedSymbolsList)
+            : null;
+
+        // Implementation notes + optional context warning
+        var implementationNotes = dto.ImplementationNotes ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(dto.ContextWarning))
+            implementationNotes = $"⚠️ {dto.ContextWarning}\n\n{implementationNotes}".TrimEnd();
+
+        // Flatten testPlan from new schema; fall back to flat legacy fields; then to tests[] array
         var unitTests        = dto.TestPlan?.UnitTestsList        is { Count: > 0 } ? string.Join("\n", dto.TestPlan.UnitTestsList.Select(t        => $"- {t}")) : dto.UnitTests        ?? string.Empty;
         var integrationTests = dto.TestPlan?.IntegrationTestsList is { Count: > 0 } ? string.Join("\n", dto.TestPlan.IntegrationTestsList.Select(t => $"- {t}")) : dto.IntegrationTests ?? string.Empty;
         var manualTests      = dto.TestPlan?.ManualTestsList      is { Count: > 0 } ? string.Join("\n", dto.TestPlan.ManualTestsList.Select(t      => $"- {t}")) : dto.ManualTests      ?? string.Empty;
         var regressionTests  = dto.TestPlan?.RegressionTestsList  is { Count: > 0 } ? string.Join("\n", dto.TestPlan.RegressionTestsList.Select(t  => $"- {t}")) : dto.RegressionTests  ?? string.Empty;
         var buildValidation  = dto.TestPlan?.BuildValidationList  is { Count: > 0 } ? string.Join("\n", dto.TestPlan.BuildValidationList)                         : dto.BuildValidation  ?? "dotnet build IronDev.slnx";
 
+        // tests[] (new flat schema) → fold into manualTests if no testPlan
+        if (string.IsNullOrWhiteSpace(manualTests) && dto.TestsList is { Count: > 0 })
+            manualTests = string.Join("\n", dto.TestsList.Select(t => $"- {t}"));
+
+        // Resolve type: prefer explicit ticketType, then type, then default
+        var ticketType = NormaliseTicketType(dto.TicketType ?? dto.Type);
+        var priority   = NormalisePriority(dto.Priority);
+        var status     = dto.Status ?? "Draft";
+
         return new DraftTicket
         {
             Title              = dto.Title              ?? "Untitled Ticket",
+            TicketType         = ticketType,
+            Priority           = priority,
+            Status             = status,
             Summary            = dto.Summary            ?? string.Empty,
             Background         = background,
             AcceptanceCriteria = criteria,
+            LinkedSymbols      = linkedSymbolsText,
             UnitTests          = unitTests,
             IntegrationTests   = integrationTests,
             ManualTests        = manualTests,
             RegressionTests    = regressionTests,
             BuildValidation    = buildValidation,
         };
+    }
+
+    /// <summary>
+    /// Resolves a JSON field that can be either a string or a string array
+    /// (deserialized as <see cref="System.Text.Json.JsonElement"/> when using object?)
+    /// into a flat string.  Returns null if the value is null/empty.
+    /// </summary>
+    private static string? ResolveStringOrArray(object? raw, string prefix = "")
+    {
+        if (raw is null) return null;
+
+        // System.Text.Json deserialises into JsonElement when the target is object
+        if (raw is System.Text.Json.JsonElement elem)
+        {
+            if (elem.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var s = elem.GetString();
+                return string.IsNullOrWhiteSpace(s) ? null : s;
+            }
+            if (elem.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                var items = elem.EnumerateArray()
+                               .Select(e => e.ValueKind == System.Text.Json.JsonValueKind.String ? e.GetString() : null)
+                               .Where(s => !string.IsNullOrWhiteSpace(s))
+                               .Select(s => $"{prefix}{s}")
+                               .ToList();
+                return items.Count > 0 ? string.Join("\n", items) : null;
+            }
+        }
+
+        if (raw is string str)
+            return string.IsNullOrWhiteSpace(str) ? null : str;
+
+        return null;
+    }
+
+    private static readonly string[] _validTypes = ["Task", "Bug", "Feature", "Spike", "Chore"];
+
+    /// <summary>Normalise LLM-returned type string to a value accepted by the TypeOptions dropdown.</summary>
+    private static string NormaliseTicketType(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "Task";
+        // Direct match (case-insensitive)
+        var match = _validTypes.FirstOrDefault(t => string.Equals(t, raw.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (match != null) return match;
+        // Map common LLM synonyms
+        var lower = raw.Trim().ToLowerInvariant();
+        if (lower.Contains("bug") || lower.Contains("fix"))          return "Bug";
+        if (lower.Contains("feature") || lower.Contains("improve"))  return "Feature";
+        if (lower.Contains("spike") || lower.Contains("research"))   return "Spike";
+        if (lower.Contains("chore") || lower.Contains("maintenance")) return "Chore";
+        if (lower.Contains("tech") || lower.Contains("debt") || lower.Contains("refactor")) return "Chore";
+        return "Task";
+    }
+
+    private static readonly string[] _validPriorities = ["Low", "Medium", "High", "Critical"];
+
+    /// <summary>Normalise LLM-returned priority string.</summary>
+    private static string NormalisePriority(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "Medium";
+        var match = _validPriorities.FirstOrDefault(p => string.Equals(p, raw.Trim(), StringComparison.OrdinalIgnoreCase));
+        return match ?? "Medium";
     }
 
     private static TestPlanJson ParseTestPlan(string json)
@@ -371,33 +486,77 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
     {
         public string?       Title               { get; set; }
         public string?       Summary             { get; set; }
-        // New schema fields
+
+        // Requirements — array (new schema) or plain string (legacy background field)
         [JsonPropertyName("requirements")]
         public List<string>? Requirements        { get; set; }
+
         public string?       ImplementationNotes { get; set; }
         public string?       ContextQuality      { get; set; }
         public string?       ContextWarning      { get; set; }
+
         // Legacy fallback fields
         public string?       Description         { get; set; }
         public string?       Background          { get; set; }
-        public string?       AcceptanceCriteria  { get; set; }
+
+        // AcceptanceCriteria — disambiguated to avoid duplicate JSON property name collision.
+        // System.Text.Json (PropertyNameCaseInsensitive=true) would map BOTH
+        //   "public string? AcceptanceCriteria" and
+        //   "[JsonPropertyName("acceptanceCriteria")] public List<string>? AcceptanceCriteriaArray"
+        // to the same key "acceptanceCriteria" — a fatal duplicate that throws
+        // "The JSON property name for '...AcceptanceCriteriaArray' collides with another property".
+        // Fix: give the string variant a distinct name so it is only used for legacy string-shape responses.
+        [JsonPropertyName("acceptanceCriteriaText")]
+        public string?       AcceptanceCriteriaText  { get; set; }
+
         [JsonPropertyName("acceptanceCriteria")]
-        public List<string>? AcceptanceCriteriaArray { get; set; }
+        public object?       AcceptanceCriteriaRaw   { get; set; }  // accepts both string and array
+
+        // type / ticketType
+        [JsonPropertyName("type")]
         public string?       Type                { get; set; }
+        [JsonPropertyName("ticketType")]
+        public string?       TicketType          { get; set; }
+
         public string?       Priority            { get; set; }
+        public string?       Status              { get; set; }
+
         [JsonPropertyName("affectedFiles")]
         public List<string>? AffectedFiles       { get; set; }
+
         [JsonPropertyName("linkedSymbols")]
-        public List<string>? LinkedSymbols       { get; set; }
+        public List<string>? LinkedSymbolsList   { get; set; }
+
+        // implementationPlan — array (new schema) or string (legacy)
+        [JsonPropertyName("implementationPlan")]
+        public object?       ImplementationPlanRaw { get; set; }
+
+        // tests — array (new schema)
+        [JsonPropertyName("tests")]
+        public List<string>? TestsList           { get; set; }
+
+        // codeContext object (new schema)
+        [JsonPropertyName("codeContext")]
+        public CodeContextJson? CodeContext      { get; set; }
+
         // New structured testPlan (replaces flat fields)
         [JsonPropertyName("testPlan")]
         public TestPlanJsonNested? TestPlan      { get; set; }
+
         // Legacy flat test fields (kept for backward compat with old LLM responses)
         public string?       UnitTests           { get; set; }
         public string?       IntegrationTests    { get; set; }
         public string?       ManualTests         { get; set; }
         public string?       RegressionTests     { get; set; }
         public string?       BuildValidation     { get; set; }
+    }
+
+    private sealed class CodeContextJson
+    {
+        [JsonPropertyName("affectedFiles")]
+        public List<string>? AffectedFiles { get; set; }
+        [JsonPropertyName("notes")]
+        public string?       Notes         { get; set; }
     }
 
     private sealed class TestPlanJsonNested
