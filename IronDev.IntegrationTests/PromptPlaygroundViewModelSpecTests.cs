@@ -1289,4 +1289,138 @@ public class PromptPlaygroundViewModelSpecTests
             IronDev.AI.PromptContextBuilder.ClassifyIntent("How do I delete a saved ticket?").ToString(),
             "Delete-ticket must still classify as SavedTicketManagement.");
     }
+
+    // ── Fix 6: DraftTicket exclusion + junk filter tests (T8) ────────────────
+
+    [TestMethod]
+    [Description("T8.1: IsDraftTicketSnippet returns true for DraftTicketService path.")]
+    public void T8_1_IsDraftTicketSnippet_True_ForDraftTicketServicePath()
+    {
+        var e = MakeEntry("IronDev.Infrastructure/Services/DraftTicketService.cs", "DraftTicketService");
+        Assert.IsTrue(IronDev.AI.PromptContextBuilder.IsDraftTicketSnippet(e),
+            "DraftTicketService path must be detected as a DraftTicket snippet.");
+    }
+
+    [TestMethod]
+    [Description("T8.2: IsDraftTicketSnippet returns false for TicketService (not DraftTicket).")]
+    public void T8_2_IsDraftTicketSnippet_False_ForTicketService()
+    {
+        var e = MakeEntry("IronDev.Infrastructure/Services/TicketService.cs", "ITicketService");
+        Assert.IsFalse(IronDev.AI.PromptContextBuilder.IsDraftTicketSnippet(e),
+            "ITicketService/TicketService must NOT be classified as a DraftTicket snippet.");
+    }
+
+    [TestMethod]
+    [Description("T8.3: SavedTicketManagement hard-excludes DraftTicketService from ranked results.")]
+    public void T8_3_SavedTicketManagement_ExcludesDraftTicketService()
+    {
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            MakeEntry("IronDev.Infrastructure/Services/DraftTicketService.cs",          "DraftTicketService"),
+            MakeEntry("IronDev.Infrastructure/Services/TicketService.cs",               "ITicketService"),
+            MakeEntry("IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",          "TicketsWorkspaceViewModel"),
+            MakeEntry("IronDeveloper/Views/TicketsWorkspaceView.xaml",                  "DeleteButton"),
+        };
+
+        var ranked = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(
+            snippets, IronDev.AI.ChatIntent.SavedTicketManagement, 14);
+
+        var hasDraft = ranked.Any(s => s.FilePath != null &&
+            s.FilePath.Contains("DraftTicket", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(hasDraft,
+            "DraftTicketService must be completely absent from SavedTicketManagement ranked results.");
+    }
+
+    [TestMethod]
+    [Description("T8.4: DraftTicketFlow still ranks DraftTicketService highly.")]
+    public void T8_4_DraftTicketFlow_StillRanks_DraftTicketService()
+    {
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            MakeEntry("IronDev.Infrastructure/Services/DraftTicketService.cs",           "DraftTicketService"),
+            MakeEntry("IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",           "TicketsWorkspaceViewModel"),
+        };
+
+        var ranked = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(
+            snippets, IronDev.AI.ChatIntent.DraftTicketFlow, 10);
+
+        Assert.AreEqual("IronDev.Infrastructure/Services/DraftTicketService.cs", ranked[0].FilePath,
+            "DraftTicketService must still rank first for DraftTicketFlow queries.");
+    }
+
+    [TestMethod]
+    [Description("T8.5: IsJunkMemory filters 'Certainly! Let's refine...' ticket text.")]
+    public void T8_5_IsJunkMemory_Filters_CertainlyLetsRefine()
+    {
+        const string junkTicket = "Certainly! Let's refine the approach for the delete-ticket implementation...";
+        var (isJunk, _) = IronDev.AI.PromptContextBuilder.IsJunkMemory(junkTicket);
+        Assert.IsTrue(isJunk,
+            "'Certainly! Let's refine' must be detected as junk memory (generic assistant text).");
+    }
+
+    [TestMethod]
+    [Description("T8.6: IsJunkMemory filters 'What would have to do to delete old chats' ticket text.")]
+    public void T8_6_IsJunkMemory_Filters_OldChatsTicket()
+    {
+        const string junkTicket = "What would have to do to delete old chats in IronDev?";
+        var (isJunk, _) = IronDev.AI.PromptContextBuilder.IsJunkMemory(junkTicket);
+        Assert.IsTrue(isJunk,
+            "Ticket about 'old chats' must be filtered from saved-ticket delete query context.");
+    }
+
+    [TestMethod]
+    [Description("T8.7: Full delete-ticket profile — top 4 contains NO DraftTicket and TicketService is present.")]
+    public void T8_7_DeleteTicketProfile_Top4_NoDraftTicket_HasTicketService()
+    {
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            MakeEntry("IronDev.Infrastructure/Services/TicketService.cs",               "ITicketService"),
+            MakeEntry("IronDev.Infrastructure/Services/DraftTicketService.cs",          "DraftTicketService"),
+            MakeEntry("IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",          "TicketsWorkspaceViewModel"),
+            MakeEntry("IronDeveloper/Views/TicketsWorkspaceView.xaml",                  "ConfirmDeleteButton"),
+            MakeEntry("IronDev.Core/Models/DataModels.cs",                              "ProjectTicket"),
+            MakeEntry("IronDev.Infrastructure/Services/DraftTicketService.cs",          "GenerateDraft"),  // dup path, different symbol
+            MakeEntry("IronDev.IntegrationTests/ChatGroundingTests.cs",                 "GroundingTest"),
+        };
+
+        var ranked = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(
+            snippets, IronDev.AI.ChatIntent.SavedTicketManagement, 14);
+
+        var top4 = ranked.Take(4).ToList();
+
+        // No DraftTicket anywhere in results
+        var draftInResults = ranked.Any(s =>
+            (s.FilePath ?? string.Empty).Contains("DraftTicket", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(draftInResults,
+            "DraftTicketService must not appear anywhere in SavedTicketManagement results.");
+
+        // TicketService must be in top 4
+        Assert.IsTrue(top4.Any(s => (s.FilePath ?? string.Empty).Contains("TicketService")),
+            "TicketService must be in top-4 for delete-ticket profile.");
+
+        // TicketsWorkspaceViewModel must be in top 4
+        Assert.IsTrue(top4.Any(s => (s.FilePath ?? string.Empty).Contains("TicketsWorkspaceViewModel")),
+            "TicketsWorkspaceViewModel must be in top-4 for delete-ticket profile.");
+    }
+
+    [TestMethod]
+    [Description("T8.8: Regression guard — T7 test matrix, scoring contracts, and intent classification all stable.")]
+    public void T8_8_RegressionGuard_T7AndEarlierStillValid()
+    {
+        Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
+
+        // IsDraftTicketSnippet does not misclassify production TicketService
+        var safe = MakeEntry("IronDev.Infrastructure/Services/TicketService.cs", "TicketService");
+        Assert.IsFalse(IronDev.AI.PromptContextBuilder.IsDraftTicketSnippet(safe),
+            "TicketService must NOT be classified as DraftTicket.");
+
+        // XAML still outranks XAML.cs for saved-ticket UI
+        var xaml   = MakeEntry("IronDeveloper/Views/TicketsWorkspaceView.xaml",    "ConfirmDelete");
+        var xamlCs = MakeEntry("IronDeveloper/Views/TicketsWorkspaceView.xaml.cs", "ConfirmDelete2");
+        var ranked = IronDev.AI.PromptContextBuilder.RankSnippetsByIntent(
+            new List<IronDev.Data.Models.CodeIndexEntry> { xamlCs, xaml },
+            IronDev.AI.ChatIntent.SavedTicketManagement, 10);
+        Assert.AreEqual(xaml.FilePath, ranked[0].FilePath,
+            ".xaml must still outrank .xaml.cs in regression check.");
+    }
 }

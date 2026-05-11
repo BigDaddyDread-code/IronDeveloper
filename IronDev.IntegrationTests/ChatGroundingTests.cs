@@ -162,14 +162,19 @@ public class ChatGroundingTests : IntegrationTestBase
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
 
-        var paths = ranked.Select(r => r.FilePath).ToList();
-        var ticketsViewModelIndex = paths.FindIndex(p => p != null && p.Contains("TicketsWorkspaceViewModel"));
-        var draftDtosIndex        = paths.FindIndex(p => p != null && p.Contains("DraftTicketDtos"));
+        var paths = ranked.Select(r => r.FilePath ?? string.Empty).ToList();
 
-        Assert.IsTrue(ticketsViewModelIndex >= 0, "TicketsWorkspaceViewModel must be present in ranked results.");
-        Assert.IsTrue(draftDtosIndex >= 0,        "DraftTicketDtos must be present in ranked results.");
-        Assert.IsTrue(ticketsViewModelIndex < draftDtosIndex,
-            $"TicketsWorkspaceViewModel (rank {ticketsViewModelIndex}) must appear before DraftTicketDtos (rank {draftDtosIndex}).");
+        // DraftTicket/CodebaseTicketGenerator snippets must be hard-excluded entirely
+        Assert.IsFalse(paths.Any(p => p.Contains("DraftTicketDtos", StringComparison.OrdinalIgnoreCase)),
+            "DraftTicketDtos must be absent from SavedTicketManagement results (hard-excluded).");
+        Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", StringComparison.OrdinalIgnoreCase)),
+            "CodebaseTicketGeneratorModels must be absent from SavedTicketManagement results (hard-excluded).");
+
+        // Production saved-ticket files must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceViewModel", StringComparison.OrdinalIgnoreCase)),
+            "TicketsWorkspaceViewModel must be present in ranked results.");
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceView", StringComparison.OrdinalIgnoreCase)),
+            "TicketsWorkspaceView must be present in ranked results.");
     }
 
     [TestMethod]
@@ -183,12 +188,15 @@ public class ChatGroundingTests : IntegrationTestBase
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
 
-        var paths = ranked.Select(r => r.FilePath).ToList();
-        var viewIndex      = paths.FindIndex(p => p != null && p.Contains("TicketsWorkspaceView"));
-        var generatorIndex = paths.FindIndex(p => p != null && p.Contains("CodebaseTicketGenerator"));
+        var paths = ranked.Select(r => r.FilePath ?? string.Empty).ToList();
 
-        Assert.IsTrue(viewIndex < generatorIndex,
-            $"TicketsWorkspaceView.xaml (rank {viewIndex}) must appear before CodebaseTicketGeneratorModels (rank {generatorIndex}) for saved ticket UI queries.");
+        // CodebaseTicketGeneratorModels is a DraftTicket-subsystem file — hard-excluded for SavedTicketManagement
+        Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", StringComparison.OrdinalIgnoreCase)),
+            "CodebaseTicketGeneratorModels must be absent from SavedTicketManagement results (hard-excluded as DraftTicket subsystem).");
+
+        // TicketsWorkspaceView must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceView", StringComparison.OrdinalIgnoreCase)),
+            "TicketsWorkspaceView.xaml must be present in SavedTicketManagement results.");
     }
 
     // ──────────────────────────────────────────────────────────────────────────

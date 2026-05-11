@@ -474,6 +474,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var junkContains = new[]
         {
             "It seems you",
+            "It seems you're",
             "If you have a specific",
             "feel free to provide",
             "let me know if you need",
@@ -483,6 +484,12 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             "a placeholder for",
             "test content",
             "lorem ipsum",
+            "Let's refine",
+            "let's refine",
+            "old chats",
+            "typical approach",
+            "please provide more specific",
+            "provide more specific",
         };
         foreach (var phrase in junkContains)
         {
@@ -739,7 +746,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         if (intent == ChatIntent.SavedTicketManagement)
         {
+            // Hard-exclude DraftTicket snippets — they must never appear in SavedTicketManagement
+            // results because DraftTicket is exclusively for Chat→Draft review, not saved-ticket ops.
             return deduped
+                .Where(s => !IsDraftTicketSnippet(s))
                 .OrderByDescending(s => ScoreSavedTicketRelevance(s))
                 .Take(take)
                 .ToList();
@@ -758,6 +768,22 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             .OrderByDescending(s => ScoreProductionPreference(s))
             .Take(take)
             .ToList();
+    }
+
+    /// <summary>
+    /// Returns true if a snippet belongs to the DraftTicket/CodebaseTicketGenerator subsystem.
+    /// These snippets must be excluded from SavedTicketManagement results — they only apply
+    /// to the Chat → Draft Ticket review flow.
+    /// </summary>
+    public static bool IsDraftTicketSnippet(IronDev.Data.Models.CodeIndexEntry e)
+    {
+        var path   = e.FilePath   ?? string.Empty;
+        var symbol = e.SymbolName ?? string.Empty;
+
+        return ContainsAny(path,   "DraftTicket", "DraftTicketDto", "DraftTicketService",
+                                    "CodebaseTicketGenerator", "CodebaseTicketGeneratorModels")
+            || ContainsAny(symbol, "DraftTicket", "DraftTicketDto", "DraftTicketService",
+                                    "IDraftTicketService", "CodebaseTicketGeneratorModels");
     }
 
     /// <summary>
@@ -786,11 +812,22 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var symbol = e.SymbolName ?? string.Empty;
         int score  = 0;
 
+        // ── Safety guard: DraftTicket snippets should already be excluded by the
+        //    hard-filter in RankSnippetsByIntent, but apply an extra penalty here
+        //    as a belt-and-suspenders measure.
+        if (IsDraftTicketSnippet(e))
+            return -1000;
+
         // ── Tier 1: Core saved-ticket service symbols (highest priority) ─────
-        if (ContainsAny(symbol, "ITicketService", "TicketService"))
-            score += 120;
-        if (ContainsAny(path, "ITicketService", "TicketService"))
-            score += 110;
+        // Use exact token matching to avoid DraftTicketService matching "TicketService"
+        bool symbolIsTicketService = string.Equals(symbol, "ITicketService", StringComparison.OrdinalIgnoreCase)
+                                  || string.Equals(symbol, "TicketService",  StringComparison.OrdinalIgnoreCase)
+                                  || (symbol.Contains("TicketService", StringComparison.OrdinalIgnoreCase)
+                                      && !symbol.Contains("Draft", StringComparison.OrdinalIgnoreCase));
+        bool pathIsTicketService   = path.Contains("TicketService", StringComparison.OrdinalIgnoreCase)
+                                  && !path.Contains("Draft", StringComparison.OrdinalIgnoreCase);
+        if (symbolIsTicketService) score += 120;
+        if (pathIsTicketService)   score += 110;
 
         // ── Tier 2: Primary UI/ViewModel symbols ─────────────────────────────
         if (ContainsAny(symbol, "TicketsWorkspaceViewModel", "TicketsWorkspaceView"))
@@ -824,12 +861,6 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         // ── Demote test files ────────────────────────────────────────────────
         if (ContainsAny(path, "IntegrationTests", ".Tests/", "Spec", "Tests/"))
             score -= 60;
-
-        // ── Penalise DraftTicket files when not asked about them ─────────────
-        if (ContainsAny(path, "DraftTicketDto", "CodebaseTicketGenerator"))
-            score -= 50;
-        if (ContainsAny(symbol, "DraftTicket", "CodebaseTicketGeneratorModels", "DraftTicketService"))
-            score -= 30;
 
         return score;
     }
