@@ -209,8 +209,9 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             snippetList.AddRange(results);
         }
 
-        // 4. Deduplicate, then rank snippets by intent relevance
-        var deduped = snippetList.GroupBy(x => x.Id).Select(g => g.First()).ToList();
+        // 4. Deduplicate using path+symbol+content dedup, then rank by intent
+        //    Note: DeduplicateSnippets() is the canonical dedup — do not use GroupBy(Id) here.
+        var deduped        = DeduplicateSnippets(snippetList);
         var rankedSnippets = RankSnippetsByIntent(deduped, intent, snippetTake);
 
         foreach (var r in rankedSnippets)
@@ -228,7 +229,26 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         foreach (var t in tickets)
         {
             var content = string.IsNullOrWhiteSpace(t.Summary) ? t.Content : t.Summary;
-            packet.Tickets.Add($"[{t.TicketType}] {t.Title} ({t.Status}): {content}");
+            var ticketLine = $"[{t.TicketType}] {t.Title} ({t.Status}): {content}";
+
+            // Intent-aware ticket exclusion:
+            // For SavedTicketManagement, exclude tickets whose title/content is about the
+            // DraftTicket subsystem — they describe Chat→Draft Ticket generation, not
+            // saved-ticket persistence operations, and would pollute the context.
+            if (intent == ChatIntent.SavedTicketManagement)
+            {
+                var titleLower = (t.Title ?? string.Empty).ToLowerInvariant();
+                var bodyLower  = (content ?? string.Empty).ToLowerInvariant();
+                if (titleLower.Contains("draft") || bodyLower.Contains("draftticket")
+                    || bodyLower.Contains("codebasisticketgenerator") || bodyLower.Contains("ticket generator"))
+                {
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[PromptContextBuilder] Excluded DraftTicket-related ticket from SavedTicketManagement context: {t.Title}");
+                    continue;
+                }
+            }
+
+            packet.Tickets.Add(ticketLine);
         }
 
         foreach (var d in decisions)

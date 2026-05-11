@@ -221,6 +221,24 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
 
             var packet = await _promptContextBuilder.BuildPacketAsync(projectId, sessionId, text);
 
+            // ── Dev-mode grounding diagnostics ────────────────────────────────
+            // Visible in VS Output window / DebugView — not shown to end users.
+            var snippetCount  = packet.MatchedFilePaths.Count;
+            var distinctFiles = packet.MatchedFilePaths.Distinct().Count();
+            var qualityLabel  = packet.IsProjectNotIndexed ? "Limited (not indexed)"
+                              : snippetCount == 0          ? "Empty (no snippets)"
+                              :                              "Ready";
+            System.Diagnostics.Trace.WriteLine(
+                $"[Chat][Grounding] ProjectId={projectId} | Intent={packet.Intent} | " +
+                $"ProjectIndexed={!packet.IsProjectNotIndexed} | " +
+                $"Snippets={snippetCount} | DistinctFiles={distinctFiles} | " +
+                $"FilteredMemory={packet.FilteredMemoryCount} | " +
+                $"ContextQuality={qualityLabel}");
+            if (packet.MatchedFilePaths.Count > 0)
+                System.Diagnostics.Trace.WriteLine(
+                    $"[Chat][Sources] {string.Join(", ", packet.MatchedFilePaths.Distinct().Take(6))}");
+            // ─────────────────────────────────────────────────────────────────
+
             // Call the real LLM service
             var responseText = string.Empty;
             try
