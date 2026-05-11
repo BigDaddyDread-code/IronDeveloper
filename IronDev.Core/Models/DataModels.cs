@@ -14,6 +14,8 @@ public sealed class Project
     public DateTime? UpdatedDate { get; set; }
     public DateTime? LastIndexedUtc { get; set; }
     public string? IndexingStatus { get; set; }
+    /// <summary>Actual count of indexed files stored in dbo.ProjectFiles. Updated by IndexDirectoryAsync.</summary>
+    public int? IndexedFileCount { get; set; }
 }
 
 public sealed class ProjectFile
@@ -30,11 +32,19 @@ public sealed class ProjectFile
 
 public sealed class CodeIndexResult
 {
-    public int FilesScanned { get; set; }
-    public int FilesAdded { get; set; }
-    public int FilesUpdated { get; set; }
+    public int FilesScanned   { get; set; }
+    public int FilesAdded     { get; set; }
+    public int FilesUpdated   { get; set; }
     public int FilesUnchanged { get; set; }
-    public int FilesSkipped { get; set; }
+    public int FilesSkipped   { get; set; }
+    /// <summary>Count of files actually persisted in dbo.ProjectFiles after this run.</summary>
+    public int StoredFileCount  { get; set; }
+    /// <summary>True when the directory path was not found on disk.</summary>
+    public bool DirectoryNotFound { get; set; }
+    /// <summary>Human-readable error or warning produced during indexing, if any.</summary>
+    public string? ErrorMessage { get; set; }
+    /// <summary>True when indexing ran but produced 0 usable files.</summary>
+    public bool IsEmpty => StoredFileCount == 0 && !DirectoryNotFound;
 }
 
 public sealed class ChatMessage

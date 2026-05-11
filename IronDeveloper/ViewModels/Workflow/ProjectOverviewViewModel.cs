@@ -119,32 +119,48 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     {
         if (_currentProject == null || string.IsNullOrWhiteSpace(_currentProject.LocalPath))
         {
-            Status = "Err: Invalid Path";
+            Status = "Err: No path configured";
             return;
         }
 
         IsIndexing = true;
-        Status     = "Indexing...";
+        Status     = "Indexing…";
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
             var result = await _indexingService.IndexProjectAsync(_currentProject);
             sw.Stop();
-            
             IndexingTime = $"{sw.Elapsed.TotalSeconds:F1}s";
-            FileCount = result.FilesScanned;
-            
-            // Note: In a real app, we'd reload the project from DB to get the new LastIndexedUtc
-            // but for now we just manually update the local object for UI
-            _currentProject.LastIndexedUtc = DateTime.UtcNow;
-            _currentProject.IndexingStatus = "Ready";
 
+            if (result.DirectoryNotFound)
+            {
+                // Path didn't exist — status already updated in DB by CodeIndexService
+                Status    = $"❌ Path not found: {_currentProject.LocalPath}";
+                FileCount = 0;
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(result.ErrorMessage) && result.StoredFileCount == 0)
+            {
+                Status    = $"⚠️ {result.ErrorMessage}";
+                FileCount = 0;
+                // Reload so LastIndexed shows correctly
+                await RefreshAsync();
+                return;
+            }
+
+            // Success — use StoredFileCount (actual DB rows) not FilesScanned (just disk walk)
+            FileCount = result.StoredFileCount;
+
+            // Reload from DB so that LastIndexedUtc, IndexingStatus come from the DB update
+            // performed by CodeIndexService, not from a manual local mutation
             await RefreshAsync();
         }
         catch (Exception ex)
         {
-            Status = $"Err: {ex.Message}";
+            sw.Stop();
+            Status = $"❌ Index failed: {ex.Message}";
         }
         finally
         {

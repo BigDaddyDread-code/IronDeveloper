@@ -521,6 +521,20 @@
                         <Run Text="⚠️ "/><Run Text="{Binding RetrievalEmptyReason}"/>
                     </TextBlock>
                 </Border>
+
+                <!-- Inconsistency banner: Ready but 0 ProjectFiles -->
+                <Border Margin="0,10,0,0" Padding="12,8" CornerRadius="4" Background="#33FF4444"
+                        Visibility="{Binding IndexInconsistent, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="#FFDD6666" TextWrapping="Wrap">
+                            <Run Text="❌ Index Inconsistency Detected"/>
+                        </TextBlock>
+                        <TextBlock FontSize="12" Foreground="#FFDD6666" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="{Binding IndexInconsistencyReason}"/>
+                        <TextBlock FontSize="12" Foreground="#FFDD6666" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="Action: Open Project Overview → click Index Project to rebuild."/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
 

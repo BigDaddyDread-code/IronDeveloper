@@ -45,7 +45,8 @@ public sealed class ProjectService : IProjectService
     public async Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate
+            SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate,
+                   LastIndexedUtc, IndexingStatus, IndexedFileCount
             FROM dbo.Projects
             WHERE TenantId = @TenantId
             ORDER BY CreatedDate DESC;

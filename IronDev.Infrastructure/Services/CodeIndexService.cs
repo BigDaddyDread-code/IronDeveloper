@@ -54,8 +54,26 @@ public sealed class SqlCodeIndexService : ICodeIndexService
     public async Task<CodeIndexResult> IndexDirectoryAsync(int projectId, string directoryPath, CancellationToken cancellationToken = default)
     {
         var result = new CodeIndexResult();
-        if (!Directory.Exists(directoryPath)) 
-            return result; // Or throw if we want explicit error handling
+
+        // ── Guard: directory must exist ───────────────────────────────────────
+        if (!Directory.Exists(directoryPath))
+        {
+            result.DirectoryNotFound = true;
+            result.ErrorMessage      = $"Directory not found: {directoryPath}";
+
+            // Mark the project status as failed — do NOT leave it as Ready
+            using var conn0 = _connectionFactory.CreateConnection();
+            conn0.Open();
+            await conn0.ExecuteAsync(
+                "UPDATE dbo.Projects" +
+                " SET IndexingStatus = 'Index Failed - path not found'," +
+                "     LastIndexedUtc = SYSUTCDATETIME()," +
+                "     IndexedFileCount = 0" +
+                " WHERE Id = @ProjectId AND TenantId = @TenantId",
+                new { ProjectId = projectId, TenantId = _tenant.TenantId });
+
+            return result;
+        }
 
         var allFiles = GetFilesToProcess(directoryPath).ToList();
 
@@ -79,90 +97,125 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         try
         {
             foreach (var fullPath in allFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            result.FilesScanned++;
-
-            var fileInfo = new FileInfo(fullPath);
-            if (fileInfo.Length > 512 * 1024) // V1 Limit: 512KB for indexing
             {
-                result.FilesSkipped++;
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                result.FilesScanned++;
 
-            var relPath = Path.GetRelativePath(directoryPath, fullPath).Replace('\\', '/');
-            processedPaths.Add(relPath);
-
-            var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
-            var hash = ComputeHash(content);
-
-            var existing = await connection.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT Id, ContentHash FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND FilePath = @FilePath",
-                new { TenantId = _tenant.TenantId, ProjectId = projectId, FilePath = relPath }, transaction);
-
-            long fileId;
-
-            if (existing != null)
-            {
-                fileId = existing.Id;
-                if (existing.ContentHash == hash)
+                var fileInfo = new FileInfo(fullPath);
+                if (fileInfo.Length > 512 * 1024) // V1 Limit: 512KB for indexing
                 {
-                    result.FilesUnchanged++;
-                    continue; // Skip re-parsing if hash matches
+                    result.FilesSkipped++;
+                    continue;
                 }
 
-                // Update metadata (Content is NULL for V1 per user req)
+                var relPath = Path.GetRelativePath(directoryPath, fullPath).Replace('\\', '/');
+                processedPaths.Add(relPath);
+
+                var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
+                var hash = ComputeHash(content);
+
+                var existing = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                    "SELECT Id, ContentHash FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND FilePath = @FilePath",
+                    new { TenantId = _tenant.TenantId, ProjectId = projectId, FilePath = relPath }, transaction);
+
+                long fileId;
+
+                if (existing != null)
+                {
+                    fileId = existing.Id;
+                    if (existing.ContentHash == hash)
+                    {
+                        result.FilesUnchanged++;
+                        continue; // Skip re-parsing if hash matches
+                    }
+
+                    // Update metadata
+                    await connection.ExecuteAsync(
+                        "UPDATE dbo.ProjectFiles SET ContentHash = @ContentHash, Content = '', LastIndexedDate = SYSUTCDATETIME() WHERE Id = @Id",
+                        new { Id = fileId, ContentHash = hash }, transaction);
+
+                    // Clear old symbols
+                    await connection.ExecuteAsync("DELETE FROM dbo.CodeIndexEntries WHERE FileId = @FileId", new { FileId = fileId }, transaction);
+                    result.FilesUpdated++;
+                }
+                else
+                {
+                    fileId = await connection.QuerySingleAsync<long>(
+                        """
+                        INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content)
+                        OUTPUT inserted.Id
+                        VALUES (@TenantId, @ProjectId, @FilePath, @FileExtension, @ContentHash, '')
+                        """,
+                        new
+                        {
+                            TenantId      = _tenant.TenantId,
+                            ProjectId     = projectId,
+                            FilePath      = relPath,
+                            FileExtension = fileInfo.Extension,
+                            ContentHash   = hash
+                        }, transaction);
+                    result.FilesAdded++;
+                }
+
+                // Symbol Extraction (V1 Regex)
+                await ExtractAndStoreSymbolsAsync(connection, projectId, fileId, content, transaction, cancellationToken);
+            }
+
+            // Cleanup stale files that weren't processed in this run
+            if (processedPaths.Count > 0)
+            {
                 await connection.ExecuteAsync(
-                    "UPDATE dbo.ProjectFiles SET ContentHash = @ContentHash, Content = '', LastIndexedDate = SYSUTCDATETIME() WHERE Id = @Id",
-                    new { Id = fileId, ContentHash = hash }, transaction);
-                
-                // Clear old symbols
-                await connection.ExecuteAsync("DELETE FROM dbo.CodeIndexEntries WHERE FileId = @FileId", new { FileId = fileId }, transaction);
-                result.FilesUpdated++;
+                    "DELETE FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND FilePath NOT IN @Paths",
+                    new { TenantId = _tenant.TenantId, ProjectId = projectId, Paths = processedPaths }, transaction);
             }
             else
             {
-                fileId = await connection.QuerySingleAsync<long>(
-                    """
-                    INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content)
-                    OUTPUT inserted.Id
-                    VALUES (@TenantId, @ProjectId, @FilePath, @FileExtension, @ContentHash, '')
-                    """,
-                    new
-                    {
-                        TenantId = _tenant.TenantId,
-                        ProjectId = projectId,
-                        FilePath = relPath,
-                        FileExtension = fileInfo.Extension,
-                        ContentHash = hash
-                    }, transaction);
-                result.FilesAdded++;
+                // processedPaths is empty: all files were unchanged (hash match) — do NOT wipe the table
+                // Only wipe if we actually found no files to process at all
+                if (allFiles.Count == 0)
+                {
+                    await connection.ExecuteAsync(
+                        "DELETE FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId",
+                        new { TenantId = _tenant.TenantId, ProjectId = projectId }, transaction);
+                }
             }
 
-            // Symbol Extraction (V1 Regex)
-            await ExtractAndStoreSymbolsAsync(connection, projectId, fileId, content, transaction, cancellationToken);
-        }
-
-        // Cleanup stale files that weren't processed
-        if (processedPaths.Count > 0)
-        {
-            await connection.ExecuteAsync(
-                "DELETE FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND FilePath NOT IN @Paths",
-                new { TenantId = _tenant.TenantId, ProjectId = projectId, Paths = processedPaths }, transaction);
-        }
-        else
-        {
-            await connection.ExecuteAsync(
-                "DELETE FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId",
+            // ── Update Project Status ────────────────────────────────────────
+            // Count how many files are actually stored after this run
+            var storedFileCount = await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM dbo.ProjectFiles WHERE TenantId = @TenantId AND ProjectId = @ProjectId",
                 new { TenantId = _tenant.TenantId, ProjectId = projectId }, transaction);
-        }
 
-        // Update Project Status
-        await connection.ExecuteAsync(
-            "UPDATE dbo.Projects SET UpdatedDate = SYSUTCDATETIME(), LastIndexedUtc = SYSUTCDATETIME(), IndexingStatus = 'Ready' WHERE Id = @ProjectId",
-            new { ProjectId = projectId }, transaction);
+            // Ready only when real indexed files exist
+            string newStatus;
+            if (storedFileCount > 0)
+            {
+                newStatus = "Ready";
+            }
+            else if (allFiles.Count == 0)
+            {
+                newStatus = "Needs Index — no indexable files found";
+                result.ErrorMessage = $"No indexable files (.cs, .xaml, .json, .md) found in: {directoryPath}";
+            }
+            else
+            {
+                // Files scanned but all were skipped (too large or all unchanged from previous run)
+                newStatus = result.FilesUnchanged > 0 ? "Ready" : "Needs Index — no indexable files found";
+            }
 
-        transaction.Commit();
+            await connection.ExecuteAsync(
+                """
+                UPDATE dbo.Projects
+                SET UpdatedDate      = SYSUTCDATETIME(),
+                    LastIndexedUtc   = SYSUTCDATETIME(),
+                    IndexingStatus   = @Status,
+                    IndexedFileCount = @FileCount
+                WHERE Id = @ProjectId
+                """,
+                new { ProjectId = projectId, Status = newStatus, FileCount = storedFileCount }, transaction);
+
+            result.StoredFileCount = storedFileCount;
+            transaction.Commit();
         }
         catch
         {

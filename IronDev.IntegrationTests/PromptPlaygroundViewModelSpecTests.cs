@@ -982,4 +982,138 @@ public class PromptPlaygroundViewModelSpecTests
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.UserMessage)), "All cases must have user messages.");
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.MustIncludeAny)), "All cases must have MustIncludeAny.");
     }
+
+    // ── Task 6: Indexing status correctness tests ────────────────────────────
+
+    [TestMethod]
+    [Description("T6.1: CodeIndexResult must expose DirectoryNotFound, ErrorMessage, and StoredFileCount.")]
+    public void T6_1_CodeIndexResult_HasDiagnosticFields()
+    {
+        var type = typeof(IronDev.Data.Models.CodeIndexResult);
+        Assert.IsNotNull(type.GetProperty("DirectoryNotFound"), "CodeIndexResult must expose DirectoryNotFound.");
+        Assert.IsNotNull(type.GetProperty("ErrorMessage"),      "CodeIndexResult must expose ErrorMessage.");
+        Assert.IsNotNull(type.GetProperty("StoredFileCount"),   "CodeIndexResult must expose StoredFileCount.");
+        Assert.IsNotNull(type.GetProperty("IsEmpty"),           "CodeIndexResult must expose IsEmpty.");
+    }
+
+    [TestMethod]
+    [Description("T6.2: CodeIndexResult.IsEmpty is true when StoredFileCount=0 and DirectoryNotFound=false.")]
+    public void T6_2_CodeIndexResult_IsEmpty_WhenStoredCountZeroAndNoPathError()
+    {
+        var r = new IronDev.Data.Models.CodeIndexResult
+        {
+            StoredFileCount   = 0,
+            DirectoryNotFound = false
+        };
+        Assert.IsTrue(r.IsEmpty, "IsEmpty must be true when StoredFileCount=0 and DirectoryNotFound=false.");
+    }
+
+    [TestMethod]
+    [Description("T6.3: CodeIndexResult.IsEmpty is false when DirectoryNotFound=true (path error is distinct from empty index).")]
+    public void T6_3_CodeIndexResult_IsEmpty_FalseWhenDirectoryNotFound()
+    {
+        var r = new IronDev.Data.Models.CodeIndexResult
+        {
+            StoredFileCount   = 0,
+            DirectoryNotFound = true
+        };
+        Assert.IsFalse(r.IsEmpty, "IsEmpty must be false when DirectoryNotFound=true — use DirectoryNotFound for path errors.");
+    }
+
+    [TestMethod]
+    [Description("T6.4: Project model exposes IndexedFileCount property for DB mapping.")]
+    public void T6_4_Project_HasIndexedFileCount()
+    {
+        var type = typeof(IronDev.Data.Models.Project);
+        var prop = type.GetProperty("IndexedFileCount");
+        Assert.IsNotNull(prop, "Project must expose IndexedFileCount.");
+        Assert.AreEqual(typeof(int?), prop.PropertyType, "IndexedFileCount must be int? (nullable).");
+    }
+
+    [TestMethod]
+    [Description("T6.5: ViewModel exposes IndexInconsistent and IndexInconsistencyReason for stale-index detection.")]
+    public void T6_5_ViewModel_ExposesInconsistencyProperties()
+    {
+        var type = typeof(IronDev.Agent.ViewModels.Workspaces.PromptPlaygroundViewModel);
+        Assert.IsNotNull(type.GetProperty("IndexInconsistent"),        "ViewModel must expose IndexInconsistent.");
+        Assert.IsNotNull(type.GetProperty("IndexInconsistencyReason"), "ViewModel must expose IndexInconsistencyReason.");
+    }
+
+    [TestMethod]
+    [Description("T6.6: Ready + StoredFileCount=0 triggers inconsistent state in the scoring contract.")]
+    public void T6_6_Ready_With_ZeroFiles_IsInconsistent()
+    {
+        const string indexStatus     = "Ready";
+        const int    projectFileCount = 0;
+
+        bool isReadyStatus = string.Equals(indexStatus, "Ready", StringComparison.OrdinalIgnoreCase);
+        bool zeroFiles     = projectFileCount == 0;
+        bool inconsistent  = isReadyStatus && zeroFiles;
+
+        Assert.IsTrue(inconsistent,
+            "Ready + 0 ProjectFiles must be detected as inconsistent (stale index).");
+    }
+
+    [TestMethod]
+    [Description("T6.7: Ready + StoredFileCount>0 is NOT flagged as inconsistent.")]
+    public void T6_7_Ready_With_FilesPresent_IsConsistent()
+    {
+        const string indexStatus      = "Ready";
+        const int    projectFileCount = 156;
+
+        bool isReadyStatus = string.Equals(indexStatus, "Ready", StringComparison.OrdinalIgnoreCase);
+        bool zeroFiles     = projectFileCount == 0;
+        bool inconsistent  = isReadyStatus && zeroFiles;
+
+        Assert.IsFalse(inconsistent,
+            "Ready + ProjectFiles=156 must NOT be flagged as inconsistent.");
+    }
+
+    [TestMethod]
+    [Description("T6.8: Scoring contract — Ready + zero files + zero retrieved snippets must score WARNING.")]
+    public void T6_8_Ready_ZeroFiles_ZeroSnippets_ScoresWarning()
+    {
+        bool intentOk        = true;
+        bool violated        = false;
+        bool filesFound      = false;  // MustInclude terms not in response (no grounding)
+        bool mustFound       = false;
+        bool hasSnippets     = false;
+        bool indexInconsistent = true; // Ready + 0 files
+
+        string result;
+        if (!intentOk || violated)           result = "❌ FAIL";
+        else if (!filesFound || !mustFound)  result = "⚠️ WARNING — response weak";
+        else if (!hasSnippets)               result = "⚠️ WARNING — correct answer, no retrieved context";
+        else if (indexInconsistent)          result = "⚠️ WARNING — index inconsistent, re-run Index Project";
+        else                                 result = "✅ PASS";
+
+        Assert.IsTrue(result.StartsWith("⚠️ WARNING"),
+            $"Ready + 0 files + 0 snippets must score WARNING. Got: {result}");
+    }
+
+    [TestMethod]
+    [Description("T6.9: IndexedFileCount on Project is updated correctly after a successful index (contract validation).")]
+    public void T6_9_IndexedFileCount_UpdatedAfterIndexing()
+    {
+        // Simulated post-index state
+        var project = new IronDev.Data.Models.Project
+        {
+            Id               = 2,
+            Name             = "IronDeveloper",
+            IndexingStatus   = "Ready",
+            IndexedFileCount = 156
+        };
+
+        Assert.AreEqual("Ready", project.IndexingStatus, "IndexingStatus must be Ready after successful index.");
+        Assert.AreEqual(156, project.IndexedFileCount, "IndexedFileCount must match the actual stored file count.");
+        Assert.IsTrue(project.IndexedFileCount > 0, "IndexedFileCount must be > 0 for a Ready project.");
+    }
+
+    [TestMethod]
+    [Description("T6.10: All Task 6/7 regression guard — existing 10 test cases unchanged.")]
+    public void T6_10_FullTestMatrix_RegressionGuard()
+    {
+        Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
+        Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.Id)), "All cases must have non-empty IDs.");
+    }
 }

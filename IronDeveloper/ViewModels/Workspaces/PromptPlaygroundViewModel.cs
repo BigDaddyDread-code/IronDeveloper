@@ -146,6 +146,9 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     [ObservableProperty] private string _retrievalSources         = string.Empty;
     [ObservableProperty] private string _retrievalEmptyReason     = string.Empty;
     [ObservableProperty] private bool   _hasDiagnostics           = false;
+    /// <summary>Set when project status is Ready but ProjectFiles count is 0 — indicates a stale/inconsistent index.</summary>
+    [ObservableProperty] private bool   _indexInconsistent        = false;
+    [ObservableProperty] private string _indexInconsistencyReason = string.Empty;
 
     public ObservableCollection<RetrievedContextItem> RetrievedItems { get; } = new();
     public IReadOnlyList<GroundingTestCase>            TestCases      { get; } = BuildTestCases();
@@ -322,14 +325,27 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
                 sources.Add("Decisions/Tickets");
             RetrievalSources = sources.Count > 0 ? string.Join(", ", sources) : "none";
 
-            // Empty reason
+            // Empty reason — distinguish inconsistent state (Ready + 0 files) from genuine miss
+            bool isReadyStatus  = string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase);
+            bool zeroFiles      = ProjectFilesCount == 0;
+
+            IndexInconsistent = isReadyStatus && zeroFiles;
+            IndexInconsistencyReason = IndexInconsistent
+                ? "Project status is Ready but dbo.ProjectFiles is empty — re-run Index Project to rebuild the index"
+                : string.Empty;
+
             if (RetrievedItems.Count == 0)
             {
                 RetrievalEmptyReason =
-                    ProjectFilesCount == 0  ? "No ProjectFiles found — project may not have been indexed yet" :
-                    ProjectFilesCount == -1 ? "Could not query ProjectFiles count" :
-                    _tenantContext.TenantId == 0 ? "TenantId = 0 — tenant context not set (open a project first)" :
-                    "Query returned no CodeIndexEntry matches — check expanded queries vs indexed symbols";
+                    _tenantContext.TenantId == 0
+                        ? "TenantId = 0 — tenant context not set (open a project first)" :
+                    IndexInconsistent
+                        ? "IndexingStatus = Ready but ProjectFiles = 0 — index is stale. Re-run Index Project." :
+                    zeroFiles
+                        ? "No ProjectFiles found — run Index Project first" :
+                    ProjectFilesCount == -1
+                        ? "Could not query ProjectFiles count" :
+                    "No CodeIndexEntry matched the expanded queries — check project path and re-index if needed";
             }
             else
             {
@@ -339,9 +355,11 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
             // Separate context retrieval status from project index status
             ContextRetrievalStatus = RetrievedItems.Count > 0
                 ? $"Retrieved {RetrievedItems.Count} snippet(s)"
-                : string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
-                    ? "Empty — project indexed but no snippets matched"
-                    : "Limited — project not yet indexed";
+                : IndexInconsistent
+                    ? "⚠️ Inconsistent — Ready but no ProjectFiles"
+                    : string.Equals(ProjectIndexStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                        ? "Empty — project indexed but no snippets matched"
+                        : "Limited — project not yet indexed";
 
             // ── Fix 2: Populate pollution diagnostics ────────────────────
             ContextPolluted      = result.ContextPolluted;
@@ -528,16 +546,18 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         RetrievedItems.Clear();
         OnPropertyChanged(nameof(PromptCharCount));
         // Retrieval diagnostics
-        RetrievalProjectId    = 0;
-        RetrievalTenantId     = 0;
-        ProjectFilesCount     = -1;
-        CodeIndexEntriesCount = -1;
-        ExpandedQueryCount    = 0;
-        RetrievedSnippetCount = 0;
-        RetrievedFileCount    = 0;
-        RetrievalSources      = string.Empty;
-        RetrievalEmptyReason  = string.Empty;
-        HasDiagnostics        = false;
+        RetrievalProjectId       = 0;
+        RetrievalTenantId        = 0;
+        ProjectFilesCount        = -1;
+        CodeIndexEntriesCount    = -1;
+        ExpandedQueryCount       = 0;
+        RetrievedSnippetCount    = 0;
+        RetrievedFileCount       = 0;
+        RetrievalSources         = string.Empty;
+        RetrievalEmptyReason     = string.Empty;
+        HasDiagnostics           = false;
+        IndexInconsistent        = false;
+        IndexInconsistencyReason = string.Empty;
     }
 
     // ── Selection change ──────────────────────────────────────────────────
@@ -560,16 +580,18 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         RetrievedItems.Clear();
         OnPropertyChanged(nameof(PromptCharCount));
         // Retrieval diagnostics
-        RetrievalProjectId    = 0;
-        RetrievalTenantId     = 0;
-        ProjectFilesCount     = -1;
-        CodeIndexEntriesCount = -1;
-        ExpandedQueryCount    = 0;
-        RetrievedSnippetCount = 0;
-        RetrievedFileCount    = 0;
-        RetrievalSources      = string.Empty;
-        RetrievalEmptyReason  = string.Empty;
-        HasDiagnostics        = false;
+        RetrievalProjectId       = 0;
+        RetrievalTenantId        = 0;
+        ProjectFilesCount        = -1;
+        CodeIndexEntriesCount    = -1;
+        ExpandedQueryCount       = 0;
+        RetrievedSnippetCount    = 0;
+        RetrievedFileCount       = 0;
+        RetrievalSources         = string.Empty;
+        RetrievalEmptyReason     = string.Empty;
+        HasDiagnostics           = false;
+        IndexInconsistent        = false;
+        IndexInconsistencyReason = string.Empty;
 
         if (value is null)
         {
