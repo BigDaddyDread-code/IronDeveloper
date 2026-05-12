@@ -316,7 +316,9 @@ No commentary before or after the JSON.
   "implementationPlan": ["step 1", "step 2"],
   "codeContext": {
     "affectedFiles": ["path/to/real/file.cs"],
-    "notes": "..."
+    "linkedSymbols": ["ClassName", "MethodName"],
+    "summary": "Technical overview of why these files are affected.",
+    "notes": "Any specific implementation constraints."
   },
   "testPlan": {
     "unitTests": ["..."],
@@ -423,23 +425,22 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
              background = implementationPlan;
         }
 
-        // affectedFiles — from top-level or codeContext.affectedFiles
-        var affectedFiles = dto.AffectedFiles
-            ?? dto.CodeContext?.AffectedFiles;
-        if (affectedFiles is { Count: > 0 })
-        {
-            var fileList = "\n\n**Affected files:**\n" + string.Join("\n", affectedFiles.Select(f => $"- {f}"));
-            background += fileList;
-        }
-
-        // codeContext.notes → append to background
-        if (!string.IsNullOrWhiteSpace(dto.CodeContext?.Notes))
-            background += $"\n\n**Notes:** {dto.CodeContext.Notes}";
-
-        // linkedSymbols — join list to newline-separated string for the DraftTicket field
-        var linkedSymbolsText = dto.LinkedSymbolsList is { Count: > 0 }
-            ? string.Join("\n", dto.LinkedSymbolsList)
+        // ── affectedFiles — from codeContext.affectedFiles or top-level affectedFiles ─
+        var affectedFilesList = dto.CodeContext?.AffectedFiles ?? dto.AffectedFiles;
+        var linkedFilePaths = affectedFilesList is { Count: > 0 }
+            ? string.Join("\n", affectedFilesList.Distinct())
             : null;
+
+        // ── linkedSymbols — from codeContext.linkedSymbols or top-level linkedSymbols ─
+        var linkedSymbolsList = dto.CodeContext?.LinkedSymbols ?? dto.LinkedSymbolsList;
+        var linkedSymbolsText = linkedSymbolsList is { Count: > 0 }
+            ? string.Join("\n", linkedSymbolsList.Distinct())
+            : null;
+
+        // codeContext.summary or codeContext.notes → append to background
+        var contextSummary = dto.CodeContext?.Summary ?? dto.CodeContext?.Notes;
+        if (!string.IsNullOrWhiteSpace(contextSummary))
+            background = $"{background.Trim()}\n\n**Code Context Summary:** {contextSummary.Trim()}".Trim();
 
         // Implementation notes + optional context warning
         var implementationNotes = dto.ImplementationNotes ?? string.Empty;
@@ -462,9 +463,12 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
         var priority   = NormalisePriority(dto.Priority);
         var status     = dto.Status ?? "Draft";
 
+        var title = dto.Title ?? "Untitled Ticket";
+        title = CleanupTypos(title);
+
         return new DraftTicket
         {
-            Title              = dto.Title              ?? "Untitled Ticket",
+            Title              = title,
             TicketType         = ticketType,
             Priority           = priority,
             Status             = status,
@@ -472,6 +476,7 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
             Background         = background,
             AcceptanceCriteria = criteria,
             ImplementationPlan = implementationPlan,
+            LinkedFilePaths    = linkedFilePaths,
             LinkedSymbols      = linkedSymbolsText,
             UnitTests          = unitTests,
             IntegrationTests   = integrationTests,
@@ -647,6 +652,12 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
     {
         [JsonPropertyName("affectedFiles")]
         public List<string>? AffectedFiles { get; set; }
+        [JsonPropertyName("linkedSymbols")]
+        public List<string>? LinkedSymbols { get; set; }
+
+        [JsonPropertyName("summary")]
+        public string?       Summary       { get; set; }
+
         [JsonPropertyName("notes")]
         public string?       Notes         { get; set; }
     }
@@ -681,5 +692,19 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
 
         [JsonIgnore]
         public string? ImplementationPlan { get; set; }
+    }
+
+    private static string CleanupTypos(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text;
+        
+        // Simple cleanup for known project entities
+        return text
+            .Replace("ProjectTickts", "ProjectTickets")
+            .Replace("ProjectTickt", "ProjectTicket")
+            .Replace("TicketServce", "TicketService")
+            .Replace("TicketSerivce", "TicketService")
+            .Replace("TicketsWorkspaceVM", "TicketsWorkspaceViewModel")
+            .Replace("IronDevControls", "IronDeveloperControls");
     }
 }

@@ -70,6 +70,14 @@ public sealed class TicketItem
     public string? LinkedFilePaths { get; set; }
     public string? LinkedCodeIndexEntryIds { get; set; }
     public string? LinkedSymbols { get; set; }
+    public string? UnitTests { get; set; }
+    public string? IntegrationTests { get; set; }
+    public string? ManualTests { get; set; }
+    public string? RegressionTests { get; set; }
+    public string? BuildValidation { get; set; }
+    public string? ContextSummary { get; set; }
+    public bool IsGenerated { get; set; }
+    public string? GenerationNote { get; set; }
     public DateTime CreatedDate { get; set; }
     public bool IsDraft { get; set; }
 }

@@ -190,6 +190,19 @@ public abstract class IntegrationTestBase
             
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ProjectTickets ADD LinkedSymbols NVARCHAR(MAX) NULL;
+
+            -- Extend ProjectTickets (Extended Draft Fields)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'UnitTests')
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD UnitTests NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD IntegrationTests NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD ManualTests NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD RegressionTests NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD BuildValidation NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD ContextSummary NVARCHAR(MAX) NULL;
+                ALTER TABLE dbo.ProjectTickets ADD IsGenerated BIT NOT NULL DEFAULT 0;
+                ALTER TABLE dbo.ProjectTickets ADD GenerationNote NVARCHAR(MAX) NULL;
+            END
             
             -- Legacy support
             IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'SessionId' AND is_nullable = 0)

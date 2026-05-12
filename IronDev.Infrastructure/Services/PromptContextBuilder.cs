@@ -78,6 +78,11 @@ public enum ChatIntent
     /// DraftTicket models, regenerating drafts, etc.
     /// </summary>
     DraftTicketFlow,
+    /// <summary>
+    /// User is asking for a global analysis or overview of the project structure/codebase.
+    /// Grounding should pull in core architectural files.
+    /// </summary>
+    AnalyzeCodebase,
 }
 
 public interface IPromptContextBuilder
@@ -299,6 +304,17 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine("- **Main files/classes involved**: [List of key files/symbols]");
             sb.AppendLine("- **How the flow works**: [Step by step natural language explanation]");
             sb.AppendLine("- **What to inspect next**: [Suggestions for the next files, classes, or tickets to look at]");
+            sb.AppendLine();
+        }
+
+        if (intent == ChatIntent.AnalyzeCodebase)
+        {
+            sb.AppendLine("CODEBASE ANALYSIS CONTEXT:");
+            sb.AppendLine("The user is asking for a global analysis or architectural overview of the project structure.");
+            sb.AppendLine("Focus your answer on the core architecture: ShellViewModel, Workspace management, Service layer (TicketService, MemoryService), and Core interfaces.");
+            sb.AppendLine("Your goal is to explain HOW the system is organized, citing specific files and classes from the snippets provided below.");
+            sb.AppendLine("Avoid generic software architecture advice. If you see a specific pattern in the snippets (e.g. WPF MVVM with CommunityToolkit), mention it explicitly.");
+            sb.AppendLine("If the user's request is broad, categorize your answer into: UI/ViewModels, Services/Logic, and Data Models.");
             sb.AppendLine();
         }
 
@@ -563,6 +579,9 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         // Saved ticket management — broad set of signals
         if (IsSavedTicketManagementQuery(lower)) return ChatIntent.SavedTicketManagement;
 
+        // Analyze codebase — global architectural overview
+        if (IsAnalyzeCodebaseQuery(lower)) return ChatIntent.AnalyzeCodebase;
+
         // Generic code / implementation query
         if (IsCodeQuery(lower)) return ChatIntent.CodeQuery;
 
@@ -579,6 +598,14 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         lower.Contains("draft review") ||
         lower.Contains("approve draft") ||
         lower.Contains("draftticket");
+
+    private static bool IsAnalyzeCodebaseQuery(string lower) =>
+        lower.Contains("analyze codebase") ||
+        lower.Contains("analyse codebase") ||
+        lower.Contains("analyze the codebase") ||
+        lower.Contains("project structure") ||
+        lower.Contains("codebase overview") ||
+        lower.Contains("architectural overview");
 
     public static bool IsSavedTicketManagementQuery(string lower) =>
         (lower.Contains("ticket") || lower.Contains("tickets")) &&
@@ -618,7 +645,9 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         lower.Contains("configure") ||
         lower.Contains("fix grounding") ||
         lower.Contains("run with") ||
-        lower.Contains("run irondev");
+        lower.Contains("run irondev") ||
+        lower.Contains("analyze codebase") ||
+        lower.Contains("analyse codebase");
 
     // ────────────────────────────────────────────────────────────────────
     // Query Expansion
@@ -666,6 +695,24 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
                 "GenerateDraft",
                 "ApproveDraft",
                 "ChatTicketContext",
+            });
+        }
+        else if (intent == ChatIntent.AnalyzeCodebase)
+        {
+            // Pull core architectural files for a codebase overview
+            queries.AddRange(new[]
+            {
+                "ShellViewModel",
+                "AppShell",
+                "MainViewModel",
+                "INavigationService",
+                "WorkspaceViewModel",
+                "ProjectMemoryService",
+                "IProjectMemoryService",
+                "PromptContextBuilder",
+                "DataModels",
+                "ProjectTicket",
+                "DraftTicket",
             });
         }
 

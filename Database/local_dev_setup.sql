@@ -143,6 +143,17 @@ BEGIN
         LinkedFilePaths NVARCHAR(MAX) NULL,
         LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
         LinkedSymbols NVARCHAR(MAX) NULL,
+
+        -- Extended draft/test fields
+        UnitTests NVARCHAR(MAX) NULL,
+        IntegrationTests NVARCHAR(MAX) NULL,
+        ManualTests NVARCHAR(MAX) NULL,
+        RegressionTests NVARCHAR(MAX) NULL,
+        BuildValidation NVARCHAR(MAX) NULL,
+        ContextSummary NVARCHAR(MAX) NULL,
+        IsGenerated BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsGenerated DEFAULT 0,
+        GenerationNote NVARCHAR(MAX) NULL,
+
         CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectTickets_CreatedDate DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
         CONSTRAINT FK_ProjectTickets_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
@@ -302,6 +313,18 @@ END
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.ProjectTickets') AND name = N'Problem')
 BEGIN
     ALTER TABLE dbo.ProjectTickets ADD Problem NVARCHAR(MAX) NULL;
+END
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.ProjectTickets') AND name = N'UnitTests')
+BEGIN
+    ALTER TABLE dbo.ProjectTickets ADD UnitTests NVARCHAR(MAX) NULL;
+    ALTER TABLE dbo.ProjectTickets ADD IntegrationTests NVARCHAR(MAX) NULL;
+    ALTER TABLE dbo.ProjectTickets ADD ManualTests NVARCHAR(MAX) NULL;
+    ALTER TABLE dbo.ProjectTickets ADD RegressionTests NVARCHAR(MAX) NULL;
+    ALTER TABLE dbo.ProjectTickets ADD BuildValidation NVARCHAR(MAX) NULL;
+    ALTER TABLE dbo.ProjectTickets ADD ContextSummary NVARCHAR(MAX) NULL;
+    ALTER TABLE dbo.ProjectTickets ADD IsGenerated BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsGenerated DEFAULT 0;
+    ALTER TABLE dbo.ProjectTickets ADD GenerationNote NVARCHAR(MAX) NULL;
 END
 GO
 
