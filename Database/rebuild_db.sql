@@ -206,6 +206,17 @@ CREATE TABLE dbo.ProjectTickets
     LinkedFilePaths NVARCHAR(MAX) NULL,
     LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
     LinkedSymbols NVARCHAR(MAX) NULL,
+    
+    -- Extended draft/test fields
+    UnitTests NVARCHAR(MAX) NULL,
+    IntegrationTests NVARCHAR(MAX) NULL,
+    ManualTests NVARCHAR(MAX) NULL,
+    RegressionTests NVARCHAR(MAX) NULL,
+    BuildValidation NVARCHAR(MAX) NULL,
+    ContextSummary NVARCHAR(MAX) NULL,
+    IsGenerated BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsGenerated DEFAULT 0,
+    GenerationNote NVARCHAR(MAX) NULL,
+
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectTickets_CreatedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectTickets_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)

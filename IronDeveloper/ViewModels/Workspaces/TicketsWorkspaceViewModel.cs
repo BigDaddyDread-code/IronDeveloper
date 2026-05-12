@@ -90,7 +90,10 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     // CommunityToolkit.Mvvm partial callback — called whenever [ObservableProperty]
     // EditTechnicalNotes is set (including direct assignment from load methods).
-    partial void OnEditTechnicalNotesChanged(string value) => SyncTechnicalNotesToTests();
+    partial void OnEditTechnicalNotesChanged(string value)
+    {
+        SyncTechnicalNotesToTests();
+    }
 
     // ── Implementation Plan ──
     [ObservableProperty] private TicketDetailTab _activeTab = TicketDetailTab.Overview;
@@ -272,7 +275,19 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditProblem              = item.Problem ?? string.Empty;
         EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
         EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
-        SyncTechnicalNotesToTests();
+        if (!string.IsNullOrWhiteSpace(item.UnitTests) || !string.IsNullOrWhiteSpace(item.IntegrationTests))
+        {
+            _editTestsUnitTests        = item.UnitTests ?? string.Empty;
+            _editTestsIntegrationTests = item.IntegrationTests ?? string.Empty;
+            _editTestsManualTests      = item.ManualTests ?? string.Empty;
+            _editTestsRegressionTests  = item.RegressionTests ?? string.Empty;
+            _editTestsBuildValidation  = item.BuildValidation ?? string.Empty;
+            SyncTestsToTechnicalNotes();
+        }
+        else
+        {
+            SyncTechnicalNotesToTests();
+        }
         EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
         EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
 
@@ -296,7 +311,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditProblem              = item.Problem ?? string.Empty;
         EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
         EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
-        SyncTechnicalNotesToTests();
+        if (!string.IsNullOrWhiteSpace(item.UnitTests)) { _editTestsUnitTests = item.UnitTests; SyncTestsToTechnicalNotes(); } else { SyncTechnicalNotesToTests(); }
         EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
         EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
 
@@ -400,7 +415,15 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 Content                = EditSummary?.Trim() ?? string.Empty,
                 LinkedFilePaths        = string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths.Trim(),
                 LinkedCodeIndexEntryIds = null,
-                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols) ? null : EditLinkedSymbols.Trim()
+                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols) ? null : EditLinkedSymbols.Trim(),
+                UnitTests              = string.IsNullOrWhiteSpace(EditTestsUnitTests) ? null : EditTestsUnitTests.Trim(),
+                IntegrationTests       = string.IsNullOrWhiteSpace(EditTestsIntegrationTests) ? null : EditTestsIntegrationTests.Trim(),
+                ManualTests            = string.IsNullOrWhiteSpace(EditTestsManualTests) ? null : EditTestsManualTests.Trim(),
+                RegressionTests        = string.IsNullOrWhiteSpace(EditTestsRegressionTests) ? null : EditTestsRegressionTests.Trim(),
+                BuildValidation        = string.IsNullOrWhiteSpace(EditTestsBuildValidation) ? null : EditTestsBuildValidation.Trim(),
+                ContextSummary         = CurrentBuildPreview?.ContextSummary,
+                IsGenerated            = SelectedTicket?.IsGenerated ?? false,
+                GenerationNote         = SelectedTicket?.GenerationNote
             };
 
             var savedId = await _ticketService.SaveTicketAsync(ticket);
@@ -424,14 +447,44 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CreatePlan()
+    private async Task GenerateImplementationPlanAsync()
     {
-        if (SelectedTicket == null) return;
-        HasPlan = true;
-        PlanId = 0;
-        PlanTitle = $"Implementation Plan for {SelectedTicket.Title}";
-        PlanGoal = SelectedTicket.Summary ?? string.Empty;
-        ActiveTab = TicketDetailTab.ImplementationPlan;
+        if (IsDraftMode && CurrentDraft != null)
+        {
+            IsDraftGenerating  = true;
+            DraftStatusMessage = "Generating implementation plan…";
+
+            try
+            {
+                var updated = await _draftService.GeneratePlanAsync(_activeProjectId, CurrentDraft);
+                CurrentDraft = updated;
+
+                // Update only plan fields; other fields are untouched
+                HasPlan           = true;
+                PlanTitle         = $"{updated.Title} — Implementation Plan";
+                PlanGoal          = updated.Summary;
+                PlanProposedSteps = updated.ImplementationPlan ?? string.Empty;
+                PlanAffectedContext = updated.LinkedFilePaths ?? string.Empty;
+
+                DraftStatusMessage = "Implementation plan generated.";
+            }
+            catch (Exception ex)
+            {
+                DraftStatusMessage = $"Plan generation failed: {ex.Message}";
+            }
+            finally
+            {
+                IsDraftGenerating = false;
+            }
+        }
+        else if (SelectedTicket != null)
+        {
+            HasPlan = true;
+            PlanId = 0;
+            PlanTitle = $"Implementation Plan for {SelectedTicket.Title}";
+            PlanGoal = SelectedTicket.Summary ?? string.Empty;
+            ActiveTab = TicketDetailTab.ImplementationPlan;
+        }
     }
 
     [RelayCommand]
@@ -808,70 +861,110 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         OnCancelDraft?.Invoke();
     }
 
-    /// <summary>Saves the draft ticket, exits draft mode, and selects the new ticket in the list.</summary>
+    /// <summary>Saves the draft ticket, its plan (if any), exits draft mode, and selects the new ticket.</summary>
     [RelayCommand]
     private async Task ApproveDraftAsync()
     {
         var savedId = await SaveDraftTicketAsync();
         if (savedId <= 0) return;
 
+        // If a plan was generated during review, save it too and link it
+        if (HasPlan)
+        {
+            await SaveLinkedPlanAsync(savedId);
+        }
+
         IsDraftMode        = false;
         CurrentDraft       = null;
         DraftStatusMessage = string.Empty;
 
-        await RefreshListAsync();  // ClearEditor() is called inside — resets HasDetail, fields, etc.
+        await RefreshListAsync();  // ClearEditor() is called inside
 
-        // Re-select the newly created ticket so the detail panel shows it.
-        // Set SelectedTicket first (triggers list highlight), then directly
-        // load the editor so we can set SaveStatus AFTER the load completes.
         var created = Tickets.FirstOrDefault(t => t.Id == savedId);
         if (created != null)
         {
-            // Suppress OnSelectedTicketChanged from clearing SaveStatus by
-            // directly loading the editor ourselves, then setting SelectedTicket.
             await LoadTicketIntoEditorAsync(created);
-            SelectedTicket = created;          // list highlight (no double-load: HasDetail already true)
+            SelectedTicket = created;
         }
 
         SaveStatus = "Ticket created \u2713";
+    }
+
+    private async Task SaveLinkedPlanAsync(long ticketId)
+    {
+        if (_memoryService == null)
+        {
+            SaveStatus = "Ticket created, but plan persistence is unavailable.";
+            return;
+        }
+
+        try
+        {
+            var plan = new ProjectImplementationPlan
+            {
+                Id = PlanId,
+                ProjectId = _activeProjectId,
+                TicketId = ticketId,
+                Title = string.IsNullOrWhiteSpace(PlanTitle) ? $"{EditTitle.Trim()} — Implementation Plan" : PlanTitle.Trim(),
+                Goal = string.IsNullOrWhiteSpace(PlanGoal) ? EditSummary.Trim() : PlanGoal.Trim(),
+                Scope = string.IsNullOrWhiteSpace(PlanScope) ? (string.IsNullOrWhiteSpace(EditAcceptanceCriteria) ? null : EditAcceptanceCriteria.Trim()) : PlanScope.Trim(),
+                ProposedSteps = string.IsNullOrWhiteSpace(PlanProposedSteps) ? null : PlanProposedSteps.Trim(),
+                AffectedContext = string.IsNullOrWhiteSpace(PlanAffectedContext) ? (string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths.Trim()) : PlanAffectedContext.Trim(),
+                RisksNotes = string.IsNullOrWhiteSpace(PlanRisksNotes) ? null : PlanRisksNotes.Trim(),
+                Status = PlanStatus,
+                LinkedFilePaths = string.IsNullOrWhiteSpace(PlanLinkedFilePaths) ? null : PlanLinkedFilePaths.Trim(),
+                LinkedSymbols = string.IsNullOrWhiteSpace(PlanLinkedSymbols) ? null : PlanLinkedSymbols.Trim()
+            };
+
+            var savedPlanId = await _memoryService.SavePlanAsync(plan);
+            PlanId = savedPlanId;
+        }
+        catch (Exception ex)
+        {
+            // Log or show warning but don't fail ticket save
+            SaveStatus = $"Ticket saved, but plan save failed: {ex.Message}";
+        }
     }
 
     /// <summary>Saves the draft ticket and then navigates to Plans to create a plan.</summary>
     [RelayCommand]
     private async Task ApproveDraftWithPlanAsync()
     {
+        // If plan is empty, generate it first
+        if (!HasPlan || string.IsNullOrWhiteSpace(PlanProposedSteps))
+        {
+            await GenerateImplementationPlanAsync();
+            if (!HasPlan || string.IsNullOrWhiteSpace(PlanProposedSteps))
+            {
+                SaveStatus = "Warning: Implementation plan is empty.";
+            }
+        }
+
         var savedId = await SaveDraftTicketAsync();
         if (savedId <= 0) return;
 
-        // ✓ SNAPSHOT all field values BEFORE RefreshListAsync calls ClearEditor() and blanks them
-        var planTitle       = $"{EditTitle.Trim()} — Implementation Plan";
-        var planGoal        = EditSummary.Trim();
-        var planScope       = string.IsNullOrWhiteSpace(EditAcceptanceCriteria)
-                                 ? null
-                                 : EditAcceptanceCriteria.Trim();
-        var planSteps       = string.IsNullOrWhiteSpace(EditBackground)
-                                 ? null
-                                 : EditBackground.Trim();
-        var planFiles       = string.IsNullOrWhiteSpace(EditLinkedFilePaths)
-                                 ? null
-                                 : EditLinkedFilePaths.Trim();
-        var planSymbols     = string.IsNullOrWhiteSpace(EditLinkedSymbols)
-                                 ? null
-                                 : EditLinkedSymbols.Trim();
-        var planRisksNotes  = string.IsNullOrWhiteSpace(EditTechnicalNotes)
-                                 ? null
-                                 : EditTechnicalNotes.Trim();   // carries Tests/Validation into plan
+        // ✓ SNAPSHOT field values for navigation event (though we are also saving to DB now)
+        var planTitle       = string.IsNullOrWhiteSpace(PlanTitle) ? $"{EditTitle.Trim()} — Implementation Plan" : PlanTitle.Trim();
+        var planGoal        = string.IsNullOrWhiteSpace(PlanGoal) ? EditSummary.Trim() : PlanGoal.Trim();
+        var planScope       = string.IsNullOrWhiteSpace(PlanScope) ? (string.IsNullOrWhiteSpace(EditAcceptanceCriteria) ? null : EditAcceptanceCriteria.Trim()) : PlanScope.Trim();
+        var planSteps       = string.IsNullOrWhiteSpace(PlanProposedSteps) ? null : PlanProposedSteps.Trim();
+        var planFiles       = string.IsNullOrWhiteSpace(PlanAffectedContext) ? (string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths.Trim()) : PlanAffectedContext.Trim();
+        var planSymbols     = string.IsNullOrWhiteSpace(EditLinkedSymbols) ? null : EditLinkedSymbols.Trim();
+        var planRisksNotes  = string.IsNullOrWhiteSpace(PlanRisksNotes) ? null : PlanRisksNotes.Trim();
+
+        // Save the plan to DB and link it
+        await SaveLinkedPlanAsync(savedId);
 
         IsDraftMode        = false;
         CurrentDraft       = null;
         DraftStatusMessage = string.Empty;
 
-        await RefreshListAsync();  // ClearEditor() called here — field snapshots are already safe
+        await RefreshListAsync();
 
         // Re-select the saved ticket
         SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
 
-        // Navigate to Plans with full prefill (title, goal, steps, files, symbols, scope, risksNotes)
+        // Navigate to Plans with full prefill
         OnApproveDraftWithPlan?.Invoke(planTitle, planGoal, planSteps, planFiles, planSymbols, planScope, planRisksNotes);
     }
 
@@ -1076,7 +1169,15 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 Content                = EditSummary?.Trim() ?? string.Empty,
                 LinkedFilePaths        = string.IsNullOrWhiteSpace(EditLinkedFilePaths)      ? null : EditLinkedFilePaths.Trim(),
                 LinkedCodeIndexEntryIds = null,
-                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols)        ? null : EditLinkedSymbols.Trim()
+                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols)      ? null : EditLinkedSymbols.Trim(),
+                UnitTests              = string.IsNullOrWhiteSpace(EditTestsUnitTests)        ? null : EditTestsUnitTests.Trim(),
+                IntegrationTests       = string.IsNullOrWhiteSpace(EditTestsIntegrationTests) ? null : EditTestsIntegrationTests.Trim(),
+                ManualTests            = string.IsNullOrWhiteSpace(EditTestsManualTests)      ? null : EditTestsManualTests.Trim(),
+                RegressionTests        = string.IsNullOrWhiteSpace(EditTestsRegressionTests)  ? null : EditTestsRegressionTests.Trim(),
+                BuildValidation        = string.IsNullOrWhiteSpace(EditTestsBuildValidation)  ? null : EditTestsBuildValidation.Trim(),
+                ContextSummary         = CurrentDraft?.Summary, // Or from build preview if generated
+                IsGenerated            = true,
+                GenerationNote         = CurrentDraft?.GenerationNote
             };
 
             var savedId = await _ticketService.SaveTicketAsync(ticket);
@@ -1120,6 +1221,20 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditTestsManualTests      = draft.ManualTests;
         EditTestsRegressionTests  = draft.RegressionTests;
         EditTestsBuildValidation  = draft.BuildValidation;
+
+        // Populate Implementation Plan tab if data exists
+        if (!string.IsNullOrWhiteSpace(draft.ImplementationPlan))
+        {
+            HasPlan           = true;
+            PlanTitle         = $"{draft.Title} — Implementation Plan";
+            PlanGoal          = draft.Summary;
+            PlanProposedSteps = draft.ImplementationPlan;
+            PlanAffectedContext = draft.LinkedFilePaths ?? string.Empty;
+        }
+        else
+        {
+            HasPlan = false;
+        }
 
         SaveStatus = string.Empty;
     }
@@ -1178,6 +1293,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         LinkedFilePaths        = t.LinkedFilePaths,
         LinkedCodeIndexEntryIds = t.LinkedCodeIndexEntryIds,
         LinkedSymbols          = t.LinkedSymbols,
+        UnitTests              = t.UnitTests,
+        IntegrationTests       = t.IntegrationTests,
+        ManualTests            = t.ManualTests,
+        RegressionTests        = t.RegressionTests,
+        BuildValidation        = t.BuildValidation,
+        ContextSummary         = t.ContextSummary,
+        IsGenerated            = t.IsGenerated,
+        GenerationNote         = t.GenerationNote,
         CreatedDate            = t.CreatedDate
     };
 

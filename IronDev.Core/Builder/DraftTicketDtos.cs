@@ -24,8 +24,9 @@ public sealed class DraftTicket
     public string  Summary            { get; set; } = string.Empty;
     public string? Background         { get; set; }   // UI label: "Requirements"
     public string? AcceptanceCriteria { get; set; }
-    public string? LinkedFilePaths    { get; set; }
+    public string? LinkedFilePaths    { get; set; } 
     public string? LinkedSymbols      { get; set; }
+    public string? ImplementationPlan { get; set; }
 
     // ── Tests sub-fields (transient — packed into TechnicalNotes on save) ─
     public string UnitTests        { get; set; } = string.Empty;

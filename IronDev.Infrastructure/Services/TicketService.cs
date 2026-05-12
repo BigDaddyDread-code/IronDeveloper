@@ -51,7 +51,11 @@ public sealed class TicketService : ITicketService
                     Summary = @Summary, Background = @Background, Problem = @Problem,
                     AcceptanceCriteria = @AcceptanceCriteria, TechnicalNotes = @TechnicalNotes,
                     Status = @Status, Content = @Content, LinkedFilePaths = @LinkedFilePaths,
-                    LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds, LinkedSymbols = @LinkedSymbols
+                    LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds, LinkedSymbols = @LinkedSymbols,
+                    UnitTests = @UnitTests, IntegrationTests = @IntegrationTests,
+                    ManualTests = @ManualTests, RegressionTests = @RegressionTests,
+                    BuildValidation = @BuildValidation, ContextSummary = @ContextSummary,
+                    IsGenerated = @IsGenerated, GenerationNote = @GenerationNote
                 WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
                 """;
 
@@ -74,7 +78,15 @@ public sealed class TicketService : ITicketService
                     ticket.Content,
                     ticket.LinkedFilePaths,
                     ticket.LinkedCodeIndexEntryIds,
-                    ticket.LinkedSymbols
+                    ticket.LinkedSymbols,
+                    ticket.UnitTests,
+                    ticket.IntegrationTests,
+                    ticket.ManualTests,
+                    ticket.RegressionTests,
+                    ticket.BuildValidation,
+                    ticket.ContextSummary,
+                    ticket.IsGenerated,
+                    ticket.GenerationNote
                 },
                 cancellationToken: cancellationToken));
                 
@@ -90,12 +102,16 @@ public sealed class TicketService : ITicketService
                 INSERT INTO dbo.ProjectTickets
                     (TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                      Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                     Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols)
+                     Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
+                     UnitTests, IntegrationTests, ManualTests, RegressionTests,
+                     BuildValidation, ContextSummary, IsGenerated, GenerationNote)
                 OUTPUT inserted.Id
                 VALUES
                     (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
                      @Summary, @Background, @Problem, @AcceptanceCriteria, @TechnicalNotes,
-                     @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols);
+                     @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols,
+                     @UnitTests, @IntegrationTests, @ManualTests, @RegressionTests,
+                     @BuildValidation, @ContextSummary, @IsGenerated, @GenerationNote);
                 """;
 
             return await connection.QuerySingleAsync<long>(new CommandDefinition(
@@ -117,7 +133,15 @@ public sealed class TicketService : ITicketService
                     ticket.Content,
                     ticket.LinkedFilePaths,
                     ticket.LinkedCodeIndexEntryIds,
-                    ticket.LinkedSymbols
+                    ticket.LinkedSymbols,
+                    ticket.UnitTests,
+                    ticket.IntegrationTests,
+                    ticket.ManualTests,
+                    ticket.RegressionTests,
+                    ticket.BuildValidation,
+                    ticket.ContextSummary,
+                    ticket.IsGenerated,
+                    ticket.GenerationNote
                 },
                 cancellationToken: cancellationToken));
         }
@@ -129,7 +153,9 @@ public sealed class TicketService : ITicketService
             SELECT TOP (@Take)
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
+                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
+                UnitTests, IntegrationTests, ManualTests, RegressionTests,
+                BuildValidation, ContextSummary, IsGenerated, GenerationNote, CreatedDate
             FROM dbo.ProjectTickets
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -152,9 +178,11 @@ public sealed class TicketService : ITicketService
             SELECT
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
-                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols, CreatedDate
+                Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
+                UnitTests, IntegrationTests, ManualTests, RegressionTests,
+                BuildValidation, ContextSummary, IsGenerated, GenerationNote, CreatedDate
             FROM dbo.ProjectTickets
-            WHERE Id = @TicketId
+                WHERE Id = @TicketId
               AND TenantId = @TenantId;
             """;
 

@@ -139,4 +139,13 @@ public interface IDraftTicketService
         int        projectId,
         DraftTicket current,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates an implementation plan from the existing ticket draft fields.
+    /// Returns the updated draft with ImplementationPlan populated.
+    /// </summary>
+    Task<DraftTicket> GeneratePlanAsync(
+        int        projectId,
+        DraftTicket current,
+        CancellationToken ct = default);
 }

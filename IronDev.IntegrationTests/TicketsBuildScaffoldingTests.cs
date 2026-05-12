@@ -119,15 +119,16 @@ internal sealed class StubDraftTicketService : IDraftTicketService
         => Task.FromResult(new DraftTicket
         {
             // Preserve non-test fields
-            Title              = current.Title,
-            TicketType         = current.TicketType,
-            Priority           = current.Priority,
-            Status             = current.Status,
-            Summary            = current.Summary,
-            Background         = current.Background,
-            AcceptanceCriteria = current.AcceptanceCriteria,
-            LinkedFilePaths    = current.LinkedFilePaths,
-            LinkedSymbols      = current.LinkedSymbols,
+            Title               = current.Title,
+            TicketType          = current.TicketType,
+            Priority            = current.Priority,
+            Status              = current.Status,
+            Summary             = current.Summary,
+            Background          = current.Background,
+            AcceptanceCriteria  = current.AcceptanceCriteria,
+            LinkedFilePaths     = current.LinkedFilePaths,
+            LinkedSymbols       = current.LinkedSymbols,
+            ImplementationPlan  = current.ImplementationPlan,
             SourceChatSessionId = current.SourceChatSessionId,
             SourceMessageId     = current.SourceMessageId,
             SourceMessageText   = current.SourceMessageText,
@@ -139,6 +140,37 @@ internal sealed class StubDraftTicketService : IDraftTicketService
             BuildValidation  = current.BuildValidation,
             IsGenerated      = true,
             GenerationNote   = "Stub tests regenerated."
+        });
+
+    public Task<DraftTicket> GeneratePlanAsync(
+        int         projectId,
+        DraftTicket current,
+        CancellationToken ct = default)
+        => Task.FromResult(new DraftTicket
+        {
+            // Preserve fields
+            Title               = current.Title,
+            TicketType          = current.TicketType,
+            Priority            = current.Priority,
+            Status              = current.Status,
+            Summary             = current.Summary,
+            Background          = current.Background,
+            AcceptanceCriteria  = current.AcceptanceCriteria,
+            LinkedFilePaths     = current.LinkedFilePaths,
+            LinkedSymbols       = current.LinkedSymbols,
+            SourceChatSessionId = current.SourceChatSessionId,
+            SourceMessageId     = current.SourceMessageId,
+            SourceMessageText   = current.SourceMessageText,
+            UnitTests           = current.UnitTests,
+            IntegrationTests    = current.IntegrationTests,
+            ManualTests         = current.ManualTests,
+            RegressionTests     = current.RegressionTests,
+            BuildValidation     = current.BuildValidation,
+
+            // New plan
+            ImplementationPlan = "- Step 1: Fix the thing.\n- Step 2: Test the thing.",
+            IsGenerated        = true,
+            GenerationNote     = "Stub implementation plan generated."
         });
 }
 
