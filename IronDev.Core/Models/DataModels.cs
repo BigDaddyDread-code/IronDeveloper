@@ -186,5 +186,6 @@ public sealed class ProjectTicket
     public string? ContextSummary { get; set; }
     public bool IsGenerated { get; set; }
     public string? GenerationNote { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTime CreatedDate { get; set; }
 }

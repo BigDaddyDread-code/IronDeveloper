@@ -216,6 +216,7 @@ CREATE TABLE dbo.ProjectTickets
     ContextSummary NVARCHAR(MAX) NULL,
     IsGenerated BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsGenerated DEFAULT 0,
     GenerationNote NVARCHAR(MAX) NULL,
+    IsDeleted BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsDeleted DEFAULT 0,
 
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectTickets_CreatedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),

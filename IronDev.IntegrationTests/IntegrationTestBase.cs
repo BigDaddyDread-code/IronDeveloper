@@ -191,6 +191,9 @@ public abstract class IntegrationTestBase
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ProjectTickets ADD LinkedSymbols NVARCHAR(MAX) NULL;
 
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'IsDeleted')
+                ALTER TABLE dbo.ProjectTickets ADD IsDeleted BIT NOT NULL DEFAULT 0;
+
             -- Extend ProjectTickets (Extended Draft Fields)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'UnitTests')
             BEGIN

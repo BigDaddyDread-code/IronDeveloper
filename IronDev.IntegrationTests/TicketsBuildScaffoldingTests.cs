@@ -88,6 +88,7 @@ internal sealed class StubDraftTicketService : IDraftTicketService
         string messageText,
         string? linkedFilePaths,
         string? linkedSymbols,
+        long?   sessionId = null,
         CancellationToken ct = default)
     {
         LastTitle = proposedTitle;
