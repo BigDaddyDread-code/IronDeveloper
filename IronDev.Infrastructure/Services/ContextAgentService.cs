@@ -259,6 +259,19 @@ public sealed class ContextAgentService : IContextAgentService
              request.RecentDecisions.Count > 0 ||
              request.ProjectRules.Count > 0))
         {
+            bool isChangeIntent = ChatIntentParser.IsChangeIntent(request.UserRequest, request.CreateTicketIntent);
+            
+            if (!isChangeIntent)
+            {
+                var tSkip = MakeTrace(ContextAgentStage.ConflictAssessment, traceGroupId, stage2Id);
+                tSkip.WasSuccessful = true;
+                tSkip.RequestText = $"UserRequest: {request.UserRequest}\nSkipped: Request intent is CodeQuery/Inspection.";
+                tSkip.ParsedResponseSummary = "ConflictAssessment skipped: request intent is CodeQuery/Inspection.";
+                tSkip.ContextSummary = "Conflict assessment is gated to ticket creation and change intents only.";
+                _traceService.AddTrace(tSkip);
+            }
+            else
+            {
             var conflictCtx = new ConflictAssessmentContext
             {
                 UserRequest      = effectiveWorkText,
@@ -337,6 +350,7 @@ public sealed class ContextAgentService : IContextAgentService
                         Warnings                = string.Join("; ", warnings),
                         ConflictAssessment      = conflictAssessment,
                     };
+                }
                 }
             }
         }

@@ -80,4 +80,34 @@ public static class ChatIntentParser
 
         return null;
     }
+
+    public static bool IsChangeIntent(string request, CreateTicketIntent? ticketIntent)
+    {
+        if (ticketIntent != null) return true;
+
+        if (string.IsNullOrWhiteSpace(request)) return false;
+
+        var lower = request.ToLowerInvariant().Trim();
+
+        var inspectionPrefixes = new[] {
+            "check", "inspect", "what", "look", "explain", "how", "where", "find", "show", "why", "does", "is", "are", "can", "review", "verify", "who"
+        };
+
+        foreach (var prefix in inspectionPrefixes)
+        {
+            if (lower.StartsWith(prefix + " ") || lower == prefix) return false;
+        }
+
+        var changePrefixes = new[] {
+            "implement", "replace", "change", "build", "generate", "add", "update", "fix", "refactor", "remove", "rewrite", "migrate", "create", "make", "raise"
+        };
+
+        foreach (var prefix in changePrefixes)
+        {
+            if (lower.StartsWith(prefix + " ") || lower == prefix) return true;
+        }
+
+        // Default to false (inspection/general) if we aren't explicitly commanding a change
+        return false;
+    }
 }

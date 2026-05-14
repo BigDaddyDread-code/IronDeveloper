@@ -51,7 +51,7 @@ public sealed class ContextConflictService : IContextConflictService
         ("testing",
          ["test", "unit test", "integration test", "grounding test"]),
         ("ui / ux",
-         ["ui", "ux", "view", "xaml", "control", "toggle", "button"]),
+         ["ui", "ux", "view ", "xaml", " ui ", " ui.", " ux.", "IronDeveloperControls", "UI component", "toggle", "button"]),
         ("database / persistence",
          ["database", "sql", "migration", "schema", "dbo.", "table"]),
     ];
