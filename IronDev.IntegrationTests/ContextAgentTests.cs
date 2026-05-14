@@ -114,7 +114,34 @@ internal static class ContextAgentFactory
 
         return (agent, llm, index, traces);
     }
+
+    /// <summary>
+    /// Builds a ContextAgentService with a real ContextConflictService wired in,
+    /// so conflict assessment tests run deterministically without a DB.
+    /// </summary>
+    public static (ContextAgentService agent, StubLlmService llm, StubCodeIndexService index, LlmTraceService traces)
+        BuildWithConflict(
+            ChatContextPacket? packet = null,
+            IEnumerable<CodeIndexEntry>? snippets = null,
+            string? llmResponse = null)
+    {
+        var llm    = new StubLlmService(llmResponse
+            ?? """{"isSufficient":true,"confidence":9,"reason":"Enough context.","requestedContext":{"codeSearchQueries":[],"clarificationQuestions":[]}}""");
+        var index  = new StubCodeIndexService(snippets);
+        var traces = new LlmTraceService();
+        var conflict = new ContextConflictService();
+
+        var agent = new ContextAgentService(
+            new StubPromptContextBuilder(packet),
+            index,
+            llm,
+            traces,
+            conflict);
+
+        return (agent, llm, index, traces);
+    }
 }
+
 
 // ── Test class ────────────────────────────────────────────────────────────────
 
@@ -758,6 +785,220 @@ public sealed class ContextAgentTests
         Assert.IsFalse(
             result.Evidence.Any(e => e.FilePath.Contains("IntegrationTests")),
             "Test file must not appear in final evidence.");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Conflict assessment tests (Q–V)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static ContextAgentRequest MakeTicketRequest(
+        string userRequest,
+        IEnumerable<IronDev.Data.Models.ProjectTicket>? tickets = null,
+        IEnumerable<IronDev.Data.Models.ProjectDecision>? decisions = null,
+        IEnumerable<IronDev.Data.Models.ProjectRule>? rules = null)
+        => new()
+        {
+            ProjectId       = 1,
+            SessionId       = 0,
+            UserRequest     = userRequest,
+            RecentTickets   = tickets?.ToList()   ?? [],
+            RecentDecisions = decisions?.ToList() ?? [],
+            ProjectRules    = rules?.ToList()     ?? [],
+        };
+
+    private static ContextAgentService BuildConflictAgent(
+        string sufficientJson = """{"isSufficient":true,"confidence":9,"reason":"Enough context.","requestedContext":{"codeSearchQueries":[],"clarificationQuestions":[]}}""")
+    {
+        var (agent, _, _, _) = ContextAgentFactory.BuildWithConflict(
+            llmResponse: sufficientJson);
+        return agent;
+    }
+
+    // ── Q: OAuth ticket conflicts with API key auth request ───────────────────
+
+    [TestMethod]
+    [Description("Q: Given existing OAuth ticket, requesting API key auth for same layer is classified as Conflicts and blocks creation.")]
+    public async Task ConflictAssessment_OAuthVsApiKey_ClassifiesAsConflict()
+    {
+        var existingTicket = new IronDev.Data.Models.ProjectTicket
+        {
+            Id      = 123,
+            Title   = "Implement OAuth in REST layer",
+            Status  = "Draft",
+            Summary = "Add OAuth authentication to the REST API endpoints.",
+        };
+
+        var agent = BuildConflictAgent();
+        var result = await agent.RunAsync(MakeTicketRequest(
+            "Create a ticket to add API key authentication to the REST layer",
+            tickets: [existingTicket]));
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsTrue(result.IsClarificationRequired,
+            "A conflict with OAuth should block ticket creation and require clarification.");
+        Assert.IsNotNull(result.ConflictAssessment, "ConflictAssessment must be set.");
+        Assert.IsTrue(
+            result.ConflictAssessment!.Classification is
+                ConflictClassification.Conflicts or ConflictClassification.NeedsDecision,
+            $"Expected Conflicts or NeedsDecision, got {result.ConflictAssessment.Classification}");
+        Assert.AreEqual(1, result.ConflictAssessment.RelatedTickets.Count,
+            "OAuth ticket must be in related tickets.");
+        Assert.IsTrue(result.ClarificationQuestions.Count > 0,
+            "Clarification questions must be returned.");
+    }
+
+    // ── R: Same-approach duplicate ────────────────────────────────────────────
+
+    [TestMethod]
+    [Description("R: Existing OAuth middleware ticket and new OAuth login middleware request → Duplicate or Overlaps.")]
+    public async Task ConflictAssessment_SameApproach_ClassifiesAsDuplicateOrOverlaps()
+    {
+        var existingTicket = new IronDev.Data.Models.ProjectTicket
+        {
+            Id      = 200,
+            Title   = "Implement OAuth login middleware",
+            Status  = "Draft",
+            Summary = "Add OAuth-based login middleware to the REST API.",
+        };
+
+        var agent = BuildConflictAgent();
+        var result = await agent.RunAsync(MakeTicketRequest(
+            "Create a ticket to add OAuth login middleware",
+            tickets: [existingTicket]));
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsNotNull(result.ConflictAssessment, "ConflictAssessment must be set.");
+        Assert.IsTrue(
+            result.ConflictAssessment!.Classification is
+                ConflictClassification.Duplicate or ConflictClassification.Overlaps,
+            $"Expected Duplicate or Overlaps for same-approach, got {result.ConflictAssessment.Classification}");
+        Assert.IsTrue(result.IsClarificationRequired,
+            "Duplicate/Overlaps must block creation and ask clarification.");
+    }
+
+    // ── S: Architecture decision blocks contradictory request ─────────────────
+
+    [TestMethod]
+    [Description("S: Decision 'OAuth is required for REST APIs' blocks a Basic Auth request.")]
+    public async Task ConflictAssessment_DecisionContradictsRequest_ClassifiesAsConflict()
+    {
+        var oauthDecision = new IronDev.Data.Models.ProjectDecision
+        {
+            Id     = 10,
+            Title  = "OAuth is required for REST APIs",
+            Detail = "All REST API authentication must use OAuth. Basic Auth is not permitted.",
+            Status = "Accepted",
+        };
+
+        var agent = BuildConflictAgent();
+        var result = await agent.RunAsync(MakeTicketRequest(
+            "Create a ticket to implement Basic Auth for the REST API",
+            decisions: [oauthDecision]));
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsNotNull(result.ConflictAssessment, "ConflictAssessment must be set.");
+        Assert.IsTrue(
+            result.ConflictAssessment!.Classification is
+                ConflictClassification.Conflicts or ConflictClassification.NeedsDecision,
+            $"Decision contradiction should classify as Conflicts or NeedsDecision, got {result.ConflictAssessment.Classification}");
+        Assert.IsTrue(result.ConflictAssessment.ConflictingDecisions.Count > 0,
+            "The contradicting decision must appear in ConflictingDecisions.");
+        Assert.IsTrue(result.IsClarificationRequired,
+            "Decision conflict must block creation.");
+    }
+
+    // ── T: Explicit replace intent ────────────────────────────────────────────
+
+    [TestMethod]
+    [Description("T: 'Replace OAuth with API key auth' is classified as ReplacesExisting.")]
+    public async Task ConflictAssessment_ExplicitReplace_ClassifiesAsReplacesExisting()
+    {
+        var existingTicket = new IronDev.Data.Models.ProjectTicket
+        {
+            Id      = 300,
+            Title   = "Implement OAuth in REST layer",
+            Status  = "Draft",
+            Summary = "OAuth authentication for REST.",
+        };
+
+        var agent = BuildConflictAgent();
+        var result = await agent.RunAsync(MakeTicketRequest(
+            "Replace OAuth with API key authentication in the REST layer",
+            tickets: [existingTicket]));
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsNotNull(result.ConflictAssessment, "ConflictAssessment must be set.");
+        Assert.AreEqual(ConflictClassification.ReplacesExisting,
+            result.ConflictAssessment!.Classification,
+            "Explicit replace phrasing must classify as ReplacesExisting.");
+        Assert.IsTrue(result.IsClarificationRequired,
+            "ReplacesExisting must block silent creation.");
+    }
+
+    // ── U: Conflict prevents silent creation ──────────────────────────────────
+
+    [TestMethod]
+    [Description("U: Strong conflict (Conflicts / Duplicate) means FinalPrompt is null and IsClarificationRequired is true.")]
+    public async Task ConflictAssessment_StrongConflict_BlocksTicketCreation()
+    {
+        var existingTicket = new IronDev.Data.Models.ProjectTicket
+        {
+            Id      = 400,
+            Title   = "Implement OAuth in REST layer",
+            Status  = "Active",
+            Summary = "OAuth authentication for REST.",
+        };
+
+        var agent = BuildConflictAgent();
+        var result = await agent.RunAsync(MakeTicketRequest(
+            "Add API key authentication to the REST layer",
+            tickets: [existingTicket]));
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsTrue(result.IsClarificationRequired,
+            "Conflict must prevent ticket creation.");
+        Assert.IsNull(result.FinalPrompt,
+            "FinalPrompt must be null when conflict blocks creation.");
+        Assert.IsTrue(result.ConflictAssessment!.BlocksTicketCreation,
+            "BlocksTicketCreation must be true.");
+    }
+
+    // ── V: Trace includes conflict classification ──────────────────────────────
+
+    [TestMethod]
+    [Description("V: ContextAgent.ConflictAssessment trace entry includes classification, domain, related ticket IDs/titles, and recommended action.")]
+    public async Task ConflictAssessment_TraceContainsClassificationDetails()
+    {
+        var existingTicket = new IronDev.Data.Models.ProjectTicket
+        {
+            Id      = 500,
+            Title   = "Implement OAuth in REST layer",
+            Status  = "Draft",
+            Summary = "OAuth authentication.",
+        };
+
+        var (agent, _, _, traces) = ContextAgentFactory.BuildWithConflict();
+        var result = await agent.RunAsync(MakeTicketRequest(
+            "Add API key authentication to the REST layer",
+            tickets: [existingTicket]));
+
+        Assert.IsTrue(result.WasSuccessful);
+
+        var allTraces = traces.GetRecentTraces();
+        var conflictTrace = allTraces.FirstOrDefault(
+            t => t.FeatureName == ContextAgentStage.ConflictAssessment);
+
+        Assert.IsNotNull(conflictTrace,
+            "ContextAgent.ConflictAssessment trace entry must be present.");
+        Assert.IsTrue(conflictTrace!.ParsedResponseSummary.Contains("Classification="),
+            $"Trace must show Classification. Got: {conflictTrace.ParsedResponseSummary}");
+        Assert.IsTrue(conflictTrace.ParsedResponseSummary.Contains("Related="),
+            $"Trace must show related ticket count. Got: {conflictTrace.ParsedResponseSummary}");
+        Assert.IsTrue(conflictTrace.ParsedResponseSummary.Contains("Domain="),
+            $"Trace must show domain. Got: {conflictTrace.ParsedResponseSummary}");
+        Assert.IsTrue(conflictTrace.RawResponseText.Contains("OAuth") ||
+                      conflictTrace.RawResponseText.Contains("REST"),
+            "Trace RawResponseText must reference the domain/approach.");
     }
 }
 

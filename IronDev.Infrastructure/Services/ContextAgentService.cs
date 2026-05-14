@@ -32,10 +32,11 @@ public sealed class ContextAgentService : IContextAgentService
 {
     // ── Injected dependencies ─────────────────────────────────────────────────
 
-    private readonly IPromptContextBuilder _contextBuilder;
-    private readonly ICodeIndexService     _codeIndexService;
-    private readonly ILLMService           _llmService;
-    private readonly ILlmTraceService      _traceService;
+    private readonly IPromptContextBuilder    _contextBuilder;
+    private readonly ICodeIndexService        _codeIndexService;
+    private readonly ILLMService              _llmService;
+    private readonly ILlmTraceService         _traceService;
+    private readonly IContextConflictService? _conflictService;
 
     // ── Default limits ────────────────────────────────────────────────────────
 
@@ -75,15 +76,17 @@ public sealed class ContextAgentService : IContextAgentService
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public ContextAgentService(
-        IPromptContextBuilder contextBuilder,
-        ICodeIndexService     codeIndexService,
-        ILLMService           llmService,
-        ILlmTraceService      traceService)
+        IPromptContextBuilder    contextBuilder,
+        ICodeIndexService        codeIndexService,
+        ILLMService              llmService,
+        ILlmTraceService         traceService,
+        IContextConflictService? conflictService = null)
     {
         _contextBuilder   = contextBuilder;
         _codeIndexService = codeIndexService;
         _llmService       = llmService;
         _traceService     = traceService;
+        _conflictService  = conflictService;
     }
 
     // ── Main pipeline ─────────────────────────────────────────────────────────
@@ -164,6 +167,8 @@ public sealed class ContextAgentService : IContextAgentService
         // ── Stage 2: Sufficiency check ────────────────────────────────────────
         ContextSufficiencyResult sufficiency;
         Guid? stage2Id = null;
+        // Hoisted here so the goto BuildFinalPrompt path in Stage 2 cannot bypass it.
+        TicketConflictAssessment? conflictAssessment = null;
         {
             var checkPrompt = BuildSufficiencyPrompt(request.UserRequest, initialPacket);
             var sw = Stopwatch.StartNew();
@@ -223,6 +228,80 @@ public sealed class ContextAgentService : IContextAgentService
                 ContextSummary          = SummarisePacket(initialPacket),
                 Warnings                = string.Join("; ", warnings),
             };
+        }
+
+        // ── Stage 3.5: Conflict assessment ─────────────────────────────────────
+        // Runs when the request carries recent tickets (i.e. ChatWorkspaceViewModel
+        // determined this looks like a ticket-creation request) AND a conflict
+        // service is wired.  Detection is deterministic — no extra LLM call.
+        if (_conflictService != null &&
+            (request.RecentTickets.Count > 0 ||
+             request.RecentDecisions.Count > 0 ||
+             request.ProjectRules.Count > 0))
+        {
+            var conflictCtx = new ConflictAssessmentContext
+            {
+                UserRequest      = request.UserRequest,
+                RecentTickets    = request.RecentTickets,
+                RecentDecisions  = request.RecentDecisions,
+                ProjectRules     = request.ProjectRules,
+            };
+
+            var swConflict = Stopwatch.StartNew();
+            try
+            {
+                conflictAssessment = await _conflictService.AssessAsync(conflictCtx, ct);
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Conflict assessment error: {ex.Message}");
+            }
+            swConflict.Stop();
+
+            if (conflictAssessment != null)
+            {
+                var tConflict = MakeTrace(ContextAgentStage.ConflictAssessment, traceGroupId, stage2Id);
+                tConflict.WasSuccessful      = true;
+                tConflict.DurationMs         = swConflict.ElapsedMilliseconds;
+                tConflict.CurrentUserMessage = request.UserRequest;
+                tConflict.ParsedResponseSummary =
+                    $"Classification={conflictAssessment.Classification} | " +
+                    $"Related={conflictAssessment.RelatedTickets.Count} | " +
+                    $"Conflicts={conflictAssessment.ConflictingDecisions.Count} | " +
+                    $"Blocks={conflictAssessment.BlocksTicketCreation} | " +
+                    $"Domain={conflictAssessment.Domain}";
+                tConflict.RawResponseText    = conflictAssessment.ToTraceText();
+                tConflict.ContextSummary     =
+                    $"Action={conflictAssessment.RecommendedAction} | " +
+                    $"ExistingApproach={conflictAssessment.ExistingApproach} | " +
+                    $"RequestedApproach={conflictAssessment.RequestedApproach}";
+                _traceService.AddTrace(tConflict);
+
+                // Block silent creation when the conflict is strong
+                if (conflictAssessment.BlocksTicketCreation)
+                {
+                    var blockQuestions = conflictAssessment.Questions.Count > 0
+                        ? conflictAssessment.Questions
+                        : new[] { $"A conflict was detected ({conflictAssessment.Classification}). Please clarify before creating this ticket." };
+
+                    var tBlock = MakeTrace(ContextAgentStage.ClarificationRequired, traceGroupId, stage2Id);
+                    tBlock.WasSuccessful         = true;
+                    tBlock.ParsedResponseSummary = $"Blocked by conflict: {conflictAssessment.Classification}";
+                    tBlock.RawResponseText       = string.Join("\n", blockQuestions);
+                    _traceService.AddTrace(tBlock);
+
+                    return new ContextAgentResult
+                    {
+                        TraceGroupId            = traceGroupId,
+                        IsClarificationRequired = true,
+                        ClarificationQuestions  = blockQuestions,
+                        WasSuccessful           = true,
+                        ContextSummary          = SummarisePacket(initialPacket),
+                        Warnings                = string.Join("; ", warnings),
+                        ConflictAssessment      = conflictAssessment,
+                    };
+                }
+            }
         }
 
         // ── Stage 4: Context expansion (tool calls) ───────────────────────────
@@ -367,6 +446,7 @@ public sealed class ContextAgentService : IContextAgentService
                 Evidence             = evidence,
                 ContextSummary       = contextSummary,
                 Warnings             = string.Join("; ", warnings),
+                ConflictAssessment   = conflictAssessment,
             };
         }
     }

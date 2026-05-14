@@ -21,6 +21,17 @@ public sealed class ContextAgentRequest
 
     // Override limits per-call (null = use service defaults)
     public ContextAgentLimits? Limits { get; init; }
+
+    // ── Conflict assessment inputs (populated by ChatWorkspaceViewModel) ────
+    /// <summary>Recent non-archived tickets for conflict detection.</summary>
+    public IReadOnlyList<IronDev.Data.Models.ProjectTicket> RecentTickets { get; init; }
+        = Array.Empty<IronDev.Data.Models.ProjectTicket>();
+    /// <summary>Recent project decisions for conflict detection.</summary>
+    public IReadOnlyList<IronDev.Data.Models.ProjectDecision> RecentDecisions { get; init; }
+        = Array.Empty<IronDev.Data.Models.ProjectDecision>();
+    /// <summary>Project rules for enforcement-level conflict detection.</summary>
+    public IReadOnlyList<IronDev.Data.Models.ProjectRule> ProjectRules { get; init; }
+        = Array.Empty<IronDev.Data.Models.ProjectRule>();
 }
 
 // ── Hard limits ───────────────────────────────────────────────────────────────
@@ -175,6 +186,14 @@ public sealed class ContextAgentResult
     /// inspected, this must be true.
     /// </summary>
     public bool HasCodeEvidence => Evidence.Count > 0;
+
+    // ── Conflict assessment ────────────────────────────────────────────────────
+    /// <summary>
+    /// Set when the agent ran a conflict assessment stage.
+    /// Null when the agent did not detect a ticket-creation intent or when
+    /// the conflict assessment is not enabled.
+    /// </summary>
+    public TicketConflictAssessment? ConflictAssessment { get; init; }
 }
 
 // ── Stage names (trace FeatureName values) ───────────────────────────────────
@@ -190,5 +209,139 @@ public static class ContextAgentStage
     public const string ToolCallSearch        = "ContextAgent.ToolCall.SearchCodeIndex";
     public const string ToolResultSearch      = "ContextAgent.ToolResult.SearchCodeIndex";
     public const string ClarificationRequired = "ContextAgent.ClarificationRequired";
+    public const string ConflictAssessment    = "ContextAgent.ConflictAssessment";
     public const string FinalAnswer           = "ContextAgent.FinalAnswer";
+}
+
+// ── Conflict assessment models ────────────────────────────────────────────────
+
+/// <summary>
+/// Classification of how a requested ticket relates to existing project work.
+/// </summary>
+public static class ConflictClassification
+{
+    /// <summary>No conflict — safe to create as-is.</summary>
+    public const string Compatible        = "Compatible";
+    /// <summary>Exact or near-exact duplicate of an existing ticket.</summary>
+    public const string Duplicate         = "Duplicate";
+    /// <summary>Same domain, significant overlap but not identical scope.</summary>
+    public const string Overlaps          = "Overlaps";
+    /// <summary>Same domain but a directly opposing technical approach.</summary>
+    public const string Conflicts         = "Conflicts";
+    /// <summary>User explicitly wants to supersede an existing approach.</summary>
+    public const string ReplacesExisting  = "ReplacesExisting";
+    /// <summary>An architectural decision should be made before any ticket is created.</summary>
+    public const string NeedsDecision     = "NeedsDecision";
+    /// <summary>Too ambiguous to classify — clarification required.</summary>
+    public const string NeedsClarification = "NeedsClarification";
+}
+
+/// <summary>
+/// Recommended action the caller (or UI) should take based on the assessment.
+/// </summary>
+public static class RecommendedAction
+{
+    public const string CreateSeparate   = "CreateSeparate";
+    public const string UpdateExisting   = "UpdateExisting";
+    public const string AskClarification = "AskClarification";
+    public const string CreateSpike      = "CreateSpike";
+    public const string ReplaceExisting  = "ReplaceExisting";
+    public const string CreateDecision   = "CreateDecision";
+    public const string Cancel           = "Cancel";
+}
+
+/// <summary>
+/// A single existing ticket or plan that overlaps / conflicts with the requested work.
+/// </summary>
+public sealed class RelatedTicketMatch
+{
+    public long   TicketId     { get; init; }
+    public string Title        { get; init; } = string.Empty;
+    public string Status       { get; init; } = string.Empty;
+    public string OverlapReason { get; init; } = string.Empty;
+    /// <summary>0.0–1.0 confidence that this ticket is actually related.</summary>
+    public double Confidence   { get; init; }
+}
+
+/// <summary>
+/// Full conflict assessment produced for a ticket-creation request.
+/// Encapsulates everything needed for the UI to decide whether to proceed.
+/// </summary>
+public sealed class TicketConflictAssessment
+{
+    public bool   HasConflict        { get; init; }
+    public string Classification     { get; init; } = ConflictClassification.Compatible;
+    /// <summary>The technical/functional domain detected in the request (e.g. "REST authentication").</summary>
+    public string Domain             { get; init; } = string.Empty;
+    /// <summary>Technical approach detected in existing tickets/decisions (e.g. "OAuth").</summary>
+    public string ExistingApproach   { get; init; } = string.Empty;
+    /// <summary>Technical approach in the new request (e.g. "API key authentication").</summary>
+    public string RequestedApproach  { get; init; } = string.Empty;
+
+    public IReadOnlyList<RelatedTicketMatch> RelatedTickets { get; init; } = Array.Empty<RelatedTicketMatch>();
+    /// <summary>Decisions that are relevant to or contradicted by the request.</summary>
+    public IReadOnlyList<string> ConflictingDecisions { get; init; } = Array.Empty<string>();
+
+    public string RecommendedAction  { get; init; } = Models.RecommendedAction.CreateSeparate;
+    /// <summary>Clarification questions to ask the user before creating the ticket.</summary>
+    public IReadOnlyList<string> Questions { get; init; } = Array.Empty<string>();
+
+    // ── Blocking rules ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// True when the assessment result is strong enough to block silent ticket creation.
+    /// Only Compatible and CreateSeparate are allowed to proceed without user confirmation.
+    /// </summary>
+    public bool BlocksTicketCreation =>
+        Classification is ConflictClassification.Duplicate
+                       or ConflictClassification.Overlaps
+                       or ConflictClassification.Conflicts
+                       or ConflictClassification.ReplacesExisting
+                       or ConflictClassification.NeedsDecision
+                       or ConflictClassification.NeedsClarification;
+
+    public string ToTraceText()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"HasConflict:      {HasConflict}");
+        sb.AppendLine($"Classification:   {Classification}");
+        sb.AppendLine($"Domain:           {Domain}");
+        if (!string.IsNullOrWhiteSpace(ExistingApproach))
+            sb.AppendLine($"ExistingApproach: {ExistingApproach}");
+        if (!string.IsNullOrWhiteSpace(RequestedApproach))
+            sb.AppendLine($"RequestedApproach:{RequestedApproach}");
+        sb.AppendLine($"RelatedTickets:   {RelatedTickets.Count}");
+        foreach (var t in RelatedTickets)
+            sb.AppendLine($"  [{t.TicketId}] {t.Title} ({t.Status}) — {t.OverlapReason} ({t.Confidence:P0})");
+        if (ConflictingDecisions.Count > 0)
+        {
+            sb.AppendLine($"ConflictingDecisions: {ConflictingDecisions.Count}");
+            foreach (var d in ConflictingDecisions)
+                sb.AppendLine($"  {d}");
+        }
+        sb.AppendLine($"Recommended:      {RecommendedAction}");
+        sb.AppendLine($"Blocks creation:  {BlocksTicketCreation}");
+        if (Questions.Count > 0)
+        {
+            sb.AppendLine("Questions:");
+            foreach (var q in Questions)
+                sb.AppendLine($"  - {q}");
+        }
+        return sb.ToString().TrimEnd();
+    }
+}
+
+/// <summary>
+/// Input context passed to IContextConflictService.
+/// Contains recent tickets, decisions, and rules for the conflict assessment.
+/// </summary>
+public sealed class ConflictAssessmentContext
+{
+    public string UserRequest { get; init; } = string.Empty;
+    public IReadOnlyList<IronDev.Data.Models.ProjectTicket> RecentTickets { get; init; }
+        = Array.Empty<IronDev.Data.Models.ProjectTicket>();
+    public IReadOnlyList<IronDev.Data.Models.ProjectDecision> RecentDecisions { get; init; }
+        = Array.Empty<IronDev.Data.Models.ProjectDecision>();
+    public IReadOnlyList<IronDev.Data.Models.ProjectRule> ProjectRules { get; init; }
+        = Array.Empty<IronDev.Data.Models.ProjectRule>();
 }

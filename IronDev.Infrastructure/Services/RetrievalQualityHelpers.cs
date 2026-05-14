@@ -214,36 +214,32 @@ public static class RetrievalQualityHelpers
     /// <summary>
     /// Patterns for vague create/fix intents that should prefer clarification
     /// over immediate code search, when combined with an ambiguous domain term.
+    ///
+    /// NOTE: "create a ticket" and "raise a ticket" are intentionally excluded here.
+    /// Those requests are domain-specific and are handled by the conflict assessment
+    /// stage (Stage 3.5) — not the pre-LLM clarification gate (Stage 0).
+    /// Only truly vague fix/bug/delete requests with no technical domain are caught here.
     /// </summary>
     private static readonly string[] AmbiguousActionPhrases =
     [
         "fix delete",
         "fix the delete",
         "delete bug",
-        "create a ticket to fix delete",
+        "create a ticket to fix delete",      // specific: vague delete fix
         "create ticket for delete",
         "create ticket to fix",
         "fix the bug",
         "fix this",
-        "create a ticket",    // bare "create a ticket" without further domain
-        "raise a ticket",
-    ];
-
-    private static readonly string[] AmbiguousDomainTerms =
-    [
-        " delete",
-        " fix",
-        " issue",
-        " bug",
-        " problem",
     ];
 
     /// <summary>
     /// Returns true when a user request is likely a vague create/fix intent
     /// that should trigger clarification instead of code search expansion.
     ///
-    /// Heuristic: matches an ambiguous action phrase OR a bare "create a ticket"
-    /// without a specific domain noun (e.g., no service/method name).
+    /// Scope: ONLY triggers for vague fix/delete requests that have NO specific
+    /// technical domain (e.g. no auth scheme, service name, or feature area).
+    /// Specific "create a ticket to add X" requests are handled by Stage 3.5
+    /// conflict assessment — do NOT catch them here.
     /// </summary>
     public static bool ShouldPreferClarification(string userRequest)
     {
@@ -251,13 +247,14 @@ public static class RetrievalQualityHelpers
 
         var lower = userRequest.ToLowerInvariant();
 
-        // Explicit ambiguous action patterns
+        // Explicit ambiguous action patterns — only truly vague ones
         foreach (var phrase in AmbiguousActionPhrases)
             if (lower.Contains(phrase, StringComparison.OrdinalIgnoreCase))
                 return true;
 
         return false;
     }
+
 
     /// <summary>
     /// Generates standardised clarification questions for vague delete/fix requests.
