@@ -17,6 +17,13 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private int    _maxContextTokens   = 8000;
     [ObservableProperty] private bool   _isDevToolsExpanded = false;
 
+    /// <summary>
+    /// When true, the Chat workspace uses the ContextAgentService pipeline
+    /// (sufficiency check + code expansion) instead of one-shot RAG.
+    /// Default: false — must be explicitly enabled. Safe to toggle at runtime.
+    /// </summary>
+    [ObservableProperty] private bool _useContextAgent = false;
+
     // ── Trace LLM Calls ───────────────────────────────────────────────────
     // Wraps ILlmTraceService.IsTracingEnabled so the Settings page can toggle
     // it. No persistence layer yet — the service defaults to true on startup.

@@ -27,6 +27,14 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private readonly IProjectMemoryService  _memoryService;
     private readonly IChatFeedbackService   _feedbackService;
     private readonly ILlmTraceService       _llmTraceService;
+    private readonly IContextAgentService?  _contextAgentService;
+
+    /// <summary>
+    /// When true and <see cref="_contextAgentService"/> is wired, the chat send
+    /// path uses ContextAgentService (sufficiency check + expansion) instead of
+    /// one-shot PromptContextBuilder. Default: false.
+    /// </summary>
+    public bool UseContextAgent { get; set; } = false;
 
     private int _activeProjectId;
     private string _activeProjectName = string.Empty;
@@ -69,7 +77,8 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         ILLMService           llmService,
         IProjectMemoryService memoryService,
         IChatFeedbackService  feedbackService,
-        ILlmTraceService      llmTraceService)
+        ILlmTraceService      llmTraceService,
+        IContextAgentService? contextAgentService = null)
     {
         _chatHistoryService   = chatHistoryService;
         _promptContextBuilder = promptContextBuilder;
@@ -77,6 +86,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         _memoryService        = memoryService;
         _feedbackService      = feedbackService;
         _llmTraceService      = llmTraceService;
+        _contextAgentService  = contextAgentService;
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
@@ -244,71 +254,168 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     $"[Chat][Sources] {string.Join(", ", packet.MatchedFilePaths.Distinct().Take(6))}");
             // ─────────────────────────────────────────────────────────────────
 
-            // Call the real LLM service with tracing
-            var responseText = string.Empty;
-            var trace = new LlmTraceEntry
+            // ── Context Agent path (feature-flagged) ──────────────────────────
+            if (UseContextAgent && _contextAgentService != null)
             {
-                FeatureName = "Chat",
-                WorkspaceName = "Chat",
-                Model = ActiveModel,
-                CurrentUserMessage = text,
-                ProjectId = projectId,
-                ChatSessionId = sessionId.ToString(),
-                RequestText = packet.FormattedPrompt,
-                Warnings = packet.RulesLoadWarning ?? string.Empty,
-                ContextSummary = BuildContextSummary(packet),
-                CreatedAt = DateTime.UtcNow
-            };
+                var agentRequest = new IronDev.Core.Models.ContextAgentRequest
+                {
+                    ProjectId   = projectId,
+                    SessionId   = sessionId,
+                    UserRequest = text,
+                };
 
+                var agentResult = await _contextAgentService.RunAsync(agentRequest);
 
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try
-            {
-                responseText = await _llmService.GetResponseAsync(packet.FormattedPrompt);
-                trace.WasSuccessful = true;
-                trace.RawResponseText = responseText;
-                trace.ParsedResponseSummary = responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText;
+                if (agentResult.IsClarificationRequired)
+                {
+                    // Surface clarification questions as an assistant message
+                    var clarificationText =
+                        "Before I can answer, I need a bit more context:\n\n" +
+                        string.Join("\n", agentResult.ClarificationQuestions.Select((q, i) => $"{i + 1}. {q}"));
+
+                    Messages.Add(new ChatSummary
+                    {
+                        Role        = "assistant",
+                        MessageText = clarificationText,
+                        Timestamp   = DateTime.UtcNow
+                    });
+                    return;
+                }
+
+                // Use the agent's assembled final prompt for the real LLM call
+                var finalPrompt = agentResult.FinalPrompt ?? packet.FormattedPrompt;
+
+                var responseText = string.Empty;
+                var trace = new LlmTraceEntry
+                {
+                    FeatureName        = "Chat",
+                    WorkspaceName      = "Chat",
+                    Model              = ActiveModel,
+                    CurrentUserMessage = text,
+                    ProjectId          = projectId,
+                    ChatSessionId      = sessionId.ToString(),
+                    RequestText        = finalPrompt,
+                    Warnings           = agentResult.Warnings,
+                    ContextSummary     = agentResult.ContextSummary,
+                    TraceGroupId       = agentResult.TraceGroupId,
+                    CreatedAt          = DateTime.UtcNow
+                };
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    responseText = await _llmService.GetResponseAsync(finalPrompt);
+                    trace.WasSuccessful = true;
+                    trace.RawResponseText = responseText;
+                    trace.ParsedResponseSummary = responseText.Length > 200 ? responseText[..200] + "..." : responseText;
+                }
+                catch (Exception ex)
+                {
+                    responseText = $"[LLM Error]: {ex.Message}";
+                    trace.WasSuccessful = false;
+                    trace.ErrorMessage  = ex.Message;
+                }
+                finally
+                {
+                    sw.Stop();
+                    trace.DurationMs = sw.ElapsedMilliseconds;
+                    _llmTraceService.AddTrace(trace);
+                }
+
+                var assistantMsgAgent = new ChatSummary
+                {
+                    Role            = "assistant",
+                    MessageText     = responseText,
+                    FormattedPrompt = finalPrompt,
+                    ContextPacket   = packet,
+                    Timestamp       = DateTime.UtcNow
+                };
+                Messages.Add(assistantMsgAgent);
+                RefreshContextChips();
+
+                var assistantDbIdAgent = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                {
+                    ProjectId       = projectId,
+                    ChatSessionId   = sessionId,
+                    Role            = "assistant",
+                    Message         = responseText,
+                    ContextSummary  = agentResult.ContextSummary,
+                    LinkedFilePaths = string.Join("\n", agentResult.Evidence.Select(e => e.FilePath).Distinct()),
+                    LinkedSymbols   = string.Join("\n", agentResult.Evidence.Select(e => e.SymbolName).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct())
+                });
+                assistantMsgAgent.PersistedMessageId = assistantDbIdAgent;
+                SelectedSession.UpdatedDate = DateTime.UtcNow;
+                await _chatHistoryService.SaveSessionAsync(SelectedSession);
+                return; // Context Agent path handled — skip the one-shot path below
             }
-            catch (Exception ex)
+
+            // ── One-shot RAG path (original, stable, feature-flag off) ─────────
             {
-                responseText = $"[LLM Error]: {ex.Message}";
-                trace.WasSuccessful = false;
-                trace.ErrorMessage = ex.Message;
+                // Call the real LLM service with tracing
+                var responseText = string.Empty;
+                var trace = new LlmTraceEntry
+                {
+                    FeatureName        = "Chat",
+                    WorkspaceName      = "Chat",
+                    Model              = ActiveModel,
+                    CurrentUserMessage = text,
+                    ProjectId          = projectId,
+                    ChatSessionId      = sessionId.ToString(),
+                    RequestText        = packet.FormattedPrompt,
+                    Warnings           = packet.RulesLoadWarning ?? string.Empty,
+                    ContextSummary     = BuildContextSummary(packet),
+                    CreatedAt          = DateTime.UtcNow
+                };
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    responseText = await _llmService.GetResponseAsync(packet.FormattedPrompt);
+                    trace.WasSuccessful = true;
+                    trace.RawResponseText = responseText;
+                    trace.ParsedResponseSummary = responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText;
+                }
+                catch (Exception ex)
+                {
+                    responseText = $"[LLM Error]: {ex.Message}";
+                    trace.WasSuccessful = false;
+                    trace.ErrorMessage = ex.Message;
+                }
+                finally
+                {
+                    sw.Stop();
+                    trace.DurationMs = sw.ElapsedMilliseconds;
+                    _llmTraceService.AddTrace(trace);
+                }
+
+                var assistantMsg = new ChatSummary
+                {
+                    Role            = "assistant",
+                    MessageText     = responseText,
+                    FormattedPrompt = packet.FormattedPrompt,
+                    ContextPacket   = packet,
+                    Timestamp       = DateTime.UtcNow
+                };
+                Messages.Add(assistantMsg);
+                RefreshContextChips();
+
+                // Persist assistant message and capture its DB Id
+                var assistantDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                {
+                    ProjectId       = projectId,
+                    ChatSessionId   = sessionId,
+                    Role            = "assistant",
+                    Message         = responseText,
+                    ContextSummary  = assistantMsg.ContextHeader,
+                    LinkedFilePaths = string.Join("\n", packet.MatchedFilePaths),
+                    LinkedSymbols   = string.Join("\n", packet.MatchedSymbols)
+                });
+                assistantMsg.PersistedMessageId = assistantDbId;
+
+                // Update session's UpdatedDate
+                SelectedSession.UpdatedDate = DateTime.UtcNow;
+                await _chatHistoryService.SaveSessionAsync(SelectedSession);
             }
-            finally
-            {
-                sw.Stop();
-                trace.DurationMs = sw.ElapsedMilliseconds;
-                _llmTraceService.AddTrace(trace);
-            }
-
-            var assistantMsg = new ChatSummary
-            {
-                Role = "assistant",
-                MessageText = responseText,
-                FormattedPrompt = packet.FormattedPrompt,
-                ContextPacket = packet,
-                Timestamp = DateTime.UtcNow
-            };
-            Messages.Add(assistantMsg);
-            RefreshContextChips();
-
-            // Persist assistant message and capture its DB Id
-            var assistantDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
-            {
-                ProjectId      = projectId,
-                ChatSessionId  = sessionId,
-                Role           = "assistant",
-                Message        = responseText,
-                ContextSummary = assistantMsg.ContextHeader,
-                LinkedFilePaths = string.Join("\n", packet.MatchedFilePaths),
-                LinkedSymbols   = string.Join("\n", packet.MatchedSymbols)
-            });
-            assistantMsg.PersistedMessageId = assistantDbId;
-
-            // Update session's UpdatedDate
-            SelectedSession.UpdatedDate = DateTime.UtcNow;
-            await _chatHistoryService.SaveSessionAsync(SelectedSession);
         }
         finally
         {
