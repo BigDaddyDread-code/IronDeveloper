@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using IronDev.Core;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Builder;
 
@@ -27,11 +28,13 @@ namespace IronDev.Infrastructure.Builder;
 /// </summary>
 public sealed class CodeChangeProposalService : ICodeChangeProposalService
 {
-    private readonly ILLMService _llm;
+    private readonly ILLMService      _llm;
+    private readonly ILlmTraceService _llmTraceService;
 
-    public CodeChangeProposalService(ILLMService llm)
+    public CodeChangeProposalService(ILLMService llm, ILlmTraceService llmTraceService)
     {
         _llm = llm;
+        _llmTraceService = llmTraceService;
     }
 
     public async Task<CodeChangeProposal> GenerateProposalAsync(
@@ -40,17 +43,53 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
     {
         var prompt = BuildPrompt(context);
 
+        // ── Call LLM with tracing ─────────────────────────────────────────────
+        var trace = new LlmTraceEntry
+        {
+            FeatureName = "BuildTicket",
+            WorkspaceName = "Builder",
+            ProjectId = context.ProjectId,
+            TicketId = context.TicketId,
+            PlanId = context.PlanId,
+            RequestText = prompt,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         string rawJson;
         try
         {
             rawJson = await _llm.GetResponseAsync(prompt, cancellationToken);
+            trace.WasSuccessful = true;
+            trace.RawResponseText = rawJson;
         }
         catch (Exception ex)
         {
+            trace.WasSuccessful = false;
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
             throw new InvalidOperationException($"LLM call failed: {ex.Message}", ex);
         }
+        finally
+        {
+            sw.Stop();
+            trace.DurationMs = sw.ElapsedMilliseconds;
+        }
 
-        return ParseProposal(rawJson, context.TicketId);
+        try
+        {
+            var proposal = ParseProposal(rawJson, context.TicketId);
+            trace.ParsedResponseSummary = $"Proposed {proposal.FileChanges.Count} file changes.";
+            _llmTraceService.AddTrace(trace);
+            return proposal;
+        }
+        catch (Exception ex)
+        {
+            trace.ParsedResponseSummary = "JSON Parse Failure";
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
+            throw;
+        }
     }
 
     // ── Prompt construction ───────────────────────────────────────────────────
@@ -65,7 +104,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         sb.AppendLine("RULES:");
         sb.AppendLine("- Only change files relevant to the ticket.");
         sb.AppendLine("- Do not invent requirements not stated in the ticket or plan.");
-        sb.AppendLine("- Follow all linked architectural decisions.");
+        sb.AppendLine("- Follow all linked architectural decisions and project rules.");
         sb.AppendLine("- Prefer small, targeted changes.");
         sb.AppendLine("- Do not replace whole files unless absolutely necessary.");
         sb.AppendLine("- Return ONLY a JSON object. No markdown fences. No prose. No commentary.");

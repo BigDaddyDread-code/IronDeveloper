@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using IronDev.Core;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Services;
 
 namespace IronDev.Infrastructure.Services;
@@ -14,13 +15,16 @@ public sealed class CodebaseTicketGeneratorService : ICodebaseTicketGeneratorSer
 {
     private readonly ILLMService             _llmService;
     private readonly IProjectMemoryService    _memoryService;
+    private readonly ILlmTraceService         _llmTraceService;
 
     public CodebaseTicketGeneratorService(
-        ILLMService          llmService,
-        IProjectMemoryService memoryService)
+        ILLMService           llmService,
+        IProjectMemoryService memoryService,
+        ILlmTraceService      llmTraceService)
     {
         _llmService    = llmService;
         _memoryService = memoryService;
+        _llmTraceService = llmTraceService;
     }
 
     public async Task<CodebaseTicketGenerationResult> GenerateTicketsAsync(
@@ -83,8 +87,36 @@ Return ONLY valid JSON matching this schema:
 Focus on actionable, specific improvements. Avoid generic advice.
 ";
 
-            // 3. Call LLM
-            var response = await _llmService.GetResponseAsync(prompt, ct);
+            // 3. Call LLM with tracing
+            var trace = new LlmTraceEntry
+            {
+                FeatureName = "CodebaseAnalysis",
+                WorkspaceName = "Architect",
+                ProjectId = projectId,
+                RequestText = prompt,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            string response;
+            try
+            {
+                response = await _llmService.GetResponseAsync(prompt, ct);
+                trace.WasSuccessful = true;
+                trace.RawResponseText = response;
+            }
+            catch (Exception ex)
+            {
+                trace.WasSuccessful = false;
+                trace.ErrorMessage = ex.Message;
+                _llmTraceService.AddTrace(trace);
+                throw;
+            }
+            finally
+            {
+                sw.Stop();
+                trace.DurationMs = sw.ElapsedMilliseconds;
+            }
             
             // 4. Parse
             var cleaned = CleanJsonResponse(response);
@@ -102,9 +134,21 @@ Focus on actionable, specific improvements. Avoid generic advice.
                 {
                     PropertyNameCaseInsensitive = true
                 });
+
+                trace.ParsedResponseSummary = $"Parsed {result?.Drafts?.Count ?? 0} drafts.";
+                _llmTraceService.AddTrace(trace);
+                return new CodebaseTicketGenerationResult
+                {
+                    Success      = true,
+                    Drafts  = result?.Drafts ?? []
+                };
             }
             catch (Exception jsonEx)
             {
+                trace.ParsedResponseSummary = "JSON Parse Failure";
+                trace.ErrorMessage = jsonEx.Message;
+                _llmTraceService.AddTrace(trace);
+
                 System.Diagnostics.Trace.WriteLine(
                     $"[CodebaseTicketGenerator] Deserialisation failed — target: GenerationWrapper — error: {jsonEx.Message}");
                 return new CodebaseTicketGenerationResult
@@ -113,21 +157,6 @@ Focus on actionable, specific improvements. Avoid generic advice.
                     ErrorMessage = $"Draft generation failed: {jsonEx.Message}. Raw response preview: {preview}"
                 };
             }
-
-            if (result?.Drafts == null || result.Drafts.Count == 0)
-            {
-                return new CodebaseTicketGenerationResult
-                {
-                    Success      = false,
-                    ErrorMessage = "AI returned no ticket drafts."
-                };
-            }
-
-            return new CodebaseTicketGenerationResult
-            {
-                Success = true,
-                Drafts  = result.Drafts
-            };
         }
         catch (Exception ex)
         {

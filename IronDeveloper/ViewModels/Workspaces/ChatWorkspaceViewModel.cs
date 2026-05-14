@@ -13,6 +13,8 @@ using IronDev.AI;
 using IronDev.Core;
 using IronDev.Data.Models;
 using IronDev.Services;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using System.Threading.Tasks;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -24,6 +26,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private readonly ILLMService            _llmService;
     private readonly IProjectMemoryService  _memoryService;
     private readonly IChatFeedbackService   _feedbackService;
+    private readonly ILlmTraceService       _llmTraceService;
 
     private int _activeProjectId;
     private string _activeProjectName = string.Empty;
@@ -65,13 +68,15 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         IPromptContextBuilder promptContextBuilder,
         ILLMService           llmService,
         IProjectMemoryService memoryService,
-        IChatFeedbackService  feedbackService)
+        IChatFeedbackService  feedbackService,
+        ILlmTraceService      llmTraceService)
     {
         _chatHistoryService   = chatHistoryService;
         _promptContextBuilder = promptContextBuilder;
         _llmService           = llmService;
         _memoryService        = memoryService;
         _feedbackService      = feedbackService;
+        _llmTraceService      = llmTraceService;
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
@@ -239,15 +244,39 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     $"[Chat][Sources] {string.Join(", ", packet.MatchedFilePaths.Distinct().Take(6))}");
             // ─────────────────────────────────────────────────────────────────
 
-            // Call the real LLM service
+            // Call the real LLM service with tracing
             var responseText = string.Empty;
+            var trace = new LlmTraceEntry
+            {
+                FeatureName = "Chat",
+                WorkspaceName = "Chat",
+                Model = ActiveModel,
+                CurrentUserMessage = text,
+                ProjectId = projectId,
+                ChatSessionId = sessionId.ToString(),
+                RequestText = packet.FormattedPrompt,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 responseText = await _llmService.GetResponseAsync(packet.FormattedPrompt);
+                trace.WasSuccessful = true;
+                trace.RawResponseText = responseText;
+                trace.ParsedResponseSummary = responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText;
             }
             catch (Exception ex)
             {
                 responseText = $"[LLM Error]: {ex.Message}";
+                trace.WasSuccessful = false;
+                trace.ErrorMessage = ex.Message;
+            }
+            finally
+            {
+                sw.Stop();
+                trace.DurationMs = sw.ElapsedMilliseconds;
+                _llmTraceService.AddTrace(trace);
             }
 
             var assistantMsg = new ChatSummary

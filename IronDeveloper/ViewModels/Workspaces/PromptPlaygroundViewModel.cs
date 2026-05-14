@@ -10,6 +10,8 @@ using CommunityToolkit.Mvvm.Input;
 using IronDev.AI;
 using IronDev.Core;
 using IronDev.Core.Auth;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Services;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -89,6 +91,7 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
     private readonly ILLMService             _llmService;
     private readonly ICodeIndexService       _codeIndexService;
     private readonly ICurrentTenantContext   _tenantContext;
+    private readonly ILlmTraceService        _llmTraceService;
 
     // ── Observable Properties ─────────────────────────────────────────────
 
@@ -168,13 +171,15 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
         IProjectService        projectService,
         ILLMService            llmService,
         ICodeIndexService      codeIndexService,
-        ICurrentTenantContext  tenantContext)
+        ICurrentTenantContext  tenantContext,
+        ILlmTraceService       llmTraceService)
     {
         _builder          = builder;
         _projectService   = projectService;
         _llmService       = llmService;
         _codeIndexService = codeIndexService;
         _tenantContext    = tenantContext;
+        _llmTraceService  = llmTraceService;
 
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRetrievedItems));
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ContextRetrievalStatus));
@@ -463,11 +468,39 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 
         try
         {
-            // Identify provider for display
-            ProviderInfo = _llmService.GetType().Name.Replace("LlmService", string.Empty);
+            // Call the real LLM service with tracing
+            var trace = new LlmTraceEntry
+            {
+                FeatureName = "GroundingTest",
+                WorkspaceName = "Playground",
+                ProjectId = RetrievalProjectId,
+                RequestText = PromptText,
+                CreatedAt = DateTime.UtcNow,
+                CurrentUserMessage = SampleUserMessage
+            };
 
-            var response = await _llmService.GetResponseAsync(PromptText, ct);
-            AiResponse = response ?? string.Empty;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            string response;
+            try
+            {
+                response = await _llmService.GetResponseAsync(PromptText, ct);
+                trace.WasSuccessful = true;
+                trace.RawResponseText = response;
+                AiResponse = response ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                trace.WasSuccessful = false;
+                trace.ErrorMessage = ex.Message;
+                _llmTraceService.AddTrace(trace);
+                throw;
+            }
+            finally
+            {
+                sw.Stop();
+                trace.DurationMs = sw.ElapsedMilliseconds;
+                _llmTraceService.AddTrace(trace);
+            }
 
             // Evaluate response against selected test case
             if (SelectedTestCase is not null && !string.IsNullOrWhiteSpace(AiResponse))

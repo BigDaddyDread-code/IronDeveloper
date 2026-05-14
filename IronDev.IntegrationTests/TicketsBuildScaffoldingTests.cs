@@ -6,6 +6,7 @@ using IronDev.Agent.Models;
 using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -179,6 +180,15 @@ internal sealed class StubDraftTicketService : IDraftTicketService
 /// ViewModel unit tests for Build Ticket MVP — Phases 1 and 2.
 /// No LLM, no Weaviate, no database, no file writes.
 /// </summary>
+internal sealed class NullLlmTraceService : ILlmTraceService
+{
+    public void AddTrace(LlmTraceEntry entry) { }
+    public void Clear() { }
+    public string ExportAll() => string.Empty;
+    public string ExportTrace(LlmTraceEntry entry) => string.Empty;
+    public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int take = 100) => [];
+    public string Redact(string text) => text;
+}
 [TestClass]
 public sealed class TicketsBuildScaffoldingTests
 {
@@ -498,6 +508,9 @@ public sealed class BuilderContextServiceTests
             => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectTicket>>([]);
         public Task<IronDev.Data.Models.ProjectTicket?> GetTicketByIdAsync(long id, CancellationToken ct = default)
             => Task.FromResult(_ticket);
+
+        public Task<bool> ArchiveTicketAsync(long ticketId, CancellationToken ct = default)
+            => Task.FromResult(true);
     }
 
     private sealed class StubMemory : IronDev.Services.IProjectMemoryService
@@ -765,7 +778,7 @@ public sealed class CodeChangeProposalServiceTests
     [Description("CodeChangeProposalService parses valid JSON into CodeChangeProposal.")]
     public async Task ParsesValidJson_ReturnsProposal()
     {
-        var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(ValidJson()));
+        var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(ValidJson()), new NullLlmTraceService());
         var proposal = await svc.GenerateProposalAsync(MakeContext());
 
         Assert.AreEqual("Replace 'Conversation History' with 'Conversations'.", proposal.Summary);
@@ -779,7 +792,7 @@ public sealed class CodeChangeProposalServiceTests
     public async Task StripsFences_BeforeParsing()
     {
         var wrapped = "```json\n" + ValidJson() + "\n```";
-        var svc     = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(wrapped));
+        var svc     = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(wrapped), new NullLlmTraceService());
         var proposal = await svc.GenerateProposalAsync(MakeContext());
 
         Assert.AreEqual("Replace 'Conversation History' with 'Conversations'.", proposal.Summary);
@@ -790,7 +803,7 @@ public sealed class CodeChangeProposalServiceTests
     public async Task InvalidJson_ThrowsWithClearMessage()
     {
         var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(
-            new FakeLlm("this is not json at all"));
+            new FakeLlm("this is not json at all"), new NullLlmTraceService());
 
         InvalidOperationException? caught = null;
         try   { await svc.GenerateProposalAsync(MakeContext()); }
@@ -813,7 +826,7 @@ public sealed class CodeChangeProposalServiceTests
               "fileChanges": []
             }
             """;
-        var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(json));
+        var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(json), new NullLlmTraceService());
         var proposal = await svc.GenerateProposalAsync(MakeContext());
 
         Assert.AreEqual(0, proposal.FileChanges.Count);
@@ -825,7 +838,7 @@ public sealed class CodeChangeProposalServiceTests
     public async Task LlmThrows_PropagatesWithClearMessage()
     {
         var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(
-            new ThrowingLlm("Simulated timeout"));
+            new ThrowingLlm("Simulated timeout"), new NullLlmTraceService());
 
         InvalidOperationException? caught = null;
         try   { await svc.GenerateProposalAsync(MakeContext()); }
