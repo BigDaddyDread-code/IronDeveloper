@@ -109,7 +109,8 @@ public partial class App : Application
                         sp.GetRequiredService<global::IronDev.Services.IProjectService>(),
                         sp.GetRequiredService<global::IronDev.Core.ILLMService>(),
                         sp.GetRequiredService<global::IronDev.Services.ICodeIndexService>(),
-                        sp.GetRequiredService<global::IronDev.Core.Auth.ICurrentTenantContext>()));
+                        sp.GetRequiredService<global::IronDev.Core.Auth.ICurrentTenantContext>(),
+                        sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
                 services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
                 {
                     // Deferred: PromptPlaygroundViewModel (and its DB deps) are only
