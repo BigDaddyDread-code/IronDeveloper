@@ -7,6 +7,7 @@ using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Data;
 using IronDev.Data.Models;
+using Microsoft.Data.SqlClient;
 
 namespace IronDev.Services;
 
@@ -383,13 +384,24 @@ public sealed class ProjectMemoryService : IProjectMemoryService
             ORDER BY CreatedDate DESC;
             """;
 
-        using var connection = _connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<ProjectRule>(new CommandDefinition(
-            sql,
-            new { TenantId = _tenant.TenantId, ProjectId = projectId },
-            cancellationToken: cancellationToken));
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            var rows = await connection.QueryAsync<ProjectRule>(new CommandDefinition(
+                sql,
+                new { TenantId = _tenant.TenantId, ProjectId = projectId },
+                cancellationToken: cancellationToken));
 
-        return rows.ToList();
+            return rows.ToList();
+        }
+        catch (SqlException ex) when (ex.Number == 208 || ex.Message.Contains("dbo.ProjectRules", StringComparison.OrdinalIgnoreCase))
+        {
+            // dbo.ProjectRules table has not been migrated yet — return empty.
+            // This is safe: context building continues without rules.
+            System.Diagnostics.Trace.WriteLine(
+                $"[ProjectMemoryService] dbo.ProjectRules not found (SQL {ex.Number}); returning empty rule list.");
+            return Array.Empty<ProjectRule>();
+        }
     }
 
     public async Task<long> SaveProjectRuleAsync(ProjectRule rule, CancellationToken cancellationToken = default)

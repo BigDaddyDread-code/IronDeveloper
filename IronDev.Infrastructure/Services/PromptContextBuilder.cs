@@ -38,6 +38,9 @@ public class ChatContextPacket
     public System.Collections.Generic.List<IronDev.Data.Models.ProjectRule> Standards { get; init; } = new();
     public int IncludedStandardsCount { get; set; }
     public int FilteredStandardsCount { get; set; }
+
+    /// <summary>Non-null when rules failed to load (e.g. table not yet migrated). Surfaces in LLM Console trace.</summary>
+    public string? RulesLoadWarning { get; set; }
 }
 
 /// <summary>
@@ -210,7 +213,20 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
         var tickets   = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
-        var allRules  = await _projectMemoryService.GetProjectRulesAsync(projectId, cancellationToken);
+
+        IReadOnlyList<IronDev.Data.Models.ProjectRule> allRules;
+        try
+        {
+            allRules = await _projectMemoryService.GetProjectRulesAsync(projectId, cancellationToken);
+        }
+        catch (Exception rulesEx)
+        {
+            // Safety net: if rules loading fails for any reason beyond the SQL-208 guard
+            // in ProjectMemoryService, continue with no rules and record a warning.
+            allRules = Array.Empty<IronDev.Data.Models.ProjectRule>();
+            packet.RulesLoadWarning = $"ProjectRules unavailable: {rulesEx.Message}";
+            System.Diagnostics.Trace.WriteLine($"[PromptContextBuilder] Rules load error (non-fatal): {rulesEx}");
+        }
 
         // 3. Build expanded search queries for the intent
         var queries = ExpandSearchQueries(userRequest, intent);

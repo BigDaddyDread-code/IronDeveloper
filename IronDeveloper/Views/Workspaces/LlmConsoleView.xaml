@@ -76,10 +76,13 @@
                     <Style TargetType="DataGridCell">
                         <Setter Property="Padding" Value="12,6"/>
                         <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="DataGridCell">
-                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                                    <Border Padding="{TemplateBinding Padding}"
+                                            Background="{TemplateBinding Background}"
+                                            Focusable="False">
                                         <ContentPresenter VerticalAlignment="Center"/>
                                     </Border>
                                 </ControlTemplate>
@@ -230,7 +233,51 @@
                                      FontFamily="Consolas" FontSize="12" Padding="12" Background="#0AFFFFFF"/>
                         </Grid>
                     </TabItem>
+
+                    <!-- Warnings / Errors Tab -->
+                    <TabItem Header="WARNINGS">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
+                            <StackPanel>
+                                <!-- Warnings -->
+                                <TextBlock Text="WARNINGS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"
+                                           Visibility="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}}"/>
+                                <Border Background="#22FFCC44" CornerRadius="4" Padding="12" Margin="0,0,0,16"
+                                        Visibility="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}}">
+                                    <TextBlock Text="{Binding SelectedTrace.Warnings}" Foreground="#FFFFCC66" 
+                                               TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
+
+                                <!-- Errors -->
+                                <TextBlock Text="ERRORS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"
+                                           Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}}"/>
+                                <Border Background="#33EE6666" CornerRadius="4" Padding="12" Margin="0,0,0,16"
+                                        Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}}">
+                                    <TextBlock Text="{Binding SelectedTrace.ErrorMessage}" Foreground="#FFEE8888" 
+                                               TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
+
+                                <TextBlock Text="No warnings or errors for this trace." HorizontalAlignment="Center"
+                                           Opacity="0.35" FontSize="12" Margin="0,24,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}" Value="Visible"/>
+                                                        <Condition Binding="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}" Value="Visible"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                 </TabControl>
+
                 
                 <TextBlock Text="No trace selected." HorizontalAlignment="Center" VerticalAlignment="Center" 
                            Opacity="0.3" Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}"/>

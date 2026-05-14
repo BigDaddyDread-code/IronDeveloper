@@ -255,8 +255,10 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 ProjectId = projectId,
                 ChatSessionId = sessionId.ToString(),
                 RequestText = packet.FormattedPrompt,
+                Warnings = packet.RulesLoadWarning ?? string.Empty,
                 CreatedAt = DateTime.UtcNow
             };
+
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
