@@ -22,6 +22,7 @@ builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
+builder.Services.AddScoped<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
 
 // Tenant context — request-scoped, reads tenant_id from JWT claim.
 builder.Services.AddScoped<ICurrentTenantContext, JwtTenantContext>();

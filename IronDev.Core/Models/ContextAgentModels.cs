@@ -16,6 +16,30 @@ public sealed class CreateTicketIntent
     public IReadOnlyList<string> ClarificationQuestions { get; init; } = Array.Empty<string>();
 }
 
+// ── Deep Code Evidence ────────────────────────────────────────────────────────
+
+public enum DeepEvidenceType
+{
+    None,
+    SymbolBody,
+    FileWindow,
+    FullSmallFile,
+    PropertyDefinition,
+    MethodBody
+}
+
+public sealed class DeepCodeEvidence
+{
+    public string FilePath { get; init; } = string.Empty;
+    public string SymbolName { get; init; } = string.Empty;
+    public DeepEvidenceType EvidenceType { get; init; }
+    public string CodeText { get; init; } = string.Empty;
+    public int? StartLine { get; init; }
+    public int? EndLine { get; init; }
+    public double Confidence { get; init; }
+    public string Reason { get; init; } = string.Empty;
+}
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 
 
@@ -229,6 +253,7 @@ public static class ContextAgentStage
     public const string ConflictAssessment    = "ContextAgent.ConflictAssessment";
     public const string FinalAnswer           = "ContextAgent.FinalAnswer";
     public const string IntentCreateTicket    = "ChatIntent.CreateTicket";
+    public const string DeepCodeEvidence      = "ContextAgent.DeepCodeEvidence";
 }
 
 // ── Conflict assessment models ────────────────────────────────────────────────

@@ -37,6 +37,7 @@ public sealed class ContextAgentService : IContextAgentService
     private readonly ILLMService              _llmService;
     private readonly ILlmTraceService         _traceService;
     private readonly IContextConflictService? _conflictService;
+    private readonly IDeepCodeLookupService   _deepLookupService;
 
     // ── Default limits ────────────────────────────────────────────────────────
 
@@ -80,13 +81,16 @@ public sealed class ContextAgentService : IContextAgentService
         ICodeIndexService        codeIndexService,
         ILLMService              llmService,
         ILlmTraceService         traceService,
-        IContextConflictService? conflictService = null)
+        IContextConflictService? conflictService = null,
+        IDeepCodeLookupService?  deepLookupService = null)
     {
-        _contextBuilder   = contextBuilder;
-        _codeIndexService = codeIndexService;
-        _llmService       = llmService;
-        _traceService     = traceService;
-        _conflictService  = conflictService;
+        _contextBuilder    = contextBuilder;
+        _codeIndexService  = codeIndexService;
+        _llmService        = llmService;
+        _traceService      = traceService;
+        _conflictService   = conflictService;
+        // In some tests it might be null, but we prefer injecting a real one
+        _deepLookupService = deepLookupService ?? new DeepCodeLookupService(codeIndexService);
     }
 
     // ── Main pipeline ─────────────────────────────────────────────────────────
@@ -347,6 +351,10 @@ public sealed class ContextAgentService : IContextAgentService
                 .ToList();
 
             int toolCallCount = 0;
+            int deepLookupsCount = 0;
+            int totalDeepChars = 0;
+            const int MaxDeepLookups = 3;
+            const int MaxTotalDeepChars = 10000;
 
             foreach (var query in expandedQueries)
             {
@@ -411,13 +419,64 @@ public sealed class ContextAgentService : IContextAgentService
                         ? r.ChunkText[..800] + "\n...[TRUNCATED]..."
                         : r.ChunkText ?? string.Empty;
 
+                    var snippetText = r.ChunkText ?? string.Empty;
                     var selectionReason = DetermineSelectionReason(r);
+                    bool isShallow = RetrievalQualityHelpers.IsShallowSnippet(snippetText, r.SymbolName ?? string.Empty, query);
+
+                    if (isShallow && deepLookupsCount < MaxDeepLookups && totalDeepChars < MaxTotalDeepChars)
+                    {
+                        var deepResult = await _deepLookupService.GetDeepCodeEvidenceAsync(
+                            request.ProjectId, r.FilePath ?? string.Empty, r.SymbolName ?? string.Empty, query, ct);
+
+                        if (deepResult != null)
+                        {
+                            deepLookupsCount++;
+                            var addedChars = deepResult.CodeText.Length;
+                            totalDeepChars += addedChars;
+                            snippetText = deepResult.CodeText;
+                            selectionReason = deepResult.Reason;
+
+                            var tDeep = MakeTrace(ContextAgentStage.DeepCodeEvidence, traceGroupId, tCall.Id);
+                            tDeep.WasSuccessful = true;
+                            tDeep.RequestText = $"OriginalQuery: {query}\n" +
+                                                $"SelectedFile: {deepResult.FilePath}\n" +
+                                                $"SelectedSymbol: {deepResult.SymbolName}\n" +
+                                                $"ShallowSnippetLength: {r.ChunkText?.Length ?? 0}\n" +
+                                                $"Reason: Shallow snippet detected. Triggered deep lookup.\n" +
+                                                $"EvidenceType: {deepResult.EvidenceType}\n" +
+                                                $"DeepEvidenceLength: {addedChars}";
+                            tDeep.ParsedResponseSummary = $"Deep evidence retrieved: {deepResult.EvidenceType} ({addedChars} chars)";
+                            _traceService.AddTrace(tDeep);
+                        }
+                        else
+                        {
+                            var tDeep = MakeTrace(ContextAgentStage.DeepCodeEvidence, traceGroupId, tCall.Id);
+                            tDeep.WasSuccessful = false;
+                            tDeep.RequestText = $"OriginalQuery: {query}\n" +
+                                                $"SelectedFile: {r.FilePath}\n" +
+                                                $"SelectedSymbol: {r.SymbolName}\n" +
+                                                $"ShallowSnippetLength: {r.ChunkText?.Length ?? 0}\n" +
+                                                $"Reason: Shallow snippet detected. Triggered deep lookup.";
+                            tDeep.ParsedResponseSummary = "Deep lookup failed or returned no evidence.";
+                            _traceService.AddTrace(tDeep);
+                            
+                            warnings.Add($"Deep lookup failed for {r.FilePath} ({r.SymbolName}). Final answer should remain honest.");
+                        }
+                    }
+
+                    if (!isShallow || deepLookupsCount == MaxDeepLookups || snippetText == (r.ChunkText ?? string.Empty))
+                    {
+                        if (snippetText.Length > 800)
+                        {
+                            snippetText = snippetText[..800] + "\n...[TRUNCATED]...";
+                        }
+                    }
 
                     evidence.Add(new CodeEvidence
                     {
                         FilePath         = r.FilePath ?? "(unknown)",
                         SymbolName       = r.SymbolName ?? string.Empty,
-                        Snippet          = snippet,
+                        Snippet          = snippetText,
                         RetrievedByQuery = query,
                         SelectionReason  = selectionReason,
                     });
@@ -617,7 +676,16 @@ public sealed class ContextAgentService : IContextAgentService
         sb.AppendLine($"Sufficiency check confidence: {sufficiency.Confidence}/10");
         sb.AppendLine($"Reason: {sufficiency.Reason}");
         if (warnings.Count > 0)
+        {
             sb.AppendLine($"Warnings: {string.Join("; ", warnings)}");
+            if (warnings.Any(w => w.Contains("Deep lookup failed")))
+            {
+                sb.AppendLine();
+                sb.AppendLine("GROUNDING RULE: Deep lookup failed for a candidate file. You MUST remain honest and state:");
+                sb.AppendLine("\"I found the likely file/symbol, but the indexed/deep evidence still does not prove the implementation details.\"");
+                sb.AppendLine("Do not invent or assume implementation details.");
+            }
+        }
 
         var result = sb.ToString();
         if (result.Length > limits.MaxContextChars)

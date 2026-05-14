@@ -88,6 +88,49 @@ public static class RetrievalQualityHelpers
             .ToList();
     }
 
+    // ── 3. Shallow snippet detection ─────────────────────────────────────────
+
+    public static bool IsShallowSnippet(string snippet, string symbolName, string query)
+    {
+        if (string.IsNullOrWhiteSpace(snippet)) return true;
+        if (snippet.Length < 100) return true;
+
+        var lower = snippet.ToLowerInvariant();
+        var lowerQuery = query.ToLowerInvariant();
+
+        // Interface declaration (no body)
+        if (lower.Contains("interface ") && !lower.Contains(" class ") && !lower.Contains("{")) return true;
+
+        // Missing braces for method (it might be an abstract method or just a signature)
+        if (!string.IsNullOrEmpty(symbolName) && snippet.Contains(symbolName, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!snippet.Contains("{") && !snippet.Contains("=>")) return true;
+        }
+
+        // ProjectTicket property filtering logic missing
+        if (symbolName.Equals("ProjectTicket", StringComparison.OrdinalIgnoreCase) && !lower.Contains("isdeleted"))
+        {
+            if (lowerQuery.Contains("delete") || lowerQuery.Contains("archive") || lowerQuery.Contains("isdeleted"))
+                return true;
+        }
+
+        // Missing filtering logic for Archive
+        if (lowerQuery.Contains("archive") && !lower.Contains("archive") && !lower.Contains("isdeleted")) return true;
+
+        // AuthController constructor
+        if (symbolName.EndsWith("Controller", StringComparison.OrdinalIgnoreCase))
+        {
+            // If it's just the class header and constructor, but we want auth methods
+            if (lower.Contains("public " + symbolName) && (!lower.Contains("login") && !lower.Contains("auth") && !lower.Contains("token")))
+            {
+                if (lowerQuery.Contains("auth") || lowerQuery.Contains("login") || lowerQuery.Contains("token"))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private static int ProductionBoostScore(string? filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath)) return 99;
@@ -96,6 +139,7 @@ public static class RetrievalQualityHelpers
                 return i;
         return 50;
     }
+
 
     // ── 3. Query expansion ───────────────────────────────────────────────────
 
