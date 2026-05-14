@@ -61,6 +61,10 @@ public partial class App : Application
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IContextAgentService,
+                    global::IronDev.Infrastructure.Services.ContextAgentService>();
+
                 var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
                                 ?? new global::IronDev.Core.Models.LlmOptions();
 

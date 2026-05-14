@@ -79,6 +79,23 @@
                         <ToggleButton Grid.Column="1" IsChecked="{Binding IsLlmTracingEnabled}"
                                        VerticalAlignment="Center"/>
                     </Grid>
+
+                    <!-- Context Agent (Agentic RAG) -->
+                    <Border Height="1" Background="#10FFFFFF" Margin="0,12,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Context Agent (Agentic RAG)" FontWeight="SemiBold" FontSize="14"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock Text="Run a sufficiency check and optional code-search expansion before answering. Default: OFF. Enable only when testing the agentic pipeline."
+                                       Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" IsChecked="{Binding UseContextAgent}"
+                                      VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
             </Border>
 

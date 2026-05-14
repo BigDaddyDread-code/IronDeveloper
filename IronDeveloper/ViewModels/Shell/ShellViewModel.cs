@@ -199,6 +199,16 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentView = _decisionsVm;
         };
 
+        // ── Propagate SettingsWorkspaceViewModel flags → Chat VM ─────────────
+        // UseContextAgent: toggled in Settings BEHAVIOUR panel; read by
+        // ChatWorkspaceViewModel.SendMessageAsync on every send.
+        _chatVm.UseContextAgent = _settingsVm.UseContextAgent; // sync initial value
+        _settingsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsWorkspaceViewModel.UseContextAgent))
+                _chatVm.UseContextAgent = _settingsVm.UseContextAgent;
+        };
+
         CurrentView = _loginVm;
     }
 

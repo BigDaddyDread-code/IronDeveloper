@@ -69,6 +69,10 @@ public class LlmTraceService : ILlmTraceService
         sb.AppendLine($"Duration: {trace.DurationMs}ms");
         sb.AppendLine($"Estimated tokens: {trace.EstimatedTokens}");
         sb.AppendLine($"Success: {trace.WasSuccessful}");
+        if (!string.IsNullOrEmpty(trace.TraceGroupId))
+            sb.AppendLine($"TraceGroupId: {trace.TraceGroupId}");
+        if (trace.ParentTraceId.HasValue)
+            sb.AppendLine($"ParentTraceId: {trace.ParentTraceId}");
         if (!string.IsNullOrEmpty(trace.ErrorMessage))
             sb.AppendLine($"Error: {trace.ErrorMessage}");
         if (!string.IsNullOrEmpty(trace.Warnings))
