@@ -1,0 +1,240 @@
+<UserControl x:Class="IronDev.Agent.Views.Workspaces.LlmConsoleView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:LlmConsoleViewModel, IsDesignTimeCreatable=False}">
+
+    <Grid Margin="24,0,24,32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="5"/>
+            <RowDefinition Height="3*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,20,0,20">
+            <TextBlock Text="DEVELOPER TOOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+            <TextBlock Text="LLM Console" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,6"/>
+            <TextBlock TextWrapping="Wrap" FontSize="13" Opacity="0.55"
+                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                Monitor and debug all LLM interactions. Traces are stored in memory and redacted for safety.
+            </TextBlock>
+            
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" 
+                         Tag="Filter traces..."
+                         MinWidth="300" HorizontalAlignment="Left"
+                         VerticalAlignment="Center"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource IronSecondaryButton}" Margin="0,0,8,0"/>
+                    <Button Content="Export All" Command="{Binding ExportAllCommand}" Style="{StaticResource IronSecondaryButton}" Margin="0,0,8,0"/>
+                    <Button Content="Clear" Command="{Binding ClearCommand}" Style="{StaticResource IronSecondaryButton}"/>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+
+        <!-- Trace List -->
+        <Border Grid.Row="1" Style="{StaticResource IronCard}" Padding="0">
+            <DataGrid ItemsSource="{Binding Traces}" 
+                      SelectedItem="{Binding SelectedTrace}"
+                      AutoGenerateColumns="False" 
+                      IsReadOnly="True"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="None"
+                      SelectionMode="Single">
+                <DataGrid.Resources>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="#10FFFFFF"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        <Setter Property="Padding" Value="12,8"/>
+                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource DarkBorderBrush}"/>
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                    </Style>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#20FFFFFF"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="Padding" Value="12,6"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="DataGridCell">
+                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                                        <ContentPresenter VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </DataGrid.Resources>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="TIME" Binding="{Binding CreatedAt, StringFormat=\{0:HH:mm:ss\}}" Width="80"/>
+                    <DataGridTemplateColumn Header="STATUS" Width="80">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding WasSuccessful, Converter={StaticResource BoolToStringConverter}, ConverterParameter='OK|FAIL'}"
+                                           FontWeight="Bold"
+                                           Foreground="{Binding WasSuccessful, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#66BB66|#EE6666'}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="FEATURE" Binding="{Binding FeatureName}" Width="150"/>
+                    <DataGridTextColumn Header="DURATION" Binding="{Binding DurationMs, StringFormat=\{0\}ms}" Width="100"/>
+                    <DataGridTextColumn Header="SUMMARY" Binding="{Binding ParsedResponseSummary}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent"/>
+
+        <!-- Details -->
+        <Border Grid.Row="3" Style="{StaticResource IronCard}" Padding="16" Margin="0,10,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12" Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}}">
+                    <TextBlock Text="TRACE DETAILS" Style="{StaticResource IronEyebrow}" VerticalAlignment="Center"/>
+                    <Border Width="1" Background="#20FFFFFF" Margin="12,2" Height="14"/>
+                    <Button Content="Copy Full Trace" Command="{Binding CopyFullTraceCommand}" Style="{StaticResource IronSecondaryButton}" Padding="8,2" Margin="0,0,8,0"/>
+                </StackPanel>
+
+                <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0" 
+                            Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}}">
+                    <TabControl.Resources>
+                        <Style TargetType="TabItem">
+                            <Setter Property="HeaderTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="SemiBold" Margin="4,2"/>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="TabItem">
+                                        <Border x:Name="Border" Padding="12,6" Margin="0,0,4,0" CornerRadius="4,4,0,0" BorderThickness="0,0,0,2">
+                                            <ContentPresenter ContentSource="Header"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Border" Property="Background" Value="#15FFFFFF"/>
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Border" Property="Background" Value="#08FFFFFF"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </TabControl.Resources>
+
+                    <!-- Summary Tab -->
+                    <TabItem Header="SUMMARY">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Feature:" Style="{StaticResource IronMetaLabel}" Grid.Row="0" Margin="0,0,12,6"/>
+                                    <TextBlock Text="{Binding SelectedTrace.FeatureName}" Grid.Row="0" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+
+                                    <TextBlock Text="Model:" Style="{StaticResource IronMetaLabel}" Grid.Row="1" Margin="0,0,12,6"/>
+                                    <TextBlock Text="{Binding SelectedTrace.Model, FallbackValue='(unknown)'}" Grid.Row="1" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+
+                                    <TextBlock Text="Duration:" Style="{StaticResource IronMetaLabel}" Grid.Row="2" Margin="0,0,12,6"/>
+                                    <TextBlock Text="{Binding SelectedTrace.DurationMs, StringFormat=\{0\}ms}" Grid.Row="2" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+
+                                    <TextBlock Text="Project ID:" Style="{StaticResource IronMetaLabel}" Grid.Row="3" Margin="0,0,12,6"/>
+                                    <TextBlock Text="{Binding SelectedTrace.ProjectId}" Grid.Row="3" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+
+                                    <TextBlock Text="Created At:" Style="{StaticResource IronMetaLabel}" Grid.Row="4" Margin="0,0,12,6"/>
+                                    <TextBlock Text="{Binding SelectedTrace.CreatedAt, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Grid.Row="4" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+                                </Grid>
+
+                                <TextBlock Text="ERROR MESSAGE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8" 
+                                           Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
+                                <Border Background="#33EE6666" CornerRadius="4" Padding="12" Margin="0,0,0,16"
+                                        Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}">
+                                    <TextBlock Text="{Binding SelectedTrace.ErrorMessage}" Foreground="#FFEE8888" TextWrapping="Wrap" FontFamily="Consolas"/>
+                                </Border>
+
+                                <TextBlock Text="USER MESSAGE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"
+                                           Visibility="{Binding SelectedTrace.CurrentUserMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
+                                <TextBlock Text="{Binding SelectedTrace.CurrentUserMessage}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Opacity="0.8" Margin="0,0,0,16"
+                                           Visibility="{Binding SelectedTrace.CurrentUserMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Prompt Tab -->
+                    <TabItem Header="PROMPT">
+                        <Grid Margin="0,12,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Button Content="Copy Prompt" Command="{Binding CopyPromptCommand}" HorizontalAlignment="Right" Style="{StaticResource IronSecondaryButton}" Margin="0,0,0,8"/>
+                            <TextBox Grid.Row="1" Text="{Binding SelectedTrace.RequestText, Mode=OneWay}" 
+                                     IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                                     FontFamily="Consolas" FontSize="12" Padding="12" Background="#0AFFFFFF"/>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Raw Response Tab -->
+                    <TabItem Header="RAW RESPONSE">
+                        <Grid Margin="0,12,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Button Content="Copy Response" Command="{Binding CopyResponseCommand}" HorizontalAlignment="Right" Style="{StaticResource IronSecondaryButton}" Margin="0,0,0,8"/>
+                            <TextBox Grid.Row="1" Text="{Binding SelectedTrace.RawResponseText, Mode=OneWay}" 
+                                     IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                                     FontFamily="Consolas" FontSize="12" Padding="12" Background="#0AFFFFFF"/>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+                
+                <TextBlock Text="No trace selected." HorizontalAlignment="Center" VerticalAlignment="Center" 
+                           Opacity="0.3" Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

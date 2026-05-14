@@ -111,12 +111,14 @@ public partial class App : Application
                         sp.GetRequiredService<global::IronDev.Services.ICodeIndexService>(),
                         sp.GetRequiredService<global::IronDev.Core.Auth.ICurrentTenantContext>(),
                         sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
+
+                services.AddSingleton<LlmConsoleViewModel>(sp =>
+                    new LlmConsoleViewModel(
+                        sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
                 services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
                 {
-                    // Deferred: PromptPlaygroundViewModel (and its DB deps) are only
-                    // instantiated when the user first expands Developer Tools —
-                    // never at app startup.
-                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>()
+                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>(),
+                    LlmConsoleFactory       = () => sp.GetRequiredService<LlmConsoleViewModel>()
                 });
 
                 // Shell

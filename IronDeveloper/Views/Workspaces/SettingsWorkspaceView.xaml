@@ -20,7 +20,7 @@
                     <TextBlock Text="AI MODEL" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
                     <TextBlock Text="Active Model" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
                     <ComboBox ItemsSource="{Binding AvailableModels}"
-                              SelectedItem="{Binding SelectedModel}"/>
+                               SelectedItem="{Binding SelectedModel}"/>
 
                     <TextBlock Text="API Endpoint" Style="{StaticResource IronMetaLabel}" Margin="0,16,0,6"/>
                     <TextBox Text="{Binding ApiEndpoint, UpdateSourceTrigger=PropertyChanged}"/>
@@ -44,7 +44,7 @@
                                        Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" IsChecked="{Binding StreamResponses}"
-                                      VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center"/>
                     </Grid>
 
                     <Grid>
@@ -59,12 +59,12 @@
                                        Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" IsChecked="{Binding AutoIndex}"
-                                      VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center"/>
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- Developer Tools / Prompt Playground -->
+            <!-- Developer Tools -->
             <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="0">
                 <StackPanel>
 
@@ -82,10 +82,10 @@
                                        Foreground="{StaticResource TextBrush}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="▶  Show Prompt Playground"/>
+                                        <Setter Property="Text" Value="▶  Show Developer Tools"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsDevToolsExpanded}" Value="True">
-                                                <Setter Property="Text" Value="▼  Hide Prompt Playground"/>
+                                                <Setter Property="Text" Value="▼  Hide Developer Tools"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -94,12 +94,50 @@
                         </Grid>
                     </Button>
 
-                    <!-- Prompt Playground — rendered via DataTemplate in App.xaml.
-                         ContentControl only instantiates the view when Content is non-null,
-                         so the DB is never touched at startup. -->
-                    <ContentControl x:Name="PlaygroundHost"
-                                    Content="{Binding PromptPlayground}"
-                                    Visibility="{Binding IsDevToolsExpanded, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <!-- Developer Tools Host -->
+                    <TabControl x:Name="DevToolsTabs"
+                                Background="Transparent" BorderThickness="0,1,0,0"
+                                BorderBrush="{StaticResource DarkBorderBrush}"
+                                Visibility="{Binding IsDevToolsExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TabControl.Resources>
+                            <Style TargetType="TabItem">
+                                <Setter Property="HeaderTemplate">
+                                    <Setter.Value>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="12" FontWeight="SemiBold" Margin="4,2"/>
+                                        </DataTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="TabItem">
+                                        <Border x:Name="Border" Padding="22,12" Background="Transparent" BorderThickness="0,0,0,2">
+                                            <ContentPresenter ContentSource="Header"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Border" Property="Background" Value="#10FFFFFF"/>
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Border" Property="Background" Value="#05FFFFFF"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </TabControl.Resources>
+
+                        <TabItem Header="PROMPT PLAYGROUND">
+                            <ContentControl Content="{Binding PromptPlayground}"/>
+                        </TabItem>
+                        <TabItem Header="LLM CONSOLE">
+                            <ContentControl Content="{Binding LlmConsole}"/>
+                        </TabItem>
+                    </TabControl>
 
                 </StackPanel>
             </Border>

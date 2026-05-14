@@ -36,6 +36,9 @@
 
             <cvt:InverseVisibilityConverter x:Key="InverseVisibilityConverter"/>
             <cvt:LoginButtonTextConverter x:Key="LoginButtonTextConverter"/>
+            <cvt:BoolToStringConverter x:Key="BoolToStringConverter"/>
+            <cvt:BoolToColorConverter x:Key="BoolToColorConverter"/>
+            <cvt:ValueToVisConverter x:Key="ValueToVis"/>
 
             <!-- ── DataTemplates: VM → View ───────────────────────────── -->
             <!--  The ContentControl in MainWindow binds CurrentView (object/VM).
@@ -79,6 +82,10 @@
 
             <DataTemplate DataType="{x:Type ws:PromptPlaygroundViewModel}">
                 <vws:PromptPlaygroundView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type ws:LlmConsoleViewModel}">
+                <vws:LlmConsoleView/>
             </DataTemplate>
 
             <cvt:StatusToBrushConverter x:Key="StatusToBrushConverter"/>

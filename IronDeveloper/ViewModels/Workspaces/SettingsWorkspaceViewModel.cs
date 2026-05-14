@@ -27,8 +27,10 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     /// Never resolved until the user opens Developer Tools.
     /// </summary>
     public Func<PromptPlaygroundViewModel>? PromptPlaygroundFactory { get; init; }
+    public Func<LlmConsoleViewModel>?      LlmConsoleFactory       { get; init; }
 
     private PromptPlaygroundViewModel? _promptPlayground;
+    private LlmConsoleViewModel?       _llmConsole;
 
     /// <summary>
     /// The Prompt Playground VM, created on first access.
@@ -38,6 +40,12 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     {
         get => _promptPlayground;
         private set => SetProperty(ref _promptPlayground, value);
+    }
+
+    public LlmConsoleViewModel? LlmConsole
+    {
+        get => _llmConsole;
+        private set => SetProperty(ref _llmConsole, value);
     }
 
     public IReadOnlyList<string> AvailableModels { get; } =
@@ -52,10 +60,13 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void ToggleDevTools()
     {
-        if (!IsDevToolsExpanded && PromptPlayground is null && PromptPlaygroundFactory is not null)
+        if (!IsDevToolsExpanded)
         {
-            // Lazy-create, then notify WPF before flipping Visibility
-            PromptPlayground = PromptPlaygroundFactory();
+            if (PromptPlayground is null && PromptPlaygroundFactory is not null)
+                PromptPlayground = PromptPlaygroundFactory();
+
+            if (LlmConsole is null && LlmConsoleFactory is not null)
+                LlmConsole = LlmConsoleFactory();
         }
 
         IsDevToolsExpanded = !IsDevToolsExpanded;
