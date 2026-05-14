@@ -10,6 +10,7 @@ using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
 using IronDev.Services;
+using IronDev.Agent.ViewModels.Workspaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -457,7 +458,8 @@ public sealed class ContextAgentTests
             new StubChatHistoryService(),
             new StubPromptContextBuilder(),
             new StubLlmService("Hello"),
-            new StubProjectMemoryService(),
+            new ContextStubProjectMemoryService(),
+            new ContextStubTicketService(),
             new StubChatFeedbackService(),
             new LlmTraceService(),
             agentSpy);
@@ -1000,6 +1002,352 @@ public sealed class ContextAgentTests
                       conflictTrace.RawResponseText.Contains("REST"),
             "Trace RawResponseText must reference the domain/approach.");
     }
+
+    // ── W: ChatWorkspaceViewModel passes tickets to ContextAgentRequest ───────
+
+    [TestMethod]
+    [Description("W: ChatWorkspaceViewModel populates ContextAgentRequest.RecentTickets when UseContextAgent is true.")]
+    public async Task ChatWorkspaceViewModel_PopulatesRecentTicketsInRequest()
+    {
+        var tickets = new List<IronDev.Data.Models.ProjectTicket> { new IronDev.Data.Models.ProjectTicket { Id = 1, Title = "Existing Ticket" } };
+        var ticketService = new ContextStubTicketService { Tickets = tickets };
+        var spy = new ContextRequestSpyAgentService();
+        
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            new StubLlmService("Hello"),
+            new ContextStubProjectMemoryService(),
+            ticketService,
+            new StubChatFeedbackService(),
+            new LlmTraceService(),
+            spy);
+
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Help me with something";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(spy.LastRequest);
+        Assert.AreEqual(1, spy.LastRequest.RecentTickets.Count);
+        Assert.AreEqual("Existing Ticket", spy.LastRequest.RecentTickets[0].Title);
+    }
+
+    // ── X: ChatWorkspaceViewModel passes decisions/rules to Request ───────────
+
+    [TestMethod]
+    [Description("X: ChatWorkspaceViewModel populates RecentDecisions and ProjectRules when UseContextAgent is true.")]
+    public async Task ChatWorkspaceViewModel_PopulatesDecisionsAndRulesInRequest()
+    {
+        var memoryService = new ContextStubProjectMemoryService
+        {
+            Decisions = [ new IronDev.Data.Models.ProjectDecision { Title = "D1" } ],
+            Rules     = [ new IronDev.Data.Models.ProjectRule { Name = "R1" } ]
+        };
+        var spy = new ContextRequestSpyAgentService();
+        
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            new StubLlmService("Hello"),
+            memoryService,
+            new ContextStubTicketService(),
+            new StubChatFeedbackService(),
+            new LlmTraceService(),
+            spy);
+
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Create a ticket";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(spy.LastRequest);
+        Assert.AreEqual(1, spy.LastRequest.RecentDecisions.Count);
+        Assert.AreEqual("D1", spy.LastRequest.RecentDecisions[0].Title);
+        Assert.AreEqual(1, spy.LastRequest.ProjectRules.Count);
+        Assert.AreEqual("R1", spy.LastRequest.ProjectRules[0].Name);
+    }
+
+    // ── Y: OAuth ticket blocks API key auth request in runtime chat ───────────
+
+    [TestMethod]
+    [Description("Y: Existing OAuth ticket in the runtime environment successfully blocks an API key auth ticket creation via ContextAgent.")]
+    public async Task ChatWorkspaceViewModel_RuntimeConflict_BlocksTicketCreation()
+    {
+        // Arrange
+        var existingTicket = new IronDev.Data.Models.ProjectTicket
+        {
+            Id = 1,
+            Title = "Implement OAuth in REST layer",
+            Status = "Draft",
+            Summary = "OAuth auth."
+        };
+        
+        var ticketService = new ContextStubTicketService { Tickets = [existingTicket] };
+        
+        // We use the REAL ContextAgentService wired with a REAL ContextConflictService,
+        // but stubbed LLM/Index/Traces.
+        var (agent, _, _, traces) = ContextAgentFactory.BuildWithConflict();
+        
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            new StubLlmService("Hello"), // Final answer LLM
+            new ContextStubProjectMemoryService(),
+            ticketService,
+            new StubChatFeedbackService(),
+            new LlmTraceService(),
+            agent);
+
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Create a ticket to add API key authentication to the REST layer";
+
+        // Act
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        // Assert
+        var lastMsg = vm.Messages.LastOrDefault();
+        Assert.IsNotNull(lastMsg);
+        Assert.AreEqual("assistant", lastMsg.Role);
+        Assert.IsTrue(lastMsg.MessageText.Contains("Before I can answer, I need a bit more context"),
+            "Should have triggered clarification due to conflict.");
+        Assert.IsTrue(lastMsg.MessageText.Contains("replace"),
+            "Clarification should mention replacement or overlap.");
+            
+        // Check trace
+        var allTraces = traces.GetRecentTraces();
+        Assert.IsTrue(allTraces.Any(t => t.FeatureName == ContextAgentStage.ConflictAssessment),
+            "ConflictAssessment trace must be present.");
+    }
+
+    // ── Z: Graceful degradation on retrieval failure ──────────────────────────
+
+    [TestMethod]
+    [Description("Z: When artefact retrieval fails, ChatWorkspaceViewModel degrades gracefully and still calls the Context Agent.")]
+    public async Task ChatWorkspaceViewModel_RetrievalFailure_DegradesGracefully()
+    {
+        var failingTicketService = new ContextFailingTicketService();
+        var spy = new ContextRequestSpyAgentService();
+        
+        var vm = new ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            new StubLlmService("Hello"),
+            new ContextStubProjectMemoryService(),
+            failingTicketService,
+            new StubChatFeedbackService(),
+            new LlmTraceService(),
+            spy);
+
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Hello";
+        
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(spy.LastRequest, "Agent must still be called even if tickets fail.");
+        Assert.AreEqual(0, spy.LastRequest.RecentTickets.Count);
+    }
+
+    // ── A3: ConflictAssessment trace in runtime chat ───────────────────────────
+
+    [TestMethod]
+    [Description("A3: ConflictAssessment trace contains diagnostic details when artefacts are passed in a runtime chat.")]
+    public async Task ChatWorkspaceViewModel_Runtime_TraceContainsConflictDiagnostics()
+    {
+        var existingTicket = new IronDev.Data.Models.ProjectTicket { Id = 1, Title = "OAuth", Summary = "OAuth" };
+        var ticketService = new ContextStubTicketService { Tickets = [existingTicket] };
+        var (agent, _, _, traces) = ContextAgentFactory.BuildWithConflict();
+        
+        var vm = new ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            new StubLlmService("Hello"),
+            new ContextStubProjectMemoryService(),
+            ticketService,
+            new StubChatFeedbackService(),
+            traces,
+            agent);
+
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Create a ticket for soft archive in rest layer";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        var conflictTrace = traces.GetRecentTraces()
+            .FirstOrDefault(t => t.FeatureName == ContextAgentStage.ConflictAssessment);
+
+        Assert.IsNotNull(conflictTrace);
+        Assert.IsTrue(conflictTrace.ParsedResponseSummary.Contains("Classification="));
+        Assert.IsTrue(conflictTrace.ParsedResponseSummary.Contains("Domain=REST"));
+        
+        // Assert B: RequestText includes user request and related ticket titles
+        Assert.IsNotNull(conflictTrace.RequestText);
+        Assert.IsTrue(conflictTrace.RequestText.Contains("Create a ticket for soft archive in rest layer"));
+        Assert.IsTrue(conflictTrace.RequestText.Contains("OAuth"));
+        Assert.IsTrue(conflictTrace.RequestText.Contains("Decision Rules"));
+    }
+    
+    // ── B2: Pre-check clarification trace contains diagnostic details ────────
+    
+    [TestMethod]
+    [Description("B2: ClarificationRequired trace contains user request and matched pattern for pre-check decisions.")]
+    public async Task ContextAgent_PreCheckClarification_TraceContainsDiagnostics()
+    {
+        var (agent, _, _, traces) = ContextAgentFactory.Build();
+        var request = new ContextAgentRequest 
+        { 
+            UserRequest = "Create a ticket to fix delete",
+            ProjectId = 1
+        };
+        
+        await agent.RunAsync(request);
+        
+        var trace = traces.GetRecentTraces()
+            .FirstOrDefault(t => t.FeatureName == ContextAgentStage.ClarificationRequired);
+            
+        Assert.IsNotNull(trace);
+        Assert.IsNotNull(trace.RequestText);
+        Assert.IsTrue(trace.RequestText.Contains("UserRequest: Create a ticket to fix delete"));
+        Assert.IsTrue(trace.RequestText.Contains("Matched Pattern: fix delete"));
+        Assert.IsTrue(trace.RequestText.Contains("Candidate Domains"));
+    }
+
+    // ── B3: ToolResult trace contains query expansion and filtering info ─────
+
+    [TestMethod]
+    [Description("B3: ToolResult trace includes query expansion and filtering input for retrieval transparency.")]
+    public async Task ContextAgent_ToolResult_TraceContainsRetrievalInput()
+    {
+        // Setup: LLM asks for "soft archive" code search
+        var sufficiencyJson = """
+        {
+          "isSufficient": false,
+          "confidence": 3,
+          "reason": "Need to see soft archive code.",
+          "requestedContext": {
+            "codeSearchQueries": ["soft archive"],
+            "clarificationQuestions": []
+          }
+        }
+        """;
+        
+        var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            new() { FilePath = "TicketService.cs", ChunkText = "public void ArchiveTicket() {}" }
+        };
+        
+        var (agent, _, _, traces) = ContextAgentFactory.BuildWithConflict(llmResponse: sufficiencyJson, snippets: snippets);
+        var request = new ContextAgentRequest { UserRequest = "How does soft archive work?", ProjectId = 1 };
+        
+        await agent.RunAsync(request);
+        
+        var resultTrace = traces.GetRecentTraces()
+            .FirstOrDefault(t => t.FeatureName == ContextAgentStage.ToolResultSearch && t.RequestText.Contains("soft archive"));
+            
+        Assert.IsNotNull(resultTrace);
+        Assert.IsNotNull(resultTrace.RequestText);
+        // Using CaseInsensitive search to be safe
+        Assert.IsTrue(resultTrace.RequestText.Contains("OriginalQuery:"), "Should have OriginalQuery label");
+        Assert.IsTrue(resultTrace.RequestText.Contains("soft archive"), "Should have the query text");
+        // "soft archive" expands to ArchiveTicketAsync etc. in ExpansionTable
+        Assert.IsTrue(resultTrace.RequestText.Contains("ExpandedQueries: soft archive, ArchiveTicketAsync", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(resultTrace.RequestText.Contains("ExcludeTests: true", StringComparison.OrdinalIgnoreCase));
+    }
+    // ── C1: Intent extraction (Test A & D) ───────────────────────────────────
+
+    [TestMethod]
+    [Description("Test A & D: Parser extracts WorkText and ignores non-ticket chat.")]
+    public void ChatIntentParser_ExtractsWorkText_IgnoresNormalChat()
+    {
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("Create a ticket to add API key authentication to REST layer");
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("add API key authentication to REST layer", intent.WorkText);
+
+        var noIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("How do I add API key authentication?");
+        Assert.IsNull(noIntent);
+    }
+
+    // ── C2: Domain extraction via WorkText (Test A & B) ──────────────────────
+
+    [TestMethod]
+    [Description("Test A & B: Domain detection uses WorkText. Prevents polluting non-ticket domains with 'ticket' keyword.")]
+    public void ContextConflictService_UsesWorkTextForDomain()
+    {
+        // "Create a ticket" has "ticket", which triggers "ticket management" domain.
+        // If we only use WorkText "add API key authentication to REST layer", it only triggers REST auth.
+        var intentA = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("Create a ticket to add API key authentication to REST layer");
+        var domainsA = IronDev.Infrastructure.Services.ContextConflictService.DetectDomains(intentA!.WorkText);
+        Assert.IsFalse(domainsA.Contains("ticket management"));
+        Assert.IsTrue(domainsA.Contains("REST authentication"));
+
+        // "Create a ticket to soft archive saved tickets" has "soft archive" in WorkText.
+        var intentB = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("Create a ticket to soft archive saved tickets");
+        var domainsB = IronDev.Infrastructure.Services.ContextConflictService.DetectDomains(intentB!.WorkText);
+        Assert.IsTrue(domainsB.Contains("ticket management"));
+    }
+
+    // ── C3: ticket this (Test C) ─────────────────────────────────────────────
+
+    [TestMethod]
+    [Description("Test C: 'ticket this' uses previous message as WorkText.")]
+    public void ChatIntentParser_TicketThis_UsesPreviousMessage()
+    {
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("ticket this", "Implement OAuth in the backend");
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("Implement OAuth in the backend", intent.WorkText);
+        Assert.AreEqual("ticket this", intent.CommandText);
+    }
+
+    // ── C4: Conflict Assessment and Traces (Test E & F) ──────────────────────
+
+    [TestMethod]
+    [Description("Test E & F: Conflict assessment receives WorkText, and Trace includes original and WorkText.")]
+    public async Task ChatWorkspaceViewModel_PassesWorkText_And_LogsTrace()
+    {
+        var tickets = new List<IronDev.Data.Models.ProjectTicket> 
+        { 
+            new IronDev.Data.Models.ProjectTicket { Id = 1, Title = "add API key authentication to REST layer" } 
+        };
+        var ticketService = new ContextStubTicketService { Tickets = tickets };
+        var spy = new ContextRequestSpyAgentService();
+        var traceService = new LlmTraceService();
+        
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            new StubLlmService("Hello"),
+            new ContextStubProjectMemoryService(),
+            ticketService,
+            new StubChatFeedbackService(),
+            traceService,
+            spy);
+
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Create a ticket to add API key authentication to REST layer";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        // Verify E: Conflict assessment (ContextAgentRequest) receives WorkText
+        Assert.IsNotNull(spy.LastRequest);
+        Assert.IsNotNull(spy.LastRequest.CreateTicketIntent);
+        Assert.AreEqual("add API key authentication to REST layer", spy.LastRequest.CreateTicketIntent.WorkText);
+        Assert.AreEqual("Create a ticket to add API key authentication to REST layer", spy.LastRequest.UserRequest);
+
+        // Verify F: Trace includes original text and extracted WorkText
+        var trace = traceService.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.IntentCreateTicket);
+        Assert.IsNotNull(trace);
+        // The RequestText should contain both (note: redaction replaces 'API key')
+        Assert.IsTrue(trace.RequestText.Contains("OriginalMessage: Create a ticket to", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(trace.RequestText.Contains("WorkText: add", StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 // ── Spy / stub helpers for test G and I ──────────────────────────────────────
@@ -1014,6 +1362,36 @@ internal sealed class SpyContextAgentService : IContextAgentService
         _onCall();
         return Task.FromResult(new ContextAgentResult { WasSuccessful = true, FinalPrompt = "AGENT RESULT" });
     }
+}
+
+internal sealed class ContextRequestSpyAgentService : IContextAgentService
+{
+    public ContextAgentRequest? LastRequest { get; private set; }
+    public ContextAgentResult Result { get; set; } = new() { WasSuccessful = true, FinalPrompt = "AGENT RESULT" };
+
+    public Task<ContextAgentResult> RunAsync(ContextAgentRequest request, CancellationToken ct = default)
+    {
+        LastRequest = request;
+        return Task.FromResult(Result);
+    }
+}
+
+internal sealed class ContextStubTicketService : IronDev.Services.ITicketService
+{
+    public List<IronDev.Data.Models.ProjectTicket> Tickets { get; set; } = [];
+    public Task<long> SaveTicketAsync(IronDev.Data.Models.ProjectTicket t, CancellationToken ct = default) => Task.FromResult(1L);
+    public Task<IReadOnlyList<IronDev.Data.Models.ProjectTicket>> GetRecentTicketsAsync(int p, int take = 10, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<IronDev.Data.Models.ProjectTicket>>(Tickets.Take(take).ToList());
+    public Task<IronDev.Data.Models.ProjectTicket?> GetTicketByIdAsync(long id, CancellationToken ct = default) => Task.FromResult(Tickets.FirstOrDefault(t => t.Id == id));
+    public Task<bool> ArchiveTicketAsync(long id, CancellationToken ct = default) => Task.FromResult(true);
+}
+
+internal sealed class ContextFailingTicketService : IronDev.Services.ITicketService
+{
+    public Task<long> SaveTicketAsync(IronDev.Data.Models.ProjectTicket t, CancellationToken ct = default) => throw new Exception("DB FAIL");
+    public Task<IReadOnlyList<IronDev.Data.Models.ProjectTicket>> GetRecentTicketsAsync(int p, int take = 10, CancellationToken ct = default) => throw new Exception("DB FAIL");
+    public Task<IronDev.Data.Models.ProjectTicket?> GetTicketByIdAsync(long id, CancellationToken ct = default) => throw new Exception("DB FAIL");
+    public Task<bool> ArchiveTicketAsync(long id, CancellationToken ct = default) => throw new Exception("DB FAIL");
 }
 
 internal sealed class ThrowingLlmService : ILLMService
@@ -1060,16 +1438,19 @@ internal sealed class StubChatHistoryService : IronDev.Services.IChatHistoryServ
     public Task DeleteSessionAsync(long sessionId, CancellationToken ct = default) => Task.CompletedTask;
 }
 
-internal sealed class StubProjectMemoryService : IronDev.Services.IProjectMemoryService
+internal sealed class ContextStubProjectMemoryService : IronDev.Services.IProjectMemoryService
 {
+    public List<IronDev.Data.Models.ProjectDecision> Decisions { get; set; } = [];
+    public List<IronDev.Data.Models.ProjectRule> Rules { get; set; } = [];
+
     public Task<long> SaveSummaryAsync(IronDev.Data.Models.ProjectSummary s, CancellationToken ct = default) => Task.FromResult(1L);
     public Task<IronDev.Data.Models.ProjectSummary?> GetLatestSummaryAsync(int p, CancellationToken ct = default) => Task.FromResult<IronDev.Data.Models.ProjectSummary?>(null);
     public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectDecision>> GetRecentDecisionsAsync(int p, int t = 5, CancellationToken ct = default)
-        => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectDecision>>(Array.Empty<IronDev.Data.Models.ProjectDecision>());
+        => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectDecision>>(Decisions.Take(t).ToList());
     public Task<long> SaveDecisionAsync(IronDev.Data.Models.ProjectDecision d, CancellationToken ct = default) => Task.FromResult(1L);
     public Task<IronDev.Data.Models.ProjectDecision?> GetDecisionByIdAsync(long id, CancellationToken ct = default) => Task.FromResult<IronDev.Data.Models.ProjectDecision?>(null);
     public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectRule>> GetProjectRulesAsync(int p, CancellationToken ct = default)
-        => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectRule>>(Array.Empty<IronDev.Data.Models.ProjectRule>());
+        => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectRule>>(Rules);
     public Task<long> SaveProjectRuleAsync(IronDev.Data.Models.ProjectRule r, CancellationToken ct = default) => Task.FromResult(1L);
     public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectImplementationPlan>> GetRecentPlansAsync(int p, int t = 10, CancellationToken ct = default)
         => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectImplementationPlan>>(Array.Empty<IronDev.Data.Models.ProjectImplementationPlan>());

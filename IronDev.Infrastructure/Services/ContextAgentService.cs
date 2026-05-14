@@ -98,16 +98,27 @@ public sealed class ContextAgentService : IContextAgentService
         var warnings     = new List<string>();
         var evidence     = new List<CodeEvidence>();
 
+        // Use intent work text if available to avoid polluting searches and rules
+        var effectiveWorkText = request.CreateTicketIntent != null && !string.IsNullOrWhiteSpace(request.CreateTicketIntent.WorkText)
+            ? request.CreateTicketIntent.WorkText
+            : request.UserRequest;
+
         // ── Stage 0: Pre-check — clarification-first for vague requests ───────
         // Done before any LLM call to save a round-trip for obviously ambiguous
         // requests like "Create a ticket to fix delete."
-        if (RetrievalQualityHelpers.ShouldPreferClarification(request.UserRequest))
+        var (shouldClarify, matched) = RetrievalQualityHelpers.ShouldPreferClarification(effectiveWorkText);
+        if (shouldClarify)
         {
             var questions = RetrievalQualityHelpers.GetDeleteClarificationQuestions();
 
             var t0 = MakeTrace(ContextAgentStage.ClarificationRequired, traceGroupId, null);
             t0.WasSuccessful         = true;
             t0.CurrentUserMessage    = request.UserRequest;
+            t0.RequestText           = 
+                $"UserRequest: {request.UserRequest}\n" +
+                $"Matched Pattern: {matched}\n" +
+                $"Reason: Request matched vague create/fix pattern — clarification preferred over code search.\n" +
+                $"Candidate Domains: Chat, Tickets (Soft Archive), Tickets (Hard Delete), Implementation Plans";
             t0.ParsedResponseSummary = $"Pre-check clarification: {questions.Count} question(s) (vague intent detected)";
             t0.RawResponseText       = string.Join("\n", questions);
             t0.ContextSummary        = "Request matched vague create/fix pattern — clarification preferred over code search.";
@@ -132,7 +143,7 @@ public sealed class ContextAgentService : IContextAgentService
             try
             {
                 initialPacket = await _contextBuilder.BuildPacketAsync(
-                    request.ProjectId, request.SessionId, request.UserRequest, ct);
+                    request.ProjectId, request.SessionId, effectiveWorkText, ct);
             }
             catch (Exception ex)
             {
@@ -170,7 +181,7 @@ public sealed class ContextAgentService : IContextAgentService
         // Hoisted here so the goto BuildFinalPrompt path in Stage 2 cannot bypass it.
         TicketConflictAssessment? conflictAssessment = null;
         {
-            var checkPrompt = BuildSufficiencyPrompt(request.UserRequest, initialPacket);
+            var checkPrompt = BuildSufficiencyPrompt(effectiveWorkText, initialPacket);
             var sw = Stopwatch.StartNew();
             string rawJson;
             try
@@ -215,6 +226,11 @@ public sealed class ContextAgentService : IContextAgentService
         {
             var t3 = MakeTrace(ContextAgentStage.ClarificationRequired, traceGroupId, stage2Id);
             t3.WasSuccessful         = true;
+            t3.RequestText           = 
+                $"UserRequest: {request.UserRequest}\n" +
+                $"Reason: LLM detected insufficient context and requested clarification.\n" +
+                $"Confidence: {sufficiency.Confidence}\n" +
+                $"LLM Reason: {sufficiency.Reason}";
             t3.ParsedResponseSummary = $"Clarification needed: {sufficiency.ClarificationQuestions.Count} question(s) (LLM-detected)";
             t3.RawResponseText       = string.Join("\n", sufficiency.ClarificationQuestions);
             _traceService.AddTrace(t3);
@@ -241,7 +257,7 @@ public sealed class ContextAgentService : IContextAgentService
         {
             var conflictCtx = new ConflictAssessmentContext
             {
-                UserRequest      = request.UserRequest,
+                UserRequest      = effectiveWorkText,
                 RecentTickets    = request.RecentTickets,
                 RecentDecisions  = request.RecentDecisions,
                 ProjectRules     = request.ProjectRules,
@@ -264,6 +280,18 @@ public sealed class ContextAgentService : IContextAgentService
                 tConflict.WasSuccessful      = true;
                 tConflict.DurationMs         = swConflict.ElapsedMilliseconds;
                 tConflict.CurrentUserMessage = request.UserRequest;
+                
+                var sbReq = new StringBuilder();
+                sbReq.AppendLine($"UserRequest:      {request.UserRequest}");
+                sbReq.AppendLine($"RecentTickets:    {request.RecentTickets.Count} considered");
+                foreach (var t in request.RecentTickets) sbReq.AppendLine($"  - [{t.Id}] {t.Title}");
+                sbReq.AppendLine($"RecentDecisions:  {request.RecentDecisions.Count} considered");
+                foreach (var d in request.RecentDecisions) sbReq.AppendLine($"  - {d.Title}");
+                sbReq.AppendLine($"ProjectRules:     {request.ProjectRules.Count} considered");
+                foreach (var r in request.ProjectRules) sbReq.AppendLine($"  - {r.Name}");
+                sbReq.AppendLine("Decision Rules:   Deterministic title/summary overlap + domain matching");
+                
+                tConflict.RequestText        = sbReq.ToString().TrimEnd();
                 tConflict.ParsedResponseSummary =
                     $"Classification={conflictAssessment.Classification} | " +
                     $"Related={conflictAssessment.RelatedTickets.Count} | " +
@@ -286,6 +314,11 @@ public sealed class ContextAgentService : IContextAgentService
 
                     var tBlock = MakeTrace(ContextAgentStage.ClarificationRequired, traceGroupId, stage2Id);
                     tBlock.WasSuccessful         = true;
+                    tBlock.RequestText           = 
+                        $"UserRequest: {request.UserRequest}\n" +
+                        $"Matched Conflict: {conflictAssessment.Classification}\n" +
+                        $"Reason: Technical conflict blocks silent ticket creation.\n" +
+                        $"Domain: {conflictAssessment.Domain}";
                     tBlock.ParsedResponseSummary = $"Blocked by conflict: {conflictAssessment.Classification}";
                     tBlock.RawResponseText       = string.Join("\n", blockQuestions);
                     _traceService.AddTrace(tBlock);
@@ -325,7 +358,12 @@ public sealed class ContextAgentService : IContextAgentService
 
                 // Stage 4a: ToolCall trace
                 var tCall = MakeTrace(ContextAgentStage.ToolCallSearch, traceGroupId, stage2Id);
-                tCall.RequestText   = $"GetRelevantSnippetsAsync(projectId={request.ProjectId}, query=\"{query}\", take={limits.MaxSnippets})";
+                tCall.RequestText   = 
+                    $"Action: GetRelevantSnippetsAsync\n" +
+                    $"Query: {query}\n" +
+                    $"OriginalQueries: {string.Join(", ", sufficiency.CodeSearchQueries)}\n" +
+                    $"Filtering: Production-first (exclude tests)\n" +
+                    $"MaxSnippets: {limits.MaxSnippets}";
                 tCall.WasSuccessful = true;
 
                 var swCall = Stopwatch.StartNew();
@@ -411,6 +449,12 @@ public sealed class ContextAgentService : IContextAgentService
 
                 tResult.ParsedResponseSummary =
                     $"Query=\"{query}\" | Raw={rawCount} | ExcludedTests={testCount} | AfterFilter={afterFilterCount} | Added={addedFromThisQuery}";
+                tResult.RequestText      = 
+                    $"OriginalQuery: {originalForThisQuery}\n" +
+                    $"ExpandedQueries: {string.Join(", ", expandedQueries)}\n" +
+                    $"ProductionFilter: true\n" +
+                    $"ExcludeTests: true\n" +
+                    $"MaxResults: {limits.MaxSnippets}";
                 tResult.RawResponseText  = retrievalSummary.ToTraceText();
                 tResult.ContextSummary   = $"Evidence so far: {evidence.Count} snippet(s) from {evidence.Select(e => e.FilePath).Distinct().Count()} file(s)";
                 _traceService.AddTrace(tResult);

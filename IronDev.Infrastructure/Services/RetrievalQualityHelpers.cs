@@ -235,24 +235,19 @@ public static class RetrievalQualityHelpers
     /// <summary>
     /// Returns true when a user request is likely a vague create/fix intent
     /// that should trigger clarification instead of code search expansion.
-    ///
-    /// Scope: ONLY triggers for vague fix/delete requests that have NO specific
-    /// technical domain (e.g. no auth scheme, service name, or feature area).
-    /// Specific "create a ticket to add X" requests are handled by Stage 3.5
-    /// conflict assessment — do NOT catch them here.
     /// </summary>
-    public static bool ShouldPreferClarification(string userRequest)
+    public static (bool ShouldClarify, string? MatchedPhrase) ShouldPreferClarification(string userRequest)
     {
-        if (string.IsNullOrWhiteSpace(userRequest)) return false;
+        if (string.IsNullOrWhiteSpace(userRequest)) return (false, null);
 
         var lower = userRequest.ToLowerInvariant();
 
         // Explicit ambiguous action patterns — only truly vague ones
         foreach (var phrase in AmbiguousActionPhrases)
             if (lower.Contains(phrase, StringComparison.OrdinalIgnoreCase))
-                return true;
+                return (true, phrase);
 
-        return false;
+        return (false, null);
     }
 
 

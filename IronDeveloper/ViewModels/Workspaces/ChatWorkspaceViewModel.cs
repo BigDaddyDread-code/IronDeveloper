@@ -25,6 +25,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private readonly IPromptContextBuilder  _promptContextBuilder;
     private readonly ILLMService            _llmService;
     private readonly IProjectMemoryService  _memoryService;
+    private readonly ITicketService         _ticketService;
     private readonly IChatFeedbackService   _feedbackService;
     private readonly ILlmTraceService       _llmTraceService;
     private readonly IContextAgentService?  _contextAgentService;
@@ -76,6 +77,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         IPromptContextBuilder promptContextBuilder,
         ILLMService           llmService,
         IProjectMemoryService memoryService,
+        ITicketService        ticketService,
         IChatFeedbackService  feedbackService,
         ILlmTraceService      llmTraceService,
         IContextAgentService? contextAgentService = null)
@@ -84,6 +86,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         _promptContextBuilder = promptContextBuilder;
         _llmService           = llmService;
         _memoryService        = memoryService;
+        _ticketService        = ticketService;
         _feedbackService      = feedbackService;
         _llmTraceService      = llmTraceService;
         _contextAgentService  = contextAgentService;
@@ -257,11 +260,59 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             // ── Context Agent path (feature-flagged) ──────────────────────────
             if (UseContextAgent && _contextAgentService != null)
             {
+                // Fetch artefacts for conflict assessment (Stage 3.5)
+                // We degrade gracefully if retrieval fails or some services are null.
+                IReadOnlyList<ProjectTicket>   recentTickets   = [];
+                IReadOnlyList<ProjectDecision> recentDecisions = [];
+                IReadOnlyList<ProjectRule>     projectRules    = [];
+
+                try
+                {
+                    var ticketsTask   = _ticketService.GetRecentTicketsAsync(projectId, take: 10);
+                    var decisionsTask = _memoryService.GetRecentDecisionsAsync(projectId, take: 10);
+                    var rulesTask     = _memoryService.GetProjectRulesAsync(projectId);
+
+                    await Task.WhenAll(ticketsTask, decisionsTask, rulesTask);
+
+                    recentTickets   = await ticketsTask;
+                    recentDecisions = await decisionsTask;
+                    projectRules    = (await rulesTask).Take(10).ToList();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"[Chat][Warning] Conflict artefact retrieval failed: {ex.Message}");
+                }
+
+                var previousMessage = Messages.Count > 1 ? Messages[Messages.Count - 2].MessageText : null;
+                var createTicketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
+
+                if (createTicketIntent != null)
+                {
+                    var intentTrace = new LlmTraceEntry
+                    {
+                        FeatureName = ContextAgentStage.IntentCreateTicket,
+                        Model = "Deterministic",
+                        RequestText = $"OriginalMessage: {text}\n" +
+                                      $"CommandText: {createTicketIntent.CommandText}\n" +
+                                      $"WorkText: {createTicketIntent.WorkText}\n" +
+                                      $"RequiresClarification: {createTicketIntent.RequiresClarification}",
+                        ParsedResponseSummary = $"Confidence: {createTicketIntent.Confidence}",
+                        DurationMs = 0,
+                        EstimatedTokens = 0,
+                        WasSuccessful = true
+                    };
+                    _llmTraceService.AddTrace(intentTrace);
+                }
+
                 var agentRequest = new IronDev.Core.Models.ContextAgentRequest
                 {
-                    ProjectId   = projectId,
-                    SessionId   = sessionId,
-                    UserRequest = text,
+                    ProjectId       = projectId,
+                    SessionId       = sessionId,
+                    UserRequest     = text,
+                    RecentTickets   = recentTickets,
+                    RecentDecisions = recentDecisions,
+                    ProjectRules    = projectRules,
+                    CreateTicketIntent = createTicketIntent,
                 };
 
                 var agentResult = await _contextAgentService.RunAsync(agentRequest);

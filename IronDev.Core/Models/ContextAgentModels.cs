@@ -3,7 +3,21 @@ using System.Collections.Generic;
 
 namespace IronDev.Core.Models;
 
+// ── Intent ────────────────────────────────────────────────────────────────────
+
+public sealed class CreateTicketIntent
+{
+    public string Intent { get; init; } = string.Empty;
+    public double Confidence { get; init; }
+    public string CommandText { get; init; } = string.Empty;
+    public string WorkText { get; init; } = string.Empty;
+    public long? SourceMessageId { get; init; }
+    public bool RequiresClarification { get; init; }
+    public IReadOnlyList<string> ClarificationQuestions { get; init; } = Array.Empty<string>();
+}
+
 // ── Input ─────────────────────────────────────────────────────────────────────
+
 
 /// <summary>
 /// Request handed to IContextAgentService. Contains everything needed
@@ -21,6 +35,9 @@ public sealed class ContextAgentRequest
 
     // Override limits per-call (null = use service defaults)
     public ContextAgentLimits? Limits { get; init; }
+
+    // ── Intent extraction ───────────────────────────────────────────────────
+    public CreateTicketIntent? CreateTicketIntent { get; init; }
 
     // ── Conflict assessment inputs (populated by ChatWorkspaceViewModel) ────
     /// <summary>Recent non-archived tickets for conflict detection.</summary>
@@ -211,6 +228,7 @@ public static class ContextAgentStage
     public const string ClarificationRequired = "ContextAgent.ClarificationRequired";
     public const string ConflictAssessment    = "ContextAgent.ConflictAssessment";
     public const string FinalAnswer           = "ContextAgent.FinalAnswer";
+    public const string IntentCreateTicket    = "ChatIntent.CreateTicket";
 }
 
 // ── Conflict assessment models ────────────────────────────────────────────────
