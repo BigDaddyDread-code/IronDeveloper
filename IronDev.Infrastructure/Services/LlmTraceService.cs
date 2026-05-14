@@ -13,9 +13,17 @@ public class LlmTraceService : ILlmTraceService
     private readonly List<LlmTraceEntry> _traces = new();
     private readonly object _lock = new();
 
+    // ── ILlmTraceService ──────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public event EventHandler<LlmTraceEntry>? TraceAdded;
+
+    /// <inheritdoc/>
+    public bool IsTracingEnabled { get; set; } = true;   // default ON
+
     public void AddTrace(LlmTraceEntry trace)
     {
-        if (trace == null) return;
+        if (trace == null || !IsTracingEnabled) return;
 
         // Redact sensitive info before storing
         RedactTrace(trace);
@@ -28,6 +36,9 @@ public class LlmTraceService : ILlmTraceService
                 _traces.RemoveAt(_traces.Count - 1);
             }
         }
+
+        // Raise outside the lock so subscribers don't deadlock
+        TraceAdded?.Invoke(this, trace);
     }
 
     public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int max = 100)
@@ -59,9 +70,9 @@ public class LlmTraceService : ILlmTraceService
         sb.AppendLine($"Estimated tokens: {trace.EstimatedTokens}");
         sb.AppendLine($"Success: {trace.WasSuccessful}");
         if (!string.IsNullOrEmpty(trace.ErrorMessage))
-        {
             sb.AppendLine($"Error: {trace.ErrorMessage}");
-        }
+        if (!string.IsNullOrEmpty(trace.Warnings))
+            sb.AppendLine($"Warnings: {trace.Warnings}");
         sb.AppendLine();
 
         sb.AppendLine("=== CONTEXT SUMMARY ===");
@@ -87,14 +98,6 @@ public class LlmTraceService : ILlmTraceService
         sb.AppendLine(trace.ParsedResponseSummary ?? "N/A");
         sb.AppendLine();
 
-        if (!string.IsNullOrEmpty(trace.Warnings) || !string.IsNullOrEmpty(trace.ErrorMessage))
-        {
-            sb.AppendLine("=== ERRORS/WARNINGS ===");
-            if (!string.IsNullOrEmpty(trace.ErrorMessage)) sb.AppendLine($"ERROR: {trace.ErrorMessage}");
-            if (!string.IsNullOrEmpty(trace.Warnings)) sb.AppendLine($"WARNINGS: {trace.Warnings}");
-            sb.AppendLine();
-        }
-
         return sb.ToString();
     }
 
@@ -118,28 +121,25 @@ public class LlmTraceService : ILlmTraceService
 
     private void RedactTrace(LlmTraceEntry trace)
     {
-        trace.RequestText = Redact(trace.RequestText);
+        trace.RequestText    = Redact(trace.RequestText);
         trace.RawRequestJson = Redact(trace.RawRequestJson);
-        trace.RawResponseText = Redact(trace.RawResponseText);
-        trace.ErrorMessage = Redact(trace.ErrorMessage);
+        trace.RawResponseText= Redact(trace.RawResponseText);
+        trace.ErrorMessage   = Redact(trace.ErrorMessage);
     }
 
-    private string Redact(string text)
+    private static string Redact(string text)
     {
         if (string.IsNullOrEmpty(text)) return text;
 
-        // Redact API keys, Bearer tokens, secrets, etc.
-        // This is a basic implementation, can be expanded.
-        
         var patterns = new[]
         {
-            @"(?i)(api[-_]?key|secret|password|token|auth|authorization|bearer)[\s=:\""']+[A-Za-z0-9\-_.~%]+",
-            @"(?i)Server=[^;]+;Database=[^;]+;User Id=[^;]+;Password=[^;]+;" // Connection strings
+            @"(?i)(api[-_]?key|secret|password|token|auth|authorization|bearer)[\s=:""']+[A-Za-z0-9\-_.~%]+",
+            @"(?i)Server=[^;]+;Database=[^;]+;User Id=[^;]+;Password=[^;]+;"
         };
 
         foreach (var pattern in patterns)
         {
-            text = Regex.Replace(text, pattern, m => 
+            text = Regex.Replace(text, pattern, m =>
             {
                 var key = m.Value.Split(new[] { ':', '=', ' ', '"', '\'' }, StringSplitOptions.RemoveEmptyEntries)[0];
                 return $"{key}: [REDACTED]";

@@ -184,6 +184,8 @@ internal sealed class StubDraftTicketService : IDraftTicketService
 /// </summary>
 internal sealed class NullLlmTraceService : ILlmTraceService
 {
+    public event EventHandler<LlmTraceEntry>? TraceAdded;
+    public bool IsTracingEnabled { get; set; } = true;
     public void AddTrace(LlmTraceEntry entry) { }
     public void Clear() { }
     public string ExportAll() => string.Empty;

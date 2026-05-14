@@ -206,27 +206,24 @@ public class ProjectRulesIntegrationTests : IntegrationTestBase
         var traceService = new IronDev.Infrastructure.Services.LlmTraceService();
         var entry = new IronDev.Core.Models.LlmTraceEntry
         {
-            FeatureName    = "Chat",
-            RequestText    = "Test prompt",
+            FeatureName     = "Chat",
+            RequestText     = "Test prompt",
             RawResponseText = "Test response",
-            WasSuccessful  = true,
-            DurationMs     = 123,
+            WasSuccessful   = true,
+            DurationMs      = 123,
         };
         traceService.AddTrace(entry);
 
         var vm = new IronDev.Agent.ViewModels.Workspaces.LlmConsoleViewModel(traceService);
 
         Assert.AreEqual(1, vm.Traces.Count, "Trace should be loaded into the console.");
-        Assert.IsNull(vm.SelectedTrace, "SelectedTrace should be null before selection.");
-
-        // Simulate row selection
-        vm.SelectedTrace = vm.Traces[0];
-
-        Assert.IsNotNull(vm.SelectedTrace, "SelectedTrace must be set after selection.");
-        Assert.AreEqual("Chat", vm.SelectedTrace.FeatureName);
+        // Refresh() auto-selects the newest trace, so SelectedTrace is non-null after construction
+        Assert.IsNotNull(vm.SelectedTrace, "SelectedTrace should be auto-selected after Refresh.");
+        Assert.AreEqual("Chat", vm.SelectedTrace!.FeatureName);
         Assert.AreEqual("Test prompt", vm.SelectedTrace.RequestText);
         Assert.AreEqual("Test response", vm.SelectedTrace.RawResponseText);
     }
+
 
     // ── Stub helpers ─────────────────────────────────────────────────────────
 

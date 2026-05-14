@@ -121,11 +121,12 @@ public class LlmProviderTests
 
     private class NullLlmTraceService : ILlmTraceService
     {
+        public event EventHandler<LlmTraceEntry>? TraceAdded;
+        public bool IsTracingEnabled { get; set; } = true;
         public void AddTrace(LlmTraceEntry entry) { }
         public void Clear() { }
         public string ExportAll() => string.Empty;
         public string ExportTrace(LlmTraceEntry entry) => string.Empty;
         public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int take = 100) => [];
-        public string Redact(string text) => text;
     }
 }

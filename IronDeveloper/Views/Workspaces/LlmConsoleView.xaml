@@ -10,277 +10,302 @@
     <Grid Margin="24,0,24,32">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2*"/>
+            <RowDefinition Height="2*" MinHeight="120"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="3*"/>
+            <RowDefinition Height="3*" MinHeight="160"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,20,0,20">
+        <!-- ── Header & toolbar ──────────────────────────────────────────────── -->
+        <StackPanel Grid.Row="0" Margin="0,20,0,12">
             <TextBlock Text="DEVELOPER TOOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
             <TextBlock Text="LLM Console" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,6"/>
             <TextBlock TextWrapping="Wrap" FontSize="13" Opacity="0.55"
                        Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
-                Monitor and debug all LLM interactions. Traces are stored in memory and redacted for safety.
+                Monitor all LLM calls in real time. Traces are stored in memory and redacted automatically.
             </TextBlock>
-            
-            <Grid Margin="0,10,0,0">
+
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
-                <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" 
-                         Tag="Filter traces..."
-                         MinWidth="300" HorizontalAlignment="Left"
-                         VerticalAlignment="Center"/>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource IronSecondaryButton}" Margin="0,0,8,0"/>
-                    <Button Content="Export All" Command="{Binding ExportAllCommand}" Style="{StaticResource IronSecondaryButton}" Margin="0,0,8,0"/>
-                    <Button Content="Clear" Command="{Binding ClearCommand}" Style="{StaticResource IronSecondaryButton}"/>
+                <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                         Tag="Filter traces..."
+                         MinWidth="280" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Refresh"    Command="{Binding RefreshCommand}"   Style="{StaticResource IronSecondaryButton}" Margin="0,0,6,0"/>
+                    <Button Content="Export All" Command="{Binding ExportAllCommand}" Style="{StaticResource IronSecondaryButton}" Margin="0,0,6,0"/>
+                    <Button Content="Clear"      Command="{Binding ClearCommand}"     Style="{StaticResource IronSecondaryButton}"/>
                 </StackPanel>
             </Grid>
         </StackPanel>
 
-        <!-- Trace List -->
+        <!-- ── Trace list (ListBox — no DataGrid fighting) ───────────────────── -->
         <Border Grid.Row="1" Style="{StaticResource IronCard}" Padding="0">
-            <DataGrid ItemsSource="{Binding Traces}" 
-                      SelectedItem="{Binding SelectedTrace}"
-                      AutoGenerateColumns="False" 
-                      IsReadOnly="True"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      HeadersVisibility="Column"
-                      GridLinesVisibility="None"
-                      SelectionMode="Single">
-                <DataGrid.Resources>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="#10FFFFFF"/>
-                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                        <Setter Property="Padding" Value="12,8"/>
-                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource DarkBorderBrush}"/>
-                        <Setter Property="FontSize" Value="11"/>
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                    </Style>
-                    <Style TargetType="DataGridRow">
+            <ListBox ItemsSource="{Binding Traces}"
+                     SelectedItem="{Binding SelectedTrace, Mode=TwoWay}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     VirtualizingPanel.IsVirtualizing="True">
+                <ListBox.Resources>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0"/>
                         <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#20FFFFFF"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="12,6"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                         <Setter Property="Template">
                             <Setter.Value>
-                                <ControlTemplate TargetType="DataGridCell">
-                                    <Border Padding="{TemplateBinding Padding}"
-                                            Background="{TemplateBinding Background}"
-                                            Focusable="False">
-                                        <ContentPresenter VerticalAlignment="Center"/>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                            BorderThickness="0,0,0,1"
+                                            BorderBrush="#12FFFFFF"
+                                            Padding="12,8">
+                                        <ContentPresenter/>
                                     </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#10FFFFFF"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
                     </Style>
-                </DataGrid.Resources>
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="TIME" Binding="{Binding CreatedAt, StringFormat=\{0:HH:mm:ss\}}" Width="80"/>
-                    <DataGridTemplateColumn Header="STATUS" Width="80">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding WasSuccessful, Converter={StaticResource BoolToStringConverter}, ConverterParameter='OK|FAIL'}"
-                                           FontWeight="Bold"
-                                           Foreground="{Binding WasSuccessful, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#66BB66|#EE6666'}"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="FEATURE" Binding="{Binding FeatureName}" Width="150"/>
-                    <DataGridTextColumn Header="DURATION" Binding="{Binding DurationMs, StringFormat=\{0\}ms}" Width="100"/>
-                    <DataGridTextColumn Header="SUMMARY" Binding="{Binding ParsedResponseSummary}" Width="*"/>
-                </DataGrid.Columns>
-            </DataGrid>
+                </ListBox.Resources>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- Time -->
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding CreatedAt, StringFormat={}{0:HH:mm:ss}}"
+                                       FontSize="12" FontFamily="Consolas"
+                                       Foreground="{StaticResource TextBrush}" Opacity="0.7"/>
+                            <!-- Status -->
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding WasSuccessful, Converter={StaticResource BoolToStringConverter}, ConverterParameter='OK|FAIL'}"
+                                       FontSize="12" FontWeight="Bold"
+                                       Foreground="{Binding WasSuccessful, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#66BB66|#EE6666'}"/>
+                            <!-- Feature -->
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding FeatureName}"
+                                       FontSize="12" Foreground="{StaticResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <!-- Duration -->
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding DurationMs, StringFormat={}{0}ms}"
+                                       FontSize="12" Foreground="{StaticResource TextBrush}" Opacity="0.6"/>
+                            <!-- Summary -->
+                            <TextBlock Grid.Column="4"
+                                       Text="{Binding ParsedResponseSummary}"
+                                       FontSize="12" Foreground="{StaticResource TextBrush}" Opacity="0.55"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Border>
 
-        <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent"/>
+        <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" Background="Transparent"/>
 
-        <!-- Details -->
+        <!-- ── Detail panel ──────────────────────────────────────────────────── -->
         <Border Grid.Row="3" Style="{StaticResource IronCard}" Padding="16" Margin="0,10,0,0">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+                <!-- "No trace selected" placeholder -->
+                <TextBlock Text="Select a trace above to inspect it."
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Opacity="0.3" FontSize="13"
+                           Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}"/>
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12" Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}}">
-                    <TextBlock Text="TRACE DETAILS" Style="{StaticResource IronEyebrow}" VerticalAlignment="Center"/>
-                    <Border Width="1" Background="#20FFFFFF" Margin="12,2" Height="14"/>
-                    <Button Content="Copy Full Trace" Command="{Binding CopyFullTraceCommand}" Style="{StaticResource IronSecondaryButton}" Padding="8,2" Margin="0,0,8,0"/>
-                </StackPanel>
+                <!-- Detail content (visible only when trace selected) -->
+                <Grid Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0" 
-                            Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}}">
-                    <TabControl.Resources>
-                        <Style TargetType="TabItem">
-                            <Setter Property="HeaderTemplate">
-                                <Setter.Value>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="SemiBold" Margin="4,2"/>
-                                    </DataTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="TabItem">
-                                        <Border x:Name="Border" Padding="12,6" Margin="0,0,4,0" CornerRadius="4,4,0,0" BorderThickness="0,0,0,2">
-                                            <ContentPresenter ContentSource="Header"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Border" Property="Background" Value="#15FFFFFF"/>
-                                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}"/>
-                                            </Trigger>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Border" Property="Background" Value="#08FFFFFF"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </TabControl.Resources>
+                    <!-- Detail header with action buttons -->
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="TRACE DETAILS" Style="{StaticResource IronEyebrow}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="Copy Prompt"    Command="{Binding CopyPromptCommand}"    Style="{StaticResource IronSecondaryButton}" Padding="8,2" Margin="0,0,6,0"/>
+                            <Button Content="Copy Response"  Command="{Binding CopyResponseCommand}"  Style="{StaticResource IronSecondaryButton}" Padding="8,2" Margin="0,0,6,0"/>
+                            <Button Content="Copy Full Trace" Command="{Binding CopyFullTraceCommand}" Style="{StaticResource IronSecondaryButton}" Padding="8,2"/>
+                        </StackPanel>
+                    </Grid>
 
-                    <!-- Summary Tab -->
-                    <TabItem Header="SUMMARY">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                    <!-- Tabbed detail -->
+                    <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
+                        <TabControl.Resources>
+                            <Style TargetType="TabItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="TabItem">
+                                            <Border x:Name="Border" Padding="12,6" Margin="0,0,4,0"
+                                                    CornerRadius="4,4,0,0" BorderThickness="0,0,0,2">
+                                                <ContentPresenter ContentSource="Header"
+                                                                  TextBlock.FontSize="12"
+                                                                  TextBlock.FontWeight="SemiBold"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Border" Property="Background" Value="#15FFFFFF"/>
+                                                    <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Border" Property="Background" Value="#08FFFFFF"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </TabControl.Resources>
 
-                                    <TextBlock Text="Feature:" Style="{StaticResource IronMetaLabel}" Grid.Row="0" Margin="0,0,12,6"/>
-                                    <TextBlock Text="{Binding SelectedTrace.FeatureName}" Grid.Row="0" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+                        <!-- SUMMARY tab -->
+                        <TabItem Header="SUMMARY">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,10,0,0">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
 
-                                    <TextBlock Text="Model:" Style="{StaticResource IronMetaLabel}" Grid.Row="1" Margin="0,0,12,6"/>
-                                    <TextBlock Text="{Binding SelectedTrace.Model, FallbackValue='(unknown)'}" Grid.Row="1" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock Text="Feature:" Style="{StaticResource IronMetaLabel}"     Grid.Row="0" Margin="0,0,8,6"/>
+                                        <TextBlock Text="{Binding SelectedTrace.FeatureName}"                 Grid.Row="0" Grid.Column="1" Foreground="{StaticResource TextBrush}" Margin="0,0,0,6"/>
 
-                                    <TextBlock Text="Duration:" Style="{StaticResource IronMetaLabel}" Grid.Row="2" Margin="0,0,12,6"/>
-                                    <TextBlock Text="{Binding SelectedTrace.DurationMs, StringFormat=\{0\}ms}" Grid.Row="2" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock Text="Model:"    Style="{StaticResource IronMetaLabel}"    Grid.Row="1" Margin="0,0,8,6"/>
+                                        <TextBlock Text="{Binding SelectedTrace.Model, FallbackValue='(unknown)'}" Grid.Row="1" Grid.Column="1" Foreground="{StaticResource TextBrush}" Margin="0,0,0,6"/>
 
-                                    <TextBlock Text="Project ID:" Style="{StaticResource IronMetaLabel}" Grid.Row="3" Margin="0,0,12,6"/>
-                                    <TextBlock Text="{Binding SelectedTrace.ProjectId}" Grid.Row="3" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock Text="Status:"   Style="{StaticResource IronMetaLabel}"    Grid.Row="2" Margin="0,0,8,6"/>
+                                        <TextBlock Text="{Binding SelectedTrace.WasSuccessful, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Success|Failed'}"
+                                                   Foreground="{Binding SelectedTrace.WasSuccessful, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#66BB66|#EE6666'}"
+                                                   FontWeight="Bold"
+                                                   Grid.Row="2" Grid.Column="1" Margin="0,0,0,6"/>
 
-                                    <TextBlock Text="Created At:" Style="{StaticResource IronMetaLabel}" Grid.Row="4" Margin="0,0,12,6"/>
-                                    <TextBlock Text="{Binding SelectedTrace.CreatedAt, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Grid.Row="4" Grid.Column="1" Foreground="{StaticResource TextBrush}"/>
-                                </Grid>
+                                        <TextBlock Text="Duration:" Style="{StaticResource IronMetaLabel}"    Grid.Row="3" Margin="0,0,8,6"/>
+                                        <TextBlock Text="{Binding SelectedTrace.DurationMs, StringFormat={}{0}ms}" Grid.Row="3" Grid.Column="1" Foreground="{StaticResource TextBrush}" Margin="0,0,0,6"/>
 
-                                <TextBlock Text="ERROR MESSAGE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8" 
-                                           Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
-                                <Border Background="#33EE6666" CornerRadius="4" Padding="12" Margin="0,0,0,16"
-                                        Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding SelectedTrace.ErrorMessage}" Foreground="#FFEE8888" TextWrapping="Wrap" FontFamily="Consolas"/>
-                                </Border>
+                                        <TextBlock Text="Project:"  Style="{StaticResource IronMetaLabel}"    Grid.Row="4" Margin="0,0,8,6"/>
+                                        <TextBlock Text="{Binding SelectedTrace.ProjectId, FallbackValue='—'}" Grid.Row="4" Grid.Column="1" Foreground="{StaticResource TextBrush}" Margin="0,0,0,6"/>
 
-                                <TextBlock Text="USER MESSAGE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"
-                                           Visibility="{Binding SelectedTrace.CurrentUserMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
-                                <TextBlock Text="{Binding SelectedTrace.CurrentUserMessage}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Opacity="0.8" Margin="0,0,0,16"
-                                           Visibility="{Binding SelectedTrace.CurrentUserMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
+                                        <TextBlock Text="Time:"     Style="{StaticResource IronMetaLabel}"    Grid.Row="5" Margin="0,0,8,6"/>
+                                        <TextBlock Text="{Binding SelectedTrace.CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Grid.Row="5" Grid.Column="1" Foreground="{StaticResource TextBrush}" Margin="0,0,0,6"/>
+                                    </Grid>
 
-                    <!-- Prompt Tab -->
-                    <TabItem Header="PROMPT">
-                        <Grid Margin="0,12,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Button Content="Copy Prompt" Command="{Binding CopyPromptCommand}" HorizontalAlignment="Right" Style="{StaticResource IronSecondaryButton}" Margin="0,0,0,8"/>
-                            <TextBox Grid.Row="1" Text="{Binding SelectedTrace.RequestText, Mode=OneWay}" 
+                                    <!-- User message (if available) -->
+                                    <TextBlock Text="USER MESSAGE" Style="{StaticResource IronEyebrow}" Margin="0,8,0,6"
+                                               Visibility="{Binding SelectedTrace.CurrentUserMessage, Converter={StaticResource ValueToVis}}"/>
+                                    <TextBlock Text="{Binding SelectedTrace.CurrentUserMessage}"
+                                               TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Opacity="0.8" Margin="0,0,0,12"
+                                               Visibility="{Binding SelectedTrace.CurrentUserMessage, Converter={StaticResource ValueToVis}}"/>
+
+                                    <!-- Parsed summary (if available) -->
+                                    <TextBlock Text="PARSED RESULT" Style="{StaticResource IronEyebrow}" Margin="0,8,0,6"
+                                               Visibility="{Binding SelectedTrace.ParsedResponseSummary, Converter={StaticResource ValueToVis}}"/>
+                                    <TextBlock Text="{Binding SelectedTrace.ParsedResponseSummary}"
+                                               TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Opacity="0.8"
+                                               Visibility="{Binding SelectedTrace.ParsedResponseSummary, Converter={StaticResource ValueToVis}}"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- PROMPT tab -->
+                        <TabItem Header="PROMPT">
+                            <TextBox Margin="0,10,0,0"
+                                     Text="{Binding SelectedTrace.RequestText, Mode=OneWay}"
                                      IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
-                                     FontFamily="Consolas" FontSize="12" Padding="12" Background="#0AFFFFFF"/>
-                        </Grid>
-                    </TabItem>
+                                     FontFamily="Consolas" FontSize="12" Padding="12"
+                                     Background="#0AFFFFFF"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </TabItem>
 
-                    <!-- Raw Response Tab -->
-                    <TabItem Header="RAW RESPONSE">
-                        <Grid Margin="0,12,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Button Content="Copy Response" Command="{Binding CopyResponseCommand}" HorizontalAlignment="Right" Style="{StaticResource IronSecondaryButton}" Margin="0,0,0,8"/>
-                            <TextBox Grid.Row="1" Text="{Binding SelectedTrace.RawResponseText, Mode=OneWay}" 
+                        <!-- RAW RESPONSE tab -->
+                        <TabItem Header="RAW RESPONSE">
+                            <TextBox Margin="0,10,0,0"
+                                     Text="{Binding SelectedTrace.RawResponseText, Mode=OneWay}"
                                      IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
-                                     FontFamily="Consolas" FontSize="12" Padding="12" Background="#0AFFFFFF"/>
-                        </Grid>
-                    </TabItem>
+                                     FontFamily="Consolas" FontSize="12" Padding="12"
+                                     Background="#0AFFFFFF"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </TabItem>
 
-                    <!-- Warnings / Errors Tab -->
-                    <TabItem Header="WARNINGS">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
-                            <StackPanel>
-                                <!-- Warnings -->
-                                <TextBlock Text="WARNINGS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"
-                                           Visibility="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}}"/>
-                                <Border Background="#22FFCC44" CornerRadius="4" Padding="12" Margin="0,0,0,16"
-                                        Visibility="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}}">
-                                    <TextBlock Text="{Binding SelectedTrace.Warnings}" Foreground="#FFFFCC66" 
-                                               TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
-                                </Border>
+                        <!-- WARNINGS tab -->
+                        <TabItem Header="WARNINGS">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,10,0,0">
+                                <StackPanel>
+                                    <!-- Warnings (amber) -->
+                                    <Border Background="#22FFCC44" CornerRadius="4" Padding="12" Margin="0,0,0,12"
+                                            Visibility="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}}">
+                                        <StackPanel>
+                                            <TextBlock Text="WARNING" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
+                                            <TextBlock Text="{Binding SelectedTrace.Warnings}"
+                                                       Foreground="#FFFFCC66" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <!-- Errors (red) -->
+                                    <Border Background="#33EE6666" CornerRadius="4" Padding="12"
+                                            Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}}">
+                                        <StackPanel>
+                                            <TextBlock Text="ERROR" Style="{StaticResource IronEyebrow}" Margin="0,0,0,6"/>
+                                            <TextBlock Text="{Binding SelectedTrace.ErrorMessage}"
+                                                       Foreground="#FFEE8888" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <!-- Empty state -->
+                                    <TextBlock Text="No warnings or errors for this trace."
+                                               HorizontalAlignment="Center" Opacity="0.3" FontSize="12" Margin="0,24,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding SelectedTrace.Warnings,
+                                                                Converter={StaticResource ValueToVis},
+                                                                ConverterParameter=Inverse}" Value="Visible"/>
+                                                            <Condition Binding="{Binding SelectedTrace.ErrorMessage,
+                                                                Converter={StaticResource ValueToVis},
+                                                                ConverterParameter=Inverse}" Value="Visible"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
 
-                                <!-- Errors -->
-                                <TextBlock Text="ERRORS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,8"
-                                           Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}}"/>
-                                <Border Background="#33EE6666" CornerRadius="4" Padding="12" Margin="0,0,0,16"
-                                        Visibility="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}}">
-                                    <TextBlock Text="{Binding SelectedTrace.ErrorMessage}" Foreground="#FFEE8888" 
-                                               TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
-                                </Border>
-
-                                <TextBlock Text="No warnings or errors for this trace." HorizontalAlignment="Center"
-                                           Opacity="0.35" FontSize="12" Margin="0,24,0,0">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding SelectedTrace.Warnings, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}" Value="Visible"/>
-                                                        <Condition Binding="{Binding SelectedTrace.ErrorMessage, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}" Value="Visible"/>
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </MultiDataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-                </TabControl>
-
-                
-                <TextBlock Text="No trace selected." HorizontalAlignment="Center" VerticalAlignment="Center" 
-                           Opacity="0.3" Visibility="{Binding SelectedTrace, Converter={StaticResource ValueToVis}, ConverterParameter=Inverse}"/>
+                    </TabControl>
+                </Grid>
             </Grid>
         </Border>
     </Grid>
