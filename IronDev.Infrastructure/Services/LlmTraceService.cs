@@ -76,7 +76,7 @@ public class LlmTraceService : ILlmTraceService
         sb.AppendLine();
 
         sb.AppendLine("=== CONTEXT SUMMARY ===");
-        sb.AppendLine(trace.ContextSummary ?? "N/A");
+        sb.AppendLine(string.IsNullOrEmpty(trace.ContextSummary) ? "(not captured)" : trace.ContextSummary);
         sb.AppendLine();
 
         sb.AppendLine("=== PROMPT SENT ===");

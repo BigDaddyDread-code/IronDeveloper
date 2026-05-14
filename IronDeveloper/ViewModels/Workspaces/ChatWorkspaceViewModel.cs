@@ -256,6 +256,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 ChatSessionId = sessionId.ToString(),
                 RequestText = packet.FormattedPrompt,
                 Warnings = packet.RulesLoadWarning ?? string.Empty,
+                ContextSummary = BuildContextSummary(packet),
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -592,4 +593,32 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void NavigateToDecision() => OnNavigateToDecision?.Invoke();
+
+    // ── Context summary builder ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a compact, human-readable context summary from a <see cref="IronDev.AI.ChatContextPacket"/>
+    /// for display in the LLM Console trace detail panel and exported trace files.
+    /// </summary>
+    public static string BuildContextSummary(IronDev.AI.ChatContextPacket packet)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Intent:            {packet.Intent}");
+        sb.AppendLine($"Project indexed:   {(packet.IsProjectNotIndexed ? "No" : "Yes")}");
+        sb.AppendLine($"Retrieved files:   {packet.MatchedFilePaths.Count}");
+        sb.AppendLine($"Distinct files:    {packet.MatchedFilePaths.Distinct().Count()}");
+        sb.AppendLine($"Memory included:   {packet.IncludedMemoryCount}");
+        sb.AppendLine($"Memory filtered:   {packet.FilteredMemoryCount}");
+        sb.AppendLine($"Standards:         {packet.IncludedStandardsCount} included, {packet.FilteredStandardsCount} filtered");
+        sb.AppendLine($"Warnings:          {(string.IsNullOrWhiteSpace(packet.RulesLoadWarning) ? "none" : packet.RulesLoadWarning)}");
+
+        if (packet.MatchedFilePaths.Count > 0)
+        {
+            sb.AppendLine("Top files:");
+            foreach (var f in packet.MatchedFilePaths.Take(5))
+                sb.AppendLine($"  - {System.IO.Path.GetFileName(f)}");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 }

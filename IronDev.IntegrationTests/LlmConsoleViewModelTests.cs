@@ -312,4 +312,101 @@ public class LlmConsoleViewModelTests
 
         vm.Dispose();
     }
+
+    // ── A: BuildContextSummary produces a populated summary ──────────────
+
+    [TestMethod]
+    [Description("A: BuildContextSummary returns a non-empty string containing all expected field labels.")]
+    public void ChatWorkspaceViewModel_BuildContextSummary_PopulatesAllFields()
+    {
+        var packet = new IronDev.AI.ChatContextPacket
+        {
+            Intent               = IronDev.AI.ChatIntent.CodeQuery,
+            IsProjectNotIndexed  = false,
+            IncludedMemoryCount  = 2,
+            FilteredMemoryCount  = 1,
+            IncludedStandardsCount = 1,
+            FilteredStandardsCount = 0,
+            RulesLoadWarning     = null
+        };
+        packet.MatchedFilePaths.AddRange(new[] { "src/Foo.cs", "src/Bar.cs", "src/Baz.cs" });
+
+        var summary = IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel
+            .BuildContextSummary(packet);
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(summary),
+            "BuildContextSummary must return a non-empty string.");
+
+        StringAssert.Contains(summary, "Intent");
+        StringAssert.Contains(summary, "CodeQuery");
+        StringAssert.Contains(summary, "Project indexed");
+        StringAssert.Contains(summary, "Yes");
+        StringAssert.Contains(summary, "Retrieved files");
+        StringAssert.Contains(summary, "3");
+        StringAssert.Contains(summary, "Memory included");
+        StringAssert.Contains(summary, "2");
+        StringAssert.Contains(summary, "Warnings");
+        StringAssert.Contains(summary, "none");
+        // Top files section should list basenames
+        StringAssert.Contains(summary, "Foo.cs");
+        StringAssert.Contains(summary, "Bar.cs");
+    }
+
+    // ── B: ExportTrace includes ContextSummary ────────────────────────────
+
+    [TestMethod]
+    [Description("B: ExportTrace output includes the ContextSummary when it is populated.")]
+    public void LlmTraceService_ExportTrace_IncludesContextSummary()
+    {
+        var svc = new LlmTraceService();
+        var entry = new LlmTraceEntry
+        {
+            FeatureName    = "Chat",
+            WasSuccessful  = true,
+            RequestText    = "User prompt",
+            RawResponseText = "AI response",
+            ContextSummary = "Intent: CodeQuery\nProject indexed: Yes\nRetrieved files: 3"
+        };
+
+        var exported = svc.ExportTrace(entry);
+
+        StringAssert.Contains(exported, "CONTEXT SUMMARY",
+            "Export must include the CONTEXT SUMMARY section header.");
+        StringAssert.Contains(exported, "Intent: CodeQuery",
+            "Export must include the populated ContextSummary text.");
+        StringAssert.Contains(exported, "Retrieved files: 3",
+            "Export must include the file count from ContextSummary.");
+    }
+
+    // ── C: Empty ContextSummary is safe ──────────────────────────────────
+
+    [TestMethod]
+    [Description("C: A trace with an empty ContextSummary does not crash the service or VM.")]
+    public void LlmConsoleViewModel_EmptyContextSummary_IsSafe()
+    {
+        var svc = new LlmTraceService();
+        // Trace with no ContextSummary set (defaults to empty string)
+        svc.AddTrace(new LlmTraceEntry
+        {
+            FeatureName  = "Chat",
+            WasSuccessful = true,
+            // ContextSummary intentionally not set
+        });
+
+        var vm = new LlmConsoleViewModel(svc);
+
+        Assert.AreEqual(1, vm.Traces.Count, "Trace must be loaded.");
+        Assert.IsNotNull(vm.SelectedTrace, "SelectedTrace must be set.");
+        Assert.AreEqual(string.Empty, vm.SelectedTrace!.ContextSummary,
+            "ContextSummary must be empty string, not null.");
+
+        // ExportTrace must not throw and must still include the section header
+        var exported = svc.ExportTrace(vm.SelectedTrace);
+        StringAssert.Contains(exported, "CONTEXT SUMMARY",
+            "Export must always include the CONTEXT SUMMARY section header even when empty.");
+        StringAssert.Contains(exported, "(not captured)",
+            "Export must show '(not captured)' when ContextSummary is not populated.");
+
+        vm.Dispose();
+    }
 }

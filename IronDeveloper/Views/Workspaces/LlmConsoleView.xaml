@@ -274,8 +274,28 @@
                                     <TextBlock Text="PARSED RESULT" Style="{StaticResource IronEyebrow}" Margin="0,8,0,6"
                                                Visibility="{Binding SelectedTrace.ParsedResponseSummary, Converter={StaticResource ValueToVis}}"/>
                                     <TextBlock Text="{Binding SelectedTrace.ParsedResponseSummary}"
-                                               TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Opacity="0.8"
+                                               TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Opacity="0.8" Margin="0,0,0,12"
                                                Visibility="{Binding SelectedTrace.ParsedResponseSummary, Converter={StaticResource ValueToVis}}"/>
+
+                                    <!-- Context summary -->
+                                    <TextBlock Text="CONTEXT SUMMARY" Style="{StaticResource IronEyebrow}" Margin="0,8,0,6"/>
+                                    <Border Background="#0AFFFFFF" CornerRadius="4" Padding="10,8" Margin="0,0,0,4">
+                                        <TextBlock FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource TextBrush}" Opacity="0.85"
+                                                   LineHeight="18">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="{Binding SelectedTrace.ContextSummary}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedTrace.ContextSummary}" Value="">
+                                                            <Setter Property="Text" Value="No context summary captured."/>
+                                                            <Setter Property="Opacity" Value="0.35"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>
