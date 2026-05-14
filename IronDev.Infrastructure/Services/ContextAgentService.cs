@@ -102,15 +102,30 @@ public sealed class ContextAgentService : IContextAgentService
         var warnings     = new List<string>();
         var evidence     = new List<CodeEvidence>();
 
-        // Use intent work text if available to avoid polluting searches and rules
-        var effectiveWorkText = request.CreateTicketIntent != null && !string.IsNullOrWhiteSpace(request.CreateTicketIntent.WorkText)
-            ? request.CreateTicketIntent.WorkText
-            : request.UserRequest;
+        // ── Stage 0.5: Executive Route Decision ──────────────────────────────
+        var route = ContextAgentRouter.DetermineRoute(request.UserRequest, request.CreateTicketIntent);
+        var effectiveWorkText = route.EffectiveWorkText;
+
+        var tRoute = MakeTrace(ContextAgentStage.RouteDecision, traceGroupId, null);
+        tRoute.WasSuccessful         = true;
+        tRoute.RequestText           = $"UserRequest: {request.UserRequest}\nEffectiveWorkText: {effectiveWorkText}";
+        tRoute.ParsedResponseSummary = $"Route: {route.RequestKind} | Confidence: {route.Confidence}";
+        tRoute.RawResponseText       = 
+            $"Reason: {route.Reason}\n" +
+            $"AllowCodeSearch: {route.AllowCodeSearch}\n" +
+            $"AllowDeepLookup: {route.AllowDeepLookup}\n" +
+            $"AllowConflictAssessment: {route.AllowConflictAssessment}\n" +
+            $"AllowConflictBlocking: {route.AllowConflictBlocking}\n" +
+            $"AllowTicketCreation: {route.AllowTicketCreation}";
+        tRoute.ContextSummary        = $"Executive Route: {route.RequestKind}";
+        _traceService.AddTrace(tRoute);
 
         // ── Stage 0: Pre-check — clarification-first for vague requests ───────
         // Done before any LLM call to save a round-trip for obviously ambiguous
         // requests like "Create a ticket to fix delete."
-        var (shouldClarify, matched) = RetrievalQualityHelpers.ShouldPreferClarification(effectiveWorkText);
+        var (shouldClarify, matched) = route.AllowConflictBlocking 
+            ? RetrievalQualityHelpers.ShouldPreferClarification(effectiveWorkText)
+            : (false, string.Empty);
         if (shouldClarify)
         {
             var questions = RetrievalQualityHelpers.GetDeleteClarificationQuestions();
@@ -259,14 +274,12 @@ public sealed class ContextAgentService : IContextAgentService
              request.RecentDecisions.Count > 0 ||
              request.ProjectRules.Count > 0))
         {
-            bool isChangeIntent = ChatIntentParser.IsChangeIntent(request.UserRequest, request.CreateTicketIntent);
-            
-            if (!isChangeIntent)
+            if (!route.AllowConflictAssessment)
             {
                 var tSkip = MakeTrace(ContextAgentStage.ConflictAssessment, traceGroupId, stage2Id);
                 tSkip.WasSuccessful = true;
-                tSkip.RequestText = $"UserRequest: {request.UserRequest}\nSkipped: Request intent is CodeQuery/Inspection.";
-                tSkip.ParsedResponseSummary = "ConflictAssessment skipped: request intent is CodeQuery/Inspection.";
+                tSkip.RequestText = $"UserRequest: {request.UserRequest}\nSkipped: RouteDecision disabled conflict assessment.";
+                tSkip.ParsedResponseSummary = $"ConflictAssessment skipped: Route is {route.RequestKind}.";
                 tSkip.ContextSummary = "Conflict assessment is gated to ticket creation and change intents only.";
                 _traceService.AddTrace(tSkip);
             }
@@ -323,7 +336,7 @@ public sealed class ContextAgentService : IContextAgentService
                 _traceService.AddTrace(tConflict);
 
                 // Block silent creation when the conflict is strong
-                if (conflictAssessment.BlocksTicketCreation)
+                if (conflictAssessment.BlocksTicketCreation && route.AllowConflictBlocking)
                 {
                     var blockQuestions = conflictAssessment.Questions.Count > 0
                         ? conflictAssessment.Questions
@@ -356,7 +369,7 @@ public sealed class ContextAgentService : IContextAgentService
         }
 
         // ── Stage 4: Context expansion (tool calls) ───────────────────────────
-        if (!sufficiency.IsSufficient && sufficiency.CodeSearchQueries.Count > 0)
+        if (!sufficiency.IsSufficient && sufficiency.CodeSearchQueries.Count > 0 && route.AllowCodeSearch)
         {
             // Expand raw LLM queries into concrete symbol-level queries
             var expandedQueries = RetrievalQualityHelpers
@@ -437,7 +450,7 @@ public sealed class ContextAgentService : IContextAgentService
                     var selectionReason = DetermineSelectionReason(r);
                     bool isShallow = RetrievalQualityHelpers.IsShallowSnippet(snippetText, r.SymbolName ?? string.Empty, query);
 
-                    if (isShallow && deepLookupsCount < MaxDeepLookups && totalDeepChars < MaxTotalDeepChars)
+                    if (isShallow && route.AllowDeepLookup && deepLookupsCount < MaxDeepLookups && totalDeepChars < MaxTotalDeepChars)
                     {
                         var deepResult = await _deepLookupService.GetDeepCodeEvidenceAsync(
                             request.ProjectId, r.FilePath ?? string.Empty, r.SymbolName ?? string.Empty, query, ct);

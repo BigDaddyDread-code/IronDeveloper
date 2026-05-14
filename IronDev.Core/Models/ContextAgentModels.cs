@@ -16,6 +16,37 @@ public sealed class CreateTicketIntent
     public IReadOnlyList<string> ClarificationQuestions { get; init; } = Array.Empty<string>();
 }
 
+// ── Routing ───────────────────────────────────────────────────────────────────
+
+public enum ContextRequestKind
+{
+    GeneralChat,
+    InspectCode,
+    ExplainCode,
+    VerifyImplementation,
+    CreateTicket,
+    CreateTicketsFromDiscussion,
+    ChangeImplementation,
+    ReplaceArchitecture,
+    BuildTicket
+}
+
+public sealed class ContextAgentRouteDecision
+{
+    public string OriginalUserRequest { get; init; } = string.Empty;
+    public string EffectiveWorkText { get; init; } = string.Empty;
+    public ContextRequestKind RequestKind { get; init; }
+    public double Confidence { get; init; }
+    public string Reason { get; init; } = string.Empty;
+    
+    public bool AllowCodeSearch { get; init; }
+    public bool AllowDeepLookup { get; init; }
+    public bool AllowConflictAssessment { get; init; }
+    public bool AllowConflictBlocking { get; init; }
+    public bool AllowTicketCreation { get; init; }
+    public bool RequiresClarification { get; init; }
+}
+
 // ── Deep Code Evidence ────────────────────────────────────────────────────────
 
 public enum DeepEvidenceType
@@ -254,6 +285,7 @@ public static class ContextAgentStage
     public const string FinalAnswer           = "ContextAgent.FinalAnswer";
     public const string IntentCreateTicket    = "ChatIntent.CreateTicket";
     public const string DeepCodeEvidence      = "ContextAgent.DeepCodeEvidence";
+    public const string RouteDecision         = "ContextAgent.RouteDecision";
 }
 
 // ── Conflict assessment models ────────────────────────────────────────────────

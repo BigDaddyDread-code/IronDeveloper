@@ -222,7 +222,7 @@ public class AuthController {
         var traceService = new LlmTraceService();
         var agent = new ContextAgentService(new StubPromptContextBuilder(), codeIndex, new StubLlmServiceForAgent { SufficiencyJson = "{ \"isSufficient\": false, \"confidence\": 5, \"reason\": \"Need more code.\", \"requestedContext\": { \"codeSearchQueries\": [\"AuthController\"] } }" }, traceService, null);
 
-        await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "auth" });
+        await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "inspect auth" });
 
         var deepTrace = traceService.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.DeepCodeEvidence);
         Assert.IsNotNull(deepTrace);
@@ -257,7 +257,7 @@ public class AuthController {
         var agent = new ContextAgentService(new StubPromptContextBuilder(), codeIndex, new StubLlmServiceForAgent { SufficiencyJson = "{ \"isSufficient\": false, \"confidence\": 5, \"reason\": \"Need more code.\", \"requestedContext\": { \"codeSearchQueries\": [\"Method\"] } }" }, traceService, null);
 
         var limits = new ContextAgentLimits { MaxCodeSearchQueries = 1, MaxSnippets = 5, MaxToolCallsPerRound = 1 };
-        await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "Method", Limits = limits });
+        await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "inspect Method", Limits = limits });
 
         var deepTraces = traceService.GetRecentTraces().Where(t => t.FeatureName == ContextAgentStage.DeepCodeEvidence).ToList();
         
@@ -281,7 +281,7 @@ public class AuthController {
         var traceService = new LlmTraceService();
         var agent = new ContextAgentService(new StubPromptContextBuilder(), codeIndex, new StubLlmServiceForAgent { SufficiencyJson = "{ \"isSufficient\": false, \"confidence\": 5, \"reason\": \"Need more code.\", \"requestedContext\": { \"codeSearchQueries\": [\"MissingMethod\"] } }" }, traceService, null);
 
-        await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "MissingMethod" });
+        await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "inspect MissingMethod" });
 
         var finalTrace = traceService.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.FinalAnswer);
         Assert.IsNotNull(finalTrace);

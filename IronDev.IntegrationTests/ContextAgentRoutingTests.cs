@@ -12,7 +12,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests;
 
 [TestClass]
-public class ContextAgentConflictGatingTests
+public class ContextAgentRoutingTests
 {
     private class StubCodeIndexService : IronDev.Services.ICodeIndexService
     {
@@ -75,6 +75,12 @@ public class ContextAgentConflictGatingTests
 
         // F. Trace clarity
         var allTraces = traceService.GetRecentTraces();
+        
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace, "Should emit RouteDecision trace.");
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("VerifyImplementation"), "Should route to VerifyImplementation.");
+        Assert.IsTrue(routeTrace.RawResponseText.Contains("AllowDeepLookup: True"), "Deep lookup should be allowed for inspection.");
+        
         var skipTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.ConflictAssessment);
         Assert.IsNotNull(skipTrace, "Should emit skipped conflict assessment trace");
         Assert.IsTrue(skipTrace.ParsedResponseSummary.Contains("skipped"));
@@ -112,6 +118,11 @@ public class ContextAgentConflictGatingTests
         Assert.IsNull(result.ConflictAssessment);
         
         var allTraces = traceService.GetRecentTraces();
+        
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace, "Should emit RouteDecision trace.");
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("InspectCode"), "Should route to InspectCode.");
+        
         var skipTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.ConflictAssessment);
         Assert.IsTrue(skipTrace.ParsedResponseSummary.Contains("skipped"));
     }
@@ -149,6 +160,11 @@ public class ContextAgentConflictGatingTests
         Assert.IsTrue(result.IsClarificationRequired, "Ticket creation should trigger conflict clarification.");
         Assert.IsNotNull(result.ConflictAssessment);
         Assert.IsTrue(result.ConflictAssessment.BlocksTicketCreation);
+        
+        var allTraces = traceService.GetRecentTraces();
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace, "Should emit RouteDecision trace.");
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("CreateTicket"), "Should route to CreateTicket.");
     }
 
     [TestMethod]
@@ -183,5 +199,10 @@ public class ContextAgentConflictGatingTests
 
         Assert.IsTrue(result.IsClarificationRequired, "Change command should trigger conflict clarification.");
         Assert.IsNotNull(result.ConflictAssessment);
+        
+        var allTraces = traceService.GetRecentTraces();
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace, "Should emit RouteDecision trace.");
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("ReplaceArchitecture"), "Should route to ReplaceArchitecture.");
     }
 }
