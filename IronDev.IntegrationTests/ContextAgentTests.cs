@@ -496,11 +496,268 @@ public sealed class ContextAgentTests
 
         var result = await agent.RunAsync(MakeRequest());
 
-        // Agent must not throw and must return a usable prompt
         Assert.IsTrue(result.WasSuccessful, "Agent must succeed even when LLM fails.");
         Assert.IsNotNull(result.FinalPrompt, "A final prompt must be returned as degraded output.");
         Assert.IsTrue(result.Warnings.Contains("Sufficiency check LLM error"),
             "Warnings must mention the LLM error.");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Retrieval quality tests (A2–G2)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ── A2: Query expansion — LLM Console ────────────────────────────────────
+
+    [TestMethod]
+    [Description("A2: 'LLM Console' query expands to symbol-level queries including LlmConsoleViewModel and LlmTraceService.")]
+    public void RetrievalQuality_QueryExpansion_LlmConsoleExpandsToSymbols()
+    {
+        var expanded = RetrievalQualityHelpers.ExpandQueries(["LLM Console"]);
+
+        CollectionAssert.Contains(expanded.ToList(), "LLM Console",
+            "Original query must be preserved.");
+        Assert.IsTrue(expanded.Any(q => q.Contains("LlmConsoleViewModel")),
+            "Must expand to LlmConsoleViewModel.");
+        Assert.IsTrue(expanded.Any(q => q.Contains("LlmTraceService")),
+            "Must expand to LlmTraceService.");
+        Assert.IsTrue(expanded.Any(q => q.Contains("ILlmTraceService")),
+            "Must expand to ILlmTraceService.");
+    }
+
+    // ── B2: Query expansion — soft archive ────────────────────────────────────
+
+    [TestMethod]
+    [Description("B2: 'soft archive tickets' expands to ArchiveTicketAsync / IsDeleted / ProjectTicket / GetRecentTicketsAsync.")]
+    public void RetrievalQuality_QueryExpansion_SoftArchiveExpandsToSymbols()
+    {
+        var expanded = RetrievalQualityHelpers.ExpandQueries(["soft archive tickets"]);
+
+        Assert.IsTrue(expanded.Any(q => q.Contains("ArchiveTicketAsync")),
+            "Must expand to ArchiveTicketAsync.");
+        Assert.IsTrue(expanded.Any(q => q.Contains("IsDeleted")),
+            "Must expand to IsDeleted.");
+        Assert.IsTrue(expanded.Any(q => q.Contains("ProjectTicket")),
+            "Must expand to ProjectTicket.");
+        Assert.IsTrue(expanded.Any(q => q.Contains("GetRecentTicketsAsync")),
+            "Must expand to GetRecentTicketsAsync.");
+    }
+
+    // ── C2: Production ranking — production over tests ────────────────────────
+
+    [TestMethod]
+    [Description("C2: Given mixed production and test snippets, production files are ranked first.")]
+    public void RetrievalQuality_ProductionRanking_ProductionFilesRankedFirst()
+    {
+        var entries = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            new() { FilePath = "IronDev.IntegrationTests/ChatGroundingQualityTests.cs",
+                    SymbolName = "SeedCodeIndexEntry", ChunkText = "seed data" },
+            new() { FilePath = "IronDev.Infrastructure/Services/TicketService.cs",
+                    SymbolName = "ArchiveTicketAsync", ChunkText = new string('x', 150) },
+            new() { FilePath = "IronDev.Core/Models/DataModels.cs",
+                    SymbolName = "ProjectTicket", ChunkText = "public bool IsDeleted" },
+        };
+
+        var ranked = RetrievalQualityHelpers.RankByProductionFirst(entries, excludeTests: false);
+
+        // Test file must be last
+        Assert.AreEqual(
+            "IronDev.IntegrationTests/ChatGroundingQualityTests.cs",
+            ranked[ranked.Count - 1].FilePath,
+            "Test file must be ranked last.");
+
+        // Production infrastructure must be first
+        Assert.AreEqual(
+            "IronDev.Infrastructure/Services/TicketService.cs",
+            ranked[0].FilePath,
+            "TicketService must be ranked first.");
+    }
+
+    // ── D2: Test fixture exclusion ─────────────────────────────────────────────
+
+    [TestMethod]
+    [Description("D2: ChatGroundingQualityTests.cs is excluded when excludeTests=true and is never selected as primary evidence.")]
+    public async Task RetrievalQuality_TestFixtureExclusion_GroundingTestsNotPrimaryEvidence()
+    {
+        const string insufficientJson = """
+            {
+              "isSufficient": false,
+              "confidence": 3,
+              "reason": "Need ArchiveTicketAsync implementation.",
+              "requestedContext": {
+                "codeSearchQueries": ["ArchiveTicketAsync"],
+                "clarificationQuestions": []
+              }
+            }
+            """;
+
+        var snippets = new[]
+        {
+            // Test fixture file — should be excluded from primary evidence
+            new IronDev.Data.Models.CodeIndexEntry
+            {
+                FilePath   = "IronDev.IntegrationTests/ChatGroundingQualityTests.cs",
+                SymbolName = "SeedCodeIndexEntryAsync",
+                ChunkText  = "await SeedCodeIndexEntryAsync(conn, projectId, \"ArchiveTicketAsync\", ...);"
+            },
+            // Production file — should be selected
+            new IronDev.Data.Models.CodeIndexEntry
+            {
+                FilePath   = "IronDev.Infrastructure/Services/TicketService.cs",
+                SymbolName = "ArchiveTicketAsync",
+                ChunkText  = new string('p', 200), // sufficiently deep
+            },
+        };
+
+        var (agent, _, _, _) = ContextAgentFactory.Build(snippets: snippets, llmResponses: insufficientJson);
+        var result = await agent.RunAsync(MakeRequest());
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsTrue(result.HasCodeEvidence, "Should have evidence from the production file.");
+
+        // ChatGroundingQualityTests.cs must not appear as primary evidence
+        Assert.IsFalse(
+            result.Evidence.Any(e => e.FilePath.Contains("ChatGrounding") || e.FilePath.Contains("IntegrationTests")),
+            "ChatGroundingQualityTests.cs must not be in primary evidence.");
+
+        // Production file must be selected
+        Assert.IsTrue(
+            result.Evidence.Any(e => e.FilePath.Contains("TicketService")),
+            "TicketService.cs must be included as primary evidence.");
+    }
+
+    // ── E2: Clarification wins for "Create a ticket to fix delete" ───────────
+
+    [TestMethod]
+    [Description("E2: 'Create a ticket to fix delete' returns clarification questions before any LLM call.")]
+    public async Task RetrievalQuality_ClarificationFirst_VagueDeleteRequestAsksClarification()
+    {
+        // Even if LLM would say "insufficient", the pre-check must catch this first.
+        // The stub LLM won't be called at all for this pattern.
+        var trackLlmCalled = false;
+        var trackingLlm    = new TrackingLlmService(() => trackLlmCalled = true,
+            """{"isSufficient":false,"confidence":2,"reason":"vague","requestedContext":{"codeSearchQueries":["DeleteTicketAsync"],"clarificationQuestions":[]}}""");
+
+        var agent = new ContextAgentService(
+            new StubPromptContextBuilder(),
+            new StubCodeIndexService(),
+            trackingLlm,
+            new LlmTraceService());
+
+        var result = await agent.RunAsync(new ContextAgentRequest
+        {
+            ProjectId   = 1,
+            SessionId   = 0,
+            UserRequest = "Create a ticket to fix delete.",
+        });
+
+        Assert.IsTrue(result.WasSuccessful);
+        Assert.IsTrue(result.IsClarificationRequired,
+            "Vague 'fix delete' request must return clarification.");
+        Assert.IsNull(result.FinalPrompt,
+            "No final prompt should be generated for a vague request.");
+        Assert.IsTrue(result.ClarificationQuestions.Count > 0,
+            "At least one clarification question must be returned.");
+        Assert.IsFalse(trackLlmCalled,
+            "LLM must NOT be called for the sufficiency check when vague intent detected pre-check.");
+    }
+
+    // ── F2: Useful snippet depth — deep snippets preferred over declarations ──
+
+    [TestMethod]
+    [Description("F2: Deep implementation snippets are preferred over shallow interface stubs.")]
+    public void RetrievalQuality_SnippetDepth_DeepSnippetsPreferredOverDeclarations()
+    {
+        var entries = new List<IronDev.Data.Models.CodeIndexEntry>
+        {
+            // Shallow: just a method signature
+            new() { FilePath = "IronDev.Core/Interfaces/ITicketService.cs",
+                    SymbolName = "ArchiveTicketAsync",
+                    ChunkText  = "Task<bool> ArchiveTicketAsync(long id);" },
+            // Deep: full method body
+            new() { FilePath = "IronDev.Infrastructure/Services/TicketService.cs",
+                    SymbolName = "ArchiveTicketAsync",
+                    ChunkText  = new string('x', 250) + "UPDATE ProjectTickets SET IsDeleted=1" },
+        };
+
+        var result = RetrievalQualityHelpers.PreferDeepSnippets(
+                     RetrievalQualityHelpers.RankByProductionFirst(entries));
+
+        // The deep production snippet should come first
+        Assert.AreEqual(
+            "IronDev.Infrastructure/Services/TicketService.cs",
+            result[0].FilePath,
+            "Deep production implementation must be ranked before shallow interface declaration.");
+    }
+
+    // ── G2: Trace transparency — ToolResult shows retrieval diagnostics ────────
+
+    [TestMethod]
+    [Description("G2: ToolResult trace contains original query, expanded queries, raw/filtered counts, and excluded test file count.")]
+    public async Task RetrievalQuality_TraceTransparency_ToolResultContainsRetrievalDiagnostics()
+    {
+        const string insufficientJson = """
+            {
+              "isSufficient": false,
+              "confidence": 3,
+              "reason": "Need LLM Console implementation.",
+              "requestedContext": {
+                "codeSearchQueries": ["LLM Console"],
+                "clarificationQuestions": []
+              }
+            }
+            """;
+
+        // Mix of production and test snippets to verify filtering diagnostics
+        var snippets = new[]
+        {
+            new IronDev.Data.Models.CodeIndexEntry
+            {
+                FilePath   = "IronDev.IntegrationTests/LlmConsoleTests.cs",
+                SymbolName = "Test_LlmConsole",
+                ChunkText  = "test code"
+            },
+            new IronDev.Data.Models.CodeIndexEntry
+            {
+                FilePath   = "IronDeveloper/ViewModels/Workspaces/LlmConsoleViewModel.cs",
+                SymbolName = "LlmConsoleViewModel",
+                ChunkText  = new string('v', 200),
+            },
+        };
+
+        var (agent, _, _, traces) = ContextAgentFactory.Build(snippets: snippets, llmResponses: insufficientJson);
+        var result = await agent.RunAsync(new ContextAgentRequest
+        {
+            ProjectId   = 1,
+            SessionId   = 0,
+            UserRequest = "What is the purpose of the LLM Console?",
+        });
+
+        Assert.IsTrue(result.WasSuccessful);
+
+        var allTraces    = traces.GetRecentTraces();
+        var toolResults  = allTraces.Where(t => t.FeatureName == ContextAgentStage.ToolResultSearch).ToList();
+
+        Assert.IsTrue(toolResults.Count > 0, "At least one ToolResult trace must exist.");
+
+        var firstResult = toolResults.First();
+
+        // ParsedResponseSummary must contain raw count, excluded test count, filtered count, added count
+        Assert.IsTrue(firstResult.ParsedResponseSummary.Contains("Raw="),
+            $"ParsedResponseSummary must show raw count. Got: {firstResult.ParsedResponseSummary}");
+        Assert.IsTrue(firstResult.ParsedResponseSummary.Contains("ExcludedTests="),
+            $"ParsedResponseSummary must show excluded test count. Got: {firstResult.ParsedResponseSummary}");
+        Assert.IsTrue(firstResult.ParsedResponseSummary.Contains("AfterFilter="),
+            $"ParsedResponseSummary must show after-filter count. Got: {firstResult.ParsedResponseSummary}");
+
+        // RawResponseText is the RetrievalTraceSummary.ToTraceText() — must contain expanded queries
+        Assert.IsTrue(firstResult.RawResponseText.Contains("Original query"),
+            "ToolResult trace RawResponseText must contain original query label.");
+
+        // Test file must NOT be in final evidence
+        Assert.IsFalse(
+            result.Evidence.Any(e => e.FilePath.Contains("IntegrationTests")),
+            "Test file must not appear in final evidence.");
     }
 }
 
@@ -522,6 +779,29 @@ internal sealed class ThrowingLlmService : ILLMService
 {
     public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default)
         => throw new InvalidOperationException("LLM endpoint is unavailable.");
+}
+
+/// <summary>
+/// LLM stub that fires a callback before returning its configured response.
+/// Used to assert whether the LLM was called when it should NOT have been
+/// (e.g. pre-check clarification gate fires before the LLM round-trip).
+/// </summary>
+internal sealed class TrackingLlmService : ILLMService
+{
+    private readonly Action _onCall;
+    private readonly string _response;
+
+    public TrackingLlmService(Action onCall, string response)
+    {
+        _onCall   = onCall;
+        _response = response;
+    }
+
+    public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default)
+    {
+        _onCall();
+        return Task.FromResult(_response);
+    }
 }
 
 internal sealed class StubChatHistoryService : IronDev.Services.IChatHistoryService

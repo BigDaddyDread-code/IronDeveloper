@@ -87,6 +87,53 @@ public sealed class CodeEvidence
     public string Snippet    { get; init; } = string.Empty;
     /// <summary>Which search query retrieved this evidence.</summary>
     public string RetrievedByQuery { get; init; } = string.Empty;
+    /// <summary>Human-readable reason this file was selected over alternatives.</summary>
+    public string SelectionReason  { get; init; } = string.Empty;
+}
+
+// ── Retrieval trace diagnostics ───────────────────────────────────────────────
+
+/// <summary>
+/// Rich diagnostic summary of a single retrieval tool call.
+/// Emitted into the ToolResult LlmTraceEntry so the LLM Console and
+/// ExportTrace give full visibility into what the agent retrieved, filtered,
+/// and why.
+/// </summary>
+public sealed class RetrievalTraceSummary
+{
+    public string   OriginalQuery        { get; init; } = string.Empty;
+    public IReadOnlyList<string> ExpandedQueries { get; init; } = Array.Empty<string>();
+    public int      RawResultCount       { get; init; }
+    public int      AfterFilterCount     { get; init; }
+    public int      ExcludedTestCount    { get; init; }
+    public int      AddedToEvidenceCount { get; init; }
+    public IReadOnlyList<SelectedEvidenceEntry> SelectedFiles { get; init; } = Array.Empty<SelectedEvidenceEntry>();
+
+    public string ToTraceText()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Original query:       {OriginalQuery}");
+        if (ExpandedQueries.Count > 0)
+            sb.AppendLine($"Expanded to:          {string.Join(", ", ExpandedQueries)}");
+        sb.AppendLine($"Raw results:          {RawResultCount}");
+        sb.AppendLine($"After production filter: {AfterFilterCount}");
+        sb.AppendLine($"Excluded test files:  {ExcludedTestCount}");
+        sb.AppendLine($"Added to evidence:    {AddedToEvidenceCount}");
+        if (SelectedFiles.Count > 0)
+        {
+            sb.AppendLine("Selected evidence:");
+            foreach (var s in SelectedFiles)
+                sb.AppendLine($"  [{s.FilePath}] {s.Symbol} — {s.Reason}");
+        }
+        return sb.ToString().TrimEnd();
+    }
+}
+
+public sealed class SelectedEvidenceEntry
+{
+    public string FilePath { get; init; } = string.Empty;
+    public string Symbol   { get; init; } = string.Empty;
+    public string Reason   { get; init; } = string.Empty;
 }
 
 // ── Final result ──────────────────────────────────────────────────────────────
