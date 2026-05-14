@@ -23,6 +23,9 @@ public interface IProjectMemoryService
     Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken cancellationToken = default);
 
     Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken cancellationToken = default);
+    
+    Task<IReadOnlyList<ProjectRule>> GetProjectRulesAsync(int projectId, CancellationToken cancellationToken = default);
+    Task<long> SaveProjectRuleAsync(ProjectRule rule, CancellationToken cancellationToken = default);
 }
 
 public sealed class ProjectMemoryService : IProjectMemoryService
@@ -363,6 +366,99 @@ public sealed class ProjectMemoryService : IProjectMemoryService
                     decision.LinkedFilePaths,
                     decision.LinkedCodeIndexEntryIds,
                     decision.LinkedSymbols
+                },
+                cancellationToken: cancellationToken));
+        }
+    }
+
+    public async Task<IReadOnlyList<ProjectRule>> GetProjectRulesAsync(int projectId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT 
+                Id, TenantId, ProjectId, Name, Type, Description, 
+                EnforcementLevel, AppliesTo, ValidationHint, CreatedDate, UpdatedDate
+            FROM dbo.ProjectRules
+            WHERE TenantId = @TenantId
+              AND ProjectId = @ProjectId
+            ORDER BY CreatedDate DESC;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<ProjectRule>(new CommandDefinition(
+            sql,
+            new { TenantId = _tenant.TenantId, ProjectId = projectId },
+            cancellationToken: cancellationToken));
+
+        return rows.ToList();
+    }
+
+    public async Task<long> SaveProjectRuleAsync(ProjectRule rule, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+
+        // Ownership guard
+        const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
+        var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            ownerSql,
+            new { rule.ProjectId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+
+        if (owns == 0)
+            throw new UnauthorizedAccessException($"Project {rule.ProjectId} does not belong to tenant {_tenant.TenantId}.");
+
+        if (rule.Id > 0)
+        {
+            const string updateSql = """
+                UPDATE dbo.ProjectRules 
+                SET Name = @Name, Type = @Type, Description = @Description, 
+                    EnforcementLevel = @EnforcementLevel, AppliesTo = @AppliesTo, 
+                    ValidationHint = @ValidationHint,
+                    UpdatedDate = SYSUTCDATETIME()
+                WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
+                """;
+
+            await connection.ExecuteAsync(new CommandDefinition(
+                updateSql,
+                new 
+                { 
+                    rule.Id,
+                    TenantId = _tenant.TenantId,
+                    rule.ProjectId,
+                    rule.Name,
+                    rule.Type,
+                    rule.Description,
+                    rule.EnforcementLevel,
+                    rule.AppliesTo,
+                    rule.ValidationHint
+                },
+                cancellationToken: cancellationToken));
+
+            return rule.Id;
+        }
+        else
+        {
+            const string insertSql = """
+                INSERT INTO dbo.ProjectRules 
+                    (TenantId, ProjectId, Name, Type, Description, 
+                     EnforcementLevel, AppliesTo, ValidationHint)
+                OUTPUT inserted.Id
+                VALUES 
+                    (@TenantId, @ProjectId, @Name, @Type, @Description, 
+                     @EnforcementLevel, @AppliesTo, @ValidationHint);
+                """;
+
+            return await connection.QuerySingleAsync<long>(new CommandDefinition(
+                insertSql,
+                new
+                {
+                    TenantId = _tenant.TenantId,
+                    rule.ProjectId,
+                    rule.Name,
+                    rule.Type,
+                    rule.Description,
+                    rule.EnforcementLevel,
+                    rule.AppliesTo,
+                    rule.ValidationHint
                 },
                 cancellationToken: cancellationToken));
         }

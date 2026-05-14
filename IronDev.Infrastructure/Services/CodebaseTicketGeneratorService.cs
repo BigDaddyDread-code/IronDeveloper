@@ -36,6 +36,7 @@ public sealed class CodebaseTicketGeneratorService : ICodebaseTicketGeneratorSer
             // 1. Assemble context
             var summary   = await _memoryService.GetLatestSummaryAsync(projectId, ct);
             var decisions = await _memoryService.GetRecentDecisionsAsync(projectId, 10, ct);
+            var rules     = await _memoryService.GetProjectRulesAsync(projectId, ct);
 
             var contextBuilder = new System.Text.StringBuilder();
             contextBuilder.AppendLine("PROJECT CONTEXT:");
@@ -54,6 +55,17 @@ public sealed class CodebaseTicketGeneratorService : ICodebaseTicketGeneratorSer
                 foreach (var d in decisions)
                 {
                     contextBuilder.AppendLine($"- {d.Title}: {d.Detail}");
+                }
+            }
+
+            if (rules.Count > 0)
+            {
+                contextBuilder.AppendLine("\nPROJECT RULES AND STANDARDS:");
+                foreach (var r in rules.Where(r => r.AppliesTo == "Both" || r.AppliesTo == "Ticket"))
+                {
+                    contextBuilder.AppendLine($"- [{r.EnforcementLevel}] {r.Name}: {r.Description}");
+                    if (!string.IsNullOrWhiteSpace(r.ValidationHint))
+                        contextBuilder.AppendLine($"  Validation Hint: {r.ValidationHint}");
                 }
             }
 

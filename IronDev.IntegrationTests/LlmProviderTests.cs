@@ -113,6 +113,10 @@ public class LlmProviderTests
         public Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken ct = default) => Task.FromResult(0L);
         public Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken ct = default) => Task.FromResult(0L);
 
+        public Task<IReadOnlyList<ProjectRule>> GetProjectRulesAsync(int projectId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ProjectRule>>([]);
+        public Task<long> SaveProjectRuleAsync(ProjectRule rule, CancellationToken cancellationToken = default)
+            => Task.FromResult(0L);
     }
 
     private class NullLlmTraceService : ILlmTraceService

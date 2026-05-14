@@ -12,6 +12,7 @@ public sealed class TicketBuildContext
     public string ProjectName  { get; set; } = "";
     public string ProjectPath  { get; set; } = "";
     public string BuildCommand { get; set; } = "dotnet build";
+    public long?  PlanId       { get; set; }
 
     // Ticket fields
     public string  TicketTitle               { get; set; } = "";
@@ -34,6 +35,7 @@ public sealed class TicketBuildContext
     public IReadOnlyList<string> AffectedFiles     { get; set; } = [];
     public IReadOnlyList<string> RetrievedSnippets { get; set; } = [];
     public IReadOnlyList<string> PastBuildFailures { get; set; } = [];
+    public IReadOnlyList<IronDev.Data.Models.ProjectRule> Standards { get; set; } = [];
 }
 
 // ── AI-produced proposal (not yet applied) ────────────────────────────────
@@ -54,6 +56,7 @@ public sealed class CodeChangeProposal
     public string Summary     { get; set; } = "";
     public string RiskNotes   { get; set; } = "";
     public string TestPlan    { get; set; } = "";
+    public string StandardsCompliance { get; set; } = "";
     public List<FileChangeProposal> FileChanges { get; set; } = [];
 }
 

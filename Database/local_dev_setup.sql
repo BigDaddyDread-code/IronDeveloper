@@ -161,6 +161,26 @@ BEGIN
     );
 END
 
+IF OBJECT_ID('dbo.ProjectRules', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectRules
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TenantId INT NOT NULL CONSTRAINT DF_ProjectRules_Tenant DEFAULT 1,
+        ProjectId INT NOT NULL,
+        Name NVARCHAR(200) NOT NULL,
+        Type NVARCHAR(100) NOT NULL, -- CodeStandard / ArchitectureDecision / WorkflowRule / TestingRule
+        Description NVARCHAR(MAX) NOT NULL,
+        EnforcementLevel NVARCHAR(50) NOT NULL, -- Advisory / Required / Blocking
+        AppliesTo NVARCHAR(50) NOT NULL, -- Ticket / Build / Both
+        ValidationHint NVARCHAR(MAX) NULL,
+        CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectRules_CreatedDate DEFAULT SYSUTCDATETIME(),
+        UpdatedDate DATETIME2 NULL,
+        CONSTRAINT FK_ProjectRules_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ProjectRules_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+    );
+END
+
 IF OBJECT_ID('dbo.ProjectSummaries', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ProjectSummaries
@@ -357,6 +377,17 @@ BEGIN
         ('Accepted',    2),
         ('Superseded',  3),
         ('Rejected',    4);
+END
+GO
+
+-- Seed Project Rules
+IF NOT EXISTS (SELECT 1 FROM dbo.ProjectRules)
+BEGIN
+    INSERT INTO dbo.ProjectRules (TenantId, ProjectId, Name, Type, Description, EnforcementLevel, AppliesTo, ValidationHint)
+    VALUES 
+    (1, 1, 'SQL Server Source of Truth', 'ArchitectureDecision', 'SQL Server (dbo.ProjectTickets) is the authoritative source of truth for ticket persistence. Do not use Weaviate or other stores as the primary record.', 'Blocking', 'Both', 'Check TicketService.cs for SQL-based persistence.'),
+    (1, 1, 'WPF MVVM Pattern', 'CodeStandard', 'All UI must follow the WPF MVVM pattern using CommunityToolkit.Mvvm. ViewModels must not reference UI elements.', 'Required', 'Build', 'Check for [ObservableProperty] and [RelayCommand] in ViewModels.'),
+    (1, 1, 'Soft Delete for Tickets', 'WorkflowRule', 'Tickets should be archived (soft-deleted) by setting IsDeleted=1 instead of being physically removed from the database.', 'Required', 'Ticket', 'Ensure ArchiveTicketAsync is used instead of a DELETE command.');
 END
 GO
 

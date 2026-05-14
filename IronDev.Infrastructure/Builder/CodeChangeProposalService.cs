@@ -166,6 +166,18 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine();
         }
 
+        if (ctx.Standards.Count > 0)
+        {
+            sb.AppendLine("PROJECT RULES AND STANDARDS:");
+            foreach (var s in ctx.Standards)
+            {
+                sb.AppendLine($"  - [{s.EnforcementLevel}] {s.Name}: {s.Description}");
+                if (!string.IsNullOrWhiteSpace(s.ValidationHint))
+                    sb.AppendLine($"    Validation Hint: {s.ValidationHint}");
+            }
+            sb.AppendLine();
+        }
+
         if (ctx.RetrievedSnippets.Count > 0)
         {
             sb.AppendLine("RELEVANT CODE CONTEXT:");
@@ -184,6 +196,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
               "summary": "<brief description of what changes and why>",
               "riskNotes": "<risk assessment>",
               "testPlan": "<how to verify the change>",
+              "standardsCompliance": "<report on which project rules were applied and any deviations or risks>",
               "fileChanges": [
                 {
                   "filePath": "<relative file path>",
@@ -228,6 +241,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             Summary   = dto.Summary   ?? "No summary provided.",
             RiskNotes = dto.RiskNotes ?? "Not specified.",
             TestPlan  = dto.TestPlan  ?? "Not specified.",
+            StandardsCompliance = dto.StandardsCompliance ?? "Not reported.",
         };
 
         foreach (var fc in dto.FileChanges ?? [])
@@ -274,6 +288,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         [JsonPropertyName("summary")]    public string?                 Summary     { get; set; }
         [JsonPropertyName("riskNotes")]  public string?                 RiskNotes   { get; set; }
         [JsonPropertyName("testPlan")]   public string?                 TestPlan    { get; set; }
+        [JsonPropertyName("standardsCompliance")] public string?        StandardsCompliance { get; set; }
         [JsonPropertyName("fileChanges")]public List<FileChangeJson>?   FileChanges { get; set; }
     }
 

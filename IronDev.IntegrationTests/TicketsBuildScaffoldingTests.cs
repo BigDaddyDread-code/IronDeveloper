@@ -6,6 +6,7 @@ using IronDev.Agent.Models;
 using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Data.Models;
 using IronDev.Core.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -46,7 +47,8 @@ internal sealed class StubOrchestrator : ITicketBuildOrchestrator
                     FilePath     = "(stub)",
                     ChangeReason = "Stub",
                     Patch        = "No diff generated in Phase 2."
-                }]
+                }],
+                StandardsCompliance = "Stub compliance: all rules satisfied."
             }
         });
     }
@@ -517,13 +519,16 @@ public sealed class BuilderContextServiceTests
     {
         private readonly IronDev.Data.Models.ProjectImplementationPlan? _plan;
         private readonly IReadOnlyList<IronDev.Data.Models.ProjectDecision> _decisions;
+        private readonly IReadOnlyList<IronDev.Data.Models.ProjectRule> _rules;
 
         public StubMemory(
             IronDev.Data.Models.ProjectImplementationPlan? plan = null,
-            IReadOnlyList<IronDev.Data.Models.ProjectDecision>? decisions = null)
+            IReadOnlyList<IronDev.Data.Models.ProjectDecision>? decisions = null,
+            IReadOnlyList<IronDev.Data.Models.ProjectRule>? rules = null)
         {
             _plan      = plan;
             _decisions = decisions ?? [];
+            _rules     = rules ?? [];
         }
 
         public Task<IronDev.Data.Models.ProjectSummary?> GetLatestSummaryAsync(int p, CancellationToken ct = default)
@@ -541,6 +546,11 @@ public sealed class BuilderContextServiceTests
         public Task<IronDev.Data.Models.ProjectImplementationPlan?> GetPlanByTicketIdAsync(long id, CancellationToken ct = default)
             => Task.FromResult(_plan);
         public Task<long> SavePlanAsync(IronDev.Data.Models.ProjectImplementationPlan p, CancellationToken ct = default) => Task.FromResult(1L);
+
+        public Task<IReadOnlyList<ProjectRule>> GetProjectRulesAsync(int projectId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_rules);
+        public Task<long> SaveProjectRuleAsync(ProjectRule rule, CancellationToken cancellationToken = default)
+            => Task.FromResult(1L);
     }
 
     private static IronDev.Data.Models.Project MakeProject() => new()
@@ -573,11 +583,12 @@ public sealed class BuilderContextServiceTests
     private static IronDev.Infrastructure.Builder.BuilderContextService MakeSvc(
         IronDev.Data.Models.ProjectTicket?                     ticket    = null,
         IronDev.Data.Models.ProjectImplementationPlan?         plan      = null,
-        IReadOnlyList<IronDev.Data.Models.ProjectDecision>?    decisions = null)
+        IReadOnlyList<IronDev.Data.Models.ProjectDecision>?    decisions = null,
+        IReadOnlyList<IronDev.Data.Models.ProjectRule>?        rules     = null)
         => new(
             new StubTickets(ticket  ?? MakeTicket()),
             new StubProject(MakeProject()),
-            new StubMemory(plan, decisions));
+            new StubMemory(plan, decisions, rules));
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
@@ -715,6 +726,38 @@ public sealed class BuilderContextServiceTests
         Assert.AreEqual(0, ctx.RetrievedSnippets.Count);
         Assert.AreEqual(0, ctx.PastBuildFailures.Count);
     }
+
+    [TestMethod]
+    [Description("BuilderContextService includes relevant project rules in context.")]
+    public async Task AssembleContextAsync_WithRules_PopulatesStandards()
+    {
+        var rules = (IReadOnlyList<IronDev.Data.Models.ProjectRule>)
+        [
+            new IronDev.Data.Models.ProjectRule
+            {
+                Id = 1, Name = "SQL Rule", AppliesTo = "Both", EnforcementLevel = "Required", Description = "Use SQL"
+            },
+            new IronDev.Data.Models.ProjectRule
+            {
+                Id = 2, Name = "Build Rule", AppliesTo = "Build", EnforcementLevel = "Blocking", Description = "No warnings"
+            },
+            new IronDev.Data.Models.ProjectRule
+            {
+                Id = 3, Name = "Ticket Rule", AppliesTo = "Ticket", EnforcementLevel = "Advisory", Description = "Add labels"
+            }
+        ];
+        var svc = MakeSvc(rules: rules);
+        var ctx = await svc.AssembleContextAsync(1, 1);
+
+        // Only Both and Build rules should be included
+        Assert.AreEqual(2, ctx.Standards.Count);
+        Assert.IsTrue(ctx.Standards.Any(r => r.Name == "SQL Rule"));
+        Assert.IsTrue(ctx.Standards.Any(r => r.Name == "Build Rule"));
+        Assert.IsFalse(ctx.Standards.Any(r => r.Name == "Ticket Rule"));
+        
+        // Blocking should be first
+        Assert.AreEqual("Build Rule", ctx.Standards[0].Name);
+    }
 }
 
 // ─── Phase 3: CodeChangeProposalService tests ────────────────────────────────
@@ -760,6 +803,7 @@ public sealed class CodeChangeProposalServiceTests
           "summary": "Replace 'Conversation History' with 'Conversations'.",
           "riskNotes": "Low — XAML layout only.",
           "testPlan": "Run app, verify header at 320px.",
+          "standardsCompliance": "Satisfied SQL Rule and MVVM Rule.",
           "fileChanges": [
             {
               "filePath": "Views\\ChatWorkspaceView.xaml",
@@ -785,6 +829,7 @@ public sealed class CodeChangeProposalServiceTests
         Assert.AreEqual(1, proposal.FileChanges.Count);
         Assert.AreEqual(@"Views\ChatWorkspaceView.xaml", proposal.FileChanges[0].FilePath);
         Assert.AreEqual("Low — XAML layout only.", proposal.RiskNotes);
+        Assert.AreEqual("Satisfied SQL Rule and MVVM Rule.", proposal.StandardsCompliance);
     }
 
     [TestMethod]

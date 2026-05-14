@@ -33,6 +33,11 @@ public class ChatContextPacket
     public int IncludedMemoryCount { get; set; }
     /// <summary>Arch-poison terms found in excluded memory items.</summary>
     public System.Collections.Generic.List<string> PollutedTermsFound { get; init; } = new();
+
+    // ── Standards ──
+    public System.Collections.Generic.List<IronDev.Data.Models.ProjectRule> Standards { get; init; } = new();
+    public int IncludedStandardsCount { get; set; }
+    public int FilteredStandardsCount { get; set; }
 }
 
 /// <summary>
@@ -56,6 +61,9 @@ public sealed class PromptPreviewResult
     public int FilteredMemoryCount  { get; set; }
     /// <summary>How many memory items passed the filter and were included in the prompt.</summary>
     public int IncludedMemoryCount  { get; set; }
+
+    public int IncludedStandardsCount { get; set; }
+    public int FilteredStandardsCount { get; set; }
 }
 
 /// <summary>
@@ -173,6 +181,8 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             ContextPolluted     = distinctPolluted.Count > 0,
             FilteredMemoryCount = packet.FilteredMemoryCount,
             IncludedMemoryCount = packet.IncludedMemoryCount,
+            IncludedStandardsCount = packet.IncludedStandardsCount,
+            FilteredStandardsCount = packet.FilteredStandardsCount,
         };
         preview.RetrievedItems.AddRange(ranked);
         preview.PollutedTermsFound.AddRange(distinctPolluted);
@@ -200,6 +210,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
         var tickets   = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
+        var allRules  = await _projectMemoryService.GetProjectRulesAsync(projectId, cancellationToken);
 
         // 3. Build expanded search queries for the intent
         var queries = ExpandSearchQueries(userRequest, intent);
@@ -259,6 +270,28 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         foreach (var d in decisions)
         {
             packet.Decisions.Add($"{d.Title}: {d.Detail}");
+        }
+
+        // Filter and add rules
+        var applicableRules = allRules
+            .Where(r => r.AppliesTo == "Both" || 
+                       (intent == ChatIntent.DraftTicketFlow && r.AppliesTo == "Ticket") ||
+                       ((intent == ChatIntent.CodeQuery || intent == ChatIntent.AnalyzeCodebase) && r.AppliesTo == "Build"))
+            .OrderBy(r => r.EnforcementLevel == "Blocking" ? 0 : r.EnforcementLevel == "Required" ? 1 : 2)
+            .ToList();
+
+        foreach (var rule in applicableRules)
+        {
+            var (isJunk, ruleTerms) = IsJunkMemory($"{rule.Name}: {rule.Description}");
+            if (!isJunk)
+            {
+                packet.IncludedStandardsCount++;
+                packet.Standards.Add(rule);
+            }
+            else
+            {
+                packet.FilteredStandardsCount++;
+            }
         }
 
         var recentMessages = await _chatHistoryService.GetRecentMessagesAsync(projectId, sessionId, 8, cancellationToken);
@@ -421,6 +454,20 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
                 {
                     packet.FilteredMemoryCount++;
                     packet.PollutedTermsFound.AddRange(decisionTerms);
+                }
+            }
+            sb.AppendLine();
+        }
+
+        if (packet.Standards.Count > 0)
+        {
+            sb.AppendLine("Project Rules and Standards:");
+            foreach (var rule in packet.Standards)
+            {
+                sb.AppendLine($"- [{rule.EnforcementLevel}] {rule.Name} ({rule.Type}): {rule.Description}");
+                if (!string.IsNullOrWhiteSpace(rule.ValidationHint))
+                {
+                    sb.AppendLine($"  Validation Hint: {rule.ValidationHint}");
                 }
             }
             sb.AppendLine();

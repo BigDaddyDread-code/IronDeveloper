@@ -103,6 +103,7 @@ public sealed class BuilderContextService : IBuilderContextService
             TicketProblem             = ticket.Problem,
 
             PlanTitle         = plan?.Title,
+            PlanId            = plan?.Id,
             PlanGoal          = plan?.Goal,
             PlanSteps         = plan?.ProposedSteps,
             PlanAffectedFiles = plan?.AffectedContext,
@@ -110,6 +111,12 @@ public sealed class BuilderContextService : IBuilderContextService
 
             Decisions         = decisionStrings.AsReadOnly(),
             AffectedFiles     = affectedFiles,
+
+            // Standards
+            Standards         = (await _memoryService.GetProjectRulesAsync(projectId, cancellationToken))
+                                    .Where(r => r.AppliesTo == "Both" || r.AppliesTo == "Build")
+                                    .OrderBy(r => r.EnforcementLevel == "Blocking" ? 0 : r.EnforcementLevel == "Required" ? 1 : 2)
+                                    .ToList().AsReadOnly(),
 
             // Phase 3+: Weaviate populates these
             RetrievedSnippets = [],
