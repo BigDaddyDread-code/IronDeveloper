@@ -47,7 +47,8 @@
                                        VerticalAlignment="Center"/>
                     </Grid>
 
-                    <Grid>
+                    <!-- Auto-Index on Open -->
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -61,8 +62,26 @@
                         <ToggleButton Grid.Column="1" IsChecked="{Binding AutoIndex}"
                                        VerticalAlignment="Center"/>
                     </Grid>
+
+                    <!-- Trace LLM Calls -->
+                    <Border Height="1" Background="#10FFFFFF" Margin="0,0,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Trace LLM Calls" FontWeight="SemiBold" FontSize="14"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock Text="Capture prompts, responses, warnings, and errors in the LLM Console."
+                                       Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" IsChecked="{Binding IsLlmTracingEnabled}"
+                                       VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
             </Border>
+
 
             <!-- Developer Tools -->
             <Border Style="{StaticResource IronCard}" Margin="0,0,0,16" Padding="0">

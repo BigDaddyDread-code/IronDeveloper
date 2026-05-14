@@ -19,6 +19,12 @@ public sealed partial class LlmConsoleViewModel : ObservableObject, IDisposable
     [ObservableProperty] private LlmTraceEntry? _selectedTrace;
     [ObservableProperty] private string _filterText = string.Empty;
 
+    /// <summary>
+    /// Read-only reflection of ILlmTraceService.IsTracingEnabled for the console header badge.
+    /// Changing this from the console is not supported — use Settings → Behaviour.
+    /// </summary>
+    public bool IsTracingEnabled => _traceService.IsTracingEnabled;
+
     // ── Advanced Filters ──────────────────────────────────────────────────
     [ObservableProperty] private int? _filterProjectId;
     [ObservableProperty] private string? _filterChatSessionId;

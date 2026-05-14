@@ -223,4 +223,93 @@ public class LlmConsoleViewModelTests
         StringAssert.Contains(exported, "Connection timeout");
         StringAssert.Contains(exported, "ProjectRules unavailable");
     }
+
+    // ── C: SettingsViewModel binding writes through to trace service ──────
+
+    [TestMethod]
+    [Description("C: Changing IsLlmTracingEnabled on SettingsWorkspaceViewModel propagates to ILlmTraceService.IsTracingEnabled.")]
+    public void SettingsWorkspaceViewModel_IsLlmTracingEnabled_WritesThrough()
+    {
+        var svc = new LlmTraceService();
+        Assert.IsTrue(svc.IsTracingEnabled, "Precondition: tracing starts enabled.");
+
+        var settingsVm = new IronDev.Agent.ViewModels.Workspaces.SettingsWorkspaceViewModel(svc);
+        Assert.IsTrue(settingsVm.IsLlmTracingEnabled,
+            "SettingsWorkspaceViewModel.IsLlmTracingEnabled must reflect the service default (true).");
+
+        // Disable through the settings VM
+        settingsVm.IsLlmTracingEnabled = false;
+        Assert.IsFalse(svc.IsTracingEnabled,
+            "Setting IsLlmTracingEnabled = false must propagate to ILlmTraceService.");
+
+        // Re-enable
+        settingsVm.IsLlmTracingEnabled = true;
+        Assert.IsTrue(svc.IsTracingEnabled,
+            "Setting IsLlmTracingEnabled = true must re-enable ILlmTraceService.");
+    }
+
+    // ── C2: SettingsViewModel PropertyChanged fires ────────────────────────
+
+    [TestMethod]
+    [Description("C2: Changing IsLlmTracingEnabled raises PropertyChanged on SettingsWorkspaceViewModel.")]
+    public void SettingsWorkspaceViewModel_IsLlmTracingEnabled_RaisesPropertyChanged()
+    {
+        var svc       = new LlmTraceService();
+        var settingsVm = new IronDev.Agent.ViewModels.Workspaces.SettingsWorkspaceViewModel(svc);
+
+        string? changedProp = null;
+        ((System.ComponentModel.INotifyPropertyChanged)settingsVm).PropertyChanged +=
+            (_, e) => { if (e.PropertyName == nameof(settingsVm.IsLlmTracingEnabled)) changedProp = e.PropertyName; };
+
+        settingsVm.IsLlmTracingEnabled = false;
+
+        Assert.AreEqual(nameof(settingsVm.IsLlmTracingEnabled), changedProp,
+            "PropertyChanged must fire for IsLlmTracingEnabled.");
+    }
+
+    // ── D: Disabling tracing does not clear existing traces ───────────────
+
+    [TestMethod]
+    [Description("D: Turning IsTracingEnabled off does not clear existing stored traces.")]
+    public void LlmTraceService_DisableTracing_PreservesExistingTraces()
+    {
+        var svc = new LlmTraceService();
+        svc.AddTrace(new LlmTraceEntry { FeatureName = "Chat",          WasSuccessful = true });
+        svc.AddTrace(new LlmTraceEntry { FeatureName = "GroundingTest", WasSuccessful = true });
+
+        Assert.AreEqual(2, svc.GetRecentTraces().Count, "Precondition: 2 traces stored.");
+
+        // Disable tracing
+        svc.IsTracingEnabled = false;
+
+        // Add another trace — should be ignored
+        svc.AddTrace(new LlmTraceEntry { FeatureName = "NewTrace", WasSuccessful = true });
+
+        var traces = svc.GetRecentTraces();
+        Assert.AreEqual(2, traces.Count,
+            "Disabling tracing must not add new traces.");
+        Assert.IsFalse(traces.Any(t => t.FeatureName == "NewTrace"),
+            "The trace added while disabled must not be stored.");
+        Assert.IsTrue(traces.Any(t => t.FeatureName == "Chat"),
+            "Pre-existing traces must be preserved after disabling.");
+        Assert.IsTrue(traces.Any(t => t.FeatureName == "GroundingTest"),
+            "Pre-existing traces must be preserved after disabling.");
+    }
+
+    // ── Console VM reflects IsTracingEnabled from service ─────────────────
+
+    [TestMethod]
+    [Description("LlmConsoleViewModel.IsTracingEnabled reflects ILlmTraceService.IsTracingEnabled.")]
+    public void LlmConsoleViewModel_IsTracingEnabled_ReflectsService()
+    {
+        var svc = new LlmTraceService();
+        var vm  = new LlmConsoleViewModel(svc);
+
+        Assert.IsTrue(vm.IsTracingEnabled, "Console VM must reflect service default (true).");
+
+        svc.IsTracingEnabled = false;
+        Assert.IsFalse(vm.IsTracingEnabled, "Console VM must reflect service being disabled.");
+
+        vm.Dispose();
+    }
 }

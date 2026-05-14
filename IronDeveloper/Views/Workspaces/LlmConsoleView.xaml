@@ -20,9 +20,53 @@
             <TextBlock Text="DEVELOPER TOOLS" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
             <TextBlock Text="LLM Console" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,6"/>
             <TextBlock TextWrapping="Wrap" FontSize="13" Opacity="0.55"
-                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,8">
                 Monitor all LLM calls in real time. Traces are stored in memory and redacted automatically.
             </TextBlock>
+
+            <!-- Tracing status badge -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Border CornerRadius="4" Padding="8,3" Margin="0,0,8,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#2266BB66"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTracingEnabled}" Value="False">
+                                    <Setter Property="Background" Value="#22888888"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock FontSize="11" FontWeight="SemiBold" FontFamily="Consolas">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="● TRACING: ON"/>
+                                <Setter Property="Foreground" Value="#FF88DD88"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTracingEnabled}" Value="False">
+                                        <Setter Property="Text" Value="○ TRACING: OFF"/>
+                                        <Setter Property="Foreground" Value="#FF888888"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+                <TextBlock Text="Tracing is disabled. Enable it in Settings → Behaviour."
+                           FontSize="12" Opacity="0.5" VerticalAlignment="Center"
+                           Foreground="{StaticResource TextBrush}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTracingEnabled}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
 
             <Grid>
                 <Grid.ColumnDefinitions>
