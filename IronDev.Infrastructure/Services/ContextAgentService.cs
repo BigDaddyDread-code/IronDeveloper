@@ -154,7 +154,7 @@ public sealed class ContextAgentService : IContextAgentService
             ProjectId = request.ProjectId,
             SessionId = request.SessionId,
             UserRequest = request.UserRequest,
-            RecentConversationSummary = string.Empty,
+            RecentConversationSummary = request.RecentConversationSummary,
             InitialIntentFromPromptContextBuilder = initialPacket.Intent.ToString(),
             RecentTickets = request.RecentTickets,
             RecentDecisions = request.RecentDecisions,

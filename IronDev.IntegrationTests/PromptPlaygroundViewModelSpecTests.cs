@@ -654,7 +654,7 @@ public class PromptPlaygroundViewModelSpecTests
         else if (hasMustInclude && !contextIsReady) result = "⚠️ WARNING — terms matched, context limited";
         else                result = "⚠️ WARNING — intent ok, context limited";
 
-        Assert.StartsWith(result, "⚠️ WARNING",
+        Assert.StartsWith("⚠️ WARNING", result,
             $"Expected WARNING for correct answer with limited context. Got: {result}");
     }
 
@@ -728,7 +728,7 @@ public class PromptPlaygroundViewModelSpecTests
 
         Assert.AreEqual("Ready", projectIndexStatus,
             "ProjectIndexStatus must remain 'Ready' — not overwritten by retrieval result.");
-        Assert.StartsWith(contextRetrievalStatus, "Empty",
+        Assert.StartsWith("Empty", contextRetrievalStatus,
             $"ContextRetrievalStatus should be 'Empty...' when project is Ready but 0 snippets returned. Got: {contextRetrievalStatus}");
         Assert.AreNotEqual(projectIndexStatus, contextRetrievalStatus,
             "ProjectIndexStatus and ContextRetrievalStatus must be distinct values.");
@@ -773,7 +773,7 @@ public class PromptPlaygroundViewModelSpecTests
         else
             result = "✅ PASS";
 
-        Assert.StartsWith(result, "⚠️ WARNING",
+        Assert.StartsWith("⚠️ WARNING", result,
             $"Zero retrieved snippets must yield WARNING even when answer quality checks pass. Got: {result}");
         Assert.AreNotEqual("✅ PASS", result,
             "PASS must not be awarded when no context snippets were retrieved.");
@@ -792,7 +792,7 @@ public class PromptPlaygroundViewModelSpecTests
                 ? "Empty — project indexed but no snippets matched"
                 : "Limited — project not yet indexed";
 
-        Assert.StartsWith(contextRetrievalStatus, "Retrieved",
+        Assert.StartsWith("Retrieved", contextRetrievalStatus,
             $"ContextRetrievalStatus should start with 'Retrieved' when snippets exist. Got: {contextRetrievalStatus}");
         Assert.IsTrue(contextRetrievalStatus.Contains("5"),
             "ContextRetrievalStatus should include the snippet count.");
@@ -817,7 +817,7 @@ public class PromptPlaygroundViewModelSpecTests
         else if (!hasSnippets)               result = "⚠️ WARNING — correct answer, no retrieved context";
         else                                 result = "✅ PASS";
 
-        Assert.StartsWith(result, "⚠️ WARNING",
+        Assert.StartsWith("⚠️ WARNING", result,
             $"Ready project + no snippets must score WARNING. Got: {result}");
         Assert.AreNotEqual("✅ PASS", result,
             "PASS must not be awarded when no context snippets were retrieved.");
@@ -856,7 +856,7 @@ public class PromptPlaygroundViewModelSpecTests
                 ? "Empty — project indexed but no snippets matched"
                 : "Limited — project not yet indexed";
 
-        Assert.StartsWith(contextStatus, "Limited",
+        Assert.StartsWith("Limited", contextStatus,
             $"Non-Ready project with no snippets must show 'Limited'. Got: {contextStatus}");
     }
 
@@ -1106,7 +1106,7 @@ public class PromptPlaygroundViewModelSpecTests
 
         Assert.AreEqual("Ready", project.IndexingStatus, "IndexingStatus must be Ready after successful index.");
         Assert.AreEqual(156, project.IndexedFileCount, "IndexedFileCount must match the actual stored file count.");
-        Assert.IsGreaterThan(project.IndexedFileCount ?? 0, 0, "IndexedFileCount must be > 0 for a Ready project.");
+        Assert.IsGreaterThan(0, project.IndexedFileCount ?? 0, "IndexedFileCount must be > 0 for a Ready project.");
     }
 
     [TestMethod]

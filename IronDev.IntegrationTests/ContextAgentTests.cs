@@ -317,7 +317,7 @@ public sealed class ContextAgentTests
         // Evidence is injected into the final prompt
         Assert.IsTrue(result.FinalPrompt!.Contains("EXPANDED CODE EVIDENCE"),
             "Final prompt must contain the expanded evidence section.");
-        Assert.Contains(result.FinalPrompt, "ArchiveTicketAsync",
+        Assert.Contains("ArchiveTicketAsync", result.FinalPrompt,
             "Final prompt must include content from the retrieved snippets.");
 
         // HasCodeEvidence is set
@@ -356,7 +356,7 @@ public sealed class ContextAgentTests
             "FinalPrompt must be null when clarification is required.");
         Assert.AreEqual(2, result.ClarificationQuestions.Count,
             "Both clarification questions must be present.");
-        Assert.Contains(result.ClarificationQuestions[0], "draft ticket flow");
+        Assert.Contains("draft ticket flow", result.ClarificationQuestions[0]);
 
         // No code search was executed
         Assert.HasCount(0, index.ReceivedQueries,

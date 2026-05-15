@@ -822,18 +822,14 @@ public sealed class CodeChangeProposalServiceTests
 
     private static string ValidJson(long ticketId = 1) => $$"""
         {
-          "ticketId": {{ticketId}},
           "summary": "Replace 'Conversation History' with 'Conversations'.",
-          "riskNotes": "Low — XAML layout only.",
-          "testPlan": "Run app, verify header at 320px.",
-          "standardsCompliance": "Satisfied SQL Rule and MVVM Rule.",
-          "fileChanges": [
+          "rationale": "Low — XAML layout only.",
+          "changes": [
             {
               "filePath": "Views\\ChatWorkspaceView.xaml",
-              "changeReason": "Header text clips.",
-              "beforeSnippet": "<TextBlock Text=\"Conversation History\"",
-              "afterSnippet": "<TextBlock Text=\"Conversations\" TextTrimming=\"CharacterEllipsis\"",
-              "patch": "@@ -1,1 +1,1 @@\n-Conversation History\n+Conversations"
+              "description": "Header text clips.",
+              "diff": "@@ -1,1 +1,1 @@\n-Conversation History\n+Conversations",
+              "fullContentAfter": "new content"
             }
           ]
         }
@@ -849,10 +845,10 @@ public sealed class CodeChangeProposalServiceTests
         var proposal = await svc.GenerateProposalAsync(MakeContext());
 
         Assert.AreEqual("Replace 'Conversation History' with 'Conversations'.", proposal.Summary);
-        Assert.AreEqual(1, proposal.FileChanges.Count);
+        Assert.HasCount(1, proposal.FileChanges);
         Assert.AreEqual(@"Views\ChatWorkspaceView.xaml", proposal.FileChanges[0].FilePath);
-        Assert.AreEqual("Low — XAML layout only.", proposal.RiskNotes);
-        Assert.AreEqual("Satisfied SQL Rule and MVVM Rule.", proposal.StandardsCompliance);
+        Assert.AreEqual("Generated in proposal-only mode.", proposal.RiskNotes);
+        Assert.AreEqual("Low — XAML layout only.", proposal.Rationale);
     }
 
     [TestMethod]
@@ -887,17 +883,15 @@ public sealed class CodeChangeProposalServiceTests
     {
         var json = """
             {
-              "ticketId": 1,
               "summary": "Nothing to change.",
-              "riskNotes": "N/A",
-              "testPlan": "N/A",
-              "fileChanges": []
+              "rationale": "N/A",
+              "changes": []
             }
             """;
         var svc = new IronDev.Infrastructure.Builder.CodeChangeProposalService(new FakeLlm(json), new NullLlmTraceService());
         var proposal = await svc.GenerateProposalAsync(MakeContext());
 
-        Assert.AreEqual(0, proposal.FileChanges.Count);
+        Assert.HasCount(0, proposal.FileChanges);
         Assert.AreEqual("Nothing to change.", proposal.Summary);
     }
 
@@ -957,8 +951,7 @@ public sealed class CodeChangeProposalServiceTests
     public void ParseProposal_UsesFallbackTicketId_WhenLlmReturnsZero()
     {
         var json = """
-            { "ticketId": 0, "summary": "ok", "riskNotes": "low",
-              "testPlan": "test", "fileChanges": [] }
+            { "summary": "ok", "rationale": "low", "changes": [] }
             """;
         var proposal = IronDev.Infrastructure.Builder.CodeChangeProposalService.ParseProposal(json, 99L);
 

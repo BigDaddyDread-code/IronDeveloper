@@ -53,7 +53,7 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
         try
         {
             // Pre-router catch obvious cases
-            if (IsObviousFallback(request.UserRequest, request.InitialIntentFromPromptContextBuilder))
+            if (IsObviousFallback(request))
             {
                 decision = FallbackRoute(request.UserRequest, request.InitialIntentFromPromptContextBuilder);
                 usedFallbackRules = true;
@@ -237,11 +237,16 @@ Evidence Packet:
         };
     }
 
-    private bool IsObviousFallback(string request, string intent)
+    private bool IsObviousFallback(ContextAgentRouteRequest request)
     {
-        var lower = (request ?? string.Empty).ToLowerInvariant().Trim();
-        if (lower.StartsWith("/ticket") || lower.StartsWith("/create-ticket") || lower.StartsWith("create a ticket")) return true;
-        if (intent == "CreateTicket") return true;
+        var lower = (request.UserRequest ?? string.Empty).ToLowerInvariant().Trim();
+        if (lower.StartsWith("/ticket") || lower.StartsWith("/create-ticket")) return true;
+        
+        // If it's just "create a ticket" and we have no context, it's a fallback.
+        // If we HAVE context, we want the LLM to resolve it against the active topic.
+        if (string.IsNullOrWhiteSpace(request.RecentConversationSummary) && lower.StartsWith("create a ticket")) return true;
+        
+        if (request.InitialIntentFromPromptContextBuilder == "CreateTicket") return true;
         return false;
     }
 
