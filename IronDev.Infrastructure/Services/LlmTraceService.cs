@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -12,6 +13,12 @@ public class LlmTraceService : ILlmTraceService
 {
     private readonly List<LlmTraceEntry> _traces = new();
     private readonly object _lock = new();
+    private readonly ILogger<LlmTraceService>? _logger;
+
+    public LlmTraceService(ILogger<LlmTraceService>? logger = null)
+    {
+        _logger = logger;
+    }
 
     // ── ILlmTraceService ──────────────────────────────────────────────────
 
@@ -37,8 +44,37 @@ public class LlmTraceService : ILlmTraceService
             }
         }
 
+        LogTraceSummary(trace);
+
         // Raise outside the lock so subscribers don't deadlock
         TraceAdded?.Invoke(this, trace);
+    }
+
+    private void LogTraceSummary(LlmTraceEntry trace)
+    {
+        if (trace.WasSuccessful || string.IsNullOrWhiteSpace(trace.ErrorMessage))
+        {
+            _logger?.LogInformation(
+                "LLM trace captured: {FeatureName} model={Model} projectId={ProjectId} ticketId={TicketId} traceGroupId={TraceGroupId} durationMs={DurationMs} tokens={TokenUsageTotal}",
+                trace.FeatureName,
+                trace.Model,
+                trace.ProjectId,
+                trace.TicketId,
+                trace.TraceGroupId,
+                trace.DurationMs,
+                trace.TokenUsageTotal ?? trace.EstimatedTokens);
+            return;
+        }
+
+        _logger?.LogWarning(
+            "LLM trace captured with failure: {FeatureName} model={Model} projectId={ProjectId} ticketId={TicketId} traceGroupId={TraceGroupId} durationMs={DurationMs} error={ErrorMessage}",
+            trace.FeatureName,
+            trace.Model,
+            trace.ProjectId,
+            trace.TicketId,
+            trace.TraceGroupId,
+            trace.DurationMs,
+            trace.ErrorMessage);
     }
 
     public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int max = 100)

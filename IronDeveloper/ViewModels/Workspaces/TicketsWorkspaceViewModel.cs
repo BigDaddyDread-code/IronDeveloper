@@ -20,6 +20,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private readonly ITicketBuildOrchestrator                        _orchestrator;
     private readonly IDraftTicketService                             _draftService;
     private readonly ICodebaseTicketGeneratorService                 _generatorService;
+    private readonly ILlmTraceService?                               _llmTraceService;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
@@ -201,13 +202,15 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         global::IronDev.Services.IProjectMemoryService memoryService,
         ITicketBuildOrchestrator                       orchestrator,
         IDraftTicketService                            draftService,
-        ICodebaseTicketGeneratorService                generatorService)
+        ICodebaseTicketGeneratorService                generatorService,
+        ILlmTraceService?                              llmTraceService = null)
     {
         _ticketService    = ticketService;
         _memoryService    = memoryService;
         _orchestrator     = orchestrator;
         _draftService     = draftService;
         _generatorService = generatorService;
+        _llmTraceService  = llmTraceService;
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
@@ -652,9 +655,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         }
 
         // ── 2. Add trace at click boundary ──
-        var traceService = (global::IronDev.Core.Interfaces.ILlmTraceService)((global::IronDev.Agent.App)System.Windows.Application.Current).Services.GetService(typeof(global::IronDev.Core.Interfaces.ILlmTraceService))!;
-        
-        traceService.AddTrace(new LlmTraceEntry
+        _llmTraceService?.AddTrace(new LlmTraceEntry
         {
             FeatureName = "Builder.BuildThisClicked",
             WorkspaceName = "Builder",
@@ -775,9 +776,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                     _shouldGenerateDraftAfterIndex = false;
                     DraftPreflightMessage         = string.Empty;
                     var ctx = _pendingChatContext;
-                    // Fire-and-forget on the UI thread; GeneratePendingDraftAsync transitions
-                    // DraftPreflight to None and sets HasDetail=true when it completes.
-                    _ = GeneratePendingDraftAsync(ctx);
+                    _ = GeneratePendingDraftAfterIndexAsync(ctx);
                 }
             }
             else if (status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase))
@@ -807,6 +806,33 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         else
         {
             DraftPreflightMessage = $"Indexing failed: {message}. You can try again or continue without index.";
+        }
+    }
+
+    private async Task GeneratePendingDraftAfterIndexAsync(ChatTicketContext ctx)
+    {
+        try
+        {
+            await GeneratePendingDraftAsync(ctx);
+        }
+        catch (Exception ex)
+        {
+            IsDraftIndexing = false;
+            DraftPreflight = DraftPreflightState.IndexFailed;
+            DraftPreflightMessage = "Draft generation failed after indexing. You can retry or continue without index.";
+
+            _llmTraceService?.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Tickets.GeneratePendingDraftAfterIndex",
+                WorkspaceName = "Tickets",
+                ProjectId = _activeProjectId,
+                ActiveProjectName = _activeProjectName,
+                ActiveProjectPath = _activeProjectPath,
+                WasSuccessful = false,
+                ErrorMessage = ex.Message,
+                ParsedResponseSummary = "Pending draft generation failed after indexing completed.",
+                CreatedAt = DateTime.UtcNow
+            });
         }
     }
 

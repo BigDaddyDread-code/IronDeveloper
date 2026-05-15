@@ -11,6 +11,7 @@ using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Data;
 using IronDev.Data.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IronDev.Services;
 
@@ -29,6 +30,7 @@ public sealed class SqlCodeIndexService : ICodeIndexService
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ICurrentTenantContext _tenant;
+    private readonly ILogger<SqlCodeIndexService>? _logger;
 
     private static readonly HashSet<string> ExcludedDirs = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -45,10 +47,14 @@ public sealed class SqlCodeIndexService : ICodeIndexService
     private static readonly Regex ClassRegex = new(@"class\s+(\w+)", RegexOptions.Compiled);
     private static readonly Regex MethodRegex = new(@"(?:public|private|protected|internal|static|\s)+\s+[\w\<\>\[\]]+\s+(\w+)\s*\(", RegexOptions.Compiled);
 
-    public SqlCodeIndexService(IDbConnectionFactory connectionFactory, ICurrentTenantContext tenant)
+    public SqlCodeIndexService(
+        IDbConnectionFactory connectionFactory,
+        ICurrentTenantContext tenant,
+        ILogger<SqlCodeIndexService>? logger = null)
     {
         _connectionFactory = connectionFactory;
         _tenant = tenant;
+        _logger = logger;
     }
 
     public async Task<CodeIndexResult> IndexDirectoryAsync(int projectId, string directoryPath, CancellationToken cancellationToken = default)
@@ -59,6 +65,12 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         System.Diagnostics.Trace.WriteLine(
             $"[CodeIndexService] IndexDirectoryAsync called: ProjectId={projectId} TenantId={_tenant.TenantId} " +
             $"Path=[{directoryPath}] Exists={Directory.Exists(directoryPath)}");
+        _logger?.LogInformation(
+            "IndexDirectoryAsync called: projectId={ProjectId} tenantId={TenantId} path={DirectoryPath} exists={PathExists}",
+            projectId,
+            _tenant.TenantId,
+            directoryPath,
+            Directory.Exists(directoryPath));
 
         // ── Guard: directory must exist ───────────────────────────────────────
         if (!Directory.Exists(directoryPath))
@@ -70,6 +82,12 @@ public sealed class SqlCodeIndexService : ICodeIndexService
                 $"[CodeIndexService] PATH NOT FOUND: [{directoryPath}] — marking project as failed.");
 
             // Mark the project status as failed — do NOT leave it as Ready
+            _logger?.LogWarning(
+                "Index path not found. Marking project indexing as failed: projectId={ProjectId} tenantId={TenantId} path={DirectoryPath}",
+                projectId,
+                _tenant.TenantId,
+                directoryPath);
+
             using var conn0 = _connectionFactory.CreateConnection();
             conn0.Open();
             await conn0.ExecuteAsync(
@@ -87,6 +105,11 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         System.Diagnostics.Trace.WriteLine(
             $"[CodeIndexService] Directory found. allFiles={allFiles.Count} (after excludes). " +
             $"First 5: {string.Join(" | ", allFiles.Take(5).Select(Path.GetFileName))}");
+        _logger?.LogInformation(
+            "Index directory found: projectId={ProjectId} fileCount={FileCount} firstFiles={FirstFiles}",
+            projectId,
+            allFiles.Count,
+            string.Join(" | ", allFiles.Take(5).Select(Path.GetFileName)));
 
 
         using var connection = _connectionFactory.CreateConnection();
@@ -229,8 +252,14 @@ public sealed class SqlCodeIndexService : ICodeIndexService
             result.StoredFileCount = storedFileCount;
             transaction.Commit();
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.LogError(
+                ex,
+                "Indexing failed. Rolling back transaction: projectId={ProjectId} tenantId={TenantId} path={DirectoryPath}",
+                projectId,
+                _tenant.TenantId,
+                directoryPath);
             transaction.Rollback();
             throw;
         }
@@ -364,7 +393,11 @@ public sealed class SqlCodeIndexService : ICodeIndexService
 
             string[] dirs;
             try { dirs = Directory.GetDirectories(current); }
-            catch { continue; }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                _logger?.LogWarning(ex, "Skipping directory during indexing: {DirectoryPath}", current);
+                continue;
+            }
 
             foreach (var d in dirs)
             {
@@ -375,7 +408,11 @@ public sealed class SqlCodeIndexService : ICodeIndexService
 
             string[] files;
             try { files = Directory.GetFiles(current); }
-            catch { continue; }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                _logger?.LogWarning(ex, "Skipping files during indexing: {DirectoryPath}", current);
+                continue;
+            }
 
             foreach (var f in files)
             {

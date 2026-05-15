@@ -1,9 +1,12 @@
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Serilog;
+using Serilog.Events;
 using IronDev.Agent.ViewModels.Shell;
 using IronDev.Agent.ViewModels.Workflow;
 using IronDev.Agent.ViewModels.Workspaces;
@@ -17,14 +20,21 @@ namespace IronDev.Agent;
 public partial class App : Application
 {
     private readonly IHost _host;
+    private static readonly string LogDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "IronDev",
+        "logs");
 
     public IServiceProvider Services => _host.Services;
 
     public App()
     {
+        ConfigureFileLogging();
+
         // Surface fatal crashes as a readable MessageBox instead of silent ExecutionEngineException
         DispatcherUnhandledException += (_, e) =>
         {
+            Log.Fatal(e.Exception, "Unhandled dispatcher exception");
             MessageBox.Show(
                 $"Unhandled error:\n\n{e.Exception.GetType().Name}: {e.Exception.Message}\n\n" +
                 $"{e.Exception.StackTrace?.Split('\n').FirstOrDefault()}",
@@ -34,12 +44,18 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             var ex = e.ExceptionObject as Exception;
+            if (ex != null)
+                Log.Fatal(ex, "Fatal AppDomain exception");
+            else
+                Log.Fatal("Fatal AppDomain exception with non-Exception payload: {Payload}", e.ExceptionObject);
+
             MessageBox.Show(
                 $"Fatal unhandled exception:\n\n{ex?.GetType().Name}: {ex?.Message}",
                 "IronDev — Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
         };
 
         _host = Host.CreateDefaultBuilder()
+            .UseSerilog()
             .ConfigureServices((context, services) =>
             {
                 // ── Data & Infrastructure ─────────────────────────────────────
@@ -55,7 +71,8 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.ITicketService, global::IronDev.Services.TicketService>();
                 services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
                 services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
-                services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddTransient<global::IronDev.Services.SqlCodeIndexService>();
+                services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Infrastructure.Tracing.TracingCodeIndexServiceDecorator>();
                 services.AddTransient<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
                 services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
                 services.AddTransient<global::IronDev.Services.IProjectContextExportService, global::IronDev.Infrastructure.Services.ProjectContextExportService>();
@@ -89,7 +106,7 @@ public partial class App : Application
                     try
                     {
                         var provider = aiOptions.Provider?.ToLowerInvariant() ?? "openai";
-                        return provider switch
+                        global::IronDev.Core.ILLMService inner = provider switch
                         {
                             "openai"      => new global::IronDev.Infrastructure.Services.OpenAiLlmService(aiOptions),
                             "localopenai" => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
@@ -97,6 +114,10 @@ public partial class App : Application
                             "custom"      => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
                             _ => throw new InvalidOperationException($"Unsupported AI provider: {aiOptions.Provider}. Check appsettings.json.")
                         };
+
+                        return new global::IronDev.Infrastructure.Tracing.TracingLlmServiceDecorator(
+                            inner,
+                            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<global::IronDev.Infrastructure.Tracing.TracingLlmServiceDecorator>>());
                     }
                     catch (Exception ex)
                     {
@@ -155,8 +176,10 @@ public partial class App : Application
                     global::IronDev.Core.Interfaces.ICodePatchService,
                     global::IronDev.Infrastructure.Builder.CodePatchService>();
                 services.AddTransient<
-                    global::IronDev.Core.Interfaces.ITicketBuildOrchestrator,
                     global::IronDev.Infrastructure.Builder.TicketBuildOrchestrator>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ITicketBuildOrchestrator,
+                    global::IronDev.Infrastructure.Tracing.TracingTicketBuildOrchestratorDecorator>();
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IDraftTicketService,
                     global::IronDev.Infrastructure.Builder.DraftTicketService>();
@@ -192,6 +215,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         await _host.StartAsync();
+        Log.Information("IronDev started. Logs: {LogDirectory}", LogDirectory);
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -204,7 +228,27 @@ public partial class App : Application
         using (_host)
             await _host.StopAsync(TimeSpan.FromSeconds(5));
 
+        Log.Information("IronDev stopped");
+        Log.CloseAndFlush();
+
         base.OnExit(e);
+    }
+
+    private static void ConfigureFileLogging()
+    {
+        Directory.CreateDirectory(LogDirectory);
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .Enrich.FromLogContext()
+            .WriteTo.File(
+                Path.Combine(LogDirectory, "irondev-.log"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 14,
+                shared: true,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
     }
 
     /// <summary>

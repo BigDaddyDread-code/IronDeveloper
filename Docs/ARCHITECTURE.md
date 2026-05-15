@@ -123,3 +123,24 @@ Services resolve `ICurrentTenantContext` from the JWT claim per-request.
 | Sequential integration tests | Tests share a real SQL Server DB — Workers=1 is required in runsettings to avoid FK/data conflicts |
 | No ASP.NET Core Identity | Too heavy for current phase; plain `UserService` + Dapper is sufficient |
 | Keyword-first context | Prompt builder prioritizes technical keywords extracted from user prompts |
+
+---
+
+## Observability And Tracing
+
+IronDev keeps LLM tracing separate from standard application logging because they answer different questions.
+
+`ILlmTraceService` is the AI workflow record. It should capture prompts, raw model responses, parsed summaries, context packets, route decisions, sufficiency checks, evidence/proof gates, trace groups, warnings, and model errors. These entries are product/debugging evidence and power the LLM Console.
+
+Serilog is the operational log. It should capture app startup/shutdown, service failures, exception stacks, indexing progress/failures, skipped files/folders, timing, health signals, and configuration/provider issues. Full prompts and raw model responses should not be written to standard log files; only compact LLM trace summaries should be logged for correlation.
+
+Recommended boundary:
+
+| Concern | Tool |
+|---|---|
+| AI workflow evidence | `ILlmTraceService` |
+| Runtime health and failures | Serilog |
+| Service-boundary timing/errors | Explicit pipeline tracing where available; DI decorators where no pipeline boundary exists |
+| Meaningful Context Agent stages | Explicit trace entries |
+
+Tracing should prefer visible pipeline boundaries over AOP-style interception. Good pipeline candidates include REST middleware and Context Agent stages. Where no useful pipeline exists, small DI decorators are acceptable for service-boundary timing, correlation, and error logging. Heavy runtime interception should be avoided. Good decorator candidates are `ILLMService`, `ICodeIndexService`, and `ITicketBuildOrchestrator`; `IContextAgentService` should keep explicit traces for meaningful AI decisions.
