@@ -395,6 +395,15 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         // Some reasonable defaults if missing
         if (string.IsNullOrWhiteSpace(ProfilePrimaryLanguage)) ProfilePrimaryLanguage = "C#";
         
+        // BookSeller specific detection
+        if (path.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(ProfileApplicationType)) ProfileApplicationType = "External Sandbox / Class Library";
+            if (string.IsNullOrWhiteSpace(ProfileFramework)) ProfileFramework = ".NET 10";
+            if (string.IsNullOrWhiteSpace(ProfileDatabaseEngine)) ProfileDatabaseEngine = "None";
+            if (string.IsNullOrWhiteSpace(ProfileDataAccessStyle)) ProfileDataAccessStyle = "InMemory";
+        }
+        
         ProfileSaveStatus = "Detected. Unsaved.";
     }
 }
