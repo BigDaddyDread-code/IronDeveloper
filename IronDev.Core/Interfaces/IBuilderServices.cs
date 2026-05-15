@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core.Builder;
+using IronDev.Core.Models;
 
 // Note: ChatTicketContext lives in IronDev.Agent (the WPF host project).
 // IDraftTicketService is defined here in Core to keep the interface layer clean;
@@ -58,6 +59,17 @@ public interface ICodeChangeProposalService
 }
 
 /// <summary>
+/// Workbench-level service for generating structured BuilderProposals.
+/// Reuses ICodeChangeProposalService and IBuilderContextService.
+/// </summary>
+public interface IBuilderProposalService
+{
+    Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default);
+    Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default);
+    Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default);
+}
+
+/// <summary>
 /// Applies file patches to disk after developer approval.
 /// Performs Git status check before any write.
 /// </summary>
@@ -92,6 +104,16 @@ public interface ICodePatchService
 public interface IDotNetBuildService
 {
     Task<DotNetBuildResult> BuildAsync(
+        string projectOrSolutionPath,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Runs 'dotnet test' as a subprocess and captures the result.
+/// </summary>
+public interface IDotNetTestService
+{
+    Task<DotNetTestResult> TestAsync(
         string projectOrSolutionPath,
         CancellationToken cancellationToken = default);
 }
@@ -149,4 +171,35 @@ public interface IDraftTicketService
         int        projectId,
         DraftTicket current,
         CancellationToken ct = default);
+}
+
+/// <summary>
+/// Classifies build output errors into common project-knowledge missing categories.
+/// </summary>
+public interface IBuildErrorClassifierService
+{
+    Task<BuildArchitectureReconciliation?> ClassifyBuildFailureAsync(
+        DotNetBuildResult buildResult,
+        IronDev.Data.Models.ProjectProfile profile,
+        string projectPath,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Evaluates if a project and ticket are ready for the Builder cycle.
+/// </summary>
+public interface IBuilderReadinessService
+{
+    Task<BuildReadinessResult> EvaluateReadinessAsync(
+        int projectId,
+        long ticketId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates a proposal specifically for architectural consistency 
+    /// (e.g. test framework mismatch) before apply.
+    /// </summary>
+    Task<BuildReadinessResult> ValidateProposalArchitectureAsync(
+        BuilderProposal proposal,
+        CancellationToken cancellationToken = default);
 }

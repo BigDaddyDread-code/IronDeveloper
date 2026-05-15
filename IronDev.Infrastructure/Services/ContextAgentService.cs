@@ -207,7 +207,7 @@ public sealed class ContextAgentService : IContextAgentService
         // Hoisted here so the goto BuildFinalPrompt path in Stage 2 cannot bypass it.
         TicketConflictAssessment? conflictAssessment = null;
         {
-            var checkPrompt = BuildSufficiencyPrompt(effectiveWorkText, initialPacket);
+            var checkPrompt = BuildSufficiencyPrompt(effectiveWorkText, initialPacket, route);
             var sw = Stopwatch.StartNew();
             string rawJson;
             try
@@ -851,10 +851,18 @@ public sealed class ContextAgentService : IContextAgentService
         return "production code";
     }
 
-    private static string BuildSufficiencyPrompt(string userRequest, ChatContextPacket packet)
+    private static string BuildSufficiencyPrompt(string userRequest, ChatContextPacket packet, ContextAgentRouteDecision route)
     {
         var sb = new StringBuilder();
         sb.AppendLine(SufficiencySystemPrompt);
+        sb.AppendLine();
+        sb.AppendLine($"=== CURRENT ROUTE: {route.RequestKind} ===");
+        if (route.RequestKind == ContextRequestKind.ArchitectureAdvice)
+        {
+            sb.AppendLine("INSTRUCTION: This is an architecture advice request.");
+            sb.AppendLine("- Do NOT search for non-existing symbols (e.g. 'BookRepository', 'DbContext') unless the user explicitly mentions they should exist.");
+            sb.AppendLine("- Instead, search for EXISTING architectural patterns and project profiles to ground your recommendations.");
+        }
         sb.AppendLine();
         sb.AppendLine("=== ASSEMBLED CONTEXT (excerpt) ===");
         var promptExcerpt = packet.FormattedPrompt.Length > 4000
@@ -986,6 +994,17 @@ Return JSON only.";
         bool shouldEnforceHonesty = route.RequestKind is ContextRequestKind.VerifyImplementation 
                                 or ContextRequestKind.InspectCode 
                                 or ContextRequestKind.ExplainCode;
+
+        if (route.RequestKind == ContextRequestKind.ArchitectureAdvice)
+        {
+            sb.AppendLine("- ARCHITECTURE ADVICE MODE: The user is seeking recommendations and industry-standard approaches.");
+            sb.AppendLine("- You SHOULD provide expert recommendations even if the feature does not exist yet.");
+            sb.AppendLine("- Label recommendations clearly as recommendations (e.g., 'I recommend...').");
+            sb.AppendLine("- If no implementation exists, state: 'No implementation exists yet for this feature. Here are my recommendations:'");
+            sb.AppendLine("- After providing your advice, you MUST ask the user: 'Should I record this as a [ProjectName] architecture decision?'");
+            sb.AppendLine("- Do NOT pretend implementation exists if it doesn't.");
+            sb.AppendLine("- Use existing project profile, standards, and decisions as grounding if available.");
+        }
 
         if (shouldEnforceHonesty && proof.Status != ContextProofStatus.ProvenPresent)
         {

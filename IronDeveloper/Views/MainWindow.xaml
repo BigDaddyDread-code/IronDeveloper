@@ -257,6 +257,13 @@
                                                  IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}"
                                                  Margin="0,0,0,10"/>
 
+                            <!-- Project Profile -->
+                            <controls:NavRailItem IconData="{StaticResource Icon.Nav.Settings}" 
+                                                 Command="{Binding NavigateWorkspaceCommand}" CommandParameter="ProjectProfile"
+                                                 ToolTip="Project Profile"
+                                                 IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=ProjectProfile}"
+                                                 Margin="0,0,0,10"
+                                                 Opacity="0.8"/>
                         </StackPanel>
 
                         <TextBlock Text="SYSTEM" Style="{StaticResource Typography.Eyebrow}" HorizontalAlignment="Center" Margin="10,10,0,10" Opacity="0.5"/>

@@ -15,6 +15,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     private readonly global::IronDev.Services.ITicketService _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
     private readonly global::IronDev.Agent.Services.Interfaces.ILocalIndexingService _indexingService;
+    private readonly global::IronDev.Core.Interfaces.IProjectProfileService _profileService;
 
     private global::IronDev.Data.Models.Project? _currentProject;
 
@@ -27,6 +28,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private string _indexingTime   = "-";
     [ObservableProperty] private int    _fileCount;
     [ObservableProperty] private bool   _isIndexing;
+    [ObservableProperty] private string _lastIndexingDetails = string.Empty;
 
     // ── Session context (set by ShellViewModel on project activation) ─────────
     [ObservableProperty] private string _currentUserDisplayName = string.Empty;
@@ -37,6 +39,23 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<TicketItem>   _recentTickets   = [];
     [ObservableProperty] private ObservableCollection<DecisionItem> _recentDecisions = [];
 
+    // ── Project Profile ───────────────────────────────────────────────────────
+    [ObservableProperty] private string _profileApplicationType = string.Empty;
+    [ObservableProperty] private string _profilePrimaryLanguage = string.Empty;
+    [ObservableProperty] private string _profileFramework = string.Empty;
+    [ObservableProperty] private string _profileDatabaseEngine = string.Empty;
+    [ObservableProperty] private string _profileDataAccessStyle = string.Empty;
+    [ObservableProperty] private string _profileTestFramework = string.Empty;
+    [ObservableProperty] private string _profileSolutionFile = string.Empty;
+    [ObservableProperty] private string _profileBuildCommand = string.Empty;
+    [ObservableProperty] private string _profileTestCommand = string.Empty;
+    [ObservableProperty] private string _profileSafeWriteRoot = string.Empty;
+    [ObservableProperty] private bool _profileAllowBuilderApply;
+    [ObservableProperty] private bool _profileAllowWritesOutsideProjectRoot;
+    [ObservableProperty] private string _profileNotes = string.Empty;
+
+    [ObservableProperty] private string _profileSaveStatus = string.Empty;
+
     // ── Derived state card properties ─────────────────────────────────────────
     public string LastTicketTitle    => RecentTickets.Count > 0   ? RecentTickets[0].Title   : "None yet";
     public string LastDecisionTitle  => RecentDecisions.Count > 0 ? RecentDecisions[0].Title : "None yet";
@@ -44,11 +63,13 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     public ProjectOverviewViewModel(
         global::IronDev.Services.ITicketService ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
-        global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService)
+        global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService,
+        global::IronDev.Core.Interfaces.IProjectProfileService profileService)
     {
         _ticketService   = ticketService;
         _memoryService   = memoryService;
         _indexingService = indexingService;
+        _profileService  = profileService;
     }
 
     internal async Task LoadAsync(global::IronDev.Data.Models.Project project)
@@ -59,6 +80,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         Description     = project.Description ?? string.Empty;
         
         await RefreshAsync();
+        await LoadProfileAsync();
     }
 
     private async Task RefreshAsync()
@@ -178,6 +200,18 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 
             // Success — use StoredFileCount (actual DB rows) not FilesScanned (just disk walk)
             FileCount = result.StoredFileCount;
+            LastIndexingDetails = $"Files Scanned: {result.FilesScanned}\n" +
+                                  $"Files Added: {result.FilesAdded}\n" +
+                                  $"Files Updated: {result.FilesUpdated}\n" +
+                                  $"Files Unchanged: {result.FilesUnchanged}\n" +
+                                  $"Files Skipped: {result.FilesSkipped}\n" +
+                                  $"Total in Index: {result.StoredFileCount}\n" +
+                                  $"Duration: {sw.Elapsed.TotalSeconds:F1}s";
+
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                LastIndexingDetails += $"\n\nMessages: {result.ErrorMessage}";
+            }
 
             // Reload from DB so that LastIndexedUtc, IndexingStatus come from the DB update
             // performed by CodeIndexService, not from a manual local mutation
@@ -198,6 +232,186 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [RelayCommand]
     private void ViewDetails()
     {
-        // Placeholder for future navigation to an "Index Details" screen
+        // 5. Replace bad View Details modal with a useful panel/dialog
+        // We'll show a comprehensive MessageBox that looks good for now.
+        // It provides real indexing details instead of just "No details captured."
+        
+        if (string.IsNullOrWhiteSpace(LastIndexingDetails))
+        {
+            System.Windows.MessageBox.Show(
+                "No index details have been captured yet. Re-index the project to collect details.",
+                "Index Details", 
+                System.Windows.MessageBoxButton.OK, 
+                System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Project: {ProjectName}");
+        sb.AppendLine($"Scope Path: {ProjectPath}");
+        sb.AppendLine($"Status: {Status}");
+        sb.AppendLine($"Indexed Files: {FileCount}");
+        sb.AppendLine($"Last Indexed: {LastIndexed}");
+        sb.AppendLine();
+        sb.AppendLine("--- Indexing Output ---");
+        sb.AppendLine(LastIndexingDetails);
+
+        // Note: MessageBox isn't perfect but is what we have right now without adding a new Window. 
+        // We ensure it includes all the requested data.
+        System.Windows.MessageBox.Show(
+            sb.ToString(),
+            "Index Details",
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private async Task LoadProfileAsync()
+    {
+        if (_currentProject == null) return;
+        var profile = await _profileService.GetProjectProfileAsync(_currentProject.Id);
+        
+        if (profile != null)
+        {
+            ProfileApplicationType = profile.ApplicationType ?? string.Empty;
+            ProfilePrimaryLanguage = profile.PrimaryLanguage ?? string.Empty;
+            ProfileFramework = profile.Framework ?? string.Empty;
+            ProfileDatabaseEngine = profile.DatabaseEngine ?? string.Empty;
+            ProfileDataAccessStyle = profile.DataAccessStyle ?? string.Empty;
+            ProfileTestFramework = profile.TestFramework ?? string.Empty;
+            ProfileSolutionFile = profile.SolutionFile ?? string.Empty;
+            ProfileSafeWriteRoot = profile.SafeWriteRoot ?? string.Empty;
+            ProfileAllowBuilderApply = profile.AllowBuilderApply;
+            ProfileAllowWritesOutsideProjectRoot = profile.AllowWritesOutsideProjectRoot;
+            ProfileNotes = profile.ProfileNotes ?? string.Empty;
+        }
+        else
+        {
+            // Default empty
+            ProfileApplicationType = string.Empty;
+            ProfilePrimaryLanguage = string.Empty;
+            ProfileFramework = string.Empty;
+            ProfileDatabaseEngine = string.Empty;
+            ProfileDataAccessStyle = string.Empty;
+            ProfileTestFramework = string.Empty;
+            ProfileSolutionFile = string.Empty;
+            ProfileSafeWriteRoot = string.Empty;
+            ProfileAllowBuilderApply = false;
+            ProfileAllowWritesOutsideProjectRoot = false;
+            ProfileNotes = string.Empty;
+        }
+
+        var buildCmd = await _profileService.GetDefaultCommandAsync(_currentProject.Id, "Build");
+        ProfileBuildCommand = buildCmd?.CommandText ?? string.Empty;
+
+        var testCmd = await _profileService.GetDefaultCommandAsync(_currentProject.Id, "Test");
+        ProfileTestCommand = testCmd?.CommandText ?? string.Empty;
+        
+        ProfileSaveStatus = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task SaveProfileAsync()
+    {
+        if (_currentProject == null) return;
+        
+        ProfileSaveStatus = "Saving...";
+
+        var profile = await _profileService.GetProjectProfileAsync(_currentProject.Id) 
+            ?? new IronDev.Data.Models.ProjectProfile { ProjectId = _currentProject.Id };
+
+        profile.ApplicationType = ProfileApplicationType;
+        profile.PrimaryLanguage = ProfilePrimaryLanguage;
+        profile.Framework = ProfileFramework;
+        profile.DatabaseEngine = ProfileDatabaseEngine;
+        profile.DataAccessStyle = ProfileDataAccessStyle;
+        profile.TestFramework = ProfileTestFramework;
+        profile.SolutionFile = ProfileSolutionFile;
+        profile.SafeWriteRoot = ProfileSafeWriteRoot;
+        profile.AllowBuilderApply = ProfileAllowBuilderApply;
+        profile.AllowWritesOutsideProjectRoot = ProfileAllowWritesOutsideProjectRoot;
+        profile.ProfileNotes = ProfileNotes;
+        
+        await _profileService.SaveProjectProfileAsync(profile);
+
+        // Save commands
+        var buildCmd = await _profileService.GetDefaultCommandAsync(_currentProject.Id, "Build")
+            ?? new IronDev.Data.Models.ProjectCommand { ProjectId = _currentProject.Id, CommandType = "Build" };
+        buildCmd.CommandText = ProfileBuildCommand;
+        await _profileService.SaveProjectCommandAsync(buildCmd);
+
+        var testCmd = await _profileService.GetDefaultCommandAsync(_currentProject.Id, "Test")
+            ?? new IronDev.Data.Models.ProjectCommand { ProjectId = _currentProject.Id, CommandType = "Test" };
+        testCmd.CommandText = ProfileTestCommand;
+        await _profileService.SaveProjectCommandAsync(testCmd);
+
+        ProfileSaveStatus = "Saved ✓";
+    }
+
+    [RelayCommand]
+    private void DetectProfile()
+    {
+        if (_currentProject == null || string.IsNullOrWhiteSpace(_currentProject.LocalPath)) return;
+
+        var path = _currentProject.LocalPath;
+        if (!Directory.Exists(path)) return;
+
+        ProfileSafeWriteRoot = path;
+
+        // Find solution
+        var slnFiles = Directory.GetFiles(path, "*.sln", SearchOption.TopDirectoryOnly);
+        if (slnFiles.Length == 0)
+        {
+            slnFiles = Directory.GetFiles(path, "*.slnx", SearchOption.TopDirectoryOnly);
+        }
+
+        if (slnFiles.Length > 0)
+        {
+            ProfileSolutionFile = slnFiles[0];
+            ProfileBuildCommand = $"dotnet build \"{ProfileSolutionFile}\" --no-incremental -v quiet";
+            ProfileTestCommand = $"dotnet test \"{ProfileSolutionFile}\" --logger \"console;verbosity=minimal\"";
+        }
+        else
+        {
+            ProfileSolutionFile = string.Empty;
+            ProfileBuildCommand = "dotnet build";
+            ProfileTestCommand = "dotnet test";
+        }
+
+        // Try to detect xUnit
+        try
+        {
+            bool hasXUnit = false;
+            var projFiles = Directory.GetFiles(path, "*.csproj", SearchOption.AllDirectories);
+            foreach (var proj in projFiles)
+            {
+                var content = File.ReadAllText(proj);
+                if (content.Contains("xunit", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasXUnit = true;
+                    break;
+                }
+            }
+
+            if (hasXUnit)
+            {
+                ProfileTestFramework = "xUnit";
+            }
+        }
+        catch { }
+
+        // Some reasonable defaults if missing
+        if (string.IsNullOrWhiteSpace(ProfilePrimaryLanguage)) ProfilePrimaryLanguage = "C#";
+        
+        // BookSeller specific detection
+        if (path.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(ProfileApplicationType)) ProfileApplicationType = "External Sandbox / Class Library";
+            if (string.IsNullOrWhiteSpace(ProfileFramework)) ProfileFramework = ".NET 10";
+            if (string.IsNullOrWhiteSpace(ProfileDatabaseEngine)) ProfileDatabaseEngine = "None";
+            if (string.IsNullOrWhiteSpace(ProfileDataAccessStyle)) ProfileDataAccessStyle = "InMemory";
+        }
+        
+        ProfileSaveStatus = "Detected. Unsaved.";
     }
 }

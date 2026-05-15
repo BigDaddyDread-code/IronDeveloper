@@ -52,6 +52,9 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             TicketId = context.TicketId,
             PlanId = context.PlanId,
             RequestText = prompt,
+            ActiveProjectName = context.ProjectName,
+            ActiveProjectPath = context.ProjectPath,
+            IsProposalOnly = true,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -79,7 +82,12 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         try
         {
             var proposal = ParseProposal(rawJson, context.TicketId);
+            proposal.OriginalRequest = context.TicketSummary;
+            
+            trace.ProposedFileCount = proposal.FileChanges.Count;
+            trace.ProposedFilesList = string.Join(", ", proposal.FileChanges.ConvertAll(c => c.FilePath));
             trace.ParsedResponseSummary = $"Proposed {proposal.FileChanges.Count} file changes.";
+            
             _llmTraceService.AddTrace(trace);
             return proposal;
         }
@@ -100,18 +108,45 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
 
         sb.AppendLine("You are IronDev Builder.");
         sb.AppendLine($"You are implementing a ticket for the project: {ctx.ProjectName}.");
+        sb.AppendLine($"Active Target Project: {ctx.ProjectName}");
+        sb.AppendLine($"Active Target Project Root: {ctx.ProjectPath}");
+        
+        if (ctx.IsExternalProject)
+        {
+            sb.AppendLine("NOTE: This is an EXTERNAL project. Do not make assumptions based on IronDev internals.");
+            if (ctx.ProjectName.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.AppendLine("- For SearchByTitle, modify the existing method in BookService.cs only.");
+                sb.AppendLine("- Use the existing private _books field for filtering.");
+                sb.AppendLine("- Return matching books using a case-insensitive, partial contains match.");
+                sb.AppendLine("- DO NOT create a new Book class; use BookSeller.Core.Models.Book.");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("TARGET PROJECT PROFILE:");
+        sb.AppendLine($"  Application Type: {ctx.ApplicationType ?? "Unknown"}");
+        sb.AppendLine($"  Primary Language: {ctx.PrimaryLanguage ?? "Unknown"}");
+        sb.AppendLine($"  Framework/Runtime: {ctx.Framework ?? "Unknown"}");
+        sb.AppendLine($"  Database Engine: {ctx.DatabaseEngine ?? "None"}");
+        sb.AppendLine($"  Data Access Style: {ctx.DataAccessStyle ?? "None"}");
+        sb.AppendLine($"  Test Framework: {ctx.TestFramework ?? "None"}");
         sb.AppendLine();
         sb.AppendLine("RULES:");
+        sb.AppendLine("- Generate a proposal only. Do not claim files were changed.");
+        sb.AppendLine("- Use relative file paths only. Do not use absolute paths.");
+        sb.AppendLine("- Do not use .. traversal in file paths.");
         sb.AppendLine("- Only change files relevant to the ticket.");
         sb.AppendLine("- Do not invent requirements not stated in the ticket or plan.");
         sb.AppendLine("- Follow all linked architectural decisions and project rules.");
+        sb.AppendLine("- PRESERVE existing namespace declarations.");
+        sb.AppendLine("- PRESERVE existing class declarations and public API signatures unless explicitly asked to change them.");
+        sb.AppendLine("- MODIFY existing methods in place; do not replace entire classes with sample code.");
+        sb.AppendLine("- DO NOT create duplicate model classes if they already exist in the project.");
         sb.AppendLine("- Prefer small, targeted changes.");
-        sb.AppendLine("- Do not replace whole files unless absolutely necessary.");
-        sb.AppendLine("- Return ONLY a JSON object. No markdown fences. No prose. No commentary.");
-        sb.AppendLine("- Include a BeforeSnippet and AfterSnippet for each file change.");
-        sb.AppendLine("- Include a unified diff Patch if possible.");
-        sb.AppendLine("- Include risk notes and a test plan.");
-        sb.AppendLine("- Do not claim the build passed.");
+        sb.AppendLine("- Produce unified diffs for all changes.");
+        sb.AppendLine("- Do not use markdown code fences inside JSON values (no ```diff).");
+        sb.AppendLine("- Return ONLY a JSON object. No prose. No commentary.");
         sb.AppendLine();
 
         sb.AppendLine("TICKET:");
@@ -121,15 +156,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine($"  Acceptance Criteria: {ctx.TicketAcceptanceCriteria}");
         if (!string.IsNullOrWhiteSpace(ctx.TicketImplementationNotes))
             sb.AppendLine($"  Implementation Notes: {ctx.TicketImplementationNotes}");
-        if (!string.IsNullOrWhiteSpace(ctx.TicketBackground))
-            sb.AppendLine($"  Background: {ctx.TicketBackground}");
-        if (!string.IsNullOrWhiteSpace(ctx.TicketProblem))
-            sb.AppendLine($"  Problem: {ctx.TicketProblem}");
-        if (!string.IsNullOrWhiteSpace(ctx.TicketTestPlan))
-        {
-            sb.AppendLine("  Test Plan:");
-            sb.AppendLine(ctx.TicketTestPlan);
-        }
         sb.AppendLine();
 
         if (ctx.PlanTitle != null)
@@ -143,10 +169,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
                 sb.AppendLine("  Proposed Steps:");
                 sb.AppendLine(ctx.PlanSteps);
             }
-            if (!string.IsNullOrWhiteSpace(ctx.PlanAffectedFiles))
-                sb.AppendLine($"  Affected Context: {ctx.PlanAffectedFiles}");
-            if (!string.IsNullOrWhiteSpace(ctx.PlanRisksNotes))
-                sb.AppendLine($"  Risks: {ctx.PlanRisksNotes}");
             sb.AppendLine();
         }
 
@@ -160,9 +182,11 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
 
         if (ctx.Decisions.Count > 0)
         {
-            sb.AppendLine("ARCHITECTURAL DECISIONS TO FOLLOW:");
+            sb.AppendLine("PROJECT ARCHITECTURE DECISIONS:");
             foreach (var d in ctx.Decisions)
+            {
                 sb.AppendLine($"  - {d}");
+            }
             sb.AppendLine();
         }
 
@@ -172,8 +196,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             foreach (var s in ctx.Standards)
             {
                 sb.AppendLine($"  - [{s.EnforcementLevel}] {s.Name}: {s.Description}");
-                if (!string.IsNullOrWhiteSpace(s.ValidationHint))
-                    sb.AppendLine($"    Validation Hint: {s.ValidationHint}");
             }
             sb.AppendLine();
         }
@@ -192,23 +214,21 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         sb.AppendLine("Return a single JSON object matching this schema exactly:");
         sb.AppendLine("""
             {
-              "ticketId": <number>,
-              "summary": "<brief description of what changes and why>",
-              "riskNotes": "<risk assessment>",
-              "testPlan": "<how to verify the change>",
-              "standardsCompliance": "<report on which project rules were applied and any deviations or risks>",
-              "fileChanges": [
+              "summary": "<brief description>",
+              "rationale": "<why these changes were chosen>",
+              "changes": [
                 {
-                  "filePath": "<relative file path>",
-                  "changeReason": "<why this file needs to change>",
-                  "beforeSnippet": "<exact text to be replaced>",
-                  "afterSnippet": "<replacement text>",
-                  "patch": "<unified diff, or empty string if not available>"
+                  "filePath": "<relative path, e.g. src/Service.cs>",
+                  "description": "<why this file changes>",
+                  "diff": "--- a/src/Service.cs\n+++ b/src/Service.cs\n@@ ...",
+                  "fullContentAfter": "<the COMPLETE content of the file after all changes are applied>",
+                  "isNewFile": false,
+                  "isDeletion": false
                 }
               ]
             }
             """);
-        sb.AppendLine("Return ONLY the JSON. No markdown. No explanation.");
+        sb.AppendLine("Return ONLY the JSON. No markdown.");
 
         return sb.ToString();
     }
@@ -220,7 +240,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         if (string.IsNullOrWhiteSpace(rawJson))
             throw new InvalidOperationException("LLM returned an empty response.");
 
-        // Strip markdown fences if the model wraps output anyway
         var json = StripMarkdownFences(rawJson.Trim());
 
         ProposalJson dto;
@@ -237,22 +256,21 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
 
         var proposal = new CodeChangeProposal
         {
-            TicketId  = dto.TicketId > 0 ? dto.TicketId : ticketId,
+            TicketId  = ticketId,
             Summary   = dto.Summary   ?? "No summary provided.",
-            RiskNotes = dto.RiskNotes ?? "Not specified.",
-            TestPlan  = dto.TestPlan  ?? "Not specified.",
-            StandardsCompliance = dto.StandardsCompliance ?? "Not reported.",
+            Rationale = dto.Rationale ?? string.Empty,
+            RiskNotes = "Generated in proposal-only mode.",
+            TestPlan  = "Review diffs in workbench.",
         };
 
-        foreach (var fc in dto.FileChanges ?? [])
+        foreach (var fc in dto.Changes ?? [])
         {
             proposal.FileChanges.Add(new FileChangeProposal
             {
                 FilePath      = fc.FilePath      ?? string.Empty,
-                ChangeReason  = fc.ChangeReason  ?? string.Empty,
-                BeforeSnippet = fc.BeforeSnippet ?? string.Empty,
-                AfterSnippet  = fc.AfterSnippet  ?? string.Empty,
-                Patch         = fc.Patch         ?? string.Empty,
+                ChangeReason  = fc.Description   ?? string.Empty,
+                Patch         = fc.Diff          ?? string.Empty,
+                FullContentAfter = fc.FullContentAfter ?? string.Empty,
             });
         }
 
@@ -261,7 +279,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
 
     private static string StripMarkdownFences(string text)
     {
-        // Handle ```json ... ``` or ``` ... ```
         if (text.StartsWith("```", StringComparison.Ordinal))
         {
             var firstNewline = text.IndexOf('\n');
@@ -273,8 +290,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         return text;
     }
 
-    // ── JSON DTO (case-insensitive deserialization) ───────────────────────────
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -284,20 +299,18 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
 
     private sealed class ProposalJson
     {
-        [JsonPropertyName("ticketId")]   public long                    TicketId    { get; set; }
         [JsonPropertyName("summary")]    public string?                 Summary     { get; set; }
-        [JsonPropertyName("riskNotes")]  public string?                 RiskNotes   { get; set; }
-        [JsonPropertyName("testPlan")]   public string?                 TestPlan    { get; set; }
-        [JsonPropertyName("standardsCompliance")] public string?        StandardsCompliance { get; set; }
-        [JsonPropertyName("fileChanges")]public List<FileChangeJson>?   FileChanges { get; set; }
+        [JsonPropertyName("rationale")]  public string?                 Rationale   { get; set; }
+        [JsonPropertyName("changes")]    public List<FileChangeJson>?   Changes     { get; set; }
     }
 
     private sealed class FileChangeJson
     {
-        [JsonPropertyName("filePath")]      public string? FilePath      { get; set; }
-        [JsonPropertyName("changeReason")]  public string? ChangeReason  { get; set; }
-        [JsonPropertyName("beforeSnippet")] public string? BeforeSnippet { get; set; }
-        [JsonPropertyName("afterSnippet")]  public string? AfterSnippet  { get; set; }
-        [JsonPropertyName("patch")]         public string? Patch         { get; set; }
+        [JsonPropertyName("filePath")]    public string? FilePath    { get; set; }
+        [JsonPropertyName("description")] public string? Description { get; set; }
+        [JsonPropertyName("diff")]        public string? Diff        { get; set; }
+        [JsonPropertyName("fullContentAfter")] public string? FullContentAfter { get; set; }
+        [JsonPropertyName("isNewFile")]   public bool    IsNewFile   { get; set; }
+        [JsonPropertyName("isDeletion")]  public bool    IsDeletion  { get; set; }
     }
 }

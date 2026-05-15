@@ -261,7 +261,7 @@ public sealed class ContextAgentTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(result.FinalPrompt), "Final prompt must not be empty.");
 
         // No tool calls
-        Assert.AreEqual(0, index.ReceivedQueries.Count,
+        Assert.HasCount(0, index.ReceivedQueries,
             "No code search queries should have been issued when context is sufficient.");
         Assert.IsFalse(result.WasExpanded,
             "WasExpanded must be false when no expansion occurred.");
@@ -317,8 +317,7 @@ public sealed class ContextAgentTests
         // Evidence is injected into the final prompt
         Assert.IsTrue(result.FinalPrompt!.Contains("EXPANDED CODE EVIDENCE"),
             "Final prompt must contain the expanded evidence section.");
-        Assert.IsTrue(result.FinalPrompt.Contains("ArchiveTicketAsync") ||
-                      result.FinalPrompt.Contains("TicketService"),
+        Assert.Contains(result.FinalPrompt, "ArchiveTicketAsync",
             "Final prompt must include content from the retrieved snippets.");
 
         // HasCodeEvidence is set
@@ -357,10 +356,10 @@ public sealed class ContextAgentTests
             "FinalPrompt must be null when clarification is required.");
         Assert.AreEqual(2, result.ClarificationQuestions.Count,
             "Both clarification questions must be present.");
-        StringAssert.Contains(result.ClarificationQuestions[0], "draft ticket flow");
+        Assert.Contains(result.ClarificationQuestions[0], "draft ticket flow");
 
         // No code search was executed
-        Assert.AreEqual(0, index.ReceivedQueries.Count,
+        Assert.HasCount(0, index.ReceivedQueries,
             "No code search should run when clarification is required.");
     }
 
@@ -567,7 +566,7 @@ public sealed class ContextAgentTests
         var r2 = ContextAgentService.ParseSufficiencyJson(
             "```json\n{\"isSufficient\":false,\"confidence\":3,\"reason\":\"Need code.\",\"requestedContext\":{\"codeSearchQueries\":[\"TicketService\"],\"clarificationQuestions\":[]}}\n```");
         Assert.IsFalse(r2.IsSufficient);
-        Assert.AreEqual(1, r2.CodeSearchQueries.Count);
+        Assert.HasCount(1, r2.CodeSearchQueries);
         Assert.AreEqual("TicketService", r2.CodeSearchQueries[0]);
 
         // Invalid JSON — must not throw, must set ParseError
@@ -1110,7 +1109,7 @@ public sealed class ContextAgentTests
         await vm.SendMessageCommand.ExecuteAsync(null);
 
         Assert.IsNotNull(spy.LastRequest);
-        Assert.AreEqual(1, spy.LastRequest.RecentTickets.Count);
+        Assert.HasCount(1, spy.LastRequest.RecentTickets);
         Assert.AreEqual("Existing Ticket", spy.LastRequest.RecentTickets[0].Title);
     }
 
@@ -1144,9 +1143,9 @@ public sealed class ContextAgentTests
         await vm.SendMessageCommand.ExecuteAsync(null);
 
         Assert.IsNotNull(spy.LastRequest);
-        Assert.AreEqual(1, spy.LastRequest.RecentDecisions.Count);
+        Assert.HasCount(1, spy.LastRequest.RecentDecisions);
         Assert.AreEqual("D1", spy.LastRequest.RecentDecisions[0].Title);
-        Assert.AreEqual(1, spy.LastRequest.ProjectRules.Count);
+        Assert.HasCount(1, spy.LastRequest.ProjectRules);
         Assert.AreEqual("R1", spy.LastRequest.ProjectRules[0].Name);
     }
 
@@ -1231,7 +1230,7 @@ public sealed class ContextAgentTests
         await vm.SendMessageCommand.ExecuteAsync(null);
 
         Assert.IsNotNull(spy.LastRequest, "Agent must still be called even if tickets fail.");
-        Assert.AreEqual(0, spy.LastRequest.RecentTickets.Count);
+        Assert.HasCount(0, spy.LastRequest.RecentTickets);
     }
 
     // ── A3: ConflictAssessment trace in runtime chat ───────────────────────────

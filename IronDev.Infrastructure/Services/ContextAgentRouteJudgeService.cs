@@ -129,6 +129,11 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"UserRequest: {request.UserRequest}");
+        if (!string.IsNullOrWhiteSpace(request.RecentConversationSummary))
+        {
+            sb.AppendLine("RecentConversationSummary:");
+            sb.AppendLine(request.RecentConversationSummary);
+        }
         if (!string.IsNullOrWhiteSpace(request.InitialIntentFromPromptContextBuilder))
             sb.AppendLine($"InitialIntent: {request.InitialIntentFromPromptContextBuilder}");
         if (request.RecentTickets.Count > 0)
@@ -163,9 +168,9 @@ Important rules:
 Return this JSON shape:
 
 {{
-  ""requestKind"": ""GeneralChat|InspectCode|ExplainCode|VerifyImplementation|CreateTicket|CreateTicketsFromDiscussion|ChangeImplementation|ReplaceArchitecture|BuildTicket"",
+  ""requestKind"": ""GeneralChat|InspectCode|ExplainCode|VerifyImplementation|CreateTicket|CreateTicketsFromDiscussion|ChangeImplementation|ReplaceArchitecture|BuildTicket|ArchitectureAdvice|ArchitectureDecisionExploration"",
   ""confidence"": 0.0,
-  ""effectiveWorkText"": """",
+  ""effectiveWorkText"": ""Expanded and resolved request text (e.g. 'industry standard' -> 'industry standard persistence for BookSeller')"",
   ""reason"": """",
   ""allowCodeSearch"": true,
   ""allowDeepLookup"": true,
@@ -176,11 +181,20 @@ Return this JSON shape:
   ""needsClarification"": false,
   ""clarificationQuestions"": [],
   ""evidenceUsed"": [],
-  ""risks"": [],
-  ""deepLookupTargets"": [
-    {{ ""filePath"": ""TicketService.cs"", ""symbolName"": ""ArchiveTicketAsync"", ""proofPattern"": ""IsDeleted body"", ""required"": true }}
-  ]
+  ""risks"": []
 }}
+
+CONTINUATION RESOLUTION RULE:
+If UserRequest is short, vague, or a follow-up (e.g. ""industry standard"", ""yes"", ""that one"", ""how?"", ""why?""):
+1. Use RecentConversationSummary to resolve what the user is actually asking about.
+2. Set effectiveWorkText to the fully resolved question (e.g. ""What is the industry-standard approach for BookSeller persistence?"").
+3. If RecentConversationSummary does not provide enough context, set needsClarification=true.
+
+ARCHITECTURE ADVICE RULE:
+If the user asks for recommendations, ""best way"", ""industry standard"", ""options"", or comparisons for a feature (even if not implemented yet):
+1. Classify as ArchitectureAdvice.
+2. Set allowCodeSearch=true (to check existing patterns).
+3. Set allowConflictAssessment=false.
 
 Evidence Packet:
 {evidencePacket}

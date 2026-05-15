@@ -309,6 +309,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     ProjectId       = projectId,
                     SessionId       = sessionId,
                     UserRequest     = text,
+                    RecentConversationSummary = string.Join("\n", Messages.TakeLast(5).Select(m => $"{m.Role}: {m.MessageText}")),
                     RecentTickets   = recentTickets,
                     RecentDecisions = recentDecisions,
                     ProjectRules    = projectRules,

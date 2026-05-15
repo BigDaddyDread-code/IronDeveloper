@@ -630,7 +630,7 @@ public class PromptPlaygroundViewModelSpecTests
         const string real = "TicketService is the service for ProjectTicket persistence. ArchiveTicketAsync should check tenant ownership before deletion.";
         var (isJunk, terms) = PromptContextBuilder.IsJunkMemory(real);
         Assert.IsFalse(isJunk,  "Real IronDev decision text must not be filtered.");
-        Assert.AreEqual(0, terms.Count, "No pollution terms should be reported for clean content.");
+        Assert.HasCount(0, terms, "No pollution terms should be reported for clean content.");
     }
 
     [TestMethod]
@@ -654,7 +654,7 @@ public class PromptPlaygroundViewModelSpecTests
         else if (hasMustInclude && !contextIsReady) result = "⚠️ WARNING — terms matched, context limited";
         else                result = "⚠️ WARNING — intent ok, context limited";
 
-        Assert.IsTrue(result.StartsWith("⚠️ WARNING"),
+        Assert.StartsWith(result, "⚠️ WARNING",
             $"Expected WARNING for correct answer with limited context. Got: {result}");
     }
 
@@ -728,7 +728,7 @@ public class PromptPlaygroundViewModelSpecTests
 
         Assert.AreEqual("Ready", projectIndexStatus,
             "ProjectIndexStatus must remain 'Ready' — not overwritten by retrieval result.");
-        Assert.IsTrue(contextRetrievalStatus.StartsWith("Empty"),
+        Assert.StartsWith(contextRetrievalStatus, "Empty",
             $"ContextRetrievalStatus should be 'Empty...' when project is Ready but 0 snippets returned. Got: {contextRetrievalStatus}");
         Assert.AreNotEqual(projectIndexStatus, contextRetrievalStatus,
             "ProjectIndexStatus and ContextRetrievalStatus must be distinct values.");
@@ -773,7 +773,7 @@ public class PromptPlaygroundViewModelSpecTests
         else
             result = "✅ PASS";
 
-        Assert.IsTrue(result.StartsWith("⚠️ WARNING"),
+        Assert.StartsWith(result, "⚠️ WARNING",
             $"Zero retrieved snippets must yield WARNING even when answer quality checks pass. Got: {result}");
         Assert.AreNotEqual("✅ PASS", result,
             "PASS must not be awarded when no context snippets were retrieved.");
@@ -792,7 +792,7 @@ public class PromptPlaygroundViewModelSpecTests
                 ? "Empty — project indexed but no snippets matched"
                 : "Limited — project not yet indexed";
 
-        Assert.IsTrue(contextRetrievalStatus.StartsWith("Retrieved"),
+        Assert.StartsWith(contextRetrievalStatus, "Retrieved",
             $"ContextRetrievalStatus should start with 'Retrieved' when snippets exist. Got: {contextRetrievalStatus}");
         Assert.IsTrue(contextRetrievalStatus.Contains("5"),
             "ContextRetrievalStatus should include the snippet count.");
@@ -817,7 +817,7 @@ public class PromptPlaygroundViewModelSpecTests
         else if (!hasSnippets)               result = "⚠️ WARNING — correct answer, no retrieved context";
         else                                 result = "✅ PASS";
 
-        Assert.IsTrue(result.StartsWith("⚠️ WARNING"),
+        Assert.StartsWith(result, "⚠️ WARNING",
             $"Ready project + no snippets must score WARNING. Got: {result}");
         Assert.AreNotEqual("✅ PASS", result,
             "PASS must not be awarded when no context snippets were retrieved.");
@@ -856,7 +856,7 @@ public class PromptPlaygroundViewModelSpecTests
                 ? "Empty — project indexed but no snippets matched"
                 : "Limited — project not yet indexed";
 
-        Assert.IsTrue(contextStatus.StartsWith("Limited"),
+        Assert.StartsWith(contextStatus, "Limited",
             $"Non-Ready project with no snippets must show 'Limited'. Got: {contextStatus}");
     }
 
@@ -977,7 +977,7 @@ public class PromptPlaygroundViewModelSpecTests
     public void T7_10_ExistingTestSuite_RegressionGuard()
     {
         // Ensure the canonical test matrix is unchanged
-        Assert.AreEqual(10, Cases.Length, "Test matrix must still have 10 cases.");
+        Assert.HasCount(10, Cases, "Test matrix must still have 10 cases.");
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.Id)),     "All cases must have IDs.");
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.UserMessage)), "All cases must have user messages.");
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.MustIncludeAny)), "All cases must have MustIncludeAny.");
@@ -1106,14 +1106,14 @@ public class PromptPlaygroundViewModelSpecTests
 
         Assert.AreEqual("Ready", project.IndexingStatus, "IndexingStatus must be Ready after successful index.");
         Assert.AreEqual(156, project.IndexedFileCount, "IndexedFileCount must match the actual stored file count.");
-        Assert.IsTrue(project.IndexedFileCount > 0, "IndexedFileCount must be > 0 for a Ready project.");
+        Assert.IsGreaterThan(project.IndexedFileCount ?? 0, 0, "IndexedFileCount must be > 0 for a Ready project.");
     }
 
     [TestMethod]
     [Description("T6.10: All Task 6/7 regression guard — existing 10 test cases unchanged.")]
     public void T6_10_FullTestMatrix_RegressionGuard()
     {
-        Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
+        Assert.HasCount(10, Cases, "Test matrix must still have exactly 10 cases.");
         Assert.IsTrue(Cases.All(c => !string.IsNullOrWhiteSpace(c.Id)), "All cases must have non-empty IDs.");
     }
 
@@ -1138,7 +1138,7 @@ public class PromptPlaygroundViewModelSpecTests
             MakeEntry("IronDeveloper/TicketsWorkspaceView.xaml",    "Button",       "chunk B"),
         };
         var result = IronDev.AI.PromptContextBuilder.DeduplicateSnippets(items);
-        Assert.AreEqual(2, result.Count, "Duplicate (FilePath, SymbolName) must be removed.");
+        Assert.HasCount(2, result, "Duplicate (FilePath, SymbolName) must be removed.");
     }
 
     [TestMethod]
@@ -1153,7 +1153,7 @@ public class PromptPlaygroundViewModelSpecTests
             MakeEntry("File2.cs", "SaveTicketV2", sharedChunk), // same chunk text, different symbol
         };
         var result = IronDev.AI.PromptContextBuilder.DeduplicateSnippets(items);
-        Assert.AreEqual(1, result.Count, "Entries with identical ChunkText (≥50 chars) must be deduplicated.");
+        Assert.HasCount(1, result, "Entries with identical ChunkText (≥50 chars) must be deduplicated.");
     }
 
     [TestMethod]
@@ -1270,7 +1270,7 @@ public class PromptPlaygroundViewModelSpecTests
 
         // IntegrationTests must NOT appear in the top 4
         var testPaths = top4.Where(p => p.Contains("IntegrationTests")).ToList();
-        Assert.AreEqual(0, testPaths.Count,
+        Assert.HasCount(0, testPaths,
             $"IntegrationTests must not appear in top-4 for delete-ticket query. Got: {string.Join(", ", testPaths)}");
 
         // TicketService must be in top 4
@@ -1282,7 +1282,7 @@ public class PromptPlaygroundViewModelSpecTests
     [Description("T7.12: Regression guard — all previous tests (T1-T6) unaffected.")]
     public void T7_12_RegressionGuard_AllPreviousTestsStillValid()
     {
-        Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
+        Assert.HasCount(10, Cases, "Test matrix must still have exactly 10 cases.");
         // Verify scoring contract still holds
         const string intentName = "SavedTicketManagement";
         Assert.AreEqual(intentName,
@@ -1407,7 +1407,7 @@ public class PromptPlaygroundViewModelSpecTests
     [Description("T8.8: Regression guard — T7 test matrix, scoring contracts, and intent classification all stable.")]
     public void T8_8_RegressionGuard_T7AndEarlierStillValid()
     {
-        Assert.AreEqual(10, Cases.Length, "Test matrix must still have exactly 10 cases.");
+        Assert.HasCount(10, Cases, "Test matrix must still have exactly 10 cases.");
 
         // IsDraftTicketSnippet does not misclassify production TicketService
         var safe = MakeEntry("IronDev.Infrastructure/Services/TicketService.cs", "TicketService");

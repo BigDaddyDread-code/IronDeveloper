@@ -28,7 +28,9 @@ public enum ContextRequestKind
     CreateTicketsFromDiscussion,
     ChangeImplementation,
     ReplaceArchitecture,
-    BuildTicket
+    BuildTicket,
+    ArchitectureAdvice,
+    ArchitectureDecisionExploration
 }
 
 public sealed class ContextAgentRouteDecision

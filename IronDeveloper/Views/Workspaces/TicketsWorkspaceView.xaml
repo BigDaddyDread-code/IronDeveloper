@@ -429,12 +429,11 @@
                                                 Padding="16,8" Margin="0,0,8,0"/>
 
                                         <!-- Build This -->
-                                        <Button Grid.Column="2" Content="⚙ Build This"
-                                                Command="{Binding BuildSelectedTicketCommand}"
+                                        <Button Grid.Column="2" Content="⚙ Build This (Proposal)"
+                                                Command="{Binding BuildSelectedTicketProposalCommand}"
                                                 Style="{StaticResource AppButton.Secondary}"
-                                                IsEnabled="{Binding CanBuildTicket}"
                                                 Padding="16,8" Margin="0,0,8,0"
-                                                ToolTip="Generate a code change proposal for this ticket"/>
+                                                ToolTip="Generate a code change proposal and open in Workbench"/>
 
                                         <TextBlock Grid.Column="4" Text="{Binding SaveStatus}"
                                                    Foreground="{StaticResource Success}"

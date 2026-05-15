@@ -12,6 +12,26 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
 
+internal sealed class StubProfile : IProjectProfileService
+{
+    public Task<ProjectProfile?> GetProjectProfileAsync(int projectId, CancellationToken ct = default)
+        => Task.FromResult<ProjectProfile?>(new ProjectProfile { ProjectId = projectId, ApplicationType = "WPF" });
+
+    public Task SaveProjectProfileAsync(ProjectProfile profile, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task<List<ProjectCommand>> GetProjectCommandsAsync(int projectId, CancellationToken ct = default)
+        => Task.FromResult(new List<ProjectCommand>());
+
+    public Task SaveProjectCommandAsync(ProjectCommand command, CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task<ProjectCommand?> GetDefaultCommandAsync(int projectId, string category, CancellationToken ct = default)
+        => Task.FromResult<ProjectCommand?>(null);
+
+    public Task<List<ProjectProfileOption>> GetOptionsByCategoryAsync(string category, CancellationToken ct = default)
+        => Task.FromResult(new List<ProjectProfileOption>());
+}
+
 // ─── Stub orchestrators ───────────────────────────────────────────────────────
 
 /// <summary>
@@ -590,7 +610,8 @@ public sealed class BuilderContextServiceTests
         => new(
             new StubTickets(ticket  ?? MakeTicket()),
             new StubProject(MakeProject()),
-            new StubMemory(plan, decisions, rules));
+            new StubMemory(plan, decisions, rules),
+            new StubProfile());
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 

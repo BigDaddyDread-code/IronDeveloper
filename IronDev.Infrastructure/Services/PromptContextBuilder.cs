@@ -41,6 +41,13 @@ public class ChatContextPacket
 
     /// <summary>Non-null when rules failed to load (e.g. table not yet migrated). Surfaces in LLM Console trace.</summary>
     public string? RulesLoadWarning { get; set; }
+
+    // ── Target-Aware Project Metadata ──
+    public string HostApplicationName { get; set; } = "IronDev";
+    public string ActiveProjectName { get; set; } = string.Empty;
+    public string ActiveProjectPath { get; set; } = string.Empty;
+    public string ActiveProjectType { get; set; } = string.Empty;
+    public bool IsExternalProject { get; set; }
 }
 
 /// <summary>
@@ -205,11 +212,19 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var decisionTake = isCodeQuery ? 2 : 5;
         var snippetTake  = isCodeQuery ? 8 : 3;
 
-        // 2. Check project index status
+        // 2. Check project index status and metadata
         var project = await _projectService.GetByIdAsync(projectId, cancellationToken);
         var isNotIndexed = project?.IndexingStatus == null ||
                            !string.Equals(project.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase);
         packet.IsProjectNotIndexed = isNotIndexed;
+
+        if (project != null)
+        {
+            packet.ActiveProjectName = project.Name;
+            packet.ActiveProjectPath = project.LocalPath ?? string.Empty;
+            packet.ActiveProjectType = ".NET / C#"; // Default for now
+            packet.IsExternalProject = !packet.ActiveProjectPath.Contains("AIDeveloper", StringComparison.OrdinalIgnoreCase);
+        }
 
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
         var tickets   = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
@@ -316,7 +331,28 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         // 5. Assemble the prompt
         var sb = new StringBuilder();
-        sb.AppendLine("You are IronDev Architect, an expert AI assistant integrated into the IronDev engineering platform.");
+        sb.AppendLine($"You are IronDev Architect, an expert AI assistant integrated into the {packet.HostApplicationName} engineering platform.");
+        sb.AppendLine();
+        
+        sb.AppendLine("## TARGET ENVIRONMENT");
+        sb.AppendLine($"Host Application: {packet.HostApplicationName}");
+        sb.AppendLine($"Active Target Project: {packet.ActiveProjectName}");
+        sb.AppendLine($"Project Root Path: {packet.ActiveProjectPath}");
+        sb.AppendLine($"Project Type: {packet.ActiveProjectType}");
+        sb.AppendLine($"Is External Project: {packet.IsExternalProject}");
+        sb.AppendLine();
+
+        if (packet.IsExternalProject)
+        {
+            sb.AppendLine("INSTRUCTION: You are working on an EXTERNAL project. Do NOT apply IronDev-specific product assumptions (e.g., WPF, CommunityToolkit, specific IronDev service names) unless you see them in the retrieved snippets below.");
+            sb.AppendLine("Focus only on the architecture and patterns present in the provided context.");
+        }
+        else
+        {
+            sb.AppendLine("INSTRUCTION: You are working on the IronDev HOST codebase itself. Apply standard IronDev WPF/MVVM architectural rules.");
+        }
+        sb.AppendLine();
+
         sb.AppendLine("IMPORTANT INSTRUCTIONS:");
         sb.AppendLine("1. Answer the user's question directly and concisely.");
         sb.AppendLine("2. Do NOT dump raw context/code unless explicitly requested. Use the provided snippets, tickets, and decisions quietly as supporting evidence.");

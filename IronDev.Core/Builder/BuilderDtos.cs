@@ -12,7 +12,18 @@ public sealed class TicketBuildContext
     public string ProjectName  { get; set; } = "";
     public string ProjectPath  { get; set; } = "";
     public string BuildCommand { get; set; } = "dotnet build";
+    public string TestCommand  { get; set; } = "dotnet test";
     public long?  PlanId       { get; set; }
+
+    // Profile metadata
+    public string? ApplicationType     { get; set; }
+    public string? PrimaryLanguage     { get; set; }
+    public string? Framework           { get; set; }
+    public string? DatabaseEngine      { get; set; }
+    public string? DataAccessStyle     { get; set; }
+    public string? TestFramework       { get; set; }
+    public string? SolutionFile        { get; set; }
+    public bool    IsExternalProject   { get; set; }
 
     // Ticket fields
     public string  TicketTitle               { get; set; } = "";
@@ -48,14 +59,17 @@ public sealed class FileChangeProposal
     public string AfterSnippet  { get; set; } = "";
     /// <summary>Unified diff format. May be empty in Phase 1.</summary>
     public string Patch         { get; set; } = "";
+    public string FullContentAfter { get; set; } = "";
 }
 
 public sealed class CodeChangeProposal
 {
     public long   TicketId    { get; set; }
     public string Summary     { get; set; } = "";
+    public string Rationale   { get; set; } = "";
     public string RiskNotes   { get; set; } = "";
     public string TestPlan    { get; set; } = "";
+    public string OriginalRequest { get; set; } = "";
     public string StandardsCompliance { get; set; } = "";
     public List<FileChangeProposal> FileChanges { get; set; } = [];
 }
@@ -107,6 +121,21 @@ public sealed class DotNetBuildResult
     public int      ExitCode       { get; set; }
     public string   StandardOutput { get; set; } = "";
     public string   StandardError  { get; set; } = "";
+    public string   Command        { get; set; } = "";
+    public string   WorkingDirectory { get; set; } = "";
+    public DateTime StartedUtc     { get; set; }
+    public DateTime FinishedUtc    { get; set; }
+    public TimeSpan Elapsed        => FinishedUtc - StartedUtc;
+}
+
+public sealed class DotNetTestResult
+{
+    public bool     Succeeded      { get; set; }
+    public int      ExitCode       { get; set; }
+    public string   StandardOutput { get; set; } = "";
+    public string   StandardError  { get; set; } = "";
+    public string   Command        { get; set; } = "";
+    public string   WorkingDirectory { get; set; } = "";
     public DateTime StartedUtc     { get; set; }
     public DateTime FinishedUtc    { get; set; }
     public TimeSpan Elapsed        => FinishedUtc - StartedUtc;
