@@ -16,6 +16,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
     private readonly global::IronDev.Agent.Services.Interfaces.ILocalIndexingService _indexingService;
     private readonly global::IronDev.Core.Interfaces.IProjectProfileService _profileService;
+    private readonly global::IronDev.Services.IProjectContextExportService _exportService;
 
     private global::IronDev.Data.Models.Project? _currentProject;
 
@@ -64,12 +65,14 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         global::IronDev.Services.ITicketService ticketService,
         global::IronDev.Services.IProjectMemoryService memoryService,
         global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService,
-        global::IronDev.Core.Interfaces.IProjectProfileService profileService)
+        global::IronDev.Core.Interfaces.IProjectProfileService profileService,
+        global::IronDev.Services.IProjectContextExportService exportService)
     {
         _ticketService   = ticketService;
         _memoryService   = memoryService;
         _indexingService = indexingService;
         _profileService  = profileService;
+        _exportService   = exportService;
     }
 
     internal async Task LoadAsync(global::IronDev.Data.Models.Project project)
@@ -413,5 +416,35 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         }
         
         ProfileSaveStatus = "Detected. Unsaved.";
+    }
+
+    [RelayCommand]
+    private async Task ExportProjectContextPackAsync()
+    {
+        if (_currentProject == null) return;
+
+        try
+        {
+            var content = await _exportService.ExportProjectContextPackAsync(_currentProject.Id);
+            var fileName = $"IronDev_ProjectContextPack_{DateTime.Now:yyyyMMdd_HHmm}.md";
+            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            var filePath = Path.Combine(desktopPath, fileName);
+
+            await File.WriteAllTextAsync(filePath, content);
+            
+            System.Windows.MessageBox.Show(
+                $"Project context pack exported to:\n{filePath}",
+                "Export Successful",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(
+                $"Failed to export context pack:\n{ex.Message}",
+                "Export Failed",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+        }
     }
 }

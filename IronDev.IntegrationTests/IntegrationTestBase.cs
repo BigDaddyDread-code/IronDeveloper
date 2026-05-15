@@ -72,6 +72,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<IProjectProfileService, ProjectProfileService>();
         services.AddScoped<IBuilderProposalService, BuilderProposalService>();
         services.AddScoped<IBuildErrorClassifierService, BuildErrorClassifierService>();
+        services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
         services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
         services.AddScoped<ICodeChangeProposalService, CodeChangeProposalService>();
         services.AddScoped<IDotNetBuildService, DotNetRunnerService>();

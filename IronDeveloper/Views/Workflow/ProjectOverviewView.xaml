@@ -94,7 +94,11 @@
                 <Button Content="VIEW DETAILS"
                         Command="{Binding ViewDetailsCommand}"
                         Style="{StaticResource AppButton.Secondary}"
-                        Width="120" Height="36"/>
+                        Margin="0,0,12,0" Width="120" Height="36"/>
+                <Button Content="EXPORT CONTEXT PACK"
+                        Command="{Binding ExportProjectContextPackCommand}"
+                        Style="{StaticResource AppButton.Secondary}"
+                        Width="180" Height="36"/>
             </StackPanel>
 
             <!-- Current State Panel -->
