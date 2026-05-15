@@ -36,6 +36,9 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _testOutput = string.Empty;
 
     public bool IsBusy => IsGenerating || IsApplying;
+    public bool IsApplyEnabled => ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase);
+    public string ApplyModeLabel => IsApplyEnabled ? "Apply Enabled — BookSeller Only" : "PROPOSAL-ONLY MODE";
+    public string ApplyModeColor => IsApplyEnabled ? "#34D16A" : "#7C6BE8";
 
     public ObservableCollection<ProposedFileChange> ProposedFiles { get; } = new();
 
@@ -144,6 +147,27 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         TestStatus = "Not Started";
         BuildOutput = string.Empty;
         TestOutput = string.Empty;
+        OnPropertyChanged(nameof(IsApplyEnabled));
+        OnPropertyChanged(nameof(ApplyModeLabel));
+        OnPropertyChanged(nameof(ApplyModeColor));
+    }
+
+    [RelayCommand]
+    private void ViewBuildDetails()
+    {
+        ShowDetails("Build Details", BuildOutput);
+    }
+
+    [RelayCommand]
+    private void ViewTestDetails()
+    {
+        ShowDetails("Test Details", TestOutput);
+    }
+
+    private void ShowDetails(string title, string content)
+    {
+        var displayContent = string.IsNullOrWhiteSpace(content) ? "No details are available for this operation." : content;
+        System.Windows.MessageBox.Show(displayContent, title, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
     }
 
     partial void OnSelectedFileChangeChanged(ProposedFileChange? value)

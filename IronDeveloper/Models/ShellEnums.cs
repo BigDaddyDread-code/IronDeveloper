@@ -22,7 +22,8 @@ public enum ProjectWorkspace
     Plans,
     Decisions,
     Settings,
-    Builder
+    Builder,
+    ProjectProfile
 }
 
 /// <summary>

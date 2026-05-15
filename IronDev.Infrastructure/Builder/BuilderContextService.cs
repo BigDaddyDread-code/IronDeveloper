@@ -25,15 +25,18 @@ public sealed class BuilderContextService : IBuilderContextService
     private readonly ITicketService         _ticketService;
     private readonly IProjectService        _projectService;
     private readonly IProjectMemoryService  _memoryService;
+    private readonly IProjectProfileService _profileService;
 
     public BuilderContextService(
         ITicketService        ticketService,
         IProjectService       projectService,
-        IProjectMemoryService memoryService)
+        IProjectMemoryService memoryService,
+        IProjectProfileService profileService)
     {
         _ticketService  = ticketService;
         _projectService = projectService;
         _memoryService  = memoryService;
+        _profileService = profileService;
     }
 
     public async Task<TicketBuildContext> AssembleContextAsync(
@@ -82,17 +85,33 @@ public sealed class BuilderContextService : IBuilderContextService
             // Decisions are additive context. Never fail the build loop over them.
         }
 
-        // ── 5. Resolve affected files ──────────────────────────────────────
+        // ── 5. Load Profile & Commands ─────────────────────────────────────
+        var profile = await _profileService.GetProjectProfileAsync(projectId, cancellationToken);
+        var buildCmd = await _profileService.GetDefaultCommandAsync(projectId, "Build", cancellationToken);
+        var testCmd = await _profileService.GetDefaultCommandAsync(projectId, "Test", cancellationToken);
+
+        // ── 6. Resolve affected files ──────────────────────────────────────
         var affectedFiles = ResolveAffectedFiles(ticket, plan);
 
-        // ── 6. Assemble ───────────────────────────────────────────────────────
+        // ── 7. Assemble ───────────────────────────────────────────────────────
         var ctx = new TicketBuildContext
         {
             ProjectId    = projectId,
             TicketId     = ticketId,
             ProjectName  = project.Name,
             ProjectPath  = project.LocalPath ?? string.Empty,
-            BuildCommand = "dotnet build",
+            
+            BuildCommand = buildCmd?.CommandText ?? "dotnet build",
+            TestCommand  = testCmd?.CommandText ?? "dotnet test",
+
+            ApplicationType   = profile?.ApplicationType,
+            PrimaryLanguage   = profile?.PrimaryLanguage,
+            Framework         = profile?.Framework,
+            DatabaseEngine    = profile?.DatabaseEngine,
+            DataAccessStyle   = profile?.DataAccessStyle,
+            TestFramework     = profile?.TestFramework,
+            SolutionFile      = profile?.SolutionFile,
+            IsExternalProject = profile?.IsExternalProject ?? false,
 
             TicketTitle               = ticket.Title,
             TicketSummary             = ticket.Summary ?? string.Empty,
@@ -118,8 +137,8 @@ public sealed class BuilderContextService : IBuilderContextService
                                     .OrderBy(r => r.EnforcementLevel == "Blocking" ? 0 : r.EnforcementLevel == "Required" ? 1 : 2)
                                     .ToList().AsReadOnly(),
 
-            // Phase 3+: Weaviate populates these
-            RetrievedSnippets = [],
+            // Phase 3+: Load full file contents for affected files
+            RetrievedSnippets = await LoadFullFileContentsAsync(project.LocalPath ?? string.Empty, affectedFiles, cancellationToken),
             PastBuildFailures = [],
         };
 
@@ -168,5 +187,27 @@ public sealed class BuilderContextService : IBuilderContextService
         }
 
         return result.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList().AsReadOnly();
+    }
+
+    private static async Task<IReadOnlyList<string>> LoadFullFileContentsAsync(string projectRoot, IReadOnlyList<string> filePaths, CancellationToken ct)
+    {
+        var snippets = new List<string>();
+        foreach (var relativePath in filePaths)
+        {
+            try
+            {
+                var fullPath = Path.Combine(projectRoot, relativePath);
+                if (File.Exists(fullPath))
+                {
+                    var content = await File.ReadAllTextAsync(fullPath, ct);
+                    snippets.Add($"--- FILE: {relativePath} ---\n{content}");
+                }
+            }
+            catch
+            {
+                // Ignore missing or locked files for context assembly
+            }
+        }
+        return snippets.AsReadOnly();
     }
 }

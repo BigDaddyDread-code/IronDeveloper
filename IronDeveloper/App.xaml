@@ -84,6 +84,10 @@
                 <vws:BuilderWorkspaceView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type ws:ProjectProfileViewModel}">
+                <vws:ProjectProfileView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type ws:PromptPlaygroundViewModel}">
                 <vws:PromptPlaygroundView/>
             </DataTemplate>

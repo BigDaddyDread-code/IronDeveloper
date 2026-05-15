@@ -28,6 +28,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
     private readonly BuilderWorkspaceViewModel   _builderVm;
+    private readonly ProjectProfileViewModel     _profileVm;
     private readonly AgentTenantContext          _tenantContext;
 
     // ── Observable shell state ────────────────────────────────────────────────
@@ -84,6 +85,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ImplementationPlansWorkspaceViewModel plansVm,
         SettingsWorkspaceViewModel  settingsVm,
         BuilderWorkspaceViewModel   builderVm,
+        ProjectProfileViewModel     profileVm,
         AgentTenantContext          tenantContext)
     {
         _loginVm     = loginVm;
@@ -96,6 +98,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _plansVm     = plansVm;
         _settingsVm  = settingsVm;
         _builderVm   = builderVm;
+        _profileVm   = profileVm;
         _tenantContext = tenantContext;
 
         // Wire child VM navigation callbacks
@@ -245,6 +248,7 @@ public sealed partial class ShellViewModel : ObservableObject
             ProjectWorkspace.Decisions  => _decisionsVm,
             ProjectWorkspace.Settings   => _settingsVm,
             ProjectWorkspace.Builder    => _builderVm,
+            ProjectWorkspace.ProjectProfile => _profileVm,
             _                           => _overviewVm
         };
     }
@@ -364,7 +368,8 @@ public sealed partial class ShellViewModel : ObservableObject
                 _chatVm.LoadAsync(project),
                 _ticketsVm.LoadAsync(project),
                 _decisionsVm.LoadAsync(project),
-                _plansVm.LoadAsync(project)
+                _plansVm.LoadAsync(project),
+                _profileVm.LoadAsync(project)
             );
 
             // Fetch final status from the overview VM

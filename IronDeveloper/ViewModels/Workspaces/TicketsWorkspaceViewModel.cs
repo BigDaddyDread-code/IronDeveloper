@@ -124,7 +124,10 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     /// <summary>True when the Build This button should be enabled.</summary>
     public bool CanBuildTicket =>
         !IsBuildingTicket
-        && !IsDraftMode;   // Build This is unavailable while reviewing a draft
+        && !IsDraftMode
+        && SelectedTicket != null
+        && !string.IsNullOrWhiteSpace(EditTitle)
+        && !string.IsNullOrWhiteSpace(_activeProjectPath);
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
@@ -597,8 +600,6 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             await RefreshPlanAsync(SelectedTicket.Id);
         }
     }
-
-    // ── Ask about this plan ──────────────────────────────────────────────────
 
     public Action<long, string, string, string, string>? OnAskAboutPlan { get; set; }
 

@@ -227,6 +227,151 @@
                 </StackPanel>
             </Border>
 
+            <!-- Project Profile Panel -->
+            <Border Background="{StaticResource Background/Panel}"
+                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
+                    CornerRadius="10" Padding="20,16" Margin="0,0,0,28">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="PROJECT PROFILE" Style="{StaticResource Typography.Eyebrow}" VerticalAlignment="Center"/>
+                        
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <TextBlock Text="{Binding ProfileSaveStatus}" VerticalAlignment="Center" Foreground="{StaticResource Text/Muted}" Margin="0,0,10,0" FontSize="11"/>
+                            <Button Content="Detect / Refresh Profile" Command="{Binding DetectProfileCommand}" Margin="0,0,8,0" Padding="12,4"/>
+                            <Button Content="Save Profile" Command="{Binding SaveProfileCommand}" Style="{StaticResource AppButton.Primary}" Padding="12,4"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <!-- Left column -->
+                        <StackPanel Grid.Column="0">
+                            <!-- Application Type -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Application Type" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileApplicationType, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="12" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Primary Language -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Primary Language" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfilePrimaryLanguage, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="12" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Framework / Runtime -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Framework" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileFramework, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="12" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Database Engine -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Database Engine" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileDatabaseEngine, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="12" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Data Access Style -->
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Data Access Style" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileDataAccessStyle, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="12" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                        </StackPanel>
+                        
+                        <!-- Right column -->
+                        <StackPanel Grid.Column="2">
+                            <!-- Test Framework -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Test Framework" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileTestFramework, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="12" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Solution File -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Solution File" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileSolutionFile, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="11" FontFamily="Consolas" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Build Command -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Build Command" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileBuildCommand, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="11" FontFamily="Consolas" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Test Command -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Test Command" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileTestCommand, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="11" FontFamily="Consolas" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Safe Write Root -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Safe Write Root" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileSafeWriteRoot, UpdateSourceTrigger=PropertyChanged}" Padding="4" FontSize="11" FontFamily="Consolas" Background="{StaticResource Background/Input}"/>
+                            </Grid>
+                            
+                            <!-- Allow Builder Apply -->
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Allow Builder Apply" Foreground="{StaticResource Text/Muted}" FontSize="12" VerticalAlignment="Center"/>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding ProfileAllowBuilderApply}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- Two-column: recent tickets + decisions -->
             <Grid>
                 <Grid.ColumnDefinitions>

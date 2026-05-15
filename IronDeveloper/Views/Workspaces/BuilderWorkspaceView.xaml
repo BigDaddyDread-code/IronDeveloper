@@ -64,8 +64,15 @@
                 </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Background="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1A34D16A|#1A7C6BE8'}" 
+                        BorderBrush="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}" BorderThickness="1"
+                        CornerRadius="4" Padding="12,6" Margin="0,0,16,0"
+                        Visibility="{Binding IsApplyEnabled, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding ApplyModeLabel}" Foreground="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}" FontSize="11" FontWeight="Bold"/>
+                </Border>
                 <Border Background="#1A7C6BE8" BorderBrush="#7C6BE8" BorderThickness="1"
-                        CornerRadius="4" Padding="12,6" Margin="0,0,16,0">
+                        CornerRadius="4" Padding="12,6" Margin="0,0,16,0"
+                        Visibility="{Binding IsApplyEnabled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                     <TextBlock Text="PROPOSAL-ONLY MODE" Foreground="#7C6BE8" FontSize="11" FontWeight="Bold"/>
                 </Border>
                 <Button Content="✕ Close Workbench"
@@ -279,10 +286,18 @@
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplyStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}"/>
                             
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Build:" Foreground="{StaticResource Text/Muted}" Margin="0,0,12,4"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BuildStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding BuildStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}" VerticalAlignment="Center"/>
+                                <Button Content="Details" Command="{Binding ViewBuildDetailsCommand}" 
+                                        Style="{StaticResource AppButton.Secondary}" Height="18" Padding="6,0" Margin="8,0,0,0" FontSize="10"/>
+                            </StackPanel>
                             
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Tests:" Foreground="{StaticResource Text/Muted}" Margin="0,0,12,4"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TestStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}"/>
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding TestStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}" VerticalAlignment="Center"/>
+                                <Button Content="Details" Command="{Binding ViewTestDetailsCommand}" 
+                                        Style="{StaticResource AppButton.Secondary}" Height="18" Padding="6,0" Margin="8,0,0,0" FontSize="10"/>
+                            </StackPanel>
                         </Grid>
 
                         <TextBlock Text="ORIGINAL REQUEST" Style="{StaticResource Typography.Eyebrow}" Margin="0,24,0,8" Opacity="0.6"/>

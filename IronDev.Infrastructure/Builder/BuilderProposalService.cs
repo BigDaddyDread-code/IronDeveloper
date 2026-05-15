@@ -23,6 +23,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
     private readonly ITicketService             _ticketService;
     private readonly IDotNetBuildService        _buildService;
     private readonly IDotNetTestService         _testService;
+    private readonly IProjectProfileService     _projectProfileService;
 
     public BuilderProposalService(
         IBuilderContextService     contextService,
@@ -30,7 +31,8 @@ public sealed class BuilderProposalService : IBuilderProposalService
         ILlmTraceService           llmTraceService,
         ITicketService             ticketService,
         IDotNetBuildService        buildService,
-        IDotNetTestService         testService)
+        IDotNetTestService         testService,
+        IProjectProfileService     projectProfileService)
     {
         _contextService  = contextService;
         _proposalService = proposalService;
@@ -38,6 +40,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
         _ticketService   = ticketService;
         _buildService    = buildService;
         _testService     = testService;
+        _projectProfileService = projectProfileService;
     }
 
     public async Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default)
@@ -128,15 +131,22 @@ public sealed class BuilderProposalService : IBuilderProposalService
         proposal.ApplyStatus = "Applying...";
         try
         {
-            var projectRoot = Path.GetFullPath(proposal.ProjectRoot);
+            var profile = await _projectProfileService.GetProjectProfileAsync(proposal.ProjectId, ct);
+            var safeRoot = !string.IsNullOrEmpty(profile?.SafeWriteRoot) ? Path.GetFullPath(profile.SafeWriteRoot) : Path.GetFullPath(proposal.ProjectRoot);
+            
+            if (profile != null && !profile.AllowBuilderApply)
+            {
+                 throw new InvalidOperationException($"Builder apply is disabled for project '{proposal.ProjectName}'.");
+            }
+
             foreach (var change in proposal.Changes)
             {
-                var targetPath = Path.GetFullPath(Path.Combine(projectRoot, change.FilePath));
+                var targetPath = Path.GetFullPath(Path.Combine(safeRoot, change.FilePath));
                 
-                // Final safety guard: must be under root
-                if (!targetPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                // Final safety guard: must be under safe root
+                if (!targetPath.StartsWith(safeRoot, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException($"Security violation: path {change.FilePath} is outside project root.");
+                    throw new InvalidOperationException($"Security violation: path {change.FilePath} is outside safe write root.");
                 }
 
                 if (change.FullContentAfter == null)
@@ -174,21 +184,43 @@ public sealed class BuilderProposalService : IBuilderProposalService
 
         // ── 4. Run Build ──────────────────────────────────────────────────────
         proposal.BuildStatus = "Build Running...";
-        var slnPath = Path.Combine(proposal.ProjectRoot, "BookSeller.sln");
+        var profileForBuild = await _projectProfileService.GetProjectProfileAsync(proposal.ProjectId, ct);
+        var buildCmd = await _projectProfileService.GetDefaultCommandAsync(proposal.ProjectId, "Build", ct);
         
+        var buildTarget = profileForBuild?.SolutionFile;
+
+        if (string.IsNullOrWhiteSpace(buildCmd?.CommandText))
+        {
+            proposal.BuildStatus = "Build Failed";
+            proposal.BuildOutput = "Build command is not configured. Set it in Project Profile.";
+            proposal.TestStatus = "Skipped (Build Failed)";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(buildTarget) || !File.Exists(buildTarget))
+        {
+            proposal.BuildStatus = "Build Failed";
+            proposal.BuildOutput = $"Solution file does not exist: {(string.IsNullOrWhiteSpace(buildTarget) ? "Not set" : buildTarget)}. Update Project Profile.";
+            proposal.TestStatus = "Skipped (Build Failed)";
+            return;
+        }
+
         _llmTraceService.AddTrace(new LlmTraceEntry
         {
             FeatureName = "Builder.BuildStarted",
             WorkspaceName = "Builder",
             ProjectId = proposal.ProjectId,
             TicketId = proposal.TicketId,
-            RequestText = $"dotnet build \"{slnPath}\" --no-incremental -v quiet",
+            RequestText = buildCmd.CommandText,
             CreatedAt = DateTime.UtcNow
         });
 
-        var buildResult = await _buildService.BuildAsync(slnPath, ct);
+        // If we have a custom command text, we might need a different runner, 
+        // but for now IDotNetBuildService.BuildAsync takes a solutionPath.
+        // We'll pass the solutionPath and let it handle it.
+        var buildResult = await _buildService.BuildAsync(buildTarget, ct);
         proposal.BuildStatus = buildResult.Succeeded ? "Build Passed" : "Build Failed";
-        proposal.BuildOutput = buildResult.Succeeded ? buildResult.StandardOutput : buildResult.StandardError;
+        proposal.BuildOutput = FormatExecutionOutput(buildResult.Succeeded, buildResult.Command, buildResult.WorkingDirectory, buildResult.ExitCode, buildResult.StandardOutput, buildResult.StandardError, buildResult.Elapsed);
         proposal.BuildDuration = buildResult.Elapsed;
 
         _llmTraceService.AddTrace(new LlmTraceEntry
@@ -201,6 +233,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
             WasSuccessful = buildResult.Succeeded,
             RawResponseText = buildResult.StandardOutput,
             ErrorMessage = buildResult.StandardError,
+            ParsedResponseSummary = $"Build {(buildResult.Succeeded ? "Succeeded" : "Failed")}. Command: {buildResult.Command}",
             CreatedAt = DateTime.UtcNow
         });
 
@@ -212,19 +245,28 @@ public sealed class BuilderProposalService : IBuilderProposalService
 
         // ── 5. Run Tests ──────────────────────────────────────────────────────
         proposal.TestStatus = "Tests Running...";
+        var testCmd = await _projectProfileService.GetDefaultCommandAsync(proposal.ProjectId, "Test", ct);
+        
+        if (string.IsNullOrWhiteSpace(testCmd?.CommandText))
+        {
+            proposal.TestStatus = "Tests Failed";
+            proposal.TestOutput = "Test command is not configured. Set it in Project Profile.";
+            return;
+        }
+
         _llmTraceService.AddTrace(new LlmTraceEntry
         {
             FeatureName = "Builder.TestStarted",
             WorkspaceName = "Builder",
             ProjectId = proposal.ProjectId,
             TicketId = proposal.TicketId,
-            RequestText = $"dotnet test \"{slnPath}\" --logger \"console;verbosity=minimal\"",
+            RequestText = testCmd.CommandText,
             CreatedAt = DateTime.UtcNow
         });
 
-        var testResult = await _testService.TestAsync(slnPath, ct);
+        var testResult = await _testService.TestAsync(buildTarget, ct);
         proposal.TestStatus = testResult.Succeeded ? "Tests Passed" : "Tests Failed";
-        proposal.TestOutput = testResult.Succeeded ? testResult.StandardOutput : testResult.StandardError;
+        proposal.TestOutput = FormatExecutionOutput(testResult.Succeeded, testResult.Command, testResult.WorkingDirectory, testResult.ExitCode, testResult.StandardOutput, testResult.StandardError, testResult.Elapsed);
         proposal.TestDuration = testResult.Elapsed;
 
         _llmTraceService.AddTrace(new LlmTraceEntry
@@ -237,6 +279,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
             WasSuccessful = testResult.Succeeded,
             RawResponseText = testResult.StandardOutput,
             ErrorMessage = testResult.StandardError,
+            ParsedResponseSummary = $"Tests {(testResult.Succeeded ? "Passed" : "Failed")}. Command: {testResult.Command}",
             CreatedAt = DateTime.UtcNow
         });
     }
@@ -324,6 +367,46 @@ public sealed class BuilderProposalService : IBuilderProposalService
                     continue;
                 }
             }
+
+            // 6. Structural Validation for C#
+            if (change.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            {
+                ValidateCSharpStructure(proposal, change);
+            }
+        }
+    }
+
+    private void ValidateCSharpStructure(BuilderProposal proposal, ProposedFileChange change)
+    {
+        var content = change.FullContentAfter;
+        if (string.IsNullOrWhiteSpace(content)) return;
+
+        // Heuristic: reject if it looks like a generic standalone sample
+        if (content.Contains("namespace Sample") || content.Contains("class Program") && !change.FilePath.Contains("Program.cs"))
+        {
+            MarkInvalid(change, "Proposal appears to be generic sample code.");
+            return;
+        }
+
+        // BookSeller specific structural rules
+        if (proposal.ProjectName.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
+        {
+            if (change.FilePath.Contains("BookService.cs"))
+            {
+                if (!content.Contains("namespace BookSeller.Core.Services"))
+                    MarkInvalid(change, "Missing namespace BookSeller.Core.Services");
+                if (!content.Contains("class BookService"))
+                    MarkInvalid(change, "Missing class BookService");
+                if (!content.Contains("IBookService"))
+                    MarkInvalid(change, "IBookService implementation removed.");
+                if (content.Contains("class Book") && !content.Contains("public class BookService")) // likely duplicate model
+                    MarkInvalid(change, "Duplicate Book model class detected in service file.");
+            }
+            
+            if (change.FilePath.Contains("Book.cs") && !content.Contains("namespace BookSeller.Core.Models"))
+            {
+                MarkInvalid(change, "Missing namespace BookSeller.Core.Models in Book model.");
+            }
         }
     }
 
@@ -331,5 +414,22 @@ public sealed class BuilderProposalService : IBuilderProposalService
     {
         change.IsValid = false;
         change.ValidationMessage = message;
+    }
+
+    private static string FormatExecutionOutput(bool success, string command, string workingDir, int exitCode, string stdout, string stderr, TimeSpan duration)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"STATUS: {(success ? "SUCCESS" : "FAILED")}");
+        sb.AppendLine($"COMMAND: {command}");
+        sb.AppendLine($"WORKING DIR: {workingDir}");
+        sb.AppendLine($"EXIT CODE: {exitCode}");
+        sb.AppendLine($"DURATION: {duration.TotalSeconds:F2}s");
+        sb.AppendLine();
+        sb.AppendLine("--- STDOUT ---");
+        sb.AppendLine(string.IsNullOrWhiteSpace(stdout) ? "(empty)" : stdout);
+        sb.AppendLine();
+        sb.AppendLine("--- STDERR ---");
+        sb.AppendLine(string.IsNullOrWhiteSpace(stderr) ? "(empty)" : stderr);
+        return sb.ToString();
     }
 }

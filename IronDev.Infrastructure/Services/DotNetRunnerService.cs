@@ -14,11 +14,17 @@ public sealed class DotNetRunnerService : IDotNetBuildService, IDotNetTestServic
     {
         var result = new DotNetBuildResult { StartedUtc = DateTime.UtcNow };
         
-        // Command: dotnet build <path> --no-incremental -v quiet
+        var command = $"dotnet build \"{projectOrSolutionPath}\" --no-incremental -v quiet";
+        var workingDir = Path.GetDirectoryName(Path.GetFullPath(projectOrSolutionPath)) ?? string.Empty;
+        
+        result.Command = command;
+        result.WorkingDirectory = workingDir;
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
             Arguments = $"build \"{projectOrSolutionPath}\" --no-incremental -v quiet",
+            WorkingDirectory = workingDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -56,11 +62,17 @@ public sealed class DotNetRunnerService : IDotNetBuildService, IDotNetTestServic
     {
         var result = new DotNetTestResult { StartedUtc = DateTime.UtcNow };
         
-        // Command: dotnet test <path> --logger "console;verbosity=minimal"
+        var command = $"dotnet test \"{projectOrSolutionPath}\" --logger \"console;verbosity=minimal\"";
+        var workingDir = Path.GetDirectoryName(Path.GetFullPath(projectOrSolutionPath)) ?? string.Empty;
+
+        result.Command = command;
+        result.WorkingDirectory = workingDir;
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
             Arguments = $"test \"{projectOrSolutionPath}\" --logger \"console;verbosity=minimal\"",
+            WorkingDirectory = workingDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

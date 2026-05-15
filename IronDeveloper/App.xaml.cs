@@ -61,6 +61,8 @@ public partial class App : Application
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
+                services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.BuilderWorkspaceViewModel>();
+                services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.ProjectProfileViewModel>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentService,
@@ -163,6 +165,10 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.ICodebaseTicketGeneratorService,
                     global::IronDev.Infrastructure.Services.CodebaseTicketGeneratorService>();
+
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IProjectProfileService,
+                    global::IronDev.Infrastructure.Services.ProjectProfileService>();
 
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IDotNetBuildService,

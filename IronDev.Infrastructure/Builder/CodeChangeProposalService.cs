@@ -110,6 +110,27 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         sb.AppendLine($"You are implementing a ticket for the project: {ctx.ProjectName}.");
         sb.AppendLine($"Active Target Project: {ctx.ProjectName}");
         sb.AppendLine($"Active Target Project Root: {ctx.ProjectPath}");
+        
+        if (ctx.IsExternalProject)
+        {
+            sb.AppendLine("NOTE: This is an EXTERNAL project. Do not make assumptions based on IronDev internals.");
+            if (ctx.ProjectName.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.AppendLine("- For SearchByTitle, modify the existing method in BookService.cs only.");
+                sb.AppendLine("- Use the existing private _books field for filtering.");
+                sb.AppendLine("- Return matching books using a case-insensitive, partial contains match.");
+                sb.AppendLine("- DO NOT create a new Book class; use BookSeller.Core.Models.Book.");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("TARGET PROJECT PROFILE:");
+        sb.AppendLine($"  Application Type: {ctx.ApplicationType ?? "Unknown"}");
+        sb.AppendLine($"  Primary Language: {ctx.PrimaryLanguage ?? "Unknown"}");
+        sb.AppendLine($"  Framework/Runtime: {ctx.Framework ?? "Unknown"}");
+        sb.AppendLine($"  Database Engine: {ctx.DatabaseEngine ?? "None"}");
+        sb.AppendLine($"  Data Access Style: {ctx.DataAccessStyle ?? "None"}");
+        sb.AppendLine($"  Test Framework: {ctx.TestFramework ?? "None"}");
         sb.AppendLine();
         sb.AppendLine("RULES:");
         sb.AppendLine("- Generate a proposal only. Do not claim files were changed.");
@@ -118,6 +139,10 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         sb.AppendLine("- Only change files relevant to the ticket.");
         sb.AppendLine("- Do not invent requirements not stated in the ticket or plan.");
         sb.AppendLine("- Follow all linked architectural decisions and project rules.");
+        sb.AppendLine("- PRESERVE existing namespace declarations.");
+        sb.AppendLine("- PRESERVE existing class declarations and public API signatures unless explicitly asked to change them.");
+        sb.AppendLine("- MODIFY existing methods in place; do not replace entire classes with sample code.");
+        sb.AppendLine("- DO NOT create duplicate model classes if they already exist in the project.");
         sb.AppendLine("- Prefer small, targeted changes.");
         sb.AppendLine("- Produce unified diffs for all changes.");
         sb.AppendLine("- Do not use markdown code fences inside JSON values (no ```diff).");
