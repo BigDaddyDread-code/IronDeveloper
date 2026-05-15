@@ -238,7 +238,7 @@ public class AuthController {
     public async Task DeepLookup_RespectsLimits()
     {
         var codeIndex = new StubCodeIndexService();
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 10; i++)
         {
             codeIndex.Entries.Add(new CodeIndexEntry
             {
@@ -256,13 +256,13 @@ public class AuthController {
         var traceService = new LlmTraceService();
         var agent = new ContextAgentService(new StubPromptContextBuilder(), codeIndex, new StubLlmServiceForAgent { SufficiencyJson = "{ \"isSufficient\": false, \"confidence\": 5, \"reason\": \"Need more code.\", \"requestedContext\": { \"codeSearchQueries\": [\"Method\"] } }" }, traceService, null);
 
-        var limits = new ContextAgentLimits { MaxCodeSearchQueries = 1, MaxSnippets = 5, MaxToolCallsPerRound = 1 };
+        var limits = new ContextAgentLimits { MaxCodeSearchQueries = 1, MaxSnippets = 10, MaxToolCallsPerRound = 1 };
         await agent.RunAsync(new ContextAgentRequest { ProjectId = 1, UserRequest = "inspect Method", Limits = limits });
 
         var deepTraces = traceService.GetRecentTraces().Where(t => t.FeatureName == ContextAgentStage.DeepCodeEvidence).ToList();
         
-        // Assert F: Max 3 deep lookups despite 5 shallow snippets
-        Assert.AreEqual(3, deepTraces.Count);
+        // Assert F: Max 5 deep lookups despite 10 shallow snippets
+        Assert.AreEqual(5, deepTraces.Count);
     }
 
     [TestMethod]

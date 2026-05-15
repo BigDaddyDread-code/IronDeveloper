@@ -29,11 +29,17 @@ public class ContextAgentRoutingTests
     {
         public string SufficiencyJson { get; set; } = "{ \"isSufficient\": true, \"confidence\": 5, \"reason\": \"All good\", \"requestedContext\": { \"codeSearchQueries\": [] } }";
 
+        public string RouteJson { get; set; } = "INVALID_JSON";
+
         public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default)
         {
             if (prompt.Contains("You are a context quality evaluator"))
             {
                 return Task.FromResult(SufficiencyJson);
+            }
+            if (prompt.Contains("You are the Context Agent route judge"))
+            {
+                return Task.FromResult(RouteJson);
             }
             return Task.FromResult("FINAL ANSWER");
         }
@@ -204,5 +210,93 @@ public class ContextAgentRoutingTests
         var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
         Assert.IsNotNull(routeTrace, "Should emit RouteDecision trace.");
         Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("ReplaceArchitecture"), "Should route to ReplaceArchitecture.");
+    }
+
+    [TestMethod]
+    [Description("Test E: Safety override - Inspection cannot block.")]
+    public async Task Inspection_SafetyOverride_OverridesBlocking()
+    {
+        var traceService = new LlmTraceService();
+        var llm = new StubLlmServiceForAgent
+        {
+            RouteJson = """
+            {
+              "requestKind": "InspectCode",
+              "confidence": 0.95,
+              "allowConflictBlocking": true
+            }
+            """
+        };
+        var agent = new ContextAgentService(new StubPromptContextBuilder(), new StubCodeIndexService(), llm, traceService);
+
+        var request = new ContextAgentRequest 
+        { 
+            ProjectId = 1, 
+            UserRequest = "What does AuthController do?"
+        };
+
+        var result = await agent.RunAsync(request);
+
+        var allTraces = traceService.GetRecentTraces();
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace);
+        Assert.IsTrue(routeTrace.RawResponseText.Contains("Inspection requests cannot allow conflict blocking. Overriding AllowConflictBlocking to false."));
+        Assert.IsTrue(routeTrace.ContextSummary.Contains("ConflictBlocking=False"));
+    }
+
+    [TestMethod]
+    [Description("Test G: Low confidence triggers clarification.")]
+    public async Task LowConfidence_TriggersClarification()
+    {
+        var traceService = new LlmTraceService();
+        var llm = new StubLlmServiceForAgent
+        {
+            RouteJson = """
+            {
+              "requestKind": "InspectCode",
+              "confidence": 0.50,
+              "allowConflictBlocking": false
+            }
+            """
+        };
+        var agent = new ContextAgentService(new StubPromptContextBuilder(), new StubCodeIndexService(), llm, traceService);
+
+        var request = new ContextAgentRequest 
+        { 
+            ProjectId = 1, 
+            UserRequest = "Can you check?"
+        };
+
+        var result = await agent.RunAsync(request);
+
+        var allTraces = traceService.GetRecentTraces();
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace);
+        Assert.IsTrue(routeTrace.RawResponseText.Contains("Confidence is below 0.70. Setting NeedsClarification to true."));
+    }
+
+    [TestMethod]
+    [Description("Test F: Invalid JSON fallback uses deterministic router.")]
+    public async Task InvalidJson_UsesFallback()
+    {
+        var traceService = new LlmTraceService();
+        var llm = new StubLlmServiceForAgent
+        {
+            RouteJson = "Not valid JSON"
+        };
+        var agent = new ContextAgentService(new StubPromptContextBuilder(), new StubCodeIndexService(), llm, traceService);
+
+        var request = new ContextAgentRequest 
+        { 
+            ProjectId = 1, 
+            UserRequest = "check this"
+        };
+
+        var result = await agent.RunAsync(request);
+
+        var allTraces = traceService.GetRecentTraces();
+        var routeTrace = allTraces.FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace);
+        Assert.IsTrue(routeTrace.ContextSummary.Contains("UsedFallbackRules=True"));
     }
 }

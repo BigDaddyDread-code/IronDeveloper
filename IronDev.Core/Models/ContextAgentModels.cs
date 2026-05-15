@@ -33,18 +33,53 @@ public enum ContextRequestKind
 
 public sealed class ContextAgentRouteDecision
 {
-    public string OriginalUserRequest { get; init; } = string.Empty;
-    public string EffectiveWorkText { get; init; } = string.Empty;
-    public ContextRequestKind RequestKind { get; init; }
-    public double Confidence { get; init; }
-    public string Reason { get; init; } = string.Empty;
+    public string OriginalUserRequest { get; set; } = string.Empty;
+    public string EffectiveWorkText { get; set; } = string.Empty;
+    public ContextRequestKind RequestKind { get; set; }
+    public double Confidence { get; set; }
+    public string Reason { get; set; } = string.Empty;
     
-    public bool AllowCodeSearch { get; init; }
-    public bool AllowDeepLookup { get; init; }
-    public bool AllowConflictAssessment { get; init; }
-    public bool AllowConflictBlocking { get; init; }
-    public bool AllowTicketCreation { get; init; }
-    public bool RequiresClarification { get; init; }
+    public bool AllowCodeSearch { get; set; }
+    public bool AllowDeepLookup { get; set; }
+    public bool AllowConflictAssessment { get; set; }
+    public bool AllowConflictBlocking { get; set; }
+    public bool AllowTicketCreation { get; set; }
+    
+    public bool RelatedTicketsAreContextOnly { get; set; }
+    public bool NeedsClarification { get; set; }
+    public IReadOnlyList<string> ClarificationQuestions { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> EvidenceUsed { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Risks { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> SafetyOverrides { get; set; } = Array.Empty<string>();
+    public bool UsedLlmJudge { get; set; }
+    public bool UsedFallbackRules { get; set; }
+    
+    public IReadOnlyList<DeepLookupTarget> DeepLookupTargets { get; set; } = Array.Empty<DeepLookupTarget>();
+}
+
+public sealed class DeepLookupTarget
+{
+    public string FilePath { get; set; } = string.Empty;
+    public string SymbolName { get; set; } = string.Empty;
+    public string ProofPattern { get; set; } = string.Empty;
+    public bool Required { get; set; } = true;
+}
+
+public sealed class ContextAgentRouteRequest
+{
+    public string TraceGroupId { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public long SessionId { get; init; }
+    public string UserRequest { get; init; } = string.Empty;
+    public string RecentConversationSummary { get; init; } = string.Empty;
+    public string InitialIntentFromPromptContextBuilder { get; init; } = string.Empty;
+    public IReadOnlyList<IronDev.Data.Models.ProjectTicket> RecentTickets { get; init; } = Array.Empty<IronDev.Data.Models.ProjectTicket>();
+    public IReadOnlyList<IronDev.Data.Models.ProjectDecision> RecentDecisions { get; init; } = Array.Empty<IronDev.Data.Models.ProjectDecision>();
+    public IReadOnlyList<IronDev.Data.Models.ProjectRule> ProjectRules { get; init; } = Array.Empty<IronDev.Data.Models.ProjectRule>();
+    public IReadOnlyList<string> RetrievedFilePaths { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> RetrievedSymbols { get; init; } = Array.Empty<string>();
+    public string? SelectedTicketTitle { get; init; }
+    public string? SelectedPlanTitle { get; init; }
 }
 
 // ── Deep Code Evidence ────────────────────────────────────────────────────────
@@ -57,6 +92,24 @@ public enum DeepEvidenceType
     FullSmallFile,
     PropertyDefinition,
     MethodBody
+}
+
+public enum ContextProofStatus
+{
+    NotProven,
+    ProvenPresent,
+    ProvenAbsent,
+    InsufficientEvidence
+}
+
+public sealed class EvidenceProofResult
+{
+    public ContextProofStatus Status { get; set; } = ContextProofStatus.NotProven;
+    public bool IsProven => Status == ContextProofStatus.ProvenPresent || Status == ContextProofStatus.ProvenAbsent;
+    public List<string> MissingElements { get; } = new();
+    public string ProofNotes { get; set; } = string.Empty;
+    public bool EvidenceProofGateSkipped { get; set; }
+    public string EvidenceProofGateSkipReason { get; set; } = string.Empty;
 }
 
 public sealed class DeepCodeEvidence
@@ -83,6 +136,7 @@ public sealed class ContextAgentRequest
     public int    ProjectId   { get; init; }
     public long   SessionId   { get; init; }
     public string UserRequest { get; init; } = string.Empty;
+    public string RecentConversationSummary { get; init; } = string.Empty;
 
     // Optional navigation context
     public long? TicketId { get; init; }
@@ -250,6 +304,7 @@ public sealed class ContextAgentResult
     public bool   WasSuccessful     { get; init; }
     public string Warnings          { get; init; } = string.Empty;
     public IReadOnlyList<CodeEvidence> Evidence { get; init; } = Array.Empty<CodeEvidence>();
+    public IReadOnlyList<TicketCandidate> TicketCandidates { get; init; } = Array.Empty<TicketCandidate>();
 
     // ── Evidence rule ─────────────────────────────────────────────────────
     /// <summary>
@@ -266,6 +321,16 @@ public sealed class ContextAgentResult
     /// the conflict assessment is not enabled.
     /// </summary>
     public TicketConflictAssessment? ConflictAssessment { get; init; }
+    public bool EvidenceProofGateSkipped { get; init; }
+    public string EvidenceProofGateSkipReason { get; init; } = string.Empty;
+}
+
+public sealed class TicketCandidate
+{
+    public string Title { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string SuggestedDomain { get; set; } = string.Empty;
+    public string ExistingRelatedWork { get; set; } = string.Empty;
 }
 
 // ── Stage names (trace FeatureName values) ───────────────────────────────────
@@ -286,6 +351,11 @@ public static class ContextAgentStage
     public const string IntentCreateTicket    = "ChatIntent.CreateTicket";
     public const string DeepCodeEvidence      = "ContextAgent.DeepCodeEvidence";
     public const string RouteDecision         = "ContextAgent.RouteDecision";
+    public const string RouteGateDecision     = "ContextAgent.RouteGateDecision";
+    public const string EvidenceProofGate     = "ContextAgent.EvidenceProofGate";
+    public const string EvidenceProofGateSkipped = "ContextAgent.EvidenceProofGateSkipped";
+    public const string DirectDeepLookupTargets = "ContextAgent.DirectDeepLookupTargets";
+    public const string CandidateExtraction   = "ContextAgent.CandidateExtraction";
 }
 
 // ── Conflict assessment models ────────────────────────────────────────────────

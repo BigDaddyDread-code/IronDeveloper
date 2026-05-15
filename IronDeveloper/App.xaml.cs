@@ -68,6 +68,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextConflictService,
                     global::IronDev.Infrastructure.Services.ContextConflictService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IContextAgentRouteJudge,
+                    global::IronDev.Infrastructure.Services.ContextAgentRouteJudgeService>();
 
                 var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
                                 ?? new global::IronDev.Core.Models.LlmOptions();

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using IronDev.Data.Models;
+using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -72,6 +73,115 @@ public static class RetrievalQualityHelpers
     ///   - Boosted production paths come first.
     ///   - Within the same tier, original ordering is preserved.
     /// </summary>
+    /// <summary>
+    /// Sorts and filters a set of retrieved snippets based on the current route decision.
+    /// This prevents irrelevant files (like conflict keyword tables or draft services)
+    /// from clogging the evidence context for inspection routes.
+    /// </summary>
+    public static IReadOnlyList<CodeIndexEntry> RankAndFilter(
+        IEnumerable<CodeIndexEntry> entries,
+        ContextAgentRouteDecision route,
+        bool excludeTests = true)
+    {
+        var list = entries.ToList();
+
+        if (excludeTests)
+            list = list.Where(e => !IsTestFile(e.FilePath)).ToList();
+
+        var lowerWork = (route.EffectiveWorkText ?? string.Empty).ToLowerInvariant();
+        bool isAuthQuery = lowerWork.Contains("auth") || lowerWork.Contains("login") || lowerWork.Contains("jwt");
+        bool isTicketQuery = lowerWork.Contains("ticket") || lowerWork.Contains("archive");
+
+        return list
+            .Where(e => !IsExplicitlyExcluded(e, route, isAuthQuery, isTicketQuery))
+            .OrderBy(e => IsTestFile(e.FilePath) ? 2 : 0)
+            .ThenBy(e => GetRouteAwareBoost(e, isAuthQuery, isTicketQuery))
+            .ThenBy(e => ProductionBoostScore(e.FilePath))
+            .ThenBy(e => list.IndexOf(e))
+            .ToList();
+    }
+
+    private static bool IsExplicitlyExcluded(CodeIndexEntry e, ContextAgentRouteDecision route, bool isAuthQuery, bool isTicketQuery)
+    {
+        var path = e.FilePath?.ToLowerInvariant() ?? string.Empty;
+        var lowerWork = (route.EffectiveWorkText ?? string.Empty).ToLowerInvariant();
+
+        // 1. Detect if the user is asking about the agent itself
+        bool isContextAgentSelfQuery = lowerWork.Contains("context agent") 
+                                    || lowerWork.Contains("routing") 
+                                    || lowerWork.Contains("proof gate") 
+                                    || lowerWork.Contains("tracing")
+                                    || lowerWork.Contains("contextagent")
+                                    || lowerWork.Contains("conflictassessment")
+                                    || lowerWork.Contains("routejudge");
+
+        // 2. Exclude Context Agent internals from product implementation questions
+        if (!isContextAgentSelfQuery)
+        {
+            string[] internalFiles = [
+                "contextagentservice.cs",
+                "contextconflictservice.cs",
+                "contextagentmodels.cs",
+                "retrievalqualityhelpers.cs",
+                "deepcodelookupservice.cs",
+                "llmtraceservice.cs",
+                "stubllmservice.cs",
+                "stubroutejudge.cs",
+                "contextagentroutejudgeservice.cs",
+                "contextagentroutejudge.cs",
+                "icontextagentroutejudge.cs",
+                "contextagentmodels.cs"
+            ];
+            
+            var fileName = Path.GetFileName(path);
+            if (internalFiles.Any(f => f.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
+                return true;
+        }
+
+        // 3. Exclude DraftTicketService from product implementation questions
+        // Unless the user explicitly asks about draft-ticket generation.
+        bool isDraftQuery = lowerWork.Contains("draft");
+        if (isTicketQuery && !isDraftQuery && path.Contains("draftticketservice.cs"))
+            return true;
+
+        return false;
+    }
+
+    private static int GetRouteAwareBoost(CodeIndexEntry e, bool isAuthQuery, bool isTicketQuery)
+    {
+        var path = e.FilePath?.ToLowerInvariant() ?? string.Empty;
+
+        // 1. Auth Domain Boosts
+        if (isAuthQuery)
+        {
+            if (path.Contains("authcontroller.cs") 
+                || path.Contains("jwttokenservice.cs") 
+                || path.Contains("userservice.cs")
+                || path.Contains("authdtos.cs")
+                || path.Contains("jwt-tenant-context.cs")
+                || path.EndsWith("program.cs"))
+                return -10; // High priority
+                
+            if (path.Contains("auth")) 
+                return -5;
+        }
+
+        // 2. Ticket Domain Boosts
+        if (isTicketQuery)
+        {
+            if (path.Contains("ticketservice.cs") 
+                || path.Contains("datamodels.cs") 
+                || path.Contains("ticketsworkspaceviewmodel.cs")
+                || path.Contains("ticketsworkspaceview.xaml"))
+                return -10;
+
+            if (path.Contains("draftticketservice.cs"))
+                return 15; // De-boost draft service relative to production
+        }
+
+        return 5;
+    }
+
     public static IReadOnlyList<CodeIndexEntry> RankByProductionFirst(
         IEnumerable<CodeIndexEntry> entries,
         bool excludeTests = false)
@@ -108,24 +218,20 @@ public static class RetrievalQualityHelpers
         }
 
         // ProjectTicket property filtering logic missing
-        if (symbolName.Equals("ProjectTicket", StringComparison.OrdinalIgnoreCase) && !lower.Contains("isdeleted"))
+        if (symbolName.Equals("ProjectTicket", StringComparison.OrdinalIgnoreCase))
         {
-            if (lowerQuery.Contains("delete") || lowerQuery.Contains("archive") || lowerQuery.Contains("isdeleted"))
+            if (!lower.Contains("public bool isdeleted") && !lower.Contains("{ get; set; }") && !lower.Contains("=>"))
                 return true;
         }
 
         // Missing filtering logic for Archive
         if (lowerQuery.Contains("archive") && !lower.Contains("archive") && !lower.Contains("isdeleted")) return true;
 
-        // AuthController constructor
-        if (symbolName.EndsWith("Controller", StringComparison.OrdinalIgnoreCase))
+        // If it's a method but has no body (likely just a signature from an interface or abstract class)
+        if (!string.IsNullOrEmpty(symbolName) && !lower.Contains("interface ") && !lower.Contains("abstract "))
         {
-            // If it's just the class header and constructor, but we want auth methods
-            if (lower.Contains("public " + symbolName) && (!lower.Contains("login") && !lower.Contains("auth") && !lower.Contains("token")))
-            {
-                if (lowerQuery.Contains("auth") || lowerQuery.Contains("login") || lowerQuery.Contains("token"))
-                    return true;
-            }
+            if (lower.Contains(" " + symbolName.ToLowerInvariant() + "(") && !lower.Contains("{") && !lower.Contains("=>"))
+                return true;
         }
 
         return false;
@@ -216,6 +322,16 @@ public static class RetrievalQualityHelpers
          ["CodeIndexService", "ICodeIndexService", "GetRelevantSnippetsAsync", "SqlCodeIndexService"]),
         ("index",
          ["CodeIndexService", "GetRelevantSnippetsAsync", "IndexDirectoryAsync"]),
+
+        // ── Authentication / Authorization ────────────────────────────────────
+        ("auth",
+         ["AuthController", "JwtTokenService", "IJwtTokenService", "JwtTenantContext", "UserService", "UserProfileDto", "LoginRequest", "LoginResponse", "Program.cs"]),
+        ("authentication",
+         ["AuthController", "JwtTokenService", "IJwtTokenService", "UserService", "JwtTenantContext", "Program.cs"]),
+        ("jwt",
+         ["JwtTokenService", "IJwtTokenService", "JwtTenantContext", "AuthController"]),
+        ("login",
+         ["AuthController", "LoginRequest", "LoginResponse", "UserService"]),
     ];
 
     /// <summary>
@@ -336,5 +452,20 @@ public static class RetrievalQualityHelpers
             .OrderBy(e => IsTestFile(e.FilePath) ? 1 : 0)
             .ThenByDescending(e => e.ChunkText?.Length ?? 0)
             .ToList();
+    }
+    /// <summary>
+    /// Returns true when the symbol name is a meaningful domain-level or logic-level
+    /// symbol. Non-semantic symbols (like readonly, Ok, Unauthorized) are skipped
+    /// during deep evidence lookup to avoid wasting budget on low-value context.
+    /// </summary>
+    public static bool IsSemanticSymbol(string? symbolName)
+    {
+        if (string.IsNullOrWhiteSpace(symbolName)) return false;
+        if (symbolName.Length < 3) return false;
+
+        var lower = symbolName.ToLowerInvariant();
+        string[] nonSemantic = ["readonly", "ok", "unauthorized", "result", "task", "void", "string", "int", "bool", "guid", "datetime"];
+        
+        return !nonSemantic.Contains(lower);
     }
 }

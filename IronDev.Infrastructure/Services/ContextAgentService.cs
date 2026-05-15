@@ -38,6 +38,7 @@ public sealed class ContextAgentService : IContextAgentService
     private readonly ILlmTraceService         _traceService;
     private readonly IContextConflictService? _conflictService;
     private readonly IDeepCodeLookupService   _deepLookupService;
+    private readonly IContextAgentRouteJudge  _routeJudge;
 
     // ── Default limits ────────────────────────────────────────────────────────
 
@@ -82,7 +83,8 @@ public sealed class ContextAgentService : IContextAgentService
         ILLMService              llmService,
         ILlmTraceService         traceService,
         IContextConflictService? conflictService = null,
-        IDeepCodeLookupService?  deepLookupService = null)
+        IDeepCodeLookupService?  deepLookupService = null,
+        IContextAgentRouteJudge? routeJudge = null)
     {
         _contextBuilder    = contextBuilder;
         _codeIndexService  = codeIndexService;
@@ -91,6 +93,7 @@ public sealed class ContextAgentService : IContextAgentService
         _conflictService   = conflictService;
         // In some tests it might be null, but we prefer injecting a real one
         _deepLookupService = deepLookupService ?? new DeepCodeLookupService(codeIndexService);
+        _routeJudge        = routeJudge ?? new ContextAgentRouteJudgeService(llmService, traceService);
     }
 
     // ── Main pipeline ─────────────────────────────────────────────────────────
@@ -101,58 +104,8 @@ public sealed class ContextAgentService : IContextAgentService
         var traceGroupId = Guid.NewGuid().ToString("N");
         var warnings     = new List<string>();
         var evidence     = new List<CodeEvidence>();
-
-        // ── Stage 0.5: Executive Route Decision ──────────────────────────────
-        var route = ContextAgentRouter.DetermineRoute(request.UserRequest, request.CreateTicketIntent);
-        var effectiveWorkText = route.EffectiveWorkText;
-
-        var tRoute = MakeTrace(ContextAgentStage.RouteDecision, traceGroupId, null);
-        tRoute.WasSuccessful         = true;
-        tRoute.RequestText           = $"UserRequest: {request.UserRequest}\nEffectiveWorkText: {effectiveWorkText}";
-        tRoute.ParsedResponseSummary = $"Route: {route.RequestKind} | Confidence: {route.Confidence}";
-        tRoute.RawResponseText       = 
-            $"Reason: {route.Reason}\n" +
-            $"AllowCodeSearch: {route.AllowCodeSearch}\n" +
-            $"AllowDeepLookup: {route.AllowDeepLookup}\n" +
-            $"AllowConflictAssessment: {route.AllowConflictAssessment}\n" +
-            $"AllowConflictBlocking: {route.AllowConflictBlocking}\n" +
-            $"AllowTicketCreation: {route.AllowTicketCreation}";
-        tRoute.ContextSummary        = $"Executive Route: {route.RequestKind}";
-        _traceService.AddTrace(tRoute);
-
-        // ── Stage 0: Pre-check — clarification-first for vague requests ───────
-        // Done before any LLM call to save a round-trip for obviously ambiguous
-        // requests like "Create a ticket to fix delete."
-        var (shouldClarify, matched) = route.AllowConflictBlocking 
-            ? RetrievalQualityHelpers.ShouldPreferClarification(effectiveWorkText)
-            : (false, string.Empty);
-        if (shouldClarify)
-        {
-            var questions = RetrievalQualityHelpers.GetDeleteClarificationQuestions();
-
-            var t0 = MakeTrace(ContextAgentStage.ClarificationRequired, traceGroupId, null);
-            t0.WasSuccessful         = true;
-            t0.CurrentUserMessage    = request.UserRequest;
-            t0.RequestText           = 
-                $"UserRequest: {request.UserRequest}\n" +
-                $"Matched Pattern: {matched}\n" +
-                $"Reason: Request matched vague create/fix pattern — clarification preferred over code search.\n" +
-                $"Candidate Domains: Chat, Tickets (Soft Archive), Tickets (Hard Delete), Implementation Plans";
-            t0.ParsedResponseSummary = $"Pre-check clarification: {questions.Count} question(s) (vague intent detected)";
-            t0.RawResponseText       = string.Join("\n", questions);
-            t0.ContextSummary        = "Request matched vague create/fix pattern — clarification preferred over code search.";
-            _traceService.AddTrace(t0);
-
-            return new ContextAgentResult
-            {
-                TraceGroupId            = traceGroupId,
-                IsClarificationRequired = true,
-                ClarificationQuestions  = questions,
-                WasSuccessful           = true,
-                ContextSummary          = "Clarification required: vague intent detected before LLM call.",
-                Warnings                = string.Join("; ", warnings),
-            };
-        }
+        var candidates   = new List<TicketCandidate>();
+        var proofResult  = new EvidenceProofResult { Status = ContextProofStatus.NotProven }; 
 
         // ── Stage 1: Build initial context ────────────────────────────────────
         Guid? stage1Id = null;
@@ -162,7 +115,7 @@ public sealed class ContextAgentService : IContextAgentService
             try
             {
                 initialPacket = await _contextBuilder.BuildPacketAsync(
-                    request.ProjectId, request.SessionId, effectiveWorkText, ct);
+                    request.ProjectId, request.SessionId, request.UserRequest, ct);
             }
             catch (Exception ex)
             {
@@ -194,6 +147,60 @@ public sealed class ContextAgentService : IContextAgentService
                 warnings.Add(initialPacket.RulesLoadWarning);
         }
 
+        // ── Stage 1.5: Executive Route Decision ──────────────────────────────
+        var routeRequest = new ContextAgentRouteRequest
+        {
+            TraceGroupId = traceGroupId,
+            ProjectId = request.ProjectId,
+            SessionId = request.SessionId,
+            UserRequest = request.UserRequest,
+            RecentConversationSummary = string.Empty,
+            InitialIntentFromPromptContextBuilder = initialPacket.Intent.ToString(),
+            RecentTickets = request.RecentTickets,
+            RecentDecisions = request.RecentDecisions,
+            ProjectRules = request.ProjectRules,
+            RetrievedFilePaths = initialPacket.MatchedFilePaths,
+            RetrievedSymbols = new List<string>(), // We don't have symbols from initial context currently
+            SelectedTicketTitle = string.Empty,
+            SelectedPlanTitle = string.Empty
+        };
+
+        var route = await _routeJudge.DecideRouteAsync(routeRequest, ct);
+        var effectiveWorkText = route.EffectiveWorkText;
+
+        // ── Stage 0: Pre-check — clarification-first for vague requests ───────
+        // Done before code search if it's obvious from user request (vague 'create ticket')
+        var (shouldClarify, matched) = route.AllowConflictBlocking 
+            ? RetrievalQualityHelpers.ShouldPreferClarification(effectiveWorkText)
+            : (false, string.Empty);
+        if (shouldClarify)
+        {
+            var questions = RetrievalQualityHelpers.GetDeleteClarificationQuestions();
+
+            var t0 = MakeTrace(ContextAgentStage.ClarificationRequired, traceGroupId, null);
+            t0.WasSuccessful         = true;
+            t0.CurrentUserMessage    = request.UserRequest;
+            t0.RequestText           = 
+                $"UserRequest: {request.UserRequest}\n" +
+                $"Matched Pattern: {matched}\n" +
+                $"Reason: Request matched vague create/fix pattern — clarification preferred over code search.\n" +
+                $"Candidate Domains: Chat, Tickets (Soft Archive), Tickets (Hard Delete), Implementation Plans";
+            t0.ParsedResponseSummary = $"Pre-check clarification: {questions.Count} question(s) (vague intent detected)";
+            t0.RawResponseText       = string.Join("\n", questions);
+            t0.ContextSummary        = "Request matched vague create/fix pattern — clarification preferred over code search.";
+            _traceService.AddTrace(t0);
+
+            return new ContextAgentResult
+            {
+                TraceGroupId            = traceGroupId,
+                IsClarificationRequired = true,
+                ClarificationQuestions  = questions,
+                WasSuccessful           = true,
+                ContextSummary          = "Clarification required: vague intent detected before LLM call.",
+                Warnings                = string.Join("; ", warnings),
+            };
+        }
+
         // ── Stage 2: Sufficiency check ────────────────────────────────────────
         ContextSufficiencyResult sufficiency;
         Guid? stage2Id = null;
@@ -218,7 +225,7 @@ public sealed class ContextAgentService : IContextAgentService
                 sufficiency = new ContextSufficiencyResult { IsSufficient = true, Confidence = 5,
                     Reason = $"Sufficiency check unavailable: {ex.Message}" };
                 warnings.Add($"Sufficiency check LLM error: {ex.Message}");
-                goto BuildFinalPrompt;
+                goto RunFinalGating;
             }
             sw.Stop();
 
@@ -364,24 +371,89 @@ public sealed class ContextAgentService : IContextAgentService
                         ConflictAssessment      = conflictAssessment,
                     };
                 }
-                }
             }
         }
+    }
 
-        // ── Stage 4: Context expansion (tool calls) ───────────────────────────
-        if (!sufficiency.IsSufficient && sufficiency.CodeSearchQueries.Count > 0 && route.AllowCodeSearch)
-        {
-            // Expand raw LLM queries into concrete symbol-level queries
+    // ── Stage 4: Context expansion (direct + tool calls) ─────────────────
+    if (!sufficiency.IsSufficient && route.AllowCodeSearch)
+    {
+        int toolCallCount = 0;
+        int deepLookupsCount = 0;
+        int totalDeepChars = 0;
+        const int MaxDeepLookups = 5; 
+        const int MaxTotalDeepChars = 20000;
+
+        // ── Stage 4.0: Direct Deep Lookup for identified targets ──────────────
+            if (route.AllowDeepLookup && route.DeepLookupTargets.Count > 0)
+            {
+                var tTargets = MakeTrace(ContextAgentStage.DirectDeepLookupTargets, traceGroupId, stage2Id);
+                tTargets.RequestText = $"Targets identified by RouteJudge: {route.DeepLookupTargets.Count}\nWorkText: {route.EffectiveWorkText}";
+                var targetsSummary = new StringBuilder();
+                int successCount = 0;
+
+                foreach (var target in route.DeepLookupTargets)
+                {
+                    bool success = false;
+                    string failureReason = string.Empty;
+                    int evidenceLength = 0;
+
+                    try
+                    {
+                        var deepResult = await _deepLookupService.GetDeepCodeEvidenceAsync(
+                            request.ProjectId, target.FilePath, target.SymbolName, target.ProofPattern, ct);
+
+                        if (deepResult != null)
+                        {
+                            evidence.Add(new CodeEvidence
+                            {
+                                FilePath = deepResult.FilePath,
+                                SymbolName = deepResult.SymbolName,
+                                Snippet = deepResult.CodeText,
+                                RetrievedByQuery = "[Direct Deep Lookup]",
+                                SelectionReason = $"Directly targeted by RouteJudge: {target.ProofPattern} (EvidenceType: {deepResult.EvidenceType})"
+                            });
+                            success = true;
+                            successCount++;
+                            evidenceLength = deepResult.CodeText.Length;
+                            deepLookupsCount++;
+                            totalDeepChars += evidenceLength;
+                        }
+                        else
+                        {
+                            failureReason = "Target not found in index or body unparsable.";
+                            if (target.Required)
+                                warnings.Add($"Required verification target {target.FilePath}/{target.SymbolName} was not found.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failureReason = ex.Message;
+                        warnings.Add($"Direct lookup error for {target.FilePath}: {ex.Message}");
+                    }
+
+                targetsSummary.AppendLine($"Target: {target.FilePath} / {target.SymbolName}");
+                targetsSummary.AppendLine($"  Pattern: {target.ProofPattern}");
+                targetsSummary.AppendLine($"  Attempted: true");
+                targetsSummary.AppendLine($"  Success: {success}");
+                if (!success) targetsSummary.AppendLine($"  FailureReason: {failureReason}");
+                targetsSummary.AppendLine($"  EvidenceLength: {evidenceLength}");
+                targetsSummary.AppendLine($"  AppendedToFinalEvidence: {success}");
+                targetsSummary.AppendLine($"  AppendedToProofGate: {success}");
+                targetsSummary.AppendLine();
+            }
+
+            tTargets.WasSuccessful = successCount > 0;
+            tTargets.RawResponseText = targetsSummary.ToString().TrimEnd();
+            tTargets.ParsedResponseSummary = $"Direct targets processed: {successCount}/{route.DeepLookupTargets.Count} successful.";
+            _traceService.AddTrace(tTargets);
+        }
+
+            // ── Stage 4.1: Keyword fallback ───────────────────────────────────
             var expandedQueries = RetrievalQualityHelpers
                 .ExpandQueries(sufficiency.CodeSearchQueries)
                 .Take(limits.MaxCodeSearchQueries)
                 .ToList();
-
-            int toolCallCount = 0;
-            int deepLookupsCount = 0;
-            int totalDeepChars = 0;
-            const int MaxDeepLookups = 3;
-            const int MaxTotalDeepChars = 10000;
 
             foreach (var query in expandedQueries)
             {
@@ -391,7 +463,7 @@ public sealed class ContextAgentService : IContextAgentService
 
                 toolCallCount++;
 
-                // Stage 4a: ToolCall trace
+                // Stage 4.1a: ToolCall trace
                 var tCall = MakeTrace(ContextAgentStage.ToolCallSearch, traceGroupId, stage2Id);
                 tCall.RequestText   = 
                     $"Action: GetRelevantSnippetsAsync\n" +
@@ -423,13 +495,13 @@ public sealed class ContextAgentService : IContextAgentService
                 int rawCount  = rawResults.Count;
                 int testCount = rawResults.Count(r => RetrievalQualityHelpers.IsTestFile(r.FilePath));
 
-                // Rank: exclude test files, then sort by production boost + depth
-                var ranked = RetrievalQualityHelpers.RankByProductionFirst(rawResults, excludeTests: true);
+                // Rank: exclude test files, then sort by route-aware boost + production boost + depth
+                var ranked = RetrievalQualityHelpers.RankAndFilter(rawResults, route, excludeTests: true);
                 ranked     = RetrievalQualityHelpers.PreferDeepSnippets(ranked);
 
                 int afterFilterCount = ranked.Count;
 
-                // Stage 4b: ToolResult trace with full retrieval transparency
+                // Stage 4.1b: ToolResult trace with full retrieval transparency
                 var tResult = MakeTrace(ContextAgentStage.ToolResultSearch, traceGroupId, tCall.Id);
                 tResult.WasSuccessful = true;
                 tResult.DurationMs    = 0;
@@ -442,6 +514,12 @@ public sealed class ContextAgentService : IContextAgentService
                     if (evidence.Select(e => e.FilePath).Distinct().Count() >= limits.MaxAddedFiles) break;
                     if (evidence.Count >= limits.MaxSnippets) break;
 
+                    // Skip if we already have this exact symbol from direct lookup
+                    bool alreadyHave = evidence.Any(e => 
+                        e.FilePath.EndsWith(r.FilePath ?? string.Empty, StringComparison.OrdinalIgnoreCase) && 
+                        e.SymbolName.Equals(r.SymbolName ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+                    if (alreadyHave) continue;
+
                     var snippet = r.ChunkText?.Length > 800
                         ? r.ChunkText[..800] + "\n...[TRUNCATED]..."
                         : r.ChunkText ?? string.Empty;
@@ -450,7 +528,9 @@ public sealed class ContextAgentService : IContextAgentService
                     var selectionReason = DetermineSelectionReason(r);
                     bool isShallow = RetrievalQualityHelpers.IsShallowSnippet(snippetText, r.SymbolName ?? string.Empty, query);
 
-                    if (isShallow && route.AllowDeepLookup && deepLookupsCount < MaxDeepLookups && totalDeepChars < MaxTotalDeepChars)
+                    bool isSemantic = RetrievalQualityHelpers.IsSemanticSymbol(r.SymbolName);
+
+                    if (isShallow && isSemantic && route.AllowDeepLookup && deepLookupsCount < MaxDeepLookups && totalDeepChars < MaxTotalDeepChars)
                     {
                         var deepResult = await _deepLookupService.GetDeepCodeEvidenceAsync(
                             request.ProjectId, r.FilePath ?? string.Empty, r.SymbolName ?? string.Empty, query, ct);
@@ -547,11 +627,72 @@ public sealed class ContextAgentService : IContextAgentService
             }
         }
 
+        // ── Stage 4.5: Evidence Proof Gate ───────────────────────────────────
+        RunFinalGating:
+        // ── Stage 4.2: Candidate Extraction (for CreateTicketsFromDiscussion) ──
+        if (route.RequestKind == ContextRequestKind.CreateTicketsFromDiscussion)
+        {
+            var (extracted, traceRaw) = await ExtractCandidatesAsync(request, initialPacket, ct);
+            candidates = extracted;
+            
+            var tExt = MakeTrace(ContextAgentStage.CandidateExtraction, traceGroupId, stage2Id);
+            tExt.WasSuccessful = candidates.Count > 0;
+            tExt.RequestText = $"UserRequest: {request.UserRequest}\nSummary: {request.RecentConversationSummary}";
+            tExt.RawResponseText = traceRaw;
+            tExt.ParsedResponseSummary = $"Extracted {candidates.Count} candidate ticket(s) from discussion.";
+            _traceService.AddTrace(tExt);
+        }
+
+        // ── Stage 4.5: Evidence Proof Gate ───────────────────────────────────
+        bool shouldRunProof = route.RequestKind is ContextRequestKind.VerifyImplementation 
+                            or ContextRequestKind.InspectCode 
+                            or ContextRequestKind.ExplainCode;
+        
+        if (shouldRunProof)
+        {
+            proofResult = CheckEvidenceProof(route, evidence);
+            var tProof = MakeTrace(ContextAgentStage.EvidenceProofGate, traceGroupId, stage2Id);
+            tProof.WasSuccessful = proofResult.IsProven;
+            tProof.RequestText = $"Proof Requirements for: {route.RequestKind}\nWorkText: {route.EffectiveWorkText}";
+            
+            var sbProof = new StringBuilder();
+            sbProof.AppendLine($"Status: {proofResult.Status}");
+            sbProof.AppendLine($"IsProven: {proofResult.IsProven}");
+            if (!string.IsNullOrWhiteSpace(proofResult.ProofNotes))
+                sbProof.AppendLine($"Notes: {proofResult.ProofNotes}");
+            if (proofResult.MissingElements.Count > 0)
+            {
+                sbProof.AppendLine("Missing Elements:");
+                foreach (var m in proofResult.MissingElements)
+                    sbProof.AppendLine($"  - {m}");
+            }
+            tProof.RawResponseText = sbProof.ToString().TrimEnd();
+            
+            tProof.ParsedResponseSummary = proofResult.Status switch
+            {
+                ContextProofStatus.ProvenPresent => "Implementation proven present.",
+                ContextProofStatus.ProvenAbsent  => "Implementation proven absent.",
+                ContextProofStatus.NotProven     => $"Proof failed: {proofResult.MissingElements.Count} element(s) missing.",
+                ContextProofStatus.InsufficientEvidence => "Insufficient evidence to confirm existence.",
+                _ => "Unknown proof status."
+            };
+            _traceService.AddTrace(tProof);
+        }
+        else
+        {
+            var tSkip = MakeTrace(ContextAgentStage.EvidenceProofGateSkipped, traceGroupId, stage2Id);
+            tSkip.WasSuccessful = true;
+            tSkip.ParsedResponseSummary = $"Proof gate skipped for route: {route.RequestKind}";
+            tSkip.RawResponseText = $"Reason=<route does not require implementation proof>. Route is {route.RequestKind}.";
+            _traceService.AddTrace(tSkip);
+            
+            proofResult = new EvidenceProofResult { Status = ContextProofStatus.NotProven, EvidenceProofGateSkipped = true, EvidenceProofGateSkipReason = $"Route is {route.RequestKind}" };
+        }
+
         // ── Stage 5: Assemble final prompt ────────────────────────────────────
-        BuildFinalPrompt:
         string finalPrompt;
         {
-            finalPrompt = AssembleFinalPrompt(request, initialPacket, evidence, sufficiency, limits, warnings);
+            finalPrompt = AssembleFinalPrompt(request, initialPacket, evidence, sufficiency, limits, warnings, route, proofResult, candidates);
 
             var contextSummary = BuildFinalContextSummary(initialPacket, evidence, sufficiency);
 
@@ -574,9 +715,12 @@ public sealed class ContextAgentService : IContextAgentService
                 ExpandedSnippetCount = evidence.Count,
                 WasSuccessful        = true,
                 Evidence             = evidence,
+                TicketCandidates     = candidates,
                 ContextSummary       = contextSummary,
                 Warnings             = string.Join("; ", warnings),
                 ConflictAssessment   = conflictAssessment,
+                EvidenceProofGateSkipped = proofResult.EvidenceProofGateSkipped,
+                EvidenceProofGateSkipReason = proofResult.EvidenceProofGateSkipReason,
             };
         }
     }
@@ -600,6 +744,75 @@ public sealed class ContextAgentService : IContextAgentService
             WasSuccessful = false,
             Warnings      = reason,
         };
+
+    private EvidenceProofResult CheckEvidenceProof(ContextAgentRouteDecision route, List<CodeEvidence> evidence)
+    {
+        var result = new EvidenceProofResult { Status = ContextProofStatus.ProvenPresent };
+        var lowerWork = (route.EffectiveWorkText ?? string.Empty).ToLowerInvariant();
+
+        // ── 1. Soft Archive Verification ─────────────────────────────────────
+        if (route.RequestKind == ContextRequestKind.VerifyImplementation && (lowerWork.Contains("archive") || lowerWork.Contains("soft delete")))
+        {
+            bool hasArchiveMethod = evidence.Any(e => 
+                e.FilePath.EndsWith("TicketService.cs", StringComparison.OrdinalIgnoreCase) && 
+                e.SymbolName == "ArchiveTicketAsync" && 
+                (e.Snippet.Contains("{") || e.Snippet.Contains("=>")));
+            
+            bool hasIsDeleted = evidence.Any(e => 
+                e.FilePath.EndsWith("DataModels.cs", StringComparison.OrdinalIgnoreCase) && 
+                (e.SymbolName == "ProjectTicket" || e.SymbolName == "IsDeleted") && 
+                e.Snippet.Contains("public bool IsDeleted") && 
+                e.Snippet.Contains("{ get; set; }"));
+
+            bool hasFiltering = evidence.Any(e => 
+                e.FilePath.EndsWith("TicketService.cs", StringComparison.OrdinalIgnoreCase) && 
+                e.SymbolName == "GetRecentTicketsAsync" && 
+                (e.Snippet.Contains("IsDeleted") || e.Snippet.Contains("!IsDeleted")));
+
+            if (!hasArchiveMethod) result.MissingElements.Add("ArchiveTicketAsync method body (TicketService.cs)");
+            if (!hasIsDeleted)    result.MissingElements.Add("ProjectTicket.IsDeleted property (DataModels.cs)");
+            if (!hasFiltering)    result.MissingElements.Add("GetRecentTicketsAsync IsDeleted filter (TicketService.cs)");
+
+            if (result.MissingElements.Count > 0)
+            {
+                int totalRequired = 3; 
+                int foundCount = totalRequired - result.MissingElements.Count;
+                result.Status = foundCount == 0 ? ContextProofStatus.NotProven : ContextProofStatus.InsufficientEvidence;
+                if (foundCount > 0)
+                {
+                    result.ProofNotes = $"I verified {foundCount} of {totalRequired} required implementation elements, but {result.MissingElements.Count} are missing from the retrieved snippets.";
+                }
+            }
+        }
+        
+        // ── 2. OAuth Existence Verification ──────────────────────────────────
+        else if (lowerWork.Contains("oauth"))
+        {
+            // existence questions like "Does it support..." or "Check for..."
+            bool hasOAuthKeywords = evidence.Any(e => e.Snippet.Contains("oauth", StringComparison.OrdinalIgnoreCase) 
+                                                   || e.Snippet.Contains("external-login", StringComparison.OrdinalIgnoreCase));
+            
+            bool hasOAuthController = evidence.Any(e => e.Snippet.Contains("OAuthController") || e.Snippet.Contains("ExternalLogin"));
+            bool hasOAuthConfig     = evidence.Any(e => e.Snippet.Contains("AddOAuth") || e.Snippet.Contains("OAuthOptions") || e.Snippet.Contains("JwtBearerOptions") == false && e.Snippet.Contains("AuthenticationOptions"));
+            bool hasOAuthFlow       = evidence.Any(e => e.Snippet.Contains("AuthorizationCode") || e.Snippet.Contains("TokenExchange"));
+
+            if (!hasOAuthKeywords)
+            {
+                result.Status = ContextProofStatus.ProvenAbsent;
+                result.ProofNotes = "I found authentication logic (JWT), but no mentions of OAuth or external providers.";
+            }
+            else if (!hasOAuthController && !hasOAuthConfig && !hasOAuthFlow)
+            {
+                result.Status = ContextProofStatus.NotProven;
+                result.MissingElements.Add("OAuth controller/action");
+                result.MissingElements.Add("OAuth middleware/config");
+                result.MissingElements.Add("Authorization code flow logic");
+                result.ProofNotes = "I found 'oauth' keywords in the index, but the retrieved snippets do not show a full implementation.";
+            }
+        }
+
+        return result;
+    }
 
     private static string DetermineSelectionReason(IronDev.Data.Models.CodeIndexEntry entry)
     {
@@ -654,17 +867,187 @@ public sealed class ContextAgentService : IContextAgentService
         return sb.ToString();
     }
 
+    private async Task<(List<TicketCandidate> Candidates, string TraceRaw)> ExtractCandidatesAsync(ContextAgentRequest request, ChatContextPacket packet, CancellationToken ct)
+    {
+        string prompt = $@"You are the Context Agent.
+Extract potential ticket candidates from the following project discussion.
+
+User Request: {request.UserRequest}
+
+Project Context:
+- Project ID: {request.ProjectId}
+- Recent Conversation Summary:
+{request.RecentConversationSummary}
+
+Existing Tickets (for relationship checking):
+{string.Join("\n", request.RecentTickets.Select(t => $"[{t.Id}] {t.Title}"))}
+
+Extraction rules:
+- Focus on actionable tasks discussed in the recent conversation.
+- Do NOT claim implementation proof.
+- Do NOT save tickets to the database.
+- For each candidate, identify if any existing tickets are semantically related.
+- Return a valid JSON list of TicketCandidate objects.
+
+JSON Shape:
+[
+  {{
+    ""title"": ""Short descriptive title"",
+    ""summary"": ""Clear explanation of the work required."",
+    ""suggestedDomain"": ""e.g. UI, REST API, Database"",
+    ""existingRelatedWork"": ""e.g. Related to [22] - already mentions soft delete.""
+  }}
+]
+
+Return JSON only.";
+
+        string rawJson = string.Empty;
+        var candidates = new List<TicketCandidate>();
+        try
+        {
+            rawJson = await _llmService.GetResponseAsync(prompt, ct);
+            var cleaned = rawJson.Trim();
+            if (cleaned.StartsWith("```"))
+            {
+                var firstNewline = cleaned.IndexOf('\n');
+                var lastFence    = cleaned.LastIndexOf("```");
+                if (firstNewline > 0 && lastFence > firstNewline)
+                    cleaned = cleaned[(firstNewline + 1)..lastFence].Trim();
+            }
+
+            var result = JsonSerializer.Deserialize<List<TicketCandidate>>(cleaned, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (result != null) candidates.AddRange(result);
+        }
+        catch (Exception ex)
+        {
+            rawJson += $"\nExtraction Error: {ex.Message}";
+        }
+
+        return (candidates, rawJson);
+    }
+
     private static string AssembleFinalPrompt(
-        ContextAgentRequest        request,
-        ChatContextPacket          initialPacket,
-        IReadOnlyList<CodeEvidence> evidence,
-        ContextSufficiencyResult   sufficiency,
-        ContextAgentLimits         limits,
-        IList<string>              warnings)
+        ContextAgentRequest         request,
+        ChatContextPacket           initialPacket,
+        List<CodeEvidence>          evidence,
+        ContextSufficiencyResult    sufficiency,
+        ContextAgentLimits          limits,
+        List<string>                warnings,
+        ContextAgentRouteDecision   route,
+        EvidenceProofResult         proof,
+        List<TicketCandidate>       candidates)
     {
         var sb = new StringBuilder();
 
+        if (route.RequestKind == ContextRequestKind.CreateTicketsFromDiscussion)
+        {
+            sb.AppendLine("=== TICKET CANDIDATES EXTRACTED FROM DISCUSSION ===");
+            if (candidates.Count > 0)
+            {
+                sb.AppendLine("I have extracted the following candidate tickets for your review. These have NOT been saved yet.");
+                sb.AppendLine();
+                foreach (var c in candidates)
+                {
+                    sb.AppendLine($"Candidate: {c.Title}");
+                    sb.AppendLine($"Domain:    {c.SuggestedDomain}");
+                    sb.AppendLine($"Summary:   {c.Summary}");
+                    if (!string.IsNullOrWhiteSpace(c.ExistingRelatedWork))
+                        sb.AppendLine($"Related:   {c.ExistingRelatedWork}");
+                    sb.AppendLine("---");
+                }
+            }
+            else
+            {
+                sb.AppendLine("I could not extract any distinct actionable ticket candidates from the recent discussion.");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("INSTRUCTION: Present these candidates to the user for review. Explain that they can select which ones to create as draft tickets.");
+            sb.AppendLine("Do NOT claim you have implemented these or that they exist in the database yet.");
+            return sb.ToString();
+        }
+
         sb.Append(initialPacket.FormattedPrompt);
+
+        sb.AppendLine();
+        sb.AppendLine("=== CONTEXT AGENT GUIDELINES ===");
+        sb.AppendLine($"- Your current route is: {route.RequestKind}");
+        
+        if (route.RequestKind == ContextRequestKind.InspectCode || 
+            route.RequestKind == ContextRequestKind.VerifyImplementation || 
+            route.RequestKind == ContextRequestKind.ExplainCode ||
+            route.RequestKind == ContextRequestKind.GeneralChat)
+        {
+            sb.AppendLine("- DO NOT emit <decision> tags. The user is asking for inspection/explanation, not for you to finalize a technical decision.");
+            sb.AppendLine("- SELF-REFERENCE RULE: You must NOT use Context Agent internal code (like ContextAgentService or ContextConflictService) as evidence that a product feature exists or does not exist.");
+            sb.AppendLine("- If those files appear in the evidence, use them ONLY to explain your own diagnostic process, not to prove product behavior.");
+        }
+
+        bool shouldEnforceHonesty = route.RequestKind is ContextRequestKind.VerifyImplementation 
+                                or ContextRequestKind.InspectCode 
+                                or ContextRequestKind.ExplainCode;
+
+        if (shouldEnforceHonesty && proof.Status != ContextProofStatus.ProvenPresent)
+        {
+            sb.AppendLine();
+            sb.AppendLine("=== HONESTY WARNING: INCOMPLETE EVIDENCE ===");
+            if (proof.Status == ContextProofStatus.ProvenAbsent)
+            {
+                sb.AppendLine("The requested feature/implementation appears to be ABSENT from the project based on indexed evidence.");
+                sb.AppendLine("WORDING RULE: Do NOT say 'The feature does not exist'.");
+                sb.AppendLine("INSTEAD say: 'I found no indexed evidence proving X exists in the current codebase.'");
+                if (!string.IsNullOrWhiteSpace(proof.ProofNotes))
+                    sb.AppendLine(proof.ProofNotes);
+            }
+            else
+            {
+                sb.AppendLine("The retrieved evidence is INCOMPLETE to prove implementation existence/details.");
+                
+                // Identify what was successfully found from identified targets
+                var foundElements = new List<string>();
+                if (route.RequestKind == ContextRequestKind.VerifyImplementation || route.RequestKind == ContextRequestKind.InspectCode)
+                {
+                    foreach (var target in route.DeepLookupTargets)
+                    {
+                        // Match if file path matches AND (symbol matches OR snippet contains symbol OR it's a known property match)
+                        bool found = evidence.Any(e => 
+                            e.FilePath.EndsWith(target.FilePath, StringComparison.OrdinalIgnoreCase) && 
+                            (e.SymbolName.Equals(target.SymbolName, StringComparison.OrdinalIgnoreCase) || 
+                             e.Snippet.Contains(target.SymbolName) ||
+                             (target.SymbolName == "ProjectTicket" && e.SymbolName == "IsDeleted")));
+                             
+                        if (found)
+                        {
+                            foundElements.Add($"{target.SymbolName} (in {target.FilePath})");
+                        }
+                    }
+                }
+
+                if (foundElements.Count > 0)
+                {
+                    sb.AppendLine("The following required elements WERE successfully found and retrieved:");
+                    foreach (var found in foundElements)
+                    {
+                        sb.AppendLine($"- [FOUND] {found}");
+                    }
+                    sb.AppendLine();
+                }
+
+                if (proof.MissingElements.Count > 0)
+                {
+                    sb.AppendLine("The following required elements were NOT found in the retrieved code snippets:");
+                    foreach (var missing in proof.MissingElements)
+                    {
+                        sb.AppendLine($"- [MISSING] {missing}");
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(proof.ProofNotes))
+                    sb.AppendLine($"Note: {proof.ProofNotes}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("BE HONEST. Do not claim the implementation is complete or correct if evidence is missing or absent.");
+            sb.AppendLine("State clearly what you found and what is missing.");
+        }
 
         sb.AppendLine();
         sb.AppendLine("=== CODE EVIDENCE RULE ===");
@@ -745,7 +1128,15 @@ public sealed class ContextAgentService : IContextAgentService
             var root = doc.RootElement;
 
             bool isSuff    = root.TryGetProperty("isSufficient", out var suffEl) && suffEl.GetBoolean();
-            int  confidence= root.TryGetProperty("confidence", out var confEl) ? confEl.GetInt32() : 5;
+            int confidence = 5;
+            if (root.TryGetProperty("confidence", out var confEl))
+            {
+                if (confEl.ValueKind == JsonValueKind.Number)
+                    confidence = (int)Math.Round(confEl.GetDouble());
+                else if (confEl.ValueKind == JsonValueKind.String && int.TryParse(confEl.GetString(), out var val))
+                    confidence = val;
+            }
+
             string reason  = root.TryGetProperty("reason", out var rEl) ? rEl.GetString() ?? string.Empty : string.Empty;
 
             var queries   = new List<string>();

@@ -82,8 +82,10 @@ public sealed class ContextConflictService : IContextConflictService
 
         // ── 1. Detect domains and approaches in the request ───────────────────
         var requestDomains   = DetectDomains(request);
-        var requestApproach  = DetectApproach(request);
         var isReplaceIntent  = IsExplicitReplaceIntent(request);
+        var requestApproach  = DetectApproach(request, preferLast: isReplaceIntent);
+        var replacedInRequest = isReplaceIntent ? DetectApproach(request, preferLast: false) : null;
+        if (replacedInRequest == requestApproach) replacedInRequest = null;
 
         // ── 2. Score tickets ──────────────────────────────────────────────────
         var relatedTickets = new List<RelatedTicketMatch>();
@@ -163,7 +165,7 @@ public sealed class ContextConflictService : IContextConflictService
             ? DetectApproach($"{topTicket.Title}")
             : (conflictingDecisions.Count > 0
                ? DetectApproach(conflictingDecisions[0])
-               : null);
+               : replacedInRequest);
 
         var assessment = new TicketConflictAssessment
         {
@@ -292,14 +294,32 @@ public sealed class ContextConflictService : IContextConflictService
         return result;
     }
 
-    public static string? DetectApproach(string? text)
+    public static string? DetectApproach(string? text, bool preferLast = false)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
         var lower = text.ToLowerInvariant();
+        
+        var matches = new List<(string Label, int Index)>();
         foreach (var (label, triggers) in ApproachTable)
-            if (triggers.Any(t => lower.Contains(t)))
-                return label;
-        return null;
+        {
+            if (label == "Replace approach") continue; // meta-approach
+            
+            foreach (var t in triggers)
+            {
+                int idx = lower.IndexOf(t);
+                if (idx != -1)
+                {
+                    matches.Add((label, idx));
+                    break; 
+                }
+            }
+        }
+        
+        if (matches.Count == 0) return null;
+        
+        return preferLast 
+            ? matches.OrderByDescending(m => m.Index).First().Label
+            : matches.OrderBy(m => m.Index).First().Label;
     }
 
     public static bool IsExplicitReplaceIntent(string request)

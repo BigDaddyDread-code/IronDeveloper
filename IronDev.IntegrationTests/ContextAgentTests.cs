@@ -32,6 +32,10 @@ internal sealed class StubLlmService : ILLMService
     public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default)
     {
         ReceivedPrompts.Add(prompt);
+        if (prompt.Contains("You are the Context Agent route judge") && _responses.Count == 0)
+        {
+            return Task.FromResult("INVALID_JSON"); // Force fallback if no response provided
+        }
         var response = _responses.Count > 0
             ? _responses.Dequeue()
             : """{"isSufficient":true,"confidence":8,"reason":"Stub fallback.","requestedContext":{"codeSearchQueries":[],"clarificationQuestions":[]}}""";
@@ -86,13 +90,81 @@ internal sealed class StubCodeIndexService : ICodeIndexService
     // Unused stubs
     public Task<CodeIndexResult> IndexDirectoryAsync(int p, string d, CancellationToken ct = default)        => Task.FromResult(new CodeIndexResult());
     public Task<IReadOnlyList<ProjectFile>> SearchFilesAsync(int p, string q, int t = 5, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectFile>>(Array.Empty<ProjectFile>());
-    public Task<ProjectFile?> GetByPathAsync(int p, string f, CancellationToken ct = default)               => Task.FromResult<ProjectFile?>(null);
+    public Dictionary<string, string> Files { get; } = new();
+
+    public Task<ProjectFile?> GetByPathAsync(int p, string f, CancellationToken ct = default)
+    {
+        if (Files.TryGetValue(f, out var content))
+        {
+            return Task.FromResult<ProjectFile?>(new ProjectFile { FilePath = f, Content = content });
+        }
+        return Task.FromResult<ProjectFile?>(null);
+    }
     public Task<IReadOnlyList<ProjectFile>> GetRecentFilesAsync(int p, int t = 20, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectFile>>(Array.Empty<ProjectFile>());
     public Task<IReadOnlyList<CodeIndexEntry>> GetSymbolsAsync(long fileId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<CodeIndexEntry>>(Array.Empty<CodeIndexEntry>());
     public Task<int> GetIndexedFileCountAsync(int p, CancellationToken ct = default)                        => Task.FromResult(0);
 }
 
 // ── Helper factory ────────────────────────────────────────────────────────────
+ 
+/// <summary>
+/// Stub route judge. Returns a default InspectCode route unless configured.
+/// </summary>
+internal sealed class StubRouteJudge : IContextAgentRouteJudge
+{
+    public ContextAgentRouteDecision Decision { get; set; } = new()
+    {
+        RequestKind = ContextRequestKind.InspectCode,
+        Confidence = 1.0,
+        AllowCodeSearch = true,
+        AllowDeepLookup = true,
+        AllowConflictAssessment = false
+    };
+
+    public Task<ContextAgentRouteDecision> DecideRouteAsync(ContextAgentRouteRequest request, CancellationToken ct = default)
+    {
+        var d = new ContextAgentRouteDecision
+        {
+            RequestKind = ContextRequestKind.InspectCode,
+            Confidence = 1.0,
+            AllowCodeSearch = true,
+            AllowDeepLookup = true,
+            AllowConflictAssessment = false,
+            AllowConflictBlocking = false,
+            AllowTicketCreation = false,
+            RelatedTicketsAreContextOnly = true,
+            EffectiveWorkText = request.UserRequest
+        };
+
+        var lower = request.UserRequest.ToLowerInvariant();
+        if (lower.Contains("verify") || lower.Contains("check whether")) d.RequestKind = ContextRequestKind.VerifyImplementation;
+        else if (lower.Contains("create") || lower.Contains("ticket") || lower.Contains("implementation") || lower.Contains("replace") || lower.Contains("add") || lower.Contains("fix"))
+        {
+            d.RequestKind = ContextRequestKind.CreateTicket;
+            d.AllowConflictBlocking = true;
+            d.AllowConflictAssessment = true;
+        }
+        else if (lower.Contains("inspect") || lower.Contains("check")) d.RequestKind = ContextRequestKind.InspectCode;
+
+        d.OriginalUserRequest = request.UserRequest;
+        d.EffectiveWorkText = request.UserRequest;
+        d.DeepLookupTargets = IdentifyTargets(lower);
+        return Task.FromResult(d);
+    }
+
+    private IReadOnlyList<DeepLookupTarget> IdentifyTargets(string lower)
+    {
+        var targets = new List<DeepLookupTarget>();
+        if (lower.Contains("soft archive") || lower.Contains("archive ticket"))
+        {
+            targets.Add(new DeepLookupTarget { FilePath = "TicketService.cs", SymbolName = "ArchiveTicketAsync", ProofPattern = "Body" });
+            targets.Add(new DeepLookupTarget { FilePath = "TicketService.cs", SymbolName = "GetRecentTicketsAsync", ProofPattern = "IsDeleted filter" });
+            targets.Add(new DeepLookupTarget { FilePath = "DataModels.cs", SymbolName = "ProjectTicket", ProofPattern = "IsDeleted property" });
+        }
+        return targets;
+    }
+}
+
 
 internal static class ContextAgentFactory
 {
@@ -106,12 +178,14 @@ internal static class ContextAgentFactory
         var llm    = new StubLlmService(llmResponses);
         var index  = new StubCodeIndexService(snippets);
         var traces = new LlmTraceService();
+        var route  = new StubRouteJudge();
 
         var agent = new ContextAgentService(
             new StubPromptContextBuilder(packet),
             index,
             llm,
-            traces);
+            traces,
+            routeJudge: route);
 
         return (agent, llm, index, traces);
     }
@@ -131,13 +205,15 @@ internal static class ContextAgentFactory
         var index  = new StubCodeIndexService(snippets);
         var traces = new LlmTraceService();
         var conflict = new ContextConflictService();
+        var route  = new StubRouteJudge();
 
         var agent = new ContextAgentService(
             new StubPromptContextBuilder(packet),
             index,
             llm,
             traces,
-            conflict);
+            conflict,
+            routeJudge: route);
 
         return (agent, llm, index, traces);
     }
@@ -933,6 +1009,10 @@ public sealed class ContextAgentTests
         Assert.AreEqual(ConflictClassification.ReplacesExisting,
             result.ConflictAssessment!.Classification,
             "Explicit replace phrasing must classify as ReplacesExisting.");
+        
+        Assert.AreEqual("OAuth", result.ConflictAssessment.ExistingApproach, "ExistingApproach should be OAuth.");
+        Assert.AreEqual("API key authentication", result.ConflictAssessment.RequestedApproach, "RequestedApproach should be API key authentication.");
+        
         Assert.IsTrue(result.IsClarificationRequired,
             "ReplacesExisting must block silent creation.");
     }
