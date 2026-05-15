@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Services;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -14,6 +15,11 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
 {
     private readonly IBuilderProposalService _proposalService;
     private readonly ILlmTraceService _traceService;
+    private readonly IProjectProfileService _profileService;
+    private readonly IProjectMemoryService _memoryService;
+    private readonly IBuilderReadinessService _readinessService;
+    private readonly IProjectService _projectService;
+    private readonly ITicketService _ticketService;
 
     [ObservableProperty] 
     [NotifyPropertyChangedFor(nameof(IsBusy))]
@@ -23,6 +29,8 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsBusy))]
     private bool _isApplying;
     [ObservableProperty] private BuilderProposal? _currentProposal;
+    [ObservableProperty] private bool _hasReconciliation;
+    [ObservableProperty] private BuildArchitectureReconciliation? _reconciliation;
     [ObservableProperty] private ProposedFileChange? _selectedFileChange;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private string _projectName = "No Project Active";
@@ -34,9 +42,10 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _testStatus = "Not Started";
     [ObservableProperty] private string _buildOutput = string.Empty;
     [ObservableProperty] private string _testOutput = string.Empty;
+    [ObservableProperty] private BuildReadinessResult? _readiness;
 
     public bool IsBusy => IsGenerating || IsApplying;
-    public bool IsApplyEnabled => ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase);
+    public bool IsApplyEnabled => ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase) && (Readiness?.IsReady ?? false);
     public string ApplyModeLabel => IsApplyEnabled ? "Apply Enabled — BookSeller Only" : "PROPOSAL-ONLY MODE";
     public string ApplyModeColor => IsApplyEnabled ? "#34D16A" : "#7C6BE8";
 
@@ -44,10 +53,20 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
 
     public BuilderWorkspaceViewModel(
         IBuilderProposalService proposalService,
-        ILlmTraceService traceService)
+        ILlmTraceService traceService,
+        IProjectProfileService profileService,
+        IProjectMemoryService memoryService,
+        IBuilderReadinessService readinessService,
+        IProjectService projectService,
+        ITicketService ticketService)
     {
         _proposalService = proposalService;
         _traceService = traceService;
+        _profileService = profileService;
+        _memoryService = memoryService;
+        _readinessService = readinessService;
+        _projectService = projectService;
+        _ticketService = ticketService;
     }
 
     [RelayCommand]
@@ -62,6 +81,19 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
 
         try
         {
+            // Evaluate readiness first
+            var ticket = await _ticketService.GetTicketByIdAsync(ticketId);
+            if (ticket != null)
+            {
+                Readiness = await _readinessService.EvaluateReadinessAsync(ticket.ProjectId, ticketId);
+                if (!Readiness.IsReady)
+                {
+                    StatusMessage = $"Build blocked: {Readiness.Message}";
+                    IsGenerating = false;
+                    return;
+                }
+            }
+
             var proposal = await _proposalService.GenerateProposalAsync(ticketId);
             CurrentProposal = proposal;
             ProjectName = proposal.ProjectName;
@@ -117,17 +149,28 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
             BuildOutput = CurrentProposal.BuildOutput ?? string.Empty;
             TestOutput = CurrentProposal.TestOutput ?? string.Empty;
 
+            if (CurrentProposal.Reconciliation != null)
+            {
+                Reconciliation = CurrentProposal.Reconciliation;
+                HasReconciliation = true;
+            }
+
             StatusMessage = "Apply workflow completed.";
         }
         catch (Exception ex)
         {
             StatusMessage = $"Apply failed: {ex.Message}";
-            ApplyStatus = "Error";
+            ApplyStatus = CurrentProposal.ApplyStatus ?? "Error";
+            BuildStatus = CurrentProposal.BuildStatus ?? "Not Started";
+            TestStatus = CurrentProposal.TestStatus ?? "Skipped";
+            BuildOutput = CurrentProposal.BuildOutput ?? string.Empty;
+            TestOutput = CurrentProposal.TestOutput ?? string.Empty;
         }
         finally
         {
             IsApplying = false;
             ApplyProposalCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(IsApplyEnabled));
         }
     }
 
@@ -147,6 +190,8 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         TestStatus = "Not Started";
         BuildOutput = string.Empty;
         TestOutput = string.Empty;
+        HasReconciliation = false;
+        Reconciliation = null;
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
         OnPropertyChanged(nameof(ApplyModeColor));
@@ -173,5 +218,95 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     partial void OnSelectedFileChangeChanged(ProposedFileChange? value)
     {
         // View will bind to this to show the diff
+    }
+
+    [RelayCommand]
+    private async Task HandleReconciliationActionAsync(ReconciliationAction? action)
+    {
+        if (action == null || CurrentProposal == null || Reconciliation == null) return;
+
+        _traceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.ReconciliationApproved",
+            WorkspaceName = "Builder",
+            ProjectId = CurrentProposal.ProjectId,
+            TicketId = CurrentProposal.TicketId,
+            RequestText = action.ActionType,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        if (action.ActionType == "Cancel")
+        {
+            HasReconciliation = false;
+            _traceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.ReconciliationCancelled",
+                WorkspaceName = "Builder",
+                ProjectId = CurrentProposal.ProjectId,
+                TicketId = CurrentProposal.TicketId,
+                CreatedAt = DateTime.UtcNow
+            });
+            return;
+        }
+
+        StatusMessage = $"Applying reconciliation action: {action.Title}...";
+
+        var profile = await _profileService.GetProjectProfileAsync(CurrentProposal.ProjectId)
+            ?? new IronDev.Data.Models.ProjectProfile { ProjectId = CurrentProposal.ProjectId };
+
+        if (action.ActionType == "AddPackage_xUnit" || action.ActionType == "UpdateProfileOnly")
+        {
+            profile.TestFramework = "xUnit";
+            await _profileService.SaveProjectProfileAsync(profile);
+
+            // Save decision
+            var decision = new IronDev.Data.Models.ProjectDecision
+            {
+                ProjectId = CurrentProposal.ProjectId,
+                Title = "Test Framework: xUnit",
+                Detail = "Use xUnit for unit tests. Tests should be generated using xUnit Fact and Theory attributes.",
+                Reason = "Determined via Build-Time Architecture Reconciliation.",
+                Category = "Architecture",
+                Status = "Approved"
+            };
+            await _memoryService.SaveDecisionAsync(decision);
+
+            _traceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.ProfileUpdateProposed",
+                WorkspaceName = "Builder",
+                ProjectId = CurrentProposal.ProjectId,
+                TicketId = CurrentProposal.TicketId,
+                ParsedResponseSummary = "Updated profile TestFramework to xUnit",
+                CreatedAt = DateTime.UtcNow
+            });
+            
+            _traceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.DecisionUpdateProposed",
+                WorkspaceName = "Builder",
+                ProjectId = CurrentProposal.ProjectId,
+                TicketId = CurrentProposal.TicketId,
+                ParsedResponseSummary = "Saved decision: Test Framework is xUnit",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        else if (action.ActionType == "RegenerateTests")
+        {
+            // Just clear the reconciliation so they can regenerate
+            // In a full implementation we would actually trigger a regenerate.
+            _traceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.DecisionUpdateProposed",
+                WorkspaceName = "Builder",
+                ProjectId = CurrentProposal.ProjectId,
+                TicketId = CurrentProposal.TicketId,
+                ParsedResponseSummary = "User chose to regenerate tests.",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        HasReconciliation = false;
+        StatusMessage = "Reconciliation complete. You may need to regenerate the proposal.";
     }
 }

@@ -44,4 +44,33 @@ public sealed class BuilderProposal
     public string? TestOutput { get; set; }
     public TimeSpan? BuildDuration { get; set; }
     public TimeSpan? TestDuration { get; set; }
+    
+    public BuildArchitectureReconciliation? Reconciliation { get; set; }
+}
+
+/// <summary>
+/// Status categories for project build readiness.
+/// </summary>
+public enum BuildReadinessStatus
+{
+    ReadyToBuild,
+    NeedsProjectProfileUpdate,
+    NeedsArchitectureDecision,
+    BlockedByExistingDecision,
+    BlockedByConflict,
+    NeedsClarification,
+    Error
+}
+
+/// <summary>
+/// Represents the result of a build readiness evaluation.
+/// </summary>
+public sealed class BuildReadinessResult
+{
+    public BuildReadinessStatus Status { get; set; } = BuildReadinessStatus.ReadyToBuild;
+    public string Message { get; set; } = "Ready to build.";
+    public List<string> Warnings { get; set; } = new();
+    public List<string> BlockingIssues { get; set; } = new();
+    
+    public bool IsReady => Status == BuildReadinessStatus.ReadyToBuild;
 }

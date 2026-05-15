@@ -51,6 +51,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private string _profileTestCommand = string.Empty;
     [ObservableProperty] private string _profileSafeWriteRoot = string.Empty;
     [ObservableProperty] private bool _profileAllowBuilderApply;
+    [ObservableProperty] private bool _profileAllowWritesOutsideProjectRoot;
+    [ObservableProperty] private string _profileNotes = string.Empty;
 
     [ObservableProperty] private string _profileSaveStatus = string.Empty;
 
@@ -280,6 +282,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
             ProfileSolutionFile = profile.SolutionFile ?? string.Empty;
             ProfileSafeWriteRoot = profile.SafeWriteRoot ?? string.Empty;
             ProfileAllowBuilderApply = profile.AllowBuilderApply;
+            ProfileAllowWritesOutsideProjectRoot = profile.AllowWritesOutsideProjectRoot;
+            ProfileNotes = profile.ProfileNotes ?? string.Empty;
         }
         else
         {
@@ -293,6 +297,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
             ProfileSolutionFile = string.Empty;
             ProfileSafeWriteRoot = string.Empty;
             ProfileAllowBuilderApply = false;
+            ProfileAllowWritesOutsideProjectRoot = false;
+            ProfileNotes = string.Empty;
         }
 
         var buildCmd = await _profileService.GetDefaultCommandAsync(_currentProject.Id, "Build");
@@ -323,6 +329,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         profile.SolutionFile = ProfileSolutionFile;
         profile.SafeWriteRoot = ProfileSafeWriteRoot;
         profile.AllowBuilderApply = ProfileAllowBuilderApply;
+        profile.AllowWritesOutsideProjectRoot = ProfileAllowWritesOutsideProjectRoot;
+        profile.ProfileNotes = ProfileNotes;
         
         await _profileService.SaveProjectProfileAsync(profile);
 

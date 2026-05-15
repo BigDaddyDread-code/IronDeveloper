@@ -24,6 +24,9 @@ public sealed class BuilderProposalService : IBuilderProposalService
     private readonly IDotNetBuildService        _buildService;
     private readonly IDotNetTestService         _testService;
     private readonly IProjectProfileService     _projectProfileService;
+    private readonly IBuildErrorClassifierService _errorClassifierService;
+    private readonly IBuilderReadinessService _readinessService;
+    private readonly IProjectService _projectService;
 
     public BuilderProposalService(
         IBuilderContextService     contextService,
@@ -32,7 +35,10 @@ public sealed class BuilderProposalService : IBuilderProposalService
         ITicketService             ticketService,
         IDotNetBuildService        buildService,
         IDotNetTestService         testService,
-        IProjectProfileService     projectProfileService)
+        IProjectProfileService     projectProfileService,
+        IBuildErrorClassifierService errorClassifierService,
+        IBuilderReadinessService readinessService,
+        IProjectService projectService)
     {
         _contextService  = contextService;
         _proposalService = proposalService;
@@ -41,6 +47,9 @@ public sealed class BuilderProposalService : IBuilderProposalService
         _buildService    = buildService;
         _testService     = testService;
         _projectProfileService = projectProfileService;
+        _errorClassifierService = errorClassifierService;
+        _readinessService = readinessService;
+        _projectService = projectService;
     }
 
     public async Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default)
@@ -51,13 +60,33 @@ public sealed class BuilderProposalService : IBuilderProposalService
 
         int projectId = ticket.ProjectId; 
 
+        // ── 1. Evaluate Build Readiness ───────────────────────────────────────
+        var readiness = await _readinessService.EvaluateReadinessAsync(projectId, ticketId, ct);
+        
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Ticket.BuildReadinessEvaluation",
+            WorkspaceName = "Builder",
+            ProjectId = projectId,
+            TicketId = ticketId,
+            WasSuccessful = readiness.IsReady,
+            ParsedResponseSummary = $"Readiness Status: {readiness.Status}",
+            ErrorMessage = readiness.IsReady ? null : string.Join("; ", readiness.BlockingIssues),
+            CreatedAt = DateTime.UtcNow
+        });
+
+        if (!readiness.IsReady)
+        {
+            throw new InvalidOperationException($"Build blocked: {readiness.Message} " + string.Join(" ", readiness.BlockingIssues));
+        }
+
         var context = await _contextService.AssembleContextAsync(projectId, ticketId, ct);
         var innerProposal = await _proposalService.GenerateProposalAsync(context, ct);
 
         var proposal = MapToBuilderProposal(innerProposal, context);
         ValidateProposal(proposal);
 
-        // Trace validation
+        // ── 2. Trace Validation ───────────────────────────────────────────────
         var trace = new LlmTraceEntry
         {
             FeatureName = "Builder.ProposalValidation",
@@ -95,13 +124,16 @@ public sealed class BuilderProposalService : IBuilderProposalService
 
     public async Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default)
     {
+        var projectId = proposal.ProjectId;
+        var ticketId = proposal.TicketId;
+
         // ── 1. Trace Requested ────────────────────────────────────────────────
         _llmTraceService.AddTrace(new LlmTraceEntry
         {
             FeatureName = "Builder.ApplyRequested",
             WorkspaceName = "Builder",
-            ProjectId = proposal.ProjectId,
-            TicketId = proposal.TicketId,
+            ProjectId = projectId,
+            TicketId = ticketId,
             ActiveProjectName = proposal.ProjectName,
             ActiveProjectPath = proposal.ProjectRoot,
             IsProposalOnly = false,
@@ -109,29 +141,47 @@ public sealed class BuilderProposalService : IBuilderProposalService
             CreatedAt = DateTime.UtcNow
         });
 
-        // ── 2. Re-Validate for Safety ─────────────────────────────────────────
+        // ── 2. Evaluate Build Readiness ───────────────────────────────────────
+        var readiness = await _readinessService.EvaluateReadinessAsync(projectId, ticketId, ct);
+        if (!readiness.IsReady)
+        {
+            throw new InvalidOperationException($"Apply blocked: {readiness.Message}");
+        }
+
+        // ── 3. Validate Architecture (Test Framework Mismatch) ────────────────
+        var archValidation = await _readinessService.ValidateProposalArchitectureAsync(proposal, ct);
+        
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.ApplyValidation",
+            WorkspaceName = "Builder",
+            ProjectId = projectId,
+            TicketId = ticketId,
+            WasSuccessful = archValidation.IsReady,
+            ParsedResponseSummary = archValidation.IsReady ? "Architecture Validation Passed" : "Architecture Validation Failed",
+            ErrorMessage = archValidation.IsReady ? null : archValidation.Message,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        if (!archValidation.IsReady)
+        {
+            proposal.ApplyStatus = "Blocked: Architecture Mismatch";
+            throw new InvalidOperationException(archValidation.Message);
+        }
+
+        // ── 4. Re-Validate for Safety ─────────────────────────────────────────
         ValidateProposal(proposal);
         if (!proposal.IsAllValid)
         {
             proposal.ApplyStatus = "Validation Failed";
-            _llmTraceService.AddTrace(new LlmTraceEntry
-            {
-                FeatureName = "Builder.ApplyValidation",
-                WorkspaceName = "Builder",
-                ProjectId = proposal.ProjectId,
-                TicketId = proposal.TicketId,
-                ErrorMessage = "Apply aborted: validation failed for one or more files.",
-                WasSuccessful = false,
-                CreatedAt = DateTime.UtcNow
-            });
             throw new InvalidOperationException("Apply aborted: validation failed for one or more files.");
         }
 
-        // ── 3. Write Files ────────────────────────────────────────────────────
+        // ── 5. Write Files ────────────────────────────────────────────────────
         proposal.ApplyStatus = "Applying...";
         try
         {
-            var profile = await _projectProfileService.GetProjectProfileAsync(proposal.ProjectId, ct);
+            var profile = await _projectProfileService.GetProjectProfileAsync(projectId, ct);
             var safeRoot = !string.IsNullOrEmpty(profile?.SafeWriteRoot) ? Path.GetFullPath(profile.SafeWriteRoot) : Path.GetFullPath(proposal.ProjectRoot);
             
             if (profile != null && !profile.AllowBuilderApply)
@@ -168,8 +218,8 @@ public sealed class BuilderProposalService : IBuilderProposalService
             {
                 FeatureName = "Builder.FilesWritten",
                 WorkspaceName = "Builder",
-                ProjectId = proposal.ProjectId,
-                TicketId = proposal.TicketId,
+                ProjectId = projectId,
+                TicketId = ticketId,
                 ProposedFileCount = proposal.Changes.Count,
                 ProposedFilesList = string.Join(", ", proposal.Changes.Select(c => c.FilePath)),
                 WasSuccessful = true,
@@ -182,10 +232,10 @@ public sealed class BuilderProposalService : IBuilderProposalService
             throw;
         }
 
-        // ── 4. Run Build ──────────────────────────────────────────────────────
+        // ── 6. Run Build ──────────────────────────────────────────────────────
         proposal.BuildStatus = "Build Running...";
-        var profileForBuild = await _projectProfileService.GetProjectProfileAsync(proposal.ProjectId, ct);
-        var buildCmd = await _projectProfileService.GetDefaultCommandAsync(proposal.ProjectId, "Build", ct);
+        var profileForBuild = await _projectProfileService.GetProjectProfileAsync(projectId, ct);
+        var buildCmd = await _projectProfileService.GetDefaultCommandAsync(projectId, "Build", ct);
         
         var buildTarget = profileForBuild?.SolutionFile;
 
@@ -209,15 +259,12 @@ public sealed class BuilderProposalService : IBuilderProposalService
         {
             FeatureName = "Builder.BuildStarted",
             WorkspaceName = "Builder",
-            ProjectId = proposal.ProjectId,
-            TicketId = proposal.TicketId,
+            ProjectId = projectId,
+            TicketId = ticketId,
             RequestText = buildCmd.CommandText,
             CreatedAt = DateTime.UtcNow
         });
 
-        // If we have a custom command text, we might need a different runner, 
-        // but for now IDotNetBuildService.BuildAsync takes a solutionPath.
-        // We'll pass the solutionPath and let it handle it.
         var buildResult = await _buildService.BuildAsync(buildTarget, ct);
         proposal.BuildStatus = buildResult.Succeeded ? "Build Passed" : "Build Failed";
         proposal.BuildOutput = FormatExecutionOutput(buildResult.Succeeded, buildResult.Command, buildResult.WorkingDirectory, buildResult.ExitCode, buildResult.StandardOutput, buildResult.StandardError, buildResult.Elapsed);
@@ -227,8 +274,8 @@ public sealed class BuilderProposalService : IBuilderProposalService
         {
             FeatureName = "Builder.BuildResult",
             WorkspaceName = "Builder",
-            ProjectId = proposal.ProjectId,
-            TicketId = proposal.TicketId,
+            ProjectId = projectId,
+            TicketId = ticketId,
             DurationMs = (long)buildResult.Elapsed.TotalMilliseconds,
             WasSuccessful = buildResult.Succeeded,
             RawResponseText = buildResult.StandardOutput,
@@ -240,12 +287,46 @@ public sealed class BuilderProposalService : IBuilderProposalService
         if (!buildResult.Succeeded)
         {
             proposal.TestStatus = "Skipped (Build Failed)";
+
+            var reconciliation = await _errorClassifierService.ClassifyBuildFailureAsync(
+                buildResult, 
+                profileForBuild ?? new IronDev.Data.Models.ProjectProfile(), 
+                proposal.ProjectRoot, 
+                ct);
+
+            if (reconciliation != null)
+            {
+                proposal.Reconciliation = reconciliation;
+
+                _llmTraceService.AddTrace(new LlmTraceEntry
+                {
+                    FeatureName = "Builder.BuildFailureClassified",
+                    WorkspaceName = "Builder",
+                    ProjectId = projectId,
+                    TicketId = ticketId,
+                    WasSuccessful = true,
+                    ParsedResponseSummary = $"Failure Category: {reconciliation.FailureCategory}",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            _llmTraceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.BuildCycleCompleted",
+                WorkspaceName = "Builder",
+                ProjectId = projectId,
+                TicketId = ticketId,
+                WasSuccessful = false,
+                ParsedResponseSummary = "Build cycle failed at Build step.",
+                CreatedAt = DateTime.UtcNow
+            });
+
             return;
         }
 
-        // ── 5. Run Tests ──────────────────────────────────────────────────────
+        // ── 7. Run Tests ──────────────────────────────────────────────────────
         proposal.TestStatus = "Tests Running...";
-        var testCmd = await _projectProfileService.GetDefaultCommandAsync(proposal.ProjectId, "Test", ct);
+        var testCmd = await _projectProfileService.GetDefaultCommandAsync(projectId, "Test", ct);
         
         if (string.IsNullOrWhiteSpace(testCmd?.CommandText))
         {
@@ -258,8 +339,8 @@ public sealed class BuilderProposalService : IBuilderProposalService
         {
             FeatureName = "Builder.TestStarted",
             WorkspaceName = "Builder",
-            ProjectId = proposal.ProjectId,
-            TicketId = proposal.TicketId,
+            ProjectId = projectId,
+            TicketId = ticketId,
             RequestText = testCmd.CommandText,
             CreatedAt = DateTime.UtcNow
         });
@@ -273,13 +354,24 @@ public sealed class BuilderProposalService : IBuilderProposalService
         {
             FeatureName = "Builder.TestResult",
             WorkspaceName = "Builder",
-            ProjectId = proposal.ProjectId,
-            TicketId = proposal.TicketId,
+            ProjectId = projectId,
+            TicketId = ticketId,
             DurationMs = (long)testResult.Elapsed.TotalMilliseconds,
             WasSuccessful = testResult.Succeeded,
             RawResponseText = testResult.StandardOutput,
             ErrorMessage = testResult.StandardError,
             ParsedResponseSummary = $"Tests {(testResult.Succeeded ? "Passed" : "Failed")}. Command: {testResult.Command}",
+            CreatedAt = DateTime.UtcNow
+        });
+
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.BuildCycleCompleted",
+            WorkspaceName = "Builder",
+            ProjectId = projectId,
+            TicketId = ticketId,
+            WasSuccessful = testResult.Succeeded,
+            ParsedResponseSummary = $"Build cycle completed. Tests {(testResult.Succeeded ? "Passed" : "Failed")}.",
             CreatedAt = DateTime.UtcNow
         });
     }

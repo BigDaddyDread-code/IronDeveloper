@@ -231,6 +231,61 @@
                     CornerRadius="10">
                 <ScrollViewer Padding="20">
                     <StackPanel>
+                        <!-- BUILD READINESS SECTION -->
+                        <TextBlock Text="BUILD READINESS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,12"/>
+                        <Border x:Name="ReadinessBorder" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,20">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#1A7C6BE8"/>
+                                    <Setter Property="BorderBrush" Value="#7C6BE8"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Readiness.IsReady}" Value="True">
+                                            <Setter Property="Background" Value="#1234D16A"/>
+                                            <Setter Property="BorderBrush" Value="#34D16A"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Readiness.IsReady}" Value="False">
+                                            <Setter Property="Background" Value="#1AEE4444"/>
+                                            <Setter Property="BorderBrush" Value="#EE4444"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Readiness}" Value="{x:Null}">
+                                            <Setter Property="Background" Value="#1A7C6BE8"/>
+                                            <Setter Property="BorderBrush" Value="#7C6BE8"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Readiness.Status, FallbackValue='Not Evaluated'}" FontWeight="Bold" FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#7C6BE8"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Readiness.IsReady}" Value="True">
+                                                    <Setter Property="Foreground" Value="#34D16A"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Readiness.IsReady}" Value="False">
+                                                    <Setter Property="Foreground" Value="#EE4444"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Readiness.Message, FallbackValue='Generate a proposal to evaluate build readiness.'}" 
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource Text/Muted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Readiness.IsReady}" Value="False">
+                                                    <Setter Property="Foreground" Value="#EE4444"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock Text="AI PROPOSAL SUMMARY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,12"/>
                         
                         <controls:SurfacePanel Variant="Subtle" Padding="16" Margin="0,0,0,20">
@@ -260,6 +315,41 @@
                                 Background="#1234D16A" BorderBrush="#34D16A" BorderThickness="1"
                                 CornerRadius="6" Padding="12,10">
                             <TextBlock Text="✓ All proposed changes pass security validation." Foreground="#34D16A" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        </Border>
+
+                        <!-- RECONCILIATION SECTION -->
+                        <Border Visibility="{Binding HasReconciliation, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Background="#1AEEA244" BorderBrush="#EEA244" BorderThickness="1"
+                                CornerRadius="6" Padding="16,16" Margin="0,20,0,0">
+                            <StackPanel>
+                                <TextBlock Text="ARCHITECTURE RECONCILIATION" Foreground="#EEA244" FontWeight="Bold" FontSize="12" Margin="0,0,0,8"/>
+                                <TextBlock Text="Build failed because project architecture/profile information is missing or inconsistent." Foreground="#D1D5DB" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                
+                                <TextBlock Text="Category:" Foreground="#9CA3AF" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.FailureCategory}" Foreground="#F3F4F6" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                
+                                <TextBlock Text="Evidence:" Foreground="#9CA3AF" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.Evidence}" Foreground="#F3F4F6" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                
+                                <TextBlock Text="Current Profile:" Foreground="#9CA3AF" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.CurrentProfileValue}" Foreground="#F3F4F6" FontSize="12" Margin="0,0,0,8"/>
+                                
+                                <TextBlock Text="Detected Facts:" Foreground="#9CA3AF" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.DetectedProjectFacts}" Foreground="#F3F4F6" FontSize="12" Margin="0,0,0,16"/>
+                                
+                                <TextBlock Text="Recommended Actions:" Foreground="#EEA244" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                
+                                <ItemsControl ItemsSource="{Binding Reconciliation.AvailableActions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Title}"
+                                                    Command="{Binding DataContext.HandleReconciliationActionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Margin="0,0,0,8" Padding="12,6"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </Border>
 
                         <!-- APPLY SECTION -->

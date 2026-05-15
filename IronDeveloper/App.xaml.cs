@@ -165,6 +165,12 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.ICodebaseTicketGeneratorService,
                     global::IronDev.Infrastructure.Services.CodebaseTicketGeneratorService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IBuildErrorClassifierService,
+                    global::IronDev.Infrastructure.Builder.BuildErrorClassifierService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IBuilderReadinessService,
+                    global::IronDev.Infrastructure.Builder.BuilderReadinessService>();
 
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IProjectProfileService,

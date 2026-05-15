@@ -172,3 +172,34 @@ public interface IDraftTicketService
         DraftTicket current,
         CancellationToken ct = default);
 }
+
+/// <summary>
+/// Classifies build output errors into common project-knowledge missing categories.
+/// </summary>
+public interface IBuildErrorClassifierService
+{
+    Task<BuildArchitectureReconciliation?> ClassifyBuildFailureAsync(
+        DotNetBuildResult buildResult,
+        IronDev.Data.Models.ProjectProfile profile,
+        string projectPath,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Evaluates if a project and ticket are ready for the Builder cycle.
+/// </summary>
+public interface IBuilderReadinessService
+{
+    Task<BuildReadinessResult> EvaluateReadinessAsync(
+        int projectId,
+        long ticketId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates a proposal specifically for architectural consistency 
+    /// (e.g. test framework mismatch) before apply.
+    /// </summary>
+    Task<BuildReadinessResult> ValidateProposalArchitectureAsync(
+        BuilderProposal proposal,
+        CancellationToken cancellationToken = default);
+}

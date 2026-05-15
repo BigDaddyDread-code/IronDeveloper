@@ -180,6 +180,16 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine();
         }
 
+        if (ctx.Decisions.Count > 0)
+        {
+            sb.AppendLine("PROJECT ARCHITECTURE DECISIONS:");
+            foreach (var d in ctx.Decisions)
+            {
+                sb.AppendLine($"  - {d}");
+            }
+            sb.AppendLine();
+        }
+
         if (ctx.Standards.Count > 0)
         {
             sb.AppendLine("PROJECT RULES AND STANDARDS:");
