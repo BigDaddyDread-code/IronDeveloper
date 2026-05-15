@@ -66,6 +66,7 @@ public interface IBuilderProposalService
 {
     Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default);
     Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default);
+    Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -103,6 +104,16 @@ public interface ICodePatchService
 public interface IDotNetBuildService
 {
     Task<DotNetBuildResult> BuildAsync(
+        string projectOrSolutionPath,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Runs 'dotnet test' as a subprocess and captures the result.
+/// </summary>
+public interface IDotNetTestService
+{
+    Task<DotNetTestResult> TestAsync(
         string projectOrSolutionPath,
         CancellationToken cancellationToken = default);
 }

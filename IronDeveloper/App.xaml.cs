@@ -164,6 +164,13 @@ public partial class App : Application
                     global::IronDev.Core.Interfaces.ICodebaseTicketGeneratorService,
                     global::IronDev.Infrastructure.Services.CodebaseTicketGeneratorService>();
 
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDotNetBuildService,
+                    global::IronDev.Infrastructure.Services.DotNetRunnerService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDotNetTestService,
+                    global::IronDev.Infrastructure.Services.DotNetRunnerService>();
+
                 services.AddTransient<BuilderWorkspaceViewModel>();
             })
             .Build();

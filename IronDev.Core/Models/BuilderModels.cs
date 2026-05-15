@@ -15,6 +15,7 @@ public sealed class ProposedFileChange
     public bool IsDeletion { get; set; }
     public bool IsValid { get; set; }
     public string ValidationMessage { get; set; } = string.Empty;
+    public string? FullContentAfter { get; set; }
 }
 
 /// <summary>
@@ -33,4 +34,14 @@ public sealed class BuilderProposal
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 
     public bool IsAllValid => Changes.TrueForAll(c => c.IsValid);
+
+    // ── Execution State ───────────────────────────────────────────────────
+    public string ApplyStatus { get; set; } = "Not Started";
+    public string BuildStatus { get; set; } = "Not Started";
+    public string TestStatus { get; set; } = "Not Started";
+
+    public string? BuildOutput { get; set; }
+    public string? TestOutput { get; set; }
+    public TimeSpan? BuildDuration { get; set; }
+    public TimeSpan? TestDuration { get; set; }
 }

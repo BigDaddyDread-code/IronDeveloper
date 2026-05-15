@@ -48,6 +48,7 @@ public sealed class FileChangeProposal
     public string AfterSnippet  { get; set; } = "";
     /// <summary>Unified diff format. May be empty in Phase 1.</summary>
     public string Patch         { get; set; } = "";
+    public string FullContentAfter { get; set; } = "";
 }
 
 public sealed class CodeChangeProposal
@@ -104,6 +105,17 @@ public sealed class TicketBuildResult
 // ── Service result types ──────────────────────────────────────────────────
 
 public sealed class DotNetBuildResult
+{
+    public bool     Succeeded      { get; set; }
+    public int      ExitCode       { get; set; }
+    public string   StandardOutput { get; set; } = "";
+    public string   StandardError  { get; set; } = "";
+    public DateTime StartedUtc     { get; set; }
+    public DateTime FinishedUtc    { get; set; }
+    public TimeSpan Elapsed        => FinishedUtc - StartedUtc;
+}
+
+public sealed class DotNetTestResult
 {
     public bool     Succeeded      { get; set; }
     public int      ExitCode       { get; set; }

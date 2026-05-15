@@ -8,6 +8,40 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:BuilderWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
+    <UserControl.Resources>
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource Text/Muted}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text/Primary}"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#7C6BE8"/>
+                                <Setter Property="Background" Value="#0A7C6BE8"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text/Primary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Background="{StaticResource Background/App}" Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -96,48 +130,88 @@
                 </controls:WorkspaceListPane.ItemTemplate>
             </controls:WorkspaceListPane>
 
-            <!-- CENTRE: Diff View -->
+            <!-- CENTRE: Body (Diff / Output) -->
             <Border Grid.Column="1" Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
                     CornerRadius="10" Margin="0,0,16,0">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                    <TabControl>
+                        <TabItem Header="FILE DIFF">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                    <!-- Diff Header -->
-                    <Border Grid.Row="0" Background="{StaticResource Background/Surface}" 
-                            BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1"
-                            Padding="16,10" CornerRadius="10,10,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding SelectedFileChange.FilePath}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <Border Visibility="{Binding SelectedFileChange.IsNewFile, Converter={StaticResource BoolToVisibilityConverter}}"
-                                    Background="#1A10B981" BorderBrush="#10B981" BorderThickness="1"
-                                    CornerRadius="3" Padding="6,1" Margin="8,0,0,0">
-                                <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="#10B981"/>
-                            </Border>
-                        </StackPanel>
-                    </Border>
+                                <!-- Diff Header -->
+                                <Border Grid.Row="0" Background="{StaticResource Background/Surface}" 
+                                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1"
+                                        Padding="16,10" CornerRadius="10,10,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding SelectedFileChange.FilePath}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <Border Visibility="{Binding SelectedFileChange.IsNewFile, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Background="#1A10B981" BorderBrush="#10B981" BorderThickness="1"
+                                                CornerRadius="3" Padding="6,1" Margin="8,0,0,0">
+                                            <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="#10B981"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
 
-                    <!-- Diff Content -->
-                    <ScrollViewer Grid.Row="1" Background="#0F1117" Padding="16">
-                        <TextBox Text="{Binding SelectedFileChange.Diff, Mode=OneWay}"
-                                 IsReadOnly="True"
-                                 Background="Transparent"
-                                 Foreground="#D1D5DB"
-                                 BorderThickness="0"
-                                 FontFamily="Consolas"
-                                 FontSize="13"
-                                 AcceptsReturn="True"
-                                 TextWrapping="NoWrap"/>
-                    </ScrollViewer>
+                                <!-- Diff Content -->
+                                <ScrollViewer Grid.Row="1" Background="#0F1117" Padding="16">
+                                    <TextBox Text="{Binding SelectedFileChange.Diff, Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             Background="Transparent"
+                                             Foreground="#D1D5DB"
+                                             BorderThickness="0"
+                                             FontFamily="Consolas"
+                                             FontSize="13"
+                                             AcceptsReturn="True"
+                                             TextWrapping="NoWrap"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </TabItem>
 
-                    <!-- Generating Overlay -->
+                        <TabItem Header="BUILD &amp; TEST OUTPUT">
+                            <ScrollViewer Background="#0F1117" Padding="20">
+                                <StackPanel>
+                                    <TextBlock Text="BUILD OUTPUT" Foreground="#7C6BE8" FontWeight="Bold" FontSize="11" Margin="0,0,0,8"/>
+                                    <Border Background="#161B22" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,24">
+                                        <TextBox Text="{Binding BuildOutput, Mode=OneWay}"
+                                                 IsReadOnly="True"
+                                                 Background="Transparent"
+                                                 Foreground="#D1D5DB"
+                                                 BorderThickness="0"
+                                                 FontFamily="Consolas"
+                                                 FontSize="12"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="150"/>
+                                    </Border>
+
+                                    <TextBlock Text="TEST OUTPUT" Foreground="#7C6BE8" FontWeight="Bold" FontSize="11" Margin="0,0,0,8"/>
+                                    <Border Background="#161B22" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6" Padding="12">
+                                        <TextBox Text="{Binding TestOutput, Mode=OneWay}"
+                                                 IsReadOnly="True"
+                                                 Background="Transparent"
+                                                 Foreground="#D1D5DB"
+                                                 BorderThickness="0"
+                                                 FontFamily="Consolas"
+                                                 FontSize="12"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="150"/>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+
+                    <!-- Processing Overlay -->
                     <Border Grid.RowSpan="2" Background="#CC000000" CornerRadius="10"
-                            Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisibilityConverter}}">
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <TextBlock Text="Generating Proposal..." Foreground="White" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Processing..." Foreground="White" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                             <TextBlock Text="{Binding StatusMessage}" Foreground="#99FFFFFF" FontSize="13" Margin="0,8,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
@@ -180,6 +254,36 @@
                                 CornerRadius="6" Padding="12,10">
                             <TextBlock Text="✓ All proposed changes pass security validation." Foreground="#34D16A" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
                         </Border>
+
+                        <!-- APPLY SECTION -->
+                        <Button Content="Apply Proposal" 
+                                Command="{Binding ApplyProposalCommand}"
+                                Style="{StaticResource AppButton.Primary}"
+                                Margin="0,24,0,0"
+                                Padding="24,12"
+                                Height="48"/>
+                        
+                        <TextBlock Text="EXECUTION STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,24,0,8"/>
+                        <Grid Margin="0,0,0,20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Apply:" Foreground="{StaticResource Text/Muted}" Margin="0,0,12,4"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplyStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Build:" Foreground="{StaticResource Text/Muted}" Margin="0,0,12,4"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BuildStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tests:" Foreground="{StaticResource Text/Muted}" Margin="0,0,12,4"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TestStatus}" FontWeight="SemiBold" Foreground="{StaticResource Text/Primary}"/>
+                        </Grid>
 
                         <TextBlock Text="ORIGINAL REQUEST" Style="{StaticResource Typography.Eyebrow}" Margin="0,24,0,8" Opacity="0.6"/>
                         <TextBlock Text="{Binding CurrentProposal.OriginalRequest}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Text/Muted}" FontStyle="Italic"/>

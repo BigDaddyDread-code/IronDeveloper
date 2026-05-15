@@ -21,17 +21,23 @@ public sealed class BuilderProposalService : IBuilderProposalService
     private readonly ICodeChangeProposalService _proposalService;
     private readonly ILlmTraceService           _llmTraceService;
     private readonly ITicketService             _ticketService;
+    private readonly IDotNetBuildService        _buildService;
+    private readonly IDotNetTestService         _testService;
 
     public BuilderProposalService(
         IBuilderContextService     contextService,
         ICodeChangeProposalService proposalService,
         ILlmTraceService           llmTraceService,
-        ITicketService             ticketService)
+        ITicketService             ticketService,
+        IDotNetBuildService        buildService,
+        IDotNetTestService         testService)
     {
         _contextService  = contextService;
         _proposalService = proposalService;
         _llmTraceService = llmTraceService;
         _ticketService   = ticketService;
+        _buildService    = buildService;
+        _testService     = testService;
     }
 
     public async Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default)
@@ -84,6 +90,157 @@ public sealed class BuilderProposalService : IBuilderProposalService
         throw new NotImplementedException("Request-based proposal generation is not implemented yet.");
     }
 
+    public async Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default)
+    {
+        // ── 1. Trace Requested ────────────────────────────────────────────────
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.ApplyRequested",
+            WorkspaceName = "Builder",
+            ProjectId = proposal.ProjectId,
+            TicketId = proposal.TicketId,
+            ActiveProjectName = proposal.ProjectName,
+            ActiveProjectPath = proposal.ProjectRoot,
+            IsProposalOnly = false,
+            ProposedFileCount = proposal.Changes.Count,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        // ── 2. Re-Validate for Safety ─────────────────────────────────────────
+        ValidateProposal(proposal);
+        if (!proposal.IsAllValid)
+        {
+            proposal.ApplyStatus = "Validation Failed";
+            _llmTraceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.ApplyValidation",
+                WorkspaceName = "Builder",
+                ProjectId = proposal.ProjectId,
+                TicketId = proposal.TicketId,
+                ErrorMessage = "Apply aborted: validation failed for one or more files.",
+                WasSuccessful = false,
+                CreatedAt = DateTime.UtcNow
+            });
+            throw new InvalidOperationException("Apply aborted: validation failed for one or more files.");
+        }
+
+        // ── 3. Write Files ────────────────────────────────────────────────────
+        proposal.ApplyStatus = "Applying...";
+        try
+        {
+            var projectRoot = Path.GetFullPath(proposal.ProjectRoot);
+            foreach (var change in proposal.Changes)
+            {
+                var targetPath = Path.GetFullPath(Path.Combine(projectRoot, change.FilePath));
+                
+                // Final safety guard: must be under root
+                if (!targetPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"Security violation: path {change.FilePath} is outside project root.");
+                }
+
+                if (change.FullContentAfter == null)
+                {
+                    throw new InvalidOperationException($"No content provided for {change.FilePath}.");
+                }
+
+                var dir = Path.GetDirectoryName(targetPath);
+                if (dir != null && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                await File.WriteAllTextAsync(targetPath, change.FullContentAfter, ct);
+            }
+
+            proposal.ApplyStatus = "Applied";
+            _llmTraceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.FilesWritten",
+                WorkspaceName = "Builder",
+                ProjectId = proposal.ProjectId,
+                TicketId = proposal.TicketId,
+                ProposedFileCount = proposal.Changes.Count,
+                ProposedFilesList = string.Join(", ", proposal.Changes.Select(c => c.FilePath)),
+                WasSuccessful = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            proposal.ApplyStatus = $"Apply Failed: {ex.Message}";
+            throw;
+        }
+
+        // ── 4. Run Build ──────────────────────────────────────────────────────
+        proposal.BuildStatus = "Build Running...";
+        var slnPath = Path.Combine(proposal.ProjectRoot, "BookSeller.sln");
+        
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.BuildStarted",
+            WorkspaceName = "Builder",
+            ProjectId = proposal.ProjectId,
+            TicketId = proposal.TicketId,
+            RequestText = $"dotnet build \"{slnPath}\" --no-incremental -v quiet",
+            CreatedAt = DateTime.UtcNow
+        });
+
+        var buildResult = await _buildService.BuildAsync(slnPath, ct);
+        proposal.BuildStatus = buildResult.Succeeded ? "Build Passed" : "Build Failed";
+        proposal.BuildOutput = buildResult.Succeeded ? buildResult.StandardOutput : buildResult.StandardError;
+        proposal.BuildDuration = buildResult.Elapsed;
+
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.BuildResult",
+            WorkspaceName = "Builder",
+            ProjectId = proposal.ProjectId,
+            TicketId = proposal.TicketId,
+            DurationMs = (long)buildResult.Elapsed.TotalMilliseconds,
+            WasSuccessful = buildResult.Succeeded,
+            RawResponseText = buildResult.StandardOutput,
+            ErrorMessage = buildResult.StandardError,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        if (!buildResult.Succeeded)
+        {
+            proposal.TestStatus = "Skipped (Build Failed)";
+            return;
+        }
+
+        // ── 5. Run Tests ──────────────────────────────────────────────────────
+        proposal.TestStatus = "Tests Running...";
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.TestStarted",
+            WorkspaceName = "Builder",
+            ProjectId = proposal.ProjectId,
+            TicketId = proposal.TicketId,
+            RequestText = $"dotnet test \"{slnPath}\" --logger \"console;verbosity=minimal\"",
+            CreatedAt = DateTime.UtcNow
+        });
+
+        var testResult = await _testService.TestAsync(slnPath, ct);
+        proposal.TestStatus = testResult.Succeeded ? "Tests Passed" : "Tests Failed";
+        proposal.TestOutput = testResult.Succeeded ? testResult.StandardOutput : testResult.StandardError;
+        proposal.TestDuration = testResult.Elapsed;
+
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.TestResult",
+            WorkspaceName = "Builder",
+            ProjectId = proposal.ProjectId,
+            TicketId = proposal.TicketId,
+            DurationMs = (long)testResult.Elapsed.TotalMilliseconds,
+            WasSuccessful = testResult.Succeeded,
+            RawResponseText = testResult.StandardOutput,
+            ErrorMessage = testResult.StandardError,
+            CreatedAt = DateTime.UtcNow
+        });
+    }
+
     private static BuilderProposal MapToBuilderProposal(CodeChangeProposal inner, TicketBuildContext context)
     {
         var proposal = new BuilderProposal
@@ -105,6 +262,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
                 FilePath    = change.FilePath,
                 Description = change.ChangeReason,
                 Diff        = change.Patch,
+                FullContentAfter = change.FullContentAfter,
                 IsNewFile   = false, // TODO: derive from LLM if possible
                 IsDeletion  = false,
                 IsValid     = true

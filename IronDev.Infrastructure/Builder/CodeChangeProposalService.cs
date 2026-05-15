@@ -186,6 +186,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
                   "filePath": "<relative path, e.g. src/Service.cs>",
                   "description": "<why this file changes>",
                   "diff": "--- a/src/Service.cs\n+++ b/src/Service.cs\n@@ ...",
+                  "fullContentAfter": "<the COMPLETE content of the file after all changes are applied>",
                   "isNewFile": false,
                   "isDeletion": false
                 }
@@ -234,6 +235,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
                 FilePath      = fc.FilePath      ?? string.Empty,
                 ChangeReason  = fc.Description   ?? string.Empty,
                 Patch         = fc.Diff          ?? string.Empty,
+                FullContentAfter = fc.FullContentAfter ?? string.Empty,
             });
         }
 
@@ -272,6 +274,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         [JsonPropertyName("filePath")]    public string? FilePath    { get; set; }
         [JsonPropertyName("description")] public string? Description { get; set; }
         [JsonPropertyName("diff")]        public string? Diff        { get; set; }
+        [JsonPropertyName("fullContentAfter")] public string? FullContentAfter { get; set; }
         [JsonPropertyName("isNewFile")]   public bool    IsNewFile   { get; set; }
         [JsonPropertyName("isDeletion")]  public bool    IsDeletion  { get; set; }
     }
