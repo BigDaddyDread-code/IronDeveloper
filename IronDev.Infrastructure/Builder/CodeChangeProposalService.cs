@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using IronDev.Core;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Builder;
 
@@ -27,11 +28,13 @@ namespace IronDev.Infrastructure.Builder;
 /// </summary>
 public sealed class CodeChangeProposalService : ICodeChangeProposalService
 {
-    private readonly ILLMService _llm;
+    private readonly ILLMService      _llm;
+    private readonly ILlmTraceService _llmTraceService;
 
-    public CodeChangeProposalService(ILLMService llm)
+    public CodeChangeProposalService(ILLMService llm, ILlmTraceService llmTraceService)
     {
         _llm = llm;
+        _llmTraceService = llmTraceService;
     }
 
     public async Task<CodeChangeProposal> GenerateProposalAsync(
@@ -40,17 +43,53 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
     {
         var prompt = BuildPrompt(context);
 
+        // ── Call LLM with tracing ─────────────────────────────────────────────
+        var trace = new LlmTraceEntry
+        {
+            FeatureName = "BuildTicket",
+            WorkspaceName = "Builder",
+            ProjectId = context.ProjectId,
+            TicketId = context.TicketId,
+            PlanId = context.PlanId,
+            RequestText = prompt,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         string rawJson;
         try
         {
             rawJson = await _llm.GetResponseAsync(prompt, cancellationToken);
+            trace.WasSuccessful = true;
+            trace.RawResponseText = rawJson;
         }
         catch (Exception ex)
         {
+            trace.WasSuccessful = false;
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
             throw new InvalidOperationException($"LLM call failed: {ex.Message}", ex);
         }
+        finally
+        {
+            sw.Stop();
+            trace.DurationMs = sw.ElapsedMilliseconds;
+        }
 
-        return ParseProposal(rawJson, context.TicketId);
+        try
+        {
+            var proposal = ParseProposal(rawJson, context.TicketId);
+            trace.ParsedResponseSummary = $"Proposed {proposal.FileChanges.Count} file changes.";
+            _llmTraceService.AddTrace(trace);
+            return proposal;
+        }
+        catch (Exception ex)
+        {
+            trace.ParsedResponseSummary = "JSON Parse Failure";
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
+            throw;
+        }
     }
 
     // ── Prompt construction ───────────────────────────────────────────────────
@@ -65,7 +104,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         sb.AppendLine("RULES:");
         sb.AppendLine("- Only change files relevant to the ticket.");
         sb.AppendLine("- Do not invent requirements not stated in the ticket or plan.");
-        sb.AppendLine("- Follow all linked architectural decisions.");
+        sb.AppendLine("- Follow all linked architectural decisions and project rules.");
         sb.AppendLine("- Prefer small, targeted changes.");
         sb.AppendLine("- Do not replace whole files unless absolutely necessary.");
         sb.AppendLine("- Return ONLY a JSON object. No markdown fences. No prose. No commentary.");
@@ -127,6 +166,18 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine();
         }
 
+        if (ctx.Standards.Count > 0)
+        {
+            sb.AppendLine("PROJECT RULES AND STANDARDS:");
+            foreach (var s in ctx.Standards)
+            {
+                sb.AppendLine($"  - [{s.EnforcementLevel}] {s.Name}: {s.Description}");
+                if (!string.IsNullOrWhiteSpace(s.ValidationHint))
+                    sb.AppendLine($"    Validation Hint: {s.ValidationHint}");
+            }
+            sb.AppendLine();
+        }
+
         if (ctx.RetrievedSnippets.Count > 0)
         {
             sb.AppendLine("RELEVANT CODE CONTEXT:");
@@ -145,6 +196,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
               "summary": "<brief description of what changes and why>",
               "riskNotes": "<risk assessment>",
               "testPlan": "<how to verify the change>",
+              "standardsCompliance": "<report on which project rules were applied and any deviations or risks>",
               "fileChanges": [
                 {
                   "filePath": "<relative file path>",
@@ -189,6 +241,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             Summary   = dto.Summary   ?? "No summary provided.",
             RiskNotes = dto.RiskNotes ?? "Not specified.",
             TestPlan  = dto.TestPlan  ?? "Not specified.",
+            StandardsCompliance = dto.StandardsCompliance ?? "Not reported.",
         };
 
         foreach (var fc in dto.FileChanges ?? [])
@@ -235,6 +288,7 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         [JsonPropertyName("summary")]    public string?                 Summary     { get; set; }
         [JsonPropertyName("riskNotes")]  public string?                 RiskNotes   { get; set; }
         [JsonPropertyName("testPlan")]   public string?                 TestPlan    { get; set; }
+        [JsonPropertyName("standardsCompliance")] public string?        StandardsCompliance { get; set; }
         [JsonPropertyName("fileChanges")]public List<FileChangeJson>?   FileChanges { get; set; }
     }
 

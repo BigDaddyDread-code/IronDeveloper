@@ -14,6 +14,7 @@ public interface ITicketService
     Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProjectTicket>> GetRecentTicketsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
     Task<ProjectTicket?> GetTicketByIdAsync(long ticketId, CancellationToken cancellationToken = default);
+    Task<bool> ArchiveTicketAsync(long ticketId, CancellationToken cancellationToken = default);
 }
 
 public sealed class TicketService : ITicketService
@@ -159,6 +160,7 @@ public sealed class TicketService : ITicketService
             FROM dbo.ProjectTickets
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
+              AND IsDeleted = 0
             ORDER BY CreatedDate DESC;
             """;
 
@@ -183,7 +185,8 @@ public sealed class TicketService : ITicketService
                 BuildValidation, ContextSummary, IsGenerated, GenerationNote, CreatedDate
             FROM dbo.ProjectTickets
                 WHERE Id = @TicketId
-              AND TenantId = @TenantId;
+              AND TenantId = @TenantId
+              AND IsDeleted = 0;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -192,5 +195,22 @@ public sealed class TicketService : ITicketService
             sql,
             new { TicketId = ticketId, TenantId = _tenant.TenantId },
             cancellationToken: cancellationToken));
+    }
+
+    public async Task<bool> ArchiveTicketAsync(long ticketId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE dbo.ProjectTickets
+            SET IsDeleted = 1
+            WHERE Id = @TicketId AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { TicketId = ticketId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+
+        return rowsAffected > 0;
     }
 }

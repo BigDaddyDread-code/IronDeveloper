@@ -9,6 +9,7 @@ GO
 
 IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DROP TABLE dbo.ChatMessageFeedback;
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTickets;
+IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DROP TABLE dbo.ProjectRules;
 IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DROP TABLE dbo.ProjectImplementationPlans;
 IF OBJECT_ID('dbo.ProjectDecisions', 'U') IS NOT NULL DROP TABLE dbo.ProjectDecisions;
 IF OBJECT_ID('dbo.DecisionCategories', 'U') IS NOT NULL DROP TABLE dbo.DecisionCategories;
@@ -216,10 +217,28 @@ CREATE TABLE dbo.ProjectTickets
     ContextSummary NVARCHAR(MAX) NULL,
     IsGenerated BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsGenerated DEFAULT 0,
     GenerationNote NVARCHAR(MAX) NULL,
+    IsDeleted BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsDeleted DEFAULT 0,
 
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectTickets_CreatedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectTickets_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+);
+
+CREATE TABLE dbo.ProjectRules
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL CONSTRAINT DF_ProjectRules_Tenant DEFAULT 1,
+    ProjectId INT NOT NULL,
+    Name NVARCHAR(200) NOT NULL,
+    Type NVARCHAR(100) NOT NULL, -- CodeStandard / ArchitectureDecision / WorkflowRule / TestingRule
+    Description NVARCHAR(MAX) NOT NULL,
+    EnforcementLevel NVARCHAR(50) NOT NULL, -- Advisory / Required / Blocking
+    AppliesTo NVARCHAR(50) NOT NULL, -- Ticket / Build / Both
+    ValidationHint NVARCHAR(MAX) NULL,
+    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectRules_CreatedDate DEFAULT SYSUTCDATETIME(),
+    UpdatedDate DATETIME2 NULL,
+    CONSTRAINT FK_ProjectRules_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ProjectRules_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
 );
 
 CREATE TABLE dbo.ProjectFiles

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using IronDev.Core;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Services;
 
 namespace IronDev.Infrastructure.Builder;
@@ -39,11 +40,13 @@ public sealed class DraftTicketService : IDraftTicketService
 {
     private readonly ILLMService           _llm;
     private readonly IProjectMemoryService _memory;
+    private readonly ILlmTraceService      _llmTraceService;
 
-    public DraftTicketService(ILLMService llm, IProjectMemoryService memory)
+    public DraftTicketService(ILLMService llm, IProjectMemoryService memory, ILlmTraceService llmTraceService)
     {
         _llm    = llm;
         _memory = memory;
+        _llmTraceService = llmTraceService;
     }
 
     public async Task<DraftTicket> GenerateDraftAsync(
@@ -53,6 +56,7 @@ public sealed class DraftTicketService : IDraftTicketService
         string messageText,
         string? linkedFilePaths,
         string? linkedSymbols,
+        long?   sessionId = null,
         CancellationToken ct = default)
     {
         // ── Build ProjectContext ──────────────────────────────────────────────
@@ -98,14 +102,38 @@ public sealed class DraftTicketService : IDraftTicketService
 
         var prompt = BuildDraftPrompt(projectName, chatHistory, context);
 
+        // ── Call LLM with tracing ─────────────────────────────────────────────
+        var trace = new LlmTraceEntry
+        {
+            FeatureName = "DraftTicketGeneration",
+            WorkspaceName = "Architect",
+            ProjectId = projectId,
+            ChatSessionId = sessionId?.ToString(),
+            TraceGroupId = sessionId?.ToString(),
+            RequestText = prompt,
+            CurrentUserMessage = messageText,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         string rawJson;
         try
         {
             rawJson = await _llm.GetResponseAsync(prompt, ct);
+            trace.WasSuccessful = true;
+            trace.RawResponseText = rawJson;
         }
         catch (Exception ex)
         {
+            trace.WasSuccessful = false;
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
             throw new InvalidOperationException($"AI draft generation failed: {ex.Message}", ex);
+        }
+        finally
+        {
+            sw.Stop();
+            trace.DurationMs = sw.ElapsedMilliseconds;
         }
 
         // ── Diagnostics before deserialisation ──────────────────────────────
@@ -118,9 +146,15 @@ public sealed class DraftTicketService : IDraftTicketService
         try
         {
             draft = ParseDraft(rawJson ?? string.Empty);
+            trace.ParsedResponseSummary = $"Generated ticket: {draft.Title}";
+            _llmTraceService.AddTrace(trace);
         }
         catch (Exception ex)
         {
+            trace.ParsedResponseSummary = "JSON Parse Failure";
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
+
             System.Diagnostics.Trace.WriteLine(
                 $"[DraftTicketService] Deserialisation failed — target: DraftTicketJson — error: {ex.Message}");
             throw new InvalidOperationException(
@@ -146,17 +180,53 @@ public sealed class DraftTicketService : IDraftTicketService
     {
         var prompt = BuildTestRegenPrompt(current);
 
+        // ── Call LLM with tracing ─────────────────────────────────────────────
+        var trace = new LlmTraceEntry
+        {
+            FeatureName = "GenerateTests",
+            WorkspaceName = "Architect",
+            ProjectId = projectId,
+            ChatSessionId = current.SourceChatSessionId.ToString(),
+            TraceGroupId = current.SourceChatSessionId.ToString(),
+            RequestText = prompt,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         string rawJson;
         try
         {
             rawJson = await _llm.GetResponseAsync(prompt, ct);
+            trace.WasSuccessful = true;
+            trace.RawResponseText = rawJson;
         }
         catch (Exception ex)
         {
+            trace.WasSuccessful = false;
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
             throw new InvalidOperationException($"AI test regeneration failed: {ex.Message}", ex);
         }
+        finally
+        {
+            sw.Stop();
+            trace.DurationMs = sw.ElapsedMilliseconds;
+        }
 
-        var testPlan = ParseTestPlan(rawJson);
+        TestPlanJson testPlan;
+        try
+        {
+            testPlan = ParseTestPlan(rawJson);
+            trace.ParsedResponseSummary = "Tests generated.";
+            _llmTraceService.AddTrace(trace);
+        }
+        catch (Exception ex)
+        {
+            trace.ParsedResponseSummary = "JSON Parse Failure";
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
+            throw;
+        }
 
         return new DraftTicket
         {
@@ -192,17 +262,53 @@ public sealed class DraftTicketService : IDraftTicketService
     {
         var prompt = BuildPlanPrompt(current);
 
+        // ── Call LLM with tracing ─────────────────────────────────────────────
+        var trace = new LlmTraceEntry
+        {
+            FeatureName = "GenerateImplementationPlan",
+            WorkspaceName = "Architect",
+            ProjectId = projectId,
+            ChatSessionId = current.SourceChatSessionId.ToString(),
+            TraceGroupId = current.SourceChatSessionId.ToString(),
+            RequestText = prompt,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         string rawJson;
         try
         {
             rawJson = await _llm.GetResponseAsync(prompt, ct);
+            trace.WasSuccessful = true;
+            trace.RawResponseText = rawJson;
         }
         catch (Exception ex)
         {
+            trace.WasSuccessful = false;
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
             throw new InvalidOperationException($"AI plan generation failed: {ex.Message}", ex);
         }
+        finally
+        {
+            sw.Stop();
+            trace.DurationMs = sw.ElapsedMilliseconds;
+        }
 
-        var planData = ParsePlan(rawJson);
+        PlanJson planData;
+        try
+        {
+            planData = ParsePlan(rawJson);
+            trace.ParsedResponseSummary = "Implementation plan generated.";
+            _llmTraceService.AddTrace(trace);
+        }
+        catch (Exception ex)
+        {
+            trace.ParsedResponseSummary = "JSON Parse Failure";
+            trace.ErrorMessage = ex.Message;
+            _llmTraceService.AddTrace(trace);
+            throw;
+        }
 
         return new DraftTicket
         {

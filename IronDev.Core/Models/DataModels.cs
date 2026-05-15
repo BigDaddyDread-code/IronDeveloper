@@ -186,5 +186,21 @@ public sealed class ProjectTicket
     public string? ContextSummary { get; set; }
     public bool IsGenerated { get; set; }
     public string? GenerationNote { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTime CreatedDate { get; set; }
+}
+
+public sealed class ProjectRule
+{
+    public long Id { get; set; }
+    public int TenantId { get; set; }
+    public int ProjectId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Type { get; set; } = "CodeStandard"; // CodeStandard / ArchitectureDecision / WorkflowRule / TestingRule
+    public string Description { get; set; } = string.Empty;
+    public string EnforcementLevel { get; set; } = "Required"; // Advisory / Required / Blocking
+    public string AppliesTo { get; set; } = "Both"; // Ticket / Build / Both
+    public string? ValidationHint { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public DateTime? UpdatedDate { get; set; }
 }

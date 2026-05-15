@@ -13,6 +13,8 @@ using IronDev.AI;
 using IronDev.Core;
 using IronDev.Data.Models;
 using IronDev.Services;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using System.Threading.Tasks;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -23,7 +25,17 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private readonly IPromptContextBuilder  _promptContextBuilder;
     private readonly ILLMService            _llmService;
     private readonly IProjectMemoryService  _memoryService;
+    private readonly ITicketService         _ticketService;
     private readonly IChatFeedbackService   _feedbackService;
+    private readonly ILlmTraceService       _llmTraceService;
+    private readonly IContextAgentService?  _contextAgentService;
+
+    /// <summary>
+    /// When true and <see cref="_contextAgentService"/> is wired, the chat send
+    /// path uses ContextAgentService (sufficiency check + expansion) instead of
+    /// one-shot PromptContextBuilder. Default: false.
+    /// </summary>
+    public bool UseContextAgent { get; set; } = false;
 
     private int _activeProjectId;
     private string _activeProjectName = string.Empty;
@@ -65,13 +77,19 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         IPromptContextBuilder promptContextBuilder,
         ILLMService           llmService,
         IProjectMemoryService memoryService,
-        IChatFeedbackService  feedbackService)
+        ITicketService        ticketService,
+        IChatFeedbackService  feedbackService,
+        ILlmTraceService      llmTraceService,
+        IContextAgentService? contextAgentService = null)
     {
         _chatHistoryService   = chatHistoryService;
         _promptContextBuilder = promptContextBuilder;
         _llmService           = llmService;
         _memoryService        = memoryService;
+        _ticketService        = ticketService;
         _feedbackService      = feedbackService;
+        _llmTraceService      = llmTraceService;
+        _contextAgentService  = contextAgentService;
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
@@ -239,44 +257,216 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     $"[Chat][Sources] {string.Join(", ", packet.MatchedFilePaths.Distinct().Take(6))}");
             // ─────────────────────────────────────────────────────────────────
 
-            // Call the real LLM service
-            var responseText = string.Empty;
-            try
+            // ── Context Agent path (feature-flagged) ──────────────────────────
+            if (UseContextAgent && _contextAgentService != null)
             {
-                responseText = await _llmService.GetResponseAsync(packet.FormattedPrompt);
+                // Fetch artefacts for conflict assessment (Stage 3.5)
+                // We degrade gracefully if retrieval fails or some services are null.
+                IReadOnlyList<ProjectTicket>   recentTickets   = [];
+                IReadOnlyList<ProjectDecision> recentDecisions = [];
+                IReadOnlyList<ProjectRule>     projectRules    = [];
+
+                try
+                {
+                    var ticketsTask   = _ticketService.GetRecentTicketsAsync(projectId, take: 10);
+                    var decisionsTask = _memoryService.GetRecentDecisionsAsync(projectId, take: 10);
+                    var rulesTask     = _memoryService.GetProjectRulesAsync(projectId);
+
+                    await Task.WhenAll(ticketsTask, decisionsTask, rulesTask);
+
+                    recentTickets   = await ticketsTask;
+                    recentDecisions = await decisionsTask;
+                    projectRules    = (await rulesTask).Take(10).ToList();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"[Chat][Warning] Conflict artefact retrieval failed: {ex.Message}");
+                }
+
+                var previousMessage = Messages.Count > 1 ? Messages[Messages.Count - 2].MessageText : null;
+                var createTicketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
+
+                if (createTicketIntent != null)
+                {
+                    var intentTrace = new LlmTraceEntry
+                    {
+                        FeatureName = ContextAgentStage.IntentCreateTicket,
+                        Model = "Deterministic",
+                        RequestText = $"OriginalMessage: {text}\n" +
+                                      $"CommandText: {createTicketIntent.CommandText}\n" +
+                                      $"WorkText: {createTicketIntent.WorkText}\n" +
+                                      $"RequiresClarification: {createTicketIntent.RequiresClarification}",
+                        ParsedResponseSummary = $"Confidence: {createTicketIntent.Confidence}",
+                        DurationMs = 0,
+                        EstimatedTokens = 0,
+                        WasSuccessful = true
+                    };
+                    _llmTraceService.AddTrace(intentTrace);
+                }
+
+                var agentRequest = new IronDev.Core.Models.ContextAgentRequest
+                {
+                    ProjectId       = projectId,
+                    SessionId       = sessionId,
+                    UserRequest     = text,
+                    RecentTickets   = recentTickets,
+                    RecentDecisions = recentDecisions,
+                    ProjectRules    = projectRules,
+                    CreateTicketIntent = createTicketIntent,
+                };
+
+                var agentResult = await _contextAgentService.RunAsync(agentRequest);
+
+                if (agentResult.IsClarificationRequired)
+                {
+                    // Surface clarification questions as an assistant message
+                    var clarificationText =
+                        "Before I can answer, I need a bit more context:\n\n" +
+                        string.Join("\n", agentResult.ClarificationQuestions.Select((q, i) => $"{i + 1}. {q}"));
+
+                    Messages.Add(new ChatSummary
+                    {
+                        Role        = "assistant",
+                        MessageText = clarificationText,
+                        Timestamp   = DateTime.UtcNow
+                    });
+                    return;
+                }
+
+                // Use the agent's assembled final prompt for the real LLM call
+                var finalPrompt = agentResult.FinalPrompt ?? packet.FormattedPrompt;
+
+                var responseText = string.Empty;
+                var trace = new LlmTraceEntry
+                {
+                    FeatureName        = "Chat",
+                    WorkspaceName      = "Chat",
+                    Model              = ActiveModel,
+                    CurrentUserMessage = text,
+                    ProjectId          = projectId,
+                    ChatSessionId      = sessionId.ToString(),
+                    RequestText        = finalPrompt,
+                    Warnings           = agentResult.Warnings,
+                    ContextSummary     = agentResult.ContextSummary,
+                    TraceGroupId       = agentResult.TraceGroupId,
+                    CreatedAt          = DateTime.UtcNow
+                };
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    responseText = await _llmService.GetResponseAsync(finalPrompt);
+                    trace.WasSuccessful = true;
+                    trace.RawResponseText = responseText;
+                    trace.ParsedResponseSummary = responseText.Length > 200 ? responseText[..200] + "..." : responseText;
+                }
+                catch (Exception ex)
+                {
+                    responseText = $"[LLM Error]: {ex.Message}";
+                    trace.WasSuccessful = false;
+                    trace.ErrorMessage  = ex.Message;
+                }
+                finally
+                {
+                    sw.Stop();
+                    trace.DurationMs = sw.ElapsedMilliseconds;
+                    _llmTraceService.AddTrace(trace);
+                }
+
+                var assistantMsgAgent = new ChatSummary
+                {
+                    Role            = "assistant",
+                    MessageText     = responseText,
+                    FormattedPrompt = finalPrompt,
+                    ContextPacket   = packet,
+                    Timestamp       = DateTime.UtcNow
+                };
+                Messages.Add(assistantMsgAgent);
+                RefreshContextChips();
+
+                var assistantDbIdAgent = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                {
+                    ProjectId       = projectId,
+                    ChatSessionId   = sessionId,
+                    Role            = "assistant",
+                    Message         = responseText,
+                    ContextSummary  = agentResult.ContextSummary,
+                    LinkedFilePaths = string.Join("\n", agentResult.Evidence.Select(e => e.FilePath).Distinct()),
+                    LinkedSymbols   = string.Join("\n", agentResult.Evidence.Select(e => e.SymbolName).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct())
+                });
+                assistantMsgAgent.PersistedMessageId = assistantDbIdAgent;
+                SelectedSession.UpdatedDate = DateTime.UtcNow;
+                await _chatHistoryService.SaveSessionAsync(SelectedSession);
+                return; // Context Agent path handled — skip the one-shot path below
             }
-            catch (Exception ex)
+
+            // ── One-shot RAG path (original, stable, feature-flag off) ─────────
             {
-                responseText = $"[LLM Error]: {ex.Message}";
+                // Call the real LLM service with tracing
+                var responseText = string.Empty;
+                var trace = new LlmTraceEntry
+                {
+                    FeatureName        = "Chat",
+                    WorkspaceName      = "Chat",
+                    Model              = ActiveModel,
+                    CurrentUserMessage = text,
+                    ProjectId          = projectId,
+                    ChatSessionId      = sessionId.ToString(),
+                    RequestText        = packet.FormattedPrompt,
+                    Warnings           = packet.RulesLoadWarning ?? string.Empty,
+                    ContextSummary     = BuildContextSummary(packet),
+                    CreatedAt          = DateTime.UtcNow
+                };
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    responseText = await _llmService.GetResponseAsync(packet.FormattedPrompt);
+                    trace.WasSuccessful = true;
+                    trace.RawResponseText = responseText;
+                    trace.ParsedResponseSummary = responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText;
+                }
+                catch (Exception ex)
+                {
+                    responseText = $"[LLM Error]: {ex.Message}";
+                    trace.WasSuccessful = false;
+                    trace.ErrorMessage = ex.Message;
+                }
+                finally
+                {
+                    sw.Stop();
+                    trace.DurationMs = sw.ElapsedMilliseconds;
+                    _llmTraceService.AddTrace(trace);
+                }
+
+                var assistantMsg = new ChatSummary
+                {
+                    Role            = "assistant",
+                    MessageText     = responseText,
+                    FormattedPrompt = packet.FormattedPrompt,
+                    ContextPacket   = packet,
+                    Timestamp       = DateTime.UtcNow
+                };
+                Messages.Add(assistantMsg);
+                RefreshContextChips();
+
+                // Persist assistant message and capture its DB Id
+                var assistantDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                {
+                    ProjectId       = projectId,
+                    ChatSessionId   = sessionId,
+                    Role            = "assistant",
+                    Message         = responseText,
+                    ContextSummary  = assistantMsg.ContextHeader,
+                    LinkedFilePaths = string.Join("\n", packet.MatchedFilePaths),
+                    LinkedSymbols   = string.Join("\n", packet.MatchedSymbols)
+                });
+                assistantMsg.PersistedMessageId = assistantDbId;
+
+                // Update session's UpdatedDate
+                SelectedSession.UpdatedDate = DateTime.UtcNow;
+                await _chatHistoryService.SaveSessionAsync(SelectedSession);
             }
-
-            var assistantMsg = new ChatSummary
-            {
-                Role = "assistant",
-                MessageText = responseText,
-                FormattedPrompt = packet.FormattedPrompt,
-                ContextPacket = packet,
-                Timestamp = DateTime.UtcNow
-            };
-            Messages.Add(assistantMsg);
-            RefreshContextChips();
-
-            // Persist assistant message and capture its DB Id
-            var assistantDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
-            {
-                ProjectId      = projectId,
-                ChatSessionId  = sessionId,
-                Role           = "assistant",
-                Message        = responseText,
-                ContextSummary = assistantMsg.ContextHeader,
-                LinkedFilePaths = string.Join("\n", packet.MatchedFilePaths),
-                LinkedSymbols   = string.Join("\n", packet.MatchedSymbols)
-            });
-            assistantMsg.PersistedMessageId = assistantDbId;
-
-            // Update session's UpdatedDate
-            SelectedSession.UpdatedDate = DateTime.UtcNow;
-            await _chatHistoryService.SaveSessionAsync(SelectedSession);
         }
         finally
         {
@@ -561,4 +751,32 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void NavigateToDecision() => OnNavigateToDecision?.Invoke();
+
+    // ── Context summary builder ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a compact, human-readable context summary from a <see cref="IronDev.AI.ChatContextPacket"/>
+    /// for display in the LLM Console trace detail panel and exported trace files.
+    /// </summary>
+    public static string BuildContextSummary(IronDev.AI.ChatContextPacket packet)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Intent:            {packet.Intent}");
+        sb.AppendLine($"Project indexed:   {(packet.IsProjectNotIndexed ? "No" : "Yes")}");
+        sb.AppendLine($"Retrieved files:   {packet.MatchedFilePaths.Count}");
+        sb.AppendLine($"Distinct files:    {packet.MatchedFilePaths.Distinct().Count()}");
+        sb.AppendLine($"Memory included:   {packet.IncludedMemoryCount}");
+        sb.AppendLine($"Memory filtered:   {packet.FilteredMemoryCount}");
+        sb.AppendLine($"Standards:         {packet.IncludedStandardsCount} included, {packet.FilteredStandardsCount} filtered");
+        sb.AppendLine($"Warnings:          {(string.IsNullOrWhiteSpace(packet.RulesLoadWarning) ? "none" : packet.RulesLoadWarning)}");
+
+        if (packet.MatchedFilePaths.Count > 0)
+        {
+            sb.AppendLine("Top files:");
+            foreach (var f in packet.MatchedFilePaths.Take(5))
+                sb.AppendLine($"  - {System.IO.Path.GetFileName(f)}");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 }

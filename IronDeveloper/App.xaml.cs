@@ -56,10 +56,22 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
                 services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
                 services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Services.SqlCodeIndexService>();
+                services.AddTransient<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
                 services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
+                services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IContextAgentService,
+                    global::IronDev.Infrastructure.Services.ContextAgentService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IContextConflictService,
+                    global::IronDev.Infrastructure.Services.ContextConflictService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IContextAgentRouteJudge,
+                    global::IronDev.Infrastructure.Services.ContextAgentRouteJudgeService>();
+
                 var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
                                 ?? new global::IronDev.Core.Models.LlmOptions();
 
@@ -108,14 +120,19 @@ public partial class App : Application
                         sp.GetRequiredService<global::IronDev.Services.IProjectService>(),
                         sp.GetRequiredService<global::IronDev.Core.ILLMService>(),
                         sp.GetRequiredService<global::IronDev.Services.ICodeIndexService>(),
-                        sp.GetRequiredService<global::IronDev.Core.Auth.ICurrentTenantContext>()));
-                services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel
+                        sp.GetRequiredService<global::IronDev.Core.Auth.ICurrentTenantContext>(),
+                        sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
+
+                services.AddSingleton<LlmConsoleViewModel>(sp =>
+                    new LlmConsoleViewModel(
+                        sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
+                services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel(
+                    sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>())
                 {
-                    // Deferred: PromptPlaygroundViewModel (and its DB deps) are only
-                    // instantiated when the user first expands Developer Tools —
-                    // never at app startup.
-                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>()
+                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>(),
+                    LlmConsoleFactory       = () => sp.GetRequiredService<LlmConsoleViewModel>()
                 });
+
 
                 // Shell
                 services.AddSingleton<ShellViewModel>();

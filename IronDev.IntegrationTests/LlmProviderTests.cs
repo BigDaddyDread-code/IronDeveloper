@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core;
+using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Builder;
@@ -76,7 +77,8 @@ public class LlmProviderTests
         // and doesn't know about the provider.
         var mockLlm    = new StubLlmService();
         var mockMemory = new NullProjectMemoryService();
-        var draftService = new DraftTicketService(mockLlm, mockMemory);
+        var mockTrace  = new NullLlmTraceService();
+        var draftService = new DraftTicketService(mockLlm, mockMemory, mockTrace);
         Assert.IsNotNull(draftService);
     }
 
@@ -110,5 +112,21 @@ public class LlmProviderTests
         public Task<ProjectImplementationPlan?> GetPlanByTicketIdAsync(long ticketId, CancellationToken ct = default) => Task.FromResult<ProjectImplementationPlan?>(null);
         public Task<long> SavePlanAsync(ProjectImplementationPlan plan, CancellationToken ct = default) => Task.FromResult(0L);
         public Task<long> SaveDecisionAsync(ProjectDecision decision, CancellationToken ct = default) => Task.FromResult(0L);
+
+        public Task<IReadOnlyList<ProjectRule>> GetProjectRulesAsync(int projectId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ProjectRule>>([]);
+        public Task<long> SaveProjectRuleAsync(ProjectRule rule, CancellationToken cancellationToken = default)
+            => Task.FromResult(0L);
+    }
+
+    private class NullLlmTraceService : ILlmTraceService
+    {
+        public event EventHandler<LlmTraceEntry>? TraceAdded;
+        public bool IsTracingEnabled { get; set; } = true;
+        public void AddTrace(LlmTraceEntry entry) { }
+        public void Clear() { }
+        public string ExportAll() => string.Empty;
+        public string ExportTrace(LlmTraceEntry entry) => string.Empty;
+        public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int take = 100) => [];
     }
 }

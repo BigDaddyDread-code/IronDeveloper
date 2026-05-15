@@ -129,6 +129,7 @@ public interface IDraftTicketService
         string messageText,
         string? linkedFilePaths,
         string? linkedSymbols,
+        long?   sessionId = null,
         CancellationToken ct = default);
 
     /// <summary>

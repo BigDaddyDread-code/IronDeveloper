@@ -492,6 +492,9 @@ internal sealed class StubTicketService : IronDev.Services.ITicketService
         long ticketId,
         System.Threading.CancellationToken cancellationToken = default)
         => Task.FromResult<IronDev.Data.Models.ProjectTicket?>(null);
+
+    public Task<bool> ArchiveTicketAsync(long ticketId, System.Threading.CancellationToken cancellationToken = default)
+        => Task.FromResult(true);
 }
 
 /// <summary>
@@ -502,6 +505,7 @@ internal sealed class FailingDraftTicketService : IDraftTicketService
     public Task<DraftTicket> GenerateDraftAsync(
         int projectId, string projectName, string proposedTitle,
         string messageText, string? linkedFilePaths, string? linkedSymbols,
+        long? sessionId = null,
         System.Threading.CancellationToken ct = default)
         => throw new InvalidOperationException("Simulated draft generation failure.");
 

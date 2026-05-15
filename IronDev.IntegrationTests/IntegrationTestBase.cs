@@ -9,6 +9,8 @@ using IronDev.Core.Auth;
 using IronDev.Data;
 using IronDev.Services;
 using IronDev.AI;
+using IronDev.Core.Interfaces;
+using IronDev.Infrastructure.Builder;
 
 namespace IronDev.IntegrationTests;
 
@@ -60,6 +62,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
+        services.AddScoped<IBuilderContextService, BuilderContextService>();
         services.AddScoped<IUserService, UserService>();
 
         ServiceProvider = services.BuildServiceProvider();
@@ -78,6 +81,7 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
+            IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DELETE FROM dbo.ProjectRules;
             DELETE FROM dbo.ChatMessages;
             DELETE FROM dbo.ProjectDecisions;
             DELETE FROM dbo.ProjectFiles;
@@ -126,6 +130,119 @@ public abstract class IntegrationTestBase
             ELSE
             BEGIN
                 UPDATE dbo.Users SET IsActive = 1 WHERE Id = 1;
+            END
+
+            -- Ensure core tables exist
+            IF OBJECT_ID('dbo.Projects', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.Projects
+                (
+                    Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    Name NVARCHAR(200) NOT NULL,
+                    Description NVARCHAR(MAX) NULL,
+                    LocalPath NVARCHAR(500) NULL,
+                    LastIndexedUtc DATETIME2 NULL,
+                    IndexingStatus NVARCHAR(50) NULL,
+                    IndexedFileCount INT NULL,
+                    CONSTRAINT FK_Projects_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id)
+                );
+            END
+
+            IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectTickets
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    SessionId UNIQUEIDENTIFIER NULL,
+                    Title NVARCHAR(200) NOT NULL DEFAULT '',
+                    TicketType NVARCHAR(50) NOT NULL DEFAULT 'Task',
+                    Priority NVARCHAR(50) NOT NULL DEFAULT 'Medium',
+                    Summary NVARCHAR(MAX) NULL,
+                    Background NVARCHAR(MAX) NULL,
+                    Problem NVARCHAR(MAX) NULL,
+                    AcceptanceCriteria NVARCHAR(MAX) NULL,
+                    TechnicalNotes NVARCHAR(MAX) NULL,
+                    Status NVARCHAR(50) NOT NULL DEFAULT 'Draft',
+                    Content NVARCHAR(MAX) NOT NULL DEFAULT '',
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    UnitTests NVARCHAR(MAX) NULL,
+                    IntegrationTests NVARCHAR(MAX) NULL,
+                    ManualTests NVARCHAR(MAX) NULL,
+                    RegressionTests NVARCHAR(MAX) NULL,
+                    BuildValidation NVARCHAR(MAX) NULL,
+                    ContextSummary NVARCHAR(MAX) NULL,
+                    IsGenerated BIT NOT NULL DEFAULT 0,
+                    GenerationNote NVARCHAR(MAX) NULL,
+                    IsDeleted BIT NOT NULL DEFAULT 0,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ProjectTickets_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            IF OBJECT_ID('dbo.ProjectFiles', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectFiles
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    FilePath NVARCHAR(1000) NOT NULL,
+                    FileExtension NVARCHAR(50) NOT NULL,
+                    ContentHash NVARCHAR(100) NOT NULL,
+                    Content NVARCHAR(MAX) NOT NULL,
+                    LastIndexedUtc DATETIME2 NULL,
+                    IndexingStatus NVARCHAR(50) NULL,
+                    CONSTRAINT FK_ProjectFiles_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ProjectFiles_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            IF OBJECT_ID('dbo.ProjectDecisions', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectDecisions
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    Title NVARCHAR(200) NOT NULL,
+                    Detail NVARCHAR(MAX) NOT NULL,
+                    Reason NVARCHAR(MAX) NULL,
+                    Category NVARCHAR(100) NULL,
+                    Status NVARCHAR(50) NOT NULL DEFAULT 'Accepted',
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedCodeIndexEntryIds NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    SourceChatMessageId BIGINT NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_ProjectDecisions_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ProjectDecisions_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            IF OBJECT_ID('dbo.ChatMessages', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatMessages
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NULL,
+                    SessionId UNIQUEIDENTIFIER NULL,
+                    Sender NVARCHAR(50) NOT NULL,
+                    Text NVARCHAR(MAX) NOT NULL,
+                    ContextSummary NVARCHAR(MAX) NULL,
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_ChatMessages_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ChatMessages_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
             END
 
             -- Extend Projects (Grounding)
@@ -190,6 +307,9 @@ public abstract class IntegrationTestBase
             
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ProjectTickets ADD LinkedSymbols NVARCHAR(MAX) NULL;
+
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'IsDeleted')
+                ALTER TABLE dbo.ProjectTickets ADD IsDeleted BIT NOT NULL DEFAULT 0;
 
             -- Extend ProjectTickets (Extended Draft Fields)
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'UnitTests')
@@ -314,6 +434,27 @@ public abstract class IntegrationTestBase
                     CreatedDate    DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
                     CONSTRAINT FK_ChatMessageFeedback_Tenants   FOREIGN KEY (TenantId)  REFERENCES dbo.Tenants(Id),
                     CONSTRAINT FK_ChatMessageFeedback_Projects  FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+                );
+            END
+
+            -- Ensure ProjectRules table exists
+            IF OBJECT_ID('dbo.ProjectRules', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectRules
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    Name NVARCHAR(200) NOT NULL,
+                    Type NVARCHAR(50) NOT NULL, -- CodeStandard, ArchitectureDecision, etc.
+                    Description NVARCHAR(MAX) NOT NULL,
+                    EnforcementLevel NVARCHAR(50) NOT NULL, -- Advisory, Required, Blocking
+                    AppliesTo NVARCHAR(50) NOT NULL, -- Ticket, Build, Both
+                    ValidationHint NVARCHAR(MAX) NULL,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT FK_ProjectRules_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+                    CONSTRAINT FK_ProjectRules_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
                 );
             END
             """;

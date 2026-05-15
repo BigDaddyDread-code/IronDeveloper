@@ -89,6 +89,7 @@ public sealed class TicketBuildOrchestrator : ITicketBuildOrchestrator
 
         sb.Append(ctx.PlanTitle != null ? ", 1 linked plan" : ", no linked plan");
         sb.Append($", {ctx.Decisions.Count} decision{(ctx.Decisions.Count == 1 ? "" : "s")}");
+        sb.Append($", {ctx.Standards.Count} standard{(ctx.Standards.Count == 1 ? "" : "s")}");
         sb.Append($", {ctx.AffectedFiles.Count} affected file hint{(ctx.AffectedFiles.Count == 1 ? "" : "s")}");
         sb.Append(". Sending to LLM for proposal generation.");
 

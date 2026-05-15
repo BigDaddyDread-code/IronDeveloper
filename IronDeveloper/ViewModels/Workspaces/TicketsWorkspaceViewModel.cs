@@ -126,6 +126,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         && !IsBuildingTicket
         && !IsDraftMode;   // Build This is unavailable while reviewing a draft
 
+    /// <summary>True when the Archive button should be enabled.</summary>
+    public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
+
     // ── Draft Ticket state ────────────────────────────────────────────────────
     [ObservableProperty] private bool       _isDraftMode;
     [ObservableProperty] private bool       _isDraftGenerating;
@@ -256,6 +259,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         // Clear stale build state when switching tickets
         ClearBuildState();
         _ = LoadTicketIntoEditorAsync(value);
+        OnPropertyChanged(nameof(CanArchiveTicket));
     }
 
     private void LoadTicketIntoEditor(TicketItem item)
@@ -443,6 +447,53 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         finally
         {
             IsSaving = false;
+            OnPropertyChanged(nameof(CanArchiveTicket));
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanArchiveTicket))]
+    private async Task ArchiveSelectedTicketAsync()
+    {
+        if (SelectedTicket == null) return;
+
+        var result = System.Windows.MessageBox.Show(
+            $"Are you sure you want to archive ticket '{SelectedTicket.Title}'?\n\nIt will be hidden from the active list but remains in the database.",
+            "Archive Ticket",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (result != System.Windows.MessageBoxResult.Yes) return;
+
+        IsSaving = true;
+        SaveStatus = "Archiving...";
+
+        try
+        {
+            var success = await _ticketService.ArchiveTicketAsync(SelectedTicket.Id);
+            if (success)
+            {
+                SaveStatus = "Ticket archived ✓";
+                
+                await RefreshListAsync();
+
+                // Selection logic: RefreshListAsync cleared editor. 
+                // We don't need to select the archived one. 
+                // Select the first one in the list if available.
+                SelectedTicket = Tickets.FirstOrDefault();
+            }
+            else
+            {
+                SaveStatus = "Archive failed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            SaveStatus = $"Archive error: {ex.Message}";
+        }
+        finally
+        {
+            IsSaving = false;
+            OnPropertyChanged(nameof(CanArchiveTicket));
         }
     }
 
@@ -789,7 +840,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 ctx.ProposedTitle,
                 ctx.MessageText,
                 ctx.LinkedFilePaths,
-                ctx.LinkedSymbols);
+                ctx.LinkedSymbols,
+                ctx.SessionId);
 
             draft.SourceChatSessionId = ctx.SessionId;
             draft.SourceMessageId     = ctx.MessageId;
@@ -987,7 +1039,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                     : CurrentDraft.SourceMessageText,
                 CurrentDraft.SourceMessageText,
                 CurrentDraft.LinkedFilePaths,
-                CurrentDraft.LinkedSymbols);
+                CurrentDraft.LinkedSymbols,
+                CurrentDraft.SourceChatSessionId);
 
             draft.SourceChatSessionId = CurrentDraft.SourceChatSessionId;
             draft.SourceMessageId     = CurrentDraft.SourceMessageId;

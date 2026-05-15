@@ -1,11 +1,15 @@
+using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Core.Interfaces;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class SettingsWorkspaceViewModel : ObservableObject
 {
+    private readonly ILlmTraceService _traceService;
+
     [ObservableProperty] private string _selectedModel      = "gpt-4o";
     [ObservableProperty] private string _apiEndpoint        = "https://api.openai.com/v1";
     [ObservableProperty] private bool   _streamResponses    = true;
@@ -13,7 +17,33 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private int    _maxContextTokens   = 8000;
     [ObservableProperty] private bool   _isDevToolsExpanded = false;
 
-    // ── Lazy Prompt Playground ────────────────────────────────────────────────
+    /// <summary>
+    /// When true, the Chat workspace uses the ContextAgentService pipeline
+    /// (sufficiency check + code expansion) instead of one-shot RAG.
+    /// Default: false — must be explicitly enabled. Safe to toggle at runtime.
+    /// </summary>
+    [ObservableProperty] private bool _useContextAgent = false;
+
+    // ── Trace LLM Calls ───────────────────────────────────────────────────
+    // Wraps ILlmTraceService.IsTracingEnabled so the Settings page can toggle
+    // it. No persistence layer yet — the service defaults to true on startup.
+
+    /// <summary>
+    /// Master on/off for LLM tracing. Reads and writes through to
+    /// <see cref="ILlmTraceService.IsTracingEnabled"/>.
+    /// </summary>
+    public bool IsLlmTracingEnabled
+    {
+        get => _traceService.IsTracingEnabled;
+        set
+        {
+            if (_traceService.IsTracingEnabled == value) return;
+            _traceService.IsTracingEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    // ── Lazy Dev Tools ────────────────────────────────────────────────────
     //
     // PromptPlaygroundViewModel pulls in IPromptContextBuilder → IChatFeedbackService
     // → SqlConnectionFactory, so it MUST NOT be resolved at app startup.
@@ -22,22 +52,23 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     // the user expands Developer Tools. WPF is notified via OnPropertyChanged so
     // the DataContext binding on PromptPlaygroundView updates correctly.
 
-    /// <summary>
-    /// Deferred factory — set by App.xaml.cs DI registration.
-    /// Never resolved until the user opens Developer Tools.
-    /// </summary>
+    /// <summary>Deferred factory — set by App.xaml.cs DI registration.</summary>
     public Func<PromptPlaygroundViewModel>? PromptPlaygroundFactory { get; init; }
+    public Func<LlmConsoleViewModel>?       LlmConsoleFactory       { get; init; }
 
     private PromptPlaygroundViewModel? _promptPlayground;
+    private LlmConsoleViewModel?       _llmConsole;
 
-    /// <summary>
-    /// The Prompt Playground VM, created on first access.
-    /// Raises PropertyChanged so WPF DataContext bindings refresh.
-    /// </summary>
     public PromptPlaygroundViewModel? PromptPlayground
     {
         get => _promptPlayground;
         private set => SetProperty(ref _promptPlayground, value);
+    }
+
+    public LlmConsoleViewModel? LlmConsole
+    {
+        get => _llmConsole;
+        private set => SetProperty(ref _llmConsole, value);
     }
 
     public IReadOnlyList<string> AvailableModels { get; } =
@@ -49,13 +80,21 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
         "gemini-2.5-pro"
     ];
 
+    public SettingsWorkspaceViewModel(ILlmTraceService traceService)
+    {
+        _traceService = traceService;
+    }
+
     [RelayCommand]
     private void ToggleDevTools()
     {
-        if (!IsDevToolsExpanded && PromptPlayground is null && PromptPlaygroundFactory is not null)
+        if (!IsDevToolsExpanded)
         {
-            // Lazy-create, then notify WPF before flipping Visibility
-            PromptPlayground = PromptPlaygroundFactory();
+            if (PromptPlayground is null && PromptPlaygroundFactory is not null)
+                PromptPlayground = PromptPlaygroundFactory();
+
+            if (LlmConsole is null && LlmConsoleFactory is not null)
+                LlmConsole = LlmConsoleFactory();
         }
 
         IsDevToolsExpanded = !IsDevToolsExpanded;
