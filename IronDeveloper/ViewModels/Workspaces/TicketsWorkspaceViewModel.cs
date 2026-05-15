@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -112,7 +113,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private bool _isSavingPlan;
 
     // ── Build Ticket state ────────────────────────────────────────────────────
-    [ObservableProperty] private bool               _isBuildingTicket;
+    [ObservableProperty] 
+    [NotifyCanExecuteChangedFor(nameof(BuildSelectedTicketProposalCommand))]
+    private bool               _isBuildingTicket;
     [ObservableProperty] private bool               _hasBuildPreview;
     [ObservableProperty] private TicketBuildPreview? _currentBuildPreview;
     [ObservableProperty] private TicketBuildResult?  _currentBuildResult;
@@ -120,17 +123,16 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>True when the Build This button should be enabled.</summary>
     public bool CanBuildTicket =>
-        SelectedTicket != null
-        && !string.IsNullOrWhiteSpace(EditTitle)
-        && !string.IsNullOrWhiteSpace(_activeProjectPath)
-        && !IsBuildingTicket
+        !IsBuildingTicket
         && !IsDraftMode;   // Build This is unavailable while reviewing a draft
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
 
     // ── Draft Ticket state ────────────────────────────────────────────────────
-    [ObservableProperty] private bool       _isDraftMode;
+    [ObservableProperty] 
+    [NotifyCanExecuteChangedFor(nameof(BuildSelectedTicketProposalCommand))]
+    private bool       _isDraftMode;
     [ObservableProperty] private bool       _isDraftGenerating;
     [ObservableProperty] private string     _draftStatusMessage = string.Empty;
     [ObservableProperty] private DraftTicket? _currentDraft;
@@ -183,6 +185,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     /// <summary>Called when user clicks "Index Project" from within the Tickets workspace.
     /// Shell wires this to IndexNowCommand on ProjectOverviewViewModel.</summary>
     public Action? OnRequestIndex { get; set; }
+    /// <summary>Called when user clicks "Build This (Proposal)" — shell navigates to Builder workbench.</summary>
+    public Action<long>? OnRequestProposal { get; set; }
 
     // Dropdown options
     public ObservableCollection<string> StatusOptions   { get; } = ["Draft", "Todo", "In Progress", "Done", "Resolved"];
@@ -259,6 +263,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         // Clear stale build state when switching tickets
         ClearBuildState();
         _ = LoadTicketIntoEditorAsync(value);
+        BuildSelectedTicketProposalCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanArchiveTicket));
     }
 
@@ -447,6 +452,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         finally
         {
             IsSaving = false;
+            BuildSelectedTicketProposalCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(CanArchiveTicket));
         }
     }
@@ -613,6 +619,61 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     }
 
     // ── Build Ticket (Phase 3+4A — real context, LLM proposal, dry-run validation) ──
+
+    [RelayCommand]
+    private void BuildSelectedTicketProposal()
+    {
+        // ── 1. Validate state with visible feedback ──
+        if (IsBuildingTicket) return;
+
+        if (SelectedTicket == null)
+        {
+            SaveStatus = "Select a ticket before building a proposal.";
+            return;
+        }
+
+        if (EditId <= 0)
+        {
+            SaveStatus = "Save the ticket before generating a builder proposal.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(EditTitle))
+        {
+            SaveStatus = "Ticket must have a title.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_activeProjectPath))
+        {
+            SaveStatus = "No active project path found.";
+            return;
+        }
+
+        // ── 2. Add trace at click boundary ──
+        var traceService = (global::IronDev.Core.Interfaces.ILlmTraceService)((global::IronDev.Agent.App)System.Windows.Application.Current).Services.GetService(typeof(global::IronDev.Core.Interfaces.ILlmTraceService))!;
+        
+        traceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.BuildThisClicked",
+            WorkspaceName = "Builder",
+            ProjectId = _activeProjectId,
+            TicketId = EditId,
+            ActiveProjectName = _activeProjectName,
+            ActiveProjectPath = _activeProjectPath,
+            ParsedResponseSummary = $"User clicked Build This (Proposal). " +
+                                    $"selectedTicketId={EditId}, " +
+                                    $"selectedTicketTitle='{EditTitle}', " +
+                                    $"activeProjectId={_activeProjectId}, " +
+                                    $"activeProjectName='{_activeProjectName}', " +
+                                    $"activeProjectPath='{_activeProjectPath}'",
+            CreatedAt = DateTime.UtcNow
+        });
+
+        // ── 3. Initiate generation ──
+        SaveStatus = "Generating builder proposal...";
+        OnRequestProposal?.Invoke(EditId);
+    }
 
     [RelayCommand]
     private async Task BuildSelectedTicketAsync()

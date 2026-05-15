@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Builder;
 
@@ -15,6 +16,13 @@ namespace IronDev.Infrastructure.Builder;
 /// </summary>
 public sealed class CodePatchService : ICodePatchService
 {
+    private readonly ILlmTraceService? _traceService;
+
+    public CodePatchService(ILlmTraceService? traceService = null)
+    {
+        _traceService = traceService;
+    }
+
     // ── Git status ────────────────────────────────────────────────────────────
 
     public Task<GitStatus> GetGitStatusAsync(
@@ -50,10 +58,12 @@ public sealed class CodePatchService : ICodePatchService
         }
 
         var root = Path.GetFullPath(projectPath);
+        var projectName = Path.GetFileName(root);
+        var isExternal = !root.Contains("AIDeveloper", StringComparison.OrdinalIgnoreCase);
 
         foreach (var change in changes)
         {
-            var result = ValidateChange(root, change);
+            var result = ValidateChange(root, change, projectName, isExternal);
             fileResults.Add(result);
         }
 
@@ -72,8 +82,18 @@ public sealed class CodePatchService : ICodePatchService
         });
     }
 
-    private static FilePatchValidation ValidateChange(string rootPath, FileChangeProposal change)
+    private FilePatchValidation ValidateChange(string rootPath, FileChangeProposal change, string projectName, bool isExternal)
     {
+        var trace = new LlmTraceEntry
+        {
+            FeatureName = "Builder.WriteRootGuard",
+            ActiveProjectName = projectName,
+            ActiveProjectPath = rootPath,
+            IsExternalProject = isExternal,
+            AllowedWriteRoot = rootPath,
+            ProposedWritePath = change.FilePath,
+            WasSuccessful = true
+        };
         // Rule 2: FilePath not empty
         if (string.IsNullOrWhiteSpace(change.FilePath))
         {
@@ -88,13 +108,38 @@ public sealed class CodePatchService : ICodePatchService
         }
         catch (Exception ex)
         {
-            return Fail(change.FilePath, "", $"FilePath could not be resolved: {ex.Message}");
+            trace.WasSuccessful = false;
+            trace.BlockReason = $"FilePath could not be resolved: {ex.Message}";
+            trace.WriteAllowed = false;
+            _traceService?.AddTrace(trace);
+            return Fail(change.FilePath, "", trace.BlockReason);
         }
 
-        if (!resolved.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        trace.ProposedWritePath = resolved;
+
+        // Path must be inside project root and not traverse up
+        bool inside = resolved.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase);
+        
+        // Ensure it's not a sibling directory that happens to start with the same name
+        if (inside && resolved.Length > rootPath.Length && 
+            resolved[rootPath.Length] != Path.DirectorySeparatorChar && 
+            resolved[rootPath.Length] != Path.AltDirectorySeparatorChar)
         {
-            return Fail(change.FilePath, resolved, "FilePath resolves outside the project root (path traversal).");
+            inside = false;
         }
+
+        if (!inside)
+        {
+            trace.WasSuccessful = false;
+            trace.BlockReason = "FilePath resolves outside the project root (path traversal block).";
+            trace.WriteAllowed = false;
+            _traceService?.AddTrace(trace);
+            return Fail(change.FilePath, resolved, trace.BlockReason);
+        }
+
+        trace.WriteAllowed = true;
+        trace.ParsedResponseSummary = "Path validation passed.";
+        _traceService?.AddTrace(trace);
 
         // Rule 4: file must exist
         if (!File.Exists(resolved))

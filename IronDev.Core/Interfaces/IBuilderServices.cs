@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core.Builder;
+using IronDev.Core.Models;
 
 // Note: ChatTicketContext lives in IronDev.Agent (the WPF host project).
 // IDraftTicketService is defined here in Core to keep the interface layer clean;
@@ -55,6 +56,16 @@ public interface ICodeChangeProposalService
     Task<CodeChangeProposal> GenerateProposalAsync(
         TicketBuildContext context,
         CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Workbench-level service for generating structured BuilderProposals.
+/// Reuses ICodeChangeProposalService and IBuilderContextService.
+/// </summary>
+public interface IBuilderProposalService
+{
+    Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default);
+    Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default);
 }
 
 /// <summary>

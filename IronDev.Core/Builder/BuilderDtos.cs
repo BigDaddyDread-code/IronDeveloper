@@ -54,8 +54,10 @@ public sealed class CodeChangeProposal
 {
     public long   TicketId    { get; set; }
     public string Summary     { get; set; } = "";
+    public string Rationale   { get; set; } = "";
     public string RiskNotes   { get; set; } = "";
     public string TestPlan    { get; set; } = "";
+    public string OriginalRequest { get; set; } = "";
     public string StandardsCompliance { get; set; } = "";
     public List<FileChangeProposal> FileChanges { get; set; } = [];
 }

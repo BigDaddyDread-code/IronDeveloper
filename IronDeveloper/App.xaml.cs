@@ -158,8 +158,13 @@ public partial class App : Application
                     global::IronDev.Core.Interfaces.IDraftTicketService,
                     global::IronDev.Infrastructure.Builder.DraftTicketService>();
                 services.AddTransient<
+                    global::IronDev.Core.Interfaces.IBuilderProposalService,
+                    global::IronDev.Infrastructure.Builder.BuilderProposalService>();
+                services.AddTransient<
                     global::IronDev.Core.Interfaces.ICodebaseTicketGeneratorService,
                     global::IronDev.Infrastructure.Services.CodebaseTicketGeneratorService>();
+
+                services.AddTransient<BuilderWorkspaceViewModel>();
             })
             .Build();
     }

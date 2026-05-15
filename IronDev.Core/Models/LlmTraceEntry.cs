@@ -27,6 +27,11 @@ public class LlmTraceEntry
     public long? TicketId { get; set; }
     public long? PlanId { get; set; }
 
+    // ── Target-Aware Metadata ─────────────────────────────────────────────
+    public string ActiveProjectName { get; set; } = string.Empty;
+    public string ActiveProjectPath { get; set; } = string.Empty;
+    public bool? IsExternalProject { get; set; }
+
     // ── Grouping & Hierarchy ──────────────────────────────────────────────
     // Used to link multiple calls together (e.g. Iterative generator pass 1, 2, 3)
     public string? TraceGroupId { get; set; }
@@ -37,4 +42,13 @@ public class LlmTraceEntry
     public int? TokenUsageInput { get; set; }
     public int? TokenUsageOutput { get; set; }
     public int? TokenUsageTotal { get; set; }
+
+    // ── Write Root Guard Diagnostics ──────────────────────────────────────
+    public string AllowedWriteRoot { get; set; } = string.Empty;
+    public string ProposedWritePath { get; set; } = string.Empty;
+    public bool? WriteAllowed { get; set; }
+    public string BlockReason { get; set; } = string.Empty;
+    public bool? IsProposalOnly { get; set; }
+    public int? ProposedFileCount { get; set; }
+    public string ProposedFilesList { get; set; } = string.Empty;
 }

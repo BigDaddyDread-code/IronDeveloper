@@ -27,6 +27,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
+    private readonly BuilderWorkspaceViewModel   _builderVm;
     private readonly AgentTenantContext          _tenantContext;
 
     // ── Observable shell state ────────────────────────────────────────────────
@@ -82,6 +83,7 @@ public sealed partial class ShellViewModel : ObservableObject
         DecisionsWorkspaceViewModel         decisionsVm,
         ImplementationPlansWorkspaceViewModel plansVm,
         SettingsWorkspaceViewModel  settingsVm,
+        BuilderWorkspaceViewModel   builderVm,
         AgentTenantContext          tenantContext)
     {
         _loginVm     = loginVm;
@@ -93,6 +95,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _decisionsVm = decisionsVm;
         _plansVm     = plansVm;
         _settingsVm  = settingsVm;
+        _builderVm   = builderVm;
         _tenantContext = tenantContext;
 
         // Wire child VM navigation callbacks
@@ -129,6 +132,14 @@ public sealed partial class ShellViewModel : ObservableObject
         _ticketsVm.OnRequestIndex = () =>
         {
             _ = IndexNow();   // existing command — pops status popup and calls overviewVm.IndexProjectCommand
+        };
+
+        // Ticket → Builder Proposal bridge
+        _ticketsVm.OnRequestProposal = (ticketId) =>
+        {
+            _ = _builderVm.GenerateProposalForTicketAsync(ticketId);
+            CurrentWorkspace = ProjectWorkspace.Builder;
+            CurrentView = _builderVm;
         };
 
         // Chat → Ticket draft review bridge
@@ -233,6 +244,7 @@ public sealed partial class ShellViewModel : ObservableObject
             ProjectWorkspace.Plans      => _plansVm,
             ProjectWorkspace.Decisions  => _decisionsVm,
             ProjectWorkspace.Settings   => _settingsVm,
+            ProjectWorkspace.Builder    => _builderVm,
             _                           => _overviewVm
         };
     }

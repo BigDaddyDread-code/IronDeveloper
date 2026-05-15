@@ -11,6 +11,7 @@ using IronDev.Services;
 using IronDev.AI;
 using IronDev.Core.Interfaces;
 using IronDev.Infrastructure.Builder;
+using IronDev.Infrastructure.Services;
 
 namespace IronDev.IntegrationTests;
 
@@ -64,6 +65,8 @@ public abstract class IntegrationTestBase
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
         services.AddScoped<IBuilderContextService, BuilderContextService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ILlmTraceService, LlmTraceService>();
+        services.AddScoped<ICodePatchService, CodePatchService>();
 
         ServiceProvider = services.BuildServiceProvider();
 

@@ -1,0 +1,36 @@
+using System;
+using System.Collections.Generic;
+
+namespace IronDev.Core.Models;
+
+/// <summary>
+/// Represents a proposed code change for a single file.
+/// </summary>
+public sealed class ProposedFileChange
+{
+    public string FilePath { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Diff { get; set; } = string.Empty;
+    public bool IsNewFile { get; set; }
+    public bool IsDeletion { get; set; }
+    public bool IsValid { get; set; }
+    public string ValidationMessage { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Represents a full AI-generated code modification proposal.
+/// </summary>
+public sealed class BuilderProposal
+{
+    public long TicketId { get; set; }
+    public int ProjectId { get; set; }
+    public string ProjectName { get; set; } = string.Empty;
+    public string ProjectRoot { get; set; } = string.Empty;
+    public string OriginalRequest { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string Rationale { get; set; } = string.Empty;
+    public List<ProposedFileChange> Changes { get; set; } = new();
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+
+    public bool IsAllValid => Changes.TrueForAll(c => c.IsValid);
+}

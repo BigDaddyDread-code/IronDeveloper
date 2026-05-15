@@ -80,6 +80,10 @@
                 <vws:SettingsWorkspaceView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type ws:BuilderWorkspaceViewModel}">
+                <vws:BuilderWorkspaceView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type ws:PromptPlaygroundViewModel}">
                 <vws:PromptPlaygroundView/>
             </DataTemplate>
