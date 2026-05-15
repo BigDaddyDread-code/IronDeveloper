@@ -31,6 +31,7 @@ public abstract class IntegrationTestBase
 {
     protected IServiceProvider ServiceProvider { get; private set; } = default!;
     protected string ConnectionString { get; private set; } = string.Empty;
+    private SqlConnection? _databaseLockConnection;
 
     /// <summary>
     /// Mutable tenant context — tests can switch tenants mid-run to verify isolation.
@@ -79,8 +80,12 @@ public abstract class IntegrationTestBase
 
         ServiceProvider = services.BuildServiceProvider();
 
+        await AcquireDatabaseLockAsync();
         await ResetDatabaseAsync();
     }
+
+    [TestCleanup]
+    public virtual async Task TestCleanup() => await ReleaseDatabaseLockAsync();
 
     protected async Task ResetDatabaseAsync()
     {
@@ -109,6 +114,50 @@ public abstract class IntegrationTestBase
             """;
 
         await connection.ExecuteAsync(sql);
+    }
+
+    private async Task AcquireDatabaseLockAsync()
+    {
+        if (_databaseLockConnection is not null) return;
+
+        _databaseLockConnection = new SqlConnection(ConnectionString);
+        await _databaseLockConnection.OpenAsync();
+
+        var result = await _databaseLockConnection.ExecuteScalarAsync<int>("""
+            DECLARE @Result INT;
+            EXEC @Result = sp_getapplock
+                @Resource = 'IronDeveloper_Test_Database',
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Session',
+                @LockTimeout = 60000;
+            SELECT @Result;
+            """);
+
+        if (result < 0)
+        {
+            await _databaseLockConnection.DisposeAsync();
+            _databaseLockConnection = null;
+            throw new TimeoutException("Timed out waiting for the IronDeveloper test database lock.");
+        }
+    }
+
+    private async Task ReleaseDatabaseLockAsync()
+    {
+        if (_databaseLockConnection is null) return;
+
+        try
+        {
+            await _databaseLockConnection.ExecuteAsync("""
+                EXEC sp_releaseapplock
+                    @Resource = 'IronDeveloper_Test_Database',
+                    @LockOwner = 'Session';
+                """);
+        }
+        finally
+        {
+            await _databaseLockConnection.DisposeAsync();
+            _databaseLockConnection = null;
+        }
     }
 
     protected async Task<int> SeedProjectAsync(int tenantId = 1, string name = "IronDev", string? localPath = null)

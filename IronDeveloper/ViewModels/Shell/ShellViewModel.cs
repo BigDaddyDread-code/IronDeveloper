@@ -59,7 +59,9 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _activeProjectName = string.Empty;
     [ObservableProperty] private string _activeProjectPath = string.Empty;
     [ObservableProperty] private string _activeModel       = string.Empty;
-    [ObservableProperty] private string _activeStatus      = string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusNeedsIndex))]
+    private string _activeStatus = string.Empty;
 
     // ── Status popup ─────────────────────────────────────────────────────────
 

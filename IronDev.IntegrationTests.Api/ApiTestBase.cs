@@ -23,6 +23,7 @@ public abstract class ApiTestBase
     protected static WebApplicationFactory<Program> Factory { get; private set; } = default!;
     protected static HttpClient Client { get; private set; } = default!;
     protected static string ConnectionString { get; private set; } = string.Empty;
+    private SqlConnection? _databaseLockConnection;
 
     /// <summary>Known test credentials — seeded in SetupAsync.</summary>
     protected const string AdminEmail = "admin@irondev.local";
@@ -95,7 +96,14 @@ public abstract class ApiTestBase
     }
 
     [TestInitialize]
-    public async Task TestInitialize() => await ResetDomainDataAsync();
+    public async Task TestInitialize()
+    {
+        await AcquireDatabaseLockAsync();
+        await ResetDomainDataAsync();
+    }
+
+    [TestCleanup]
+    public async Task TestCleanup() => await ReleaseDatabaseLockAsync();
 
     // ── Database helpers ──────────────────────────────────────────────────────
 
@@ -209,13 +217,18 @@ public abstract class ApiTestBase
         
         // 1. Wipe domain data
         await conn.ExecuteAsync("""
+            IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
+            IF OBJECT_ID('dbo.ProjectProfiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectProfiles;
+            IF OBJECT_ID('dbo.ProjectCommands', 'U') IS NOT NULL DELETE FROM dbo.ProjectCommands;
+            IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DELETE FROM dbo.ProjectRules;
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
-            IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
-            DELETE FROM dbo.ChatMessages;
+            DELETE FROM dbo.ProjectDecisions;
             DELETE FROM dbo.ProjectSummaries;
-            DELETE FROM dbo.ProjectFiles;
             DELETE FROM dbo.ProjectTickets;
+            DELETE FROM dbo.ProjectFiles;
+            DELETE FROM dbo.ChatMessages;
+            IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
             DELETE FROM dbo.Projects;
             """);
 
@@ -268,6 +281,50 @@ public abstract class ApiTestBase
     }
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────
+
+    private async Task AcquireDatabaseLockAsync()
+    {
+        if (_databaseLockConnection is not null) return;
+
+        _databaseLockConnection = new SqlConnection(ConnectionString);
+        await _databaseLockConnection.OpenAsync();
+
+        var result = await _databaseLockConnection.ExecuteScalarAsync<int>("""
+            DECLARE @Result INT;
+            EXEC @Result = sp_getapplock
+                @Resource = 'IronDeveloper_Test_Database',
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Session',
+                @LockTimeout = 60000;
+            SELECT @Result;
+            """);
+
+        if (result < 0)
+        {
+            await _databaseLockConnection.DisposeAsync();
+            _databaseLockConnection = null;
+            throw new TimeoutException("Timed out waiting for the IronDeveloper test database lock.");
+        }
+    }
+
+    private async Task ReleaseDatabaseLockAsync()
+    {
+        if (_databaseLockConnection is null) return;
+
+        try
+        {
+            await _databaseLockConnection.ExecuteAsync("""
+                EXEC sp_releaseapplock
+                    @Resource = 'IronDeveloper_Test_Database',
+                    @LockOwner = 'Session';
+                """);
+        }
+        finally
+        {
+            await _databaseLockConnection.DisposeAsync();
+            _databaseLockConnection = null;
+        }
+    }
 
     protected static async Task<string> LoginAsync(string email = AdminEmail, string password = AdminPassword)
     {
