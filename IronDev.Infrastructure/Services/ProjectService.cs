@@ -65,7 +65,7 @@ public sealed class ProjectService : IProjectService
     {
         const string sql = """
             SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate,
-                   LastIndexedUtc, IndexingStatus
+                   LastIndexedUtc, IndexingStatus, IndexedFileCount
             FROM dbo.Projects
             WHERE Id = @ProjectId
               AND TenantId = @TenantId;

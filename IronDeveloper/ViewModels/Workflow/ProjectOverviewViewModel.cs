@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
 using IronDev.Agent.Services;
+using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workflow;
 
@@ -31,8 +32,18 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private int    _fileCount;
     [ObservableProperty] private bool   _isIndexing;
     [ObservableProperty] private string _lastIndexingDetails = string.Empty;
+    [ObservableProperty] private bool _showIndexHealthCallout;
+    [ObservableProperty] private string _indexHealthTitle = string.Empty;
+    [ObservableProperty] private string _indexHealthMessage = string.Empty;
+    [ObservableProperty] private string _indexHealthBadgeText = "INFO";
+    [ObservableProperty] private BadgeStatus _indexHealthBadgeStatus = BadgeStatus.Info;
+    [ObservableProperty] private bool _showIndexDetails;
+    [ObservableProperty] private string _indexDetailsTitle = "Index details";
+    [ObservableProperty] private string _indexDetailsMessage = string.Empty;
+    [ObservableProperty] private string _indexDetailsBadgeText = "DETAILS";
+    [ObservableProperty] private BadgeStatus _indexDetailsBadgeStatus = BadgeStatus.Info;
 
-    // ── Session context (set by ShellViewModel on project activation) ─────────
+    // Session context (set by ShellViewModel on project activation)
     [ObservableProperty] private string _currentUserDisplayName = string.Empty;
     [ObservableProperty] private string _currentUserEmail       = string.Empty;
     [ObservableProperty] private string _currentTenantName      = string.Empty;
@@ -41,7 +52,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<TicketItem>   _recentTickets   = [];
     [ObservableProperty] private ObservableCollection<DecisionItem> _recentDecisions = [];
 
-    // ── Project Profile ───────────────────────────────────────────────────────
+    // Project Profile
     [ObservableProperty] private string _profileApplicationType = string.Empty;
     [ObservableProperty] private string _profilePrimaryLanguage = string.Empty;
     [ObservableProperty] private string _profileFramework = string.Empty;
@@ -58,7 +69,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 
     [ObservableProperty] private string _profileSaveStatus = string.Empty;
 
-    // ── Derived state card properties ─────────────────────────────────────────
+    // Derived state card properties
     public string LastTicketTitle    => RecentTickets.Count > 0   ? RecentTickets[0].Title   : "None yet";
     public string LastDecisionTitle  => RecentDecisions.Count > 0 ? RecentDecisions[0].Title : "None yet";
 
@@ -141,6 +152,8 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         {
             FileCount = 0;
         }
+
+        ApplyIndexHealth();
     }
 
     [RelayCommand]
@@ -149,17 +162,19 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         if (_currentProject == null || string.IsNullOrWhiteSpace(_currentProject.LocalPath))
         {
             Status = "Err: No path configured";
+            ApplyIndexHealth();
             return;
         }
 
         IsIndexing = true;
-        Status     = "Indexing…";
+        Status = "Indexing...";
+        ShowIndexDetails = false;
+        ApplyIndexHealth();
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        // ── Pre-index diagnostics (visible in Visual Studio Output → Debug) ───
-        var path      = _currentProject.LocalPath;
+        var path = _currentProject.LocalPath;
         var pathExists = Directory.Exists(path);
-        System.Diagnostics.Trace.WriteLine("╔══════════════════════════════════════════════╗");
+        System.Diagnostics.Trace.WriteLine("[Index] ------------------------------------------------");
         System.Diagnostics.Trace.WriteLine("  [Index] Starting Index Project");
         System.Diagnostics.Trace.WriteLine($"  ProjectId  : {_currentProject.Id}");
         System.Diagnostics.Trace.WriteLine($"  Name       : {_currentProject.Name}");
@@ -175,7 +190,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
             var csTotal = Directory.GetFiles(path, "*.cs", SearchOption.AllDirectories).Length;
             System.Diagnostics.Trace.WriteLine($"  Total .cs files (all dirs): {csTotal}");
         }
-        System.Diagnostics.Trace.WriteLine("╚══════════════════════════════════════════════╝");
+        System.Diagnostics.Trace.WriteLine("[Index] ------------------------------------------------");
 
         try
         {
@@ -183,7 +198,6 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
             sw.Stop();
             IndexingTime = $"{sw.Elapsed.TotalSeconds:F1}s";
 
-            // Post-index diagnostics
             System.Diagnostics.Trace.WriteLine(
                 $"[Index] Result: Scanned={result.FilesScanned} Added={result.FilesAdded} Updated={result.FilesUpdated} " +
                 $"Unchanged={result.FilesUnchanged} Skipped={result.FilesSkipped} Stored={result.StoredFileCount} " +
@@ -191,20 +205,21 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 
             if (result.DirectoryNotFound)
             {
-                Status    = $"❌ Path not found: [{path}]";
+                Status = $"Path not found: {path}";
                 FileCount = 0;
+                LastIndexingDetails = $"The configured project path does not exist: {path}";
+                ApplyIndexHealth();
                 return;
             }
 
             if (!string.IsNullOrEmpty(result.ErrorMessage) && result.StoredFileCount == 0)
             {
-                Status    = $"⚠️ {result.ErrorMessage}";
+                Status = result.ErrorMessage;
                 FileCount = 0;
                 await RefreshAsync();
                 return;
             }
 
-            // Success — use StoredFileCount (actual DB rows) not FilesScanned (just disk walk)
             FileCount = result.StoredFileCount;
             LastIndexingDetails = $"Files Scanned: {result.FilesScanned}\n" +
                                   $"Files Added: {result.FilesAdded}\n" +
@@ -219,56 +234,36 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
                 LastIndexingDetails += $"\n\nMessages: {result.ErrorMessage}";
             }
 
-            // Reload from DB so that LastIndexedUtc, IndexingStatus come from the DB update
-            // performed by CodeIndexService, not from a manual local mutation
             await RefreshAsync();
         }
         catch (Exception ex)
         {
             sw.Stop();
             System.Diagnostics.Trace.WriteLine($"[Index] EXCEPTION: {ex}");
-            Status = $"❌ Index failed: {ex.Message}";
+            Status = $"Index failed: {ex.Message}";
+            LastIndexingDetails = ex.ToString();
+            ApplyIndexHealth();
         }
         finally
         {
             IsIndexing = false;
+            ApplyIndexHealth();
         }
     }
 
     [RelayCommand]
     private void ViewDetails()
     {
-        // 5. Replace bad View Details modal with a useful panel/dialog
-        // We'll show a comprehensive MessageBox that looks good for now.
-        // It provides real indexing details instead of just "No details captured."
-        
-        if (string.IsNullOrWhiteSpace(LastIndexingDetails))
-        {
-            System.Windows.MessageBox.Show(
-                "No index details have been captured yet. Re-index the project to collect details.",
-                "Index Details", 
-                System.Windows.MessageBoxButton.OK, 
-                System.Windows.MessageBoxImage.Information);
-            return;
-        }
+        var hasDetails = !string.IsNullOrWhiteSpace(LastIndexingDetails);
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"Project: {ProjectName}");
-        sb.AppendLine($"Scope Path: {ProjectPath}");
-        sb.AppendLine($"Status: {Status}");
-        sb.AppendLine($"Indexed Files: {FileCount}");
-        sb.AppendLine($"Last Indexed: {LastIndexed}");
-        sb.AppendLine();
-        sb.AppendLine("--- Indexing Output ---");
-        sb.AppendLine(LastIndexingDetails);
-
-        // Note: MessageBox isn't perfect but is what we have right now without adding a new Window. 
-        // We ensure it includes all the requested data.
-        System.Windows.MessageBox.Show(
-            sb.ToString(),
-            "Index Details",
-            System.Windows.MessageBoxButton.OK,
-            System.Windows.MessageBoxImage.Information);
+        IndexDetailsTitle = hasDetails ? "Index run details" : "No index details yet";
+        IndexDetailsMessage = hasDetails
+            ? "These are the latest captured indexing diagnostics for this project."
+            : "Run Index Project to collect file counts, duration, skipped files, and any indexing errors.";
+        IndexDetailsBadgeText = IsIndexReady() ? "READY" : "DETAILS";
+        IndexDetailsBadgeStatus = IsIndexReady() ? BadgeStatus.Ready : BadgeStatus.Info;
+        LastIndexingDetails = hasDetails ? LastIndexingDetails : BuildIndexSummary();
+        ShowIndexDetails = true;
     }
 
     [RelayCommand]
@@ -351,7 +346,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         testCmd.CommandText = ProfileTestCommand;
         await _profileService.SaveProjectCommandAsync(testCmd);
 
-        ProfileSaveStatus = "Saved ✓";
+        ProfileSaveStatus = "Saved";
     }
 
     [RelayCommand]
@@ -406,5 +401,68 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Error);
         }
+    }
+
+    private void ApplyIndexHealth()
+    {
+        if (IsIndexing)
+        {
+            IndexHealthTitle = "Indexing project";
+            IndexHealthMessage = "IronDev is refreshing the code index. Builder actions should wait for this to finish.";
+            IndexHealthBadgeText = "INDEXING";
+            IndexHealthBadgeStatus = BadgeStatus.InProgress;
+            ShowIndexHealthCallout = true;
+            return;
+        }
+
+        if (Status.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
+            Status.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+            Status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase))
+        {
+            IndexHealthTitle = "Index failed";
+            IndexHealthMessage = "The project index is not ready. Check the details, fix the cause, then index again before building proposals.";
+            IndexHealthBadgeText = "FAILED";
+            IndexHealthBadgeStatus = BadgeStatus.Danger;
+            ShowIndexHealthCallout = true;
+            return;
+        }
+
+        if (!IsIndexReady())
+        {
+            IndexHealthTitle = "Project needs indexing";
+            IndexHealthMessage = "Index this project before creating build-ready tickets or generating Builder proposals.";
+            IndexHealthBadgeText = "NEEDS INDEX";
+            IndexHealthBadgeStatus = BadgeStatus.NeedsIndex;
+            ShowIndexHealthCallout = true;
+            return;
+        }
+
+        ShowIndexHealthCallout = false;
+    }
+
+    private bool IsIndexReady()
+    {
+        return string.Equals(Status, "Ready", StringComparison.OrdinalIgnoreCase)
+            && LastIndexed != "Never"
+            && FileCount > 0;
+    }
+
+    private string BuildIndexSummary()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Project: {ProjectName}");
+        sb.AppendLine($"Scope Path: {ProjectPath}");
+        sb.AppendLine($"Status: {Status}");
+        sb.AppendLine($"Indexed Files: {FileCount}");
+        sb.AppendLine($"Last Indexed: {LastIndexed}");
+
+        if (!string.IsNullOrWhiteSpace(LastIndexingDetails))
+        {
+            sb.AppendLine();
+            sb.AppendLine("Indexing Output:");
+            sb.AppendLine(LastIndexingDetails);
+        }
+
+        return sb.ToString();
     }
 }

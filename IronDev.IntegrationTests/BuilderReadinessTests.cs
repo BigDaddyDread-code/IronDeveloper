@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Dapper;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -49,6 +51,7 @@ public sealed class BuilderReadinessTests : IntegrationTestBase
         // Arrange
         await SeedProjectProfileAsync(_projectId, testFramework: "xUnit", allowBuilderApply: true);
         await SeedProjectCommandAsync(_projectId, "Build", "dotnet build");
+        await SeedProjectIndexAsync(_projectId);
 
         // Act
         var result = await _readinessService.EvaluateReadinessAsync(_projectId, 1);
@@ -64,6 +67,7 @@ public sealed class BuilderReadinessTests : IntegrationTestBase
         // Arrange
         await SeedProjectProfileAsync(_projectId, testFramework: "xUnit", allowBuilderApply: false);
         await SeedProjectCommandAsync(_projectId, "Build", "dotnet build");
+        await SeedProjectIndexAsync(_projectId);
 
         // Act
         var result = await _readinessService.EvaluateReadinessAsync(_projectId, 1);
@@ -72,6 +76,57 @@ public sealed class BuilderReadinessTests : IntegrationTestBase
         Assert.AreEqual(BuildReadinessStatus.BlockedByConflict, result.Status);
         Assert.IsFalse(result.IsReady);
         StringAssert.Contains(result.Message, "disabled");
+    }
+
+    [TestMethod]
+    public async Task EvaluateReadiness_NotIndexed_ReturnsNeedsReindex()
+    {
+        // Arrange
+        await SeedProjectProfileAsync(_projectId, testFramework: "xUnit", allowBuilderApply: true);
+        await SeedProjectCommandAsync(_projectId, "Build", "dotnet build");
+
+        // Act
+        var result = await _readinessService.EvaluateReadinessAsync(_projectId, 1);
+
+        // Assert
+        Assert.AreEqual(BuildReadinessStatus.NeedsReindex, result.Status);
+        Assert.IsFalse(result.IsReady);
+        StringAssert.Contains(result.Message, "Index this project");
+        CollectionAssert.Contains(result.BlockingIssues, "Project has not been indexed.");
+    }
+
+    [TestMethod]
+    public async Task EvaluateReadiness_IndexFailed_ReturnsNeedsReindex()
+    {
+        // Arrange
+        await SeedProjectProfileAsync(_projectId, testFramework: "xUnit", allowBuilderApply: true);
+        await SeedProjectCommandAsync(_projectId, "Build", "dotnet build");
+        await SeedProjectIndexAsync(_projectId, status: "Index failed: invalid column", indexedFileCount: 0);
+
+        // Act
+        var result = await _readinessService.EvaluateReadinessAsync(_projectId, 1);
+
+        // Assert
+        Assert.AreEqual(BuildReadinessStatus.NeedsReindex, result.Status);
+        Assert.IsFalse(result.IsReady);
+        StringAssert.Contains(result.Message, "not ready");
+    }
+
+    [TestMethod]
+    public async Task EvaluateReadiness_ReadyIndexWithZeroFiles_ReturnsNeedsReindex()
+    {
+        // Arrange
+        await SeedProjectProfileAsync(_projectId, testFramework: "xUnit", allowBuilderApply: true);
+        await SeedProjectCommandAsync(_projectId, "Build", "dotnet build");
+        await SeedProjectIndexAsync(_projectId, indexedFileCount: 0);
+
+        // Act
+        var result = await _readinessService.EvaluateReadinessAsync(_projectId, 1);
+
+        // Assert
+        Assert.AreEqual(BuildReadinessStatus.NeedsReindex, result.Status);
+        Assert.IsFalse(result.IsReady);
+        StringAssert.Contains(result.Message, "contains no files");
     }
 
     [TestMethod]
@@ -140,5 +195,21 @@ public sealed class BuilderReadinessTests : IntegrationTestBase
 
         // Cleanup
         Directory.Delete(projectPath, true);
+    }
+
+    private async Task SeedProjectIndexAsync(int projectId, string status = "Ready", int indexedFileCount = 7)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        const string sql = """
+            UPDATE dbo.Projects
+            SET IndexingStatus = @Status,
+                IndexedFileCount = @IndexedFileCount,
+                LastIndexedUtc = SYSUTCDATETIME()
+            WHERE Id = @ProjectId;
+            """;
+
+        await connection.ExecuteAsync(sql, new { ProjectId = projectId, Status = status, IndexedFileCount = indexedFileCount });
     }
 }

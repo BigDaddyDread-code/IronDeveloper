@@ -55,6 +55,7 @@ public enum BuildReadinessStatus
 {
     ReadyToBuild,
     NeedsProjectProfileUpdate,
+    NeedsReindex,
     NeedsArchitectureDecision,
     BlockedByExistingDecision,
     BlockedByConflict,

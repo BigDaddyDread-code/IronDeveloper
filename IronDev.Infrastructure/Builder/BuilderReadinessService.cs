@@ -63,7 +63,27 @@ public sealed class BuilderReadinessService : IBuilderReadinessService
             return result;
         }
 
-        // 4. Build/Test commands exist
+        // 4. Code index is available and fresh enough for Builder context.
+        if (!project.LastIndexedUtc.HasValue)
+        {
+            result.Status = BuildReadinessStatus.NeedsReindex;
+            result.Message = "Index this project before running Builder.";
+            result.BlockingIssues.Add("Project has not been indexed.");
+        }
+        else if (!string.Equals(project.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase))
+        {
+            result.Status = BuildReadinessStatus.NeedsReindex;
+            result.Message = $"Project index is not ready: {project.IndexingStatus ?? "Not indexed"}.";
+            result.BlockingIssues.Add("Project index status is not Ready.");
+        }
+        else if ((project.IndexedFileCount ?? 0) <= 0)
+        {
+            result.Status = BuildReadinessStatus.NeedsReindex;
+            result.Message = "Project index contains no files. Re-index before running Builder.";
+            result.BlockingIssues.Add("Project index contains no files.");
+        }
+
+        // 5. Build/Test commands exist
         var buildCmd = await _profileService.GetDefaultCommandAsync(projectId, "Build", ct);
         if (buildCmd == null || string.IsNullOrWhiteSpace(buildCmd.CommandText))
         {
@@ -78,7 +98,7 @@ public sealed class BuilderReadinessService : IBuilderReadinessService
             result.Warnings.Add("Test command missing. Tests will be skipped.");
         }
 
-        // 5. Architecture check (Simple for v0.2)
+        // 6. Architecture check (Simple for v0.2)
         var ticket = await _ticketService.GetTicketByIdAsync(ticketId, ct);
         if (ticket != null && (ticket.Problem?.Contains("persist", StringComparison.OrdinalIgnoreCase) == true || 
                                ticket.Problem?.Contains("database", StringComparison.OrdinalIgnoreCase) == true))
