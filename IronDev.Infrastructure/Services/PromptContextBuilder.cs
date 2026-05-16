@@ -13,6 +13,8 @@ public class ChatContextPacket
     public System.Collections.Generic.List<string> Snippets  { get; init; } = new();
     public System.Collections.Generic.List<string> Tickets   { get; init; } = new();
     public System.Collections.Generic.List<string> Decisions { get; init; } = new();
+    public System.Collections.Generic.List<IronDev.Data.Models.ProjectContextDocument> ContextDocuments { get; init; } = new();
+    public IronDev.Data.Models.ProjectObservableState? ObservableState { get; set; }
     public string FormattedPrompt { get; set; } = string.Empty;
 
     /// <summary>Structured file paths from matched code snippets.</summary>
@@ -227,6 +229,17 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         }
 
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
+        var relevantContextDocuments = await _projectMemoryService.GetRelevantContextDocumentsAsync(projectId, userRequest, isCodeQuery ? 8 : 16, cancellationToken);
+        var topContextDocuments = await _projectMemoryService.GetContextDocumentsAsync(projectId, isCodeQuery ? 6 : 10, cancellationToken);
+        var contextDocuments = relevantContextDocuments
+            .Concat(topContextDocuments)
+            .GroupBy(d => d.Id)
+            .Select(g => g.First())
+            .Take(isCodeQuery ? 10 : 18)
+            .ToList();
+        var observableState = await _projectMemoryService.GetObservableStateAsync(projectId, cancellationToken);
+        packet.ContextDocuments.AddRange(contextDocuments);
+        packet.ObservableState = observableState;
         var tickets   = await _ticketService.GetRecentTicketsAsync(projectId, ticketTake, cancellationToken);
 
         IReadOnlyList<IronDev.Data.Models.ProjectRule> allRules;
@@ -508,6 +521,45 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
                     packet.PollutedTermsFound.AddRange(decisionTerms);
                 }
             }
+            sb.AppendLine();
+        }
+
+        if (packet.ContextDocuments.Count > 0)
+        {
+            sb.AppendLine("Project context documents:");
+            foreach (var doc in packet.ContextDocuments)
+            {
+                var title = (doc.Title ?? string.Empty).Trim();
+                var content = (doc.Summary ?? doc.Content ?? string.Empty).Trim();
+                var (isJunk, docTerms) = IsJunkMemory($"{title}: {content}");
+                if (!isJunk)
+                {
+                    packet.IncludedMemoryCount++;
+                    sb.AppendLine($"- [{doc.AuthorityLevel}] {doc.DocumentType} / {doc.Status}: {title}");
+                    if (!string.IsNullOrWhiteSpace(content))
+                        sb.AppendLine($"  {content}");
+                }
+                else
+                {
+                    packet.FilteredMemoryCount++;
+                    packet.PollutedTermsFound.AddRange(docTerms);
+                }
+            }
+            sb.AppendLine();
+        }
+
+        if (packet.ObservableState != null)
+        {
+            sb.AppendLine("Current observable project state:");
+            AppendObservableStateLine(sb, "Active capability", packet.ObservableState.ActiveCapability);
+            AppendObservableStateLine(sb, "Active milestone", packet.ObservableState.ActiveMilestone);
+            AppendObservableStateLine(sb, "Current focus", packet.ObservableState.CurrentFocus);
+            AppendObservableStateLine(sb, "Build readiness", packet.ObservableState.BuildReadiness);
+            AppendObservableStateLine(sb, "Index status", packet.ObservableState.IndexStatus);
+            AppendObservableStateLine(sb, "Builder mode", packet.ObservableState.BuilderMode);
+            AppendObservableStateLine(sb, "Open blockers", packet.ObservableState.OpenBlockers);
+            AppendObservableStateLine(sb, "Last recommendation", packet.ObservableState.LastRecommendation);
+            AppendObservableStateLine(sb, "Known current gaps", packet.ObservableState.KnownCurrentGaps);
             sb.AppendLine();
         }
 
@@ -1047,6 +1099,12 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
     private static bool ContainsAny(string source, params string[] terms) =>
         terms.Any(t => source.Contains(t, StringComparison.OrdinalIgnoreCase));
+
+    private static void AppendObservableStateLine(StringBuilder sb, string label, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            sb.AppendLine($"- {label}: {value.Trim()}");
+    }
 
     private static string GetMatchReason(IronDev.Data.Models.CodeIndexEntry e, ChatIntent intent) =>
         intent switch

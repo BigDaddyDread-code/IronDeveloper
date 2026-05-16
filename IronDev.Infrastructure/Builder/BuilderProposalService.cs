@@ -27,6 +27,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
     private readonly IBuildErrorClassifierService _errorClassifierService;
     private readonly IBuilderReadinessService _readinessService;
     private readonly IProjectService _projectService;
+    private readonly IArtifactSourceReferenceService _referenceService;
 
     public BuilderProposalService(
         IBuilderContextService     contextService,
@@ -38,7 +39,8 @@ public sealed class BuilderProposalService : IBuilderProposalService
         IProjectProfileService     projectProfileService,
         IBuildErrorClassifierService errorClassifierService,
         IBuilderReadinessService readinessService,
-        IProjectService projectService)
+        IProjectService projectService,
+        IArtifactSourceReferenceService referenceService)
     {
         _contextService  = contextService;
         _proposalService = proposalService;
@@ -50,6 +52,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
         _errorClassifierService = errorClassifierService;
         _readinessService = readinessService;
         _projectService = projectService;
+        _referenceService = referenceService;
     }
 
     public async Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default)
@@ -111,6 +114,21 @@ public sealed class BuilderProposalService : IBuilderProposalService
         }
         
         _llmTraceService.AddTrace(trace);
+
+        // ── 3. Record Traceability Reference ──────────────────────────────────
+        // Since BuilderProposal isn't persisted with a unique BIGINT ID yet,
+        // we link the Proposal-to-Ticket relationship using TicketId as ArtifactId.
+        await _referenceService.RecordReferenceAsync(new ArtifactSourceReference
+        {
+            TenantId = ticket.TenantId,
+            ProjectId = projectId,
+            ArtifactType = "BuilderProposal",
+            ArtifactId = ticketId,
+            SourceType = "Ticket",
+            SourceId = ticketId,
+            ReferenceType = "GeneratedFrom",
+            Summary = $"Generated proposal with {proposal.Changes.Count} changes from ticket #{ticketId}."
+        }, ct);
 
         return proposal;
     }

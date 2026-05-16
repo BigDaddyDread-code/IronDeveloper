@@ -1048,6 +1048,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 Title = string.IsNullOrWhiteSpace(PlanTitle) ? $"{EditTitle.Trim()} — Implementation Plan" : PlanTitle.Trim(),
                 Goal = string.IsNullOrWhiteSpace(PlanGoal) ? EditSummary.Trim() : PlanGoal.Trim(),
                 Scope = string.IsNullOrWhiteSpace(PlanScope) ? (string.IsNullOrWhiteSpace(EditAcceptanceCriteria) ? null : EditAcceptanceCriteria.Trim()) : PlanScope.Trim(),
+                SourceChatMessageId = CurrentDraft?.SourceMessageId,
                 ProposedSteps = string.IsNullOrWhiteSpace(PlanProposedSteps) ? null : PlanProposedSteps.Trim(),
                 AffectedContext = string.IsNullOrWhiteSpace(PlanAffectedContext) ? (string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths.Trim()) : PlanAffectedContext.Trim(),
                 RisksNotes = string.IsNullOrWhiteSpace(PlanRisksNotes) ? null : PlanRisksNotes.Trim(),
@@ -1318,7 +1319,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 BuildValidation        = string.IsNullOrWhiteSpace(EditTestsBuildValidation)  ? null : EditTestsBuildValidation.Trim(),
                 ContextSummary         = CurrentDraft?.Summary, // Or from build preview if generated
                 IsGenerated            = true,
-                GenerationNote         = CurrentDraft?.GenerationNote
+                GenerationNote         = CurrentDraft?.GenerationNote,
+                SourceChatSessionId    = CurrentDraft?.SourceChatSessionId,
+                SourceChatMessageId    = CurrentDraft?.SourceMessageId
             };
 
             var savedId = await _ticketService.SaveTicketAsync(ticket);

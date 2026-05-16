@@ -12,6 +12,8 @@ IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTicket
 IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DROP TABLE dbo.ProjectRules;
 IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DROP TABLE dbo.ProjectImplementationPlans;
 IF OBJECT_ID('dbo.ProjectDecisions', 'U') IS NOT NULL DROP TABLE dbo.ProjectDecisions;
+IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DROP TABLE dbo.ProjectContextDocuments;
+IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NOT NULL DROP TABLE dbo.ProjectObservableStates;
 IF OBJECT_ID('dbo.DecisionCategories', 'U') IS NOT NULL DROP TABLE dbo.DecisionCategories;
 IF OBJECT_ID('dbo.DecisionStatuses', 'U') IS NOT NULL DROP TABLE dbo.DecisionStatuses;
 IF OBJECT_ID('dbo.ProjectSummaries', 'U') IS NOT NULL DROP TABLE dbo.ProjectSummaries;
@@ -157,6 +159,52 @@ CREATE TABLE dbo.ProjectDecisions
     CONSTRAINT FK_ProjectDecisions_ChatMessages FOREIGN KEY (SourceChatMessageId) REFERENCES dbo.ChatMessages(Id)
 );
 
+CREATE TABLE dbo.ProjectContextDocuments
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL CONSTRAINT DF_ProjectContextDocuments_Tenant DEFAULT 1,
+    ProjectId INT NOT NULL,
+    DocumentType NVARCHAR(100) NOT NULL,
+    AuthorityLevel NVARCHAR(50) NOT NULL,
+    Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectContextDocuments_Status DEFAULT 'Active',
+    Title NVARCHAR(200) NOT NULL,
+    Content NVARCHAR(MAX) NOT NULL,
+    Summary NVARCHAR(MAX) NULL,
+    Tags NVARCHAR(MAX) NULL,
+    AppliesToCapability NVARCHAR(200) NULL,
+    AppliesToArea NVARCHAR(200) NULL,
+    Source NVARCHAR(200) NULL,
+    SupersedesDocumentId BIGINT NULL,
+    SourceChatMessageId BIGINT NULL,
+    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectContextDocuments_CreatedDate DEFAULT SYSUTCDATETIME(),
+    UpdatedDate DATETIME2 NULL,
+    CONSTRAINT FK_ProjectContextDocuments_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ProjectContextDocuments_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
+    CONSTRAINT FK_ProjectContextDocuments_ChatMessages FOREIGN KEY (SourceChatMessageId) REFERENCES dbo.ChatMessages(Id),
+    CONSTRAINT FK_ProjectContextDocuments_Supersedes FOREIGN KEY (SupersedesDocumentId) REFERENCES dbo.ProjectContextDocuments(Id)
+);
+
+CREATE TABLE dbo.ProjectObservableStates
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL CONSTRAINT DF_ProjectObservableStates_Tenant DEFAULT 1,
+    ProjectId INT NOT NULL,
+    ActiveCapability NVARCHAR(200) NULL,
+    ActiveMilestone NVARCHAR(200) NULL,
+    CurrentFocus NVARCHAR(500) NULL,
+    BuildReadiness NVARCHAR(100) NULL,
+    IndexStatus NVARCHAR(100) NULL,
+    BuilderMode NVARCHAR(100) NULL,
+    OpenBlockers NVARCHAR(MAX) NULL,
+    LastRecommendation NVARCHAR(MAX) NULL,
+    CurrentTargetPath NVARCHAR(1000) NULL,
+    KnownCurrentGaps NVARCHAR(MAX) NULL,
+    SnapshotJson NVARCHAR(MAX) NULL,
+    UpdatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectObservableStates_UpdatedDate DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ProjectObservableStates_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ProjectObservableStates_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+);
+
 CREATE TABLE dbo.ProjectImplementationPlans
 (
     Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -283,6 +331,12 @@ CREATE INDEX IX_ProjectSummaries_ProjectId_CreatedDate
 
 CREATE INDEX IX_ProjectDecisions_ProjectId_CreatedDate
     ON dbo.ProjectDecisions(ProjectId, CreatedDate DESC);
+
+CREATE INDEX IX_ProjectContextDocuments_Project_Type_Authority
+    ON dbo.ProjectContextDocuments(ProjectId, DocumentType, AuthorityLevel, Status, CreatedDate DESC);
+
+CREATE UNIQUE INDEX UX_ProjectObservableStates_Tenant_Project
+    ON dbo.ProjectObservableStates(TenantId, ProjectId);
 
 CREATE INDEX IX_ProjectImplementationPlans_ProjectId_CreatedDate
     ON dbo.ProjectImplementationPlans(ProjectId, CreatedDate DESC);

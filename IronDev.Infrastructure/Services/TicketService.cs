@@ -4,6 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using IronDev.Core.Auth;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Data;
 using IronDev.Data.Models;
 
@@ -21,11 +23,16 @@ public sealed class TicketService : ITicketService
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ICurrentTenantContext _tenant;
+    private readonly IArtifactSourceReferenceService _referenceService;
 
-    public TicketService(IDbConnectionFactory connectionFactory, ICurrentTenantContext tenant)
+    public TicketService(
+        IDbConnectionFactory connectionFactory, 
+        ICurrentTenantContext tenant,
+        IArtifactSourceReferenceService referenceService)
     {
         _connectionFactory = connectionFactory;
         _tenant = tenant;
+        _referenceService = referenceService;
     }
 
     public async Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default)
@@ -115,7 +122,7 @@ public sealed class TicketService : ITicketService
                      @BuildValidation, @ContextSummary, @IsGenerated, @GenerationNote);
                 """;
 
-            return await connection.QuerySingleAsync<long>(new CommandDefinition(
+            var savedId = await connection.QuerySingleAsync<long>(new CommandDefinition(
                 insertSql,
                 new
                 {
@@ -145,6 +152,39 @@ public sealed class TicketService : ITicketService
                     ticket.GenerationNote
                 },
                 cancellationToken: cancellationToken));
+
+            // Record traceability references
+            if (ticket.SourceChatSessionId.HasValue)
+            {
+                await _referenceService.RecordReferenceAsync(new ArtifactSourceReference
+                {
+                    TenantId = _tenant.TenantId,
+                    ProjectId = ticket.ProjectId,
+                    ArtifactType = "Ticket",
+                    ArtifactId = savedId,
+                    SourceType = "ChatSession",
+                    SourceId = ticket.SourceChatSessionId.Value,
+                    ReferenceType = "CreatedFrom",
+                    Summary = $"Ticket '{ticket.Title}' created from chat session."
+                }, cancellationToken);
+            }
+
+            if (ticket.SourceChatMessageId.HasValue)
+            {
+                await _referenceService.RecordReferenceAsync(new ArtifactSourceReference
+                {
+                    TenantId = _tenant.TenantId,
+                    ProjectId = ticket.ProjectId,
+                    ArtifactType = "Ticket",
+                    ArtifactId = savedId,
+                    SourceType = "ChatMessage",
+                    SourceId = ticket.SourceChatMessageId.Value,
+                    ReferenceType = "CreatedFrom",
+                    Summary = $"Ticket '{ticket.Title}' created from chat message."
+                }, cancellationToken);
+            }
+
+            return savedId;
         }
     }
 

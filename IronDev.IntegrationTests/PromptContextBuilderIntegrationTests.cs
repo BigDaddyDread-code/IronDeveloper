@@ -44,6 +44,25 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
             Detail = "Store project memory in SQL first."
         });
 
+        await memoryService.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            DocumentType = "ProjectStandard",
+            AuthorityLevel = "StrongGuidance",
+            Status = "Active",
+            Title = "Use constructor injection",
+            Content = "Services should use constructor injection instead of service locators.",
+            Tags = "services,dependency injection"
+        });
+
+        await memoryService.SaveObservableStateAsync(new ProjectObservableState
+        {
+            ProjectId = projectId,
+            ActiveCapability = "Ticket creation",
+            CurrentFocus = "Generate grounded tickets",
+            BuildReadiness = "Ready"
+        });
+
         var indexService = scope.ServiceProvider.GetRequiredService<ICodeIndexService>();
         await using var connection = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
         await connection.OpenAsync();
@@ -74,6 +93,8 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
 
         StringAssert.Contains(prompt, "IronDev is a WPF-based AI development assistant.");
         StringAssert.Contains(prompt, "Use SQL memory");
+        StringAssert.Contains(prompt, "Use constructor injection");
+        StringAssert.Contains(prompt, "Ticket creation");
         StringAssert.Contains(prompt, "Please create a ticket");
         StringAssert.Contains(prompt, "Generate a ticket for MainWindow.xaml");
         StringAssert.Contains(prompt, "<Window><Grid></Grid></Window>");

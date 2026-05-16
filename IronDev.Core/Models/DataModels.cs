@@ -138,6 +138,46 @@ public sealed class ProjectDecision
     public DateTime CreatedDate { get; set; }
 }
 
+public sealed class ProjectContextDocument
+{
+    public long Id { get; set; }
+    public int TenantId { get; set; }
+    public int ProjectId { get; set; }
+    public string DocumentType { get; set; } = "DiscussionNote";
+    public string AuthorityLevel { get; set; } = "ContextOnly";
+    public string Status { get; set; } = "Active";
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string? Summary { get; set; }
+    public string? Tags { get; set; }
+    public string? AppliesToCapability { get; set; }
+    public string? AppliesToArea { get; set; }
+    public string? Source { get; set; }
+    public long? SupersedesDocumentId { get; set; }
+    public long? SourceChatMessageId { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public DateTime? UpdatedDate { get; set; }
+}
+
+public sealed class ProjectObservableState
+{
+    public long Id { get; set; }
+    public int TenantId { get; set; }
+    public int ProjectId { get; set; }
+    public string? ActiveCapability { get; set; }
+    public string? ActiveMilestone { get; set; }
+    public string? CurrentFocus { get; set; }
+    public string? BuildReadiness { get; set; }
+    public string? IndexStatus { get; set; }
+    public string? BuilderMode { get; set; }
+    public string? OpenBlockers { get; set; }
+    public string? LastRecommendation { get; set; }
+    public string? CurrentTargetPath { get; set; }
+    public string? KnownCurrentGaps { get; set; }
+    public string? SnapshotJson { get; set; }
+    public DateTime UpdatedDate { get; set; }
+}
+
 public sealed class ProjectImplementationPlan
 {
     public long Id { get; set; }
@@ -186,6 +226,8 @@ public sealed class ProjectTicket
     public string? ContextSummary { get; set; }
     public bool IsGenerated { get; set; }
     public string? GenerationNote { get; set; }
+    public long? SourceChatSessionId { get; set; }
+    public long? SourceChatMessageId { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime CreatedDate { get; set; }
 }

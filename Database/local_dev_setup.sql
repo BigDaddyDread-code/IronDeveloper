@@ -219,6 +219,62 @@ BEGIN
     );
 END
 
+IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectContextDocuments
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TenantId INT NOT NULL CONSTRAINT DF_ProjectContextDocuments_Tenant DEFAULT 1,
+        ProjectId INT NOT NULL,
+        DocumentType NVARCHAR(100) NOT NULL,
+        AuthorityLevel NVARCHAR(50) NOT NULL,
+        Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectContextDocuments_Status DEFAULT 'Active',
+        Title NVARCHAR(200) NOT NULL,
+        Content NVARCHAR(MAX) NOT NULL,
+        Summary NVARCHAR(MAX) NULL,
+        Tags NVARCHAR(MAX) NULL,
+        AppliesToCapability NVARCHAR(200) NULL,
+        AppliesToArea NVARCHAR(200) NULL,
+        Source NVARCHAR(200) NULL,
+        SupersedesDocumentId BIGINT NULL,
+        SourceChatMessageId BIGINT NULL,
+        CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectContextDocuments_CreatedDate DEFAULT SYSUTCDATETIME(),
+        UpdatedDate DATETIME2 NULL,
+        CONSTRAINT FK_ProjectContextDocuments_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ProjectContextDocuments_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+    );
+
+    CREATE INDEX IX_ProjectContextDocuments_Project_Type_Authority
+        ON dbo.ProjectContextDocuments(ProjectId, DocumentType, AuthorityLevel, Status, CreatedDate DESC);
+END
+
+IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectObservableStates
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TenantId INT NOT NULL CONSTRAINT DF_ProjectObservableStates_Tenant DEFAULT 1,
+        ProjectId INT NOT NULL,
+        ActiveCapability NVARCHAR(200) NULL,
+        ActiveMilestone NVARCHAR(200) NULL,
+        CurrentFocus NVARCHAR(500) NULL,
+        BuildReadiness NVARCHAR(100) NULL,
+        IndexStatus NVARCHAR(100) NULL,
+        BuilderMode NVARCHAR(100) NULL,
+        OpenBlockers NVARCHAR(MAX) NULL,
+        LastRecommendation NVARCHAR(MAX) NULL,
+        CurrentTargetPath NVARCHAR(1000) NULL,
+        KnownCurrentGaps NVARCHAR(MAX) NULL,
+        SnapshotJson NVARCHAR(MAX) NULL,
+        UpdatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectObservableStates_UpdatedDate DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_ProjectObservableStates_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ProjectObservableStates_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+    );
+
+    CREATE UNIQUE INDEX UX_ProjectObservableStates_Tenant_Project
+        ON dbo.ProjectObservableStates(TenantId, ProjectId);
+END
+
 IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ProjectImplementationPlans

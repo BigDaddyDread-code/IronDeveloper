@@ -1,0 +1,5 @@
+JSON_F52E2B61-18A1-11d1-B105-00805F49916B                                                                                                                                                                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+[{"Id":1,"TenantId":3,"ProjectId":2,"Title":"Controls Isolation","Detail":"Keep IronDeveloperControls library separate from main app.","Reason":"Max reusability and clean design-system boundary.","CreatedDate":"2026-04-18T15:02:40.0576767","Status":"Accept
+
+(1 rows affected)

@@ -1,0 +1,7 @@
+JSON_F52E2B61-18A1-11d1-B105-00805F49916B                                                                                                                                                                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+[{"Id":1,"TenantId":3,"ProjectId":2,"Title":"Implement Soft Delete for Tickets with Confirmation in IronDeveloper — Implementation Plan","Goal":"Add a soft-delete feature for tickets, with a UI confirmation step and associated service updates.","Scope":"- 
+aft ticket management features in TicketsWorkspaceViewModel.","AffectedContext":"IronDev.Core\/Builder\/DraftTicketDtos.cs\nIronDev.Infrastructure\/Builder\/DraftTicketService.cs","Status":"Draft","CreatedDate":"2026-05-12T06:32:50.2710487","TicketId":24},
+/Models\/Book.cs","Status":"Draft","CreatedDate":"2026-05-15T19:26:49.4199408","TicketId":27}]                                                                                                                                                                  
+
+(3 rows affected)

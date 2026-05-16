@@ -85,6 +85,25 @@ public sealed class BuilderContextService : IBuilderContextService
             // Decisions are additive context. Never fail the build loop over them.
         }
 
+        try
+        {
+            var contextDocs = await _memoryService.GetRelevantContextDocumentsAsync(
+                projectId,
+                $"{ticket.Title} {ticket.Summary} {ticket.Problem} {ticket.TechnicalNotes}",
+                take: 10,
+                cancellationToken);
+
+            foreach (var doc in contextDocs)
+            {
+                var text = string.IsNullOrWhiteSpace(doc.Summary) ? doc.Content : doc.Summary;
+                decisionStrings.Add($"[{doc.AuthorityLevel}] {doc.DocumentType}: {doc.Title} - {text}");
+            }
+        }
+        catch
+        {
+            // Context documents are additive context. Never fail the build loop over them.
+        }
+
         // ── 5. Load Profile & Commands ─────────────────────────────────────
         var profile = await _profileService.GetProjectProfileAsync(projectId, cancellationToken);
         var buildCmd = await _profileService.GetDefaultCommandAsync(projectId, "Build", cancellationToken);

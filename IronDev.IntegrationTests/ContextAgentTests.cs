@@ -1523,6 +1523,14 @@ internal sealed class ContextStubProjectMemoryService : IronDev.Services.IProjec
     public List<IronDev.Data.Models.ProjectRule> Rules { get; set; } = [];
 
     public Task<long> SaveSummaryAsync(IronDev.Data.Models.ProjectSummary s, CancellationToken ct = default) => Task.FromResult(1L);
+    public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetContextDocumentsAsync(int p, int t = 50, CancellationToken ct = default)
+        => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>>(Array.Empty<IronDev.Data.Models.ProjectContextDocument>());
+    public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetRelevantContextDocumentsAsync(int p, string q, int t = 20, CancellationToken ct = default)
+        => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>>(Array.Empty<IronDev.Data.Models.ProjectContextDocument>());
+    public Task<long> SaveContextDocumentAsync(IronDev.Data.Models.ProjectContextDocument d, CancellationToken ct = default) => Task.FromResult(1L);
+    public Task<IronDev.Data.Models.ProjectObservableState?> GetObservableStateAsync(int p, CancellationToken ct = default)
+        => Task.FromResult<IronDev.Data.Models.ProjectObservableState?>(null);
+    public Task SaveObservableStateAsync(IronDev.Data.Models.ProjectObservableState s, CancellationToken ct = default) => Task.CompletedTask;
     public Task<IronDev.Data.Models.ProjectSummary?> GetLatestSummaryAsync(int p, CancellationToken ct = default) => Task.FromResult<IronDev.Data.Models.ProjectSummary?>(null);
     public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectDecision>> GetRecentDecisionsAsync(int p, int t = 5, CancellationToken ct = default)
         => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectDecision>>(Decisions.Take(t).ToList());
