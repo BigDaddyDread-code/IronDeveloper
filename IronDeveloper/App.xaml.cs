@@ -80,6 +80,7 @@ public partial class App : Application
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
                 services.AddSingleton<global::IronDev.Agent.Services.IAppSettingsService, global::IronDev.Agent.Services.AppSettingsService>();
+                services.AddTransient<global::IronDev.Agent.Services.ManualIndexingTask>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.BuilderWorkspaceViewModel>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.ProjectProfileViewModel>();

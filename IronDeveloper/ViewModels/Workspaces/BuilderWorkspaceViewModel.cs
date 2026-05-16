@@ -24,6 +24,8 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     private readonly ITicketService _ticketService;
     private readonly IAppSettingsService? _settingsService;
 
+    internal Action<string>? OnProjectIndexStatusChanged { get; set; }
+
     [ObservableProperty] 
     [NotifyPropertyChangedFor(nameof(IsBusy))]
     private bool _isGenerating;
@@ -217,6 +219,7 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         }
         finally
         {
+            await RefreshIndexStatusAfterApplyAsync();
             IsApplying = false;
             ApplyProposalCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(IsApplyEnabled));
@@ -267,6 +270,27 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
         OnPropertyChanged(nameof(ApplyModeColor));
+    }
+
+    private async Task RefreshIndexStatusAfterApplyAsync()
+    {
+        if (CurrentProposal == null) return;
+
+        var project = await _projectService.GetByIdAsync(CurrentProposal.ProjectId);
+        var status = project?.IndexingStatus ?? "Needs Index";
+        OnProjectIndexStatusChanged?.Invoke(status);
+
+        if (!string.Equals(status, "Ready", StringComparison.OrdinalIgnoreCase))
+        {
+            Readiness = new BuildReadinessResult
+            {
+                Status = BuildReadinessStatus.NeedsReindex,
+                Message = string.Equals(status, "Stale Index", StringComparison.OrdinalIgnoreCase)
+                    ? "Project index is stale after applying this proposal. Re-index before generating or applying the next Builder proposal."
+                    : $"Project index is not ready: {status}.",
+                BlockingIssues = { "Project index must be refreshed before the next Builder action." }
+            };
+        }
     }
 
     partial void OnReadinessChanged(BuildReadinessResult? value)

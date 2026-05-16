@@ -216,6 +216,11 @@ public sealed class BuilderProposalService : IBuilderProposalService
             }
 
             proposal.ApplyStatus = "Applied";
+            await _projectService.MarkIndexStaleAsync(
+                projectId,
+                "Builder applied file changes; code index no longer matches disk.",
+                ct);
+
             _llmTraceService.AddTrace(new LlmTraceEntry
             {
                 FeatureName = "Builder.FilesWritten",
@@ -225,6 +230,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
                 ProposedFileCount = proposal.Changes.Count,
                 ProposedFilesList = string.Join(", ", proposal.Changes.Select(c => c.FilePath)),
                 WasSuccessful = true,
+                ParsedResponseSummary = "Files written and project index marked stale.",
                 CreatedAt = DateTime.UtcNow
             });
         }

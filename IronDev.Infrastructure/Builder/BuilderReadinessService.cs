@@ -73,8 +73,16 @@ public sealed class BuilderReadinessService : IBuilderReadinessService
         else if (!string.Equals(project.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase))
         {
             result.Status = BuildReadinessStatus.NeedsReindex;
-            result.Message = $"Project index is not ready: {project.IndexingStatus ?? "Not indexed"}.";
-            result.BlockingIssues.Add("Project index status is not Ready.");
+            if (string.Equals(project.IndexingStatus, "Stale Index", StringComparison.OrdinalIgnoreCase))
+            {
+                result.Message = "Project index is stale. Re-index before running Builder so proposals use current code context.";
+                result.BlockingIssues.Add("Project index is stale after file changes.");
+            }
+            else
+            {
+                result.Message = $"Project index is not ready: {project.IndexingStatus ?? "Not indexed"}.";
+                result.BlockingIssues.Add("Project index status is not Ready.");
+            }
         }
         else if ((project.IndexedFileCount ?? 0) <= 0)
         {

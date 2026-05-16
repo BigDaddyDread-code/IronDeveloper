@@ -48,7 +48,8 @@ public sealed class ConversationContextResolver : IConversationContextResolver
     public ConversationContextResolution Resolve(ContextAgentRouteRequest request)
     {
         var snapshot = request.ConversationContextSnapshot
-                    ?? TryParseSnapshot(request.RecentConversationSummary);
+                    ?? TryParseSnapshot(request.RecentConversationSummary)
+                    ?? TryInferSnapshot(request);
 
         var original = request.UserRequest.Trim();
         var lower = Normalize(original);
@@ -105,7 +106,10 @@ public sealed class ConversationContextResolver : IConversationContextResolver
 
         if (IsAny(lower, ConfirmationFollowUps))
         {
-            var recommendation = FirstUseful(snapshot.LastRecommendation, snapshot.LastOptionsPresented.FirstOrDefault());
+            var recommendation = FirstUseful(
+                ExtractRecommendationFromConfirmation(original),
+                snapshot.LastRecommendation,
+                snapshot.LastOptionsPresented.FirstOrDefault());
             var verb = lower == "that one" || lower == "use that" || lower == "go with that"
                 ? "Select"
                 : "Confirm";
@@ -143,6 +147,46 @@ public sealed class ConversationContextResolver : IConversationContextResolver
         }
 
         return Unresolved(original, snapshot);
+    }
+
+    public static ConversationContextSnapshot? TryInferSnapshot(ContextAgentRouteRequest request)
+    {
+        var conversation = request.RecentConversationSummary ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(conversation))
+            return null;
+
+        var haystack = $"{conversation}\n{request.UserRequest}".ToLowerInvariant();
+        var isPersistenceDiscussion =
+            ContainsAny(haystack, "persist", "persistence", "save data", "database", "db", "orm", "dapper", "sql server") &&
+            ContainsAny(haystack, "bookseller", "bookservice", "book.cs", "books");
+
+        if (!isPersistenceDiscussion)
+            return null;
+
+        var projectName = ContainsAny(haystack, "bookseller", "bookservice", "book.cs")
+            ? "BookSeller"
+            : "the project";
+
+        var recommendation = ExtractPersistenceRecommendation(request.UserRequest);
+        if (string.IsNullOrWhiteSpace(recommendation))
+            recommendation = ExtractPersistenceRecommendation(conversation);
+
+        return new ConversationContextSnapshot
+        {
+            ProjectId = request.ProjectId,
+            SessionId = request.SessionId,
+            ActiveTopic = $"{projectName} persistence architecture",
+            CurrentGoal = "choose database and data access approach",
+            ContextMode = "ArchitectureAdvice",
+            PendingDecision = "Choose persistence engine and data access style",
+            LastRecommendation = recommendation,
+            LastOptionsPresented = string.IsNullOrWhiteSpace(recommendation) ? [] : [recommendation],
+            KnownFacts =
+            [
+                $"{projectName} currently has no database",
+                $"{projectName} needs persisted book data"
+            ]
+        };
     }
 
     public static ConversationContextSnapshot? TryParseSnapshot(string text)
@@ -255,6 +299,9 @@ public sealed class ConversationContextResolver : IConversationContextResolver
     private static bool IsAny(string lower, IEnumerable<string> phrases)
         => phrases.Any(p => lower == p || lower.TrimEnd('?') == p || lower.StartsWith(p + " "));
 
+    private static bool ContainsAny(string text, params string[] terms)
+        => terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
+
     private static string Normalize(string text)
         => text.Trim().TrimEnd('.', '!', '?').ToLowerInvariant();
 
@@ -317,6 +364,53 @@ public sealed class ConversationContextResolver : IConversationContextResolver
             return $"{verb} {recommendation} for {DescribeTopic(snapshot)}.";
 
         return $"{verb} the pending decision for {DescribeTopic(snapshot)}.";
+    }
+
+    private static string ExtractRecommendationFromConfirmation(string text)
+    {
+        var recommendation = ExtractPersistenceRecommendation(text);
+        if (!string.IsNullOrWhiteSpace(recommendation))
+            return recommendation;
+
+        var lower = text.ToLowerInvariant();
+        foreach (var marker in new[] { "i will use ", "i'll use ", "use " })
+        {
+            var index = lower.IndexOf(marker, StringComparison.Ordinal);
+            if (index >= 0)
+                return NormalizeRecommendation(text[(index + marker.Length)..]);
+        }
+
+        return string.Empty;
+    }
+
+    private static string ExtractPersistenceRecommendation(string text)
+    {
+        var lower = text.ToLowerInvariant();
+        var hasDapper = lower.Contains("dapper", StringComparison.OrdinalIgnoreCase);
+        if (!hasDapper)
+            return string.Empty;
+
+        if (lower.Contains("sql server", StringComparison.OrdinalIgnoreCase))
+            return "SQL Server + Dapper";
+        if (lower.Contains("sqlite", StringComparison.OrdinalIgnoreCase))
+            return "SQLite + Dapper";
+        if (lower.Contains("postgres", StringComparison.OrdinalIgnoreCase) ||
+            lower.Contains("postgresql", StringComparison.OrdinalIgnoreCase))
+            return "PostgreSQL + Dapper";
+
+        return "Dapper";
+    }
+
+    private static string NormalizeRecommendation(string value)
+    {
+        var cleaned = value.Trim().TrimEnd('.', '!', '?');
+        if (string.IsNullOrWhiteSpace(cleaned))
+            return string.Empty;
+
+        return cleaned
+            .Replace(" and ", " + ", StringComparison.OrdinalIgnoreCase)
+            .Replace("  ", " ")
+            .Trim();
     }
 
     private static bool IsBookPersistence(ConversationContextSnapshot snapshot)

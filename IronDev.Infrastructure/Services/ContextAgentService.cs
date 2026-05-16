@@ -1015,6 +1015,18 @@ Return JSON only.";
             sb.AppendLine("- Use existing project profile, standards, and decisions as grounding if available.");
         }
 
+        if (route.RequestKind == ContextRequestKind.ArchitectureDecisionExploration)
+        {
+            sb.AppendLine("- ARCHITECTURE DECISION MODE: The user is confirming or selecting an architectural choice from the recent discussion.");
+            sb.AppendLine("- Treat the resolved effective request as the decision being finalized unless it asks for more comparison.");
+            sb.AppendLine("- Acknowledge the selected choice briefly. Do NOT repeat the full recommendation list.");
+            sb.AppendLine("- You MUST emit exactly one hidden decision tag in this format:");
+            sb.AppendLine("<decision>Decision Title | The detailed rule</decision>");
+            sb.AppendLine("- The decision title should name the project and choice. The detailed rule should include the selected technology and how it will be used.");
+            sb.AppendLine("- Do NOT ask 'Should I record this as a [ProjectName] architecture decision?' after the user has already confirmed the choice.");
+            sb.AppendLine("- Do NOT claim implementation exists unless code evidence is present.");
+        }
+
         if (shouldEnforceHonesty && proof.Status != ContextProofStatus.ProvenPresent)
         {
             sb.AppendLine();

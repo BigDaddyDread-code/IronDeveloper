@@ -37,6 +37,53 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _filterDocumentType = "All";
     [ObservableProperty] private string _filterStatus = "Active";
 
+    public string SelectedDocumentBody
+    {
+        get
+        {
+            if (!HasDetail)
+                return string.Empty;
+
+            if (string.IsNullOrWhiteSpace(EditSummary))
+                return EditContent;
+
+            if (string.IsNullOrWhiteSpace(EditContent))
+                return EditSummary;
+
+            return $"{EditSummary.Trim()}\n\n{EditContent.Trim()}";
+        }
+    }
+
+    public string SelectedDocumentMeta
+    {
+        get
+        {
+            if (!HasDetail)
+                return string.Empty;
+
+            var updated = SelectedDocument?.UpdatedDate ?? SelectedDocument?.CreatedDate;
+            var updatedText = updated is null || updated.Value == default
+                ? string.Empty
+                : $"Updated {updated.Value.ToLocalTime():MMM d, h:mm tt}";
+
+            var source = string.IsNullOrWhiteSpace(EditSource) ? string.Empty : $"Source {EditSource.Trim()}";
+            return string.Join("  |  ", new[] { EditDocumentType, EditAuthorityLevel, EditStatus, source, updatedText }
+                .Where(static value => !string.IsNullOrWhiteSpace(value)));
+        }
+    }
+
+    public string ProjectSummaryPreview
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(ProjectSummary))
+                return "No project summary saved yet.";
+
+            var normalized = ProjectSummary.Replace("\r\n", " ").Replace('\n', ' ').Trim();
+            return normalized.Length <= 180 ? normalized : normalized[..177] + "...";
+        }
+    }
+
     public ObservableCollection<string> DocumentTypeOptions { get; } =
     [
         "ArchitectureDecision",
@@ -165,6 +212,30 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
         LoadDocumentIntoEditor(value);
     }
+
+    partial void OnHasDetailChanged(bool value)
+        => NotifyDocumentPreviewChanged();
+
+    partial void OnProjectSummaryChanged(string value)
+        => OnPropertyChanged(nameof(ProjectSummaryPreview));
+
+    partial void OnEditDocumentTypeChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnEditAuthorityLevelChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnEditStatusChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnEditSummaryChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentBody));
+
+    partial void OnEditContentChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentBody));
+
+    partial void OnEditSourceChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
 
     partial void OnFilterDocumentTypeChanged(string value)
         => _ = RefreshListAsync();
@@ -298,6 +369,7 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         EditAppliesToCapability = document.AppliesToCapability ?? string.Empty;
         EditSource = document.Source ?? string.Empty;
         SaveStatus = string.Empty;
+        NotifyDocumentPreviewChanged();
     }
 
     private void ClearEditor()
@@ -315,8 +387,15 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         EditAppliesToCapability = string.Empty;
         EditSource = string.Empty;
         SaveStatus = string.Empty;
+        NotifyDocumentPreviewChanged();
     }
 
     private static string? EmptyToNull(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void NotifyDocumentPreviewChanged()
+    {
+        OnPropertyChanged(nameof(SelectedDocumentBody));
+        OnPropertyChanged(nameof(SelectedDocumentMeta));
+    }
 }

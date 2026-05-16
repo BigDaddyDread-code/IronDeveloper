@@ -47,42 +47,31 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="BUILDER" Style="{StaticResource Typography.Eyebrow}"/>
-                <TextBlock Text="Builder Workbench" Style="{StaticResource Typography.ScreenTitle}"/>
-                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <TextBlock Text="{Binding ProjectName}" Foreground="{StaticResource Text/Muted}" FontSize="12" FontWeight="SemiBold"/>
-                    <TextBlock Text=" • " Foreground="{StaticResource Text/Muted}" FontSize="12"/>
-                    <TextBlock Text="{Binding ProjectRoot}" Foreground="{StaticResource Text/Muted}" FontSize="12" Opacity="0.7"/>
+        <controls:WorkspaceHeader Grid.Row="0"
+                                  Eyebrow="BUILDER"
+                                  Title="Builder Workbench"
+                                  Subtitle="{Binding ProjectRoot}"
+                                  Margin="0,0,0,18">
+            <controls:WorkspaceHeader.Actions>
+                <StackPanel Orientation="Horizontal">
+                    <Border Background="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1A34D16A|#1A7C6BE8'}"
+                            BorderBrush="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="10,4"
+                            Margin="0,0,8,0">
+                        <TextBlock Text="{Binding ApplyModeLabel, FallbackValue=PROPOSAL-ONLY, TargetNullValue=PROPOSAL-ONLY}"
+                                   Foreground="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}"
+                                   FontSize="10"
+                                   FontWeight="Bold"/>
+                    </Border>
+                    <Button Content="Close Workbench"
+                            Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="Tickets"
+                            Style="{StaticResource AppButton.CompactGhost}"/>
                 </StackPanel>
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1A34D16A|#1A7C6BE8'}" 
-                        BorderBrush="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}" BorderThickness="1"
-                        CornerRadius="4" Padding="12,6" Margin="0,0,16,0"
-                        Visibility="{Binding IsApplyEnabled, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="{Binding ApplyModeLabel}" Foreground="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}" FontSize="11" FontWeight="Bold"/>
-                </Border>
-                <Border Background="#1A7C6BE8" BorderBrush="#7C6BE8" BorderThickness="1"
-                        CornerRadius="4" Padding="12,6" Margin="0,0,16,0"
-                        Visibility="{Binding IsApplyEnabled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                    <TextBlock Text="PROPOSAL-ONLY MODE" Foreground="#7C6BE8" FontSize="11" FontWeight="Bold"/>
-                </Border>
-                <Button Content="✕ Close Workbench"
-                        Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                        CommandParameter="Tickets"
-                        Style="{StaticResource AppButton.Secondary}"
-                        Padding="16,8"/>
-            </StackPanel>
-        </Grid>
-
+            </controls:WorkspaceHeader.Actions>
+        </controls:WorkspaceHeader>
         <!-- Workbench Body -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>

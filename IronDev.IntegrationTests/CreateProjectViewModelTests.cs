@@ -91,6 +91,9 @@ public sealed class CreateProjectViewModelTests
 
         public Task UpdateLocalPathAsync(int projectId, string localPath, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task MarkIndexStaleAsync(int projectId, string reason, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class FakeProjectProfileService : IProjectProfileService

@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -61,6 +62,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _activeModel       = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusNeedsIndex))]
+    [NotifyPropertyChangedFor(nameof(StatusCanIndex))]
     private string _activeStatus = string.Empty;
 
     // ── Status popup ─────────────────────────────────────────────────────────
@@ -72,7 +74,8 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool HasActiveTenant => CurrentTenant != null;
     public bool ShowSidebar => HasActiveProject && CurrentShellMode == ShellMode.ProjectActive;
     public bool ShowHeader  => HasActiveProject && CurrentShellMode == ShellMode.ProjectActive;
-    public bool StatusNeedsIndex => ActiveStatus == "Needs Index";
+    public bool StatusNeedsIndex => IsIndexActionableStatus(ActiveStatus);
+    public bool StatusCanIndex => IsIndexActionableStatus(ActiveStatus);
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -145,6 +148,14 @@ public sealed partial class ShellViewModel : ObservableObject
             _ = _builderVm.GenerateProposalForTicketAsync(ticketId);
             CurrentWorkspace = ProjectWorkspace.Builder;
             CurrentView = _builderVm;
+        };
+
+        _builderVm.OnProjectIndexStatusChanged = (status) =>
+        {
+            ActiveStatus = string.IsNullOrWhiteSpace(status) ? "Needs Index" : status;
+            _ticketsVm.SetIndexStatus(ActiveStatus);
+            OnPropertyChanged(nameof(StatusNeedsIndex));
+            OnPropertyChanged(nameof(StatusCanIndex));
         };
 
         // Chat → Ticket draft review bridge
@@ -392,6 +403,16 @@ public sealed partial class ShellViewModel : ObservableObject
                 ActiveStatus = "Offline";
 
             OnPropertyChanged(nameof(StatusNeedsIndex));
+            OnPropertyChanged(nameof(StatusCanIndex));
         }
+    }
+
+    private static bool IsIndexActionableStatus(string status)
+    {
+        return !string.Equals(status, "Ready", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(status, "Checking...", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(status, "Indexing...", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(status, "Offline", StringComparison.OrdinalIgnoreCase) &&
+               !string.IsNullOrWhiteSpace(status);
     }
 }

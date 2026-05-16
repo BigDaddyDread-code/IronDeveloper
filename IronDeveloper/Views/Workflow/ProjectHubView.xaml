@@ -100,7 +100,7 @@
 
                                             <!-- Status + Model row -->
                                             <StackPanel Grid.Row="3" Orientation="Horizontal">
-                                                <TextBlock Text="{Binding IndexingStatus, TargetNullValue='Ready'}"
+                                                <TextBlock Text="{Binding IndexingStatus, TargetNullValue='Needs Index'}"
                                                            Foreground="{Binding IndexingStatus, Converter={StaticResource StatusToBrushConverter}}"
                                                            FontSize="10" FontWeight="Bold" Margin="0,0,12,0"
                                                            VerticalAlignment="Center"/>

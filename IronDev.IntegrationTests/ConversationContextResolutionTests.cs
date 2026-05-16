@@ -107,6 +107,55 @@ public sealed class ConversationContextResolutionTests
     }
 
     [TestMethod]
+    public async Task ExplicitTechnologyConfirmation_InfersDecisionFromPlainConversationHistory()
+    {
+        var llm = new ConversationStateAwareLlm();
+        var traceService = new LlmTraceService();
+        var judge = new ContextAgentRouteJudgeService(llm, traceService);
+
+        var decision = await judge.DecideRouteAsync(new ContextAgentRouteRequest
+        {
+            ProjectId = 5,
+            SessionId = 14,
+            UserRequest = "ok I will use SQL Server and dapper",
+            RecentConversationSummary = PlainBookSellerPersistenceConversation()
+        });
+
+        Assert.AreEqual(ContextRequestKind.ArchitectureDecisionExploration, decision.RequestKind);
+        Assert.AreEqual("Confirm SQL Server + Dapper as the persistence recommendation for BookSeller.", decision.EffectiveWorkText);
+        Assert.IsTrue(decision.UsedConversationContextResolver);
+        Assert.IsFalse(decision.AllowCodeSearch);
+        Assert.IsFalse(decision.AllowConflictAssessment);
+        Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
+    }
+
+    [TestMethod]
+    public async Task ExplicitTechnologyConfirmation_FinalPromptRequiresDecisionTag()
+    {
+        var traceService = new LlmTraceService();
+        var agent = CreateAgent(traceService);
+
+        var result = await agent.RunAsync(new ContextAgentRequest
+        {
+            ProjectId = 5,
+            SessionId = 14,
+            UserRequest = "ok I will use SQL Server and dapper",
+            RecentConversationSummary = PlainBookSellerPersistenceConversation()
+        });
+
+        Assert.IsTrue(result.WasSuccessful);
+
+        var routeTrace = FindTrace(traceService, ContextAgentStage.RouteDecision);
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("Kind=ArchitectureDecisionExploration"));
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("SQL Server + Dapper"));
+
+        var finalTrace = FindTrace(traceService, ContextAgentStage.FinalAnswer);
+        Assert.IsTrue(finalTrace.RequestText.Contains("ARCHITECTURE DECISION MODE"));
+        Assert.IsTrue(finalTrace.RequestText.Contains("<decision>Decision Title | The detailed rule</decision>"));
+        Assert.IsTrue(finalTrace.RequestText.Contains("Do NOT ask 'Should I record this as a [ProjectName] architecture decision?'"));
+    }
+
+    [TestMethod]
     public async Task ThatOneFollowUp_ResolvesAgainstLastOptionsPresented()
     {
         var judge = new ContextAgentRouteJudgeService(new ConversationStateAwareLlm(), new LlmTraceService());
@@ -233,6 +282,18 @@ public sealed class ConversationContextResolutionTests
             - BookSeller currently has no database
             - BookSeller currently uses in-memory storage
             - User wants to persist books
+            """;
+    }
+
+    private static string PlainBookSellerPersistenceConversation()
+    {
+        return """
+            user: currentlly it is not there is no db
+            user: can give some recommendations
+            user: ORM and databases , whats the best way persist data in this project
+            assistant: No implementation exists yet for saving data in the BookSeller project. Here are my recommendations for achieving efficient data persistence using industry-standard practices.
+            assistant: Use a database and data access layer for BookService.cs and Book.cs.
+            assistant: Should I record this as a BookSeller architecture decision?
             """;
     }
 

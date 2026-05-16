@@ -10,20 +10,19 @@ namespace IronDev.Agent.Services;
 public sealed class LocalIndexingService : ILocalIndexingService
 {
     private readonly ICodeIndexService _codeIndexService;
+    private readonly ManualIndexingTask _manualIndexingTask;
 
-    public LocalIndexingService(ICodeIndexService codeIndexService)
+    public LocalIndexingService(ICodeIndexService codeIndexService, ManualIndexingTask manualIndexingTask)
     {
         _codeIndexService = codeIndexService;
+        _manualIndexingTask = manualIndexingTask;
     }
 
     public async Task<CodeIndexResult> IndexProjectAsync(Project project, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(project.LocalPath))
-        {
-            throw new InvalidOperationException("Project does not have a local path configured.");
-        }
+        var resolvedProject = await _manualIndexingTask.ResolveProjectAsync(project, ct);
 
-        return await _codeIndexService.IndexDirectoryAsync(project.Id, project.LocalPath, ct);
+        return await _codeIndexService.IndexDirectoryAsync(resolvedProject.Id, resolvedProject.LocalPath!, ct);
     }
 
     public Task<int> GetIndexedFileCountAsync(int projectId, CancellationToken ct = default)

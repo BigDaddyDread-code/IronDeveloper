@@ -520,6 +520,7 @@ public sealed class BuilderContextServiceTests
         public Task<IronDev.Data.Models.Project?> GetByIdAsync(int id, CancellationToken ct = default)
             => Task.FromResult(_project);
         public Task UpdateLocalPathAsync(int id, string path, CancellationToken ct = default) => Task.CompletedTask;
+        public Task MarkIndexStaleAsync(int id, string reason, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class StubTickets : IronDev.Services.ITicketService

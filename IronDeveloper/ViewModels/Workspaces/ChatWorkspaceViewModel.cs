@@ -39,7 +39,6 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public bool UseContextAgent { get; set; } = false;
 
     private int _activeProjectId;
-    private string _activeProjectName = string.Empty;
 
     [ObservableProperty] private ObservableCollection<ProjectChatSession> _sessions = [];
     [ObservableProperty] private ProjectChatSession? _selectedSession;
@@ -47,8 +46,11 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _promptText = string.Empty;
     [ObservableProperty] private bool   _isBusy;
     [ObservableProperty] private bool   _hasSelectedSession;
+    [ObservableProperty] private bool   _isChatListCollapsed;
+    [ObservableProperty] private GridLength _chatListColumnWidth = new(320);
     [ObservableProperty] private string? _statusMessage;
     [ObservableProperty] private bool    _hasStatusMessage;
+    [ObservableProperty] private string _activeProjectName = string.Empty;
 
     /// <summary>Grouped view of Sessions for the ListBox — groups by DateGroup (Today / This Week / Earlier).</summary>
     public ICollectionView GroupedSessions { get; }
@@ -60,6 +62,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     // Composer context
     [ObservableProperty] private ObservableCollection<string> _contextChips = [];
     [ObservableProperty] private bool _hasContextChips;
+    [ObservableProperty] private string _chatContextStatusText = "Project-aware";
     [ObservableProperty] private string _activeModel = "gpt-4o";
 
     // Ticket creation now passes a ChatTicketContext so the shell can
@@ -102,7 +105,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public async Task LoadAsync(global::IronDev.Data.Models.Project project)
     {
         _activeProjectId = project.Id;
-        _activeProjectName = project.Name;
+        ActiveProjectName = project.Name;
 
         await RefreshSessionsAsync();
 
@@ -120,6 +123,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 ContextChips.Add(System.IO.Path.GetFileName(p));
         }
         HasContextChips = ContextChips.Count > 0;
+        ChatContextStatusText = HasContextChips ? "Code-aware" : "Project-aware";
     }
 
     private async Task RefreshSessionsAsync()
@@ -148,6 +152,13 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             SelectedSession = session;
     }
 
+    [RelayCommand]
+    private void ToggleChatList()
+    {
+        IsChatListCollapsed = !IsChatListCollapsed;
+        ChatListColumnWidth = IsChatListCollapsed ? new GridLength(44) : new GridLength(320);
+    }
+
     private async Task LoadMessagesAsync(long sessionId)
     {
         var messages = await _chatHistoryService.GetRecentMessagesAsync(_activeProjectId, sessionId, 100);
@@ -158,6 +169,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 Role = m.Role,
                 MessageText = m.Message,
                 Timestamp = m.CreatedDate,
+                PersistedMessageId = m.Id,
                 // In a real V1, we might store the ContextSummary in the DB and display it here
             });
         }

@@ -115,6 +115,24 @@ public sealed class BuilderReadinessTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task EvaluateReadiness_StaleIndex_ReturnsNeedsReindex()
+    {
+        // Arrange
+        await SeedProjectProfileAsync(_projectId, testFramework: "xUnit", allowBuilderApply: true);
+        await SeedProjectCommandAsync(_projectId, "Build", "dotnet build");
+        await SeedProjectIndexAsync(_projectId, status: "Stale Index", indexedFileCount: 7);
+
+        // Act
+        var result = await _readinessService.EvaluateReadinessAsync(_projectId, _ticketId);
+
+        // Assert
+        Assert.AreEqual(BuildReadinessStatus.NeedsReindex, result.Status);
+        Assert.IsFalse(result.IsReady);
+        StringAssert.Contains(result.Message, "stale");
+        CollectionAssert.Contains(result.BlockingIssues, "Project index is stale after file changes.");
+    }
+
+    [TestMethod]
     public async Task EvaluateReadiness_ReadyIndexWithZeroFiles_ReturnsNeedsReindex()
     {
         // Arrange

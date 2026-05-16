@@ -429,9 +429,12 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 
         if (!IsIndexReady())
         {
-            IndexHealthTitle = "Project needs indexing";
-            IndexHealthMessage = "Index this project before creating build-ready tickets or generating Builder proposals.";
-            IndexHealthBadgeText = "NEEDS INDEX";
+            var isStale = Status.Equals("Stale Index", StringComparison.OrdinalIgnoreCase);
+            IndexHealthTitle = isStale ? "Project index is stale" : "Project needs indexing";
+            IndexHealthMessage = isStale
+                ? "Files changed after the last index. Re-index before chat, ticket creation, or Builder actions rely on project context."
+                : "Index this project before creating build-ready tickets or generating Builder proposals.";
+            IndexHealthBadgeText = isStale ? "STALE INDEX" : "NEEDS INDEX";
             IndexHealthBadgeStatus = BadgeStatus.NeedsIndex;
             ShowIndexHealthCallout = true;
             return;
