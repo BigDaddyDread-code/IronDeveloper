@@ -31,9 +31,21 @@ public sealed class BuilderProposal
     public string Summary { get; set; } = string.Empty;
     public string Rationale { get; set; } = string.Empty;
     public List<ProposedFileChange> Changes { get; set; } = new();
+    public List<string> ValidationIssues { get; set; } = new();
+    public List<string> ValidationWarnings { get; set; } = new();
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 
-    public bool IsAllValid => Changes.TrueForAll(c => c.IsValid);
+    public bool HasValidationIssues => ValidationIssues.Count > 0 || Changes.Exists(c => !c.IsValid);
+    public bool HasValidationWarnings => ValidationWarnings.Count > 0;
+    public string ValidationSummary =>
+        HasValidationIssues
+            ? string.Join(Environment.NewLine, ValidationIssues)
+            : HasValidationWarnings
+                ? string.Join(Environment.NewLine, ValidationWarnings)
+                : Changes.Count == 0
+                    ? "Proposal has not been validated."
+                    : "All proposed changes pass validation.";
+    public bool IsAllValid => Changes.Count > 0 && !HasValidationIssues && Changes.TrueForAll(c => c.IsValid);
 
     // ── Execution State ───────────────────────────────────────────────────
     public string ApplyStatus { get; set; } = "Not Started";

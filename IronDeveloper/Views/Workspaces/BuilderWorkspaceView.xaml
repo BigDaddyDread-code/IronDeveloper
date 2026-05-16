@@ -251,6 +251,28 @@
                         <TextBlock Text="{Binding CurrentProposal.Rationale}" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource Text/Secondary}" Margin="0,0,0,20"/>
 
                         <TextBlock Text="VALIDATION STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding CurrentProposal.ValidationIssues}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1AEE4444" BorderBrush="#EE4444" BorderThickness="1"
+                                            CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding}" Foreground="#EE4444" FontSize="11" TextWrapping="Wrap"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ItemsControl ItemsSource="{Binding CurrentProposal.ValidationWarnings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1AEEA244" BorderBrush="#EEA244" BorderThickness="1"
+                                            CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding}" Foreground="#EEA244" FontSize="11" TextWrapping="Wrap"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
                         <ItemsControl ItemsSource="{Binding ProposedFiles}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

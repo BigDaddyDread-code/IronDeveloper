@@ -71,7 +71,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
             TicketId = ticketId,
             WasSuccessful = readiness.IsReady,
             ParsedResponseSummary = $"Readiness Status: {readiness.Status}",
-            ErrorMessage = readiness.IsReady ? null : string.Join("; ", readiness.BlockingIssues),
+            ErrorMessage = readiness.IsReady ? string.Empty : string.Join("; ", readiness.BlockingIssues),
             CreatedAt = DateTime.UtcNow
         });
 
@@ -103,11 +103,13 @@ public sealed class BuilderProposalService : IBuilderProposalService
             CreatedAt = DateTime.UtcNow
         };
         
-        if (!proposal.IsAllValid)
+        if (proposal.HasValidationIssues)
         {
-            var failures = proposal.Changes.Where(c => !c.IsValid).ToList();
-            trace.ErrorMessage = $"Rejected {failures.Count} files: " + 
-                string.Join("; ", failures.Select(f => $"{f.FilePath}: {f.ValidationMessage}"));
+            trace.ErrorMessage = string.Join("; ", proposal.ValidationIssues);
+        }
+        else if (proposal.HasValidationWarnings)
+        {
+            trace.ErrorMessage = string.Join("; ", proposal.ValidationWarnings);
         }
         
         _llmTraceService.AddTrace(trace);
@@ -159,7 +161,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
             TicketId = ticketId,
             WasSuccessful = archValidation.IsReady,
             ParsedResponseSummary = archValidation.IsReady ? "Architecture Validation Passed" : "Architecture Validation Failed",
-            ErrorMessage = archValidation.IsReady ? null : archValidation.Message,
+            ErrorMessage = archValidation.IsReady ? string.Empty : archValidation.Message,
             CreatedAt = DateTime.UtcNow
         });
 
@@ -174,7 +176,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
         if (!proposal.IsAllValid)
         {
             proposal.ApplyStatus = "Validation Failed";
-            throw new InvalidOperationException("Apply aborted: validation failed for one or more files.");
+            throw new InvalidOperationException("Apply aborted: validation failed. " + proposal.ValidationSummary);
         }
 
         // ── 5. Write Files ────────────────────────────────────────────────────
@@ -384,7 +386,9 @@ public sealed class BuilderProposalService : IBuilderProposalService
             ProjectId       = context.ProjectId,
             ProjectName     = context.ProjectName,
             ProjectRoot     = context.ProjectPath,
-            OriginalRequest = inner.OriginalRequest,
+            OriginalRequest = string.IsNullOrWhiteSpace(inner.OriginalRequest)
+                ? $"{context.TicketTitle}. {context.TicketSummary}".Trim()
+                : inner.OriginalRequest,
             Summary         = inner.Summary,
             Rationale       = inner.Rationale,
             GeneratedAt     = DateTime.UtcNow
@@ -407,105 +411,9 @@ public sealed class BuilderProposalService : IBuilderProposalService
         return proposal;
     }
 
-    private void ValidateProposal(BuilderProposal proposal)
+    private static void ValidateProposal(BuilderProposal proposal)
     {
-        if (proposal.Changes.Count == 0)
-        {
-            // Empty proposal is technically valid but we should probably note it.
-            return;
-        }
-
-        foreach (var change in proposal.Changes)
-        {
-            if (string.IsNullOrWhiteSpace(change.FilePath))
-            {
-                MarkInvalid(change, "Empty file path.");
-                continue;
-            }
-
-            // 1. Block absolute paths
-            if (Path.IsPathRooted(change.FilePath))
-            {
-                MarkInvalid(change, "Absolute file paths are not allowed.");
-                continue;
-            }
-
-            // 2. Block .. traversal
-            if (change.FilePath.Contains(".."))
-            {
-                MarkInvalid(change, "Path traversal (..) is not allowed.");
-                continue;
-            }
-
-            // 3. Block paths outside project root
-            // Since paths are relative, we check if they would resolve outside.
-            // But they are relative to root, so any path starting with / or \ might be risky if not handled.
-            // The prompt says "relative file paths only".
-            
-            // 4. Deletion check (v1 restriction)
-            if (change.IsDeletion)
-            {
-                MarkInvalid(change, "File deletions are not allowed in v1.");
-                continue;
-            }
-
-            // 5. Host protection
-            if (proposal.ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
-            {
-                if (change.FilePath.Contains("IronDev", StringComparison.OrdinalIgnoreCase) || 
-                    change.FilePath.Contains("IronDeveloper", StringComparison.OrdinalIgnoreCase))
-                {
-                    MarkInvalid(change, "Cannot modify host files when active project is external.");
-                    continue;
-                }
-            }
-
-            // 6. Structural Validation for C#
-            if (change.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            {
-                ValidateCSharpStructure(proposal, change);
-            }
-        }
-    }
-
-    private void ValidateCSharpStructure(BuilderProposal proposal, ProposedFileChange change)
-    {
-        var content = change.FullContentAfter;
-        if (string.IsNullOrWhiteSpace(content)) return;
-
-        // Heuristic: reject if it looks like a generic standalone sample
-        if (content.Contains("namespace Sample") || content.Contains("class Program") && !change.FilePath.Contains("Program.cs"))
-        {
-            MarkInvalid(change, "Proposal appears to be generic sample code.");
-            return;
-        }
-
-        // BookSeller specific structural rules
-        if (proposal.ProjectName.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
-        {
-            if (change.FilePath.Contains("BookService.cs"))
-            {
-                if (!content.Contains("namespace BookSeller.Core.Services"))
-                    MarkInvalid(change, "Missing namespace BookSeller.Core.Services");
-                if (!content.Contains("class BookService"))
-                    MarkInvalid(change, "Missing class BookService");
-                if (!content.Contains("IBookService"))
-                    MarkInvalid(change, "IBookService implementation removed.");
-                if (content.Contains("class Book") && !content.Contains("public class BookService")) // likely duplicate model
-                    MarkInvalid(change, "Duplicate Book model class detected in service file.");
-            }
-            
-            if (change.FilePath.Contains("Book.cs") && !content.Contains("namespace BookSeller.Core.Models"))
-            {
-                MarkInvalid(change, "Missing namespace BookSeller.Core.Models in Book model.");
-            }
-        }
-    }
-
-    private static void MarkInvalid(ProposedFileChange change, string message)
-    {
-        change.IsValid = false;
-        change.ValidationMessage = message;
+        BuilderProposalValidator.Validate(proposal);
     }
 
     private static string FormatExecutionOutput(bool success, string command, string workingDir, int exitCode, string stdout, string stderr, TimeSpan duration)

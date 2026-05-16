@@ -122,7 +122,9 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
 
             StatusMessage = proposal.IsAllValid 
                 ? "Proposal generated successfully." 
-                : "Proposal generated with validation warnings.";
+                : proposal.HasValidationIssues
+                    ? "Proposal generated but validation blocked apply."
+                    : "Proposal generated with validation warnings.";
         }
         catch (Exception ex)
         {
