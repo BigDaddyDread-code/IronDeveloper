@@ -9,6 +9,8 @@ namespace IronDev.Agent.ViewModels.Workflow;
 public sealed partial class CreateProjectViewModel : ObservableObject
 {
     private readonly global::IronDev.Services.IProjectService _projectService;
+    private readonly global::IronDev.Core.Interfaces.IProjectProfileService _profileService;
+    private readonly global::IronDev.Core.Interfaces.IProjectProfileDetectionService _profileDetectionService;
 
     [ObservableProperty] private string _projectName = string.Empty;
     [ObservableProperty] private string _projectPath = string.Empty;
@@ -27,9 +29,14 @@ public sealed partial class CreateProjectViewModel : ObservableObject
     internal Action<global::IronDev.Data.Models.Project>? OnProjectCreated { get; set; }
     internal Action?                                    OnCancel         { get; set; }
 
-    public CreateProjectViewModel(global::IronDev.Services.IProjectService projectService)
+    public CreateProjectViewModel(
+        global::IronDev.Services.IProjectService projectService,
+        global::IronDev.Core.Interfaces.IProjectProfileService profileService,
+        global::IronDev.Core.Interfaces.IProjectProfileDetectionService profileDetectionService)
     {
         _projectService = projectService;
+        _profileService = profileService;
+        _profileDetectionService = profileDetectionService;
     }
 
     [RelayCommand]
@@ -59,12 +66,22 @@ public sealed partial class CreateProjectViewModel : ObservableObject
         {
             var id = await _projectService.CreateProjectAsync(newProject);
             newProject.Id = id;
+            await SeedDetectedProfileAsync(newProject);
             OnProjectCreated?.Invoke(newProject);
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Failed to create project: {ex.Message}";
         }
+    }
+
+    private async Task SeedDetectedProfileAsync(global::IronDev.Data.Models.Project project)
+    {
+        var detected = await _profileDetectionService.DetectAsync(project.LocalPath ?? string.Empty, project.Id);
+
+        await _profileService.SaveProjectProfileAsync(detected.Profile);
+        await _profileService.SaveProjectCommandAsync(detected.BuildCommand);
+        await _profileService.SaveProjectCommandAsync(detected.TestCommand);
     }
 
     [RelayCommand]

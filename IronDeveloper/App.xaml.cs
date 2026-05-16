@@ -200,6 +200,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IProjectProfileService,
                     global::IronDev.Infrastructure.Services.ProjectProfileService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IProjectProfileDetectionService,
+                    global::IronDev.Infrastructure.Services.ProjectProfileDetectionService>();
 
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IDotNetBuildService,

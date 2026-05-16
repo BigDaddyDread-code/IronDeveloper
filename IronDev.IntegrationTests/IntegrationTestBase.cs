@@ -63,6 +63,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
         services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
         services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
+        services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();

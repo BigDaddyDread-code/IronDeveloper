@@ -16,6 +16,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
     private readonly global::IronDev.Agent.Services.Interfaces.ILocalIndexingService _indexingService;
     private readonly global::IronDev.Core.Interfaces.IProjectProfileService _profileService;
+    private readonly global::IronDev.Core.Interfaces.IProjectProfileDetectionService _profileDetectionService;
     private readonly global::IronDev.Services.IProjectContextExportService _exportService;
 
     private global::IronDev.Data.Models.Project? _currentProject;
@@ -66,12 +67,14 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         global::IronDev.Services.IProjectMemoryService memoryService,
         global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService,
         global::IronDev.Core.Interfaces.IProjectProfileService profileService,
+        global::IronDev.Core.Interfaces.IProjectProfileDetectionService profileDetectionService,
         global::IronDev.Services.IProjectContextExportService exportService)
     {
         _ticketService   = ticketService;
         _memoryService   = memoryService;
         _indexingService = indexingService;
         _profileService  = profileService;
+        _profileDetectionService = profileDetectionService;
         _exportService   = exportService;
     }
 
@@ -352,70 +355,27 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void DetectProfile()
+    private async Task DetectProfileAsync()
     {
         if (_currentProject == null || string.IsNullOrWhiteSpace(_currentProject.LocalPath)) return;
 
-        var path = _currentProject.LocalPath;
-        if (!Directory.Exists(path)) return;
-
-        ProfileSafeWriteRoot = path;
-
-        // Find solution
-        var slnFiles = Directory.GetFiles(path, "*.sln", SearchOption.TopDirectoryOnly);
-        if (slnFiles.Length == 0)
-        {
-            slnFiles = Directory.GetFiles(path, "*.slnx", SearchOption.TopDirectoryOnly);
-        }
-
-        if (slnFiles.Length > 0)
-        {
-            ProfileSolutionFile = slnFiles[0];
-            ProfileBuildCommand = $"dotnet build \"{ProfileSolutionFile}\" --no-incremental -v quiet";
-            ProfileTestCommand = $"dotnet test \"{ProfileSolutionFile}\" --logger \"console;verbosity=minimal\"";
-        }
-        else
-        {
-            ProfileSolutionFile = string.Empty;
-            ProfileBuildCommand = "dotnet build";
-            ProfileTestCommand = "dotnet test";
-        }
-
-        // Try to detect xUnit
-        try
-        {
-            bool hasXUnit = false;
-            var projFiles = Directory.GetFiles(path, "*.csproj", SearchOption.AllDirectories);
-            foreach (var proj in projFiles)
-            {
-                var content = File.ReadAllText(proj);
-                if (content.Contains("xunit", StringComparison.OrdinalIgnoreCase))
-                {
-                    hasXUnit = true;
-                    break;
-                }
-            }
-
-            if (hasXUnit)
-            {
-                ProfileTestFramework = "xUnit";
-            }
-        }
-        catch { }
-
-        // Some reasonable defaults if missing
-        if (string.IsNullOrWhiteSpace(ProfilePrimaryLanguage)) ProfilePrimaryLanguage = "C#";
-        
-        // BookSeller specific detection
-        if (path.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(ProfileApplicationType)) ProfileApplicationType = "External Sandbox / Class Library";
-            if (string.IsNullOrWhiteSpace(ProfileFramework)) ProfileFramework = ".NET 10";
-            if (string.IsNullOrWhiteSpace(ProfileDatabaseEngine)) ProfileDatabaseEngine = "None";
-            if (string.IsNullOrWhiteSpace(ProfileDataAccessStyle)) ProfileDataAccessStyle = "InMemory";
-        }
-        
-        ProfileSaveStatus = "Detected. Unsaved.";
+        var detected = await _profileDetectionService.DetectAsync(_currentProject.LocalPath, _currentProject.Id);
+        ProfileApplicationType = detected.Profile.ApplicationType ?? string.Empty;
+        ProfilePrimaryLanguage = detected.Profile.PrimaryLanguage ?? string.Empty;
+        ProfileFramework = detected.Profile.Framework ?? string.Empty;
+        ProfileDatabaseEngine = detected.Profile.DatabaseEngine ?? string.Empty;
+        ProfileDataAccessStyle = detected.Profile.DataAccessStyle ?? string.Empty;
+        ProfileTestFramework = detected.Profile.TestFramework ?? string.Empty;
+        ProfileSolutionFile = detected.Profile.SolutionFile ?? string.Empty;
+        ProfileSafeWriteRoot = detected.Profile.SafeWriteRoot ?? string.Empty;
+        ProfileAllowBuilderApply = detected.Profile.AllowBuilderApply;
+        ProfileAllowWritesOutsideProjectRoot = detected.Profile.AllowWritesOutsideProjectRoot;
+        ProfileNotes = detected.Profile.ProfileNotes ?? string.Empty;
+        ProfileBuildCommand = detected.BuildCommand.CommandText;
+        ProfileTestCommand = detected.TestCommand.CommandText;
+        ProfileSaveStatus = detected.Warnings.Count > 0
+            ? $"Detected with warnings: {string.Join(" ", detected.Warnings)}"
+            : "Detected. Unsaved.";
     }
 
     [RelayCommand]

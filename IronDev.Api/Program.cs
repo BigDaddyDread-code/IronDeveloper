@@ -47,6 +47,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
+builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<SqlCodeIndexService>();
 builder.Services.AddScoped<ICodeIndexService, TracingCodeIndexServiceDecorator>();
