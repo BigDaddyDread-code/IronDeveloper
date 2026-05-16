@@ -251,10 +251,10 @@
                                                  IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Plans}"
                                                  Margin="0,0,0,10"/>
 
-                            <!-- Decisions -->
+                            <!-- Project Memory -->
                             <controls:NavRailItem IconData="{StaticResource Icon.Nav.Decisions}" 
                                                  Command="{Binding NavigateWorkspaceCommand}" CommandParameter="Decisions"
-                                                 ToolTip="Decisions"
+                                                 ToolTip="Project Memory"
                                                  IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}"
                                                  Margin="0,0,0,10"/>
 

@@ -17,6 +17,20 @@ public interface IProjectMemoryService
     Task<IReadOnlyList<ProjectDecision>> GetRecentDecisionsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
     Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken cancellationToken = default);
     Task<long> SaveSummaryAsync(ProjectSummary summary, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProjectContextDocument>> GetContextDocumentsAsync(
+        int projectId,
+        string? documentType = null,
+        string? authorityLevel = null,
+        string? status = "Active",
+        int take = 100,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<ProjectContextDocument>>(Array.Empty<ProjectContextDocument>());
+    Task<ProjectContextDocument?> GetContextDocumentByIdAsync(long documentId, CancellationToken cancellationToken = default)
+        => Task.FromResult<ProjectContextDocument?>(null);
+    Task<long> SaveContextDocumentAsync(ProjectContextDocument document, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This project memory service does not support context documents.");
+    Task<bool> ArchiveContextDocumentAsync(long documentId, CancellationToken cancellationToken = default)
+        => Task.FromResult(false);
     
     Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
     Task<ProjectImplementationPlan?> GetPlanByIdAsync(long planId, CancellationToken cancellationToken = default);
@@ -111,6 +125,188 @@ public sealed class ProjectMemoryService : IProjectMemoryService
                 summary.UpdatedDate
             },
             cancellationToken: cancellationToken));
+    }
+
+    public async Task<IReadOnlyList<ProjectContextDocument>> GetContextDocumentsAsync(
+        int projectId,
+        string? documentType = null,
+        string? authorityLevel = null,
+        string? status = "Active",
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
+
+        const string sql = """
+            SELECT TOP (@Take)
+                Id, TenantId, ProjectId, DocumentType, AuthorityLevel, Status, Title, Content,
+                Summary, Tags, AppliesToCapability, AppliesToArea, Source, SupersedesDocumentId,
+                SourceChatMessageId, CreatedDate, UpdatedDate
+            FROM dbo.ProjectContextDocuments
+            WHERE TenantId = @TenantId
+              AND ProjectId = @ProjectId
+              AND (@DocumentType IS NULL OR DocumentType = @DocumentType)
+              AND (@AuthorityLevel IS NULL OR AuthorityLevel = @AuthorityLevel)
+              AND (@Status IS NULL OR Status = @Status)
+            ORDER BY
+                CASE AuthorityLevel
+                    WHEN 'Binding' THEN 1
+                    WHEN 'StrongGuidance' THEN 2
+                    WHEN 'ObservedFact' THEN 3
+                    WHEN 'Pending' THEN 4
+                    WHEN 'ContextOnly' THEN 5
+                    ELSE 6
+                END,
+                UpdatedDate DESC,
+                CreatedDate DESC;
+            """;
+
+        var rows = await connection.QueryAsync<ProjectContextDocument>(new CommandDefinition(
+            sql,
+            new
+            {
+                TenantId = _tenant.TenantId,
+                ProjectId = projectId,
+                DocumentType = string.IsNullOrWhiteSpace(documentType) ? null : documentType,
+                AuthorityLevel = string.IsNullOrWhiteSpace(authorityLevel) ? null : authorityLevel,
+                Status = string.IsNullOrWhiteSpace(status) ? null : status,
+                Take = take
+            },
+            cancellationToken: cancellationToken));
+
+        return rows.ToList();
+    }
+
+    public async Task<ProjectContextDocument?> GetContextDocumentByIdAsync(long documentId, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
+
+        const string sql = """
+            SELECT
+                Id, TenantId, ProjectId, DocumentType, AuthorityLevel, Status, Title, Content,
+                Summary, Tags, AppliesToCapability, AppliesToArea, Source, SupersedesDocumentId,
+                SourceChatMessageId, CreatedDate, UpdatedDate
+            FROM dbo.ProjectContextDocuments
+            WHERE Id = @DocumentId
+              AND TenantId = @TenantId;
+            """;
+
+        return await connection.QuerySingleOrDefaultAsync<ProjectContextDocument>(new CommandDefinition(
+            sql,
+            new { DocumentId = documentId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task<long> SaveContextDocumentAsync(ProjectContextDocument document, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
+
+        await EnsureProjectOwnershipAsync(connection, document.ProjectId, cancellationToken);
+
+        if (document.Id > 0)
+        {
+            const string updateSql = """
+                UPDATE dbo.ProjectContextDocuments
+                SET DocumentType = @DocumentType,
+                    AuthorityLevel = @AuthorityLevel,
+                    Status = @Status,
+                    Title = @Title,
+                    Content = @Content,
+                    Summary = @Summary,
+                    Tags = @Tags,
+                    AppliesToCapability = @AppliesToCapability,
+                    AppliesToArea = @AppliesToArea,
+                    Source = @Source,
+                    SupersedesDocumentId = @SupersedesDocumentId,
+                    SourceChatMessageId = @SourceChatMessageId,
+                    UpdatedDate = SYSUTCDATETIME()
+                WHERE Id = @Id
+                  AND TenantId = @TenantId
+                  AND ProjectId = @ProjectId;
+                """;
+
+            var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
+                updateSql,
+                new
+                {
+                    document.Id,
+                    TenantId = _tenant.TenantId,
+                    document.ProjectId,
+                    document.DocumentType,
+                    document.AuthorityLevel,
+                    document.Status,
+                    document.Title,
+                    document.Content,
+                    document.Summary,
+                    document.Tags,
+                    document.AppliesToCapability,
+                    document.AppliesToArea,
+                    document.Source,
+                    document.SupersedesDocumentId,
+                    document.SourceChatMessageId
+                },
+                cancellationToken: cancellationToken));
+
+            if (rowsAffected == 0)
+                throw new InvalidOperationException("Context document update failed or document not found/not owned.");
+
+            return document.Id;
+        }
+
+        const string insertSql = """
+            INSERT INTO dbo.ProjectContextDocuments
+                (TenantId, ProjectId, DocumentType, AuthorityLevel, Status, Title, Content, Summary,
+                 Tags, AppliesToCapability, AppliesToArea, Source, SupersedesDocumentId, SourceChatMessageId)
+            OUTPUT inserted.Id
+            VALUES
+                (@TenantId, @ProjectId, @DocumentType, @AuthorityLevel, @Status, @Title, @Content, @Summary,
+                 @Tags, @AppliesToCapability, @AppliesToArea, @Source, @SupersedesDocumentId, @SourceChatMessageId);
+            """;
+
+        return await connection.QuerySingleAsync<long>(new CommandDefinition(
+            insertSql,
+            new
+            {
+                TenantId = _tenant.TenantId,
+                document.ProjectId,
+                document.DocumentType,
+                document.AuthorityLevel,
+                document.Status,
+                document.Title,
+                document.Content,
+                document.Summary,
+                document.Tags,
+                document.AppliesToCapability,
+                document.AppliesToArea,
+                document.Source,
+                document.SupersedesDocumentId,
+                document.SourceChatMessageId
+            },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task<bool> ArchiveContextDocumentAsync(long documentId, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
+
+        const string sql = """
+            UPDATE dbo.ProjectContextDocuments
+            SET Status = 'Archived',
+                UpdatedDate = SYSUTCDATETIME()
+            WHERE Id = @DocumentId
+              AND TenantId = @TenantId;
+            """;
+
+        var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { DocumentId = documentId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+
+        return rowsAffected > 0;
     }
 
     public async Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken cancellationToken = default)
@@ -474,5 +670,51 @@ public sealed class ProjectMemoryService : IProjectMemoryService
                 },
                 cancellationToken: cancellationToken));
         }
+    }
+
+    private async Task EnsureProjectOwnershipAsync(System.Data.IDbConnection connection, int projectId, CancellationToken cancellationToken)
+    {
+        const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
+        var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            ownerSql,
+            new { ProjectId = projectId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+
+        if (owns == 0)
+            throw new UnauthorizedAccessException($"Project {projectId} does not belong to tenant {_tenant.TenantId}.");
+    }
+
+    private static async Task EnsureContextDocumentSchemaAsync(System.Data.IDbConnection connection, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectContextDocuments
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL CONSTRAINT DF_ProjectContextDocuments_Tenant DEFAULT 1,
+                    ProjectId INT NOT NULL,
+                    DocumentType NVARCHAR(100) NOT NULL,
+                    AuthorityLevel NVARCHAR(50) NOT NULL,
+                    Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectContextDocuments_Status DEFAULT 'Active',
+                    Title NVARCHAR(200) NOT NULL,
+                    Content NVARCHAR(MAX) NOT NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    Tags NVARCHAR(MAX) NULL,
+                    AppliesToCapability NVARCHAR(200) NULL,
+                    AppliesToArea NVARCHAR(200) NULL,
+                    Source NVARCHAR(200) NULL,
+                    SupersedesDocumentId BIGINT NULL,
+                    SourceChatMessageId BIGINT NULL,
+                    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectContextDocuments_CreatedDate DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NULL
+                );
+
+                CREATE INDEX IX_ProjectContextDocuments_Project_Type_Authority
+                    ON dbo.ProjectContextDocuments(ProjectId, DocumentType, AuthorityLevel, Status, CreatedDate DESC);
+            END
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
     }
 }

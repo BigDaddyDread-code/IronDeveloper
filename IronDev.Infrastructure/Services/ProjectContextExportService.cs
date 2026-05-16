@@ -45,6 +45,7 @@ public class ProjectContextExportService : IProjectContextExportService
         var commands = await _profileService.GetProjectCommandsAsync(projectId);
         var decisions = await _memoryService.GetRecentDecisionsAsync(projectId, 100);
         var latestSummary = await _memoryService.GetLatestSummaryAsync(projectId);
+        var contextDocuments = await _memoryService.GetContextDocumentsAsync(projectId, status: null, take: 200);
         var rules = await _memoryService.GetProjectRulesAsync(projectId);
         var tickets = await _ticketService.GetRecentTicketsAsync(projectId, 100);
         var plans = await _memoryService.GetRecentPlansAsync(projectId, 100);
@@ -113,6 +114,35 @@ public class ProjectContextExportService : IProjectContextExportService
                     sb.AppendLine($"*Hint: {Scrub(r.ValidationHint)}*");
                 }
                 sb.AppendLine();
+            }
+        }
+
+        if (contextDocuments.Any())
+        {
+            sb.AppendLine("## Project Context Documents");
+            foreach (var group in contextDocuments
+                         .GroupBy(d => d.DocumentType)
+                         .OrderBy(g => g.Key))
+            {
+                sb.AppendLine($"### {group.Key}");
+                foreach (var d in group)
+                {
+                    sb.AppendLine($"#### {d.Title}");
+                    sb.AppendLine($"- **Authority:** {d.AuthorityLevel}");
+                    sb.AppendLine($"- **Status:** {d.Status}");
+                    if (!string.IsNullOrWhiteSpace(d.AppliesToArea))
+                        sb.AppendLine($"- **Area:** {Scrub(d.AppliesToArea)}");
+                    if (!string.IsNullOrWhiteSpace(d.Tags))
+                        sb.AppendLine($"- **Tags:** {Scrub(d.Tags)}");
+                    sb.AppendLine();
+                    if (!string.IsNullOrWhiteSpace(d.Summary))
+                    {
+                        sb.AppendLine(Scrub(d.Summary));
+                        sb.AppendLine();
+                    }
+                    sb.AppendLine(Scrub(d.Content));
+                    sb.AppendLine();
+                }
             }
         }
 

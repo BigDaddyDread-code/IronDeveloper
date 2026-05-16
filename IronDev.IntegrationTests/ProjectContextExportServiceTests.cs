@@ -42,6 +42,29 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
             Reason = "Better support for parallel tests."
         });
 
+        await memoryService.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            DocumentType = "ProjectFact",
+            AuthorityLevel = "ObservedFact",
+            Status = "Active",
+            Title = "BookSeller uses in-memory storage",
+            Summary = "Persistence has not been implemented yet.",
+            Content = "The current sandbox stores books in memory.",
+            Tags = "bookseller,persistence",
+            AppliesToArea = "Persistence"
+        });
+
+        await memoryService.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            DocumentType = "OpenQuestion",
+            AuthorityLevel = "Pending",
+            Status = "Pending",
+            Title = "Choose persistence engine",
+            Content = "Should BookSeller use SQLite plus Dapper or SQL Server plus Dapper?"
+        });
+
         await ticketService.SaveTicketAsync(new ProjectTicket
         {
             ProjectId = projectId,
@@ -70,6 +93,11 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         StringAssert.Contains(markdown, "test blueprint for export verification");
         StringAssert.Contains(markdown, "## Architecture Decisions");
         StringAssert.Contains(markdown, "Use NUnit for Tests");
+        StringAssert.Contains(markdown, "## Project Context Documents");
+        StringAssert.Contains(markdown, "BookSeller uses in-memory storage");
+        StringAssert.Contains(markdown, "**Authority:** ObservedFact");
+        StringAssert.Contains(markdown, "Choose persistence engine");
+        StringAssert.Contains(markdown, "**Authority:** Pending");
         StringAssert.Contains(markdown, "## Recent Tickets");
         StringAssert.Contains(markdown, "Implement Export Feature");
         StringAssert.Contains(markdown, "#### Source Traceability");
