@@ -186,6 +186,8 @@ public sealed class ProjectTicket
     public string? ContextSummary { get; set; }
     public bool IsGenerated { get; set; }
     public string? GenerationNote { get; set; }
+    public long? SourceChatSessionId { get; set; }
+    public long? SourceChatMessageId { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime CreatedDate { get; set; }
 }

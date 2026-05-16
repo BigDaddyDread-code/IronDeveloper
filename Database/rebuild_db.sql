@@ -8,6 +8,7 @@ USE [IronDeveloper];
 GO
 
 IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DROP TABLE dbo.ChatMessageFeedback;
+IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DROP TABLE dbo.ArtifactSourceReferences;
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTickets;
 IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DROP TABLE dbo.ProjectRules;
 IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DROP TABLE dbo.ProjectImplementationPlans;
@@ -184,7 +185,6 @@ CREATE TABLE dbo.ProjectImplementationPlans
 
     CONSTRAINT FK_ProjectImplementationPlans_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectImplementationPlans_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
-    CONSTRAINT FK_ProjectImplementationPlans_Tickets FOREIGN KEY (TicketId) REFERENCES dbo.ProjectTickets(Id),
     CONSTRAINT FK_ProjectImplementationPlans_ChatMessages FOREIGN KEY (SourceChatMessageId) REFERENCES dbo.ChatMessages(Id)
 );
 
@@ -217,11 +217,36 @@ CREATE TABLE dbo.ProjectTickets
     ContextSummary NVARCHAR(MAX) NULL,
     IsGenerated BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsGenerated DEFAULT 0,
     GenerationNote NVARCHAR(MAX) NULL,
+    SourceChatSessionId BIGINT NULL,
+    SourceChatMessageId BIGINT NULL,
     IsDeleted BIT NOT NULL CONSTRAINT DF_ProjectTickets_IsDeleted DEFAULT 0,
 
     CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectTickets_CreatedDate DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ProjectTickets_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ProjectTickets_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+);
+
+CREATE TABLE dbo.ArtifactSourceReferences
+(
+    ArtifactSourceReferenceId BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL,
+    ProjectId INT NOT NULL,
+    ArtifactType NVARCHAR(100) NOT NULL,
+    ArtifactId BIGINT NOT NULL,
+    SourceType NVARCHAR(100) NOT NULL,
+    SourceId BIGINT NULL,
+    SourcePath NVARCHAR(1000) NULL,
+    SourceSymbol NVARCHAR(500) NULL,
+    SourceSection NVARCHAR(500) NULL,
+    SourceAnchor NVARCHAR(500) NULL,
+    ReferenceType NVARCHAR(100) NOT NULL,
+    Summary NVARCHAR(MAX) NULL,
+    RelevanceScore DECIMAL(9,4) NULL,
+    IsRequired BIT NOT NULL CONSTRAINT DF_ArtifactSourceReferences_IsRequired DEFAULT 0,
+    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ArtifactSourceReferences_CreatedUtc DEFAULT SYSUTCDATETIME(),
+    CreatedBy NVARCHAR(200) NULL,
+    CONSTRAINT FK_ArtifactSourceReferences_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ArtifactSourceReferences_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
 );
 
 CREATE TABLE dbo.ProjectRules
@@ -289,6 +314,12 @@ CREATE INDEX IX_ProjectImplementationPlans_ProjectId_CreatedDate
 
 CREATE INDEX IX_ProjectTickets_ProjectId_CreatedDate
     ON dbo.ProjectTickets(ProjectId, CreatedDate DESC);
+
+CREATE INDEX IX_ArtifactSourceReferences_Artifact
+    ON dbo.ArtifactSourceReferences(TenantId, ProjectId, ArtifactType, ArtifactId);
+
+CREATE INDEX IX_ArtifactSourceReferences_Source
+    ON dbo.ArtifactSourceReferences(TenantId, ProjectId, SourceType, SourceId);
 
 CREATE INDEX IX_ProjectFiles_ProjectId_FilePath
     ON dbo.ProjectFiles(ProjectId, FilePath);

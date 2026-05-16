@@ -75,6 +75,7 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Infrastructure.Tracing.TracingCodeIndexServiceDecorator>();
                 services.AddTransient<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
                 services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
+                services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
                 services.AddTransient<global::IronDev.Services.IProjectContextExportService, global::IronDev.Infrastructure.Services.ProjectContextExportService>();
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();

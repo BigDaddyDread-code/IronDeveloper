@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -79,6 +80,17 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
         "claude-3-haiku",
         "gemini-2.5-pro"
     ];
+
+    public string ProductDisplayName => AppBuildInfo.DisplayName;
+    public string ProductVersion => AppBuildInfo.Version;
+    public string ProductWorkflowName => AppBuildInfo.WorkflowName;
+    public string ProductSafetyModel => AppBuildInfo.SafetyModel;
+    public string AlphaScopeSummary =>
+        "Create or import a project, profile it, index it, chat with context, create tickets, review proposals, and inspect trace output.";
+    public string AlphaLimitations =>
+        "No autonomous writes by default, no auto-fix loop, no Git or PR automation, and sandbox apply only for explicitly safe projects.";
+    public string AlphaTesterPrompt =>
+        "Point IronDev at a small repo, create one build-ready ticket from chat, generate a proposal, review the diff, and inspect the trace.";
 
     public SettingsWorkspaceViewModel(ILlmTraceService traceService)
     {

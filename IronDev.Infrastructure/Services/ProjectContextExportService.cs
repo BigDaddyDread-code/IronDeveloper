@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
 
@@ -17,19 +18,22 @@ public class ProjectContextExportService : IProjectContextExportService
     private readonly IProjectMemoryService _memoryService;
     private readonly ITicketService _ticketService;
     private readonly ICodeIndexService _codeIndexService;
+    private readonly IArtifactSourceReferenceService _artifactSourceReferenceService;
 
     public ProjectContextExportService(
         IProjectService projectService,
         IProjectProfileService profileService,
         IProjectMemoryService memoryService,
         ITicketService ticketService,
-        ICodeIndexService codeIndexService)
+        ICodeIndexService codeIndexService,
+        IArtifactSourceReferenceService artifactSourceReferenceService)
     {
         _projectService = projectService;
         _profileService = profileService;
         _memoryService = memoryService;
         _ticketService = ticketService;
         _codeIndexService = codeIndexService;
+        _artifactSourceReferenceService = artifactSourceReferenceService;
     }
 
     public async Task<string> ExportProjectContextPackAsync(int projectId)
@@ -48,6 +52,8 @@ public class ProjectContextExportService : IProjectContextExportService
 
         var sb = new StringBuilder();
         sb.AppendLine($"# Project Context Pack: {project.Name}");
+        sb.AppendLine($"IronDev: {AppBuildInfo.DisplayName} ({AppBuildInfo.Version})");
+        sb.AppendLine($"Workflow: {AppBuildInfo.WorkflowName}");
         sb.AppendLine($"Exported: {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine();
 
@@ -139,6 +145,21 @@ public class ProjectContextExportService : IProjectContextExportService
                 sb.AppendLine();
                 sb.AppendLine(Scrub(t.Summary));
                 sb.AppendLine();
+
+                var sourceReferences = await _artifactSourceReferenceService.GetReferencesForArtifactAsync("Ticket", t.Id);
+                if (sourceReferences.Any())
+                {
+                    sb.AppendLine("#### Source Traceability");
+                    foreach (var reference in sourceReferences)
+                    {
+                        var sourceLabel = reference.SourceId.HasValue
+                            ? $"{reference.SourceType} #{reference.SourceId.Value}"
+                            : reference.SourceType;
+                        sb.AppendLine($"- **{reference.ReferenceType}:** {sourceLabel}");
+                    }
+
+                    sb.AppendLine();
+                }
                 
                 var ticketPlan = plans.FirstOrDefault(p => p.TicketId == t.Id);
                 if (ticketPlan != null)

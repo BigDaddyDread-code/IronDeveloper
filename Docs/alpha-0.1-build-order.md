@@ -1,0 +1,70 @@
+# IronDev Alpha 0.1 Build Order
+
+## Goal
+
+Ship a project-aware, proposal-first engineering cockpit that can import or create a small project, understand its profile, index it, create structured tickets, generate safe proposals, and trace the workflow.
+
+Source of truth: [IronDev Alpha 0.1 Charter](alpha-0.1-charter.md).
+
+## Ordered Milestones
+
+1. Storage foundations
+   - Project context documents.
+   - Observable project state.
+   - Artifact source references.
+   - Ticket provenance.
+   - Migrations and test database setup.
+
+2. Versioning and Help/About
+   - Single app version source.
+   - Visible Alpha 0.1 identity.
+   - Help/About content for current scope, safety model, and alpha limits.
+   - Version included in context export and trace export.
+
+3. Project Profile reliability
+   - Detect solution/project files.
+   - Detect framework, test framework, build command, test command, safe write root.
+   - Save and reload without drift.
+
+4. Stale Index visibility
+   - Show stale/not-indexed state on project, ticket, and builder screens.
+   - Block unsafe builder actions when index freshness matters.
+
+5. Project Summary and Context Documents editor
+   - Manual UI for summary, decisions, standards, facts, recommendations, open questions, and discussion notes.
+   - Respect authority levels: Binding, StrongGuidance, ObservedFact, ContextOnly, Pending, Rejected, Superseded.
+
+6. Build Readiness v0.1
+   - ReadyToBuild.
+   - NeedsArchitectureDecision.
+   - NeedsProjectProfileUpdate.
+   - NeedsReindex.
+   - NeedsClarification.
+   - BlockedByConflict.
+
+7. Chat-to-Ticket routing hardening
+   - Explicit ticket creation opens draft ticket workflow.
+   - Preserve user-specified APIs unless the user approves a change.
+   - Include affected files, non-goals, open questions, and readiness.
+
+8. Chat Context Resolver v0.1
+   - Track active topic, current goal, context mode, pending decision/question.
+   - Resolve short follow-ups like "industry standard", "yes", and "that one".
+   - Distinguish ArchitectureAdvice from CodeEvidence.
+
+9. Builder Proposal stabilisation
+   - Proposal-first by default.
+   - Validate path safety, file type, ticket coverage, API drift, architecture compatibility, and test framework compatibility.
+
+10. Sandbox apply/build/test
+    - Opt-in for BookSeller or explicitly safe external projects.
+    - Enforce SafeWriteRoot.
+    - Capture build/test output.
+
+11. Trace UI polish
+    - Make chat, ticket, readiness, proposal, validation, apply, build, and test traceable from one workflow chain.
+
+12. Manual validation and comprehensive tests
+    - Keep a manual alpha validation script.
+    - Add focused unit/integration coverage per milestone.
+    - Finish with a full regression pass before external testers.

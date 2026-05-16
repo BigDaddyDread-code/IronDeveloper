@@ -5,9 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Shell"
         xmlns:conv="clr-namespace:IronDev.Agent.Converters"
+        xmlns:coreModels="clr-namespace:IronDev.Core.Models;assembly=IronDev.Core"
         xmlns:controls="http://schemas.irondeveloper.com/controls"
         mc:Ignorable="d"
-        Title="IronDev" 
+        Title="{x:Static coreModels:AppBuildInfo.WindowTitle}"
         Height="860" Width="1300"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -75,7 +76,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
                         <Image Source="pack://application:,,,/IronDeveloperControls;component/Icons/logo.png" 
                                Width="18" Height="18" Margin="0,0,10,0" RenderOptions.BitmapScalingMode="HighQuality"/>
-                        <TextBlock Text="IronDev" 
+                        <TextBlock Text="{x:Static coreModels:AppBuildInfo.DisplayName}"
                                    Foreground="{StaticResource Text/Secondary}" 
                                    FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         

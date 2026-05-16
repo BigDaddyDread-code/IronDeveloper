@@ -62,6 +62,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
         services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
         services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
+        services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
@@ -95,7 +96,88 @@ public abstract class IntegrationTestBase
 
         // Delete in correct FK order: children before parents.
         var sql = """
+            IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectContextDocuments
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL CONSTRAINT DF_ProjectContextDocuments_Tenant DEFAULT 1,
+                    ProjectId INT NOT NULL,
+                    DocumentType NVARCHAR(100) NOT NULL,
+                    AuthorityLevel NVARCHAR(50) NOT NULL,
+                    Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectContextDocuments_Status DEFAULT 'Active',
+                    Title NVARCHAR(200) NOT NULL,
+                    Content NVARCHAR(MAX) NOT NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    Tags NVARCHAR(MAX) NULL,
+                    AppliesToCapability NVARCHAR(200) NULL,
+                    AppliesToArea NVARCHAR(200) NULL,
+                    Source NVARCHAR(200) NULL,
+                    SupersedesDocumentId BIGINT NULL,
+                    SourceChatMessageId BIGINT NULL,
+                    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectContextDocuments_CreatedDate DEFAULT SYSUTCDATETIME(),
+                    UpdatedDate DATETIME2 NULL
+                );
+            END
+
+            IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ProjectObservableStates
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL CONSTRAINT DF_ProjectObservableStates_Tenant DEFAULT 1,
+                    ProjectId INT NOT NULL,
+                    ActiveCapability NVARCHAR(200) NULL,
+                    ActiveMilestone NVARCHAR(200) NULL,
+                    CurrentFocus NVARCHAR(500) NULL,
+                    BuildReadiness NVARCHAR(100) NULL,
+                    IndexStatus NVARCHAR(100) NULL,
+                    BuilderMode NVARCHAR(100) NULL,
+                    OpenBlockers NVARCHAR(MAX) NULL,
+                    LastRecommendation NVARCHAR(MAX) NULL,
+                    CurrentTargetPath NVARCHAR(1000) NULL,
+                    KnownCurrentGaps NVARCHAR(MAX) NULL,
+                    SnapshotJson NVARCHAR(MAX) NULL,
+                    UpdatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectObservableStates_UpdatedDate DEFAULT SYSUTCDATETIME()
+                );
+            END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatSessionId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceChatSessionId BIGINT NULL;
+            END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatMessageId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
+            END
+
+            IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ArtifactSourceReferences
+                (
+                    ArtifactSourceReferenceId BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ArtifactType NVARCHAR(100) NOT NULL,
+                    ArtifactId BIGINT NOT NULL,
+                    SourceType NVARCHAR(100) NOT NULL,
+                    SourceId BIGINT NULL,
+                    SourcePath NVARCHAR(1000) NULL,
+                    SourceSymbol NVARCHAR(500) NULL,
+                    SourceSection NVARCHAR(500) NULL,
+                    SourceAnchor NVARCHAR(500) NULL,
+                    ReferenceType NVARCHAR(100) NOT NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    RelevanceScore DECIMAL(9,4) NULL,
+                    IsRequired BIT NOT NULL CONSTRAINT DF_ArtifactSourceReferences_IsRequired DEFAULT 0,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ArtifactSourceReferences_CreatedUtc DEFAULT SYSUTCDATETIME(),
+                    CreatedBy NVARCHAR(200) NULL
+                );
+            END
+
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
+            IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             IF OBJECT_ID('dbo.ProjectProfiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectProfiles;
             IF OBJECT_ID('dbo.ProjectCommands', 'U') IS NOT NULL DELETE FROM dbo.ProjectCommands;

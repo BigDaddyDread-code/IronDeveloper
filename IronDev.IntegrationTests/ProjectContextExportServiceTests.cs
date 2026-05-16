@@ -49,7 +49,9 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
             Summary = "Need to allow exporting project context pack.",
             Status = "In Progress",
             Priority = "High",
-            TicketType = "Feature"
+            TicketType = "Feature",
+            SourceChatSessionId = 7007,
+            SourceChatMessageId = 8008
         });
 
         // 2. Execute
@@ -58,6 +60,8 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         // 3. Verify
         Assert.IsNotNull(markdown);
         StringAssert.Contains(markdown, "# Project Context Pack: Export Test Project");
+        StringAssert.Contains(markdown, "IronDev Alpha 0.1");
+        StringAssert.Contains(markdown, "0.1.0-alpha");
         StringAssert.Contains(markdown, "## Project Details");
         StringAssert.Contains(markdown, "Export Test Project");
         StringAssert.Contains(markdown, "## Project Profile");
@@ -68,6 +72,9 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         StringAssert.Contains(markdown, "Use NUnit for Tests");
         StringAssert.Contains(markdown, "## Recent Tickets");
         StringAssert.Contains(markdown, "Implement Export Feature");
+        StringAssert.Contains(markdown, "#### Source Traceability");
+        StringAssert.Contains(markdown, "ChatSession #7007");
+        StringAssert.Contains(markdown, "ChatMessage #8008");
     }
 
     [TestMethod]

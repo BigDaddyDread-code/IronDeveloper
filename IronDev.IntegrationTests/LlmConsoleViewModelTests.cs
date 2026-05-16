@@ -215,6 +215,8 @@ public class LlmConsoleViewModelTests
 
         var exported = svc.ExportTrace(entry);
 
+        StringAssert.Contains(exported, "IronDev Alpha 0.1");
+        StringAssert.Contains(exported, "0.1.0-alpha");
         StringAssert.Contains(exported, "DraftTicketGeneration");
         StringAssert.Contains(exported, "gpt-4o");
         StringAssert.Contains(exported, "1234ms");
