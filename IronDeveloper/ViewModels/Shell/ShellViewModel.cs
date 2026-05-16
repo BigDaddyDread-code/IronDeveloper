@@ -114,9 +114,9 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         _hubVm.OnOpenProject           = (p) => _ = OpenProjectAsync(p);
-        _hubVm.OnCreateProject         = NavigateToCreateProject;
+        _hubVm.AttachWizard(_createVm);
         _createVm.OnProjectCreated     = (p) => _ = CreateAndOpenProjectAsync(p);
-        _createVm.OnCancel             = NavigateToHub;
+        _createVm.OnCancel             = _hubVm.CloseWizard;
         
         // ——— SYNC STATUS FROM OVERVIEW TO SHELL AND WORKSPACE VMs ———
         _overviewVm.PropertyChanged += (s, e) =>
@@ -332,14 +332,9 @@ public sealed partial class ShellViewModel : ObservableObject
         await ActivateProjectAsync(project);
     }
 
-    private void NavigateToCreateProject()
-    {
-        CurrentShellMode = ShellMode.CreateProject;
-        CurrentView = _createVm;
-    }
-
     private async Task CreateAndOpenProjectAsync(global::IronDev.Data.Models.Project project)
     {
+        _hubVm.CloseWizard();
         await ActivateProjectAsync(project);
     }
 

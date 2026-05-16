@@ -28,6 +28,10 @@
     </UserControl.Resources>
 
     <Grid Background="Transparent">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="420"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -35,13 +39,13 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="48,40,48,0">
+        <StackPanel Grid.Row="0" Grid.Column="0" Margin="48,40,48,0">
             <TextBlock Text="PROJECT HUB" Style="{StaticResource Typography.Eyebrow}"/>
             <TextBlock Text="Your Projects" Style="{StaticResource Typography.ScreenTitle}"/>
         </StackPanel>
 
         <!-- Create New CTA -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="48,24,48,40">
+        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="48,24,48,40">
             <Button Content="+ Create New Project"
                     Command="{Binding CreateNewProjectCommand}"
                     Style="{StaticResource AppButton.Primary}"
@@ -49,7 +53,7 @@
         </StackPanel>
 
         <!-- Project tiles -->
-        <ScrollViewer Grid.Row="2" Margin="40,0,40,40" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" Grid.Column="0" Margin="40,0,40,40" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding RecentProjects}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -125,5 +129,13 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
+
+        <!-- Embedded project wizard -->
+        <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+                Margin="0,24,32,32"
+                Visibility="{Binding IsProjectWizardOpen, Converter={StaticResource BoolToVisibilityConverter}}"
+                Style="{StaticResource IronMetalPanel}">
+            <ContentControl Content="{Binding ProjectWizard}"/>
+        </Border>
     </Grid>
 </UserControl>

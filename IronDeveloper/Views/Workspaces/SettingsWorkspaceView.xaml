@@ -112,7 +112,7 @@
 
                     <!-- Context Agent (Agentic RAG) -->
                     <Border Height="1" Background="#10FFFFFF" Margin="0,12,0,12"/>
-                    <Grid>
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -124,6 +124,23 @@
                                        Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" IsChecked="{Binding UseContextAgent}"
+                                      VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Builder approval -->
+                    <Border Height="1" Background="#10FFFFFF" Margin="0,0,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Require Builder Apply Approval" FontWeight="SemiBold" FontSize="14"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock Text="Ask before applying proposal files and running the build/test cycle."
+                                       Style="{StaticResource IronMetaLabel}" Opacity="0.65" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" IsChecked="{Binding RequireBuilderApplyApproval}"
                                       VerticalAlignment="Center"/>
                     </Grid>
                 </StackPanel>
@@ -209,7 +226,7 @@
             </Border>
 
             <!-- Note -->
-            <TextBlock Text="Settings are stored in memory only in this preview build."
+            <TextBlock Text="Settings are saved on this machine."
                        Style="{StaticResource IronMetaLabel}" HorizontalAlignment="Center"
                        Opacity="0.4" Margin="0,4,0,0"/>
 

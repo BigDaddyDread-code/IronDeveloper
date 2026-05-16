@@ -239,7 +239,7 @@ public sealed class ChatHistoryService : IChatHistoryService
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
               AND ChatSessionId = @SessionId
-            ORDER BY CreatedDate DESC;
+            ORDER BY CreatedDate DESC, Id DESC;
             """;
 
         using var connection = _connectionFactory.CreateConnection();

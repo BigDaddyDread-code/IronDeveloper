@@ -113,14 +113,6 @@ public static class BuilderProposalValidator
             AddWarning(proposal, $"{change.FilePath}: missing change description.");
         }
 
-        if (proposal.ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase) &&
-            (change.FilePath.Contains("IronDev", StringComparison.OrdinalIgnoreCase) ||
-             change.FilePath.Contains("IronDeveloper", StringComparison.OrdinalIgnoreCase)))
-        {
-            MarkInvalid(proposal, change, "Cannot modify host files when active project is external.");
-            return;
-        }
-
         if (change.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
         {
             ValidateCSharpStructure(proposal, change);
@@ -149,39 +141,6 @@ public static class BuilderProposalValidator
             AddWarning(proposal, $"{change.FilePath}: C# class has no namespace in full replacement content.");
         }
 
-        if (!proposal.ProjectName.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        if (change.FilePath.Contains("BookService.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!content.Contains("namespace BookSeller.Core.Services", StringComparison.Ordinal))
-            {
-                MarkInvalid(proposal, change, "Missing namespace BookSeller.Core.Services.");
-            }
-
-            if (!content.Contains("class BookService", StringComparison.Ordinal))
-            {
-                MarkInvalid(proposal, change, "Missing class BookService.");
-            }
-
-            if (!content.Contains("IBookService", StringComparison.Ordinal))
-            {
-                MarkInvalid(proposal, change, "IBookService implementation removed.");
-            }
-
-            if (content.Contains("class Book", StringComparison.Ordinal) && !content.Contains("public class BookService", StringComparison.Ordinal))
-            {
-                MarkInvalid(proposal, change, "Duplicate Book model class detected in service file.");
-            }
-        }
-
-        if (change.FilePath.Contains("Book.cs", StringComparison.OrdinalIgnoreCase) &&
-            !content.Contains("namespace BookSeller.Core.Models", StringComparison.Ordinal))
-        {
-            MarkInvalid(proposal, change, "Missing namespace BookSeller.Core.Models in Book model.");
-        }
     }
 
     private static void ValidateCoverage(BuilderProposal proposal)

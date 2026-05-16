@@ -58,7 +58,7 @@ public sealed class ProjectProfileDetectionServiceTests
     }
 
     [TestMethod]
-    public async Task DetectAsync_ForBookSeller_ShouldEnableSandboxDefaults()
+    public async Task DetectAsync_ForBookSeller_ShouldNotEnableApplyByName()
     {
         var root = CreateTempProjectRoot("BookSeller");
         try
@@ -76,10 +76,10 @@ public sealed class ProjectProfileDetectionServiceTests
             var service = new ProjectProfileDetectionService();
             var detected = await service.DetectAsync(root, projectId: 7);
 
-            Assert.AreEqual("External Sandbox / Class Library", detected.Profile.ApplicationType);
+            Assert.AreEqual("External Sandbox / .NET Project", detected.Profile.ApplicationType);
             Assert.AreEqual(".NET 9", detected.Profile.Framework);
             Assert.IsTrue(detected.Profile.IsExternalProject);
-            Assert.IsTrue(detected.Profile.AllowBuilderApply);
+            Assert.IsFalse(detected.Profile.AllowBuilderApply);
             Assert.IsFalse(detected.Profile.AllowWritesOutsideProjectRoot);
             Assert.AreEqual("None", detected.Profile.DatabaseEngine);
             Assert.AreEqual("None", detected.Profile.DataAccessStyle);

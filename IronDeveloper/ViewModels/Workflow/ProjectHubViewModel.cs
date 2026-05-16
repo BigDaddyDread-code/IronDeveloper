@@ -12,9 +12,10 @@ public sealed partial class ProjectHubViewModel : ObservableObject
     private readonly global::IronDev.Services.IProjectService _projectService;
 
     [ObservableProperty] private ObservableCollection<global::IronDev.Data.Models.Project> _recentProjects = [];
+    [ObservableProperty] private bool _isProjectWizardOpen;
+    [ObservableProperty] private CreateProjectViewModel? _projectWizard;
 
     internal Action<global::IronDev.Data.Models.Project>? OnOpenProject   { get; set; }
-    internal Action?                                     OnCreateProject { get; set; }
 
     public ProjectHubViewModel(global::IronDev.Services.IProjectService projectService)
     {
@@ -51,5 +52,15 @@ public sealed partial class ProjectHubViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CreateNewProject() => OnCreateProject?.Invoke();
+    private void CreateNewProject() => IsProjectWizardOpen = true;
+
+    internal void AttachWizard(CreateProjectViewModel wizard)
+    {
+        ProjectWizard = wizard;
+    }
+
+    internal void CloseWizard()
+    {
+        IsProjectWizardOpen = false;
+    }
 }

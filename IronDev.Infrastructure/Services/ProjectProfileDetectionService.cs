@@ -23,7 +23,7 @@ public sealed class ProjectProfileDetectionService : IProjectProfileDetectionSer
         result.Profile.SafeWriteRoot = root;
         result.Profile.IsExternalProject = true;
         result.Profile.AllowWritesOutsideProjectRoot = false;
-        result.Profile.AllowBuilderApply = IsKnownSandbox(root);
+        result.Profile.AllowBuilderApply = false;
         result.Profile.DatabaseEngine = "None";
         result.Profile.DataAccessStyle = "None";
         result.Profile.TestFramework = "None";
@@ -90,12 +90,6 @@ public sealed class ProjectProfileDetectionService : IProjectProfileDetectionSer
 
         if (string.IsNullOrWhiteSpace(result.Profile.ApplicationType))
             result.Profile.ApplicationType = projectFiles.Length > 0 ? "External Sandbox / .NET Project" : "Unknown";
-
-        if (IsKnownSandbox(root))
-        {
-            result.Profile.ApplicationType = "External Sandbox / Class Library";
-            result.Profile.ProfileNotes = "Detected as a known safe sandbox project. Confirm before enabling apply/build/test.";
-        }
 
         return result;
     }
@@ -184,9 +178,6 @@ public sealed class ProjectProfileDetectionService : IProjectProfileDetectionSer
 
         return targetFramework;
     }
-
-    private static bool IsKnownSandbox(string path)
-        => path.Contains("BookSeller", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsIgnoredPath(string path)
         => path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
