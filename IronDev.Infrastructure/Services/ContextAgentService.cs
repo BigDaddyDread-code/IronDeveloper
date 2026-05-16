@@ -155,6 +155,7 @@ public sealed class ContextAgentService : IContextAgentService
             SessionId = request.SessionId,
             UserRequest = request.UserRequest,
             RecentConversationSummary = request.RecentConversationSummary,
+            ConversationContextSnapshot = ConversationContextResolver.TryParseSnapshot(request.RecentConversationSummary),
             InitialIntentFromPromptContextBuilder = initialPacket.Intent.ToString(),
             RecentTickets = request.RecentTickets,
             RecentDecisions = request.RecentDecisions,
@@ -980,6 +981,14 @@ Return JSON only.";
         sb.AppendLine();
         sb.AppendLine("=== CONTEXT AGENT GUIDELINES ===");
         sb.AppendLine($"- Your current route is: {route.RequestKind}");
+        if (!string.IsNullOrWhiteSpace(route.ContextMode))
+            sb.AppendLine($"- Current context mode is: {route.ContextMode}");
+        if (!string.Equals(route.EffectiveWorkText, request.UserRequest, StringComparison.Ordinal))
+        {
+            sb.AppendLine($"- Original user text: {request.UserRequest}");
+            sb.AppendLine($"- Resolved effective request: {route.EffectiveWorkText}");
+            sb.AppendLine("- Answer the resolved effective request, while preserving the user's wording where it matters.");
+        }
         
         if (route.RequestKind == ContextRequestKind.InspectCode || 
             route.RequestKind == ContextRequestKind.VerifyImplementation || 
@@ -1095,9 +1104,18 @@ Return JSON only.";
         else
         {
             sb.AppendLine("No additional code was retrieved during this request.");
-            sb.AppendLine("If your answer requires inspecting specific code that is not in the context above, you MUST say:");
-            sb.AppendLine("\"I do not have enough indexed code context to verify that.\"");
-            sb.AppendLine("Do NOT invent code details not present in the retrieved snippets.");
+            if (route.RequestKind == ContextRequestKind.ArchitectureAdvice ||
+                route.RequestKind == ContextRequestKind.ArchitectureDecisionExploration)
+            {
+                sb.AppendLine("This route does not require code evidence. Use project profile, decisions, standards, facts, and conversation state.");
+                sb.AppendLine("Do NOT claim implementation exists unless code evidence is present.");
+            }
+            else
+            {
+                sb.AppendLine("If your answer requires inspecting specific code that is not in the context above, you MUST say:");
+                sb.AppendLine("\"I do not have enough indexed code context to verify that.\"");
+                sb.AppendLine("Do NOT invent code details not present in the retrieved snippets.");
+            }
         }
 
         sb.AppendLine();

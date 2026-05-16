@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -64,6 +65,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     // Ticket creation now passes a ChatTicketContext so the shell can
     // initiate the draft review flow instead of directly prefilling.
     public Action<IronDev.Agent.Models.ChatTicketContext>? OnCreateTicketFromChat { get; set; }
+    public Action<IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>>? OnCreateTicketsFromChat { get; set; }
     public Action<string, string, string?, string?, string?>? OnCreatePlanFromChat { get; set; }
     public Action<string, string, string?, string?>? OnCreateDecisionFromChat { get; set; }
 
@@ -207,7 +209,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             var sessionId = SelectedSession.Id;
 
             // Persist user message
-            await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+            var userDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
             {
                 ProjectId = projectId,
                 ChatSessionId = sessionId,
@@ -235,6 +237,39 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     SelectedSession = currentSession;
 
                 await _chatHistoryService.SaveSessionAsync(currentSession);
+            }
+
+            var previousMessage = Messages.Count > 1 ? Messages[Messages.Count - 2].MessageText : null;
+            var ticketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
+            if (ticketIntent != null && (!UseContextAgent || _contextAgentService == null))
+            {
+                if (ticketIntent.RequiresClarification)
+                {
+                    var clarificationText = string.Join("\n", ticketIntent.ClarificationQuestions);
+                    var assistantMsg = new ChatSummary
+                    {
+                        Role = "assistant",
+                        MessageText = clarificationText,
+                        Timestamp = DateTime.UtcNow
+                    };
+                    Messages.Add(assistantMsg);
+                    await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                    {
+                        ProjectId = projectId,
+                        ChatSessionId = sessionId,
+                        Role = "assistant",
+                        Message = clarificationText
+                    });
+                    return;
+                }
+
+                var contexts = BuildTicketContextsFromIntent(ticketIntent, sessionId, userDbId);
+                if (contexts.Count > 1 && OnCreateTicketsFromChat != null)
+                    OnCreateTicketsFromChat.Invoke(contexts);
+                else if (contexts.Count > 0 && OnCreateTicketFromChat != null)
+                    OnCreateTicketFromChat.Invoke(contexts[0]);
+
+                return;
             }
 
             var packet = await _promptContextBuilder.BuildPacketAsync(projectId, sessionId, text);
@@ -283,7 +318,6 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     System.Diagnostics.Trace.WriteLine($"[Chat][Warning] Conflict artefact retrieval failed: {ex.Message}");
                 }
 
-                var previousMessage = Messages.Count > 1 ? Messages[Messages.Count - 2].MessageText : null;
                 var createTicketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
 
                 if (createTicketIntent != null)
@@ -515,6 +549,59 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private void CancelRename()
     {
         IsRenamingTitle = false;
+    }
+
+    private static IReadOnlyList<IronDev.Agent.Models.ChatTicketContext> BuildTicketContextsFromIntent(
+        CreateTicketIntent intent,
+        long sessionId,
+        long messageId)
+    {
+        var count = Math.Clamp(intent.TicketCount <= 0 ? 1 : intent.TicketCount, 1, 5);
+        var workText = intent.WorkText.Trim();
+        if (count == 1)
+        {
+            return
+            [
+                new IronDev.Agent.Models.ChatTicketContext
+                {
+                    SessionId = sessionId,
+                    MessageId = messageId,
+                    MessageText = workText,
+                    ProposedTitle = MakeTicketTitle(workText),
+                    SplitIndex = 1,
+                    SplitCount = 1
+                }
+            ];
+        }
+
+        var contexts = new List<IronDev.Agent.Models.ChatTicketContext>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var hint = i < intent.SplitHints.Count ? intent.SplitHints[i] : $"Part {i + 1}";
+            contexts.Add(new IronDev.Agent.Models.ChatTicketContext
+            {
+                SessionId = sessionId,
+                MessageId = messageId,
+                MessageText =
+                    $"Split ticket {i + 1} of {count}: {hint}\n\n" +
+                    "Source discussion:\n" +
+                    workText,
+                ProposedTitle = MakeTicketTitle(hint),
+                SplitIndex = i + 1,
+                SplitCount = count
+            });
+        }
+
+        return contexts;
+    }
+
+    private static string MakeTicketTitle(string text)
+    {
+        var normalized = string.Join(" ", text.Split(['\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries));
+        if (string.IsNullOrWhiteSpace(normalized))
+            return "Chat-generated ticket";
+
+        return normalized.Length > 80 ? normalized[..80] + "..." : normalized;
     }
 
     [RelayCommand]

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using IronDev.Agent.Models;
 using IronDev.Agent.ViewModels.Workspaces;
@@ -466,6 +467,65 @@ public class ChatToDraftTicketTests
             "Implementation plan should have been auto-generated before callback.");
         StringAssert.Contains(receivedSteps, "Step 1",
             "Received steps must contain content from the auto-generated plan.");
+    }
+
+    [TestMethod]
+    [Description("Split ticket contexts generate multiple in-list draft tickets for separate review.")]
+    public async Task BeginDraftsFromChatAsync_GeneratesMultipleDraftTickets()
+    {
+        var vm = CreateVm();
+        var contexts = new[]
+        {
+            MakeContext("Project Summary", "Split ticket 1 of 2: project summary"),
+            MakeContext("Context Documents", "Split ticket 2 of 2: context documents")
+        };
+
+        await vm.BeginDraftsFromChatAsync(contexts);
+
+        Assert.AreEqual(2, vm.Tickets.Count(t => t.IsDraft));
+        Assert.IsTrue(vm.IsDraftMode);
+        Assert.IsNotNull(vm.SelectedTicket);
+        Assert.AreEqual("Project Summary", vm.SelectedTicket!.Title);
+        StringAssert.Contains(vm.DraftStatusMessage, "Generated 2 draft tickets");
+    }
+
+    [TestMethod]
+    [Description("Split ticket drafts preserve each proposed title and message body.")]
+    public async Task BeginDraftsFromChatAsync_PreservesEachSplitContext()
+    {
+        var vm = CreateVm();
+
+        await vm.BeginDraftsFromChatAsync(
+        [
+            MakeContext("UI controls", "Split ticket 1 of 2: add controls"),
+            MakeContext("Routing", "Split ticket 2 of 2: add routing")
+        ]);
+
+        var titles = vm.Tickets.Where(t => t.IsDraft).Select(t => t.Title).ToList();
+        CollectionAssert.Contains(titles, "UI controls");
+        CollectionAssert.Contains(titles, "Routing");
+    }
+
+    [TestMethod]
+    [Description("Split ticket preflight stores the whole batch until the user continues without index.")]
+    public async Task BeginDraftsFromChatAsync_WhenIndexLimited_WaitsForPreflightContinue()
+    {
+        var vm = CreateVm();
+        vm.SetIndexStatus("Needs Index");
+
+        await vm.BeginDraftsFromChatAsync(
+        [
+            MakeContext("Summary", "Split ticket 1 of 2: summary"),
+            MakeContext("Documents", "Split ticket 2 of 2: documents")
+        ]);
+
+        Assert.AreEqual(DraftPreflightState.NeedsChoice, vm.DraftPreflight);
+        Assert.AreEqual(0, vm.Tickets.Count(t => t.IsDraft));
+
+        await vm.PreflightContinueCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(2, vm.Tickets.Count(t => t.IsDraft));
+        Assert.AreEqual(DraftPreflightState.None, vm.DraftPreflight);
     }
 }
 

@@ -156,6 +156,12 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentWorkspace = ProjectWorkspace.Tickets;
             CurrentView = _ticketsVm;
         };
+        _chatVm.OnCreateTicketsFromChat = (contexts) =>
+        {
+            _ = _ticketsVm.BeginDraftsFromChatAsync(contexts);
+            CurrentWorkspace = ProjectWorkspace.Tickets;
+            CurrentView = _ticketsVm;
+        };
 
         // Ticket draft cancelled → navigate back to Chat
         _ticketsVm.OnCancelDraft = () =>

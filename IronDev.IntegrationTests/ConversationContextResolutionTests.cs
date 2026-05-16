@@ -14,12 +14,13 @@ namespace IronDev.IntegrationTests;
 public sealed class ConversationContextResolutionTests
 {
     [TestMethod]
-    public async Task RouteJudgePrompt_IncludesStructuredConversationStateAndContinuationRules()
+    public async Task RouteJudge_UsesStructuredConversationResolverBeforeLlm()
     {
         var llm = new ConversationStateAwareLlm();
-        var judge = new ContextAgentRouteJudgeService(llm, new LlmTraceService());
+        var traceService = new LlmTraceService();
+        var judge = new ContextAgentRouteJudgeService(llm, traceService);
 
-        await judge.DecideRouteAsync(new ContextAgentRouteRequest
+        var decision = await judge.DecideRouteAsync(new ContextAgentRouteRequest
         {
             ProjectId = 44,
             SessionId = 9001,
@@ -27,11 +28,14 @@ public sealed class ConversationContextResolutionTests
             RecentConversationSummary = BookSellerPersistenceState()
         });
 
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("ActiveTopic: BookSeller persistence architecture"));
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("PendingDecision: Choose persistence engine and data access style"));
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("LastRecommendation: SQLite + Dapper"));
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("CONTINUATION RESOLUTION RULE"));
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("ARCHITECTURE ADVICE RULE"));
+        Assert.AreEqual(ContextRequestKind.ArchitectureAdvice, decision.RequestKind);
+        Assert.AreEqual("What is the industry-standard persistence approach for BookSeller?", decision.EffectiveWorkText);
+        Assert.IsTrue(decision.UsedConversationContextResolver);
+        Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
+
+        var resolutionTrace = FindTrace(traceService, ContextAgentStage.IntentContextResolution);
+        Assert.IsTrue(resolutionTrace.RawResponseText.Contains("ActiveTopic: BookSeller persistence architecture"));
+        Assert.IsTrue(resolutionTrace.RawResponseText.Contains("LastRecommendation: SQLite + Dapper"));
     }
 
     [TestMethod]
@@ -161,7 +165,7 @@ public sealed class ConversationContextResolutionTests
     }
 
     [TestMethod]
-    public async Task ContextAgent_PassesConversationSummaryIntoRouteJudge()
+    public async Task ContextAgent_EmitsConversationResolutionTrace()
     {
         var llm = new ConversationStateAwareLlm();
         var traceService = new LlmTraceService();
@@ -175,8 +179,12 @@ public sealed class ConversationContextResolutionTests
             RecentConversationSummary = BookSellerPersistenceState()
         });
 
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("ActiveTopic: BookSeller persistence architecture"));
-        Assert.IsTrue(llm.LastRoutePrompt.Contains("KnownFacts:"));
+        Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
+
+        var resolutionTrace = FindTrace(traceService, ContextAgentStage.IntentContextResolution);
+        Assert.IsTrue(resolutionTrace.RawResponseText.Contains("ActiveTopic: BookSeller persistence architecture"));
+        Assert.IsTrue(resolutionTrace.RawResponseText.Contains("KnownFacts") ||
+                      resolutionTrace.RequestText.Contains("KnownFacts"));
     }
 
     private static ContextAgentService CreateAgent(

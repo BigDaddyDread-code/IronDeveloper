@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -171,6 +172,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>Pending context held while the user decides on the preflight choice.</summary>
     private ChatTicketContext? _pendingChatContext;
+    private IReadOnlyList<ChatTicketContext>? _pendingChatContexts;
 
     /// <summary>
     /// True when "Index Project First" was clicked and we should auto-generate
@@ -264,7 +266,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         {
             IsDraftMode        = true;
             IsDraftGenerating  = false;
-            DraftStatusMessage = "Draft Codebase Ticket";
+            if (string.IsNullOrWhiteSpace(DraftStatusMessage) || DraftStatusMessage.StartsWith("Generating", StringComparison.OrdinalIgnoreCase))
+                DraftStatusMessage = "Draft ticket";
             HasDetail          = true;
             IsEditing          = true;
             IsNewTicket        = true;
@@ -792,13 +795,16 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             if (IsProjectIndexed)
             {
                 // Happy path: indexing completed, auto-generate the draft.
-                if (_shouldGenerateDraftAfterIndex && _pendingChatContext != null)
+                if (_shouldGenerateDraftAfterIndex && (_pendingChatContext != null || _pendingChatContexts != null))
                 {
                     IsDraftIndexing               = false;
                     _shouldGenerateDraftAfterIndex = false;
                     DraftPreflightMessage         = string.Empty;
                     var ctx = _pendingChatContext;
-                    _ = GeneratePendingDraftAfterIndexAsync(ctx);
+                    var contexts = _pendingChatContexts;
+                    _ = ctx != null
+                        ? GeneratePendingDraftAfterIndexAsync(ctx)
+                        : GeneratePendingDraftsAfterIndexAsync(contexts!);
                 }
             }
             else if (status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase))
@@ -853,6 +859,33 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 WasSuccessful = false,
                 ErrorMessage = ex.Message,
                 ParsedResponseSummary = "Pending draft generation failed after indexing completed.",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+    }
+
+    private async Task GeneratePendingDraftsAfterIndexAsync(IReadOnlyList<ChatTicketContext> contexts)
+    {
+        try
+        {
+            await GeneratePendingDraftsAsync(contexts);
+        }
+        catch (Exception ex)
+        {
+            IsDraftIndexing = false;
+            DraftPreflight = DraftPreflightState.IndexFailed;
+            DraftPreflightMessage = "Draft generation failed after indexing. You can retry or continue without index.";
+
+            _llmTraceService?.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Tickets.GeneratePendingDraftsAfterIndex",
+                WorkspaceName = "Tickets",
+                ProjectId = _activeProjectId,
+                ActiveProjectName = _activeProjectName,
+                ActiveProjectPath = _activeProjectPath,
+                WasSuccessful = false,
+                ErrorMessage = ex.Message,
+                ParsedResponseSummary = "Pending split ticket drafts failed after indexing completed.",
                 CreatedAt = DateTime.UtcNow
             });
         }
@@ -918,6 +951,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         {
             // Project is not indexed — show preflight choice instead of generating.
             _pendingChatContext = ctx;
+            _pendingChatContexts = null;
             DraftPreflight      = DraftPreflightState.NeedsChoice;
             HasDetail           = false;   // don't show the editor yet
             return;
@@ -925,6 +959,27 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         // Project is indexed — proceed immediately.
         await GeneratePendingDraftAsync(ctx);
+    }
+
+    public async Task BeginDraftsFromChatAsync(IReadOnlyList<ChatTicketContext> contexts)
+    {
+        if (contexts.Count == 0) return;
+        if (contexts.Count == 1)
+        {
+            await BeginDraftFromChatAsync(contexts[0]);
+            return;
+        }
+
+        if (IsContextLimited)
+        {
+            _pendingChatContext = null;
+            _pendingChatContexts = contexts;
+            DraftPreflight = DraftPreflightState.NeedsChoice;
+            HasDetail = false;
+            return;
+        }
+
+        await GeneratePendingDraftsAsync(contexts);
     }
 
     /// <summary>Inner generation path — shared by BeginDraftFromChatAsync and PreflightContinue.</summary>
@@ -941,6 +996,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         // Clear any preflight state before generating
         DraftPreflight      = DraftPreflightState.None;
         _pendingChatContext  = null;
+        _pendingChatContexts = null;
 
         try
         {
@@ -981,12 +1037,71 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     /// Preflight: "Continue Without Index" — generate draft immediately with limited context.
     /// Guard: no-op while indexing is in progress (belt-and-suspenders; button is also disabled in UI).
     /// </summary>
+    private async Task GeneratePendingDraftsAsync(IReadOnlyList<ChatTicketContext> contexts)
+    {
+        IsDraftMode        = true;
+        IsDraftGenerating  = true;
+        DraftStatusMessage = $"Generating {contexts.Count} draft tickets...";
+        HasDetail          = true;
+        IsEditing          = true;
+        IsNewTicket        = true;
+        ActiveTab          = TicketDetailTab.Overview;
+
+        DraftPreflight      = DraftPreflightState.None;
+        _pendingChatContext  = null;
+        _pendingChatContexts = null;
+
+        try
+        {
+            var existingDrafts = Tickets.Where(t => t.IsDraft).ToList();
+            foreach (var existingDraft in existingDrafts)
+                Tickets.Remove(existingDraft);
+
+            var generated = new List<TicketItem>(contexts.Count);
+            foreach (var ctx in contexts)
+            {
+                var draft = await _draftService.GenerateDraftAsync(
+                    _activeProjectId,
+                    _activeProjectName,
+                    ctx.ProposedTitle,
+                    ctx.MessageText,
+                    ctx.LinkedFilePaths,
+                    ctx.LinkedSymbols,
+                    ctx.SessionId);
+
+                draft.SourceChatSessionId = ctx.SessionId;
+                draft.SourceMessageId     = ctx.MessageId;
+                draft.SourceMessageText   = ctx.MessageText;
+
+                generated.Add(MapDraftToUnsavedTicket(draft));
+            }
+
+            for (var i = generated.Count - 1; i >= 0; i--)
+                Tickets.Insert(0, generated[i]);
+
+            CurrentDraft = null;
+            DraftStatusMessage = $"Generated {generated.Count} draft tickets. Review and save each one.";
+            if (Tickets.Count > 0 && Tickets[0].IsDraft)
+                SelectedTicket = Tickets[0];
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Draft generation failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
     [RelayCommand]
     private async Task PreflightContinueAsync()
     {
-        if (_pendingChatContext == null || IsDraftIndexing) return;
-        var ctx = _pendingChatContext;
-        await GeneratePendingDraftAsync(ctx);
+        if ((_pendingChatContext == null && _pendingChatContexts == null) || IsDraftIndexing) return;
+        if (_pendingChatContext != null)
+            await GeneratePendingDraftAsync(_pendingChatContext);
+        else
+            await GeneratePendingDraftsAsync(_pendingChatContexts!);
     }
 
     /// <summary>
@@ -997,7 +1112,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void PreflightIndexProject()
     {
-        if (_pendingChatContext == null) return;
+        if (_pendingChatContext == null && _pendingChatContexts == null) return;
 
         IsDraftIndexing              = true;
         _shouldGenerateDraftAfterIndex = true;
@@ -1015,6 +1130,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private void PreflightCancel()
     {
         _pendingChatContext           = null;
+        _pendingChatContexts          = null;
         _shouldGenerateDraftAfterIndex = false;
         IsDraftIndexing              = false;
         DraftPreflight               = DraftPreflightState.None;
@@ -1403,6 +1519,31 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
+
+    private static TicketItem MapDraftToUnsavedTicket(DraftTicket draft)
+        => new()
+        {
+            Id                 = 0,
+            Title              = draft.Title,
+            TicketType         = draft.TicketType,
+            Priority           = draft.Priority,
+            Summary            = draft.Summary,
+            Background         = draft.Background,
+            AcceptanceCriteria = draft.AcceptanceCriteria,
+            Status             = draft.Status,
+            LinkedFilePaths    = draft.LinkedFilePaths,
+            LinkedSymbols      = draft.LinkedSymbols,
+            UnitTests          = draft.UnitTests,
+            IntegrationTests   = draft.IntegrationTests,
+            ManualTests        = draft.ManualTests,
+            RegressionTests    = draft.RegressionTests,
+            BuildValidation    = draft.BuildValidation,
+            ContextSummary     = draft.Summary,
+            IsGenerated        = true,
+            GenerationNote     = draft.GenerationNote,
+            IsDraft            = true,
+            CreatedDate        = DateTime.UtcNow
+        };
 
     private void ClearEditor()
     {
