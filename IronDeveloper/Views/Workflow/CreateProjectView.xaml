@@ -27,6 +27,10 @@
                 <TextBox Text="{Binding ProjectPath, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,18"/>
 
+                <CheckBox IsChecked="{Binding CreateNewProjectSkeleton}"
+                          Content="Create a new .NET skeleton if this folder is empty"
+                          Margin="0,0,0,18"/>
+
                 <!-- Model Selector -->
                 <TextBlock Text="AI MODEL" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
                 <ComboBox ItemsSource="{Binding AvailableModels}"
