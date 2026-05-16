@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Services;
+using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -43,6 +44,12 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _buildOutput = string.Empty;
     [ObservableProperty] private string _testOutput = string.Empty;
     [ObservableProperty] private BuildReadinessResult? _readiness;
+    [ObservableProperty] private bool _showReadinessCallout;
+    [ObservableProperty] private string _readinessTitle = "Build readiness";
+    [ObservableProperty] private string _readinessMessage = "Generate a proposal to evaluate build readiness.";
+    [ObservableProperty] private string _readinessDetails = string.Empty;
+    [ObservableProperty] private string _readinessBadgeText = "NOT EVALUATED";
+    [ObservableProperty] private BadgeStatus _readinessBadgeStatus = BadgeStatus.Info;
 
     public bool IsBusy => IsGenerating || IsApplying;
     public bool IsApplyEnabled => ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase) && (Readiness?.IsReady ?? false);
@@ -85,6 +92,10 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
             var ticket = await _ticketService.GetTicketByIdAsync(ticketId);
             if (ticket != null)
             {
+                var project = await _projectService.GetByIdAsync(ticket.ProjectId);
+                ProjectName = project?.Name ?? ProjectName;
+                ProjectRoot = project?.LocalPath ?? ProjectRoot;
+
                 Readiness = await _readinessService.EvaluateReadinessAsync(ticket.ProjectId, ticketId);
                 if (!Readiness.IsReady)
                 {
@@ -178,6 +189,7 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     {
         return CurrentProposal != null 
             && CurrentProposal.IsAllValid 
+            && (Readiness?.IsReady ?? false)
             && !IsGenerating 
             && !IsApplying 
             && ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase);
@@ -195,6 +207,57 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
         OnPropertyChanged(nameof(ApplyModeColor));
+    }
+
+    partial void OnReadinessChanged(BuildReadinessResult? value)
+    {
+        ApplyReadinessPresentation();
+        OnPropertyChanged(nameof(IsApplyEnabled));
+        OnPropertyChanged(nameof(ApplyModeLabel));
+        OnPropertyChanged(nameof(ApplyModeColor));
+        ApplyProposalCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplyReadinessPresentation()
+    {
+        if (Readiness == null)
+        {
+            ShowReadinessCallout = true;
+            ReadinessTitle = "Build readiness";
+            ReadinessMessage = "Open a saved ticket from Tickets to evaluate build readiness.";
+            ReadinessDetails = string.Empty;
+            ReadinessBadgeText = "NOT EVALUATED";
+            ReadinessBadgeStatus = BadgeStatus.Info;
+            return;
+        }
+
+        ShowReadinessCallout = true;
+        ReadinessTitle = Readiness.IsReady ? "Ready to build" : "Build blocked";
+        ReadinessMessage = Readiness.Message;
+        ReadinessBadgeText = Readiness.Status.ToString();
+        ReadinessBadgeStatus = Readiness.Status switch
+        {
+            BuildReadinessStatus.ReadyToBuild => BadgeStatus.Ready,
+            BuildReadinessStatus.NeedsReindex => BadgeStatus.NeedsIndex,
+            BuildReadinessStatus.NeedsClarification => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsArchitectureDecision => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsProjectProfileUpdate => BadgeStatus.Warning,
+            BuildReadinessStatus.BlockedByConflict => BadgeStatus.Danger,
+            BuildReadinessStatus.BlockedByExistingDecision => BadgeStatus.Danger,
+            BuildReadinessStatus.Error => BadgeStatus.Danger,
+            _ => BadgeStatus.Info
+        };
+
+        var details = new System.Text.StringBuilder();
+        foreach (var issue in Readiness.BlockingIssues)
+        {
+            details.AppendLine($"Blocking: {issue}");
+        }
+        foreach (var warning in Readiness.Warnings)
+        {
+            details.AppendLine($"Warning: {warning}");
+        }
+        ReadinessDetails = details.ToString().TrimEnd();
     }
 
     [RelayCommand]

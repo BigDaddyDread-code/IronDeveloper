@@ -10,6 +10,7 @@ using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
+using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -21,6 +22,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private readonly IDraftTicketService                             _draftService;
     private readonly ICodebaseTicketGeneratorService                 _generatorService;
     private readonly ILlmTraceService?                               _llmTraceService;
+    private readonly IBuilderReadinessService?                       _readinessService;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
@@ -121,6 +123,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private TicketBuildPreview? _currentBuildPreview;
     [ObservableProperty] private TicketBuildResult?  _currentBuildResult;
     [ObservableProperty] private string              _buildStatusMessage = string.Empty;
+    [ObservableProperty] private BuildReadinessResult? _buildReadiness;
+    [ObservableProperty] private bool _showBuildReadiness;
+    [ObservableProperty] private string _buildReadinessTitle = "Build readiness";
+    [ObservableProperty] private string _buildReadinessMessage = string.Empty;
+    [ObservableProperty] private string _buildReadinessDetails = string.Empty;
+    [ObservableProperty] private string _buildReadinessBadgeText = "READY";
+    [ObservableProperty] private BadgeStatus _buildReadinessBadgeStatus = BadgeStatus.Info;
+    [ObservableProperty] private string _buildReadinessActionText = string.Empty;
 
     /// <summary>True when the Build This button should be enabled.</summary>
     public bool CanBuildTicket =>
@@ -128,7 +138,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         && !IsDraftMode
         && SelectedTicket != null
         && !string.IsNullOrWhiteSpace(EditTitle)
-        && !string.IsNullOrWhiteSpace(_activeProjectPath);
+        && !string.IsNullOrWhiteSpace(_activeProjectPath)
+        && (_readinessService == null || (BuildReadiness?.IsReady ?? false));
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
@@ -203,6 +214,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         ITicketBuildOrchestrator                       orchestrator,
         IDraftTicketService                            draftService,
         ICodebaseTicketGeneratorService                generatorService,
+        IBuilderReadinessService?                      readinessService = null,
         ILlmTraceService?                              llmTraceService = null)
     {
         _ticketService    = ticketService;
@@ -210,6 +222,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         _orchestrator     = orchestrator;
         _draftService     = draftService;
         _generatorService = generatorService;
+        _readinessService = readinessService;
         _llmTraceService  = llmTraceService;
     }
 
@@ -334,6 +347,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         // Load plan for this ticket
         await RefreshPlanAsync(item.Id);
+        await RefreshBuildReadinessAsync();
     }
 
     private async Task RefreshPlanAsync(long ticketId)
@@ -624,8 +638,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     // ── Build Ticket (Phase 3+4A — real context, LLM proposal, dry-run validation) ──
 
-    [RelayCommand]
-    private void BuildSelectedTicketProposal()
+    [RelayCommand(CanExecute = nameof(CanBuildTicket))]
+    private async Task BuildSelectedTicketProposalAsync()
     {
         // ── 1. Validate state with visible feedback ──
         if (IsBuildingTicket) return;
@@ -651,6 +665,13 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(_activeProjectPath))
         {
             SaveStatus = "No active project path found.";
+            return;
+        }
+
+        await RefreshBuildReadinessAsync();
+        if (BuildReadiness is { IsReady: false })
+        {
+            SaveStatus = $"Build blocked: {BuildReadiness.Message}";
             return;
         }
 
@@ -764,6 +785,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     {
         IsProjectIndexed = status == "Ready";
         OnPropertyChanged(nameof(IsContextLimited));
+        _ = RefreshBuildReadinessAsync();
 
         if (DraftPreflight == DraftPreflightState.Indexing)
         {
@@ -1416,6 +1438,91 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         PlanSaveStatus    = string.Empty;
 
         ClearBuildState();
+        ClearBuildReadiness();
+    }
+
+    private async Task RefreshBuildReadinessAsync()
+    {
+        if (_readinessService == null || _activeProjectId <= 0 || EditId <= 0 || IsDraftMode || SelectedTicket == null)
+        {
+            ClearBuildReadiness();
+            return;
+        }
+
+        try
+        {
+            BuildReadiness = await _readinessService.EvaluateReadinessAsync(_activeProjectId, EditId);
+            ApplyBuildReadinessPresentation();
+        }
+        catch (Exception ex)
+        {
+            BuildReadiness = new BuildReadinessResult
+            {
+                Status = BuildReadinessStatus.Error,
+                Message = $"Readiness check failed: {ex.Message}",
+                BlockingIssues = { ex.Message }
+            };
+            ApplyBuildReadinessPresentation();
+        }
+        finally
+        {
+            BuildSelectedTicketProposalCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanBuildTicket));
+        }
+    }
+
+    private void ClearBuildReadiness()
+    {
+        BuildReadiness = null;
+        ShowBuildReadiness = false;
+        BuildReadinessTitle = "Build readiness";
+        BuildReadinessMessage = string.Empty;
+        BuildReadinessDetails = string.Empty;
+        BuildReadinessBadgeText = "READY";
+        BuildReadinessBadgeStatus = BadgeStatus.Info;
+        BuildReadinessActionText = string.Empty;
+        BuildSelectedTicketProposalCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanBuildTicket));
+    }
+
+    private void ApplyBuildReadinessPresentation()
+    {
+        if (BuildReadiness == null)
+        {
+            ClearBuildReadiness();
+            return;
+        }
+
+        ShowBuildReadiness = true;
+        BuildReadinessTitle = BuildReadiness.IsReady ? "Ready to build" : "Build blocked";
+        BuildReadinessMessage = BuildReadiness.Message;
+        BuildReadinessBadgeText = BuildReadiness.Status.ToString();
+        BuildReadinessActionText = BuildReadiness.Status == BuildReadinessStatus.NeedsReindex ? "Index Project" : string.Empty;
+        BuildReadinessBadgeStatus = BuildReadiness.Status switch
+        {
+            BuildReadinessStatus.ReadyToBuild => BadgeStatus.Ready,
+            BuildReadinessStatus.NeedsReindex => BadgeStatus.NeedsIndex,
+            BuildReadinessStatus.NeedsClarification => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsArchitectureDecision => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsProjectProfileUpdate => BadgeStatus.Warning,
+            BuildReadinessStatus.BlockedByConflict => BadgeStatus.Danger,
+            BuildReadinessStatus.BlockedByExistingDecision => BadgeStatus.Danger,
+            BuildReadinessStatus.Error => BadgeStatus.Danger,
+            _ => BadgeStatus.Info
+        };
+
+        var details = new System.Text.StringBuilder();
+        foreach (var issue in BuildReadiness.BlockingIssues)
+        {
+            details.AppendLine($"Blocking: {issue}");
+        }
+        foreach (var warning in BuildReadiness.Warnings)
+        {
+            details.AppendLine($"Warning: {warning}");
+        }
+
+        BuildReadinessDetails = details.ToString().TrimEnd();
+        OnPropertyChanged(nameof(CanBuildTicket));
     }
 
     private static TicketItem MapToItem(ProjectTicket t) => new()

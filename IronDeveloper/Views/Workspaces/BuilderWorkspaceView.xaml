@@ -233,58 +233,13 @@
                     <StackPanel>
                         <!-- BUILD READINESS SECTION -->
                         <TextBlock Text="BUILD READINESS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,12"/>
-                        <Border x:Name="ReadinessBorder" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,20">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Background" Value="#1A7C6BE8"/>
-                                    <Setter Property="BorderBrush" Value="#7C6BE8"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Readiness.IsReady}" Value="True">
-                                            <Setter Property="Background" Value="#1234D16A"/>
-                                            <Setter Property="BorderBrush" Value="#34D16A"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding Readiness.IsReady}" Value="False">
-                                            <Setter Property="Background" Value="#1AEE4444"/>
-                                            <Setter Property="BorderBrush" Value="#EE4444"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding Readiness}" Value="{x:Null}">
-                                            <Setter Property="Background" Value="#1A7C6BE8"/>
-                                            <Setter Property="BorderBrush" Value="#7C6BE8"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <StackPanel>
-                                <TextBlock Text="{Binding Readiness.Status, FallbackValue='Not Evaluated'}" FontWeight="Bold" FontSize="12">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="#7C6BE8"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Readiness.IsReady}" Value="True">
-                                                    <Setter Property="Foreground" Value="#34D16A"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Readiness.IsReady}" Value="False">
-                                                    <Setter Property="Foreground" Value="#EE4444"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding Readiness.Message, FallbackValue='Generate a proposal to evaluate build readiness.'}" 
-                                           FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{StaticResource Text/Muted}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Readiness.IsReady}" Value="False">
-                                                    <Setter Property="Foreground" Value="#EE4444"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                        </Border>
+                        <controls:StatusCallout Title="{Binding ReadinessTitle}"
+                                                Message="{Binding ReadinessMessage}"
+                                                Details="{Binding ReadinessDetails}"
+                                                BadgeText="{Binding ReadinessBadgeText}"
+                                                Status="{Binding ReadinessBadgeStatus}"
+                                                Visibility="{Binding ShowReadinessCallout, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Margin="0,0,0,20"/>
 
                         <TextBlock Text="AI PROPOSAL SUMMARY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,12"/>
                         

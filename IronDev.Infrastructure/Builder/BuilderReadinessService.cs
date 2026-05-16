@@ -98,10 +98,26 @@ public sealed class BuilderReadinessService : IBuilderReadinessService
             result.Warnings.Add("Test command missing. Tests will be skipped.");
         }
 
-        // 6. Architecture check (Simple for v0.2)
+        // 6. Ticket clarity and architecture gates
         var ticket = await _ticketService.GetTicketByIdAsync(ticketId, ct);
-        if (ticket != null && (ticket.Problem?.Contains("persist", StringComparison.OrdinalIgnoreCase) == true || 
-                               ticket.Problem?.Contains("database", StringComparison.OrdinalIgnoreCase) == true))
+        if (ticket == null)
+        {
+            result.Status = BuildReadinessStatus.NeedsClarification;
+            result.Message = "Ticket not found. Select or save a ticket before running Builder.";
+            result.BlockingIssues.Add("Ticket missing.");
+            return result;
+        }
+
+        if (IsTicketScopeUnclear(ticket))
+        {
+            result.Status = BuildReadinessStatus.NeedsClarification;
+            result.Message = "Ticket scope is unclear. Add a summary, problem, or acceptance criteria before running Builder.";
+            result.BlockingIssues.Add("Ticket scope is unclear.");
+        }
+
+        var ticketText = GetTicketText(ticket);
+        if (ticketText.Contains("persist", StringComparison.OrdinalIgnoreCase) ||
+            ticketText.Contains("database", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(profile.DatabaseEngine) || string.IsNullOrWhiteSpace(profile.DataAccessStyle))
             {
@@ -111,12 +127,86 @@ public sealed class BuilderReadinessService : IBuilderReadinessService
             }
         }
 
+        var openQuestions = await _memoryService.GetContextDocumentsAsync(projectId, documentType: "OpenQuestion", status: null, take: 50, cancellationToken: ct);
+        var blockingQuestions = openQuestions
+            .Where(q => IsPendingOpenQuestion(q) && IsQuestionRelevantToTicket(q, ticketText))
+            .ToList();
+
+        if (blockingQuestions.Count > 0)
+        {
+            result.Status = BuildReadinessStatus.NeedsArchitectureDecision;
+            result.Message = "Resolve open project questions before running Builder for this ticket.";
+            foreach (var question in blockingQuestions.Take(5))
+            {
+                result.BlockingIssues.Add($"Open question: {question.Title}");
+            }
+        }
+
         if (result.BlockingIssues.Count > 0 && result.Status == BuildReadinessStatus.ReadyToBuild)
         {
             result.Status = BuildReadinessStatus.Error;
         }
 
         return result;
+    }
+
+    private static bool IsTicketScopeUnclear(IronDev.Data.Models.ProjectTicket ticket)
+    {
+        return string.IsNullOrWhiteSpace(ticket.Summary) &&
+               string.IsNullOrWhiteSpace(ticket.Problem) &&
+               string.IsNullOrWhiteSpace(ticket.AcceptanceCriteria) &&
+               string.IsNullOrWhiteSpace(ticket.TechnicalNotes);
+    }
+
+    private static string GetTicketText(IronDev.Data.Models.ProjectTicket ticket)
+    {
+        return string.Join(" ", new[]
+        {
+            ticket.Title,
+            ticket.TicketType,
+            ticket.Summary,
+            ticket.Problem,
+            ticket.AcceptanceCriteria,
+            ticket.TechnicalNotes,
+            ticket.LinkedFilePaths,
+            ticket.LinkedSymbols
+        }.Where(s => !string.IsNullOrWhiteSpace(s)));
+    }
+
+    private static bool IsPendingOpenQuestion(IronDev.Data.Models.ProjectContextDocument document)
+    {
+        return document.DocumentType.Equals("OpenQuestion", StringComparison.OrdinalIgnoreCase) &&
+               !document.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase) &&
+               !document.Status.Equals("Superseded", StringComparison.OrdinalIgnoreCase) &&
+               !document.Status.Equals("Archived", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsQuestionRelevantToTicket(IronDev.Data.Models.ProjectContextDocument question, string ticketText)
+    {
+        var lowerTicket = ticketText.ToLowerInvariant();
+
+        if (!string.IsNullOrWhiteSpace(question.AppliesToArea) &&
+            lowerTicket.Contains(question.AppliesToArea.ToLowerInvariant()))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(question.AppliesToCapability) &&
+            lowerTicket.Contains(question.AppliesToCapability.ToLowerInvariant()))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(question.Tags))
+        {
+            var tags = question.Tags.Split([',', ';', '|'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (tags.Any(tag => tag.Length > 2 && lowerTicket.Contains(tag.ToLowerInvariant())))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public async Task<BuildReadinessResult> ValidateProposalArchitectureAsync(BuilderProposal proposal, CancellationToken ct = default)

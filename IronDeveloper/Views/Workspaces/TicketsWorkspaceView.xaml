@@ -364,6 +364,16 @@
                                         </Style>
                                     </StackPanel.Style>
                                     
+                                    <controls:StatusCallout Title="{Binding BuildReadinessTitle}"
+                                                            Message="{Binding BuildReadinessMessage}"
+                                                            Details="{Binding BuildReadinessDetails}"
+                                                            BadgeText="{Binding BuildReadinessBadgeText}"
+                                                            Status="{Binding BuildReadinessBadgeStatus}"
+                                                            ActionText="{Binding BuildReadinessActionText}"
+                                                            ActionCommand="{Binding RequestIndexCommand}"
+                                                            Visibility="{Binding ShowBuildReadiness, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                            Margin="0,0,0,16"/>
+
                                     <controls:SurfacePanel Variant="Subtle" Padding="20,16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <controls:FormField Label="TICKET TITLE">
