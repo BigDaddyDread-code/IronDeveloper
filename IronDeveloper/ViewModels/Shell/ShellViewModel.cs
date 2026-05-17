@@ -351,6 +351,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private async Task ActivateProjectAsync(global::IronDev.Data.Models.Project project)
     {
+        Serilog.Log.Information("[ShellDebug] Activating project: {ProjectName}", project.Name);
         System.Diagnostics.Trace.WriteLine($"[Shell] Activating project: {project.Name}");
         
         // Switch to project mode and show overview immediately
@@ -363,6 +364,8 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveProjectPath = project.LocalPath ?? string.Empty;
         ActiveModel       = _overviewVm.Model; 
         ActiveStatus      = "Checking...";
+
+        RaiseAllActiveProjectProperties();
 
         // Track active project so cross-cutting VMs (e.g. Playground) resolve the right project
         _tenantContext.SetProject(project.Id);
@@ -388,11 +391,13 @@ public sealed partial class ShellViewModel : ObservableObject
 
             // Fetch final status from the overview VM
             ActiveStatus = _overviewVm.Status;
+            ActiveModel = _overviewVm.Model;
             _ticketsVm.SetIndexStatus(ActiveStatus);   // propagate initial index state
             System.Diagnostics.Trace.WriteLine($"[Shell] Project activation complete. Status: {ActiveStatus}");
         }
         catch (Exception ex)
         {
+            Serilog.Log.Error(ex, "[ShellDebug] ERROR activating project {ProjectName}", project.Name);
             System.Diagnostics.Trace.WriteLine($"[Shell] ERROR activating project {project.Name}: {ex.Message}");
             ActiveStatus = "Error";
         }
@@ -402,9 +407,49 @@ public sealed partial class ShellViewModel : ObservableObject
             if (ActiveStatus == "Checking...")
                 ActiveStatus = "Offline";
 
-            OnPropertyChanged(nameof(StatusNeedsIndex));
-            OnPropertyChanged(nameof(StatusCanIndex));
+            // Task 3: Ensure opening a project sets a default workspace
+            if (CurrentWorkspace == default)
+            {
+                CurrentWorkspace = ProjectWorkspace.Overview;
+            }
+
+            // Task 4: Ensure CurrentView is assigned and NavigateWorkspace is called
+            NavigateWorkspace(CurrentWorkspace.ToString());
+            if (CurrentView == null)
+            {
+                CurrentView = _overviewVm;
+            }
+
+            RaiseAllActiveProjectProperties();
+
+            // Task 2: Add temporary debug logging after ActivateProjectAsync completes
+            Serilog.Log.Information("[ShellDebug] Project activation diagnostics complete: ProjectName='{ProjectName}', Path='{Path}', Model='{Model}', Status='{Status}', Workspace='{Workspace}', ViewIsNull='{ViewIsNull}', View='{View}', ShowHeader='{ShowHeader}', HasActiveProject='{HasActiveProject}'",
+                ActiveProjectName, ActiveProjectPath, ActiveModel, ActiveStatus, CurrentWorkspace, CurrentView == null, CurrentView?.GetType().FullName, ShowHeader, HasActiveProject);
+
+            System.Diagnostics.Trace.WriteLine($"[ShellDebug] Project activation diagnostics:");
+            System.Diagnostics.Trace.WriteLine($" - ActiveProjectName: '{ActiveProjectName}'");
+            System.Diagnostics.Trace.WriteLine($" - ActiveProjectPath: '{ActiveProjectPath}'");
+            System.Diagnostics.Trace.WriteLine($" - ActiveModel: '{ActiveModel}'");
+            System.Diagnostics.Trace.WriteLine($" - ActiveStatus: '{ActiveStatus}'");
+            System.Diagnostics.Trace.WriteLine($" - CurrentWorkspace: '{CurrentWorkspace}'");
+            System.Diagnostics.Trace.WriteLine($" - CurrentView == null: '{CurrentView == null}'");
+            System.Diagnostics.Trace.WriteLine($" - CurrentView.GetType().FullName: '{(CurrentView != null ? CurrentView.GetType().FullName : "null")}'");
+            System.Diagnostics.Trace.WriteLine($" - ShowHeader: '{ShowHeader}'");
+            System.Diagnostics.Trace.WriteLine($" - HasActiveProject: '{HasActiveProject}'");
         }
+    }
+
+    private void RaiseAllActiveProjectProperties()
+    {
+        OnPropertyChanged(nameof(ActiveProjectName));
+        OnPropertyChanged(nameof(ActiveProjectPath));
+        OnPropertyChanged(nameof(ActiveModel));
+        OnPropertyChanged(nameof(ActiveStatus));
+        OnPropertyChanged(nameof(ShowHeader));
+        OnPropertyChanged(nameof(ShowSidebar));
+        OnPropertyChanged(nameof(HasActiveProject));
+        OnPropertyChanged(nameof(CurrentView));
+        OnPropertyChanged(nameof(CurrentWorkspace));
     }
 
     private static bool IsIndexActionableStatus(string status)
@@ -414,5 +459,20 @@ public sealed partial class ShellViewModel : ObservableObject
                !string.Equals(status, "Indexing...", StringComparison.OrdinalIgnoreCase) &&
                !string.Equals(status, "Offline", StringComparison.OrdinalIgnoreCase) &&
                !string.IsNullOrWhiteSpace(status);
+    }
+
+    partial void OnActiveStatusChanged(string value)
+    {
+        RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnCurrentWorkspaceChanged(ProjectWorkspace value)
+    {
+        RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnHasActiveProjectChanged(bool value)
+    {
+        RaiseAllActiveProjectProperties();
     }
 }

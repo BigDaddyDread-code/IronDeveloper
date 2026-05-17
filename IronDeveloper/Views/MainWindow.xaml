@@ -8,6 +8,7 @@
         xmlns:coreModels="clr-namespace:IronDev.Core.Models;assembly=IronDev.Core"
         xmlns:controls="http://schemas.irondeveloper.com/controls"
         mc:Ignorable="d"
+        x:Name="RootWindow"
         Title="{x:Static coreModels:AppBuildInfo.WindowTitle}"
         Height="860" Width="1300"
         WindowStartupLocation="CenterScreen"
@@ -85,8 +86,19 @@
                                 <TextBlock Text="PREVIEW" Foreground="{StaticResource Accent/Primary}" FontSize="9" FontWeight="Bold"/>
                             </Border>
                             <TextBlock Text="  ·  " Foreground="{StaticResource TextBrush}" FontSize="12" Opacity="0.3" Margin="10,0"/>
-                            <TextBlock Text="{Binding CurrentTenant.Name}" Foreground="{StaticResource Accent/Primary}" 
-                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8"/>
+                            <TextBlock Foreground="{StaticResource Accent/Primary}" 
+                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{Binding CurrentTenant.Name}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasActiveProject}" Value="True">
+                                                <Setter Property="Text" Value="{Binding ActiveProjectName}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </StackPanel>
 
@@ -214,56 +226,63 @@
                                             ProjectPath="{Binding ActiveProjectPath}"
                                             ModelName="{Binding ActiveModel}"
                                             ProjectStatusText="{Binding ActiveStatus}"
-                                            MainContent="{Binding CurrentView}"
                                             Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVisibilityConverter}}">
+                <controls:ProjectWorkspaceFrame.MainContent>
+                    <ContentControl Content="{Binding CurrentView}"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch"/>
+                </controls:ProjectWorkspaceFrame.MainContent>
+
                 <controls:ProjectWorkspaceFrame.LeftNavigationContent>
                     <controls:AppNavRail>
                         <controls:AppNavRail.HeaderContent>
                             <controls:NavRailItem IconData="{StaticResource Icon.Nav.Projects}"
-                                                  Command="{Binding NavigateWorkspaceCommand}"
+                                                  Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   CommandParameter="ProjectHub"
                                                   ToolTip="Project Hub"/>
                         </controls:AppNavRail.HeaderContent>
+
                         <controls:AppNavRail.ItemsSource>
                             <x:Array Type="{x:Type controls:NavRailItem}">
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Branch}"
-                                                      Command="{Binding NavigateWorkspaceCommand}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Overview"
                                                       ToolTip="Dashboard"
-                                                      IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Overview}"/>
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Overview}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Chat}"
-                                                      Command="{Binding NavigateWorkspaceCommand}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Chat"
                                                       ToolTip="Chat"
-                                                      IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Chat}"/>
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Chat}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Tickets}"
-                                                      Command="{Binding NavigateWorkspaceCommand}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Tickets"
                                                       ToolTip="Tickets"
-                                                      IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Tickets}"/>
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Tickets}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Action.Build}"
-                                                      Command="{Binding NavigateWorkspaceCommand}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Builder"
                                                       ToolTip="Builder"
-                                                      IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Builder}"/>
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Builder}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Decisions}"
-                                                      Command="{Binding NavigateWorkspaceCommand}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Decisions"
                                                       ToolTip="Memory"
-                                                      IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}"/>
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Decisions}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Search}"
-                                                      Command="{Binding NavigateWorkspaceCommand}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Settings"
                                                       ToolTip="Trace"
-                                                      IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Settings}"/>
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Settings}"/>
                             </x:Array>
                         </controls:AppNavRail.ItemsSource>
+
                         <controls:AppNavRail.FooterContent>
                             <controls:NavRailItem IconData="{StaticResource Icon.Nav.Settings}"
-                                                  Command="{Binding NavigateWorkspaceCommand}"
+                                                  Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   CommandParameter="ProjectProfile"
                                                   ToolTip="Project Profile"
-                                                  IsActive="{Binding CurrentWorkspace, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=ProjectProfile}"/>
+                                                  IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=ProjectProfile}"/>
                         </controls:AppNavRail.FooterContent>
                     </controls:AppNavRail>
                 </controls:ProjectWorkspaceFrame.LeftNavigationContent>
@@ -271,12 +290,12 @@
                 <controls:ProjectWorkspaceFrame.ProjectActions>
                     <StackPanel Orientation="Horizontal">
                         <Button Content="Index Now"
-                                Command="{Binding IndexNowCommand}"
+                                Command="{Binding DataContext.IndexNowCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 Style="{StaticResource AppButton.CompactGhost}"
                                 Margin="0,0,6,0"
-                                Visibility="{Binding StatusCanIndex, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                Visibility="{Binding DataContext.StatusCanIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <Button Content="Overview"
-                                Command="{Binding OpenOverviewCommand}"
+                                Command="{Binding DataContext.OpenOverviewCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 Style="{StaticResource AppButton.CompactGhost}"/>
                     </StackPanel>
                 </controls:ProjectWorkspaceFrame.ProjectActions>

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -30,6 +31,7 @@ public partial class App : Application
     public App()
     {
         ConfigureFileLogging();
+        ConfigureWpfTracing();
 
         // Surface fatal crashes as a readable MessageBox instead of silent ExecutionEngineException
         DispatcherUnhandledException += (_, e) =>
@@ -256,6 +258,41 @@ public partial class App : Application
                 shared: true,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
+    }
+
+    private static void ConfigureWpfTracing()
+    {
+        try
+        {
+            Directory.CreateDirectory(LogDirectory);
+
+            const string listenerName = "IronDevWpfBindingTrace";
+            var hasListener = false;
+
+            foreach (TraceListener listener in Trace.Listeners)
+            {
+                if (string.Equals(listener.Name, listenerName, StringComparison.Ordinal))
+                {
+                    hasListener = true;
+                    break;
+                }
+            }
+
+            if (!hasListener)
+            {
+                Trace.Listeners.Add(new TextWriterTraceListener(
+                    Path.Combine(LogDirectory, "wpf-binding-trace.log"),
+                    listenerName));
+                Trace.AutoFlush = true;
+            }
+
+            PresentationTraceSources.DataBindingSource.Switch.Level =
+                SourceLevels.Warning | SourceLevels.Error | SourceLevels.Critical;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to configure WPF binding trace listener");
+        }
     }
 
     /// <summary>
