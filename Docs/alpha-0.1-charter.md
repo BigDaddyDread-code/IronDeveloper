@@ -1,0 +1,167 @@
+# IronDev Alpha 0.1 Charter
+
+Project-Aware Ticket and Proposal Workflow
+
+## Executive Summary
+
+IronDev Alpha 0.1 is the first usable version of IronDev as a project-aware AI software engineering cockpit. The alpha should prove that IronDev can create or import a project, understand its profile, index it, chat with project context, create structured tickets, check build readiness, generate safe code proposals, and trace what happened.
+
+The alpha is not intended to be a fully autonomous coding agent. Its core promise is safe, reviewable, traceable assistance: proposal first, approval before writes, and visible build/test feedback.
+
+## Core Alpha Flow
+
+1. Create or import project.
+2. Detect or set up Project Profile.
+3. Index project.
+4. Chat with project context.
+5. Create structured ticket.
+6. Check build readiness.
+7. Generate Builder proposal.
+8. Review diff in Builder Workbench.
+9. Optionally apply/build/test in sandbox.
+10. Trace the complete workflow.
+
+## Alpha Scope
+
+| In Scope | Out of Scope for Alpha |
+| --- | --- |
+| Project onboarding for existing and new projects | Weaviate / semantic vector memory |
+| Project Profile detection and manual editing | Auto-fix loop |
+| Project Summary and typed context documents | Git / PR automation |
+| Chat with project context | Full autonomous coding |
+| Chat-to-ticket creation | Image/document ingestion |
+| Build readiness gate | Multi-agent orchestration |
+| Builder proposal workbench | Cloud deployment |
+| Sandbox-only apply/build/test | Applying changes to IronDev itself by default |
+| LLM trace and diagnostics | Complex source-reference UI polish |
+
+## Required Alpha Capabilities
+
+### 1. Project Setup
+
+- Existing Project: select folder, detect profile, confirm settings, and index.
+- New Project: use a wizard to choose architecture, create a solution skeleton, seed profile and decisions.
+- Project Profile must capture solution file, language/framework, test framework, build command, test command, and safe write root.
+
+### 2. Project Memory
+
+- Manually create and edit Project Summary, Architecture Decisions, Project Standards, Project Facts, Open Questions, and Recommendations.
+- Use typed context documents so decisions, standards, facts, and discussion notes are not treated as the same kind of memory.
+- Binding decisions should influence Builder and build readiness; discussion notes should remain context only.
+
+### 3. Chat Context
+
+- Chat should distinguish code evidence questions from architecture advice questions.
+- Short follow-ups should resolve against the active discussion topic when possible.
+- Architecture advice should use project profile, decisions, facts, and known absence of implementation; it should not demand code evidence when the question is about what to choose.
+
+### 4. Ticket Creation
+
+- Explicit requests such as "create a ticket" must open the draft ticket workflow, not return generic advice.
+- Tickets should include requirements, acceptance criteria, affected files, non-goals, build readiness, and open questions.
+- Generated tickets should preserve user-specified APIs unless the user approves a change.
+
+### 5. Build Readiness
+
+- Every ticket should display readiness: ReadyToBuild, NeedsArchitectureDecision, NeedsProjectProfileUpdate, NeedsReindex, NeedsClarification, BlockedByConflict, or similar.
+- Builder should not run for tickets with unresolved architecture decisions, missing project profile data, stale index, or unclear scope.
+
+### 6. Builder Workbench
+
+- Default mode should be review-first: generate proposal, validate, show diff, and require approval before writes.
+- Sandbox apply/build/test can be available for BookSeller or other explicitly safe projects.
+- Proposals must be validated for path safety, file type, ticket coverage, architecture compatibility, and test framework compatibility.
+
+### 7. Trace and Trust
+
+- Trace prompt, context, route decisions, ticket creation, proposal generation, validation, files written, build command, test output, and failures.
+- The LLM Console or run trace should make the workflow auditable without needing to guess what happened.
+
+## Project Wizard v0.1
+
+IronDev needs two project entry paths: Existing Project import and New Project creation.
+
+### Existing Project Mode
+
+- User selects a folder.
+- IronDev detects `.sln`, `.slnx`, `.csproj`, framework, test framework, database/data access libraries, logging libraries, and build/test commands where possible.
+- User confirms or edits the detected Project Profile.
+- IronDev saves the profile and indexes the project.
+
+### New Project Mode
+
+- User enters project name and location.
+- User selects application type, language/framework, UI style, database, data access style, logging, test framework, and architecture style.
+- IronDev creates the solution/project skeleton, README, initial tests, Project Profile, Project Summary, and seed decisions/standards.
+- IronDev indexes the new project and creates initial milestones/tickets if requested.
+
+## Project Memory Model
+
+The alpha should establish the project memory spine. Tickets are micro-level work items; they should not be the top-level planning object.
+
+| Memory Type | Purpose | Authority |
+| --- | --- | --- |
+| Project Summary | Describes what the product/project is, who it is for, and the main workflows. | Product map |
+| Architecture Decision | Approved, binding technical or product choice. | Binding |
+| Project Standard | Repeatable implementation convention. | Strong guidance |
+| Project Fact | Observed truth about the current project. | Observed fact |
+| Discussion Note | Historical context from design conversations. | Context only |
+| Recommendation | Suggested direction not yet accepted. | Pending |
+| Open Question | Unresolved issue that may block build readiness. | Pending / blocking when relevant |
+
+## Source References and Provenance
+
+Every generated artefact should know what it was based on. Chats, tickets, decisions, plans, builder proposals, and build results should carry source references so IronDev can explain why something exists and retrieve the source material later.
+
+- Ticket CreatedFrom chat session/messages.
+- Ticket BasedOn project profile, facts, standards, decisions, and code symbols.
+- Ticket MustObey binding architecture decisions and standards.
+- BuilderProposal GeneratedFrom ticket and BasedOn code files/symbols.
+- BuildResult ValidatedBy proposal and command output.
+- OpenQuestion Blocks tickets or plans when unresolved.
+
+## Alpha Demo Flow
+
+1. Create or import BookSeller.
+2. IronDev detects the .NET project profile.
+3. User says: "Create a ticket to add book sorting."
+4. IronDev creates a build-ready ticket.
+5. User clicks Build This.
+6. Builder Workbench shows proposed diffs.
+7. User approves apply in sandbox.
+8. Build/test runs.
+9. Trace shows the full chain.
+
+## Must Be Stable Before External Testing
+
+- Stale index warnings are visible on the main project screen, ticket screen, and builder workbench.
+- Chat-to-ticket routing works reliably for explicit ticket creation requests.
+- Project Profile detection, save, and reload are reliable.
+- Ticket build readiness blocks missing decisions, missing profile data, stale index, and unclear scope.
+- Proposal completeness validation catches missing expected files and API drift.
+- Diff viewer is readable enough for review.
+- LLM trace is usable enough to debug a workflow.
+- Builder cannot write outside SafeWriteRoot.
+- BookSeller remains external and is not committed into IronDev.
+
+## First Testers
+
+- Dogfood daily inside IronDev.
+- Invite one friendly .NET developer to test a small repository.
+- Invite one product-minded/non-expert tester to check whether the workflow makes sense.
+- Ask testers to perform one task: point IronDev at a small repo and create one build-ready ticket with a proposal.
+
+## Recommended Next Milestones
+
+| Milestone | Goal | Notes |
+| --- | --- | --- |
+| Project Wizard v0.1 | Create/import projects with reliable profile setup. | Foundation for first-time users. |
+| Project Summary + Context Documents | Add typed project memory and manual editor. | Decisions, standards, facts, recommendations, open questions. |
+| Artifact Source References | Track source material for tickets, plans, decisions, and proposals. | Trust and provenance layer. |
+| Stale Index Visibility | Make stale indexing obvious and block unsafe builder actions. | Must-fix before external testers. |
+| Chat Context Resolver v0.1 | Resolve short follow-ups and distinguish advice vs code evidence. | Fixes "industry standard" style failures. |
+| Builder v0.2 Stabilisation | Make sandbox apply/build/test boring and reliable. | No auto-fix loop yet. |
+
+## Alpha Definition
+
+IronDev Alpha 0.1 is successful when a user can point it at a small project, establish project context, create a structured build-ready ticket from chat, generate a safe proposal, review the diff, and understand exactly what happened through trace output.

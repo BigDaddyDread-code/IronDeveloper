@@ -107,9 +107,17 @@ public class LlmProviderTests
         public Task<IReadOnlyList<ProjectDecision>> GetRecentDecisionsAsync(int projectId, int take = 10, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectDecision>>(new List<ProjectDecision>());
         public Task<ProjectDecision?> GetDecisionByIdAsync(long decisionId, CancellationToken ct = default) => Task.FromResult<ProjectDecision?>(null);
         public Task<long> SaveSummaryAsync(ProjectSummary summary, CancellationToken ct = default) => Task.FromResult(0L);
-        public Task<IReadOnlyList<ProjectContextDocument>> GetContextDocumentsAsync(int projectId, int take = 50, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectContextDocument>>([]);
+        public Task<IReadOnlyList<ProjectContextDocument>> GetContextDocumentsAsync(
+            int projectId,
+            string? documentType = null,
+            string? authorityLevel = null,
+            string? status = "Active",
+            int take = 100,
+            CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectContextDocument>>([]);
         public Task<IReadOnlyList<ProjectContextDocument>> GetRelevantContextDocumentsAsync(int projectId, string query, int take = 20, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectContextDocument>>([]);
+        public Task<ProjectContextDocument?> GetContextDocumentByIdAsync(long documentId, CancellationToken ct = default) => Task.FromResult<ProjectContextDocument?>(null);
         public Task<long> SaveContextDocumentAsync(ProjectContextDocument document, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<bool> ArchiveContextDocumentAsync(long documentId, CancellationToken ct = default) => Task.FromResult(false);
         public Task<ProjectObservableState?> GetObservableStateAsync(int projectId, CancellationToken ct = default) => Task.FromResult<ProjectObservableState?>(null);
         public Task SaveObservableStateAsync(ProjectObservableState state, CancellationToken ct = default) => Task.CompletedTask;
         public Task<IReadOnlyList<ProjectImplementationPlan>> GetRecentPlansAsync(int projectId, int take = 10, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ProjectImplementationPlan>>(new List<ProjectImplementationPlan>());

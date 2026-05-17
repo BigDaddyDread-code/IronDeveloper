@@ -7,50 +7,150 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:CreateProjectViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Background="{StaticResource AppBackgroundBrush}">
+    <ScrollViewer Background="Transparent" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22">
 
-        <Border Style="{StaticResource IronCard}"
-                Width="500" VerticalAlignment="Center" HorizontalAlignment="Center">
-            <StackPanel>
+            <TextBlock Text="PROJECT WIZARD" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding WizardTitle}" Style="{StaticResource IronSectionTitle}" FontSize="22" Margin="0,0,0,18"/>
 
-                <!-- Header -->
-                <TextBlock Text="NEW PROJECT" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>
-                <TextBlock Text="Create Project" Style="{StaticResource IronSectionTitle}" Margin="0,0,0,28"/>
+            <Grid Margin="0,0,0,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Height="4" CornerRadius="2" Background="{StaticResource Accent/Primary}" Margin="0,0,4,0"/>
+                <Border Grid.Column="1" Height="4" CornerRadius="2" Margin="4,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#22FFFFFF"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding WizardStep}" Value="2">
+                                    <Setter Property="Background" Value="{StaticResource Accent/Primary}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding WizardStep}" Value="3">
+                                    <Setter Property="Background" Value="{StaticResource Accent/Primary}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+                <Border Grid.Column="2" Height="4" CornerRadius="2" Margin="4,0,0,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#22FFFFFF"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding WizardStep}" Value="3">
+                                    <Setter Property="Background" Value="{StaticResource Accent/Primary}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+            </Grid>
 
-                <!-- Project Name -->
+            <StackPanel Visibility="{Binding ShowEntryStep, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="ENTRY MODE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                <ComboBox ItemsSource="{Binding EntryModes}" SelectedItem="{Binding EntryMode}" Margin="0,0,0,14"/>
+
                 <TextBlock Text="PROJECT NAME" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
-                <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,0,18"/>
+                <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14"/>
 
-                <!-- Local Path -->
                 <TextBlock Text="LOCAL PATH" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
-                <TextBox Text="{Binding ProjectPath, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,0,18"/>
+                <TextBox Text="{Binding ProjectPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14"/>
 
-                <!-- Model Selector -->
+                <CheckBox IsChecked="{Binding CreateInitialContext}"
+                          Content="Seed project summary, standards, and decisions"
+                          Margin="0,0,0,14"/>
+
                 <TextBlock Text="AI MODEL" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
-                <ComboBox ItemsSource="{Binding AvailableModels}"
-                          SelectedItem="{Binding SelectedModel}"
-                          Margin="0,0,0,24"/>
+                <ComboBox ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding SelectedModel}" Margin="0,0,0,4"/>
+            </StackPanel>
 
-                <!-- Error -->
-                <TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="{StaticResource StatusErrorBrush}"
-                           FontSize="12" Margin="0,0,0,16" TextWrapping="Wrap"
-                           Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
+            <StackPanel Visibility="{Binding ShowProfileStep, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Visibility="{Binding IsNewProjectMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="APPLICATION TYPE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding ApplicationTypes}" SelectedItem="{Binding SelectedApplicationType}" Margin="0,0,0,12"/>
 
-                <!-- Actions -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Cancel"
-                            Command="{Binding CancelCommand}"
-                            Margin="0,0,12,0" Padding="24,12"/>
-                    <Button Content="Create Project"
-                            Command="{Binding CreateCommand}"
-                            Style="{StaticResource IronPrimaryButton}"
-                            Padding="24,12"/>
+                    <TextBlock Text="FRAMEWORK" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding FrameworkOptions}" SelectedItem="{Binding SelectedFramework}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="UI STYLE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding UiStyles}" SelectedItem="{Binding SelectedUiStyle}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="DATABASE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding DatabaseOptions}" SelectedItem="{Binding SelectedDatabase}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="DATA ACCESS" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding DataAccessOptions}" SelectedItem="{Binding SelectedDataAccess}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="LOGGING" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding LoggingOptions}" SelectedItem="{Binding SelectedLogging}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="TEST FRAMEWORK" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding TestFrameworkOptions}" SelectedItem="{Binding SelectedTestFramework}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="ARCHITECTURE STYLE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding ArchitectureStyleOptions}" SelectedItem="{Binding SelectedArchitectureStyle}" Margin="0,0,0,12"/>
                 </StackPanel>
 
+                <StackPanel Visibility="{Binding IsExistingProjectMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Button Content="Detect Profile Again" Command="{Binding DetectProfileCommand}"
+                            Style="{StaticResource AppButton.Secondary}" Padding="12,8" Margin="0,0,0,12"/>
+                    <TextBlock Text="{Binding DetectionSummary}" Style="{StaticResource IronMetaLabel}" TextWrapping="Wrap" Opacity="0.78" Margin="0,0,0,12"/>
+                </StackPanel>
+
+                <TextBlock Text="SOLUTION OR PROJECT FILE" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                <TextBox Text="{Binding DetectedSolutionFile, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,12"/>
+
+                <TextBlock Text="BUILD COMMAND" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                <TextBox Text="{Binding DetectedBuildCommand, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,12"/>
+
+                <TextBlock Text="TEST COMMAND" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                <TextBox Text="{Binding DetectedTestCommand, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,12"/>
+
+                <TextBlock Text="SAFE WRITE ROOT" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,6"/>
+                <TextBox Text="{Binding SafeWriteRoot, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,12"/>
+
+                <CheckBox IsChecked="{Binding AllowBuilderApply}"
+                          Content="Allow Builder apply/build/test for this project"
+                          Margin="0,0,0,4"/>
             </StackPanel>
-        </Border>
-    </Grid>
+
+            <StackPanel Visibility="{Binding ShowReviewStep, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="REVIEW" Style="{StaticResource IronEyebrow}" Margin="0,0,0,10"/>
+                <TextBlock Text="{Binding EntryMode}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10"/>
+                <TextBlock Text="{Binding ProjectName}" Style="{StaticResource IronMetaValue}" FontSize="14" Margin="0,0,0,4"/>
+                <TextBlock Text="{Binding ProjectPath}" Style="{StaticResource IronMetaLabel}" TextWrapping="Wrap" Margin="0,0,0,14"/>
+                <TextBlock Text="{Binding SelectedApplicationType}" Style="{StaticResource IronMetaValue}" Margin="0,0,0,4"/>
+                <TextBlock Text="{Binding SelectedFramework}" Style="{StaticResource IronMetaLabel}" Margin="0,0,0,14"/>
+                <TextBlock Text="{Binding DetectedBuildCommand}" Style="{StaticResource IronMetaLabel}" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding DetectedTestCommand}" Style="{StaticResource IronMetaLabel}" FontFamily="Consolas" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="{StaticResource StatusErrorBrush}"
+                       FontSize="12" Margin="0,16,0,12" TextWrapping="Wrap"
+                       Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" Content="Back" Command="{Binding BackCommand}"
+                        Padding="18,10" Visibility="{Binding CanGoBack, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <Button Grid.Column="2" Content="Cancel" Command="{Binding CancelCommand}"
+                        Margin="0,0,10,0" Padding="18,10"/>
+                <Button Grid.Column="3" Content="{Binding PrimaryActionText}"
+                        Command="{Binding PrimaryActionCommand}"
+                        Style="{StaticResource IronPrimaryButton}"
+                        Padding="20,10"/>
+            </Grid>
+
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

@@ -15,6 +15,8 @@ public sealed class ChatTicketContext
     public string ProposedTitle   { get; set; } = string.Empty;
     public string? LinkedFilePaths { get; set; }
     public string? LinkedSymbols   { get; set; }
+    public int SplitIndex { get; set; } = 1;
+    public int SplitCount { get; set; } = 1;
 }
 
 public sealed class ChatMessageItem

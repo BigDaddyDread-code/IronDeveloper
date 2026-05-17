@@ -11,6 +11,8 @@ public sealed class CreateTicketIntent
     public double Confidence { get; init; }
     public string CommandText { get; init; } = string.Empty;
     public string WorkText { get; init; } = string.Empty;
+    public int TicketCount { get; init; } = 1;
+    public IReadOnlyList<string> SplitHints { get; init; } = Array.Empty<string>();
     public long? SourceMessageId { get; init; }
     public bool RequiresClarification { get; init; }
     public IReadOnlyList<string> ClarificationQuestions { get; init; } = Array.Empty<string>();
@@ -55,8 +57,49 @@ public sealed class ContextAgentRouteDecision
     public IReadOnlyList<string> SafetyOverrides { get; set; } = Array.Empty<string>();
     public bool UsedLlmJudge { get; set; }
     public bool UsedFallbackRules { get; set; }
+    public bool UsedConversationContextResolver { get; set; }
+    public string ContextMode { get; set; } = string.Empty;
     
     public IReadOnlyList<DeepLookupTarget> DeepLookupTargets { get; set; } = Array.Empty<DeepLookupTarget>();
+}
+
+public sealed class ConversationContextSnapshot
+{
+    public long SessionId { get; init; }
+    public int ProjectId { get; init; }
+    public string ActiveTopic { get; init; } = string.Empty;
+    public string CurrentGoal { get; init; } = string.Empty;
+    public string ContextMode { get; init; } = string.Empty;
+    public IReadOnlyList<string> KnownFacts { get; init; } = Array.Empty<string>();
+    public string PendingDecision { get; init; } = string.Empty;
+    public IReadOnlyList<string> PendingQuestions { get; init; } = Array.Empty<string>();
+    public string LastRecommendation { get; init; } = string.Empty;
+    public IReadOnlyList<string> LastOptionsPresented { get; init; } = Array.Empty<string>();
+    public DateTime? UpdatedUtc { get; init; }
+
+    public bool HasUsefulState =>
+        !string.IsNullOrWhiteSpace(ActiveTopic) ||
+        !string.IsNullOrWhiteSpace(CurrentGoal) ||
+        !string.IsNullOrWhiteSpace(PendingDecision) ||
+        !string.IsNullOrWhiteSpace(LastRecommendation) ||
+        KnownFacts.Count > 0 ||
+        LastOptionsPresented.Count > 0;
+}
+
+public sealed class ConversationContextResolution
+{
+    public string OriginalRequest { get; init; } = string.Empty;
+    public string EffectiveRequest { get; init; } = string.Empty;
+    public string ContextMode { get; init; } = string.Empty;
+    public ContextRequestKind RequestKind { get; init; } = ContextRequestKind.GeneralChat;
+    public bool IsResolved { get; init; }
+    public bool NeedsClarification { get; init; }
+    public IReadOnlyList<string> ClarificationQuestions { get; init; } = Array.Empty<string>();
+    public bool RequiresCodeEvidence { get; init; }
+    public bool AllowsTicketCreation { get; init; }
+    public IReadOnlyList<string> EvidenceUsed { get; init; } = Array.Empty<string>();
+    public string Reason { get; init; } = string.Empty;
+    public ConversationContextSnapshot? Snapshot { get; init; }
 }
 
 public sealed class DeepLookupTarget
@@ -74,6 +117,7 @@ public sealed class ContextAgentRouteRequest
     public long SessionId { get; init; }
     public string UserRequest { get; init; } = string.Empty;
     public string RecentConversationSummary { get; init; } = string.Empty;
+    public ConversationContextSnapshot? ConversationContextSnapshot { get; init; }
     public string InitialIntentFromPromptContextBuilder { get; init; } = string.Empty;
     public IReadOnlyList<IronDev.Data.Models.ProjectTicket> RecentTickets { get; init; } = Array.Empty<IronDev.Data.Models.ProjectTicket>();
     public IReadOnlyList<IronDev.Data.Models.ProjectDecision> RecentDecisions { get; init; } = Array.Empty<IronDev.Data.Models.ProjectDecision>();
@@ -344,6 +388,7 @@ public sealed class TicketCandidate
 public static class ContextAgentStage
 {
     public const string InitialContext        = "ContextAgent.InitialContext";
+    public const string IntentContextResolution = "ContextAgent.IntentContextResolution";
     public const string SufficiencyCheck      = "ContextAgent.SufficiencyCheck";
     public const string ToolCallSearch        = "ContextAgent.ToolCall.SearchCodeIndex";
     public const string ToolResultSearch      = "ContextAgent.ToolResult.SearchCodeIndex";

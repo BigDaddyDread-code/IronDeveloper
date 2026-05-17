@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
 
@@ -17,7 +18,7 @@ public class ProjectContextExportService : IProjectContextExportService
     private readonly IProjectMemoryService _memoryService;
     private readonly ITicketService _ticketService;
     private readonly ICodeIndexService _codeIndexService;
-    private readonly IArtifactSourceReferenceService _referenceService;
+    private readonly IArtifactSourceReferenceService _artifactSourceReferenceService;
 
     public ProjectContextExportService(
         IProjectService projectService,
@@ -25,14 +26,14 @@ public class ProjectContextExportService : IProjectContextExportService
         IProjectMemoryService memoryService,
         ITicketService ticketService,
         ICodeIndexService codeIndexService,
-        IArtifactSourceReferenceService referenceService)
+        IArtifactSourceReferenceService artifactSourceReferenceService)
     {
         _projectService = projectService;
         _profileService = profileService;
         _memoryService = memoryService;
         _ticketService = ticketService;
         _codeIndexService = codeIndexService;
-        _referenceService = referenceService;
+        _artifactSourceReferenceService = artifactSourceReferenceService;
     }
 
     public async Task<string> ExportProjectContextPackAsync(int projectId)
@@ -43,9 +44,9 @@ public class ProjectContextExportService : IProjectContextExportService
         var profile = await _profileService.GetProjectProfileAsync(projectId);
         var commands = await _profileService.GetProjectCommandsAsync(projectId);
         var decisions = await _memoryService.GetRecentDecisionsAsync(projectId, 100);
-        var contextDocuments = await _memoryService.GetContextDocumentsAsync(projectId, 200);
-        var observableState = await _memoryService.GetObservableStateAsync(projectId);
         var latestSummary = await _memoryService.GetLatestSummaryAsync(projectId);
+        var observableState = await _memoryService.GetObservableStateAsync(projectId);
+        var contextDocuments = await _memoryService.GetContextDocumentsAsync(projectId, status: null, take: 200);
         var rules = await _memoryService.GetProjectRulesAsync(projectId);
         var tickets = await _ticketService.GetRecentTicketsAsync(projectId, 100);
         var plans = await _memoryService.GetRecentPlansAsync(projectId, 100);
@@ -53,6 +54,8 @@ public class ProjectContextExportService : IProjectContextExportService
 
         var sb = new StringBuilder();
         sb.AppendLine($"# Project Context Pack: {project.Name}");
+        sb.AppendLine($"IronDev: {AppBuildInfo.DisplayName} ({AppBuildInfo.Version})");
+        sb.AppendLine($"Workflow: {AppBuildInfo.WorkflowName}");
         sb.AppendLine($"Exported: {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine();
 
@@ -130,6 +133,35 @@ public class ProjectContextExportService : IProjectContextExportService
             }
         }
 
+        if (contextDocuments.Any())
+        {
+            sb.AppendLine("## Project Context Documents");
+            foreach (var group in contextDocuments
+                         .GroupBy(d => d.DocumentType)
+                         .OrderBy(g => g.Key))
+            {
+                sb.AppendLine($"### {group.Key}");
+                foreach (var d in group)
+                {
+                    sb.AppendLine($"#### {d.Title}");
+                    sb.AppendLine($"- **Authority:** {d.AuthorityLevel}");
+                    sb.AppendLine($"- **Status:** {d.Status}");
+                    if (!string.IsNullOrWhiteSpace(d.AppliesToArea))
+                        sb.AppendLine($"- **Area:** {Scrub(d.AppliesToArea)}");
+                    if (!string.IsNullOrWhiteSpace(d.Tags))
+                        sb.AppendLine($"- **Tags:** {Scrub(d.Tags)}");
+                    sb.AppendLine();
+                    if (!string.IsNullOrWhiteSpace(d.Summary))
+                    {
+                        sb.AppendLine(Scrub(d.Summary));
+                        sb.AppendLine();
+                    }
+                    sb.AppendLine(Scrub(d.Content));
+                    sb.AppendLine();
+                }
+            }
+        }
+
         if (decisions.Any())
         {
             sb.AppendLine("## Architecture Decisions");
@@ -145,37 +177,6 @@ public class ProjectContextExportService : IProjectContextExportService
                 sb.AppendLine("#### Reason");
                 sb.AppendLine(Scrub(d.Reason));
                 sb.AppendLine();
-                
-                await AppendTraceabilityAsync(sb, "Decision", d.Id);
-                sb.AppendLine();
-            }
-        }
-
-        if (contextDocuments.Any())
-        {
-            sb.AppendLine("## Project Context Documents");
-            foreach (var d in contextDocuments)
-            {
-                sb.AppendLine($"### {d.Title}");
-                sb.AppendLine($"- **Type:** {d.DocumentType}");
-                sb.AppendLine($"- **Authority:** {d.AuthorityLevel}");
-                sb.AppendLine($"- **Status:** {d.Status}");
-                if (!string.IsNullOrWhiteSpace(d.AppliesToCapability))
-                    sb.AppendLine($"- **Capability:** {Scrub(d.AppliesToCapability)}");
-                if (!string.IsNullOrWhiteSpace(d.AppliesToArea))
-                    sb.AppendLine($"- **Area:** {Scrub(d.AppliesToArea)}");
-                if (!string.IsNullOrWhiteSpace(d.Tags))
-                    sb.AppendLine($"- **Tags:** {Scrub(d.Tags)}");
-                sb.AppendLine();
-                if (!string.IsNullOrWhiteSpace(d.Summary))
-                {
-                    sb.AppendLine("#### Summary");
-                    sb.AppendLine(Scrub(d.Summary));
-                    sb.AppendLine();
-                }
-                sb.AppendLine("#### Content");
-                sb.AppendLine(Scrub(d.Content));
-                sb.AppendLine();
             }
         }
 
@@ -190,6 +191,21 @@ public class ProjectContextExportService : IProjectContextExportService
                 sb.AppendLine();
                 sb.AppendLine(Scrub(t.Summary));
                 sb.AppendLine();
+
+                var sourceReferences = await _artifactSourceReferenceService.GetReferencesForArtifactAsync("Ticket", t.Id);
+                if (sourceReferences.Any())
+                {
+                    sb.AppendLine("#### Source Traceability");
+                    foreach (var reference in sourceReferences)
+                    {
+                        var sourceLabel = reference.SourceId.HasValue
+                            ? $"{reference.SourceType} #{reference.SourceId.Value}"
+                            : reference.SourceType;
+                        sb.AppendLine($"- **{reference.ReferenceType}:** {sourceLabel}");
+                    }
+
+                    sb.AppendLine();
+                }
                 
                 var ticketPlan = plans.FirstOrDefault(p => p.TicketId == t.Id);
                 if (ticketPlan != null)
@@ -201,12 +217,7 @@ public class ProjectContextExportService : IProjectContextExportService
                     sb.AppendLine("##### Steps");
                     sb.AppendLine(Scrub(ticketPlan.ProposedSteps));
                     sb.AppendLine();
-                    await AppendTraceabilityAsync(sb, "ImplementationPlan", ticketPlan.Id);
-                    sb.AppendLine();
                 }
-
-                await AppendTraceabilityAsync(sb, "Ticket", t.Id);
-                sb.AppendLine();
             }
         }
 
@@ -238,22 +249,9 @@ public class ProjectContextExportService : IProjectContextExportService
         return scrubbed;
     }
 
-    private void AppendStateLine(StringBuilder sb, string label, string? value)
+    private static void AppendStateLine(StringBuilder sb, string label, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value))
-            sb.AppendLine($"- **{label}:** {Scrub(value)}");
-    }
-
-    private async Task AppendTraceabilityAsync(StringBuilder sb, string artifactType, long artifactId)
-    {
-        var references = await _referenceService.GetReferencesForArtifactAsync(artifactType, artifactId);
-        if (references != null && references.Any())
-        {
-            sb.AppendLine("#### Source Traceability");
-            foreach (var r in references)
-            {
-                sb.AppendLine($"- **{r.ReferenceType}:** {r.SourceType} #{r.SourceId} ({r.Summary})");
-            }
-        }
+            sb.AppendLine($"- **{label}:** {value}");
     }
 }

@@ -14,6 +14,7 @@ public interface IProjectService
     Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken cancellationToken = default);
     Task<Project?> GetByIdAsync(int projectId, CancellationToken cancellationToken = default);
     Task UpdateLocalPathAsync(int projectId, string localPath, CancellationToken cancellationToken = default);
+    Task MarkIndexStaleAsync(int projectId, string reason, CancellationToken cancellationToken = default);
 }
 
 public sealed class ProjectService : IProjectService
@@ -65,7 +66,7 @@ public sealed class ProjectService : IProjectService
     {
         const string sql = """
             SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate,
-                   LastIndexedUtc, IndexingStatus
+                   LastIndexedUtc, IndexingStatus, IndexedFileCount
             FROM dbo.Projects
             WHERE Id = @ProjectId
               AND TenantId = @TenantId;
@@ -91,6 +92,23 @@ public sealed class ProjectService : IProjectService
         await connection.ExecuteAsync(new CommandDefinition(
             sql,
             new { ProjectId = projectId, LocalPath = localPath, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task MarkIndexStaleAsync(int projectId, string reason, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE dbo.Projects
+            SET IndexingStatus = 'Stale Index',
+                UpdatedDate = SYSUTCDATETIME()
+            WHERE Id = @ProjectId
+              AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { ProjectId = projectId, TenantId = _tenant.TenantId, Reason = reason },
             cancellationToken: cancellationToken));
     }
 }

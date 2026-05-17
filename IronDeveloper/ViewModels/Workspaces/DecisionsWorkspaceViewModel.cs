@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using IronDev.Agent.Models;
 using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -12,99 +11,198 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 {
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
-    private readonly global::IronDev.Services.ILookupService _lookupService;
-
     private int _activeProjectId;
 
-    // ── List panel ──────────────────────────────────────────────────────────
-    [ObservableProperty] private ObservableCollection<DecisionItem> _decisions = [];
-    [ObservableProperty] private DecisionItem? _selectedDecision;
-
-    // ── Detail/editor panel ─────────────────────────────────────────────────
-    [ObservableProperty] private bool _isEditing;
-    [ObservableProperty] private bool _isNewDecision;
+    [ObservableProperty] private ObservableCollection<ProjectContextDocument> _documents = [];
+    [ObservableProperty] private ProjectContextDocument? _selectedDocument;
     [ObservableProperty] private bool _hasDetail;
     [ObservableProperty] private bool _isSaving;
     [ObservableProperty] private string _saveStatus = string.Empty;
 
-    // Editable fields
-    [ObservableProperty] private long   _editId;
-    [ObservableProperty] private string _editTitle = string.Empty;
-    [ObservableProperty] private string _editDetail = string.Empty;
-    [ObservableProperty] private string _editReason = string.Empty;
-    [ObservableProperty] private string _editCategory = "Architecture";
-    [ObservableProperty] private string _editStatus = "Accepted";
-    [ObservableProperty] private string _editLinkedFilePaths = string.Empty;
-    [ObservableProperty] private string _editLinkedSymbols = string.Empty;
+    [ObservableProperty] private string _projectSummary = string.Empty;
+    [ObservableProperty] private string _summarySaveStatus = string.Empty;
 
-    // Dropdown options (loaded from SQL lookup tables)
-    public ObservableCollection<string> StatusOptions { get; } = [];
-    public ObservableCollection<string> CategoryOptions { get; } = [];
+    [ObservableProperty] private long _editId;
+    [ObservableProperty] private string _editDocumentType = "ProjectFact";
+    [ObservableProperty] private string _editAuthorityLevel = "ObservedFact";
+    [ObservableProperty] private string _editStatus = "Active";
+    [ObservableProperty] private string _editTitle = string.Empty;
+    [ObservableProperty] private string _editSummary = string.Empty;
+    [ObservableProperty] private string _editContent = string.Empty;
+    [ObservableProperty] private string _editTags = string.Empty;
+    [ObservableProperty] private string _editAppliesToArea = string.Empty;
+    [ObservableProperty] private string _editAppliesToCapability = string.Empty;
+    [ObservableProperty] private string _editSource = string.Empty;
+
+    [ObservableProperty] private string _filterDocumentType = "All";
+    [ObservableProperty] private string _filterStatus = "Active";
+
+    public string SelectedDocumentBody
+    {
+        get
+        {
+            if (!HasDetail)
+                return string.Empty;
+
+            if (string.IsNullOrWhiteSpace(EditSummary))
+                return EditContent;
+
+            if (string.IsNullOrWhiteSpace(EditContent))
+                return EditSummary;
+
+            return $"{EditSummary.Trim()}\n\n{EditContent.Trim()}";
+        }
+    }
+
+    public string SelectedDocumentMeta
+    {
+        get
+        {
+            if (!HasDetail)
+                return string.Empty;
+
+            var updated = SelectedDocument?.UpdatedDate ?? SelectedDocument?.CreatedDate;
+            var updatedText = updated is null || updated.Value == default
+                ? string.Empty
+                : $"Updated {updated.Value.ToLocalTime():MMM d, h:mm tt}";
+
+            var source = string.IsNullOrWhiteSpace(EditSource) ? string.Empty : $"Source {EditSource.Trim()}";
+            return string.Join("  |  ", new[] { EditDocumentType, EditAuthorityLevel, EditStatus, source, updatedText }
+                .Where(static value => !string.IsNullOrWhiteSpace(value)));
+        }
+    }
+
+    public string ProjectSummaryPreview
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(ProjectSummary))
+                return "No project summary saved yet.";
+
+            var normalized = ProjectSummary.Replace("\r\n", " ").Replace('\n', ' ').Trim();
+            return normalized.Length <= 180 ? normalized : normalized[..177] + "...";
+        }
+    }
+
+    public ObservableCollection<string> DocumentTypeOptions { get; } =
+    [
+        "ArchitectureDecision",
+        "ProjectStandard",
+        "ProjectFact",
+        "TechnologyNote",
+        "DiscussionNote",
+        "Constraint",
+        "OpenQuestion",
+        "Recommendation",
+        "ImplementationNote",
+        "ProductBlueprint",
+        "CapabilityNote",
+        "MilestoneNote"
+    ];
+
+    public ObservableCollection<string> DocumentTypeFilterOptions { get; } =
+    [
+        "All",
+        "ArchitectureDecision",
+        "ProjectStandard",
+        "ProjectFact",
+        "TechnologyNote",
+        "DiscussionNote",
+        "Constraint",
+        "OpenQuestion",
+        "Recommendation",
+        "ImplementationNote",
+        "ProductBlueprint",
+        "CapabilityNote",
+        "MilestoneNote"
+    ];
+
+    public ObservableCollection<string> AuthorityLevelOptions { get; } =
+    [
+        "Binding",
+        "StrongGuidance",
+        "ObservedFact",
+        "ContextOnly",
+        "Pending",
+        "Rejected",
+        "Superseded"
+    ];
+
+    public ObservableCollection<string> StatusOptions { get; } =
+    [
+        "Active",
+        "Pending",
+        "Accepted",
+        "Rejected",
+        "Superseded",
+        "Archived"
+    ];
+
+    public ObservableCollection<string> StatusFilterOptions { get; } =
+    [
+        "Active",
+        "Pending",
+        "Accepted",
+        "All",
+        "Archived"
+    ];
 
     public DecisionsWorkspaceViewModel(
         global::IronDev.Services.IProjectMemoryService memoryService,
         global::IronDev.Services.ILookupService lookupService)
     {
         _memoryService = memoryService;
-        _lookupService = lookupService;
     }
-
-    // ── Load ────────────────────────────────────────────────────────────────
 
     internal async Task LoadAsync(Project project)
     {
         _activeProjectId = project.Id;
-        await LoadLookupsAsync();
+        await LoadSummaryAsync();
         await RefreshListAsync();
     }
 
-    private async Task LoadLookupsAsync()
+    private async Task LoadSummaryAsync()
     {
-        try
-        {
-            var categories = await _lookupService.GetDecisionCategoriesAsync();
-            var statuses = await _lookupService.GetDecisionStatusesAsync();
-
-            CategoryOptions.Clear();
-            foreach (var c in categories)
-                CategoryOptions.Add(c.Name);
-
-            StatusOptions.Clear();
-            foreach (var s in statuses)
-                StatusOptions.Add(s.Name);
-        }
-        catch
-        {
-            // Fallback if lookup tables don't exist yet
-            if (CategoryOptions.Count == 0)
-            {
-                foreach (var c in new[] { "Architecture", "Code Standards", "Product", "Data", "Infrastructure",
-                    "AI / Prompting", "UX / UI", "Workflow / Process", "Integration", "Security" })
-                    CategoryOptions.Add(c);
-            }
-            if (StatusOptions.Count == 0)
-            {
-                foreach (var s in new[] { "Proposed", "Accepted", "Superseded", "Rejected" })
-                    StatusOptions.Add(s);
-            }
-        }
+        var summary = await _memoryService.GetLatestSummaryAsync(_activeProjectId);
+        ProjectSummary = summary?.Summary ?? string.Empty;
+        SummarySaveStatus = string.Empty;
     }
 
+    [RelayCommand]
+    private async Task SaveSummaryAsync()
+    {
+        if (_activeProjectId <= 0) return;
+
+        SummarySaveStatus = "Saving...";
+        await _memoryService.SaveSummaryAsync(new ProjectSummary
+        {
+            ProjectId = _activeProjectId,
+            Summary = ProjectSummary.Trim(),
+            UpdatedDate = DateTime.UtcNow
+        });
+
+        SummarySaveStatus = "Saved";
+    }
+
+    [RelayCommand]
     private async Task RefreshListAsync()
     {
-        Decisions.Clear();
+        Documents.Clear();
         ClearEditor();
 
-        var decisions = await _memoryService.GetRecentDecisionsAsync(_activeProjectId, take: 50);
-        foreach (var d in decisions)
-        {
-            Decisions.Add(MapToItem(d));
-        }
+        var documentType = FilterDocumentType == "All" ? null : FilterDocumentType;
+        var status = FilterStatus == "All" ? null : FilterStatus;
+        var documents = await _memoryService.GetContextDocumentsAsync(
+            _activeProjectId,
+            documentType: documentType,
+            status: status,
+            take: 200);
+
+        foreach (var document in documents)
+            Documents.Add(document);
     }
 
-    // ── Selection ───────────────────────────────────────────────────────────
-
-    partial void OnSelectedDecisionChanged(DecisionItem? value)
+    partial void OnSelectedDocumentChanged(ProjectContextDocument? value)
     {
         if (value == null)
         {
@@ -112,57 +210,70 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
             return;
         }
 
-        LoadDecisionIntoEditor(value);
+        LoadDocumentIntoEditor(value);
     }
 
-    private void LoadDecisionIntoEditor(DecisionItem item)
+    partial void OnHasDetailChanged(bool value)
+        => NotifyDocumentPreviewChanged();
+
+    partial void OnProjectSummaryChanged(string value)
+        => OnPropertyChanged(nameof(ProjectSummaryPreview));
+
+    partial void OnEditDocumentTypeChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnEditAuthorityLevelChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnEditStatusChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnEditSummaryChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentBody));
+
+    partial void OnEditContentChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentBody));
+
+    partial void OnEditSourceChanged(string value)
+        => OnPropertyChanged(nameof(SelectedDocumentMeta));
+
+    partial void OnFilterDocumentTypeChanged(string value)
+        => _ = RefreshListAsync();
+
+    partial void OnFilterStatusChanged(string value)
+        => _ = RefreshListAsync();
+
+    [RelayCommand]
+    private void NewDocument()
     {
-        IsNewDecision = false;
-        IsEditing = true;
+        SelectedDocument = null;
         HasDetail = true;
-
-        EditId               = item.Id;
-        EditTitle            = item.Title;
-        EditDetail           = item.Detail;
-        EditReason           = item.Reason ?? string.Empty;
-        EditCategory         = item.Category ?? "Architecture";
-        EditStatus           = item.Status;
-        EditLinkedFilePaths  = item.LinkedFilePaths ?? string.Empty;
-        EditLinkedSymbols    = item.LinkedSymbols ?? string.Empty;
-
+        EditId = 0;
+        EditDocumentType = "ProjectFact";
+        EditAuthorityLevel = "ObservedFact";
+        EditStatus = "Active";
+        EditTitle = string.Empty;
+        EditSummary = string.Empty;
+        EditContent = string.Empty;
+        EditTags = string.Empty;
+        EditAppliesToArea = string.Empty;
+        EditAppliesToCapability = string.Empty;
+        EditSource = "Manual";
         SaveStatus = string.Empty;
     }
 
-    // ── New Decision ────────────────────────────────────────────────────────
-
     [RelayCommand]
-    private void NewDecision()
-    {
-        SelectedDecision = null;
-        IsNewDecision = true;
-        IsEditing = true;
-        HasDetail = true;
-
-        EditId              = 0;
-        EditTitle           = string.Empty;
-        EditDetail          = string.Empty;
-        EditReason          = string.Empty;
-        EditCategory        = "Architecture";
-        EditStatus          = "Accepted";
-        EditLinkedFilePaths = string.Empty;
-        EditLinkedSymbols   = string.Empty;
-
-        SaveStatus = string.Empty;
-    }
-
-    // ── Save ────────────────────────────────────────────────────────────────
-
-    [RelayCommand]
-    private async Task SaveDecisionAsync()
+    private async Task SaveDocumentAsync()
     {
         if (string.IsNullOrWhiteSpace(EditTitle))
         {
             SaveStatus = "Title is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(EditContent))
+        {
+            SaveStatus = "Content is required.";
             return;
         }
 
@@ -171,29 +282,27 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
         try
         {
-            var decision = new ProjectDecision
+            var document = new ProjectContextDocument
             {
-                Id                     = EditId,
-                ProjectId              = _activeProjectId,
-                Title                  = EditTitle.Trim(),
-                Detail                 = EditDetail.Trim(),
-                Reason                 = string.IsNullOrWhiteSpace(EditReason) ? null : EditReason.Trim(),
-                Category               = EditCategory,
-                Status                 = EditStatus,
-                LinkedFilePaths        = string.IsNullOrWhiteSpace(EditLinkedFilePaths) ? null : EditLinkedFilePaths.Trim(),
-                LinkedCodeIndexEntryIds = null,
-                LinkedSymbols          = string.IsNullOrWhiteSpace(EditLinkedSymbols) ? null : EditLinkedSymbols.Trim()
+                Id = EditId,
+                ProjectId = _activeProjectId,
+                DocumentType = EditDocumentType,
+                AuthorityLevel = EditAuthorityLevel,
+                Status = EditStatus,
+                Title = EditTitle.Trim(),
+                Summary = EmptyToNull(EditSummary),
+                Content = EditContent.Trim(),
+                Tags = EmptyToNull(EditTags),
+                AppliesToArea = EmptyToNull(EditAppliesToArea),
+                AppliesToCapability = EmptyToNull(EditAppliesToCapability),
+                Source = EmptyToNull(EditSource)
             };
 
-            var savedId = await _memoryService.SaveDecisionAsync(decision);
+            var savedId = await _memoryService.SaveContextDocumentAsync(document);
             EditId = savedId;
-            IsNewDecision = false;
-
-            SaveStatus = "Saved ✓";
+            SaveStatus = "Saved";
             await RefreshListAsync();
-
-            // Re-select the saved decision
-            SelectedDecision = Decisions.FirstOrDefault(d => d.Id == savedId);
+            SelectedDocument = Documents.FirstOrDefault(d => d.Id == savedId);
         }
         catch (Exception ex)
         {
@@ -205,64 +314,88 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         }
     }
 
-    // ── Cancel ──────────────────────────────────────────────────────────────
+    [RelayCommand]
+    private async Task ArchiveDocumentAsync()
+    {
+        if (EditId <= 0) return;
+
+        IsSaving = true;
+        try
+        {
+            await _memoryService.ArchiveContextDocumentAsync(EditId);
+            SaveStatus = "Archived";
+            await RefreshListAsync();
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
 
     [RelayCommand]
     private void CancelEdit()
     {
-        if (SelectedDecision != null)
-        {
-            LoadDecisionIntoEditor(SelectedDecision);
-        }
+        if (SelectedDocument != null)
+            LoadDocumentIntoEditor(SelectedDocument);
         else
-        {
             ClearEditor();
-        }
     }
 
-    // ── Prefill from chat (called by ShellViewModel) ────────────────────────
-
-    /// <summary>
-    /// Sets up a new decision editor with pre-filled data from chat context.
-    /// </summary>
     public void PrefillFromChat(string title, string detail, string? linkedFilePaths, string? linkedSymbols)
     {
-        NewDecision();
-        EditTitle           = title;
-        EditDetail          = detail;
-        EditLinkedFilePaths = linkedFilePaths ?? string.Empty;
-        EditLinkedSymbols   = linkedSymbols ?? string.Empty;
+        NewDocument();
+        EditDocumentType = "ArchitectureDecision";
+        EditAuthorityLevel = "Binding";
+        EditStatus = "Accepted";
+        EditTitle = title;
+        EditContent = detail;
+        EditTags = linkedSymbols ?? string.Empty;
+        EditAppliesToArea = linkedFilePaths ?? string.Empty;
+        EditSource = "Chat";
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
+    private void LoadDocumentIntoEditor(ProjectContextDocument document)
+    {
+        HasDetail = true;
+        EditId = document.Id;
+        EditDocumentType = document.DocumentType;
+        EditAuthorityLevel = document.AuthorityLevel;
+        EditStatus = document.Status;
+        EditTitle = document.Title;
+        EditSummary = document.Summary ?? string.Empty;
+        EditContent = document.Content;
+        EditTags = document.Tags ?? string.Empty;
+        EditAppliesToArea = document.AppliesToArea ?? string.Empty;
+        EditAppliesToCapability = document.AppliesToCapability ?? string.Empty;
+        EditSource = document.Source ?? string.Empty;
+        SaveStatus = string.Empty;
+        NotifyDocumentPreviewChanged();
+    }
 
     private void ClearEditor()
     {
-        IsEditing = false;
-        IsNewDecision = false;
         HasDetail = false;
         EditId = 0;
+        EditDocumentType = "ProjectFact";
+        EditAuthorityLevel = "ObservedFact";
+        EditStatus = "Active";
         EditTitle = string.Empty;
-        EditDetail = string.Empty;
-        EditReason = string.Empty;
-        EditCategory = "Architecture";
-        EditStatus = "Accepted";
-        EditLinkedFilePaths = string.Empty;
-        EditLinkedSymbols = string.Empty;
+        EditSummary = string.Empty;
+        EditContent = string.Empty;
+        EditTags = string.Empty;
+        EditAppliesToArea = string.Empty;
+        EditAppliesToCapability = string.Empty;
+        EditSource = string.Empty;
         SaveStatus = string.Empty;
+        NotifyDocumentPreviewChanged();
     }
 
-    private static DecisionItem MapToItem(ProjectDecision d) => new()
+    private static string? EmptyToNull(string value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void NotifyDocumentPreviewChanged()
     {
-        Id                     = d.Id,
-        Title                  = d.Title,
-        Detail                 = d.Detail,
-        Reason                 = d.Reason,
-        Category               = d.Category,
-        Status                 = d.Status,
-        LinkedFilePaths        = d.LinkedFilePaths,
-        LinkedCodeIndexEntryIds = d.LinkedCodeIndexEntryIds,
-        LinkedSymbols          = d.LinkedSymbols,
-        CreatedDate            = d.CreatedDate
-    };
+        OnPropertyChanged(nameof(SelectedDocumentBody));
+        OnPropertyChanged(nameof(SelectedDocumentMeta));
+    }
 }

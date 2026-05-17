@@ -1387,6 +1387,103 @@ public sealed class ContextAgentTests
     // ── C4: Conflict Assessment and Traces (Test E & F) ──────────────────────
 
     [TestMethod]
+    [Description("Split ticket commands resolve against previous discussion and request multiple ticket drafts.")]
+    public void ChatIntentParser_SplitThisIntoTwoTickets_UsesPreviousMessage()
+    {
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(
+            "split this into 2 tickets",
+            "Add project summary and typed project context documents.");
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("CreateTickets", intent.Intent);
+        Assert.AreEqual(2, intent.TicketCount);
+        Assert.AreEqual("Add project summary and typed project context documents.", intent.WorkText);
+        Assert.IsFalse(intent.RequiresClarification);
+    }
+
+    [TestMethod]
+    [Description("Split ticket commands can carry named split areas.")]
+    public void ChatIntentParser_SplitIntoNamedAreas_ExtractsHints()
+    {
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(
+            "split this into two tickets: project summary and context documents",
+            "Build the alpha memory model.");
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual(2, intent.TicketCount);
+        Assert.AreEqual(2, intent.SplitHints.Count);
+        Assert.AreEqual("project summary", intent.SplitHints[0]);
+        Assert.AreEqual("context documents", intent.SplitHints[1]);
+    }
+
+    [TestMethod]
+    [Description("Bare create-ticket commands are explicit but need scope clarification.")]
+    public void ChatIntentParser_CreateTicketWithoutScope_AsksClarification()
+    {
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("create a ticket");
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("CreateTicket", intent.Intent);
+        Assert.IsTrue(intent.RequiresClarification);
+        Assert.IsTrue(intent.ClarificationQuestions.Count > 0);
+    }
+
+    [TestMethod]
+    [Description("Explicit create-ticket chat opens the draft workflow instead of asking the LLM for generic advice.")]
+    public async Task ChatWorkspaceViewModel_CreateTicketCommand_RoutesDirectlyToDraft()
+    {
+        var llm = new StubLlmService("SHOULD NOT BE USED");
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            llm,
+            new ContextStubProjectMemoryService(),
+            new ContextStubTicketService(),
+            new StubChatFeedbackService(),
+            new LlmTraceService());
+
+        IronDev.Agent.Models.ChatTicketContext? captured = null;
+        vm.OnCreateTicketFromChat = ctx => captured = ctx;
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1, Name = "BookSeller" });
+
+        vm.PromptText = "Create a ticket to add book sorting";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(captured);
+        Assert.AreEqual("add book sorting", captured!.MessageText);
+        Assert.AreEqual("add book sorting", captured.ProposedTitle);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
+    }
+
+    [TestMethod]
+    [Description("Explicit split-ticket chat opens a multi-draft workflow instead of asking the LLM for advice.")]
+    public async Task ChatWorkspaceViewModel_SplitTicketCommand_RoutesDirectlyToMultipleDrafts()
+    {
+        var llm = new StubLlmService("SHOULD NOT BE USED");
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            llm,
+            new ContextStubProjectMemoryService(),
+            new ContextStubTicketService(),
+            new StubChatFeedbackService(),
+            new LlmTraceService());
+
+        IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>? captured = null;
+        vm.OnCreateTicketsFromChat = contexts => captured = contexts;
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1, Name = "BookSeller" });
+
+        vm.PromptText = "split this into two tickets: project summary and context documents";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(captured);
+        Assert.AreEqual(2, captured!.Count);
+        Assert.AreEqual("project summary", captured[0].ProposedTitle);
+        Assert.AreEqual("context documents", captured[1].ProposedTitle);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
+    }
+
+    [TestMethod]
     [Description("Test E & F: Conflict assessment receives WorkText, and Trace includes original and WorkText.")]
     public async Task ChatWorkspaceViewModel_PassesWorkText_And_LogsTrace()
     {
@@ -1523,11 +1620,20 @@ internal sealed class ContextStubProjectMemoryService : IronDev.Services.IProjec
     public List<IronDev.Data.Models.ProjectRule> Rules { get; set; } = [];
 
     public Task<long> SaveSummaryAsync(IronDev.Data.Models.ProjectSummary s, CancellationToken ct = default) => Task.FromResult(1L);
-    public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetContextDocumentsAsync(int p, int t = 50, CancellationToken ct = default)
+    public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetContextDocumentsAsync(
+        int p,
+        string? documentType = null,
+        string? authorityLevel = null,
+        string? status = "Active",
+        int t = 100,
+        CancellationToken ct = default)
         => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>>(Array.Empty<IronDev.Data.Models.ProjectContextDocument>());
     public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetRelevantContextDocumentsAsync(int p, string q, int t = 20, CancellationToken ct = default)
         => Task.FromResult<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>>(Array.Empty<IronDev.Data.Models.ProjectContextDocument>());
+    public Task<IronDev.Data.Models.ProjectContextDocument?> GetContextDocumentByIdAsync(long id, CancellationToken ct = default)
+        => Task.FromResult<IronDev.Data.Models.ProjectContextDocument?>(null);
     public Task<long> SaveContextDocumentAsync(IronDev.Data.Models.ProjectContextDocument d, CancellationToken ct = default) => Task.FromResult(1L);
+    public Task<bool> ArchiveContextDocumentAsync(long id, CancellationToken ct = default) => Task.FromResult(false);
     public Task<IronDev.Data.Models.ProjectObservableState?> GetObservableStateAsync(int p, CancellationToken ct = default)
         => Task.FromResult<IronDev.Data.Models.ProjectObservableState?>(null);
     public Task SaveObservableStateAsync(IronDev.Data.Models.ProjectObservableState s, CancellationToken ct = default) => Task.CompletedTask;

@@ -520,6 +520,7 @@ public sealed class BuilderContextServiceTests
         public Task<IronDev.Data.Models.Project?> GetByIdAsync(int id, CancellationToken ct = default)
             => Task.FromResult(_project);
         public Task UpdateLocalPathAsync(int id, string path, CancellationToken ct = default) => Task.CompletedTask;
+        public Task MarkIndexStaleAsync(int id, string reason, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class StubTickets : IronDev.Services.ITicketService
@@ -560,11 +561,20 @@ public sealed class BuilderContextServiceTests
         public Task<IronDev.Data.Models.ProjectDecision?> GetDecisionByIdAsync(long id, CancellationToken ct = default)
             => Task.FromResult<IronDev.Data.Models.ProjectDecision?>(null);
         public Task<long> SaveSummaryAsync(IronDev.Data.Models.ProjectSummary s, CancellationToken ct = default) => Task.FromResult(1L);
-        public Task<IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetContextDocumentsAsync(int p, int take = 50, CancellationToken ct = default)
+        public Task<IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetContextDocumentsAsync(
+            int p,
+            string? documentType = null,
+            string? authorityLevel = null,
+            string? status = "Active",
+            int take = 100,
+            CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>>([]);
         public Task<IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>> GetRelevantContextDocumentsAsync(int p, string q, int take = 20, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<IronDev.Data.Models.ProjectContextDocument>>([]);
+        public Task<IronDev.Data.Models.ProjectContextDocument?> GetContextDocumentByIdAsync(long id, CancellationToken ct = default)
+            => Task.FromResult<IronDev.Data.Models.ProjectContextDocument?>(null);
         public Task<long> SaveContextDocumentAsync(IronDev.Data.Models.ProjectContextDocument d, CancellationToken ct = default) => Task.FromResult(1L);
+        public Task<bool> ArchiveContextDocumentAsync(long id, CancellationToken ct = default) => Task.FromResult(false);
         public Task<IronDev.Data.Models.ProjectObservableState?> GetObservableStateAsync(int p, CancellationToken ct = default)
             => Task.FromResult<IronDev.Data.Models.ProjectObservableState?>(null);
         public Task SaveObservableStateAsync(IronDev.Data.Models.ProjectObservableState s, CancellationToken ct = default) => Task.CompletedTask;

@@ -15,6 +15,7 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
 {
     private readonly ILLMService _llmService;
     private readonly ILlmTraceService _traceService;
+    private readonly IConversationContextResolver _conversationResolver;
 
     private static readonly string[] InspectionPrefixes =
     [
@@ -34,10 +35,14 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public ContextAgentRouteJudgeService(ILLMService llmService, ILlmTraceService traceService)
+    public ContextAgentRouteJudgeService(
+        ILLMService llmService,
+        ILlmTraceService traceService,
+        IConversationContextResolver? conversationResolver = null)
     {
         _llmService = llmService;
         _traceService = traceService;
+        _conversationResolver = conversationResolver ?? new ConversationContextResolver();
     }
 
     public async Task<ContextAgentRouteDecision> DecideRouteAsync(ContextAgentRouteRequest request, CancellationToken cancellationToken = default)
@@ -48,12 +53,20 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
         ContextAgentRouteDecision decision;
         bool usedLlmJudge = false;
         bool usedFallbackRules = false;
+        bool usedConversationResolver = false;
         string rawJson = string.Empty;
 
         try
         {
+            var resolution = _conversationResolver.Resolve(request);
+            if (resolution.IsResolved || resolution.NeedsClarification)
+            {
+                decision = ToRouteDecision(request, resolution);
+                usedConversationResolver = true;
+                rawJson = BuildResolutionTraceText(resolution);
+            }
             // Pre-router catch obvious cases
-            if (IsObviousFallback(request))
+            else if (IsObviousFallback(request))
             {
                 decision = FallbackRoute(request.UserRequest, request.InitialIntentFromPromptContextBuilder);
                 usedFallbackRules = true;
@@ -92,7 +105,9 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
             Risks = decision.Risks,
             DeepLookupTargets = decision.DeepLookupTargets,
             UsedLlmJudge = usedLlmJudge,
-            UsedFallbackRules = usedFallbackRules
+            UsedFallbackRules = usedFallbackRules,
+            UsedConversationContextResolver = usedConversationResolver,
+            ContextMode = decision.ContextMode
         };
 
         decision = ApplySafetyValidation(decision, request.UserRequest, safetyOverrides);
@@ -120,6 +135,25 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
         };
         _traceService.AddTrace(tGate);
 
+        if (usedConversationResolver)
+        {
+            var tResolution = new LlmTraceEntry
+            {
+                Id = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                FeatureName = ContextAgentStage.IntentContextResolution,
+                TraceGroupId = request.TraceGroupId,
+                ProjectId = request.ProjectId,
+                ChatSessionId = request.SessionId.ToString(),
+                CurrentUserMessage = request.UserRequest,
+                RequestText = request.RecentConversationSummary,
+                RawResponseText = rawJson,
+                ParsedResponseSummary = $"Mode={decision.ContextMode} | Effective={decision.EffectiveWorkText}",
+                WasSuccessful = true
+            };
+            _traceService.AddTrace(tResolution);
+        }
+
         EmitTrace(request, decision, prompt, rawJson, evidencePacket);
 
         return decision;
@@ -133,6 +167,19 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
         {
             sb.AppendLine("RecentConversationSummary:");
             sb.AppendLine(request.RecentConversationSummary);
+        }
+        if (request.ConversationContextSnapshot is { HasUsefulState: true } snapshot)
+        {
+            sb.AppendLine("ConversationContextSnapshot:");
+            sb.AppendLine($"ActiveTopic: {snapshot.ActiveTopic}");
+            sb.AppendLine($"CurrentGoal: {snapshot.CurrentGoal}");
+            sb.AppendLine($"ContextMode: {snapshot.ContextMode}");
+            sb.AppendLine($"PendingDecision: {snapshot.PendingDecision}");
+            sb.AppendLine($"LastRecommendation: {snapshot.LastRecommendation}");
+            if (snapshot.LastOptionsPresented.Count > 0)
+                sb.AppendLine($"LastOptionsPresented: {string.Join("; ", snapshot.LastOptionsPresented)}");
+            if (snapshot.KnownFacts.Count > 0)
+                sb.AppendLine($"KnownFacts: {string.Join("; ", snapshot.KnownFacts)}");
         }
         if (!string.IsNullOrWhiteSpace(request.InitialIntentFromPromptContextBuilder))
             sb.AppendLine($"InitialIntent: {request.InitialIntentFromPromptContextBuilder}");
@@ -193,7 +240,7 @@ If UserRequest is short, vague, or a follow-up (e.g. ""industry standard"", ""ye
 ARCHITECTURE ADVICE RULE:
 If the user asks for recommendations, ""best way"", ""industry standard"", ""options"", or comparisons for a feature (even if not implemented yet):
 1. Classify as ArchitectureAdvice.
-2. Set allowCodeSearch=true (to check existing patterns).
+2. Set allowCodeSearch=false unless the user explicitly asks whether something exists in code.
 3. Set allowConflictAssessment=false.
 
 Evidence Packet:
@@ -235,6 +282,46 @@ Evidence Packet:
             Risks = decision.Risks ?? Array.Empty<string>(),
             DeepLookupTargets = decision.DeepLookupTargets ?? Array.Empty<DeepLookupTarget>()
         };
+    }
+
+    private static ContextAgentRouteDecision ToRouteDecision(
+        ContextAgentRouteRequest request,
+        ConversationContextResolution resolution)
+        => new()
+        {
+            OriginalUserRequest = request.UserRequest,
+            EffectiveWorkText = resolution.EffectiveRequest,
+            RequestKind = resolution.RequestKind,
+            Confidence = resolution.NeedsClarification ? 0.5 : 0.95,
+            Reason = resolution.Reason,
+            AllowCodeSearch = resolution.RequiresCodeEvidence,
+            AllowDeepLookup = resolution.RequiresCodeEvidence,
+            AllowConflictAssessment = resolution.AllowsTicketCreation,
+            AllowConflictBlocking = resolution.AllowsTicketCreation,
+            AllowTicketCreation = resolution.AllowsTicketCreation,
+            RelatedTicketsAreContextOnly = !resolution.AllowsTicketCreation,
+            NeedsClarification = resolution.NeedsClarification,
+            ClarificationQuestions = resolution.ClarificationQuestions,
+            EvidenceUsed = resolution.EvidenceUsed,
+            ContextMode = resolution.ContextMode
+        };
+
+    private static string BuildResolutionTraceText(ConversationContextResolution resolution)
+    {
+        var snapshot = resolution.Snapshot;
+        return
+            $"OriginalRequest: {resolution.OriginalRequest}\n" +
+            $"EffectiveRequest: {resolution.EffectiveRequest}\n" +
+            $"ContextMode: {resolution.ContextMode}\n" +
+            $"RequestKind: {resolution.RequestKind}\n" +
+            $"NeedsClarification: {resolution.NeedsClarification}\n" +
+            $"RequiresCodeEvidence: {resolution.RequiresCodeEvidence}\n" +
+            $"AllowsTicketCreation: {resolution.AllowsTicketCreation}\n" +
+            $"EvidenceUsed: {string.Join(", ", resolution.EvidenceUsed)}\n" +
+            $"Reason: {resolution.Reason}\n" +
+            $"ActiveTopic: {snapshot?.ActiveTopic}\n" +
+            $"PendingDecision: {snapshot?.PendingDecision}\n" +
+            $"LastRecommendation: {snapshot?.LastRecommendation}";
     }
 
     private bool IsObviousFallback(ContextAgentRouteRequest request)
@@ -425,7 +512,9 @@ Evidence Packet:
             DeepLookupTargets = decision.DeepLookupTargets,
             SafetyOverrides = overrides,
             UsedLlmJudge = decision.UsedLlmJudge,
-            UsedFallbackRules = decision.UsedFallbackRules
+            UsedFallbackRules = decision.UsedFallbackRules,
+            UsedConversationContextResolver = decision.UsedConversationContextResolver,
+            ContextMode = decision.ContextMode
         };
     }
 
@@ -468,9 +557,11 @@ Evidence Packet:
                 $"AllowConflictBlocking: {decision.AllowConflictBlocking}\n" +
                 $"AllowTicketCreation: {decision.AllowTicketCreation}\n" +
                 $"RelatedTicketsAreContextOnly: {decision.RelatedTicketsAreContextOnly}\n" +
+                $"ContextMode: {decision.ContextMode}\n" +
+                $"UsedConversationContextResolver: {decision.UsedConversationContextResolver}\n" +
                 $"\nRaw JSON:\n{rawJson}\n\nOverrides:\n{string.Join("\n", decision.SafetyOverrides)}",
             ParsedResponseSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence} | Effective={decision.EffectiveWorkText}",
-            ContextSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence} | ConflictBlocking={decision.AllowConflictBlocking} | DeepLookup={decision.AllowDeepLookup} | UsedLlmJudge={decision.UsedLlmJudge} | UsedFallbackRules={decision.UsedFallbackRules}",
+            ContextSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence} | Mode={decision.ContextMode} | ConflictBlocking={decision.AllowConflictBlocking} | DeepLookup={decision.AllowDeepLookup} | UsedResolver={decision.UsedConversationContextResolver} | UsedLlmJudge={decision.UsedLlmJudge} | UsedFallbackRules={decision.UsedFallbackRules}",
             WasSuccessful = true
         };
         _traceService.AddTrace(trace);

@@ -155,6 +155,7 @@ public sealed class ContextAgentService : IContextAgentService
             SessionId = request.SessionId,
             UserRequest = request.UserRequest,
             RecentConversationSummary = request.RecentConversationSummary,
+            ConversationContextSnapshot = ConversationContextResolver.TryParseSnapshot(request.RecentConversationSummary),
             InitialIntentFromPromptContextBuilder = initialPacket.Intent.ToString(),
             RecentTickets = request.RecentTickets,
             RecentDecisions = request.RecentDecisions,
@@ -980,6 +981,14 @@ Return JSON only.";
         sb.AppendLine();
         sb.AppendLine("=== CONTEXT AGENT GUIDELINES ===");
         sb.AppendLine($"- Your current route is: {route.RequestKind}");
+        if (!string.IsNullOrWhiteSpace(route.ContextMode))
+            sb.AppendLine($"- Current context mode is: {route.ContextMode}");
+        if (!string.Equals(route.EffectiveWorkText, request.UserRequest, StringComparison.Ordinal))
+        {
+            sb.AppendLine($"- Original user text: {request.UserRequest}");
+            sb.AppendLine($"- Resolved effective request: {route.EffectiveWorkText}");
+            sb.AppendLine("- Answer the resolved effective request, while preserving the user's wording where it matters.");
+        }
         
         if (route.RequestKind == ContextRequestKind.InspectCode || 
             route.RequestKind == ContextRequestKind.VerifyImplementation || 
@@ -1004,6 +1013,18 @@ Return JSON only.";
             sb.AppendLine("- After providing your advice, you MUST ask the user: 'Should I record this as a [ProjectName] architecture decision?'");
             sb.AppendLine("- Do NOT pretend implementation exists if it doesn't.");
             sb.AppendLine("- Use existing project profile, standards, and decisions as grounding if available.");
+        }
+
+        if (route.RequestKind == ContextRequestKind.ArchitectureDecisionExploration)
+        {
+            sb.AppendLine("- ARCHITECTURE DECISION MODE: The user is confirming or selecting an architectural choice from the recent discussion.");
+            sb.AppendLine("- Treat the resolved effective request as the decision being finalized unless it asks for more comparison.");
+            sb.AppendLine("- Acknowledge the selected choice briefly. Do NOT repeat the full recommendation list.");
+            sb.AppendLine("- You MUST emit exactly one hidden decision tag in this format:");
+            sb.AppendLine("<decision>Decision Title | The detailed rule</decision>");
+            sb.AppendLine("- The decision title should name the project and choice. The detailed rule should include the selected technology and how it will be used.");
+            sb.AppendLine("- Do NOT ask 'Should I record this as a [ProjectName] architecture decision?' after the user has already confirmed the choice.");
+            sb.AppendLine("- Do NOT claim implementation exists unless code evidence is present.");
         }
 
         if (shouldEnforceHonesty && proof.Status != ContextProofStatus.ProvenPresent)
@@ -1095,9 +1116,18 @@ Return JSON only.";
         else
         {
             sb.AppendLine("No additional code was retrieved during this request.");
-            sb.AppendLine("If your answer requires inspecting specific code that is not in the context above, you MUST say:");
-            sb.AppendLine("\"I do not have enough indexed code context to verify that.\"");
-            sb.AppendLine("Do NOT invent code details not present in the retrieved snippets.");
+            if (route.RequestKind == ContextRequestKind.ArchitectureAdvice ||
+                route.RequestKind == ContextRequestKind.ArchitectureDecisionExploration)
+            {
+                sb.AppendLine("This route does not require code evidence. Use project profile, decisions, standards, facts, and conversation state.");
+                sb.AppendLine("Do NOT claim implementation exists unless code evidence is present.");
+            }
+            else
+            {
+                sb.AppendLine("If your answer requires inspecting specific code that is not in the context above, you MUST say:");
+                sb.AppendLine("\"I do not have enough indexed code context to verify that.\"");
+                sb.AppendLine("Do NOT invent code details not present in the retrieved snippets.");
+            }
         }
 
         sb.AppendLine();

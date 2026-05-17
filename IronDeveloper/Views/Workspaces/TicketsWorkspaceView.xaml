@@ -13,43 +13,34 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="WORKFLOW" Style="{StaticResource Typography.Eyebrow}"/>
-                <TextBlock Text="Ticket Management" Style="{StaticResource Typography.ScreenTitle}"/>
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Command="{Binding GenerateCodebaseTicketsCommand}"
-                        Style="{StaticResource AppButton.Secondary}"
-                        Padding="16,8" Margin="0,0,8,0"
-                        ToolTip="Analyze project context and generate improvement tickets">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="✧ Analyze Codebase" VerticalAlignment="Center">
+        <controls:WorkspaceHeader Grid.Row="0"
+                                  Eyebrow="WORKFLOW"
+                                  Title="Ticket Management"
+                                  Margin="0,0,0,18">
+            <controls:WorkspaceHeader.Actions>
+                <StackPanel Orientation="Horizontal">
+                    <Button Command="{Binding GenerateCodebaseTicketsCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"
+                            Margin="0,0,8,0"
+                            ToolTip="Analyze project context and generate improvement tickets">
+                        <TextBlock Text="Analyze Codebase" VerticalAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsGeneratingCodebaseTickets}" Value="True">
-                                            <Setter Property="Text" Value="⟳ Analyzing..."/>
+                                            <Setter Property="Text" Value="Analyzing..."/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                    </StackPanel>
-                </Button>
-                <Button Content="＋ New Ticket"
-                        Command="{Binding NewTicketCommand}"
-                        Style="{StaticResource AppButton.Primary}"
-                        Padding="20,8"/>
-            </StackPanel>
-        </Grid>
-
+                    </Button>
+                    <Button Content="+ New Ticket"
+                            Command="{Binding NewTicketCommand}"
+                            Style="{StaticResource AppButton.Primary}"/>
+                </StackPanel>
+            </controls:WorkspaceHeader.Actions>
+        </controls:WorkspaceHeader>
         <!-- Master-Detail -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -57,7 +48,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ═══ LEFT: Ticket List ═══ -->
+            <!-- LEFT: Ticket List -->
             <controls:WorkspaceListPane Grid.Column="0" Title="PROJECT TICKETS" Margin="0,0,16,0"
                                         ItemsSource="{Binding Tickets}"
                                         SelectedItem="{Binding SelectedTicket, Mode=TwoWay}">
@@ -108,7 +99,7 @@
                 </controls:WorkspaceListPane.ItemTemplate>
             </controls:WorkspaceListPane>
 
-            <!-- ═══ RIGHT: Detail/Editor ═══ -->
+            <!-- RIGHT: Detail/Editor -->
             <Border Grid.Column="1"
                     Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
@@ -251,7 +242,7 @@
                             <RowDefinition Height="Auto"/>  <!-- 3: footer -->
                         </Grid.RowDefinitions>
 
-                        <!-- ══ Draft Banner: compact single row ══ -->
+                        <!-- Draft Banner: compact single row -->
                         <Border Grid.Row="0"
                                 Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Background="#1A7C6BE8" BorderBrush="#7C6BE8" BorderThickness="0,0,0,1"
@@ -265,8 +256,8 @@
                                 </Grid.ColumnDefinitions>
                                 <!-- Icon + label -->
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="✦" Foreground="#7C6BE8" FontSize="13" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <TextBlock Text="Draft Ticket — review before saving"
+                                    <TextBlock Text="Draft" Foreground="#7C6BE8" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Draft Ticket - review before saving"
                                                Foreground="#7C6BE8" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <!-- Generating / status -->
@@ -278,7 +269,7 @@
                                             <Setter Property="Text" Value="{Binding DraftStatusMessage}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsDraftGenerating}" Value="True">
-                                                    <Setter Property="Text" Value="⟳ Generating…"/>
+                                                    <Setter Property="Text" Value="Generating..."/>
                                                     <Setter Property="FontStyle" Value="Italic"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -290,8 +281,8 @@
                                         Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
                                         Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
                                         CornerRadius="3" Padding="7,2" Margin="0,0,8,0"
-                                        ToolTip="Project not indexed — see Code Context tab">
-                                    <TextBlock Text="⚠ Limited context" Foreground="#F59E0B" FontSize="10" FontWeight="SemiBold"/>
+                                        ToolTip="Project not indexed - see Code Context tab">
+                                    <TextBlock Text="Limited context" Foreground="#F59E0B" FontSize="10" FontWeight="SemiBold"/>
                                 </Border>
                                 <!-- AI badge -->
                                 <Border Grid.Column="3" Background="#7C6BE8" CornerRadius="3" Padding="7,2">
@@ -351,7 +342,7 @@
                         <!-- Content Area -->
                         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="16">
                             <Grid>
-                                <!-- ═══ TAB: Overview ═══ -->
+                                <!-- TAB: Overview -->
                                 <StackPanel>
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
@@ -364,13 +355,23 @@
                                         </Style>
                                     </StackPanel.Style>
                                     
+                                    <controls:StatusCallout Title="{Binding BuildReadinessTitle}"
+                                                            Message="{Binding BuildReadinessMessage}"
+                                                            Details="{Binding BuildReadinessDetails}"
+                                                            BadgeText="{Binding BuildReadinessBadgeText}"
+                                                            Status="{Binding BuildReadinessBadgeStatus}"
+                                                            ActionText="{Binding BuildReadinessActionText}"
+                                                            ActionCommand="{Binding RequestIndexCommand}"
+                                                            Visibility="{Binding ShowBuildReadiness, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                            Margin="0,0,0,16"/>
+
                                     <controls:SurfacePanel Variant="Subtle" Padding="20,16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <controls:FormField Label="TICKET TITLE">
                                                 <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="16" FontWeight="SemiBold"/>
                                             </controls:FormField>
 
-                                            <!-- Status / Priority / Type — native ComboBox for reliable text display -->
+                                            <!-- Status / Priority / Type - native ComboBox for reliable text display -->
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                                                 <StackPanel Margin="0,0,16,0">
                                                     <TextBlock Text="STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,6"/>
@@ -408,40 +409,30 @@
                                         </StackPanel>
                                     </controls:SurfacePanel>
                                              
-                                    <Grid Margin="0,8,0,0"
-                                          Visibility="{Binding IsDraftMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <Button Grid.Column="0" Content="Save Ticket"
-                                                Command="{Binding SaveTicketCommand}"
-                                                Style="{StaticResource AppButton.Primary}"
-                                                Padding="24,8" Margin="0,0,8,0"
-                                                IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
-                                        <Button Grid.Column="1" Content="Cancel"
-                                                Command="{Binding CancelEditCommand}"
-                                                Style="{StaticResource AppButton.Secondary}"
-                                                Padding="16,8" Margin="0,0,8,0"/>
-
-                                        <!-- Build This -->
-                                        <Button Grid.Column="2" Content="⚙ Build This (Proposal)"
-                                                Command="{Binding BuildSelectedTicketProposalCommand}"
-                                                Style="{StaticResource AppButton.Secondary}"
-                                                Padding="16,8" Margin="0,0,8,0"
-                                                ToolTip="Generate a code change proposal and open in Workbench"/>
-
-                                        <TextBlock Grid.Column="4" Text="{Binding SaveStatus}"
-                                                   Foreground="{StaticResource Success}"
-                                                   VerticalAlignment="Center" FontSize="12"/>
-                                    </Grid>
+                                    <controls:EditorActionBar Margin="0,8,0,0"
+                                                              StatusText="{Binding SaveStatus}"
+                                                              Visibility="{Binding IsDraftMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                        <controls:EditorActionBar.LeftActions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="Save Ticket"
+                                                        Command="{Binding SaveTicketCommand}"
+                                                        Style="{StaticResource AppButton.Primary}"
+                                                        Margin="0,0,8,0"
+                                                        IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
+                                                <Button Content="Cancel"
+                                                        Command="{Binding CancelEditCommand}"
+                                                        Style="{StaticResource AppButton.CompactGhost}"
+                                                        Margin="0,0,8,0"/>
+                                                <Button Content="Build This"
+                                                        Command="{Binding BuildSelectedTicketProposalCommand}"
+                                                        Style="{StaticResource AppButton.CompactGhost}"
+                                                        ToolTip="Generate a code change proposal and open in Workbench"/>
+                                            </StackPanel>
+                                        </controls:EditorActionBar.LeftActions>
+                                    </controls:EditorActionBar>
                                 </StackPanel>
 
-                                <!-- ═══ TAB: Plan ═══ -->
+                                <!-- TAB: Plan -->
                                 <StackPanel>
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
@@ -460,7 +451,7 @@
                                         <StackPanel HorizontalAlignment="Center">
                                             <controls:EmptyResultsState Title="No Implementation Plan" 
                                                                        Description="Create a plan to outline the technical steps for this ticket."/>
-                                            <Button Content="＋ Generate Implementation Plan"
+                                            <Button Content="Generate Implementation Plan"
                                                     Command="{Binding GenerateImplementationPlanCommand}"
                                                     Style="{StaticResource AppButton.Primary}"
                                                     Padding="20,10" Margin="0,24,0,0"/>
@@ -478,7 +469,7 @@
 
                                                 <!-- Ask about this plan: secondary action row, sits below title -->
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,16" HorizontalAlignment="Left">
-                                                    <Button Content="💬 Ask about this plan"
+                                                    <Button Content="Ask about this plan"
                                                             Command="{Binding AskAboutPlanCommand}"
                                                             Style="{StaticResource AppButton.Ghost}"
                                                             Padding="12,5"/>
@@ -502,30 +493,24 @@
                                             </StackPanel>
                                         </controls:SurfacePanel>
 
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Content="Save Plan"
-                                                    Command="{Binding SavePlanCommand}"
-                                                    Style="{StaticResource AppButton.Primary}"
-                                                    Padding="24,8" Margin="0,0,8,0"
-                                                    IsEnabled="{Binding IsSavingPlan, Converter={StaticResource InverseBoolConverter}}"/>
-                                            <Button Grid.Column="1" Content="Reset"
-                                                    Command="{Binding CancelPlanEditCommand}"
-                                                    Style="{StaticResource AppButton.Secondary}"
-                                                    Padding="16,8"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding PlanSaveStatus}"
-                                                       Foreground="{StaticResource Success}"
-                                                       VerticalAlignment="Center" FontSize="12"/>
-                                        </Grid>
+                                        <controls:EditorActionBar StatusText="{Binding PlanSaveStatus}">
+                                            <controls:EditorActionBar.LeftActions>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="Save Plan"
+                                                            Command="{Binding SavePlanCommand}"
+                                                            Style="{StaticResource AppButton.Primary}"
+                                                            Margin="0,0,8,0"
+                                                            IsEnabled="{Binding IsSavingPlan, Converter={StaticResource InverseBoolConverter}}"/>
+                                                    <Button Content="Reset"
+                                                            Command="{Binding CancelPlanEditCommand}"
+                                                            Style="{StaticResource AppButton.CompactGhost}"/>
+                                                </StackPanel>
+                                            </controls:EditorActionBar.LeftActions>
+                                        </controls:EditorActionBar>
                                     </StackPanel>
                                 </StackPanel>
 
-                                <!-- ═══ TAB: Code Context ═══ -->
+                                <!-- TAB: Code Context -->
                                 <StackPanel>
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
@@ -552,14 +537,14 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0">
-                                                        <TextBlock Text="⚠️ Project is not indexed"
+                                                        <TextBlock Text="Project is not indexed"
                                                                    Foreground="#F59E0B" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
                                                         <TextBlock TextWrapping="Wrap" FontSize="12"
                                                                    Foreground="{StaticResource Text/Muted}"
                                                                    Text="Code context may be incomplete. Index the project to enable code retrieval and improve AI output quality."/>
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-                                                        <Button Content="🗂 Index Project"
+                                                        <Button Content="Index Project"
                                                                 Command="{Binding RequestIndexCommand}"
                                                                 Style="{StaticResource AppButton.Secondary}"
                                                                 Padding="14,6" FontSize="12"
@@ -574,7 +559,7 @@
                                             <Border Visibility="{Binding IsContextLimited, Converter={StaticResource InverseBoolToVisibilityConverter}}"
                                                     Background="#1234D16A" BorderBrush="#34D16A" BorderThickness="1"
                                                     CornerRadius="6" Padding="12,8">
-                                                <TextBlock Text="✓ Project is indexed — code context is available"
+                                                <TextBlock Text="Project is indexed - code context is available"
                                                            Foreground="#34D16A" FontSize="12" FontWeight="SemiBold"/>
                                             </Border>
                                         </StackPanel>
@@ -647,7 +632,7 @@
                                                        Visibility="{Binding HasBuildPreview, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
-                                                        <Setter Property="Text" Value="No context summary yet. Run ⚙ Build This to assemble code context."/>
+                                                        <Setter Property="Text" Value="No context summary yet. Run Build This to assemble code context."/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsContextLimited}" Value="True">
                                                                 <Setter Property="Text" Value="No indexed snippets available. Index the project to enable code retrieval."/>
@@ -660,7 +645,7 @@
                                     </controls:SurfacePanel>
                                 </StackPanel>
 
-                                <!-- ═══ TAB: Tests ═══ -->
+                                <!-- TAB: Tests -->
                                 <!-- NOTE: Mapped to TechnicalNotes DB field (no schema change). -->
                                 <!-- Structure is free-text with labelled sections as a convention. -->
                                 <StackPanel>
@@ -723,91 +708,70 @@
                                         </StackPanel>
                                     </controls:SurfacePanel>
 
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Content="Save Tests"
-                                                Command="{Binding SaveTicketCommand}"
-                                                Style="{StaticResource AppButton.Primary}"
-                                                Padding="24,8" Margin="0,0,8,0"
-                                                IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
-                                        <Button Grid.Column="1" Content="Cancel"
-                                                Command="{Binding CancelEditCommand}"
-                                                Style="{StaticResource AppButton.Secondary}"
-                                                Padding="16,8"/>
-                                        <TextBlock Grid.Column="3" Text="{Binding SaveStatus}"
-                                                   Foreground="{StaticResource Success}"
-                                                   VerticalAlignment="Center" FontSize="12"/>
-                                    </Grid>
+                                    <controls:EditorActionBar StatusText="{Binding SaveStatus}">
+                                        <controls:EditorActionBar.LeftActions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="Save Tests"
+                                                        Command="{Binding SaveTicketCommand}"
+                                                        Style="{StaticResource AppButton.Primary}"
+                                                        Margin="0,0,8,0"
+                                                        IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
+                                                <Button Content="Cancel"
+                                                        Command="{Binding CancelEditCommand}"
+                                                        Style="{StaticResource AppButton.CompactGhost}"/>
+                                            </StackPanel>
+                                        </controls:EditorActionBar.LeftActions>
+                                    </controls:EditorActionBar>
                                 </StackPanel>
                             </Grid>
                         </ScrollViewer>
 
-                        <!-- ══ Draft Action Bar (Grid.Row 3, visible only in IsDraftMode) ══ -->
-                        <Border Grid.Row="3"
-                                Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Background="{StaticResource Background/Surface}"
-                                BorderBrush="{StaticResource Border/Subtle}"
-                                BorderThickness="0,1,0,0"
-                                Padding="16,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Regenerate buttons -->
-                                <Button Grid.Column="0" Content="↺ Regenerate All"
-                                        Command="{Binding RegenerateAllCommand}"
-                                        Style="{StaticResource AppButton.Ghost}"
-                                        IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
-                                        Padding="14,7" Margin="0,0,6,0"
-                                        ToolTip="Re-generate all draft fields from the original chat context"/>
-                                <Button Grid.Column="1" Content="↺ Regenerate Tests"
-                                        Command="{Binding RegenerateTestsCommand}"
-                                        Style="{StaticResource AppButton.Ghost}"
-                                        IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
-                                        Padding="14,7" Margin="0,0,0,0"
-                                        ToolTip="Re-generate only the Tests / Validation fields"/>
-
-                                <!-- Status -->
-                                <TextBlock Grid.Column="2" Text="{Binding SaveStatus}"
-                                           Foreground="{StaticResource Success}"
-                                           VerticalAlignment="Center" FontSize="12"
-                                           HorizontalAlignment="Center"/>
-
-                                <!-- Approve buttons -->
-                                <Button Grid.Column="3" Content="✕ Cancel"
-                                        Command="{Binding CancelDraftCommand}"
-                                        Style="{StaticResource AppButton.Secondary}"
-                                        Padding="14,7" Margin="0,0,8,0"
-                                        ToolTip="Discard draft and return to Chat"/>
-                                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                                    <Button Content="✓ Save Ticket"
+                        <!-- Draft Action Bar -->
+                        <controls:EditorActionBar Grid.Row="3"
+                                                  Visibility="{Binding IsDraftMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                  Background="{StaticResource Background/Surface}"
+                                                  SeparatorThickness="0,1,0,0"
+                                                  BarPadding="16,12"
+                                                  StatusText="{Binding SaveStatus}">
+                            <controls:EditorActionBar.LeftActions>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Regenerate All"
+                                            Command="{Binding RegenerateAllCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
+                                            Margin="0,0,6,0"
+                                            ToolTip="Re-generate all draft fields from the original chat context"/>
+                                    <Button Content="Regenerate Tests"
+                                            Command="{Binding RegenerateTestsCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
+                                            ToolTip="Re-generate only the Tests / Validation fields"/>
+                                </StackPanel>
+                            </controls:EditorActionBar.LeftActions>
+                            <controls:EditorActionBar.RightActions>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Cancel"
+                                            Command="{Binding CancelDraftCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            Margin="0,0,8,0"
+                                            ToolTip="Discard draft and return to Chat"/>
+                                    <Button Content="Save Ticket"
                                             Command="{Binding ApproveDraftCommand}"
                                             Style="{StaticResource AppButton.Primary}"
                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
-                                            Padding="18,7" Margin="0,0,6,0"
+                                            Margin="0,0,6,0"
                                             ToolTip="Save this ticket to the database"/>
-                                    <Button Content="✓ Save Ticket + Plan"
+                                    <Button Content="Save Ticket + Plan"
                                             Command="{Binding ApproveDraftWithPlanCommand}"
-                                            Style="{StaticResource AppButton.Secondary}"
+                                            Style="{StaticResource AppButton.CompactGhost}"
                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
-                                            Padding="18,7"
                                             ToolTip="Save ticket and navigate to Plans to create an implementation plan"/>
                                 </StackPanel>
-                            </Grid>
-                        </Border>
+                            </controls:EditorActionBar.RightActions>
+                        </controls:EditorActionBar>
                     </Grid>
 
-                        <!-- ═══ BUILD PREVIEW PANEL ═══ -->
+                        <!-- BUILD PREVIEW PANEL -->
                         <controls:SurfacePanel
                             Grid.Row="3"
                             Variant="Subtle"
@@ -844,7 +808,7 @@
                                         <DataTemplate>
                                             <TextBlock Foreground="{StaticResource Text/Muted}"
                                                        FontSize="11" FontFamily="Consolas">
-                                                <Run Text="• "/><Run Text="{Binding FilePath}"/>
+                                                <Run Text="- "/><Run Text="{Binding FilePath}"/>
                                             </TextBlock>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -873,7 +837,7 @@
                                                 <Expander.Header>
                                                     <TextBlock FontFamily="Consolas" FontSize="11"
                                                                Foreground="{StaticResource Text/Primary}">
-                                                        <Run Text="▸ "/><Run Text="{Binding FilePath}"/>
+                                                        <Run Text="> "/><Run Text="{Binding FilePath}"/>
                                                     </TextBlock>
                                                 </Expander.Header>
                                                 <StackPanel Margin="12,6,0,0">
@@ -918,7 +882,7 @@
                                             Style="{StaticResource AppButton.Primary}"
                                             Padding="20,8" Margin="0,0,8,0"
                                             IsEnabled="False"
-                                            ToolTip="Apply not available in Phase 3 — patch execution required (Phase 4)"/>
+                                            ToolTip="Apply not available in Phase 3 - patch execution required (Phase 4)"/>
                                     <Button Content="Cancel"
                                             Command="{Binding CancelBuildPreviewCommand}"
                                             Style="{StaticResource AppButton.Ghost}"

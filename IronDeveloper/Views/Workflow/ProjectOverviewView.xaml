@@ -9,104 +9,53 @@
              d:DataContext="{d:DesignInstance Type=vm:ProjectOverviewViewModel, IsDesignTimeCreatable=False}">
 
     <ScrollViewer Background="{StaticResource Background/App}">
-        <StackPanel Margin="40,36,40,40">
+        <StackPanel Margin="32,24,32,32">
 
             <!-- Page header -->
             <TextBlock Text="PROJECT OVERVIEW" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
             <TextBlock Text="{Binding ProjectName}" Style="{StaticResource Typography.ScreenTitle}" Margin="0,0,0,6"/>
             <TextBlock Text="{Binding Description}"
                        Foreground="{StaticResource Text/Muted}"
-                       FontSize="13" TextWrapping="Wrap" Margin="0,0,0,32"/>
+                       FontSize="13" TextWrapping="Wrap" Margin="0,0,0,18"/>
 
-            <!-- Dashboard Metrics row -->
-            <Grid Margin="0,0,0,28">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <controls:StatusCallout Title="{Binding IndexHealthTitle}"
+                                    Message="{Binding IndexHealthMessage}"
+                                    BadgeText="{Binding IndexHealthBadgeText}"
+                                    Status="{Binding IndexHealthBadgeStatus}"
+                                    ActionText="Index Project"
+                                    ActionCommand="{Binding IndexProjectCommand}"
+                                    Visibility="{Binding ShowIndexHealthCallout, Converter={StaticResource BoolToVisibilityConverter}}"
+                                    Margin="0,0,0,24"/>
 
-                <!-- Index Status Card -->
-                <Border Grid.Column="0"
-                        Background="{StaticResource Background/Panel}"
-                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                        CornerRadius="10" Padding="16,12">
-                    <StackPanel>
-                        <TextBlock Text="INDEX STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding Status}"
-                                   FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"/>
-                    </StackPanel>
-                </Border>
+            <controls:CompactStatsStrip Title="Index"
+                                        StatusText="{Binding Status}"
+                                        StatusBrush="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                        MetricText="{Binding FileCount, StringFormat={}{0} files}"
+                                        TimestampText="{Binding LastIndexed, StringFormat=Last indexed {0}}"
+                                        ScopeText="{Binding ProjectPath}"
+                                        PrimaryActionText="Re-index"
+                                        PrimaryActionCommand="{Binding IndexProjectCommand}"
+                                        PrimaryActionEnabled="{Binding IsIndexing, Converter={StaticResource InverseBoolConverter}}"
+                                        SecondaryActionText="Details"
+                                        SecondaryActionCommand="{Binding ViewDetailsCommand}"
+                                        TertiaryActionText="Export context"
+                                        TertiaryActionCommand="{Binding ExportProjectContextPackCommand}"
+                                        Margin="0,0,0,20"/>
 
-                <!-- Indexed Files Card -->
-                <Border Grid.Column="2"
-                        Background="{StaticResource Background/Panel}"
-                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                        CornerRadius="10" Padding="16,12">
-                    <StackPanel>
-                        <TextBlock Text="INDEXED FILES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding FileCount}"
-                                   FontSize="20" FontWeight="Bold"
-                                   Foreground="{StaticResource Text/Primary}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Last Indexed Card -->
-                <Border Grid.Column="4"
-                        Background="{StaticResource Background/Panel}"
-                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                        CornerRadius="10" Padding="16,12">
-                    <StackPanel>
-                        <TextBlock Text="LAST INDEXED" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding LastIndexed}"
-                                   FontSize="13" Foreground="{StaticResource Text/Secondary}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Scope Card -->
-                <Border Grid.Column="6"
-                        Background="{StaticResource Background/Panel}"
-                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                        CornerRadius="10" Padding="16,12">
-                    <StackPanel>
-                        <TextBlock Text="SCOPE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding ProjectPath}"
-                                   FontSize="11" FontFamily="Consolas"
-                                   Foreground="{StaticResource Text/Muted}"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding ProjectPath}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- Actions Row -->
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,28">
-                <Button Content="INDEX PROJECT"
-                        Command="{Binding IndexProjectCommand}"
-                        IsEnabled="{Binding IsIndexing, Converter={StaticResource InverseBoolConverter}}"
-                        Style="{StaticResource AppButton.Primary}"
-                        Margin="0,0,12,0" Width="140" Height="36"/>
-                <Button Content="VIEW DETAILS"
-                        Command="{Binding ViewDetailsCommand}"
-                        Style="{StaticResource AppButton.Secondary}"
-                        Margin="0,0,12,0" Width="120" Height="36"/>
-                <Button Content="EXPORT CONTEXT PACK"
-                        Command="{Binding ExportProjectContextPackCommand}"
-                        Style="{StaticResource AppButton.Secondary}"
-                        Width="180" Height="36"/>
-            </StackPanel>
+            <controls:StatusCallout Title="{Binding IndexDetailsTitle}"
+                                    Message="{Binding IndexDetailsMessage}"
+                                    Details="{Binding LastIndexingDetails}"
+                                    BadgeText="{Binding IndexDetailsBadgeText}"
+                                    Status="{Binding IndexDetailsBadgeStatus}"
+                                    Visibility="{Binding ShowIndexDetails, Converter={StaticResource BoolToVisibilityConverter}}"
+                                    Margin="0,0,0,28"/>
 
             <!-- Current State Panel -->
             <Border Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                    CornerRadius="10" Padding="20,16" Margin="0,0,0,28">
+                    CornerRadius="8" Padding="14,12" Margin="0,0,0,20">
                 <StackPanel>
-                    <TextBlock Text="CURRENT STATE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,14"/>
+                    <TextBlock Text="PROJECT CONTEXT" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,10"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -116,7 +65,7 @@
                         <!-- Left column -->
                         <StackPanel Grid.Column="0">
                             <!-- User -->
-                            <Grid Margin="0,0,0,8">
+                            <Grid Margin="0,0,0,8" Visibility="Collapsed">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120"/>
                                     <ColumnDefinition Width="*"/>
@@ -127,7 +76,7 @@
                                            TextTrimming="CharacterEllipsis"/>
                             </Grid>
                             <!-- Email -->
-                            <Grid Margin="0,0,0,8">
+                            <Grid Margin="0,0,0,8" Visibility="Collapsed">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120"/>
                                     <ColumnDefinition Width="*"/>
@@ -138,7 +87,7 @@
                                            TextTrimming="CharacterEllipsis"/>
                             </Grid>
                             <!-- Tenant -->
-                            <Grid Margin="0,0,0,8">
+                            <Grid Margin="0,0,0,8" Visibility="Collapsed">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120"/>
                                     <ColumnDefinition Width="*"/>
@@ -234,21 +183,15 @@
             <!-- Project Profile Panel -->
             <Border Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                    CornerRadius="10" Padding="20,16" Margin="0,0,0,28">
+                    CornerRadius="8" Padding="14,12" Margin="0,0,0,20">
                 <StackPanel>
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="PROJECT PROFILE" Style="{StaticResource Typography.Eyebrow}" VerticalAlignment="Center"/>
-                        
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <TextBlock Text="{Binding ProfileSaveStatus}" VerticalAlignment="Center" Foreground="{StaticResource Text/Muted}" Margin="0,0,10,0" FontSize="11"/>
-                            <Button Content="Detect / Refresh Profile" Command="{Binding DetectProfileCommand}" Margin="0,0,8,0" Padding="12,4"/>
-                            <Button Content="Save Profile" Command="{Binding SaveProfileCommand}" Style="{StaticResource AppButton.Primary}" Padding="12,4"/>
-                        </StackPanel>
-                    </Grid>
+                    <controls:SectionHeaderActions Eyebrow="PROJECT PROFILE"
+                                                   Title="{Binding ProfileSaveStatus}"
+                                                   SecondaryActionText="Detect"
+                                                   SecondaryActionCommand="{Binding DetectProfileCommand}"
+                                                   PrimaryActionText="Save"
+                                                   PrimaryActionCommand="{Binding SaveProfileCommand}"
+                                                   Margin="0,0,0,12"/>
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -259,6 +202,7 @@
                         
                         <!-- Left column -->
                         <StackPanel Grid.Column="0">
+                            <TextBlock Text="BASICS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                             <!-- Application Type -->
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -312,6 +256,7 @@
                         
                         <!-- Right column -->
                         <StackPanel Grid.Column="2">
+                            <TextBlock Text="BUILD, TEST, SAFETY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                             <!-- Test Framework -->
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>

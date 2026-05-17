@@ -62,6 +62,8 @@ public abstract class IntegrationTestBase
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
         services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
         services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
+        services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
+        services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
@@ -141,13 +143,46 @@ public abstract class IntegrationTestBase
                 );
             END
 
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatSessionId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceChatSessionId BIGINT NULL;
+            END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatMessageId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
+            END
+
+            IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ArtifactSourceReferences
+                (
+                    ArtifactSourceReferenceId BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ArtifactType NVARCHAR(100) NOT NULL,
+                    ArtifactId BIGINT NOT NULL,
+                    SourceType NVARCHAR(100) NOT NULL,
+                    SourceId BIGINT NULL,
+                    SourcePath NVARCHAR(1000) NULL,
+                    SourceSymbol NVARCHAR(500) NULL,
+                    SourceSection NVARCHAR(500) NULL,
+                    SourceAnchor NVARCHAR(500) NULL,
+                    ReferenceType NVARCHAR(100) NOT NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    RelevanceScore DECIMAL(9,4) NULL,
+                    IsRequired BIT NOT NULL CONSTRAINT DF_ArtifactSourceReferences_IsRequired DEFAULT 0,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ArtifactSourceReferences_CreatedUtc DEFAULT SYSUTCDATETIME(),
+                    CreatedBy NVARCHAR(200) NULL
+                );
+            END
+
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
+            IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             IF OBJECT_ID('dbo.ProjectProfiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectProfiles;
             IF OBJECT_ID('dbo.ProjectCommands', 'U') IS NOT NULL DELETE FROM dbo.ProjectCommands;
             IF OBJECT_ID('dbo.ProjectProfileOptions', 'U') IS NOT NULL DELETE FROM dbo.ProjectProfileOptions;
-            IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
-            IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NOT NULL DELETE FROM dbo.ProjectObservableStates;
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
             IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DELETE FROM dbo.ProjectRules;

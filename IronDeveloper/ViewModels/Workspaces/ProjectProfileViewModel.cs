@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,6 +12,7 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 public partial class ProjectProfileViewModel : ObservableObject
 {
     private readonly IProjectProfileService _profileService;
+    private readonly IProjectProfileDetectionService _profileDetectionService;
     private Project? _currentProject;
 
     [ObservableProperty] private bool _isBusy;
@@ -45,9 +44,12 @@ public partial class ProjectProfileViewModel : ObservableObject
     public ObservableCollection<ProjectProfileOption> DataAccessStyles { get; } = new();
     public ObservableCollection<ProjectProfileOption> TestFrameworks { get; } = new();
 
-    public ProjectProfileViewModel(IProjectProfileService profileService)
+    public ProjectProfileViewModel(
+        IProjectProfileService profileService,
+        IProjectProfileDetectionService profileDetectionService)
     {
         _profileService = profileService;
+        _profileDetectionService = profileDetectionService;
     }
 
     public async Task LoadAsync(Project project)
@@ -208,39 +210,28 @@ public partial class ProjectProfileViewModel : ObservableObject
     {
         if (_currentProject == null || string.IsNullOrEmpty(_currentProject.LocalPath)) return;
 
-        var root = _currentProject.LocalPath;
-        if (!Directory.Exists(root)) return;
+        var detected = await _profileDetectionService.DetectAsync(_currentProject.LocalPath, _currentProject.Id);
+        ApplyDetectedProfile(detected);
+        StatusMessage = detected.Warnings.Count > 0
+            ? string.Join(" ", detected.Warnings)
+            : "Detected. Review and save.";
+    }
 
-        // 1. Find Solution
-        var sln = Directory.GetFiles(root, "*.slnx", SearchOption.AllDirectories).FirstOrDefault()
-               ?? Directory.GetFiles(root, "*.sln", SearchOption.AllDirectories).FirstOrDefault();
-
-        if (sln != null)
-        {
-            SolutionFile = sln;
-            BuildCommandText = $"dotnet build \"{sln}\" --no-incremental -v quiet";
-            TestCommandText = $"dotnet test \"{sln}\" --logger \"console;verbosity=minimal\"";
-        }
-
-        // 2. Detect Test Framework (very simple heuristic)
-        if (string.IsNullOrEmpty(SelectedTestFramework) || SelectedTestFramework == "None" || SelectedTestFramework == "Unknown")
-        {
-            var csprojFiles = Directory.GetFiles(root, "*.csproj", SearchOption.AllDirectories);
-            foreach (var file in csprojFiles)
-            {
-                var content = await File.ReadAllTextAsync(file);
-                if (content.Contains("xunit", StringComparison.OrdinalIgnoreCase)) { SelectedTestFramework = "xUnit"; break; }
-                if (content.Contains("MSTest", StringComparison.OrdinalIgnoreCase)) { SelectedTestFramework = "MSTest"; break; }
-                if (content.Contains("nunit", StringComparison.OrdinalIgnoreCase)) { SelectedTestFramework = "NUnit"; break; }
-            }
-        }
-
-        // 3. Defaults for BookSeller specific if path matches
-        if (root.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
-        {
-            IsExternalProject = true;
-            SelectedApplicationType = "ExternalSandbox";
-            AllowBuilderApply = true;
-        }
+    private void ApplyDetectedProfile(ProjectProfileDetectionResult detected)
+    {
+        IsExternalProject = detected.Profile.IsExternalProject;
+        SelectedApplicationType = detected.Profile.ApplicationType;
+        SelectedPrimaryLanguage = detected.Profile.PrimaryLanguage;
+        SelectedFramework = detected.Profile.Framework;
+        SelectedDatabaseEngine = detected.Profile.DatabaseEngine;
+        SelectedDataAccessStyle = detected.Profile.DataAccessStyle;
+        SelectedTestFramework = detected.Profile.TestFramework;
+        SolutionFile = detected.Profile.SolutionFile;
+        SafeWriteRoot = detected.Profile.SafeWriteRoot;
+        AllowBuilderApply = detected.Profile.AllowBuilderApply;
+        AllowWritesOutsideProjectRoot = detected.Profile.AllowWritesOutsideProjectRoot;
+        ProfileNotes = detected.Profile.ProfileNotes;
+        BuildCommandText = detected.BuildCommand.CommandText;
+        TestCommandText = detected.TestCommand.CommandText;
     }
 }

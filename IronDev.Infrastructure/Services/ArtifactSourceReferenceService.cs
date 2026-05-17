@@ -25,6 +25,7 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
         CancellationToken ct = default)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureSchemaAsync(connection, ct);
         var sql = @"
             SELECT *
             FROM dbo.ArtifactSourceReferences
@@ -54,6 +55,7 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
         CancellationToken ct = default)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureSchemaAsync(connection, ct);
         var sql = @"
             SELECT *
             FROM dbo.ArtifactSourceReferences
@@ -77,6 +79,7 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
     public async Task AddAsync(ArtifactSourceReference reference, CancellationToken ct = default)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureSchemaAsync(connection, ct);
         var sql = @"
             INSERT INTO dbo.ArtifactSourceReferences
             (
@@ -99,6 +102,7 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
     public async Task AddManyAsync(IEnumerable<ArtifactSourceReference> references, CancellationToken ct = default)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureSchemaAsync(connection, ct);
         var sql = @"
             INSERT INTO dbo.ArtifactSourceReferences
             (
@@ -126,6 +130,7 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
         CancellationToken ct = default)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureSchemaAsync(connection, ct);
         var sql = @"
             DELETE FROM dbo.ArtifactSourceReferences
             WHERE TenantId = @tenantId
@@ -140,5 +145,42 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
             artifactType,
             artifactId
         });
+    }
+
+    private static async Task EnsureSchemaAsync(System.Data.IDbConnection connection, CancellationToken ct)
+    {
+        const string sql = """
+            IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ArtifactSourceReferences
+                (
+                    ArtifactSourceReferenceId BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ArtifactType NVARCHAR(100) NOT NULL,
+                    ArtifactId BIGINT NOT NULL,
+                    SourceType NVARCHAR(100) NOT NULL,
+                    SourceId BIGINT NULL,
+                    SourcePath NVARCHAR(1000) NULL,
+                    SourceSymbol NVARCHAR(500) NULL,
+                    SourceSection NVARCHAR(500) NULL,
+                    SourceAnchor NVARCHAR(500) NULL,
+                    ReferenceType NVARCHAR(100) NOT NULL,
+                    Summary NVARCHAR(MAX) NULL,
+                    RelevanceScore DECIMAL(9,4) NULL,
+                    IsRequired BIT NOT NULL CONSTRAINT DF_ArtifactSourceReferences_IsRequired DEFAULT 0,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ArtifactSourceReferences_CreatedUtc DEFAULT SYSUTCDATETIME(),
+                    CreatedBy NVARCHAR(200) NULL
+                );
+
+                CREATE INDEX IX_ArtifactSourceReferences_Artifact
+                    ON dbo.ArtifactSourceReferences(TenantId, ProjectId, ArtifactType, ArtifactId);
+
+                CREATE INDEX IX_ArtifactSourceReferences_Source
+                    ON dbo.ArtifactSourceReferences(TenantId, ProjectId, SourceType, SourceId);
+            END
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: ct));
     }
 }

@@ -99,6 +99,7 @@ public class LlmTraceService : ILlmTraceService
 
         var sb = new StringBuilder();
         sb.AppendLine("=== LLM TRACE ===");
+        sb.AppendLine($"IronDev: {AppBuildInfo.DisplayName} ({AppBuildInfo.Version})");
         sb.AppendLine($"Feature: {trace.FeatureName}");
         sb.AppendLine($"Model: {trace.Model}");
         sb.AppendLine($"Created: {trace.CreatedAt:yyyy-MM-dd HH:mm:ss}");

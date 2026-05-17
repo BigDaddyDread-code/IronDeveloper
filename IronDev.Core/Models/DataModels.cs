@@ -121,6 +121,27 @@ public sealed class ProjectSummary
     public DateTime? UpdatedDate { get; set; }
 }
 
+public sealed class ProjectContextDocument
+{
+    public long Id { get; set; }
+    public int TenantId { get; set; }
+    public int ProjectId { get; set; }
+    public string DocumentType { get; set; } = "ProjectFact";
+    public string AuthorityLevel { get; set; } = "ObservedFact";
+    public string Status { get; set; } = "Active";
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string? Summary { get; set; }
+    public string? Tags { get; set; }
+    public string? AppliesToCapability { get; set; }
+    public string? AppliesToArea { get; set; }
+    public string? Source { get; set; }
+    public long? SupersedesDocumentId { get; set; }
+    public long? SourceChatMessageId { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public DateTime? UpdatedDate { get; set; }
+}
+
 public sealed class ProjectDecision
 {
     public long Id { get; set; }
@@ -136,27 +157,6 @@ public sealed class ProjectDecision
     public string? LinkedCodeIndexEntryIds { get; set; }
     public string? LinkedSymbols { get; set; }
     public DateTime CreatedDate { get; set; }
-}
-
-public sealed class ProjectContextDocument
-{
-    public long Id { get; set; }
-    public int TenantId { get; set; }
-    public int ProjectId { get; set; }
-    public string DocumentType { get; set; } = "DiscussionNote";
-    public string AuthorityLevel { get; set; } = "ContextOnly";
-    public string Status { get; set; } = "Active";
-    public string Title { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
-    public string? Summary { get; set; }
-    public string? Tags { get; set; }
-    public string? AppliesToCapability { get; set; }
-    public string? AppliesToArea { get; set; }
-    public string? Source { get; set; }
-    public long? SupersedesDocumentId { get; set; }
-    public long? SourceChatMessageId { get; set; }
-    public DateTime CreatedDate { get; set; }
-    public DateTime? UpdatedDate { get; set; }
 }
 
 public sealed class ProjectObservableState

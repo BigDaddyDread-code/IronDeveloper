@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -10,6 +11,7 @@ using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
+using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -21,6 +23,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private readonly IDraftTicketService                             _draftService;
     private readonly ICodebaseTicketGeneratorService                 _generatorService;
     private readonly ILlmTraceService?                               _llmTraceService;
+    private readonly IBuilderReadinessService?                       _readinessService;
 
     private int    _activeProjectId;
     private int?   _activeTenantId;
@@ -121,6 +124,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private TicketBuildPreview? _currentBuildPreview;
     [ObservableProperty] private TicketBuildResult?  _currentBuildResult;
     [ObservableProperty] private string              _buildStatusMessage = string.Empty;
+    [ObservableProperty] private BuildReadinessResult? _buildReadiness;
+    [ObservableProperty] private bool _showBuildReadiness;
+    [ObservableProperty] private string _buildReadinessTitle = "Build readiness";
+    [ObservableProperty] private string _buildReadinessMessage = string.Empty;
+    [ObservableProperty] private string _buildReadinessDetails = string.Empty;
+    [ObservableProperty] private string _buildReadinessBadgeText = "READY";
+    [ObservableProperty] private BadgeStatus _buildReadinessBadgeStatus = BadgeStatus.Info;
+    [ObservableProperty] private string _buildReadinessActionText = string.Empty;
 
     /// <summary>True when the Build This button should be enabled.</summary>
     public bool CanBuildTicket =>
@@ -128,7 +139,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         && !IsDraftMode
         && SelectedTicket != null
         && !string.IsNullOrWhiteSpace(EditTitle)
-        && !string.IsNullOrWhiteSpace(_activeProjectPath);
+        && !string.IsNullOrWhiteSpace(_activeProjectPath)
+        && (_readinessService == null || (BuildReadiness?.IsReady ?? false));
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
@@ -160,6 +172,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>Pending context held while the user decides on the preflight choice.</summary>
     private ChatTicketContext? _pendingChatContext;
+    private IReadOnlyList<ChatTicketContext>? _pendingChatContexts;
 
     /// <summary>
     /// True when "Index Project First" was clicked and we should auto-generate
@@ -203,6 +216,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         ITicketBuildOrchestrator                       orchestrator,
         IDraftTicketService                            draftService,
         ICodebaseTicketGeneratorService                generatorService,
+        IBuilderReadinessService?                      readinessService = null,
         ILlmTraceService?                              llmTraceService = null)
     {
         _ticketService    = ticketService;
@@ -210,6 +224,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         _orchestrator     = orchestrator;
         _draftService     = draftService;
         _generatorService = generatorService;
+        _readinessService = readinessService;
         _llmTraceService  = llmTraceService;
     }
 
@@ -251,7 +266,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         {
             IsDraftMode        = true;
             IsDraftGenerating  = false;
-            DraftStatusMessage = "Draft Codebase Ticket";
+            if (string.IsNullOrWhiteSpace(DraftStatusMessage) || DraftStatusMessage.StartsWith("Generating", StringComparison.OrdinalIgnoreCase))
+                DraftStatusMessage = "Draft ticket";
             HasDetail          = true;
             IsEditing          = true;
             IsNewTicket        = true;
@@ -334,6 +350,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         // Load plan for this ticket
         await RefreshPlanAsync(item.Id);
+        await RefreshBuildReadinessAsync();
     }
 
     private async Task RefreshPlanAsync(long ticketId)
@@ -624,8 +641,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     // ── Build Ticket (Phase 3+4A — real context, LLM proposal, dry-run validation) ──
 
-    [RelayCommand]
-    private void BuildSelectedTicketProposal()
+    [RelayCommand(CanExecute = nameof(CanBuildTicket))]
+    private async Task BuildSelectedTicketProposalAsync()
     {
         // ── 1. Validate state with visible feedback ──
         if (IsBuildingTicket) return;
@@ -651,6 +668,13 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(_activeProjectPath))
         {
             SaveStatus = "No active project path found.";
+            return;
+        }
+
+        await RefreshBuildReadinessAsync();
+        if (BuildReadiness is { IsReady: false })
+        {
+            SaveStatus = $"Build blocked: {BuildReadiness.Message}";
             return;
         }
 
@@ -764,19 +788,23 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     {
         IsProjectIndexed = status == "Ready";
         OnPropertyChanged(nameof(IsContextLimited));
+        _ = RefreshBuildReadinessAsync();
 
         if (DraftPreflight == DraftPreflightState.Indexing)
         {
             if (IsProjectIndexed)
             {
                 // Happy path: indexing completed, auto-generate the draft.
-                if (_shouldGenerateDraftAfterIndex && _pendingChatContext != null)
+                if (_shouldGenerateDraftAfterIndex && (_pendingChatContext != null || _pendingChatContexts != null))
                 {
                     IsDraftIndexing               = false;
                     _shouldGenerateDraftAfterIndex = false;
                     DraftPreflightMessage         = string.Empty;
                     var ctx = _pendingChatContext;
-                    _ = GeneratePendingDraftAfterIndexAsync(ctx);
+                    var contexts = _pendingChatContexts;
+                    _ = ctx != null
+                        ? GeneratePendingDraftAfterIndexAsync(ctx)
+                        : GeneratePendingDraftsAfterIndexAsync(contexts!);
                 }
             }
             else if (status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase))
@@ -831,6 +859,33 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 WasSuccessful = false,
                 ErrorMessage = ex.Message,
                 ParsedResponseSummary = "Pending draft generation failed after indexing completed.",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+    }
+
+    private async Task GeneratePendingDraftsAfterIndexAsync(IReadOnlyList<ChatTicketContext> contexts)
+    {
+        try
+        {
+            await GeneratePendingDraftsAsync(contexts);
+        }
+        catch (Exception ex)
+        {
+            IsDraftIndexing = false;
+            DraftPreflight = DraftPreflightState.IndexFailed;
+            DraftPreflightMessage = "Draft generation failed after indexing. You can retry or continue without index.";
+
+            _llmTraceService?.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Tickets.GeneratePendingDraftsAfterIndex",
+                WorkspaceName = "Tickets",
+                ProjectId = _activeProjectId,
+                ActiveProjectName = _activeProjectName,
+                ActiveProjectPath = _activeProjectPath,
+                WasSuccessful = false,
+                ErrorMessage = ex.Message,
+                ParsedResponseSummary = "Pending split ticket drafts failed after indexing completed.",
                 CreatedAt = DateTime.UtcNow
             });
         }
@@ -896,6 +951,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         {
             // Project is not indexed — show preflight choice instead of generating.
             _pendingChatContext = ctx;
+            _pendingChatContexts = null;
             DraftPreflight      = DraftPreflightState.NeedsChoice;
             HasDetail           = false;   // don't show the editor yet
             return;
@@ -903,6 +959,27 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         // Project is indexed — proceed immediately.
         await GeneratePendingDraftAsync(ctx);
+    }
+
+    public async Task BeginDraftsFromChatAsync(IReadOnlyList<ChatTicketContext> contexts)
+    {
+        if (contexts.Count == 0) return;
+        if (contexts.Count == 1)
+        {
+            await BeginDraftFromChatAsync(contexts[0]);
+            return;
+        }
+
+        if (IsContextLimited)
+        {
+            _pendingChatContext = null;
+            _pendingChatContexts = contexts;
+            DraftPreflight = DraftPreflightState.NeedsChoice;
+            HasDetail = false;
+            return;
+        }
+
+        await GeneratePendingDraftsAsync(contexts);
     }
 
     /// <summary>Inner generation path — shared by BeginDraftFromChatAsync and PreflightContinue.</summary>
@@ -919,6 +996,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         // Clear any preflight state before generating
         DraftPreflight      = DraftPreflightState.None;
         _pendingChatContext  = null;
+        _pendingChatContexts = null;
 
         try
         {
@@ -959,12 +1037,71 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     /// Preflight: "Continue Without Index" — generate draft immediately with limited context.
     /// Guard: no-op while indexing is in progress (belt-and-suspenders; button is also disabled in UI).
     /// </summary>
+    private async Task GeneratePendingDraftsAsync(IReadOnlyList<ChatTicketContext> contexts)
+    {
+        IsDraftMode        = true;
+        IsDraftGenerating  = true;
+        DraftStatusMessage = $"Generating {contexts.Count} draft tickets...";
+        HasDetail          = true;
+        IsEditing          = true;
+        IsNewTicket        = true;
+        ActiveTab          = TicketDetailTab.Overview;
+
+        DraftPreflight      = DraftPreflightState.None;
+        _pendingChatContext  = null;
+        _pendingChatContexts = null;
+
+        try
+        {
+            var existingDrafts = Tickets.Where(t => t.IsDraft).ToList();
+            foreach (var existingDraft in existingDrafts)
+                Tickets.Remove(existingDraft);
+
+            var generated = new List<TicketItem>(contexts.Count);
+            foreach (var ctx in contexts)
+            {
+                var draft = await _draftService.GenerateDraftAsync(
+                    _activeProjectId,
+                    _activeProjectName,
+                    ctx.ProposedTitle,
+                    ctx.MessageText,
+                    ctx.LinkedFilePaths,
+                    ctx.LinkedSymbols,
+                    ctx.SessionId);
+
+                draft.SourceChatSessionId = ctx.SessionId;
+                draft.SourceMessageId     = ctx.MessageId;
+                draft.SourceMessageText   = ctx.MessageText;
+
+                generated.Add(MapDraftToUnsavedTicket(draft));
+            }
+
+            for (var i = generated.Count - 1; i >= 0; i--)
+                Tickets.Insert(0, generated[i]);
+
+            CurrentDraft = null;
+            DraftStatusMessage = $"Generated {generated.Count} draft tickets. Review and save each one.";
+            if (Tickets.Count > 0 && Tickets[0].IsDraft)
+                SelectedTicket = Tickets[0];
+        }
+        catch (Exception ex)
+        {
+            DraftStatusMessage = $"Draft generation failed: {ex.Message}";
+        }
+        finally
+        {
+            IsDraftGenerating = false;
+        }
+    }
+
     [RelayCommand]
     private async Task PreflightContinueAsync()
     {
-        if (_pendingChatContext == null || IsDraftIndexing) return;
-        var ctx = _pendingChatContext;
-        await GeneratePendingDraftAsync(ctx);
+        if ((_pendingChatContext == null && _pendingChatContexts == null) || IsDraftIndexing) return;
+        if (_pendingChatContext != null)
+            await GeneratePendingDraftAsync(_pendingChatContext);
+        else
+            await GeneratePendingDraftsAsync(_pendingChatContexts!);
     }
 
     /// <summary>
@@ -975,7 +1112,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void PreflightIndexProject()
     {
-        if (_pendingChatContext == null) return;
+        if (_pendingChatContext == null && _pendingChatContexts == null) return;
 
         IsDraftIndexing              = true;
         _shouldGenerateDraftAfterIndex = true;
@@ -993,6 +1130,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private void PreflightCancel()
     {
         _pendingChatContext           = null;
+        _pendingChatContexts          = null;
         _shouldGenerateDraftAfterIndex = false;
         IsDraftIndexing              = false;
         DraftPreflight               = DraftPreflightState.None;
@@ -1385,6 +1523,31 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
+    private static TicketItem MapDraftToUnsavedTicket(DraftTicket draft)
+        => new()
+        {
+            Id                 = 0,
+            Title              = draft.Title,
+            TicketType         = draft.TicketType,
+            Priority           = draft.Priority,
+            Summary            = draft.Summary,
+            Background         = draft.Background,
+            AcceptanceCriteria = draft.AcceptanceCriteria,
+            Status             = draft.Status,
+            LinkedFilePaths    = draft.LinkedFilePaths,
+            LinkedSymbols      = draft.LinkedSymbols,
+            UnitTests          = draft.UnitTests,
+            IntegrationTests   = draft.IntegrationTests,
+            ManualTests        = draft.ManualTests,
+            RegressionTests    = draft.RegressionTests,
+            BuildValidation    = draft.BuildValidation,
+            ContextSummary     = draft.Summary,
+            IsGenerated        = true,
+            GenerationNote     = draft.GenerationNote,
+            IsDraft            = true,
+            CreatedDate        = DateTime.UtcNow
+        };
+
     private void ClearEditor()
     {
         IsEditing  = false;
@@ -1419,6 +1582,91 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         PlanSaveStatus    = string.Empty;
 
         ClearBuildState();
+        ClearBuildReadiness();
+    }
+
+    private async Task RefreshBuildReadinessAsync()
+    {
+        if (_readinessService == null || _activeProjectId <= 0 || EditId <= 0 || IsDraftMode || SelectedTicket == null)
+        {
+            ClearBuildReadiness();
+            return;
+        }
+
+        try
+        {
+            BuildReadiness = await _readinessService.EvaluateReadinessAsync(_activeProjectId, EditId);
+            ApplyBuildReadinessPresentation();
+        }
+        catch (Exception ex)
+        {
+            BuildReadiness = new BuildReadinessResult
+            {
+                Status = BuildReadinessStatus.Error,
+                Message = $"Readiness check failed: {ex.Message}",
+                BlockingIssues = { ex.Message }
+            };
+            ApplyBuildReadinessPresentation();
+        }
+        finally
+        {
+            BuildSelectedTicketProposalCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanBuildTicket));
+        }
+    }
+
+    private void ClearBuildReadiness()
+    {
+        BuildReadiness = null;
+        ShowBuildReadiness = false;
+        BuildReadinessTitle = "Build readiness";
+        BuildReadinessMessage = string.Empty;
+        BuildReadinessDetails = string.Empty;
+        BuildReadinessBadgeText = "READY";
+        BuildReadinessBadgeStatus = BadgeStatus.Info;
+        BuildReadinessActionText = string.Empty;
+        BuildSelectedTicketProposalCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanBuildTicket));
+    }
+
+    private void ApplyBuildReadinessPresentation()
+    {
+        if (BuildReadiness == null)
+        {
+            ClearBuildReadiness();
+            return;
+        }
+
+        ShowBuildReadiness = true;
+        BuildReadinessTitle = BuildReadiness.IsReady ? "Ready to build" : "Build blocked";
+        BuildReadinessMessage = BuildReadiness.Message;
+        BuildReadinessBadgeText = BuildReadiness.Status.ToString();
+        BuildReadinessActionText = BuildReadiness.Status == BuildReadinessStatus.NeedsReindex ? "Index Project" : string.Empty;
+        BuildReadinessBadgeStatus = BuildReadiness.Status switch
+        {
+            BuildReadinessStatus.ReadyToBuild => BadgeStatus.Ready,
+            BuildReadinessStatus.NeedsReindex => BadgeStatus.NeedsIndex,
+            BuildReadinessStatus.NeedsClarification => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsArchitectureDecision => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsProjectProfileUpdate => BadgeStatus.Warning,
+            BuildReadinessStatus.BlockedByConflict => BadgeStatus.Danger,
+            BuildReadinessStatus.BlockedByExistingDecision => BadgeStatus.Danger,
+            BuildReadinessStatus.Error => BadgeStatus.Danger,
+            _ => BadgeStatus.Info
+        };
+
+        var details = new System.Text.StringBuilder();
+        foreach (var issue in BuildReadiness.BlockingIssues)
+        {
+            details.AppendLine($"Blocking: {issue}");
+        }
+        foreach (var warning in BuildReadiness.Warnings)
+        {
+            details.AppendLine($"Warning: {warning}");
+        }
+
+        BuildReadinessDetails = details.ToString().TrimEnd();
+        OnPropertyChanged(nameof(CanBuildTicket));
     }
 
     private static TicketItem MapToItem(ProjectTicket t) => new()

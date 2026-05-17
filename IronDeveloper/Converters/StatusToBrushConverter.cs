@@ -12,15 +12,21 @@ public class StatusToBrushConverter : IValueConverter
     {
         var status = value?.ToString() ?? string.Empty;
 
+        if (string.IsNullOrWhiteSpace(status))
+            return Application.Current.TryFindResource("StatusWarningBrush") as SolidColorBrush ?? Brushes.Orange;
+
         if (status.Equals("Ready", StringComparison.OrdinalIgnoreCase))
             return Application.Current.TryFindResource("StatusReadyBrush") as SolidColorBrush ?? Brushes.SpringGreen;
 
-        if (status.Equals("Needs Index", StringComparison.OrdinalIgnoreCase) || 
+        if (status.Equals("Needs Index", StringComparison.OrdinalIgnoreCase) ||
+            status.Equals("Stale Index", StringComparison.OrdinalIgnoreCase) ||
+            status.StartsWith("Needs Index", StringComparison.OrdinalIgnoreCase) ||
             status.Equals("Indexing...", StringComparison.OrdinalIgnoreCase))
             return Application.Current.TryFindResource("StatusWarningBrush") as SolidColorBrush ?? Brushes.Orange;
 
         if (status.StartsWith("Err:", StringComparison.OrdinalIgnoreCase) || 
-            status.Equals("Error", StringComparison.OrdinalIgnoreCase))
+            status.Equals("Error", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("failed", StringComparison.OrdinalIgnoreCase))
             return Application.Current.TryFindResource("StatusErrorBrush") as SolidColorBrush ?? Brushes.Crimson;
 
         if (status.Equals("Checking...", StringComparison.OrdinalIgnoreCase) || 

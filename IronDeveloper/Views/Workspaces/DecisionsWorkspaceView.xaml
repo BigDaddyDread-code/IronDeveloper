@@ -14,151 +14,296 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ── Header ─────────────────────────────────────────────────────── -->
-        <Grid Grid.Row="0" Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="DECISIONS" Style="{StaticResource Typography.Eyebrow}"/>
-                <TextBlock Text="Decision Management" Style="{StaticResource Typography.ScreenTitle}"/>
-            </StackPanel>
-            <Button Grid.Column="1" Content="＋ New Decision"
-                    Command="{Binding NewDecisionCommand}"
-                    Style="{StaticResource AppButton.Primary}"
-                    Padding="20,8" VerticalAlignment="Center"/>
-        </Grid>
+        <controls:WorkspaceHeader Grid.Row="0"
+                                  Eyebrow="PROJECT MEMORY"
+                                  Title="Summary and Context Documents"
+                                  Margin="0,0,0,18">
+            <controls:WorkspaceHeader.Actions>
+                <Button Content="+ New Document"
+                        Command="{Binding NewDocumentCommand}"
+                        Style="{StaticResource AppButton.Primary}"/>
+            </controls:WorkspaceHeader.Actions>
+        </controls:WorkspaceHeader>
 
-        <!-- ── Master-Detail ─────────────────────────────────────────────── -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="340" MinWidth="270"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ═══ LEFT: Decision List — WorkspaceListPane ═══ -->
-            <controls:WorkspaceListPane
-                Grid.Column="0"
-                Title="DECISIONS"
-                Margin="0,0,12,0"
-                ItemsSource="{Binding Decisions}"
-                SelectedItem="{Binding SelectedDecision, Mode=TwoWay}">
+            <Grid Grid.Column="0" Margin="0,0,14,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                <controls:WorkspaceListPane.ItemTemplate>
-                    <DataTemplate>
-                        <controls:WorkspaceListItem
-                            Title="{Binding Title}"
-                            Subtitle="{Binding Detail}"
-                            Metadata="{Binding Status}"
-                            IconData="{StaticResource Icon.Nav.Decisions}"/>
-                    </DataTemplate>
-                </controls:WorkspaceListPane.ItemTemplate>
+                <controls:SurfacePanel Grid.Row="0"
+                                       Variant="Subtle"
+                                       Padding="14"
+                                       Margin="0,0,0,12">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="PROJECT SUMMARY" Style="{StaticResource Typography.Eyebrow}"/>
+                            <Button Grid.Column="1"
+                                    Content="Save"
+                                    Command="{Binding SaveSummaryCommand}"
+                                    Style="{StaticResource AppButton.CompactGhost}"/>
+                        </Grid>
 
-            </controls:WorkspaceListPane>
+                        <TextBlock Text="{Binding ProjectSummaryPreview}"
+                                   Foreground="{StaticResource Text/Secondary}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   LineHeight="17"
+                                   Margin="0,0,0,8"/>
 
-            <!-- ═══ RIGHT: Detail/Editor ═══ -->
+                        <TextBox Text="{Binding ProjectSummary, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="56"
+                                 MaxHeight="96"
+                                 Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding SummarySaveStatus}"
+                                   Foreground="{StaticResource StatusReadyBrush}"
+                                   FontSize="11"/>
+                    </StackPanel>
+                </controls:SurfacePanel>
+
+                <controls:WorkspaceListPane
+                    Grid.Row="1"
+                    Title="SYSTEM DOCS"
+                    ItemsSource="{Binding Documents}"
+                    SelectedItem="{Binding SelectedDocument, Mode=TwoWay}">
+
+                    <controls:WorkspaceListPane.SearchField>
+                        <StackPanel Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="TYPE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                    <ComboBox ItemsSource="{Binding DocumentTypeFilterOptions}"
+                                              SelectedItem="{Binding FilterDocumentType}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                    <ComboBox ItemsSource="{Binding StatusFilterOptions}"
+                                              SelectedItem="{Binding FilterStatus}"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </controls:WorkspaceListPane.SearchField>
+
+                    <controls:WorkspaceListPane.ItemTemplate>
+                        <DataTemplate>
+                            <controls:WorkspaceListItem
+                                Title="{Binding Title}"
+                                Subtitle="{Binding Summary}"
+                                Metadata="{Binding DocumentType}"
+                                IconData="{StaticResource Icon.Nav.Decisions}">
+                                <controls:WorkspaceListItem.ToolTip>
+                                    <ToolTip MaxWidth="420">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource Text/Primary}"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding DocumentType}"
+                                                       Foreground="{StaticResource Accent/Primary}"
+                                                       FontSize="11"
+                                                       Margin="0,4,0,8"/>
+                                            <TextBlock Text="{Binding Summary}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </controls:WorkspaceListItem.ToolTip>
+                            </controls:WorkspaceListItem>
+                        </DataTemplate>
+                    </controls:WorkspaceListPane.ItemTemplate>
+                </controls:WorkspaceListPane>
+            </Grid>
+
             <Border Grid.Column="1"
                     Background="{StaticResource Background/Panel}"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                    CornerRadius="10">
+                    BorderBrush="{StaticResource Border/Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="8">
 
                 <Grid>
-                    <!-- Empty state: no decision selected -->
                     <controls:EmptyResultsState
-                        Title="No Decision Selected"
-                        Description="Select a decision or create a new one to capture an architectural choice."
+                        Title="No Context Document Selected"
+                        Description="Select a document or create one to capture a decision, standard, fact, recommendation, or open question."
                         Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
-                    <!-- Editor panel -->
-                    <ScrollViewer Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"
-                                  VerticalScrollBarVisibility="Auto" Padding="24">
-                        <StackPanel>
+                    <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                            <!-- Title -->
-                            <TextBlock Text="TITLE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
-                                     FontSize="16" FontWeight="SemiBold" Padding="10,8"
-                                     Margin="0,0,0,16"/>
+                        <ScrollViewer Grid.Row="0"
+                                      VerticalScrollBarVisibility="Auto"
+                                      Padding="24">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3"
+                                                Margin="0,0,6,0">
+                                            <TextBlock Text="{Binding EditDocumentType}"
+                                                       Foreground="{StaticResource Accent/Primary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3">
+                                            <TextBlock Text="{Binding EditStatus}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                    </StackPanel>
 
-                            <!-- Status / Category row -->
-                            <Grid Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding EditTitle}"
+                                               FontSize="20"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource Text/Primary}"
+                                               TextWrapping="Wrap"/>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                    <TextBlock Text="STATUS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding StatusOptions}"
-                                              SelectedItem="{Binding EditStatus}"
-                                              Padding="8,6"/>
+                                    <TextBlock Grid.Row="2"
+                                               Text="{Binding SelectedDocumentMeta}"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="11"
+                                               Margin="0,6,0,0"
+                                               TextWrapping="Wrap"/>
+                                </Grid>
+
+                                <controls:StructuredTextView Text="{Binding SelectedDocumentBody}"
+                                                             TextSize="13"/>
+
+                                <Border BorderBrush="{StaticResource Border/Subtle}"
+                                        BorderThickness="0,1,0,0"
+                                        Margin="0,22,0,14"/>
+
+                                <TextBlock Text="EDIT DOCUMENT"
+                                           Style="{StaticResource Typography.Eyebrow}"
+                                           Margin="0,0,0,12"/>
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <controls:FormField Grid.Column="0" Label="TYPE">
+                                        <ComboBox ItemsSource="{Binding DocumentTypeOptions}"
+                                                  SelectedItem="{Binding EditDocumentType}"/>
+                                    </controls:FormField>
+                                    <controls:FormField Grid.Column="2" Label="AUTHORITY">
+                                        <ComboBox ItemsSource="{Binding AuthorityLevelOptions}"
+                                                  SelectedItem="{Binding EditAuthorityLevel}"/>
+                                    </controls:FormField>
+                                    <controls:FormField Grid.Column="4" Label="STATUS">
+                                        <ComboBox ItemsSource="{Binding StatusOptions}"
+                                                  SelectedItem="{Binding EditStatus}"/>
+                                    </controls:FormField>
+                                </Grid>
+
+                                <controls:FormField Label="TITLE">
+                                    <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="15"
+                                             FontWeight="SemiBold"/>
+                                </controls:FormField>
+
+                                <controls:FormField Label="SUMMARY">
+                                    <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}"
+                                             TextWrapping="Wrap"
+                                             MinHeight="48"/>
+                                </controls:FormField>
+
+                                <controls:FormField Label="CONTENT">
+                                    <TextBox Text="{Binding EditContent, UpdateSourceTrigger=PropertyChanged}"
+                                             TextWrapping="Wrap"
+                                             AcceptsReturn="True"
+                                             MinHeight="150"/>
+                                </controls:FormField>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <controls:FormField Grid.Column="0" Label="APPLIES TO AREA">
+                                        <TextBox Text="{Binding EditAppliesToArea, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </controls:FormField>
+                                    <controls:FormField Grid.Column="2" Label="CAPABILITY">
+                                        <TextBox Text="{Binding EditAppliesToCapability, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </controls:FormField>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <controls:FormField Grid.Column="0" Label="TAGS">
+                                        <TextBox Text="{Binding EditTags, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </controls:FormField>
+                                    <controls:FormField Grid.Column="2" Label="SOURCE">
+                                        <TextBox Text="{Binding EditSource, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </controls:FormField>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <controls:EditorActionBar Grid.Row="1"
+                                                  Background="{StaticResource Background/Surface}"
+                                                  SeparatorThickness="0,1,0,0"
+                                                  BarPadding="16,12"
+                                                  StatusText="{Binding SaveStatus}">
+                            <controls:EditorActionBar.LeftActions>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Save Document"
+                                            Command="{Binding SaveDocumentCommand}"
+                                            Style="{StaticResource AppButton.Primary}"
+                                            Margin="0,0,8,0"
+                                            IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
+                                    <Button Content="Archive"
+                                            Command="{Binding ArchiveDocumentCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            Margin="0,0,8,0"/>
+                                    <Button Content="Cancel"
+                                            Command="{Binding CancelEditCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="CATEGORY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                    <ComboBox ItemsSource="{Binding CategoryOptions}"
-                                              SelectedItem="{Binding EditCategory}"
-                                              Padding="8,6"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Detail -->
-                            <TextBlock Text="DETAIL" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditDetail, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
-                                     Padding="10,8" Margin="0,0,0,16"/>
-
-                            <!-- Rationale -->
-                            <TextBlock Text="RATIONALE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                            <TextBox Text="{Binding EditReason, UpdateSourceTrigger=PropertyChanged}"
-                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
-                                     Padding="10,8" Margin="0,0,0,16"/>
-
-                            <!-- Linked Code Context (collapsible) -->
-                            <Expander Header="Linked Code Context"
-                                      Foreground="{StaticResource Text/Muted}"
-                                      Margin="0,0,0,16">
-                                <StackPanel Margin="0,8,0,0">
-                                    <TextBlock Text="LINKED FILE PATHS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                    <TextBox Text="{Binding EditLinkedFilePaths, UpdateSourceTrigger=PropertyChanged}"
-                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36"
-                                             Padding="10,8" Margin="0,0,0,12"
-                                             FontSize="11" FontFamily="Consolas"/>
-
-                                    <TextBlock Text="LINKED SYMBOLS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                    <TextBox Text="{Binding EditLinkedSymbols, UpdateSourceTrigger=PropertyChanged}"
-                                             TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36"
-                                             Padding="10,8"
-                                             FontSize="11" FontFamily="Consolas"/>
-                                </StackPanel>
-                            </Expander>
-
-                            <!-- Actions -->
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Button Grid.Column="0" Content="Save Decision"
-                                        Command="{Binding SaveDecisionCommand}"
-                                        Style="{StaticResource AppButton.Primary}"
-                                        Padding="24,8" Margin="0,0,8,0"
-                                        IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"/>
-                                <Button Grid.Column="1" Content="Cancel"
-                                        Command="{Binding CancelEditCommand}"
-                                        Style="{StaticResource AppButton.Ghost}"
-                                        Padding="16,8" Margin="0,0,8,0"/>
-
-                                <TextBlock Grid.Column="3" Text="{Binding SaveStatus}"
-                                           Foreground="{StaticResource StatusReadyBrush}"
-                                           VerticalAlignment="Center" FontSize="12"/>
-                            </Grid>
-
-                        </StackPanel>
-                    </ScrollViewer>
+                            </controls:EditorActionBar.LeftActions>
+                        </controls:EditorActionBar>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>

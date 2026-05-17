@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -61,6 +62,7 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _activeModel       = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusNeedsIndex))]
+    [NotifyPropertyChangedFor(nameof(StatusCanIndex))]
     private string _activeStatus = string.Empty;
 
     // ── Status popup ─────────────────────────────────────────────────────────
@@ -72,7 +74,8 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool HasActiveTenant => CurrentTenant != null;
     public bool ShowSidebar => HasActiveProject && CurrentShellMode == ShellMode.ProjectActive;
     public bool ShowHeader  => HasActiveProject && CurrentShellMode == ShellMode.ProjectActive;
-    public bool StatusNeedsIndex => ActiveStatus == "Needs Index";
+    public bool StatusNeedsIndex => IsIndexActionableStatus(ActiveStatus);
+    public bool StatusCanIndex => IsIndexActionableStatus(ActiveStatus);
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -114,9 +117,9 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         _hubVm.OnOpenProject           = (p) => _ = OpenProjectAsync(p);
-        _hubVm.OnCreateProject         = NavigateToCreateProject;
+        _hubVm.AttachWizard(_createVm);
         _createVm.OnProjectCreated     = (p) => _ = CreateAndOpenProjectAsync(p);
-        _createVm.OnCancel             = NavigateToHub;
+        _createVm.OnCancel             = _hubVm.CloseWizard;
         
         // ——— SYNC STATUS FROM OVERVIEW TO SHELL AND WORKSPACE VMs ———
         _overviewVm.PropertyChanged += (s, e) =>
@@ -147,12 +150,26 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentView = _builderVm;
         };
 
+        _builderVm.OnProjectIndexStatusChanged = (status) =>
+        {
+            ActiveStatus = string.IsNullOrWhiteSpace(status) ? "Needs Index" : status;
+            _ticketsVm.SetIndexStatus(ActiveStatus);
+            OnPropertyChanged(nameof(StatusNeedsIndex));
+            OnPropertyChanged(nameof(StatusCanIndex));
+        };
+
         // Chat → Ticket draft review bridge
         // Phase 1-3: navigates to Tickets in draft mode with stub-generated draft.
         // Phase 4: DraftTicketService will call the real LLM.
         _chatVm.OnCreateTicketFromChat = (ctx) =>
         {
             _ = _ticketsVm.BeginDraftFromChatAsync(ctx);
+            CurrentWorkspace = ProjectWorkspace.Tickets;
+            CurrentView = _ticketsVm;
+        };
+        _chatVm.OnCreateTicketsFromChat = (contexts) =>
+        {
+            _ = _ticketsVm.BeginDraftsFromChatAsync(contexts);
             CurrentWorkspace = ProjectWorkspace.Tickets;
             CurrentView = _ticketsVm;
         };
@@ -326,19 +343,15 @@ public sealed partial class ShellViewModel : ObservableObject
         await ActivateProjectAsync(project);
     }
 
-    private void NavigateToCreateProject()
-    {
-        CurrentShellMode = ShellMode.CreateProject;
-        CurrentView = _createVm;
-    }
-
     private async Task CreateAndOpenProjectAsync(global::IronDev.Data.Models.Project project)
     {
+        _hubVm.CloseWizard();
         await ActivateProjectAsync(project);
     }
 
     private async Task ActivateProjectAsync(global::IronDev.Data.Models.Project project)
     {
+        Serilog.Log.Information("[ShellDebug] Activating project: {ProjectName}", project.Name);
         System.Diagnostics.Trace.WriteLine($"[Shell] Activating project: {project.Name}");
         
         // Switch to project mode and show overview immediately
@@ -351,6 +364,8 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveProjectPath = project.LocalPath ?? string.Empty;
         ActiveModel       = _overviewVm.Model; 
         ActiveStatus      = "Checking...";
+
+        RaiseAllActiveProjectProperties();
 
         // Track active project so cross-cutting VMs (e.g. Playground) resolve the right project
         _tenantContext.SetProject(project.Id);
@@ -376,11 +391,13 @@ public sealed partial class ShellViewModel : ObservableObject
 
             // Fetch final status from the overview VM
             ActiveStatus = _overviewVm.Status;
+            ActiveModel = _overviewVm.Model;
             _ticketsVm.SetIndexStatus(ActiveStatus);   // propagate initial index state
             System.Diagnostics.Trace.WriteLine($"[Shell] Project activation complete. Status: {ActiveStatus}");
         }
         catch (Exception ex)
         {
+            Serilog.Log.Error(ex, "[ShellDebug] ERROR activating project {ProjectName}", project.Name);
             System.Diagnostics.Trace.WriteLine($"[Shell] ERROR activating project {project.Name}: {ex.Message}");
             ActiveStatus = "Error";
         }
@@ -390,7 +407,72 @@ public sealed partial class ShellViewModel : ObservableObject
             if (ActiveStatus == "Checking...")
                 ActiveStatus = "Offline";
 
-            OnPropertyChanged(nameof(StatusNeedsIndex));
+            // Task 3: Ensure opening a project sets a default workspace
+            if (CurrentWorkspace == default)
+            {
+                CurrentWorkspace = ProjectWorkspace.Overview;
+            }
+
+            // Task 4: Ensure CurrentView is assigned and NavigateWorkspace is called
+            NavigateWorkspace(CurrentWorkspace.ToString());
+            if (CurrentView == null)
+            {
+                CurrentView = _overviewVm;
+            }
+
+            RaiseAllActiveProjectProperties();
+
+            // Task 2: Add temporary debug logging after ActivateProjectAsync completes
+            Serilog.Log.Information("[ShellDebug] Project activation diagnostics complete: ProjectName='{ProjectName}', Path='{Path}', Model='{Model}', Status='{Status}', Workspace='{Workspace}', ViewIsNull='{ViewIsNull}', View='{View}', ShowHeader='{ShowHeader}', HasActiveProject='{HasActiveProject}'",
+                ActiveProjectName, ActiveProjectPath, ActiveModel, ActiveStatus, CurrentWorkspace, CurrentView == null, CurrentView?.GetType().FullName, ShowHeader, HasActiveProject);
+
+            System.Diagnostics.Trace.WriteLine($"[ShellDebug] Project activation diagnostics:");
+            System.Diagnostics.Trace.WriteLine($" - ActiveProjectName: '{ActiveProjectName}'");
+            System.Diagnostics.Trace.WriteLine($" - ActiveProjectPath: '{ActiveProjectPath}'");
+            System.Diagnostics.Trace.WriteLine($" - ActiveModel: '{ActiveModel}'");
+            System.Diagnostics.Trace.WriteLine($" - ActiveStatus: '{ActiveStatus}'");
+            System.Diagnostics.Trace.WriteLine($" - CurrentWorkspace: '{CurrentWorkspace}'");
+            System.Diagnostics.Trace.WriteLine($" - CurrentView == null: '{CurrentView == null}'");
+            System.Diagnostics.Trace.WriteLine($" - CurrentView.GetType().FullName: '{(CurrentView != null ? CurrentView.GetType().FullName : "null")}'");
+            System.Diagnostics.Trace.WriteLine($" - ShowHeader: '{ShowHeader}'");
+            System.Diagnostics.Trace.WriteLine($" - HasActiveProject: '{HasActiveProject}'");
         }
+    }
+
+    private void RaiseAllActiveProjectProperties()
+    {
+        OnPropertyChanged(nameof(ActiveProjectName));
+        OnPropertyChanged(nameof(ActiveProjectPath));
+        OnPropertyChanged(nameof(ActiveModel));
+        OnPropertyChanged(nameof(ActiveStatus));
+        OnPropertyChanged(nameof(ShowHeader));
+        OnPropertyChanged(nameof(ShowSidebar));
+        OnPropertyChanged(nameof(HasActiveProject));
+        OnPropertyChanged(nameof(CurrentView));
+        OnPropertyChanged(nameof(CurrentWorkspace));
+    }
+
+    private static bool IsIndexActionableStatus(string status)
+    {
+        return !string.Equals(status, "Ready", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(status, "Checking...", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(status, "Indexing...", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(status, "Offline", StringComparison.OrdinalIgnoreCase) &&
+               !string.IsNullOrWhiteSpace(status);
+    }
+
+    partial void OnActiveStatusChanged(string value)
+    {
+        RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnCurrentWorkspaceChanged(ProjectWorkspace value)
+    {
+        RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnHasActiveProjectChanged(bool value)
+    {
+        RaiseAllActiveProjectProperties();
     }
 }

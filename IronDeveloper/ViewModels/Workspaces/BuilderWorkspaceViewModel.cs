@@ -5,9 +5,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Agent.Services;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Services;
+using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -20,6 +22,9 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     private readonly IBuilderReadinessService _readinessService;
     private readonly IProjectService _projectService;
     private readonly ITicketService _ticketService;
+    private readonly IAppSettingsService? _settingsService;
+
+    internal Action<string>? OnProjectIndexStatusChanged { get; set; }
 
     [ObservableProperty] 
     [NotifyPropertyChangedFor(nameof(IsBusy))]
@@ -43,10 +48,17 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     [ObservableProperty] private string _buildOutput = string.Empty;
     [ObservableProperty] private string _testOutput = string.Empty;
     [ObservableProperty] private BuildReadinessResult? _readiness;
+    [ObservableProperty] private bool _profileAllowsApply;
+    [ObservableProperty] private bool _showReadinessCallout;
+    [ObservableProperty] private string _readinessTitle = "Build readiness";
+    [ObservableProperty] private string _readinessMessage = "Generate a proposal to evaluate build readiness.";
+    [ObservableProperty] private string _readinessDetails = string.Empty;
+    [ObservableProperty] private string _readinessBadgeText = "NOT EVALUATED";
+    [ObservableProperty] private BadgeStatus _readinessBadgeStatus = BadgeStatus.Info;
 
     public bool IsBusy => IsGenerating || IsApplying;
-    public bool IsApplyEnabled => ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase) && (Readiness?.IsReady ?? false);
-    public string ApplyModeLabel => IsApplyEnabled ? "Apply Enabled — BookSeller Only" : "PROPOSAL-ONLY MODE";
+    public bool IsApplyEnabled => ProfileAllowsApply && (Readiness?.IsReady ?? false);
+    public string ApplyModeLabel => IsApplyEnabled ? "Apply Enabled" : "PROPOSAL-ONLY MODE";
     public string ApplyModeColor => IsApplyEnabled ? "#34D16A" : "#7C6BE8";
 
     public ObservableCollection<ProposedFileChange> ProposedFiles { get; } = new();
@@ -58,7 +70,8 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         IProjectMemoryService memoryService,
         IBuilderReadinessService readinessService,
         IProjectService projectService,
-        ITicketService ticketService)
+        ITicketService ticketService,
+        IAppSettingsService? settingsService = null)
     {
         _proposalService = proposalService;
         _traceService = traceService;
@@ -67,6 +80,7 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         _readinessService = readinessService;
         _projectService = projectService;
         _ticketService = ticketService;
+        _settingsService = settingsService;
     }
 
     [RelayCommand]
@@ -85,6 +99,11 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
             var ticket = await _ticketService.GetTicketByIdAsync(ticketId);
             if (ticket != null)
             {
+                var project = await _projectService.GetByIdAsync(ticket.ProjectId);
+                ProjectName = project?.Name ?? ProjectName;
+                ProjectRoot = project?.LocalPath ?? ProjectRoot;
+                ProfileAllowsApply = (await _profileService.GetProjectProfileAsync(ticket.ProjectId))?.AllowBuilderApply ?? false;
+
                 Readiness = await _readinessService.EvaluateReadinessAsync(ticket.ProjectId, ticketId);
                 if (!Readiness.IsReady)
                 {
@@ -111,7 +130,9 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
 
             StatusMessage = proposal.IsAllValid 
                 ? "Proposal generated successfully." 
-                : "Proposal generated with validation warnings.";
+                : proposal.HasValidationIssues
+                    ? "Proposal generated but validation blocked apply."
+                    : "Proposal generated with validation warnings.";
         }
         catch (Exception ex)
         {
@@ -130,10 +151,40 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         if (CurrentProposal == null) return;
 
         // ── 1. Confirmation ───────────────────────────────────────────────────
-        var msg = $"Apply this proposal to {ProjectRoot}?\n\nThis will modify files under the active project root.";
-        // Note: For Phase 1 we use a simple MessageBox or similar via a service if available.
-        // For now, we'll assume the USER confirmed via the button click itself, 
-        // but in a real app we'd inject a dialog service.
+        if (!ConfirmFullBuildCycle())
+        {
+            StatusMessage = "Apply/build/test cycle cancelled.";
+            _traceService.AddTrace(new LlmTraceEntry
+            {
+                FeatureName = "Builder.ApplyApprovalCancelled",
+                WorkspaceName = "Builder",
+                ProjectId = CurrentProposal.ProjectId,
+                TicketId = CurrentProposal.TicketId,
+                ActiveProjectName = CurrentProposal.ProjectName,
+                ActiveProjectPath = CurrentProposal.ProjectRoot,
+                ProposedFileCount = CurrentProposal.Changes.Count,
+                ProposedFilesList = string.Join(", ", CurrentProposal.Changes.Select(c => c.FilePath)),
+                WasSuccessful = false,
+                ParsedResponseSummary = "User cancelled the apply/build/test approval prompt.",
+                CreatedAt = DateTime.UtcNow
+            });
+            return;
+        }
+
+        _traceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.ApplyApprovalGranted",
+            WorkspaceName = "Builder",
+            ProjectId = CurrentProposal.ProjectId,
+            TicketId = CurrentProposal.TicketId,
+            ActiveProjectName = CurrentProposal.ProjectName,
+            ActiveProjectPath = CurrentProposal.ProjectRoot,
+            ProposedFileCount = CurrentProposal.Changes.Count,
+            ProposedFilesList = string.Join(", ", CurrentProposal.Changes.Select(c => c.FilePath)),
+            WasSuccessful = true,
+            ParsedResponseSummary = "User approved the full apply/build/test cycle.",
+            CreatedAt = DateTime.UtcNow
+        });
         
         IsApplying = true;
         StatusMessage = "Applying changes...";
@@ -168,6 +219,7 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         }
         finally
         {
+            await RefreshIndexStatusAfterApplyAsync();
             IsApplying = false;
             ApplyProposalCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(IsApplyEnabled));
@@ -178,9 +230,32 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     {
         return CurrentProposal != null 
             && CurrentProposal.IsAllValid 
+            && (Readiness?.IsReady ?? false)
             && !IsGenerating 
-            && !IsApplying 
-            && ProjectRoot.Contains("BookSeller", StringComparison.OrdinalIgnoreCase);
+            && !IsApplying
+            && ProfileAllowsApply;
+    }
+
+    private bool ConfirmFullBuildCycle()
+    {
+        if (_settingsService?.Current.RequireBuilderApplyApproval == false)
+            return true;
+
+        var fileList = string.Join(Environment.NewLine, CurrentProposal!.Changes.Select(c => $"  - {c.FilePath}"));
+        var message =
+            $"Apply this proposal and run the full build/test cycle?{Environment.NewLine}{Environment.NewLine}" +
+            $"Project: {ProjectName}{Environment.NewLine}" +
+            $"Safe write root: {ProjectRoot}{Environment.NewLine}{Environment.NewLine}" +
+            $"Files:{Environment.NewLine}{fileList}{Environment.NewLine}{Environment.NewLine}" +
+            "This will write the proposed files, then run the configured build and test commands.";
+
+        var result = System.Windows.MessageBox.Show(
+            message,
+            "Approve Builder Apply / Build / Test",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        return result == System.Windows.MessageBoxResult.Yes;
     }
 
     private void ResetExecutionState()
@@ -195,6 +270,86 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
         OnPropertyChanged(nameof(ApplyModeColor));
+    }
+
+    private async Task RefreshIndexStatusAfterApplyAsync()
+    {
+        if (CurrentProposal == null) return;
+
+        var project = await _projectService.GetByIdAsync(CurrentProposal.ProjectId);
+        var status = project?.IndexingStatus ?? "Needs Index";
+        OnProjectIndexStatusChanged?.Invoke(status);
+
+        if (!string.Equals(status, "Ready", StringComparison.OrdinalIgnoreCase))
+        {
+            Readiness = new BuildReadinessResult
+            {
+                Status = BuildReadinessStatus.NeedsReindex,
+                Message = string.Equals(status, "Stale Index", StringComparison.OrdinalIgnoreCase)
+                    ? "Project index is stale after applying this proposal. Re-index before generating or applying the next Builder proposal."
+                    : $"Project index is not ready: {status}.",
+                BlockingIssues = { "Project index must be refreshed before the next Builder action." }
+            };
+        }
+    }
+
+    partial void OnReadinessChanged(BuildReadinessResult? value)
+    {
+        ApplyReadinessPresentation();
+        OnPropertyChanged(nameof(IsApplyEnabled));
+        OnPropertyChanged(nameof(ApplyModeLabel));
+        OnPropertyChanged(nameof(ApplyModeColor));
+        ApplyProposalCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnProfileAllowsApplyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsApplyEnabled));
+        OnPropertyChanged(nameof(ApplyModeLabel));
+        OnPropertyChanged(nameof(ApplyModeColor));
+        ApplyProposalCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplyReadinessPresentation()
+    {
+        if (Readiness == null)
+        {
+            ShowReadinessCallout = true;
+            ReadinessTitle = "Build readiness";
+            ReadinessMessage = "Open a saved ticket from Tickets to evaluate build readiness.";
+            ReadinessDetails = string.Empty;
+            ReadinessBadgeText = "NOT EVALUATED";
+            ReadinessBadgeStatus = BadgeStatus.Info;
+            return;
+        }
+
+        ShowReadinessCallout = true;
+        ReadinessTitle = Readiness.IsReady ? "Ready to build" : "Build blocked";
+        ReadinessMessage = Readiness.Message;
+        ReadinessBadgeText = Readiness.Status.ToString();
+        ReadinessBadgeStatus = Readiness.Status switch
+        {
+            BuildReadinessStatus.ReadyToBuild => BadgeStatus.Ready,
+            BuildReadinessStatus.NeedsReindex => BadgeStatus.NeedsIndex,
+            BuildReadinessStatus.NeedsClarification => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsArchitectureDecision => BadgeStatus.Warning,
+            BuildReadinessStatus.NeedsProjectProfileUpdate => BadgeStatus.Warning,
+            BuildReadinessStatus.BlockedByConflict => BadgeStatus.Danger,
+            BuildReadinessStatus.BlockedByExistingDecision => BadgeStatus.Danger,
+            BuildReadinessStatus.Error => BadgeStatus.Danger,
+            _ => BadgeStatus.Info
+        };
+
+        var details = new System.Text.StringBuilder();
+        foreach (var issue in Readiness.BlockingIssues)
+        {
+            details.AppendLine($"Blocking: {issue}");
+        }
+        foreach (var warning in Readiness.Warnings)
+        {
+            details.AppendLine($"Warning: {warning}");
+        }
+        ReadinessDetails = details.ToString().TrimEnd();
     }
 
     [RelayCommand]

@@ -11,71 +11,50 @@
 
     <Grid Background="{StaticResource Background/App}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="320" MinWidth="280"/>
+            <ColumnDefinition Width="{Binding ChatListColumnWidth}" MinWidth="44"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- ══ LEFT: CHAT HISTORY ══ -->
-        <Grid Grid.Column="0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <controls:CollapsibleSidePane Grid.Column="0"
+                                      Eyebrow="CHATS"
+                                      Title="Conversations"
+                                      IsCollapsed="{Binding IsChatListCollapsed}"
+                                      CollapseCommand="{Binding ToggleChatListCommand}">
+            <controls:CollapsibleSidePane.HeaderActions>
+                <Button Content="+ New"
+                        Command="{Binding NewChatCommand}"
+                        Style="{StaticResource AppButton.CompactGhost}"
+                        VerticalAlignment="Center"/>
+            </controls:CollapsibleSidePane.HeaderActions>
 
-            <!-- Header -->
-            <Border Grid.Row="0"
-                    Background="{StaticResource Background/Panel}"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,1,1"
-                    Padding="14,10,10,10">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="CHATS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,1"/>
-                        <TextBlock Text="Conversations"
-                                   FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{StaticResource Text/Primary}"
-                                   TextTrimming="CharacterEllipsis"/>
-                    </StackPanel>
-                    <Button Grid.Column="1" Content="+ New"
-                            Command="{Binding NewChatCommand}"
-                            Style="{StaticResource AppButton.Primary}"
-                            Height="26" Padding="10,0" FontSize="11"
-                            VerticalAlignment="Center" Margin="8,0,0,0"/>
-                </Grid>
-            </Border>
-
-            <!-- Search -->
-            <Border Grid.Row="1"
-                    Background="{StaticResource Background/Panel}"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,1,1"
-                    Padding="10,6">
+            <controls:CollapsibleSidePane.SearchContent>
                 <Border Background="{StaticResource Background/App}"
-                        BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                        CornerRadius="5" Padding="8,4">
+                        BorderBrush="{StaticResource Border/Subtle}"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        Padding="8,4">
                     <Grid>
-                        <TextBlock Text="⌕  Search conversations…"
+                        <TextBlock Text="Search conversations..."
                                    Foreground="{StaticResource Text/Muted}"
-                                   FontSize="11" VerticalAlignment="Center"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
                                    IsHitTestVisible="False"/>
-                        <TextBox Background="Transparent" BorderThickness="0"
-                                 Foreground="{StaticResource Text/Primary}" FontSize="11"
+                        <TextBox Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="{StaticResource Text/Primary}"
+                                 FontSize="11"
                                  VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
-            </Border>
+            </controls:CollapsibleSidePane.SearchContent>
 
-            <!-- Session list with grouping -->
-            <Border Grid.Row="2"
-                    Background="{StaticResource Background/Panel}"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,1,0">
+            <controls:CollapsibleSidePane.PaneContent>
                 <ListBox ItemsSource="{Binding GroupedSessions}"
                          SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
-                         Background="Transparent" BorderThickness="0"
-                         Padding="0,4,0,8" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="0,4,0,8"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          HorizontalContentAlignment="Stretch">
                     <ListBox.GroupStyle>
                         <GroupStyle>
@@ -96,29 +75,29 @@
                             <Setter Property="Margin" Value="0"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
                             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Row"
-                                                Padding="14,9,12,9"
+                                        <Border Padding="14,9,12,9"
                                                 BorderThickness="3,0,0,0"
-                                                BorderBrush="Transparent"
-                                                Background="Transparent"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                Background="{TemplateBinding Background}"
                                                 Cursor="Hand">
                                             <ContentPresenter/>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Row" Property="Background" Value="{StaticResource Background/Interactive}"/>
-                                                <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource Accent/Primary}"/>
+                                                <Setter Property="Background" Value="{StaticResource Background/Interactive}"/>
+                                                <Setter Property="BorderBrush" Value="{StaticResource Accent/Primary}"/>
                                             </Trigger>
                                             <MultiTrigger>
                                                 <MultiTrigger.Conditions>
                                                     <Condition Property="IsMouseOver" Value="True"/>
                                                     <Condition Property="IsSelected" Value="False"/>
                                                 </MultiTrigger.Conditions>
-                                                <Setter TargetName="Row" Property="Background" Value="{StaticResource Background/Surface}"/>
+                                                <Setter Property="Background" Value="{StaticResource Background/Surface}"/>
                                             </MultiTrigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -133,7 +112,6 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                <!-- Title + smart time -->
                                 <Grid Grid.Row="0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -142,21 +120,24 @@
                                     <TextBlock Grid.Column="0"
                                                Text="{Binding Title, FallbackValue='New Chat'}"
                                                Foreground="{StaticResource Text/Primary}"
-                                               FontWeight="SemiBold" FontSize="12"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
                                                TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding SmartTime}"
                                                Foreground="{StaticResource Text/Muted}"
-                                               FontSize="10" VerticalAlignment="Top"
+                                               FontSize="10"
+                                               VerticalAlignment="Top"
                                                Margin="8,1,0,0"/>
                                 </Grid>
-                                <!-- Preview summary -->
                                 <TextBlock Grid.Row="1"
                                            Text="{Binding Summary, FallbackValue=''}"
                                            Foreground="{StaticResource Text/Muted}"
-                                           FontSize="11" Margin="0,3,0,0"
+                                           FontSize="11"
+                                           Margin="0,3,0,0"
                                            TextTrimming="CharacterEllipsis"
-                                           MaxHeight="32" Opacity="0.75">
+                                           MaxHeight="32"
+                                           Opacity="0.75">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Visible"/>
@@ -175,10 +156,17 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-            </Border>
-        </Grid>
+            </controls:CollapsibleSidePane.PaneContent>
 
-        <!-- ══ RIGHT: ACTIVE CONVERSATION ══ -->
+            <controls:CollapsibleSidePane.CollapsedActions>
+                <Button Content="+"
+                        Command="{Binding NewChatCommand}"
+                        Style="{StaticResource AppButton.HeaderIcon}"
+                        ToolTip="New chat"/>
+            </controls:CollapsibleSidePane.CollapsedActions>
+        </controls:CollapsibleSidePane>
+
+        <!-- RIGHT: ACTIVE CONVERSATION -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -186,42 +174,77 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Conversation header -->
-            <Border Grid.Row="0" Padding="24,12,20,10"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1"
-                    Visibility="{Binding HasSelectedSession, Converter={StaticResource BoolToVisibilityConverter}}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <!-- Normal title view -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
-                                Visibility="{Binding IsRenamingTitle, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                        <TextBlock Text="{Binding SelectedSession.Title, FallbackValue='New Conversation'}"
-                                   FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{StaticResource Text/Primary}" VerticalAlignment="Center"/>
-                        <Button Content="Rename" Command="{Binding StartRenameCommand}"
-                                Style="{StaticResource AppButton.Ghost}"
-                                FontSize="11" Margin="10,0,0,0"
-                                Foreground="{StaticResource Text/Muted}"/>
+            <controls:WorkspaceHeader Grid.Row="0"
+                                      Title="{Binding SelectedSession.Title, FallbackValue='New Conversation'}"
+                                      Visibility="{Binding HasSelectedSession, Converter={StaticResource BoolToVisibilityConverter}}">
+                <controls:WorkspaceHeader.Style>
+                    <Style TargetType="controls:WorkspaceHeader">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRenamingTitle}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </controls:WorkspaceHeader.Style>
+                <controls:WorkspaceHeader.Actions>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Command="{Binding StartRenameCommand}"
+                                Style="{StaticResource AppButton.HeaderIcon}"
+                                ToolTip="Rename conversation">
+                            <Path Data="{StaticResource Icon.Action.Edit}"
+                                  Fill="{StaticResource Text/Muted}"
+                                  Width="13" Height="13"
+                                  Stretch="Uniform"/>
+                        </Button>
+                        <Button Style="{StaticResource AppButton.HeaderIcon}"
+                                ToolTip="More conversation actions"
+                                Margin="4,0,0,0">
+                            <Path Data="{StaticResource Icon.Action.More}"
+                                  Fill="{StaticResource Text/Muted}"
+                                  Width="14" Height="14"
+                                  Stretch="Uniform"/>
+                        </Button>
                     </StackPanel>
-                    <!-- Rename edit mode -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
-                                Visibility="{Binding IsRenamingTitle, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                                 FontSize="16" FontWeight="SemiBold" Background="Transparent"
-                                 Foreground="{StaticResource Text/Primary}"
-                                 BorderThickness="0,0,0,1" BorderBrush="{StaticResource Accent/Primary}"
-                                 MinWidth="260" x:Name="RenameBox"/>
-                        <Button Content="Save" Command="{Binding SaveTitleCommand}"
-                                Style="{StaticResource AppButton.Primary}"
-                                Height="26" Padding="14,0" FontSize="11" Margin="10,0,6,0"/>
-                        <Button Content="Cancel" Command="{Binding CancelRenameCommand}"
-                                Style="{StaticResource AppButton.Ghost}"
-                                Height="26" Padding="10,0" FontSize="11"/>
-                    </StackPanel>
-                </Grid>
+                </controls:WorkspaceHeader.Actions>
+            </controls:WorkspaceHeader>
+
+            <Border Grid.Row="0"
+                    Padding="20,12"
+                    BorderBrush="{StaticResource Border/Subtle}"
+                    BorderThickness="0,0,0,1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding HasSelectedSession}" Value="True"/>
+                                    <Condition Binding="{Binding IsRenamingTitle}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             Background="Transparent"
+                             Foreground="{StaticResource Text/Primary}"
+                             BorderThickness="0,0,0,1"
+                             BorderBrush="{StaticResource Accent/Primary}"
+                             MinWidth="260"
+                             x:Name="RenameBox"/>
+                    <Button Content="Save"
+                            Command="{Binding SaveTitleCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"
+                            Margin="10,0,6,0"/>
+                    <Button Content="Cancel"
+                            Command="{Binding CancelRenameCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"/>
+                </StackPanel>
             </Border>
 
             <!-- Messages / Empty states -->
@@ -255,7 +278,7 @@
 
                 <!-- Message thread -->
                 <ScrollViewer x:Name="MessagesScroller" VerticalScrollBarVisibility="Auto"
-                              Padding="28,20,28,16">
+                              Padding="24,18,24,16">
                     <ItemsControl ItemsSource="{Binding Messages}">
                         <ItemsControl.Style>
                             <Style TargetType="ItemsControl">
@@ -284,7 +307,7 @@
                                         </Grid.Style>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto" MaxWidth="660"/>
+                                            <ColumnDefinition Width="Auto" MaxWidth="780"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
@@ -295,12 +318,7 @@
                                                 VerticalAlignment="Top" Margin="0,2,10,0">
                                             <Border.Style>
                                                 <Style TargetType="Border">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Role}" Value="user">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
                                                 </Style>
                                             </Border.Style>
                                             <TextBlock Text="AI" FontSize="8" FontWeight="Bold"
@@ -308,68 +326,54 @@
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
 
-                                        <!-- Bubble -->
-                                        <Border Grid.Column="1" CornerRadius="10" Padding="14,10" MaxWidth="640">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="{StaticResource Background/Panel}"/>
-                                                    <Setter Property="BorderBrush" Value="{StaticResource Border/Subtle}"/>
-                                                    <Setter Property="BorderThickness" Value="1"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Role}" Value="user">
-                                                            <Setter Property="Background" Value="{StaticResource Accent/Primary}"/>
-                                                            <Setter Property="BorderThickness" Value="0"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding MessageText}"
-                                                           TextWrapping="Wrap" FontSize="13" LineHeight="21">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{StaticResource Text/Primary}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Role}" Value="user">
-                                                                    <Setter Property="Foreground" Value="#0D1117"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                                <!-- Context used — only for assistant -->
-                                                <TextBlock Text="{Binding ContextHeader}"
-                                                           FontSize="10" Opacity="0.5"
-                                                           Foreground="{StaticResource Text/Muted}"
-                                                           Margin="0,6,0,0">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasContext}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                                <!-- Timestamp -->
-                                                <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}"
-                                                           FontSize="10" Opacity="0.4"
-                                                           Margin="0,5,0,0" HorizontalAlignment="Right">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{StaticResource Text/Muted}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Role}" Value="user">
-                                                                    <Setter Property="Foreground" Value="#0D1117"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </Border>
+                                        <!-- Message card -->
+                                        <Grid Grid.Column="1" MaxWidth="780">
+                                            <Border BorderBrush="{StaticResource Border/Subtle}"
+                                                    BorderThickness="1,0,0,0"
+                                                    Padding="16,0,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Role}" Value="user">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <controls:AssistantResponseCard Text="{Binding MessageText}"
+                                                                               ShowSavedState="{Binding HasPersistedMessage}"
+                                                                               SavedText="Response saved"
+                                                                               UseChrome="False"/>
+                                            </Border>
+
+                                            <Border CornerRadius="8" Padding="12,9" MaxWidth="560"
+                                                    Background="{StaticResource Accent/Primary}">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Role}" Value="user">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding MessageText}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="13"
+                                                               LineHeight="20"
+                                                               Foreground="#0D1117"/>
+                                                    <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}"
+                                                               FontSize="10"
+                                                               Opacity="0.45"
+                                                               Margin="0,5,0,0"
+                                                               Foreground="#0D1117"
+                                                               HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
 
                                         <!-- User avatar -->
                                         <Border Grid.Column="2" Width="28" Height="28" CornerRadius="14"
@@ -391,10 +395,19 @@
                                         </Border>
                                     </Grid>
 
-                                    <!-- Action strip — assistant only -->
-                                    <WrapPanel Margin="38,4,0,0" HorizontalAlignment="Left">
-                                        <WrapPanel.Style>
-                                            <Style TargetType="WrapPanel">
+                                    <!-- Action strip - assistant only -->
+                                    <controls:MessageActionStrip Margin="16,6,0,0"
+                                                                 CommandParameter="{Binding}"
+                                                                 PlanCommand="{Binding DataContext.CreatePlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 TicketCommand="{Binding DataContext.CreateTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 DecisionCommand="{Binding DataContext.SaveDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 SummaryCommand="{Binding DataContext.SaveSummaryFromMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 CopyCommand="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 UsefulCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 WeakCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 FeedbackSaved="{Binding FeedbackSaved}">
+                                        <controls:MessageActionStrip.Style>
+                                            <Style TargetType="controls:MessageActionStrip">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Role}" Value="assistant">
@@ -402,107 +415,11 @@
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </WrapPanel.Style>
-                                        <Button Content="Plan"
-                                                Command="{Binding DataContext.CreatePlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource AppButton.Ghost}"
-                                                Height="22" Padding="9,0" FontSize="10" Margin="0,0,3,0"
-                                                ToolTip="Create Implementation Plan"/>
-                                        <Button Content="Ticket"
-                                                Command="{Binding DataContext.CreateTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource AppButton.Ghost}"
-                                                Height="22" Padding="9,0" FontSize="10" Margin="0,0,3,0"
-                                                ToolTip="Create Ticket"/>
-                                        <Button Content="Decision"
-                                                Command="{Binding DataContext.SaveDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource AppButton.Ghost}"
-                                                Height="22" Padding="9,0" FontSize="10" Margin="0,0,3,0"
-                                                ToolTip="Save as Decision"/>
-                                        <Button Content="Summary"
-                                                Command="{Binding DataContext.SaveSummaryFromMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource AppButton.Ghost}"
-                                                Height="22" Padding="9,0" FontSize="10" Margin="0,0,3,0"
-                                                ToolTip="Save as Project Summary"/>
-                                        <Button Content="Copy"
-                                                Command="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource AppButton.Ghost}"
-                                                Height="22" Padding="9,0" FontSize="10"
-                                                ToolTip="Copy to clipboard"/>
+                                        </controls:MessageActionStrip.Style>
+                                    </controls:MessageActionStrip>
 
-                                        <!-- Separator -->
-                                        <TextBlock Text="|" Foreground="{StaticResource Border/Subtle}"
-                                                   VerticalAlignment="Center" Margin="4,0" FontSize="11" Opacity="0.5">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
 
-                                        <!-- 👍 Useful button -->
-                                        <Button Height="22" Padding="7,0" FontSize="10" Margin="0,0,2,0"
-                                                Command="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="Useful"
-                                                ToolTip="This was useful">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource AppButton.Ghost}">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <TextBlock Text="👍" FontSize="11"/>
-                                        </Button>
-
-                                        <!-- 👎 Weak button -->
-                                        <Button Height="22" Padding="7,0" FontSize="10" Margin="0,0,3,0"
-                                                Command="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="Weak"
-                                                ToolTip="This needs improvement">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource AppButton.Ghost}">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <TextBlock Text="👎" FontSize="11"/>
-                                        </Button>
-
-                                        <!-- "Feedback saved" confirmation -->
-                                        <TextBlock Text="✓ Feedback saved" FontSize="10"
-                                                   Foreground="{StaticResource Text/Muted}" Opacity="0.7"
-                                                   VerticalAlignment="Center">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding FeedbackSaved}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </WrapPanel>
-
-                                    <!-- Reason picker — shown when AwaitingReason is true -->
+                                    <!-- Reason picker - shown when AwaitingReason is true -->
                                     <Border Margin="38,4,0,0" Padding="8,5"
                                             Background="{StaticResource Background/Surface}"
                                             BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
@@ -601,7 +518,7 @@
                 </ScrollViewer>
             </Grid>
 
-            <!-- ══ COMPOSER ══ -->
+            <!-- COMPOSER -->
             <Border Grid.Row="2"
                     Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,1,0,0"
@@ -614,68 +531,43 @@
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="5" Height="5" Fill="{StaticResource Accent/Primary}"
                                      Margin="0,0,5,0" Opacity="0.9"/>
-                            <TextBlock Text="IronDev is thinking…" FontSize="11" FontStyle="Italic"
+                            <TextBlock Text="IronDev is thinking..." FontSize="11" FontStyle="Italic"
                                        Foreground="{StaticResource Accent/Primary}" Opacity="0.8"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- Context chips row -->
-                    <Border Margin="0,0,0,6"
-                            Visibility="{Binding HasContextChips, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <WrapPanel>
-                            <TextBlock Text="Context:" Foreground="{StaticResource Text/Muted}"
-                                       FontSize="10" Margin="0,3,6,0" VerticalAlignment="Center"/>
-                            <ItemsControl ItemsSource="{Binding ContextChips}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{StaticResource Background/Surface}"
-                                                BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                                                CornerRadius="4" Padding="7,2" Margin="0,0,4,0">
-                                            <TextBlock Text="{Binding}"
-                                                       Foreground="{StaticResource Text/Muted}"
-                                                       FontSize="10" FontFamily="Consolas"/>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </WrapPanel>
-                    </Border>
+                    <controls:InfoBanner Title="{Binding StatusMessage}"
+                                         BadgeText="CHAT"
+                                         Margin="0,0,0,7"
+                                         Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <controls:ChatStatusStrip ProjectText="{Binding ActiveProjectName, StringFormat='Project: {0}'}"
+                                              IndexText="Index: Ready"
+                                              ContextText="{Binding ChatContextStatusText, StringFormat='Context: {0}'}"
+                                              DraftText="Draft ticket: Available"
+                                              ContextItems="{Binding ContextChips}"
+                                              Margin="0,0,0,7"/>
 
                     <!-- Input row -->
                     <controls:ComposerBar
                         Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                        Placeholder="Ask about code, tickets, decisions, or implementation plans…"
+                        Placeholder="Ask about code, tickets, decisions, or implementation plans..."
                         SendCommand="{Binding SendMessageCommand}"/>
-
-                    <!-- Model · status inline strip -->
-                    <TextBlock Margin="2,4,2,0" FontSize="10"
-                               Foreground="{StaticResource Text/Muted}"
-                               TextTrimming="CharacterEllipsis">
-                        <Run Text="{Binding ActiveModel, FallbackValue='gpt-4o'}" Foreground="{StaticResource Accent/Primary}" FontWeight="SemiBold"/>
-                        <Run Text=" · "/>
-                        <Run Text="{Binding StatusMessage, FallbackValue='Ready'}"/>
-                    </TextBlock>
 
                     <!-- Quick actions -->
                     <WrapPanel Margin="0,5,0,0"
                                Visibility="{Binding HasSelectedSession, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Button Content="Create Plan"
                                 Command="{Binding NavigateToPlanCommand}"
-                                Style="{StaticResource AppButton.Ghost}"
-                                Height="24" Padding="10,0" FontSize="11" Margin="0,0,4,0"/>
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Margin="0,0,4,0"/>
                         <Button Content="New Ticket"
                                 Command="{Binding NavigateToTicketCommand}"
-                                Style="{StaticResource AppButton.Ghost}"
-                                Height="24" Padding="10,0" FontSize="11" Margin="0,0,4,0"/>
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Margin="0,0,4,0"/>
                         <Button Content="New Decision"
                                 Command="{Binding NavigateToDecisionCommand}"
-                                Style="{StaticResource AppButton.Ghost}"
-                                Height="24" Padding="10,0" FontSize="11"/>
+                                Style="{StaticResource AppButton.CompactGhost}"/>
                     </WrapPanel>
 
                 </StackPanel>

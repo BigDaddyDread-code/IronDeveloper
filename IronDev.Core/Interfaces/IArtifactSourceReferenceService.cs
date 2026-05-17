@@ -16,7 +16,6 @@ public interface IArtifactSourceReferenceService
         ArtifactSourceReference reference,
         CancellationToken ct = default);
 
-    // Keep compatibility if needed, or just update everything
     Task<IReadOnlyList<ArtifactSourceReference>> GetForArtifactAsync(
         int tenantId,
         int projectId,

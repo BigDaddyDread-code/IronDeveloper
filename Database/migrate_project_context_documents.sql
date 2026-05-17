@@ -61,6 +61,51 @@ BEGIN
 END
 GO
 
+IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatSessionId') IS NULL
+BEGIN
+    ALTER TABLE dbo.ProjectTickets ADD SourceChatSessionId BIGINT NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatMessageId') IS NULL
+BEGIN
+    ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
+END
+GO
+
+IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ArtifactSourceReferences
+    (
+        ArtifactSourceReferenceId BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TenantId INT NOT NULL,
+        ProjectId INT NOT NULL,
+        ArtifactType NVARCHAR(100) NOT NULL,
+        ArtifactId BIGINT NOT NULL,
+        SourceType NVARCHAR(100) NOT NULL,
+        SourceId BIGINT NULL,
+        SourcePath NVARCHAR(1000) NULL,
+        SourceSymbol NVARCHAR(500) NULL,
+        SourceSection NVARCHAR(500) NULL,
+        SourceAnchor NVARCHAR(500) NULL,
+        ReferenceType NVARCHAR(100) NOT NULL,
+        Summary NVARCHAR(MAX) NULL,
+        RelevanceScore DECIMAL(9,4) NULL,
+        IsRequired BIT NOT NULL CONSTRAINT DF_ArtifactSourceReferences_IsRequired DEFAULT 0,
+        CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ArtifactSourceReferences_CreatedUtc DEFAULT SYSUTCDATETIME(),
+        CreatedBy NVARCHAR(200) NULL,
+        CONSTRAINT FK_ArtifactSourceReferences_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ArtifactSourceReferences_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id)
+    );
+
+    CREATE INDEX IX_ArtifactSourceReferences_Artifact
+        ON dbo.ArtifactSourceReferences(TenantId, ProjectId, ArtifactType, ArtifactId);
+
+    CREATE INDEX IX_ArtifactSourceReferences_Source
+        ON dbo.ArtifactSourceReferences(TenantId, ProjectId, SourceType, SourceId);
+END
+GO
+
 DECLARE @BookSellerProjectId INT =
 (
     SELECT TOP (1) Id

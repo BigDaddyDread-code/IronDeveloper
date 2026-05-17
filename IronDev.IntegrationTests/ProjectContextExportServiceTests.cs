@@ -42,6 +42,29 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
             Reason = "Better support for parallel tests."
         });
 
+        await memoryService.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            DocumentType = "ProjectFact",
+            AuthorityLevel = "ObservedFact",
+            Status = "Active",
+            Title = "BookSeller uses in-memory storage",
+            Summary = "Persistence has not been implemented yet.",
+            Content = "The current sandbox stores books in memory.",
+            Tags = "bookseller,persistence",
+            AppliesToArea = "Persistence"
+        });
+
+        await memoryService.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            DocumentType = "OpenQuestion",
+            AuthorityLevel = "Pending",
+            Status = "Pending",
+            Title = "Choose persistence engine",
+            Content = "Should BookSeller use SQLite plus Dapper or SQL Server plus Dapper?"
+        });
+
         await ticketService.SaveTicketAsync(new ProjectTicket
         {
             ProjectId = projectId,
@@ -49,7 +72,9 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
             Summary = "Need to allow exporting project context pack.",
             Status = "In Progress",
             Priority = "High",
-            TicketType = "Feature"
+            TicketType = "Feature",
+            SourceChatSessionId = 7007,
+            SourceChatMessageId = 8008
         });
 
         // 2. Execute
@@ -58,6 +83,8 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         // 3. Verify
         Assert.IsNotNull(markdown);
         StringAssert.Contains(markdown, "# Project Context Pack: Export Test Project");
+        StringAssert.Contains(markdown, "IronDev Alpha 0.1");
+        StringAssert.Contains(markdown, "0.1.0-alpha");
         StringAssert.Contains(markdown, "## Project Details");
         StringAssert.Contains(markdown, "Export Test Project");
         StringAssert.Contains(markdown, "## Project Profile");
@@ -66,8 +93,16 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         StringAssert.Contains(markdown, "test blueprint for export verification");
         StringAssert.Contains(markdown, "## Architecture Decisions");
         StringAssert.Contains(markdown, "Use NUnit for Tests");
+        StringAssert.Contains(markdown, "## Project Context Documents");
+        StringAssert.Contains(markdown, "BookSeller uses in-memory storage");
+        StringAssert.Contains(markdown, "**Authority:** ObservedFact");
+        StringAssert.Contains(markdown, "Choose persistence engine");
+        StringAssert.Contains(markdown, "**Authority:** Pending");
         StringAssert.Contains(markdown, "## Recent Tickets");
         StringAssert.Contains(markdown, "Implement Export Feature");
+        StringAssert.Contains(markdown, "#### Source Traceability");
+        StringAssert.Contains(markdown, "ChatSession #7007");
+        StringAssert.Contains(markdown, "ChatMessage #8008");
     }
 
     [TestMethod]

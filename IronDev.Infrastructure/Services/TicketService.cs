@@ -23,21 +23,22 @@ public sealed class TicketService : ITicketService
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ICurrentTenantContext _tenant;
-    private readonly IArtifactSourceReferenceService _referenceService;
+    private readonly IArtifactSourceReferenceService _artifactSourceReferenceService;
 
     public TicketService(
-        IDbConnectionFactory connectionFactory, 
+        IDbConnectionFactory connectionFactory,
         ICurrentTenantContext tenant,
-        IArtifactSourceReferenceService referenceService)
+        IArtifactSourceReferenceService artifactSourceReferenceService)
     {
         _connectionFactory = connectionFactory;
         _tenant = tenant;
-        _referenceService = referenceService;
+        _artifactSourceReferenceService = artifactSourceReferenceService;
     }
 
     public async Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureTicketSchemaAsync(connection, cancellationToken);
 
         // Ownership guard: reject operations where the project belongs to a different tenant.
         const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
@@ -63,7 +64,9 @@ public sealed class TicketService : ITicketService
                     UnitTests = @UnitTests, IntegrationTests = @IntegrationTests,
                     ManualTests = @ManualTests, RegressionTests = @RegressionTests,
                     BuildValidation = @BuildValidation, ContextSummary = @ContextSummary,
-                    IsGenerated = @IsGenerated, GenerationNote = @GenerationNote
+                    IsGenerated = @IsGenerated, GenerationNote = @GenerationNote,
+                    SourceChatSessionId = @SourceChatSessionId,
+                    SourceChatMessageId = @SourceChatMessageId
                 WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
                 """;
 
@@ -94,13 +97,16 @@ public sealed class TicketService : ITicketService
                     ticket.BuildValidation,
                     ticket.ContextSummary,
                     ticket.IsGenerated,
-                    ticket.GenerationNote
+                    ticket.GenerationNote,
+                    ticket.SourceChatSessionId,
+                    ticket.SourceChatMessageId
                 },
                 cancellationToken: cancellationToken));
                 
             if (rowsAffected == 0)
                 throw new System.InvalidOperationException("Ticket update failed or ticket not found/not owned.");
 
+            await EnsureCreatedFromReferencesAsync(ticket, ticket.Id, cancellationToken);
             return ticket.Id;
         }
         else
@@ -112,17 +118,19 @@ public sealed class TicketService : ITicketService
                      Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                      Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                      UnitTests, IntegrationTests, ManualTests, RegressionTests,
-                     BuildValidation, ContextSummary, IsGenerated, GenerationNote)
+                     BuildValidation, ContextSummary, IsGenerated, GenerationNote,
+                     SourceChatSessionId, SourceChatMessageId)
                 OUTPUT inserted.Id
                 VALUES
                     (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
                      @Summary, @Background, @Problem, @AcceptanceCriteria, @TechnicalNotes,
                      @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols,
                      @UnitTests, @IntegrationTests, @ManualTests, @RegressionTests,
-                     @BuildValidation, @ContextSummary, @IsGenerated, @GenerationNote);
+                     @BuildValidation, @ContextSummary, @IsGenerated, @GenerationNote,
+                     @SourceChatSessionId, @SourceChatMessageId);
                 """;
 
-            var savedId = await connection.QuerySingleAsync<long>(new CommandDefinition(
+            var ticketId = await connection.QuerySingleAsync<long>(new CommandDefinition(
                 insertSql,
                 new
                 {
@@ -149,42 +157,14 @@ public sealed class TicketService : ITicketService
                     ticket.BuildValidation,
                     ticket.ContextSummary,
                     ticket.IsGenerated,
-                    ticket.GenerationNote
+                    ticket.GenerationNote,
+                    ticket.SourceChatSessionId,
+                    ticket.SourceChatMessageId
                 },
                 cancellationToken: cancellationToken));
 
-            // Record traceability references
-            if (ticket.SourceChatSessionId.HasValue)
-            {
-                await _referenceService.RecordReferenceAsync(new ArtifactSourceReference
-                {
-                    TenantId = _tenant.TenantId,
-                    ProjectId = ticket.ProjectId,
-                    ArtifactType = "Ticket",
-                    ArtifactId = savedId,
-                    SourceType = "ChatSession",
-                    SourceId = ticket.SourceChatSessionId.Value,
-                    ReferenceType = "CreatedFrom",
-                    Summary = $"Ticket '{ticket.Title}' created from chat session."
-                }, cancellationToken);
-            }
-
-            if (ticket.SourceChatMessageId.HasValue)
-            {
-                await _referenceService.RecordReferenceAsync(new ArtifactSourceReference
-                {
-                    TenantId = _tenant.TenantId,
-                    ProjectId = ticket.ProjectId,
-                    ArtifactType = "Ticket",
-                    ArtifactId = savedId,
-                    SourceType = "ChatMessage",
-                    SourceId = ticket.SourceChatMessageId.Value,
-                    ReferenceType = "CreatedFrom",
-                    Summary = $"Ticket '{ticket.Title}' created from chat message."
-                }, cancellationToken);
-            }
-
-            return savedId;
+            await EnsureCreatedFromReferencesAsync(ticket, ticketId, cancellationToken);
+            return ticketId;
         }
     }
 
@@ -196,7 +176,8 @@ public sealed class TicketService : ITicketService
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                 UnitTests, IntegrationTests, ManualTests, RegressionTests,
-                BuildValidation, ContextSummary, IsGenerated, GenerationNote, CreatedDate
+                BuildValidation, ContextSummary, IsGenerated, GenerationNote,
+                SourceChatSessionId, SourceChatMessageId, CreatedDate
             FROM dbo.ProjectTickets
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -205,6 +186,7 @@ public sealed class TicketService : ITicketService
             """;
 
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureTicketSchemaAsync(connection, cancellationToken);
 
         var rows = await connection.QueryAsync<ProjectTicket>(new CommandDefinition(
             sql,
@@ -222,7 +204,8 @@ public sealed class TicketService : ITicketService
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                 UnitTests, IntegrationTests, ManualTests, RegressionTests,
-                BuildValidation, ContextSummary, IsGenerated, GenerationNote, CreatedDate
+                BuildValidation, ContextSummary, IsGenerated, GenerationNote,
+                SourceChatSessionId, SourceChatMessageId, CreatedDate
             FROM dbo.ProjectTickets
                 WHERE Id = @TicketId
               AND TenantId = @TenantId
@@ -230,6 +213,7 @@ public sealed class TicketService : ITicketService
             """;
 
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureTicketSchemaAsync(connection, cancellationToken);
 
         return await connection.QuerySingleOrDefaultAsync<ProjectTicket>(new CommandDefinition(
             sql,
@@ -246,11 +230,83 @@ public sealed class TicketService : ITicketService
             """;
 
         using var connection = _connectionFactory.CreateConnection();
+        await EnsureTicketSchemaAsync(connection, cancellationToken);
         var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
             sql,
             new { TicketId = ticketId, TenantId = _tenant.TenantId },
             cancellationToken: cancellationToken));
 
         return rowsAffected > 0;
+    }
+
+    private static async Task EnsureTicketSchemaAsync(System.Data.IDbConnection connection, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatSessionId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceChatSessionId BIGINT NULL;
+            END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatMessageId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
+            END
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
+    }
+
+    private async Task EnsureCreatedFromReferencesAsync(ProjectTicket ticket, long ticketId, CancellationToken cancellationToken)
+    {
+        if (ticket.SourceChatSessionId == null && ticket.SourceChatMessageId == null)
+            return;
+
+        var existing = await _artifactSourceReferenceService.GetForArtifactAsync(
+            _tenant.TenantId,
+            ticket.ProjectId,
+            "Ticket",
+            ticketId,
+            cancellationToken);
+
+        var references = new List<ArtifactSourceReference>();
+
+        if (ticket.SourceChatSessionId is { } sourceChatSessionId &&
+            !existing.Any(r => r.SourceType == "ChatSession" && r.SourceId == sourceChatSessionId && r.ReferenceType == "CreatedFrom"))
+        {
+            references.Add(new ArtifactSourceReference
+            {
+                TenantId = _tenant.TenantId,
+                ProjectId = ticket.ProjectId,
+                ArtifactType = "Ticket",
+                ArtifactId = ticketId,
+                SourceType = "ChatSession",
+                SourceId = sourceChatSessionId,
+                ReferenceType = "CreatedFrom",
+                Summary = "Ticket was created from this chat session.",
+                IsRequired = true,
+                CreatedBy = "IronDev"
+            });
+        }
+
+        if (ticket.SourceChatMessageId is { } sourceChatMessageId &&
+            !existing.Any(r => r.SourceType == "ChatMessage" && r.SourceId == sourceChatMessageId && r.ReferenceType == "CreatedFrom"))
+        {
+            references.Add(new ArtifactSourceReference
+            {
+                TenantId = _tenant.TenantId,
+                ProjectId = ticket.ProjectId,
+                ArtifactType = "Ticket",
+                ArtifactId = ticketId,
+                SourceType = "ChatMessage",
+                SourceId = sourceChatMessageId,
+                ReferenceType = "CreatedFrom",
+                Summary = "Ticket was created from this chat message.",
+                IsRequired = true,
+                CreatedBy = "IronDev"
+            });
+        }
+
+        if (references.Count > 0)
+            await _artifactSourceReferenceService.AddManyAsync(references, cancellationToken);
     }
 }

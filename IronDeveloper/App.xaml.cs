@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -30,6 +31,7 @@ public partial class App : Application
     public App()
     {
         ConfigureFileLogging();
+        ConfigureWpfTracing();
 
         // Surface fatal crashes as a readable MessageBox instead of silent ExecutionEngineException
         DispatcherUnhandledException += (_, e) =>
@@ -75,10 +77,13 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Infrastructure.Tracing.TracingCodeIndexServiceDecorator>();
                 services.AddTransient<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
                 services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
+                services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
                 services.AddTransient<global::IronDev.Services.IProjectContextExportService, global::IronDev.Infrastructure.Services.ProjectContextExportService>();
                 services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
+                services.AddSingleton<global::IronDev.Agent.Services.IAppSettingsService, global::IronDev.Agent.Services.AppSettingsService>();
+                services.AddTransient<global::IronDev.Agent.Services.ManualIndexingTask>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.BuilderWorkspaceViewModel>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.ProjectProfileViewModel>();
@@ -152,7 +157,8 @@ public partial class App : Application
                     new LlmConsoleViewModel(
                         sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
                 services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel(
-                    sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>())
+                    sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>(),
+                    sp.GetRequiredService<global::IronDev.Agent.Services.IAppSettingsService>())
                 {
                     PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>(),
                     LlmConsoleFactory       = () => sp.GetRequiredService<LlmConsoleViewModel>()
@@ -200,6 +206,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IProjectProfileService,
                     global::IronDev.Infrastructure.Services.ProjectProfileService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IProjectProfileDetectionService,
+                    global::IronDev.Infrastructure.Services.ProjectProfileDetectionService>();
 
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IDotNetBuildService,
@@ -250,6 +259,41 @@ public partial class App : Application
                 shared: true,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
+    }
+
+    private static void ConfigureWpfTracing()
+    {
+        try
+        {
+            Directory.CreateDirectory(LogDirectory);
+
+            const string listenerName = "IronDevWpfBindingTrace";
+            var hasListener = false;
+
+            foreach (TraceListener listener in Trace.Listeners)
+            {
+                if (string.Equals(listener.Name, listenerName, StringComparison.Ordinal))
+                {
+                    hasListener = true;
+                    break;
+                }
+            }
+
+            if (!hasListener)
+            {
+                Trace.Listeners.Add(new TextWriterTraceListener(
+                    Path.Combine(LogDirectory, "wpf-binding-trace.log"),
+                    listenerName));
+                Trace.AutoFlush = true;
+            }
+
+            PresentationTraceSources.DataBindingSource.Switch.Level =
+                SourceLevels.Warning | SourceLevels.Error | SourceLevels.Critical;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to configure WPF binding trace listener");
+        }
     }
 
     /// <summary>

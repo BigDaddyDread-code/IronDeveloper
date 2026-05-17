@@ -230,7 +230,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         var decisions = await _projectMemoryService.GetRecentDecisionsAsync(projectId, decisionTake, cancellationToken);
         var relevantContextDocuments = await _projectMemoryService.GetRelevantContextDocumentsAsync(projectId, userRequest, isCodeQuery ? 8 : 16, cancellationToken);
-        var topContextDocuments = await _projectMemoryService.GetContextDocumentsAsync(projectId, isCodeQuery ? 6 : 10, cancellationToken);
+        var topContextDocuments = await _projectMemoryService.GetContextDocumentsAsync(
+            projectId,
+            take: isCodeQuery ? 6 : 10,
+            cancellationToken: cancellationToken);
         var contextDocuments = relevantContextDocuments
             .Concat(topContextDocuments)
             .GroupBy(d => d.Id)

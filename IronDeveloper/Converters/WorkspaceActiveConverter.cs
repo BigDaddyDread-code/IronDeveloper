@@ -22,9 +22,10 @@ public sealed class WorkspaceActiveConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is ProjectWorkspace workspace && parameter is string paramStr)
-            return Enum.TryParse<ProjectWorkspace>(paramStr, out var target) && workspace == target
-                ? "Active"
-                : string.Empty;
+        {
+            var isActive = Enum.TryParse<ProjectWorkspace>(paramStr, out var target) && workspace == target;
+            return targetType == typeof(bool) ? isActive : isActive ? "Active" : string.Empty;
+        }
 
         return string.Empty;
     }
