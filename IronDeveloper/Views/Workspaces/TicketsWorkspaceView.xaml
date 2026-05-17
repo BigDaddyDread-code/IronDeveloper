@@ -115,6 +115,7 @@
                                         <MultiDataTrigger.Conditions>
                                             <Condition Binding="{Binding HasDetail}" Value="False"/>
                                             <Condition Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=None}" Value="True"/>
+                                            <Condition Binding="{Binding CodexReview.HasTickets}" Value="False"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </MultiDataTrigger>
@@ -232,6 +233,169 @@
 
                             </StackPanel>
                         </controls:SurfacePanel>
+                    </Grid>
+
+                    <!-- Codex generated ticket review/import surface -->
+                    <Grid Visibility="{Binding CodexReview.HasTickets, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="0,0,0,1"
+                                Padding="18,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="GENERATED CODEX TICKETS"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               Margin="0,0,0,5"/>
+                                    <TextBlock Text="{Binding CodexReview.ContextBannerText}"
+                                               Foreground="{StaticResource Text/Primary}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding CodexReview.ContextWarningText}"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"
+                                               Visibility="{Binding CodexReview.HasContextWarnings, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CodexReview.StatusText}"
+                                           Foreground="{StaticResource Text/Muted}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="16,0,0,0"/>
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto"
+                                      Padding="18">
+                            <ItemsControl ItemsSource="{Binding CodexReview.Tickets}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Expander IsExpanded="False"
+                                                  Margin="0,0,0,10"
+                                                  Background="{StaticResource Background/Surface}"
+                                                  BorderBrush="{StaticResource Border/Subtle}"
+                                                  Foreground="{StaticResource Text/Primary}">
+                                            <Expander.Header>
+                                                <Grid MinHeight="46" Margin="8,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="34"/>
+                                                        <ColumnDefinition Width="42"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="92"/>
+                                                        <ColumnDefinition Width="72"/>
+                                                        <ColumnDefinition Width="92"/>
+                                                        <ColumnDefinition Width="56"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="76"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding SuggestedBuildOrder}"
+                                                               Foreground="{StaticResource Text/Muted}"
+                                                               FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"/>
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                        <TextBlock Text="{Binding Title}"
+                                                                   Foreground="{StaticResource Text/Primary}"
+                                                                   FontWeight="SemiBold"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Problem}"
+                                                                   Foreground="{StaticResource Text/Muted}"
+                                                                   FontSize="11"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="3" Text="{Binding Category}" Foreground="{StaticResource Text/Secondary}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Grid.Column="4" Text="{Binding RiskLevel}" Foreground="{StaticResource Text/Secondary}" FontSize="11" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="5" Text="{Binding ConfidenceText}" Foreground="{StaticResource Text/Primary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="6" Text="{Binding FilesCountText}" Foreground="{StaticResource Text/Secondary}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="7" Text="{Binding SymbolsCountText}" Foreground="{StaticResource Text/Secondary}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="8" Text="{Binding WarningsCountText}" Foreground="{StaticResource Text/Secondary}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Expander.Header>
+                                            <Grid Margin="20,4,20,16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,14">
+                                                    <TextBlock Text="PROBLEM" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding Problem}" Foreground="{StaticResource Text/Primary}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,14">
+                                                    <TextBlock Text="PROPOSED CHANGE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding ProposedChange}" Foreground="{StaticResource Text/Primary}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,14">
+                                                    <TextBlock Text="AFFECTED FILES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding AffectedFilesText}" Foreground="{StaticResource Text/Secondary}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
+                                                    <TextBlock Text="AFFECTED SYMBOLS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding AffectedSymbolsText}" Foreground="{StaticResource Text/Secondary}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,16,0">
+                                                    <TextBlock Text="ACCEPTANCE / TESTS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding AcceptanceCriteriaText}" Foreground="{StaticResource Text/Primary}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                                    <TextBlock Text="{Binding TestSuggestionsText}" Foreground="{StaticResource Text/Secondary}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="2" Grid.Column="1">
+                                                    <TextBlock Text="GROUNDING WARNINGS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding GroundingWarningsText}" Foreground="{StaticResource Text/Secondary}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Expander>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <controls:EditorActionBar Grid.Row="2"
+                                                  Background="{StaticResource Background/Surface}"
+                                                  SeparatorThickness="0,1,0,0"
+                                                  BarPadding="16,12"
+                                                  StatusText="{Binding CodexReview.StatusText}">
+                            <controls:EditorActionBar.LeftActions>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Import Selected"
+                                            Command="{Binding CodexReview.ImportSelectedTicketsCommand}"
+                                            Style="{StaticResource AppButton.Primary}"
+                                            Margin="0,0,8,0"
+                                            IsEnabled="{Binding CodexReview.IsImporting, Converter={StaticResource InverseBoolConverter}}"/>
+                                    <Button Content="Clear Review"
+                                            Command="{Binding CodexReview.ClearCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"/>
+                                </StackPanel>
+                            </controls:EditorActionBar.LeftActions>
+                            <controls:EditorActionBar.RightActions>
+                                <TextBlock Text="{Binding CodexReview.SelectedTicketCount, StringFormat={}{0} selected}"
+                                           Foreground="{StaticResource Text/Muted}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"/>
+                            </controls:EditorActionBar.RightActions>
+                        </controls:EditorActionBar>
                     </Grid>
 
                     <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">

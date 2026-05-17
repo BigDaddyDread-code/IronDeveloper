@@ -55,4 +55,8 @@ public sealed class CodebaseTicketGenerationResult
     public List<CodebaseTicketDraft> Drafts { get; set; } = [];
     public int ContextQualityScore { get; set; }
     public List<string> MissingContextReasons { get; set; } = [];
+    public int FileCount { get; set; }
+    public int SemanticSymbolCount { get; set; }
+    public int IndexWarningCount { get; set; }
+    public List<string> IndexWarnings { get; set; } = [];
 }

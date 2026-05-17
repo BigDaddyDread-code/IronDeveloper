@@ -265,7 +265,11 @@ Focus on actionable, specific improvements. Avoid generic advice.
                     Success      = true,
                     Drafts  = drafts,
                     ContextQualityScore = snapshot.ContextQualityScore,
-                    MissingContextReasons = snapshot.MissingContextReasons.ToList()
+                    MissingContextReasons = snapshot.MissingContextReasons.ToList(),
+                    FileCount = snapshot.Files.Count,
+                    SemanticSymbolCount = snapshot.Symbols.Count,
+                    IndexWarningCount = snapshot.SemanticWarnings.Count,
+                    IndexWarnings = snapshot.SemanticWarnings.ToList()
                 };
             }
             catch (Exception jsonEx)
