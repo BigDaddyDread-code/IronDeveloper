@@ -97,6 +97,27 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentRouteJudge,
                     global::IronDev.Infrastructure.Services.ContextAgentRouteJudgeService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ILanguageSemanticIndexer,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.CSharpStructuralSemanticIndexer>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ILanguageSemanticIndexer,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.XamlStructuralSemanticIndexer>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ILanguageSemanticIndexer,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.ConfigStructuralSemanticIndexer>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IProjectSemanticIndexService,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.RoslynProjectSemanticIndexService>();
+                services.AddSingleton<
+                    global::IronDev.Core.Interfaces.ICodexContextQualityScorer,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.CodexContextQualityScorer>();
+                services.AddSingleton<
+                    global::IronDev.Core.Interfaces.ICodexTicketGroundingValidator,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.CodexTicketGroundingValidator>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.ICodexSnapshotBuilder,
+                    global::IronDev.Infrastructure.Services.CodeIntelligence.CodexSnapshotBuilder>();
 
                 var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
                                 ?? new global::IronDev.Core.Models.LlmOptions();

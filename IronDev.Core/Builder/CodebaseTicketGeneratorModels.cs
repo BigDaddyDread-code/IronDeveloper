@@ -9,11 +9,23 @@ namespace IronDev.Core.Builder;
 public sealed class CodebaseTicketDraft
 {
     public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
+    public string Problem { get; set; } = string.Empty;
+    public string ProposedChange { get; set; } = string.Empty;
+    public string WhyNow { get; set; } = string.Empty;
     public string Background { get; set; } = string.Empty;
     public string AcceptanceCriteria { get; set; } = string.Empty;
     public string Priority { get; set; } = "Medium";
     public string TicketType { get; set; } = "Task";
+    public List<string> AffectedFiles { get; set; } = [];
+    public List<string> AffectedSymbols { get; set; } = [];
+    public List<string> Dependencies { get; set; } = [];
+    public int SuggestedBuildOrder { get; set; }
+    public string RiskLevel { get; set; } = "Medium";
+    public int ConfidenceScore { get; set; }
+    public List<string> GroundingWarnings { get; set; } = [];
+    public List<string> TestSuggestions { get; set; } = [];
     
     // Sub-fields for tests convention
     public string UnitTests { get; set; } = string.Empty;
@@ -41,4 +53,6 @@ public sealed class CodebaseTicketGenerationResult
     public bool Success { get; set; }
     public string ErrorMessage { get; set; } = string.Empty;
     public List<CodebaseTicketDraft> Drafts { get; set; } = [];
+    public int ContextQualityScore { get; set; }
+    public List<string> MissingContextReasons { get; set; } = [];
 }
