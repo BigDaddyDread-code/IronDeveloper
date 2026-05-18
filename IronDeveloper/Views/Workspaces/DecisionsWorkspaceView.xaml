@@ -142,8 +142,8 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="24"/>
-                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="18"/>
+                                    <ColumnDefinition Width="180"/>
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
@@ -192,8 +192,16 @@
                                                    TextWrapping="Wrap"/>
                                     </Grid>
 
+                                    <Border BorderBrush="{StaticResource Border/Subtle}"
+                                            BorderThickness="0,1,0,0"
+                                            Margin="0,4,0,14"/>
+
+                                    <TextBlock Text="CONTENT"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               Margin="0,0,0,10"/>
+
                                     <controls:StructuredTextView Text="{Binding SelectedDocumentBody}"
-                                                                 TextSize="13"/>
+                                                                 TextSize="15"/>
 
                                     <StackPanel Visibility="{Binding IsEditingDocument, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <Border BorderBrush="{StaticResource Border/Subtle}"
@@ -276,30 +284,34 @@
                                     </StackPanel>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="ACTIONS"
+                                <StackPanel Grid.Column="2"
+                                            Opacity="0.86">
+                                    <TextBlock Text="TOOLS"
                                                Style="{StaticResource Typography.Eyebrow}"
                                                Margin="0,0,0,8"/>
                                     <Button Content="Discuss in Chat"
                                             Command="{Binding DiscussSelectedDocumentCommand}"
                                             Style="{StaticResource AppButton.CompactGhost}"
-                                            HorizontalAlignment="Stretch"
+                                            HorizontalAlignment="Left"
+                                            Width="160"
                                             Margin="0,0,0,8"/>
                                     <Button Content="Edit"
                                             Command="{Binding EditSelectedDocumentCommand}"
                                             Style="{StaticResource AppButton.CompactGhost}"
-                                            HorizontalAlignment="Stretch"
+                                            HorizontalAlignment="Left"
+                                            Width="160"
                                             Margin="0,0,0,8"/>
                                     <Button Content="Archive"
                                             Command="{Binding ArchiveDocumentCommand}"
                                             Style="{StaticResource AppButton.CompactGhost}"
-                                            HorizontalAlignment="Stretch"/>
+                                            HorizontalAlignment="Left"
+                                            Width="160"/>
 
                                     <Border BorderBrush="{StaticResource Border/Subtle}"
                                             BorderThickness="0,1,0,0"
                                             Margin="0,18,0,14"/>
 
-                                    <TextBlock Text="DETAILS"
+                                    <TextBlock Text="REFERENCE"
                                                Style="{StaticResource Typography.Eyebrow}"
                                                Margin="0,0,0,8"/>
                                     <TextBlock Foreground="{StaticResource Text/Secondary}"
