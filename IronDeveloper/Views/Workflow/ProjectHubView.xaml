@@ -15,7 +15,6 @@
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -25,42 +24,46 @@
             <TextBlock Text="Your Projects" Style="{StaticResource Typography.ScreenTitle}"/>
         </StackPanel>
 
-        <!-- Create New CTA -->
-        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="48,24,48,40">
-            <Button Content="+ Create New Project"
-                    Command="{Binding CreateNewProjectCommand}"
-                    Style="{StaticResource AppButton.Primary}"
-                    Padding="32,14" Height="48"/>
-        </StackPanel>
-
         <!-- Project tiles -->
-        <ScrollViewer Grid.Row="2" Grid.Column="0" Margin="40,0,40,40" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding RecentProjects}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <controls:ActionCard
-                            Width="320"
-                            MinHeight="156"
-                            Margin="10"
-                            Title="{Binding Name}"
-                            Description="{Binding Description}"
-                            StatusText="{Binding IndexingStatus, TargetNullValue='Needs Index', FallbackValue='Needs Index'}"
-                            IconData="{StaticResource Icon.Nav.Projects}"
-                            ActionText="Open"
-                            PrimaryCommand="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                            PrimaryCommandParameter="{Binding}"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+        <ScrollViewer Grid.Row="1" Grid.Column="0" Margin="40,26,40,40" VerticalScrollBarVisibility="Auto">
+            <WrapPanel>
+                <controls:ActionCard
+                    Width="320"
+                    MinHeight="156"
+                    Margin="10"
+                    Title="Create New Project"
+                    Description="Start a new project workspace."
+                    IconData="{StaticResource Icon.Action.Add}"
+                    ActionText="Create"
+                    PrimaryCommand="{Binding CreateNewProjectCommand}"/>
+
+                <ItemsControl ItemsSource="{Binding RecentProjects}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <controls:ActionCard
+                                Width="320"
+                                MinHeight="156"
+                                Margin="10"
+                                Title="{Binding Name}"
+                                Description="{Binding Description}"
+                                StatusText="{Binding IndexingStatus, TargetNullValue='Needs Index', FallbackValue='Needs Index'}"
+                                IconData="{StaticResource Icon.Nav.Projects}"
+                                ActionText="Open"
+                                PrimaryCommand="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                PrimaryCommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </WrapPanel>
         </ScrollViewer>
 
         <!-- Embedded project wizard -->
-        <controls:SurfacePanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+        <controls:SurfacePanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
                 Width="420"
                 Margin="0,24,32,32"
                 Visibility="{Binding IsProjectWizardOpen, Converter={StaticResource BoolToVisibilityConverter}}"
