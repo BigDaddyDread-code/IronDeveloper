@@ -40,6 +40,7 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
     [ObservableProperty] private string _filterDocumentType = "All";
     [ObservableProperty] private string _filterStatus = "Active";
+    [ObservableProperty] private string _filterText = string.Empty;
 
     public string SelectedDocumentBody
     {
@@ -210,6 +211,14 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
             take: 200);
 
         var documentList = documents.ToList();
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            var filterText = FilterText.Trim();
+            documentList = documentList
+                .Where(d => ContainsFilterText(d, filterText))
+                .ToList();
+        }
+
         if (preferredDocumentId is > 0 &&
             includePreferredIfFilteredOut &&
             documentList.All(d => d.Id != preferredDocumentId.Value))
@@ -276,6 +285,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         => _ = RefreshListAsync();
 
     partial void OnFilterStatusChanged(string value)
+        => _ = RefreshListAsync();
+
+    partial void OnFilterTextChanged(string value)
         => _ = RefreshListAsync();
 
     [RelayCommand]
@@ -493,6 +505,18 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
     private static string? EmptyToNull(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool ContainsFilterText(ProjectContextDocument document, string filterText)
+    {
+        return Contains(document.Title, filterText) ||
+               Contains(document.Summary, filterText) ||
+               Contains(document.Content, filterText) ||
+               Contains(document.DocumentType, filterText) ||
+               Contains(document.Status, filterText);
+    }
+
+    private static bool Contains(string? value, string filterText)
+        => value?.Contains(filterText, StringComparison.OrdinalIgnoreCase) == true;
 
     private void NotifyDocumentPreviewChanged()
     {
