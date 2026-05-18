@@ -17,15 +17,7 @@
         <controls:WorkspaceHeader Grid.Row="0"
                                   Eyebrow="PROJECT KNOWLEDGE"
                                   Title="Knowledge and Discussions"
-                                  Margin="0,0,0,18">
-            <controls:WorkspaceHeader.Actions>
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="+ New Item"
-                            Command="{Binding NewDocumentCommand}"
-                            Style="{StaticResource AppButton.Primary}"/>
-                </StackPanel>
-            </controls:WorkspaceHeader.Actions>
-        </controls:WorkspaceHeader>
+                                  Margin="0,0,0,18"/>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -41,6 +33,11 @@
 
                     <controls:WorkspaceListPane.SearchField>
                         <StackPanel Margin="0,8,0,0">
+                            <Button Content="+ New Knowledge Item"
+                                    Command="{Binding NewDocumentCommand}"
+                                    Style="{StaticResource AppButton.CompactGhost}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,0,0,10"/>
                             <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
                                      Tag="Filter knowledge..."
                                      Margin="0,0,0,10"/>
@@ -147,7 +144,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <WrapPanel Grid.Row="0" Margin="0,0,0,10">
                                         <Border Background="{StaticResource Background/Interactive}"
                                                 BorderBrush="{StaticResource Border/Subtle}"
                                                 BorderThickness="1"
@@ -169,7 +166,69 @@
                                                        FontSize="11"
                                                        FontWeight="SemiBold"/>
                                         </Border>
-                                    </StackPanel>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3"
+                                                Margin="0,0,6,0">
+                                            <TextBlock Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold">
+                                                <Run Text="Document "/>
+                                                <Run Text="{Binding EditId}"/>
+                                            </TextBlock>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3"
+                                                Margin="0,0,6,0">
+                                            <TextBlock Text="{Binding EditAuthorityLevel}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3"
+                                                Margin="0,0,6,0">
+                                            <TextBlock Text="{Binding EditSource}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3"
+                                                Margin="0,0,6,0"
+                                                Visibility="{Binding EditAppliesToArea, Converter={StaticResource StringToVisibilityConverter}}">
+                                            <TextBlock Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold">
+                                                <Run Text="Area "/>
+                                                <Run Text="{Binding EditAppliesToArea}"/>
+                                            </TextBlock>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="8,3"
+                                                Visibility="{Binding EditTags, Converter={StaticResource StringToVisibilityConverter}}">
+                                            <TextBlock Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold">
+                                                <Run Text="Tags "/>
+                                                <Run Text="{Binding EditTags}"/>
+                                            </TextBlock>
+                                        </Border>
+                                    </WrapPanel>
 
                                     <TextBlock Grid.Row="1"
                                                Text="{Binding EditTitle}"
@@ -283,104 +342,30 @@
                                 BorderBrush="{StaticResource Border/Subtle}"
                                 BorderThickness="0,1,0,0"
                                 Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <WrapPanel Grid.Column="0"
-                                           VerticalAlignment="Center">
-                                    <Border Background="{StaticResource Background/Interactive}"
-                                            BorderBrush="{StaticResource Border/Subtle}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="8,3"
-                                            Margin="0,0,6,0">
-                                        <TextBlock Foreground="{StaticResource Text/Secondary}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold">
-                                            <Run Text="Document "/>
-                                            <Run Text="{Binding EditId}"/>
-                                        </TextBlock>
-                                    </Border>
-                                    <Border Background="{StaticResource Background/Interactive}"
-                                            BorderBrush="{StaticResource Border/Subtle}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="8,3"
-                                            Margin="0,0,6,0">
-                                        <TextBlock Text="{Binding EditAuthorityLevel}"
-                                                   Foreground="{StaticResource Text/Secondary}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"/>
-                                    </Border>
-                                    <Border Background="{StaticResource Background/Interactive}"
-                                            BorderBrush="{StaticResource Border/Subtle}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="8,3"
-                                            Margin="0,0,6,0">
-                                        <TextBlock Text="{Binding EditSource}"
-                                                   Foreground="{StaticResource Text/Secondary}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"/>
-                                    </Border>
-                                    <Border Background="{StaticResource Background/Interactive}"
-                                            BorderBrush="{StaticResource Border/Subtle}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="8,3"
-                                            Margin="0,0,6,0"
-                                            Visibility="{Binding EditAppliesToArea, Converter={StaticResource StringToVisibilityConverter}}">
-                                        <TextBlock Foreground="{StaticResource Text/Secondary}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold">
-                                            <Run Text="Area "/>
-                                            <Run Text="{Binding EditAppliesToArea}"/>
-                                        </TextBlock>
-                                    </Border>
-                                    <Border Background="{StaticResource Background/Interactive}"
-                                            BorderBrush="{StaticResource Border/Subtle}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="8,3"
-                                            Visibility="{Binding EditTags, Converter={StaticResource StringToVisibilityConverter}}">
-                                        <TextBlock Foreground="{StaticResource Text/Secondary}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold">
-                                            <Run Text="Tags "/>
-                                            <Run Text="{Binding EditTags}"/>
-                                        </TextBlock>
-                                    </Border>
-                                </WrapPanel>
-
-                                <StackPanel Grid.Column="1"
-                                            Orientation="Horizontal"
-                                            VerticalAlignment="Center">
-                                    <Button Content="Discuss in Chat"
-                                            Command="{Binding DiscussSelectedDocumentCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            Height="24"
-                                            Padding="8,2"
-                                            FontSize="11"
-                                            Margin="8,0,0,0"/>
-                                    <Button Content="Edit"
-                                            Command="{Binding EditSelectedDocumentCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            Height="24"
-                                            Padding="8,2"
-                                            FontSize="11"
-                                            Margin="6,0,0,0"/>
-                                    <Button Content="Archive"
-                                            Command="{Binding ArchiveDocumentCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            Height="24"
-                                            Padding="8,2"
-                                            FontSize="11"
-                                            Margin="6,0,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <Button Content="Discuss in Chat"
+                                        Command="{Binding DiscussSelectedDocumentCommand}"
+                                        Style="{StaticResource AppButton.CompactGhost}"
+                                        Height="24"
+                                        Padding="8,2"
+                                        FontSize="11"/>
+                                <Button Content="Edit"
+                                        Command="{Binding EditSelectedDocumentCommand}"
+                                        Style="{StaticResource AppButton.CompactGhost}"
+                                        Height="24"
+                                        Padding="8,2"
+                                        FontSize="11"
+                                        Margin="6,0,0,0"/>
+                                <Button Content="Archive"
+                                        Command="{Binding ArchiveDocumentCommand}"
+                                        Style="{StaticResource AppButton.CompactGhost}"
+                                        Height="24"
+                                        Padding="8,2"
+                                        FontSize="11"
+                                        Margin="6,0,0,0"/>
+                            </StackPanel>
                         </Border>
 
                         <controls:EditorActionBar Grid.Row="2"

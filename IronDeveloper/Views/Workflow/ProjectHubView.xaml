@@ -7,6 +7,24 @@
              xmlns:controls="http://schemas.irondeveloper.com/controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ProjectHubViewModel, IsDesignTimeCreatable=False}">
+    <UserControl.Resources>
+        <Style x:Key="ProjectHubCardButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
 
     <Grid Background="Transparent">
         <Grid.ColumnDefinitions>
@@ -27,15 +45,20 @@
         <!-- Project tiles -->
         <ScrollViewer Grid.Row="1" Grid.Column="0" Margin="40,26,40,40" VerticalScrollBarVisibility="Auto">
             <WrapPanel>
-                <controls:ActionCard
+                <Button
                     Width="320"
                     MinHeight="156"
                     Margin="10"
-                    Title="Create New Project"
-                    Description="Start a new project workspace."
-                    IconData="{StaticResource Icon.Action.Add}"
-                    ActionText="Create"
-                    PrimaryCommand="{Binding CreateNewProjectCommand}"/>
+                    Command="{Binding CreateNewProjectCommand}"
+                    Style="{StaticResource ProjectHubCardButton}">
+                    <controls:ActionCard
+                        MinHeight="156"
+                        IsHitTestVisible="False"
+                        Title="Create New Project"
+                        Description="Start a new project workspace."
+                        IconData="{StaticResource Icon.Action.Add}"
+                        ActionText=""/>
+                </Button>
 
                 <ItemsControl ItemsSource="{Binding RecentProjects}">
                     <ItemsControl.ItemsPanel>
@@ -45,17 +68,22 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <controls:ActionCard
+                            <Button
                                 Width="320"
                                 MinHeight="156"
                                 Margin="10"
-                                Title="{Binding Name}"
-                                Description="{Binding Description}"
-                                StatusText="{Binding IndexingStatus, TargetNullValue='Needs Index', FallbackValue='Needs Index'}"
-                                IconData="{StaticResource Icon.Nav.Projects}"
-                                ActionText="Open"
-                                PrimaryCommand="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                PrimaryCommandParameter="{Binding}"/>
+                                Command="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource ProjectHubCardButton}">
+                                <controls:ActionCard
+                                    MinHeight="156"
+                                    IsHitTestVisible="False"
+                                    Title="{Binding Name}"
+                                    Description="{Binding Description}"
+                                    StatusText="{Binding IndexingStatus, TargetNullValue='Needs Index', FallbackValue='Needs Index'}"
+                                    IconData="{StaticResource Icon.Nav.Projects}"
+                                    ActionText=""/>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
