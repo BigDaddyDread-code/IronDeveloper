@@ -9,7 +9,7 @@
              d:DataContext="{d:DesignInstance Type=vm:SettingsWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
     <ScrollViewer Background="{StaticResource Background/App}">
-        <StackPanel Margin="40,36,40,40" MaxWidth="900">
+        <StackPanel Margin="28,24,28,28" MaxWidth="980">
 
             <!-- Header -->
             <TextBlock Text="WORKSPACE" Style="{StaticResource IronEyebrow}" Margin="0,0,0,4"/>

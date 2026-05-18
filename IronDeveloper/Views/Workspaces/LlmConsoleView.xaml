@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:LlmConsoleViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Margin="24,0,24,32">
+    <Grid Margin="16,0,16,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="2*" MinHeight="120"/>

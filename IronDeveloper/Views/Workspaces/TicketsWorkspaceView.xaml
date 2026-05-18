@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:TicketsWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Background="{StaticResource Background/App}" Margin="24">
+    <Grid Background="{StaticResource Background/App}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -16,7 +16,7 @@
         <controls:WorkspaceHeader Grid.Row="0"
                                   Eyebrow="WORKFLOW"
                                   Title="Ticket Management"
-                                  Margin="0,0,0,18">
+                                  Margin="0">
             <controls:WorkspaceHeader.Actions>
                 <StackPanel Orientation="Horizontal">
                     <Button Command="{Binding GenerateCodebaseTicketsCommand}"
@@ -44,12 +44,12 @@
         <!-- Master-Detail -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="320" MinWidth="240"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- LEFT: Ticket List -->
-            <controls:WorkspaceListPane Grid.Column="0" Title="PROJECT TICKETS" Margin="0,0,16,0"
+            <controls:WorkspaceListPane Grid.Column="0" Title="PROJECT TICKETS" Margin="0,0,12,0"
                                         ItemsSource="{Binding Tickets}"
                                         SelectedItem="{Binding SelectedTicket, Mode=TwoWay}">
                 <controls:WorkspaceListPane.ItemTemplate>
@@ -104,7 +104,7 @@
                             </Style>
                         </Grid.Style>
 
-                        <controls:SurfacePanel Variant="Subtle" Padding="40" Margin="48"
+                        <controls:SurfacePanel Variant="Subtle" Padding="28" Margin="32"
                                                VerticalAlignment="Center" HorizontalAlignment="Center"
                                                MaxWidth="520">
                             <StackPanel>
@@ -403,10 +403,10 @@
                                 <!-- Limited context inline chip -->
                                 <Border Grid.Column="2"
                                         Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
+                                        Background="{StaticResource Brush.Status.Warning.Background}" BorderBrush="{StaticResource Brush.Status.Warning.Border}" BorderThickness="1"
                                         CornerRadius="3" Padding="7,2" Margin="0,0,8,0"
                                         ToolTip="Project not indexed - see Code Context tab">
-                                    <TextBlock Text="Limited context" Foreground="#F59E0B" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Limited context" Foreground="{StaticResource Brush.Status.Warning.Foreground}" FontSize="10" FontWeight="SemiBold"/>
                                 </Border>
                                 <!-- AI badge -->
                                 <Border Grid.Column="3" Background="{StaticResource Accent/Primary}" CornerRadius="3" Padding="7,2">
@@ -620,7 +620,7 @@
                                             <TextBlock Text="OPTIONAL BUILDER CONTEXT" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                                             <!-- Not-indexed warning -->
                                             <Border Visibility="{Binding IsContextLimited, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                    Background="#18F59E0B" BorderBrush="#F59E0B" BorderThickness="1"
+                                                    Background="{StaticResource Brush.Status.Warning.Background}" BorderBrush="{StaticResource Brush.Status.Warning.Border}" BorderThickness="1"
                                                     CornerRadius="6" Padding="14,10" Margin="0,0,0,10">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
@@ -629,7 +629,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0">
                                                         <TextBlock Text="Project is not indexed"
-                                                                   Foreground="#F59E0B" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                                                                   Foreground="{StaticResource Brush.Status.Warning.Foreground}" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
                                                         <TextBlock TextWrapping="Wrap" FontSize="12"
                                                                    Foreground="{StaticResource Text/Muted}"
                                                                    Text="Code context may be incomplete. Index the project to enable code retrieval and improve AI output quality."/>
@@ -648,10 +648,10 @@
                                             </Border>
                                             <!-- Indexed OK state -->
                                             <Border Visibility="{Binding IsContextLimited, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                                                    Background="#1234D16A" BorderBrush="#34D16A" BorderThickness="1"
+                                                    Background="{StaticResource Brush.Status.Ready.Background}" BorderBrush="{StaticResource Brush.Status.Ready.Border}" BorderThickness="1"
                                                     CornerRadius="6" Padding="12,8">
                                                 <TextBlock Text="Project is indexed - code context is available"
-                                                           Foreground="#34D16A" FontSize="12" FontWeight="SemiBold"/>
+                                                           Foreground="{StaticResource Brush.Status.Ready.Foreground}" FontSize="12" FontWeight="SemiBold"/>
                                             </Border>
                                         </StackPanel>
                                     </controls:SurfacePanel>

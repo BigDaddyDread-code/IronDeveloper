@@ -37,16 +37,16 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Grid.Column="0" Margin="48,40,48,0">
+        <StackPanel Grid.Row="0" Grid.Column="0" Margin="32,30,32,0">
             <TextBlock Text="PROJECT HUB" Style="{StaticResource Typography.Eyebrow}"/>
             <TextBlock Text="Your Projects" Style="{StaticResource Typography.ScreenTitle}"/>
         </StackPanel>
 
         <!-- Project tiles -->
-        <ScrollViewer Grid.Row="1" Grid.Column="0" Margin="40,26,40,40" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="1" Grid.Column="0" Margin="22,22,30,30" VerticalScrollBarVisibility="Auto">
             <WrapPanel>
                 <Button
-                    Width="320"
+                    Width="318"
                     MinHeight="156"
                     Margin="10"
                     Command="{Binding CreateNewProjectCommand}"
@@ -69,7 +69,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button
-                                Width="320"
+                                Width="318"
                                 MinHeight="156"
                                 Margin="10"
                                 Command="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
@@ -93,7 +93,7 @@
         <!-- Embedded project wizard -->
         <controls:SurfacePanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
                 Width="420"
-                Margin="0,24,32,32"
+                Margin="0,22,28,28"
                 Visibility="{Binding IsProjectWizardOpen, Converter={StaticResource BoolToVisibilityConverter}}"
                 Variant="Elevated">
             <ContentControl Content="{Binding ProjectWizard}"/>

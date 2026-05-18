@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:LoginViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Background="#060D16">
+    <Grid Background="{StaticResource Background/App}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="420"/>
             <ColumnDefinition Width="*"/>
@@ -88,7 +88,7 @@
                                Visibility="{Binding IsResolvingVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <ProgressBar IsIndeterminate="True" Width="240" Height="4" Margin="0,0,0,24"
-                                             Background="#1E293B" Foreground="{StaticResource Accent/Primary}" BorderThickness="0"/>
+                                             Background="{StaticResource Background/Interactive}" Foreground="{StaticResource Accent/Primary}" BorderThickness="0"/>
                                 <TextBlock Text="Loading your workspace..." FontSize="16" Opacity="0.8" HorizontalAlignment="Center" FontWeight="Medium"/>
                                 <TextBlock Text="Checking tenant associations..." FontSize="13" Opacity="0.4" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                             </StackPanel>
