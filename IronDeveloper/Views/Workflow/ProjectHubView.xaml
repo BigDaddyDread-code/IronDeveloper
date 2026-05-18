@@ -4,28 +4,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:IronDev.Agent.ViewModels.Workflow"
+             xmlns:controls="http://schemas.irondeveloper.com/controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ProjectHubViewModel, IsDesignTimeCreatable=False}">
-
-    <UserControl.Resources>
-        <!-- Dedicated Project Tile Style to avoid conflicts with global IronTileCard -->
-        <Style x:Key="IronProjectTile" TargetType="Border">
-            <Setter Property="Background"      Value="{StaticResource Background/Elevated}" />
-            <Setter Property="BorderBrush"     Value="{StaticResource Border/Subtle}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius"    Value="14" />
-            <Setter Property="Padding"         Value="22" />
-            <Setter Property="MinWidth"        Value="320" />
-            <Setter Property="MinHeight"       Value="180" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="#000000" BlurRadius="20" ShadowDepth="4" Opacity="0.4"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
 
     <Grid Background="Transparent">
         <Grid.ColumnDefinitions>
@@ -62,80 +43,28 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Command="{Binding DataContext.OpenProjectCommand,
-                                         RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                CommandParameter="{Binding}"
-                                Margin="10" Padding="0" Cursor="Hand" Height="Auto"
-                                OverridesDefaultStyle="True">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="TileBorder" Style="{StaticResource IronProjectTile}">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/> <!-- Name -->
-                                                <RowDefinition Height="Auto"/> <!-- Date -->
-                                                <RowDefinition Height="*"/>    <!-- Summary -->
-                                                <RowDefinition Height="Auto"/> <!-- Chips -->
-                                            </Grid.RowDefinitions>
-
-                                            <!-- Project name -->
-                                            <TextBlock Grid.Row="0"
-                                                       Text="{Binding Name}"
-                                                       FontSize="18" FontWeight="Bold"
-                                                       Foreground="{StaticResource Text/Primary}"
-                                                       TextTrimming="CharacterEllipsis"/>
-
-                                            <!-- Date -->
-                                            <TextBlock Grid.Row="1" 
-                                                       Text="{Binding CreatedDate, StringFormat='Created {0:MMM dd, yyyy}'}"
-                                                       FontSize="11" Opacity="0.4" Margin="0,2,0,0"/>
-
-                                            <!-- Description -->
-                                            <TextBlock Grid.Row="2"
-                                                       Text="{Binding Description}"
-                                                       Style="{StaticResource Typography.BodySmall}"
-                                                       TextWrapping="Wrap"
-                                                       Opacity="0.7"
-                                                       Margin="0,12,0,12"/>
-
-                                            <!-- Status + Model row -->
-                                            <StackPanel Grid.Row="3" Orientation="Horizontal">
-                                                <TextBlock Text="{Binding IndexingStatus, TargetNullValue='Needs Index'}"
-                                                           Foreground="{Binding IndexingStatus, Converter={StaticResource StatusToBrushConverter}}"
-                                                           FontSize="10" FontWeight="Bold" Margin="0,0,12,0"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="GPT-4O" FontSize="10" FontWeight="Bold"
-                                                           Foreground="{StaticResource Accent/Primary}"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="TileBorder" Property="Background" Value="{StaticResource Background/Interactive}"/>
-                                            <Setter TargetName="TileBorder" Property="BorderBrush" Value="{StaticResource Accent/Primary}"/>
-                                        </Trigger>
-                                        <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="TileBorder" Property="Opacity" Value="0.8"/>
-                                            <Setter TargetName="TileBorder" Property="RenderTransform">
-                                                <Setter.Value><ScaleTransform ScaleX="0.98" ScaleY="0.98"/></Setter.Value>
-                                            </Setter>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                        <controls:ActionCard
+                            Width="320"
+                            MinHeight="156"
+                            Margin="10"
+                            Title="{Binding Name}"
+                            Description="{Binding Description}"
+                            StatusText="{Binding IndexingStatus, TargetNullValue='Needs Index'}"
+                            IconData="{StaticResource Icon.Nav.Projects}"
+                            ActionText="Open"
+                            PrimaryCommand="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            PrimaryCommandParameter="{Binding}"/>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
 
         <!-- Embedded project wizard -->
-        <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+        <controls:SurfacePanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
                 Margin="0,24,32,32"
                 Visibility="{Binding IsProjectWizardOpen, Converter={StaticResource BoolToVisibilityConverter}}"
-                Style="{StaticResource IronMetalPanel}">
+                Variant="Elevated">
             <ContentControl Content="{Binding ProjectWizard}"/>
-        </Border>
+        </controls:SurfacePanel>
     </Grid>
 </UserControl>

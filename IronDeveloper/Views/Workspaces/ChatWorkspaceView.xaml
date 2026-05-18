@@ -70,40 +70,7 @@
                         </GroupStyle>
                     </ListBox.GroupStyle>
                     <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="0"/>
-                            <Setter Property="Margin" Value="0"/>
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="BorderBrush" Value="Transparent"/>
-                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border Padding="14,9,12,9"
-                                                BorderThickness="3,0,0,0"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                Background="{TemplateBinding Background}"
-                                                Cursor="Hand">
-                                            <ContentPresenter/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter Property="Background" Value="{StaticResource Background/Interactive}"/>
-                                                <Setter Property="BorderBrush" Value="{StaticResource Accent/Primary}"/>
-                                            </Trigger>
-                                            <MultiTrigger>
-                                                <MultiTrigger.Conditions>
-                                                    <Condition Property="IsMouseOver" Value="True"/>
-                                                    <Condition Property="IsSelected" Value="False"/>
-                                                </MultiTrigger.Conditions>
-                                                <Setter Property="Background" Value="{StaticResource Background/Surface}"/>
-                                            </MultiTrigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource AppListBoxItem.Compact}"/>
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -279,7 +246,14 @@
                 <!-- Message thread -->
                 <ScrollViewer x:Name="MessagesScroller" VerticalScrollBarVisibility="Auto"
                               Padding="24,18,24,16">
-                    <ItemsControl ItemsSource="{Binding Messages}">
+                    <ItemsControl ItemsSource="{Binding Messages}"
+                                  HorizontalAlignment="Stretch"
+                                  Width="{Binding ViewportWidth, ElementName=MessagesScroller}">
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
                         <ItemsControl.Style>
                             <Style TargetType="ItemsControl">
                                 <Setter Property="Visibility" Value="Visible"/>
@@ -292,12 +266,17 @@
                         </ItemsControl.Style>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Margin="0,0,0,20">
+                                <Grid Margin="0,0,0,20">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
                                     <!-- Bubble row -->
-                                    <Grid>
+                                    <Grid Grid.Row="0">
                                         <Grid.Style>
                                             <Style TargetType="Grid">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Role}" Value="user">
                                                         <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -307,7 +286,7 @@
                                         </Grid.Style>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto" MaxWidth="780"/>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
@@ -327,10 +306,8 @@
                                         </Border>
 
                                         <!-- Message card -->
-                                        <Grid Grid.Column="1" MaxWidth="780">
-                                            <Border BorderBrush="{StaticResource Border/Subtle}"
-                                                    BorderThickness="1,0,0,0"
-                                                    Padding="16,0,0,0">
+                                        <Grid Grid.Column="1">
+                                                        <Border Padding="0">
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Visibility" Value="Visible"/>
@@ -396,11 +373,13 @@
                                     </Grid>
 
                                     <!-- Action strip - assistant only -->
-                                    <controls:MessageActionStrip Margin="16,6,0,0"
+                                                    <controls:MessageActionStrip Grid.Row="1"
+                                                                                 Margin="0,6,0,0"
                                                                  CommandParameter="{Binding}"
                                                                  PlanCommand="{Binding DataContext.CreatePlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                  TicketCommand="{Binding DataContext.CreateTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                  DecisionCommand="{Binding DataContext.SaveDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 DocumentCommand="{Binding DataContext.CreateDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                  SummaryCommand="{Binding DataContext.SaveSummaryFromMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                  CopyCommand="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                  UsefulCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -420,7 +399,8 @@
 
 
                                     <!-- Reason picker - shown when AwaitingReason is true -->
-                                    <Border Margin="38,4,0,0" Padding="8,5"
+                                    <Border Grid.Row="2"
+                                            Margin="38,4,0,0" Padding="8,5"
                                             Background="{StaticResource Background/Surface}"
                                             BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
                                             CornerRadius="5">
@@ -511,7 +491,7 @@
                                             </WrapPanel>
                                         </StackPanel>
                                     </Border>
-                                </StackPanel>
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

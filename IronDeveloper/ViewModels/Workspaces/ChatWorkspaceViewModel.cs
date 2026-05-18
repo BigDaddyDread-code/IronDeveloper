@@ -71,6 +71,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public Action<IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>>? OnCreateTicketsFromChat { get; set; }
     public Action<string, string, string?, string?, string?>? OnCreatePlanFromChat { get; set; }
     public Action<string, string, string?, string?>? OnCreateDecisionFromChat { get; set; }
+    public Action<string, string, string?, string?, string?>? OnCreateDocumentFromChat { get; set; }
 
     // Navigation shortcuts — wired by ShellViewModel
     public Action? OnNavigateToPlan     { get; set; }
@@ -616,6 +617,15 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         return normalized.Length > 80 ? normalized[..80] + "..." : normalized;
     }
 
+    private static string MakeDocumentSummary(string text)
+    {
+        var normalized = string.Join(" ", text.Split(['\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries));
+        if (string.IsNullOrWhiteSpace(normalized))
+            return string.Empty;
+
+        return normalized.Length > 240 ? normalized[..240] + "..." : normalized;
+    }
+
     [RelayCommand]
     private void CreateTicket(ChatSummary message)
     {
@@ -684,6 +694,36 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         }
 
         OnCreateDecisionFromChat.Invoke(userQuestion, detail, linkedFilePaths, linkedSymbols);
+    }
+
+    [RelayCommand]
+    private void CreateDocument(ChatSummary message)
+    {
+        if (message == null || OnCreateDocumentFromChat == null) return;
+
+        var idx = Messages.IndexOf(message);
+        var title = "Chat-generated project document";
+        if (idx > 0 && Messages[idx - 1].Role == "user")
+        {
+            var q = Messages[idx - 1].MessageText;
+            title = q.Length > 80 ? q[..80] + "..." : q;
+        }
+
+        var content = message.MessageText;
+        if (content.Length > 6000)
+            content = content[..6000] + "\n...[truncated]";
+
+        string? linkedFilePaths = null;
+        string? linkedSymbols = null;
+        if (message.ContextPacket != null)
+        {
+            if (message.ContextPacket.MatchedFilePaths.Count > 0)
+                linkedFilePaths = string.Join("\n", message.ContextPacket.MatchedFilePaths);
+            if (message.ContextPacket.MatchedSymbols.Count > 0)
+                linkedSymbols = string.Join("\n", message.ContextPacket.MatchedSymbols);
+        }
+
+        OnCreateDocumentFromChat.Invoke(title, content, MakeDocumentSummary(content), linkedFilePaths, linkedSymbols);
     }
 
     [RelayCommand]

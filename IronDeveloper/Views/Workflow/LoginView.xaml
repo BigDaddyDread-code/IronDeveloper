@@ -15,7 +15,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ── Left Side: Brand Panel ──────────────────────────────────── -->
-        <Border Grid.Column="0" Background="#04080F" BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="0,0,1,0">
+        <Border Grid.Column="0" Background="{StaticResource Background/App}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,1,0">
             <StackPanel VerticalAlignment="Center" Margin="60,0">
                 <TextBlock Text="IRONDEV" FontSize="44" FontWeight="Black"
                            Foreground="{StaticResource Accent/Primary}" Margin="0,0,0,12"/>
@@ -44,9 +44,9 @@
         </Border>
 
         <!-- ── Right Side: Login Form ──────────────────────────────────── -->
-        <Grid Grid.Column="1" Background="{StaticResource AppBackgroundBrush}">
+        <Grid Grid.Column="1" Background="{StaticResource Background/App}">
             <Border Width="460" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Border Style="{StaticResource IronCard}" Padding="40">
+                <Border Style="{StaticResource SurfacePanel.Elevated}" Padding="40">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/> <!-- Title -->
@@ -78,7 +78,7 @@
                             <Button Content="Continue"
                                     Command="{Binding SignInCommand}"
                                     CommandParameter="{Binding ElementName=PasswordInput}"
-                                    Style="{StaticResource IronPrimaryButton}"
+                                    Style="{StaticResource AppButton.Primary}"
                                     HorizontalAlignment="Stretch" Height="50"
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
                         </StackPanel>
@@ -109,12 +109,12 @@
 
                             <Button Content="Access Workspace"
                                     Command="{Binding SelectTenantCommand}"
-                                    Style="{StaticResource IronPrimaryButton}"
+                                    Style="{StaticResource AppButton.Primary}"
                                     HorizontalAlignment="Stretch" Height="50"
                                     Margin="0,0,0,12"/>
 
                             <Button Content="Back to login" 
-                                    Style="{StaticResource IronGhostButton}"
+                                    Style="{StaticResource AppButton.Ghost}"
                                     HorizontalAlignment="Center"
                                     Command="{Binding BackToLoginCommand}"/>
                         </StackPanel>

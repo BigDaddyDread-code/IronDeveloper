@@ -87,6 +87,15 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.BuilderWorkspaceViewModel>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.ProjectProfileViewModel>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDiscussionSeedService,
+                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.DiscussionSeedService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDiscussionResolverService,
+                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.DiscussionResolverService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IKnowledgeArtefactApplyService,
+                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.KnowledgeArtefactApplyService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentService,
@@ -162,6 +171,7 @@ public partial class App : Application
 
                 // ── Workspace ViewModels ──────────────────────────────────────
                 services.AddTransient<ChatWorkspaceViewModel>();
+                services.AddTransient<KnowledgeCompilerViewModel>();
                 services.AddTransient<TicketsWorkspaceViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();

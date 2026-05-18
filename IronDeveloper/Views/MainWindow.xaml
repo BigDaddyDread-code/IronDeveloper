@@ -22,42 +22,7 @@
                       ResizeBorderThickness="4"/>
     </WindowChrome.WindowChrome>
 
-    <Window.Resources>
-        <!-- Window Command Buttons Style -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="46"/>
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="VerticalAlignment" Value="Top"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#20FFFFFF"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="WindowCloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E81123"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
-
-    <Border CornerRadius="14" ClipToBounds="True" BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="1">
+    <Border CornerRadius="14" ClipToBounds="True" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1">
         <Grid Background="{StaticResource Background/App}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="38"/>
@@ -71,7 +36,7 @@
             <!-- ══ TITLE BAR ══════════════════════════════════════════════════ -->
             <Border Grid.Row="0" Grid.ColumnSpan="2"
                     Background="{StaticResource MetalBrush}"
-                    BorderBrush="{StaticResource DarkBorderBrush}" BorderThickness="0,0,0,1">
+                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1">
                 <Grid>
                     <!-- Branding & Tenant (Left) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
@@ -85,7 +50,7 @@
                             <Border Background="{StaticResource Background/Interactive}" Padding="6,2" CornerRadius="4" Margin="12,0,0,0">
                                 <TextBlock Text="PREVIEW" Foreground="{StaticResource Accent/Primary}" FontSize="9" FontWeight="Bold"/>
                             </Border>
-                            <TextBlock Text="  ·  " Foreground="{StaticResource TextBrush}" FontSize="12" Opacity="0.3" Margin="10,0"/>
+                            <TextBlock Text="  ·  " Foreground="{StaticResource Text/Muted}" FontSize="12" Opacity="0.3" Margin="10,0"/>
                             <TextBlock Foreground="{StaticResource Accent/Primary}" 
                                        FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.8">
                                 <TextBlock.Style>
@@ -109,44 +74,7 @@
                         <Grid Visibility="{Binding IsAuthenticated, Converter={StaticResource BoolToVisibilityConverter}}"
                                Margin="0,0,10,0" VerticalAlignment="Center">
                             <ToggleButton x:Name="UserMenuButton"
-                                          Padding="8,4"
-                                          Cursor="Hand"
-                                          Background="Transparent"
-                                          BorderThickness="0"
-                                          FocusVisualStyle="{x:Null}"
-                                          WindowChrome.IsHitTestVisibleInChrome="True">
-                                <ToggleButton.Style>
-                                    <Style TargetType="ToggleButton">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="BorderThickness" Value="0"/>
-                                        <Setter Property="Cursor" Value="Hand"/>
-                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="ToggleButton">
-                                                    <Border x:Name="Bd"
-                                                            Background="{TemplateBinding Background}"
-                                                            BorderThickness="0"
-                                                            CornerRadius="6"
-                                                            Padding="{TemplateBinding Padding}">
-                                                        <ContentPresenter HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="Bd" Property="Background"
-                                                                    Value="{StaticResource Background/Interactive}"/>
-                                                        </Trigger>
-                                                        <Trigger Property="IsChecked" Value="True">
-                                                            <Setter TargetName="Bd" Property="Background"
-                                                                    Value="{StaticResource Background/Interactive}"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </ToggleButton.Style>
+                                          Style="{StaticResource AppToggle.UserMenu}">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Data="{StaticResource Icon.Nav.Settings}" Fill="{StaticResource Text/Secondary}"
                                           Width="14" Height="14" Margin="0,0,8,0" Stretch="Uniform" Opacity="0.7"/>
@@ -164,7 +92,7 @@
                             <Popup IsOpen="{Binding IsChecked, ElementName=UserMenuButton}" 
                                    PlacementTarget="{Binding ElementName=UserMenuButton}"
                                    Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-                                <Border Style="{StaticResource IronMetalPanel}" Padding="8" Margin="0,8,0,0" Width="220">
+                                <controls:SurfacePanel Variant="Overlay" Padding="8" Margin="0,8,0,0" Width="220">
                                     <StackPanel>
                                         <!-- Identity header -->
                                         <Border Padding="12,10,12,10"
@@ -188,25 +116,25 @@
                                                 Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
                                         <Button Content="Settings" Command="{Binding OpenSettingsCommand}" 
                                                 Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
-                                        <Separator Background="{StaticResource DarkBorderBrush}" Margin="4,4"/>
+                                        <Separator Background="{StaticResource Border/Subtle}" Margin="4,4"/>
                                         <Button Content="Switch Project" Command="{Binding NavigateWorkspaceCommand}" CommandParameter="SwitchProject"
                                                 Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"/>
                                         <Button Content="Sign out" Command="{Binding SignOutCommand}" 
                                                 Style="{StaticResource AppButton.Ghost}" HorizontalContentAlignment="Left" Padding="12,8"
                                                 Foreground="{StaticResource StatusErrorBrush}"/>
                                     </StackPanel>
-                                </Border>
+                                </controls:SurfacePanel>
                             </Popup>
                         </Grid>
 
                         <!-- Window Controls -->
-                        <Button Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click">
+                        <Button Style="{StaticResource AppButton.WindowChrome}" Click="MinimizeButton_Click">
                             <Path Data="{StaticResource Icon.Window.Minimize}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
                         </Button>
-                        <Button Style="{StaticResource WindowControlButton}" Click="MaximizeButton_Click">
+                        <Button Style="{StaticResource AppButton.WindowChrome}" Click="MaximizeButton_Click">
                             <Path Data="{StaticResource Icon.Window.Maximize}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
                         </Button>
-                        <Button Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click">
+                        <Button Style="{StaticResource AppButton.WindowClose}" Click="CloseButton_Click">
                             <Path Data="{StaticResource Icon.Window.Close}" Fill="{StaticResource Text/Secondary}" Width="10" Height="10" Stretch="Uniform"/>
                         </Button>
                     </StackPanel>
@@ -249,6 +177,11 @@
                                                       CommandParameter="Overview"
                                                       ToolTip="Dashboard"
                                                       IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Overview}"/>
+                                <controls:NavRailItem IconData="{StaticResource Icon.Nav.Layers}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="Discovery"
+                                                      ToolTip="Discovery"
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Discovery}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Chat}"
                                                       Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Chat"

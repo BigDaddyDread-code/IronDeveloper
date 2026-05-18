@@ -59,7 +59,6 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     public bool IsBusy => IsGenerating || IsApplying;
     public bool IsApplyEnabled => ProfileAllowsApply && (Readiness?.IsReady ?? false);
     public string ApplyModeLabel => IsApplyEnabled ? "Apply Enabled" : "PROPOSAL-ONLY MODE";
-    public string ApplyModeColor => IsApplyEnabled ? "#34D16A" : "#7C6BE8";
 
     public ObservableCollection<ProposedFileChange> ProposedFiles { get; } = new();
 
@@ -269,7 +268,6 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         Reconciliation = null;
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
-        OnPropertyChanged(nameof(ApplyModeColor));
     }
 
     private async Task RefreshIndexStatusAfterApplyAsync()
@@ -298,7 +296,6 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         ApplyReadinessPresentation();
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
-        OnPropertyChanged(nameof(ApplyModeColor));
         ApplyProposalCommand.NotifyCanExecuteChanged();
     }
 
@@ -306,7 +303,6 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsApplyEnabled));
         OnPropertyChanged(nameof(ApplyModeLabel));
-        OnPropertyChanged(nameof(ApplyModeColor));
         ApplyProposalCommand.NotifyCanExecuteChanged();
     }
 

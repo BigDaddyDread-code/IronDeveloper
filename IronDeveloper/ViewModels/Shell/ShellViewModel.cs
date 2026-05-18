@@ -23,6 +23,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly ProjectHubViewModel  _hubVm;
     private readonly CreateProjectViewModel _createVm;
     private readonly ProjectOverviewViewModel _overviewVm;
+    private readonly KnowledgeCompilerViewModel _knowledgeCompilerVm;
     private readonly ChatWorkspaceViewModel   _chatVm;
     private readonly TicketsWorkspaceViewModel _ticketsVm;
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
@@ -84,6 +85,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ProjectHubViewModel        hubVm,
         CreateProjectViewModel     createVm,
         ProjectOverviewViewModel   overviewVm,
+        KnowledgeCompilerViewModel knowledgeCompilerVm,
         ChatWorkspaceViewModel     chatVm,
         TicketsWorkspaceViewModel  ticketsVm,
         DecisionsWorkspaceViewModel         decisionsVm,
@@ -97,6 +99,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _hubVm       = hubVm;
         _createVm    = createVm;
         _overviewVm  = overviewVm;
+        _knowledgeCompilerVm = knowledgeCompilerVm;
         _chatVm      = chatVm;
         _ticketsVm   = ticketsVm;
         _decisionsVm = decisionsVm;
@@ -215,6 +218,20 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentView = _decisionsVm;
         };
 
+        _chatVm.OnCreateDocumentFromChat = (title, content, summary, linkedFilePaths, linkedSymbols) =>
+        {
+            _decisionsVm.PrefillDocumentFromChat(title, content, summary, linkedFilePaths, linkedSymbols);
+            CurrentWorkspace = ProjectWorkspace.Decisions;
+            CurrentView = _decisionsVm;
+        };
+
+        _decisionsVm.OnDiscussDocumentInChat = (prompt) =>
+        {
+            _chatVm.PromptText = prompt;
+            CurrentWorkspace = ProjectWorkspace.Chat;
+            CurrentView = _chatVm;
+        };
+
         // Chat quick-nav: Plans / Tickets / Decisions
         _chatVm.OnNavigateToPlan = () =>
         {
@@ -261,6 +278,7 @@ public sealed partial class ShellViewModel : ObservableObject
         CurrentView = ws switch
         {
             ProjectWorkspace.Overview   => _overviewVm,
+            ProjectWorkspace.Discovery  => _knowledgeCompilerVm,
             ProjectWorkspace.Chat       => _chatVm,
             ProjectWorkspace.Tickets    => _ticketsVm,
             ProjectWorkspace.Plans      => _plansVm,
@@ -382,6 +400,7 @@ public sealed partial class ShellViewModel : ObservableObject
             // Populate child ViewModels with real data
             await Task.WhenAll(
                 _overviewVm.LoadAsync(project),
+                _knowledgeCompilerVm.LoadAsync(project),
                 _chatVm.LoadAsync(project),
                 _ticketsVm.LoadAsync(project),
                 _decisionsVm.LoadAsync(project),

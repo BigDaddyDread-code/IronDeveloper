@@ -17,6 +17,7 @@ public enum ShellMode
 public enum ProjectWorkspace
 {
     Overview,
+    Discovery,
     Chat,
     Tickets,
     Plans,

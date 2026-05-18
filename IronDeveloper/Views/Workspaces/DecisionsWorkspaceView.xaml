@@ -16,12 +16,18 @@
 
         <controls:WorkspaceHeader Grid.Row="0"
                                   Eyebrow="PROJECT MEMORY"
-                                  Title="Summary and Context Documents"
+                                  Title="Memory and Discussions"
                                   Margin="0,0,0,18">
             <controls:WorkspaceHeader.Actions>
-                <Button Content="+ New Document"
-                        Command="{Binding NewDocumentCommand}"
-                        Style="{StaticResource AppButton.Primary}"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Discuss in Chat"
+                            Command="{Binding DiscussSelectedDocumentCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="+ New Memory"
+                            Command="{Binding NewDocumentCommand}"
+                            Style="{StaticResource AppButton.Primary}"/>
+                </StackPanel>
             </controls:WorkspaceHeader.Actions>
         </controls:WorkspaceHeader>
 
@@ -75,7 +81,7 @@
 
                 <controls:WorkspaceListPane
                     Grid.Row="1"
-                    Title="SYSTEM DOCS"
+                    Title="MEMORY ITEMS"
                     ItemsSource="{Binding Documents}"
                     SelectedItem="{Binding SelectedDocument, Mode=TwoWay}">
 
@@ -139,8 +145,8 @@
 
                 <Grid>
                     <controls:EmptyResultsState
-                        Title="No Context Document Selected"
-                        Description="Select a document or create one to capture a decision, standard, fact, recommendation, or open question."
+                        Title="No Memory Item Selected"
+                        Description="Select a discussion, decision, standard, fact, recommendation, or open question to preview it here."
                         Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
                     <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -159,29 +165,49 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                                        <Border Background="{StaticResource Background/Interactive}"
-                                                BorderBrush="{StaticResource Border/Subtle}"
-                                                BorderThickness="1"
-                                                CornerRadius="4"
-                                                Padding="8,3"
-                                                Margin="0,0,6,0">
-                                            <TextBlock Text="{Binding EditDocumentType}"
-                                                       Foreground="{StaticResource Accent/Primary}"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"/>
-                                        </Border>
-                                        <Border Background="{StaticResource Background/Interactive}"
-                                                BorderBrush="{StaticResource Border/Subtle}"
-                                                BorderThickness="1"
-                                                CornerRadius="4"
-                                                Padding="8,3">
-                                            <TextBlock Text="{Binding EditStatus}"
-                                                       Foreground="{StaticResource Text/Secondary}"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"/>
-                                        </Border>
-                                    </StackPanel>
+                                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                            <Border Background="{StaticResource Background/Interactive}"
+                                                    BorderBrush="{StaticResource Border/Subtle}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4"
+                                                    Padding="8,3"
+                                                    Margin="0,0,6,0">
+                                                <TextBlock Text="{Binding EditDocumentType}"
+                                                           Foreground="{StaticResource Accent/Primary}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"/>
+                                            </Border>
+                                            <Border Background="{StaticResource Background/Interactive}"
+                                                    BorderBrush="{StaticResource Border/Subtle}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4"
+                                                    Padding="8,3">
+                                                <TextBlock Text="{Binding EditStatus}"
+                                                           Foreground="{StaticResource Text/Secondary}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"/>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button Content="Discuss in Chat"
+                                                    Command="{Binding DiscussSelectedDocumentCommand}"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Margin="0,0,8,0"/>
+                                            <Button Content="Edit"
+                                                    Command="{Binding EditSelectedDocumentCommand}"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Margin="0,0,8,0"/>
+                                            <Button Content="Archive"
+                                                    Command="{Binding ArchiveDocumentCommand}"
+                                                    Style="{StaticResource AppButton.CompactGhost}"/>
+                                        </StackPanel>
+                                    </Grid>
 
                                     <TextBlock Grid.Row="1"
                                                Text="{Binding EditTitle}"
@@ -201,87 +227,90 @@
                                 <controls:StructuredTextView Text="{Binding SelectedDocumentBody}"
                                                              TextSize="13"/>
 
-                                <Border BorderBrush="{StaticResource Border/Subtle}"
-                                        BorderThickness="0,1,0,0"
-                                        Margin="0,22,0,14"/>
+                                <StackPanel Visibility="{Binding IsEditingDocument, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Border BorderBrush="{StaticResource Border/Subtle}"
+                                            BorderThickness="0,1,0,0"
+                                            Margin="0,22,0,14"/>
 
-                                <TextBlock Text="EDIT DOCUMENT"
-                                           Style="{StaticResource Typography.Eyebrow}"
-                                           Margin="0,0,0,12"/>
+                                    <TextBlock Text="EDIT MEMORY ITEM"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               Margin="0,0,0,12"/>
 
-                                <Grid Margin="0,0,0,14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                                    <controls:FormField Grid.Column="0" Label="TYPE">
-                                        <ComboBox ItemsSource="{Binding DocumentTypeOptions}"
-                                                  SelectedItem="{Binding EditDocumentType}"/>
+                                        <controls:FormField Grid.Column="0" Label="TYPE">
+                                            <ComboBox ItemsSource="{Binding DocumentTypeOptions}"
+                                                      SelectedItem="{Binding EditDocumentType}"/>
+                                        </controls:FormField>
+                                        <controls:FormField Grid.Column="2" Label="AUTHORITY">
+                                            <ComboBox ItemsSource="{Binding AuthorityLevelOptions}"
+                                                      SelectedItem="{Binding EditAuthorityLevel}"/>
+                                        </controls:FormField>
+                                        <controls:FormField Grid.Column="4" Label="STATUS">
+                                            <ComboBox ItemsSource="{Binding StatusOptions}"
+                                                      SelectedItem="{Binding EditStatus}"/>
+                                        </controls:FormField>
+                                    </Grid>
+
+                                    <controls:FormField Label="TITLE">
+                                        <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                                                 FontSize="15"
+                                                 FontWeight="SemiBold"/>
                                     </controls:FormField>
-                                    <controls:FormField Grid.Column="2" Label="AUTHORITY">
-                                        <ComboBox ItemsSource="{Binding AuthorityLevelOptions}"
-                                                  SelectedItem="{Binding EditAuthorityLevel}"/>
-                                    </controls:FormField>
-                                    <controls:FormField Grid.Column="4" Label="STATUS">
-                                        <ComboBox ItemsSource="{Binding StatusOptions}"
-                                                  SelectedItem="{Binding EditStatus}"/>
-                                    </controls:FormField>
-                                </Grid>
 
-                                <controls:FormField Label="TITLE">
-                                    <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
-                                             FontSize="15"
-                                             FontWeight="SemiBold"/>
-                                </controls:FormField>
-
-                                <controls:FormField Label="SUMMARY">
-                                    <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}"
-                                             TextWrapping="Wrap"
-                                             MinHeight="48"/>
-                                </controls:FormField>
-
-                                <controls:FormField Label="CONTENT">
-                                    <TextBox Text="{Binding EditContent, UpdateSourceTrigger=PropertyChanged}"
-                                             TextWrapping="Wrap"
-                                             AcceptsReturn="True"
-                                             MinHeight="150"/>
-                                </controls:FormField>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <controls:FormField Grid.Column="0" Label="APPLIES TO AREA">
-                                        <TextBox Text="{Binding EditAppliesToArea, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <controls:FormField Label="SUMMARY">
+                                        <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="48"/>
                                     </controls:FormField>
-                                    <controls:FormField Grid.Column="2" Label="CAPABILITY">
-                                        <TextBox Text="{Binding EditAppliesToCapability, UpdateSourceTrigger=PropertyChanged}"/>
-                                    </controls:FormField>
-                                </Grid>
 
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <controls:FormField Grid.Column="0" Label="TAGS">
-                                        <TextBox Text="{Binding EditTags, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <controls:FormField Label="CONTENT">
+                                        <TextBox Text="{Binding EditContent, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextWrapping="Wrap"
+                                                 AcceptsReturn="True"
+                                                 MinHeight="150"/>
                                     </controls:FormField>
-                                    <controls:FormField Grid.Column="2" Label="SOURCE">
-                                        <TextBox Text="{Binding EditSource, UpdateSourceTrigger=PropertyChanged}"/>
-                                    </controls:FormField>
-                                </Grid>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <controls:FormField Grid.Column="0" Label="APPLIES TO AREA">
+                                            <TextBox Text="{Binding EditAppliesToArea, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </controls:FormField>
+                                        <controls:FormField Grid.Column="2" Label="CAPABILITY">
+                                            <TextBox Text="{Binding EditAppliesToCapability, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </controls:FormField>
+                                    </Grid>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <controls:FormField Grid.Column="0" Label="TAGS">
+                                            <TextBox Text="{Binding EditTags, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </controls:FormField>
+                                        <controls:FormField Grid.Column="2" Label="SOURCE">
+                                            <TextBox Text="{Binding EditSource, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </controls:FormField>
+                                    </Grid>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
 
                         <controls:EditorActionBar Grid.Row="1"
+                                                  Visibility="{Binding IsEditingDocument, Converter={StaticResource BoolToVisibilityConverter}}"
                                                   Background="{StaticResource Background/Surface}"
                                                   SeparatorThickness="0,1,0,0"
                                                   BarPadding="16,12"
