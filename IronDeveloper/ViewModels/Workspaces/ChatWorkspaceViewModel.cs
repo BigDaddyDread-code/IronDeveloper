@@ -70,8 +70,8 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public Action<IronDev.Agent.Models.ChatTicketContext>? OnCreateTicketFromChat { get; set; }
     public Action<IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>>? OnCreateTicketsFromChat { get; set; }
     public Action<string, string, string?, string?, string?>? OnCreatePlanFromChat { get; set; }
-    public Action<string, string, string?, string?>? OnCreateDecisionFromChat { get; set; }
-    public Action<string, string, string?, string?, string?>? OnCreateDocumentFromChat { get; set; }
+    public Action<string, string, string?, string?, long?>? OnCreateDecisionFromChat { get; set; }
+    public Action<string, string, string?, string?, string?, long?>? OnCreateDocumentFromChat { get; set; }
 
     // Navigation shortcuts — wired by ShellViewModel
     public Action? OnNavigateToPlan     { get; set; }
@@ -680,6 +680,13 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         }
 
         var detail = message.MessageText;
+        var decisionTag = TryExtractDecisionTag(message.MessageText);
+        if (decisionTag != null)
+        {
+            userQuestion = decisionTag.Value.Title;
+            detail = decisionTag.Value.Detail;
+        }
+
         if (detail.Length > 2000)
             detail = detail.Substring(0, 2000) + "\n...[truncated]";
 
@@ -693,7 +700,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 linkedSymbols = string.Join("\n", message.ContextPacket.MatchedSymbols);
         }
 
-        OnCreateDecisionFromChat.Invoke(userQuestion, detail, linkedFilePaths, linkedSymbols);
+        OnCreateDecisionFromChat.Invoke(userQuestion, detail, linkedFilePaths, linkedSymbols, FindSourceDocumentIdForMessage(idx));
     }
 
     [RelayCommand]
@@ -723,7 +730,71 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 linkedSymbols = string.Join("\n", message.ContextPacket.MatchedSymbols);
         }
 
-        OnCreateDocumentFromChat.Invoke(title, content, MakeDocumentSummary(content), linkedFilePaths, linkedSymbols);
+        OnCreateDocumentFromChat.Invoke(title, content, MakeDocumentSummary(content), linkedFilePaths, linkedSymbols, FindSourceDocumentIdForMessage(idx));
+    }
+
+    private long? FindSourceDocumentIdForMessage(int messageIndex)
+    {
+        if (messageIndex < 0)
+            return null;
+
+        for (var i = messageIndex; i >= 0 && i >= messageIndex - 12; i--)
+        {
+            var documentId = TryExtractDocumentId(Messages[i].MessageText);
+            if (documentId.HasValue)
+                return documentId.Value;
+        }
+
+        return null;
+    }
+
+    private static long? TryExtractDocumentId(string text)
+    {
+        foreach (var line in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!line.StartsWith("DocumentId", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var separatorIndex = line.IndexOf(':');
+            if (separatorIndex < 0)
+                separatorIndex = line.IndexOf('=');
+
+            if (separatorIndex < 0)
+                continue;
+
+            var rawValue = line[(separatorIndex + 1)..].Trim();
+            if (long.TryParse(rawValue, out var documentId))
+                return documentId;
+        }
+
+        return null;
+    }
+
+    private static (string Title, string Detail)? TryExtractDecisionTag(string text)
+    {
+        const string startTag = "<decision>";
+        const string endTag = "</decision>";
+
+        var startIndex = text.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+        if (startIndex < 0)
+            return null;
+
+        startIndex += startTag.Length;
+        var endIndex = text.IndexOf(endTag, startIndex, StringComparison.OrdinalIgnoreCase);
+        if (endIndex <= startIndex)
+            return null;
+
+        var body = text[startIndex..endIndex].Trim();
+        var separatorIndex = body.IndexOf('|');
+        if (separatorIndex <= 0 || separatorIndex >= body.Length - 1)
+            return null;
+
+        var title = body[..separatorIndex].Trim();
+        var detail = body[(separatorIndex + 1)..].Trim();
+
+        return string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(detail)
+            ? null
+            : (title, detail);
     }
 
     [RelayCommand]

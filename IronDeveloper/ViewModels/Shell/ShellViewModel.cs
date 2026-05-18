@@ -211,16 +211,16 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Chat → Decision creation bridge
-        _chatVm.OnCreateDecisionFromChat = (title, detail, linkedFilePaths, linkedSymbols) =>
+        _chatVm.OnCreateDecisionFromChat = (title, detail, linkedFilePaths, linkedSymbols, sourceDocumentId) =>
         {
-            _decisionsVm.PrefillFromChat(title, detail, linkedFilePaths, linkedSymbols);
+            _decisionsVm.PrefillFromChat(title, detail, linkedFilePaths, linkedSymbols, sourceDocumentId);
             CurrentWorkspace = ProjectWorkspace.Decisions;
             CurrentView = _decisionsVm;
         };
 
-        _chatVm.OnCreateDocumentFromChat = (title, content, summary, linkedFilePaths, linkedSymbols) =>
+        _chatVm.OnCreateDocumentFromChat = (title, content, summary, linkedFilePaths, linkedSymbols, sourceDocumentId) =>
         {
-            _decisionsVm.PrefillDocumentFromChat(title, content, summary, linkedFilePaths, linkedSymbols);
+            _decisionsVm.PrefillDocumentFromChat(title, content, summary, linkedFilePaths, linkedSymbols, sourceDocumentId);
             CurrentWorkspace = ProjectWorkspace.Decisions;
             CurrentView = _decisionsVm;
         };

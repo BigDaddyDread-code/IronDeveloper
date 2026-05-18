@@ -405,9 +405,17 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         IsEditingDocument = true;
     }
 
-    public void PrefillFromChat(string title, string detail, string? linkedFilePaths, string? linkedSymbols)
+    public void PrefillFromChat(
+        string title,
+        string detail,
+        string? linkedFilePaths,
+        string? linkedSymbols,
+        long? sourceDocumentId = null)
     {
         NewDocument();
+        if (sourceDocumentId is > 0)
+            EditId = sourceDocumentId.Value;
+
         EditDocumentType = "ArchitectureDecision";
         EditAuthorityLevel = "Binding";
         EditStatus = "Accepted";
@@ -415,7 +423,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         EditContent = detail;
         EditTags = linkedSymbols ?? string.Empty;
         EditAppliesToArea = linkedFilePaths ?? string.Empty;
-        EditSource = "Chat";
+        EditSource = sourceDocumentId is > 0 ? $"Chat update of DocumentId {sourceDocumentId.Value}" : "Chat";
+        if (sourceDocumentId is > 0)
+            SaveStatus = $"Updating knowledge item #{sourceDocumentId.Value} from chat.";
     }
 
     public void PrefillDocumentFromChat(
@@ -423,9 +433,13 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         string content,
         string? summary,
         string? linkedFilePaths,
-        string? linkedSymbols)
+        string? linkedSymbols,
+        long? sourceDocumentId = null)
     {
         NewDocument();
+        if (sourceDocumentId is > 0)
+            EditId = sourceDocumentId.Value;
+
         EditDocumentType = "DiscussionNote";
         EditAuthorityLevel = "Pending";
         EditStatus = "Pending";
@@ -434,7 +448,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         EditContent = content.Trim();
         EditTags = linkedSymbols ?? string.Empty;
         EditAppliesToArea = linkedFilePaths ?? string.Empty;
-        EditSource = "Chat";
+        EditSource = sourceDocumentId is > 0 ? $"Chat update of DocumentId {sourceDocumentId.Value}" : "Chat";
+        if (sourceDocumentId is > 0)
+            SaveStatus = $"Updating knowledge item #{sourceDocumentId.Value} from chat.";
     }
 
     private void LoadDocumentIntoEditor(ProjectContextDocument document)

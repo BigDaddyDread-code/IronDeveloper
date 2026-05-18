@@ -66,6 +66,64 @@ public sealed class MemoryDocumentWorkflowTests
     }
 
     [TestMethod]
+    public void PrefillFromChat_WithSourceDocumentId_UpdatesExistingKnowledgeItemDraft()
+    {
+        var vm = CreateViewModel();
+
+        vm.PrefillFromChat(
+            "BookSeller SQL Server and Dapper",
+            "Use SQL Server for persistent storage and Dapper for data access.",
+            null,
+            null,
+            sourceDocumentId: 2);
+
+        Assert.IsTrue(vm.HasDetail);
+        Assert.IsTrue(vm.IsEditingDocument);
+        Assert.AreEqual(2, vm.EditId);
+        Assert.AreEqual("ArchitectureDecision", vm.EditDocumentType);
+        Assert.AreEqual("Binding", vm.EditAuthorityLevel);
+        Assert.AreEqual("Accepted", vm.EditStatus);
+        Assert.AreEqual("BookSeller SQL Server and Dapper", vm.EditTitle);
+        Assert.AreEqual("Use SQL Server for persistent storage and Dapper for data access.", vm.EditContent);
+        Assert.AreEqual("Chat update of DocumentId 2", vm.EditSource);
+    }
+
+    [TestMethod]
+    public void SaveDecisionCommand_UsesDecisionTagAndSourceDocumentIdFromChat()
+    {
+        var vm = new ChatWorkspaceViewModel(null!, null!, null!, null!, null!, null!, null!);
+        var userMessage = new IronDev.Agent.Models.ChatSummary
+        {
+            Role = "user",
+            MessageText = "Discuss this project memory item.\n\nDocumentId: 2\nTitle: perssit data"
+        };
+        var assistantMessage = new IronDev.Agent.Models.ChatSummary
+        {
+            Role = "assistant",
+            MessageText = "SQL Server and Dapper selected.\n\n<decision>BookSeller SQL Server and Dapper | Implement SQL Server for persistent data storage and Dapper for data access in the BookSeller project.</decision>"
+        };
+
+        string? title = null;
+        string? detail = null;
+        long? sourceDocumentId = null;
+        vm.OnCreateDecisionFromChat = (proposedTitle, proposedDetail, _, _, documentId) =>
+        {
+            title = proposedTitle;
+            detail = proposedDetail;
+            sourceDocumentId = documentId;
+        };
+
+        vm.Messages.Add(userMessage);
+        vm.Messages.Add(assistantMessage);
+
+        vm.SaveDecisionCommand.Execute(assistantMessage);
+
+        Assert.AreEqual("BookSeller SQL Server and Dapper", title);
+        Assert.AreEqual("Implement SQL Server for persistent data storage and Dapper for data access in the BookSeller project.", detail);
+        Assert.AreEqual(2, sourceDocumentId);
+    }
+
+    [TestMethod]
     public async Task SaveDocumentAsync_ReselectsSavedDocumentEvenWhenFilterWouldHideIt()
     {
         var vm = CreateViewModel();
