@@ -191,11 +191,16 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RefreshListAsync()
+    private Task RefreshListAsync()
     {
-        Documents.Clear();
-        ClearEditor();
+        var preferredDocumentId = SelectedDocument?.Id > 0 ? SelectedDocument.Id : (long?)null;
+        return RefreshDocumentsAsync(preferredDocumentId);
+    }
 
+    private async Task RefreshDocumentsAsync(
+        long? preferredDocumentId = null,
+        bool includePreferredIfFilteredOut = false)
+    {
         var documentType = FilterDocumentType == "All" ? null : FilterDocumentType;
         var status = FilterStatus == "All" ? null : FilterStatus;
         var documents = await _memoryService.GetContextDocumentsAsync(
@@ -204,8 +209,32 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
             status: status,
             take: 200);
 
-        foreach (var document in documents)
+        var documentList = documents.ToList();
+        if (preferredDocumentId is > 0 &&
+            includePreferredIfFilteredOut &&
+            documentList.All(d => d.Id != preferredDocumentId.Value))
+        {
+            var preferredDocument = await _memoryService.GetContextDocumentByIdAsync(preferredDocumentId.Value);
+            if (preferredDocument != null && preferredDocument.ProjectId == _activeProjectId)
+                documentList.Insert(0, preferredDocument);
+        }
+
+        Documents.Clear();
+        foreach (var document in documentList)
             Documents.Add(document);
+
+        var selectedDocument = preferredDocumentId is > 0
+            ? Documents.FirstOrDefault(d => d.Id == preferredDocumentId.Value)
+            : null;
+
+        if (selectedDocument != null)
+        {
+            SelectedDocument = selectedDocument;
+        }
+        else if (!IsEditingDocument)
+        {
+            SelectedDocument = null;
+        }
     }
 
     partial void OnSelectedDocumentChanged(ProjectContextDocument? value)
@@ -307,10 +336,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
             var savedId = await _memoryService.SaveContextDocumentAsync(document);
             EditId = savedId;
-            SaveStatus = "Saved";
-            await RefreshListAsync();
-            SelectedDocument = Documents.FirstOrDefault(d => d.Id == savedId);
+            await RefreshDocumentsAsync(savedId, includePreferredIfFilteredOut: true);
             IsEditingDocument = false;
+            SaveStatus = "Saved";
         }
         catch (Exception ex)
         {
@@ -331,8 +359,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         try
         {
             await _memoryService.ArchiveContextDocumentAsync(EditId);
+            await RefreshDocumentsAsync();
+            SelectedDocument = null;
             SaveStatus = "Archived";
-            await RefreshListAsync();
         }
         finally
         {

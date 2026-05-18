@@ -15,16 +15,12 @@
         </Grid.RowDefinitions>
 
         <controls:WorkspaceHeader Grid.Row="0"
-                                  Eyebrow="PROJECT MEMORY"
-                                  Title="Memory and Discussions"
+                                  Eyebrow="PROJECT KNOWLEDGE"
+                                  Title="Knowledge and Discussions"
                                   Margin="0,0,0,18">
             <controls:WorkspaceHeader.Actions>
                 <StackPanel Orientation="Horizontal">
-                    <Button Content="Discuss in Chat"
-                            Command="{Binding DiscussSelectedDocumentCommand}"
-                            Style="{StaticResource AppButton.CompactGhost}"
-                            Margin="0,0,8,0"/>
-                    <Button Content="+ New Memory"
+                    <Button Content="+ New Item"
                             Command="{Binding NewDocumentCommand}"
                             Style="{StaticResource AppButton.Primary}"/>
                 </StackPanel>
@@ -81,7 +77,7 @@
 
                 <controls:WorkspaceListPane
                     Grid.Row="1"
-                    Title="MEMORY ITEMS"
+                    Title="KNOWLEDGE ITEMS"
                     ItemsSource="{Binding Documents}"
                     SelectedItem="{Binding SelectedDocument, Mode=TwoWay}">
 
@@ -111,7 +107,7 @@
                         <DataTemplate>
                             <controls:WorkspaceListItem
                                 Title="{Binding Title}"
-                                Subtitle="{Binding Summary}"
+                                Subtitle="{Binding Status}"
                                 Metadata="{Binding DocumentType}"
                                 IconData="{StaticResource Icon.Nav.Decisions}">
                                 <controls:WorkspaceListItem.ToolTip>
@@ -145,7 +141,7 @@
 
                 <Grid>
                     <controls:EmptyResultsState
-                        Title="No Memory Item Selected"
+                        Title="No Knowledge Item Selected"
                         Description="Select a discussion, decision, standard, fact, recommendation, or open question to preview it here."
                         Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
@@ -232,7 +228,7 @@
                                             BorderThickness="0,1,0,0"
                                             Margin="0,22,0,14"/>
 
-                                    <TextBlock Text="EDIT MEMORY ITEM"
+                                    <TextBlock Text="EDIT KNOWLEDGE ITEM"
                                                Style="{StaticResource Typography.Eyebrow}"
                                                Margin="0,0,0,12"/>
 

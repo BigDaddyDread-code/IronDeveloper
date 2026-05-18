@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Agent.ViewModels.Workspaces;
@@ -63,8 +65,38 @@ public sealed class MemoryDocumentWorkflowTests
         StringAssert.Contains(prompt, "keep the DocumentId visible");
     }
 
+    [TestMethod]
+    public async Task SaveDocumentAsync_ReselectsSavedDocumentEvenWhenFilterWouldHideIt()
+    {
+        var vm = CreateViewModel();
+        SetActiveProjectId(vm, 17);
+
+        vm.FilterStatus = "Active";
+        vm.NewDocumentCommand.Execute(null);
+        vm.EditTitle = "Persistence discussion";
+        vm.EditContent = "Capture the SQL Server and Dapper persistence discussion.";
+        vm.EditStatus = "Pending";
+
+        await vm.SaveDocumentCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("Saved", vm.SaveStatus);
+        Assert.IsFalse(vm.IsEditingDocument);
+        Assert.IsNotNull(vm.SelectedDocument);
+        Assert.AreEqual("Persistence discussion", vm.SelectedDocument.Title);
+        Assert.AreEqual("Pending", vm.SelectedDocument.Status);
+        Assert.HasCount(1, vm.Documents);
+        Assert.AreEqual("Persistence discussion", vm.Documents[0].Title);
+    }
+
     private static DecisionsWorkspaceViewModel CreateViewModel()
         => new(new FakeProjectMemoryService(), new FakeLookupService());
+
+    private static void SetActiveProjectId(DecisionsWorkspaceViewModel vm, int projectId)
+    {
+        var field = typeof(DecisionsWorkspaceViewModel).GetField("_activeProjectId", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        field.SetValue(vm, projectId);
+    }
 
     private sealed class FakeLookupService : ILookupService
     {
@@ -77,6 +109,9 @@ public sealed class MemoryDocumentWorkflowTests
 
     private sealed class FakeProjectMemoryService : IProjectMemoryService
     {
+        private readonly List<ProjectContextDocument> _documents = [];
+        private long _nextDocumentId = 1;
+
         public Task<ProjectSummary?> GetLatestSummaryAsync(int projectId, CancellationToken cancellationToken = default)
             => Task.FromResult<ProjectSummary?>(null);
 
@@ -90,19 +125,51 @@ public sealed class MemoryDocumentWorkflowTests
             => Task.FromResult(1L);
 
         public Task<IReadOnlyList<ProjectContextDocument>> GetContextDocumentsAsync(int projectId, string? documentType = null, string? authorityLevel = null, string? status = "Active", int take = 100, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<ProjectContextDocument>>(Array.Empty<ProjectContextDocument>());
+        {
+            var documents = _documents
+                .Where(d => d.ProjectId == projectId)
+                .Where(d => string.IsNullOrWhiteSpace(documentType) || d.DocumentType == documentType)
+                .Where(d => string.IsNullOrWhiteSpace(authorityLevel) || d.AuthorityLevel == authorityLevel)
+                .Where(d => string.IsNullOrWhiteSpace(status) || d.Status == status)
+                .Take(take)
+                .ToList();
+
+            return Task.FromResult<IReadOnlyList<ProjectContextDocument>>(documents);
+        }
 
         public Task<IReadOnlyList<ProjectContextDocument>> GetRelevantContextDocumentsAsync(int projectId, string query, int take = 20, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ProjectContextDocument>>(Array.Empty<ProjectContextDocument>());
 
         public Task<ProjectContextDocument?> GetContextDocumentByIdAsync(long documentId, CancellationToken cancellationToken = default)
-            => Task.FromResult<ProjectContextDocument?>(null);
+            => Task.FromResult(_documents.FirstOrDefault(d => d.Id == documentId));
 
         public Task<long> SaveContextDocumentAsync(ProjectContextDocument document, CancellationToken cancellationToken = default)
-            => Task.FromResult(1L);
+        {
+            if (document.Id <= 0)
+            {
+                document.Id = _nextDocumentId++;
+                _documents.Add(document);
+                return Task.FromResult(document.Id);
+            }
+
+            var index = _documents.FindIndex(d => d.Id == document.Id);
+            if (index >= 0)
+                _documents[index] = document;
+            else
+                _documents.Add(document);
+
+            return Task.FromResult(document.Id);
+        }
 
         public Task<bool> ArchiveContextDocumentAsync(long documentId, CancellationToken cancellationToken = default)
-            => Task.FromResult(true);
+        {
+            var document = _documents.FirstOrDefault(d => d.Id == documentId);
+            if (document == null)
+                return Task.FromResult(false);
+
+            document.Status = "Archived";
+            return Task.FromResult(true);
+        }
 
         public Task<ProjectObservableState?> GetObservableStateAsync(int projectId, CancellationToken cancellationToken = default)
             => Task.FromResult<ProjectObservableState?>(null);
