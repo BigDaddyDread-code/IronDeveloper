@@ -27,6 +27,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly ChatWorkspaceViewModel   _chatVm;
     private readonly TicketsWorkspaceViewModel _ticketsVm;
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
+    private readonly DocumentsWorkspaceViewModel _documentsVm;
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
     private readonly BuilderWorkspaceViewModel   _builderVm;
@@ -88,7 +89,8 @@ public sealed partial class ShellViewModel : ObservableObject
         KnowledgeCompilerViewModel knowledgeCompilerVm,
         ChatWorkspaceViewModel     chatVm,
         TicketsWorkspaceViewModel  ticketsVm,
-        DecisionsWorkspaceViewModel         decisionsVm,
+        DecisionsWorkspaceViewModel          decisionsVm,
+        DocumentsWorkspaceViewModel          documentsVm,
         ImplementationPlansWorkspaceViewModel plansVm,
         SettingsWorkspaceViewModel  settingsVm,
         BuilderWorkspaceViewModel   builderVm,
@@ -103,6 +105,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _chatVm      = chatVm;
         _ticketsVm   = ticketsVm;
         _decisionsVm = decisionsVm;
+        _documentsVm = documentsVm;
         _plansVm     = plansVm;
         _settingsVm  = settingsVm;
         _builderVm   = builderVm;
@@ -162,8 +165,6 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Chat → Ticket draft review bridge
-        // Phase 1-3: navigates to Tickets in draft mode with stub-generated draft.
-        // Phase 4: DraftTicketService will call the real LLM.
         _chatVm.OnCreateTicketFromChat = (ctx) =>
         {
             _ = _ticketsVm.BeginDraftFromChatAsync(ctx);
@@ -185,7 +186,6 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Ticket draft approved with plan → navigate to Plans after save
-        // Receives: title, goal, steps, filePaths, symbols, scope, risksNotes
         _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols, scope, risks) =>
         {
             _plansVm.PrefillFromChat(title, goal, steps, filePaths, symbols, scope, risks);
@@ -250,8 +250,6 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // ── Propagate SettingsWorkspaceViewModel flags → Chat VM ─────────────
-        // UseContextAgent: toggled in Settings BEHAVIOUR panel; read by
-        // ChatWorkspaceViewModel.SendMessageAsync on every send.
         _chatVm.UseContextAgent = _settingsVm.UseContextAgent; // sync initial value
         _settingsVm.PropertyChanged += (_, e) =>
         {
@@ -277,16 +275,17 @@ public sealed partial class ShellViewModel : ObservableObject
         CurrentWorkspace = ws;
         CurrentView = ws switch
         {
-            ProjectWorkspace.Overview   => _overviewVm,
-            ProjectWorkspace.Discovery  => _knowledgeCompilerVm,
-            ProjectWorkspace.Chat       => _chatVm,
-            ProjectWorkspace.Tickets    => _ticketsVm,
-            ProjectWorkspace.Plans      => _plansVm,
-            ProjectWorkspace.Decisions  => _decisionsVm,
-            ProjectWorkspace.Settings   => _settingsVm,
-            ProjectWorkspace.Builder    => _builderVm,
+            ProjectWorkspace.Overview       => _overviewVm,
+            ProjectWorkspace.Discovery      => _knowledgeCompilerVm,
+            ProjectWorkspace.Chat           => _chatVm,
+            ProjectWorkspace.Tickets        => _ticketsVm,
+            ProjectWorkspace.Plans          => _plansVm,
+            ProjectWorkspace.Decisions      => _decisionsVm,
+            ProjectWorkspace.Documents      => _documentsVm,
+            ProjectWorkspace.Settings       => _settingsVm,
+            ProjectWorkspace.Builder        => _builderVm,
             ProjectWorkspace.ProjectProfile => _profileVm,
-            _                           => _overviewVm
+            _                               => _overviewVm
         };
     }
 
@@ -404,6 +403,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 _chatVm.LoadAsync(project),
                 _ticketsVm.LoadAsync(project),
                 _decisionsVm.LoadAsync(project),
+                _documentsVm.LoadAsync(project),
                 _plansVm.LoadAsync(project),
                 _profileVm.LoadAsync(project)
             );
@@ -426,22 +426,15 @@ public sealed partial class ShellViewModel : ObservableObject
             if (ActiveStatus == "Checking...")
                 ActiveStatus = "Offline";
 
-            // Task 3: Ensure opening a project sets a default workspace
             if (CurrentWorkspace == default)
-            {
                 CurrentWorkspace = ProjectWorkspace.Overview;
-            }
 
-            // Task 4: Ensure CurrentView is assigned and NavigateWorkspace is called
             NavigateWorkspace(CurrentWorkspace.ToString());
             if (CurrentView == null)
-            {
                 CurrentView = _overviewVm;
-            }
 
             RaiseAllActiveProjectProperties();
 
-            // Task 2: Add temporary debug logging after ActivateProjectAsync completes
             Serilog.Log.Information("[ShellDebug] Project activation diagnostics complete: ProjectName='{ProjectName}', Path='{Path}', Model='{Model}', Status='{Status}', Workspace='{Workspace}', ViewIsNull='{ViewIsNull}', View='{View}', ShowHeader='{ShowHeader}', HasActiveProject='{HasActiveProject}'",
                 ActiveProjectName, ActiveProjectPath, ActiveModel, ActiveStatus, CurrentWorkspace, CurrentView == null, CurrentView?.GetType().FullName, ShowHeader, HasActiveProject);
 
