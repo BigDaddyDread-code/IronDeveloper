@@ -13,6 +13,7 @@ using IronDev.Agent.ViewModels.Workflow;
 using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Agent.Views;
 using IronDev.Agent.Services;
+using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Agent.Services.Interfaces;
 using IronDev.Agent.Services.Mock;
 
@@ -79,7 +80,6 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
                 services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
                 services.AddTransient<global::IronDev.Services.IProjectContextExportService, global::IronDev.Infrastructure.Services.ProjectContextExportService>();
-                services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IProjectDocumentService,
                     global::IronDev.Services.ProjectDocumentService>();
@@ -112,27 +112,8 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentRouteJudge,
                     global::IronDev.Infrastructure.Services.ContextAgentRouteJudgeService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ILanguageSemanticIndexer,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.CSharpStructuralSemanticIndexer>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ILanguageSemanticIndexer,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.XamlStructuralSemanticIndexer>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ILanguageSemanticIndexer,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.ConfigStructuralSemanticIndexer>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IProjectSemanticIndexService,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.RoslynProjectSemanticIndexService>();
-                services.AddSingleton<
-                    global::IronDev.Core.Interfaces.ICodexContextQualityScorer,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.CodexContextQualityScorer>();
-                services.AddSingleton<
-                    global::IronDev.Core.Interfaces.ICodexTicketGroundingValidator,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.CodexTicketGroundingValidator>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ICodexSnapshotBuilder,
-                    global::IronDev.Infrastructure.Services.CodeIntelligence.CodexSnapshotBuilder>();
+                // ── Code intelligence (semantic indexers, snapshot, grounding, prompt/parse) ──
+                services.AddCodeIntelligenceServices();
 
                 var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
                                 ?? new global::IronDev.Core.Models.LlmOptions();
