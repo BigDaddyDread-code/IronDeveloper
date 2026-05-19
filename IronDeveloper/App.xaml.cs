@@ -83,6 +83,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IProjectDocumentService,
                     global::IronDev.Services.ProjectDocumentService>();
+                services.AddSingleton<
+                    global::IronDev.Core.Interfaces.IMarkdownRenderService,
+                    global::IronDev.Infrastructure.Services.MarkdownRenderService>();
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
                 services.AddSingleton<global::IronDev.Agent.Services.IAppSettingsService, global::IronDev.Agent.Services.AppSettingsService>();
@@ -175,6 +178,7 @@ public partial class App : Application
                 // ── Workspace ViewModels ──────────────────────────────────────
                 services.AddTransient<ChatWorkspaceViewModel>();
                 services.AddTransient<KnowledgeCompilerViewModel>();
+                services.AddTransient<DocumentsWorkspaceViewModel>();
                 services.AddTransient<TicketsWorkspaceViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();

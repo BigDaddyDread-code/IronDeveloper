@@ -22,6 +22,7 @@ public enum ProjectWorkspace
     Tickets,
     Plans,
     Decisions,
+    Documents,
     Settings,
     Builder,
     ProjectProfile
