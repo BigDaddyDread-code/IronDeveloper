@@ -24,6 +24,7 @@ public enum ProjectWorkspace
     Plans,
     Decisions,
     Documents,
+    DevTools,
     Settings,
     Builder,
     ProjectProfile

@@ -166,7 +166,7 @@
                     <!-- Document header -->
                     <Border Grid.Row="0"
                             Padding="16,14,16,12"
-                            BorderBrush="{StaticResource Surface/Border}"
+                            BorderBrush="{StaticResource Border/Subtle}"
                             BorderThickness="0,0,0,1">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -288,7 +288,7 @@
                         <Border Grid.Row="1"
                                 Background="#0D1117"
                                 Padding="14,10"
-                                BorderBrush="{StaticResource Surface/Border}"
+                                BorderBrush="{StaticResource Border/Subtle}"
                                 BorderThickness="0,1,0,0">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Left"
@@ -313,7 +313,7 @@
                     <Border Grid.Row="2"
                             Padding="14,8"
                             Background="#0B0F14"
-                            BorderBrush="{StaticResource Surface/Border}"
+                            BorderBrush="{StaticResource Border/Subtle}"
                             BorderThickness="0,1,0,0"
                             Visibility="{Binding HasStatusText,
                                          Converter={StaticResource BoolToVisibilityConverter}}">

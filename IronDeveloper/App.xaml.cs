@@ -181,11 +181,11 @@ public partial class App : Application
                         sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
                 services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel(
                     sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>(),
-                    sp.GetRequiredService<global::IronDev.Agent.Services.IAppSettingsService>())
-                {
-                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>(),
-                    LlmConsoleFactory       = () => sp.GetRequiredService<LlmConsoleViewModel>()
-                });
+                    sp.GetRequiredService<global::IronDev.Agent.Services.IAppSettingsService>()));
+                services.AddSingleton(sp => new DevToolsWorkspaceViewModel(
+                    () => sp.GetRequiredService<LlmConsoleViewModel>(),
+                    () => sp.GetRequiredService<TestingCompanionViewModel>(),
+                    () => sp.GetRequiredService<PromptPlaygroundViewModel>()));
 
 
                 // Shell

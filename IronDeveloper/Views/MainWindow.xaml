@@ -214,9 +214,9 @@
                                                       IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Documents}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Nav.Search}"
                                                       Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                      CommandParameter="Settings"
-                                                      ToolTip="Trace"
-                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Settings}"/>
+                                                      CommandParameter="DevTools"
+                                                      ToolTip="Dev Tools"
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=DevTools}"/>
                             </x:Array>
                         </controls:AppNavRail.ItemsSource>
 

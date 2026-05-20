@@ -30,6 +30,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
     private readonly DocumentsWorkspaceViewModel _documentsVm;
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
+    private readonly DevToolsWorkspaceViewModel _devToolsVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
     private readonly BuilderWorkspaceViewModel   _builderVm;
     private readonly ProjectProfileViewModel     _profileVm;
@@ -98,6 +99,7 @@ public sealed partial class ShellViewModel : ObservableObject
         DecisionsWorkspaceViewModel          decisionsVm,
         DocumentsWorkspaceViewModel          documentsVm,
         ImplementationPlansWorkspaceViewModel plansVm,
+        DevToolsWorkspaceViewModel           devToolsVm,
         SettingsWorkspaceViewModel  settingsVm,
         BuilderWorkspaceViewModel   builderVm,
         ProjectProfileViewModel     profileVm,
@@ -114,6 +116,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _decisionsVm = decisionsVm;
         _documentsVm = documentsVm;
         _plansVm     = plansVm;
+        _devToolsVm  = devToolsVm;
         _settingsVm  = settingsVm;
         _builderVm   = builderVm;
         _profileVm   = profileVm;
@@ -301,6 +304,7 @@ public sealed partial class ShellViewModel : ObservableObject
             ProjectWorkspace.Plans          => _plansVm,
             ProjectWorkspace.Decisions      => _decisionsVm,
             ProjectWorkspace.Documents      => _documentsVm,
+            ProjectWorkspace.DevTools       => _devToolsVm,
             ProjectWorkspace.Settings       => _settingsVm,
             ProjectWorkspace.Builder        => _builderVm,
             ProjectWorkspace.ProjectProfile => _profileVm,
