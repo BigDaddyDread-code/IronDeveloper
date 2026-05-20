@@ -3,8 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="http://schemas.irondeveloper.com/controls"
         Title="Mark Moment"
-        Width="1120"
-        Height="760"
+        Width="1440"
+        Height="900"
+        MinWidth="980"
+        MinHeight="680"
+        ResizeMode="CanResize"
+        WindowState="Maximized"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource Background/App}">
     <Border BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" Padding="16">
@@ -15,8 +19,8 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="520"/>
-                <ColumnDefinition Width="360"/>
+                <ColumnDefinition Width="3*" MinWidth="680"/>
+                <ColumnDefinition Width="420" MinWidth="360"/>
             </Grid.ColumnDefinitions>
 
             <DockPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,14">
@@ -29,7 +33,7 @@
                                Foreground="{StaticResource Text/Primary}"
                                FontSize="22"
                                FontWeight="SemiBold"/>
-                    <TextBlock Text="Draw one rectangle around the problem area, then describe what happened."
+                    <TextBlock Text="Draw one rectangle around the problem area. Resize or maximize this window if the target is too small."
                                Foreground="{StaticResource Text/Secondary}"
                                Margin="0,4,0,0"/>
                 </StackPanel>
@@ -47,7 +51,8 @@
                       MouseLeftButtonUp="ScreenshotHost_MouseLeftButtonUp">
                     <Image x:Name="ScreenshotImage"
                            Source="{Binding ScreenshotPath}"
-                           Stretch="Uniform"/>
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
                     <Canvas x:Name="AnnotationCanvas"
                             IsHitTestVisible="False">
                         <Rectangle x:Name="SelectionRectangle"
