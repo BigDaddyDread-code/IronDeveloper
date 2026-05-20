@@ -56,6 +56,26 @@ IronDev.slnx                   Root solution file
 
 ---
 
+## Quick bootstrap script
+
+For a local dev machine with .NET and Docker Desktop installed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
+```
+
+This restores packages, starts and smoke-tests Weaviate, builds the WPF app, and runs a small stabilisation smoke test set.
+
+Database setup is opt-in:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1 -RunDatabaseSetup
+```
+
+The script intentionally does not run DB setup by default, so it will not reseed or change an existing database unless you ask it to.
+
+---
+
 ## Local database setup
 
 For a fresh local environment, run:

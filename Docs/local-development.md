@@ -10,6 +10,35 @@ This guide helps you set up a local development environment for IronDev.
 
 ---
 
+## Quick Bootstrap
+
+For a local machine that already has .NET and Docker Desktop installed, run this from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
+```
+
+This restores packages, starts/smoke-tests Weaviate, builds the WPF app, and runs a small stabilisation smoke test set.
+
+Database setup is opt-in so the script does not accidentally reseed an existing database:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1 -RunDatabaseSetup
+```
+
+Useful switches:
+
+```text
+-SkipWeaviate
+-SkipBuild
+-SkipTests
+-RunDatabaseSetup
+-SqlServerInstance "(localdb)\MSSQLLocalDB"
+-DatabaseName "IronDeveloper"
+```
+
+---
+
 ## 1. Local Database Setup
 
 1.  **Create Database**: Create a new database named `IronDeveloper`.
