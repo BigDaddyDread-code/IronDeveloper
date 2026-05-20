@@ -270,7 +270,9 @@
                                     BorderBrush="{StaticResource Border/Subtle}"
                                     BorderThickness="1"
                                     CornerRadius="4"
-                                    ClipToBounds="True">
+                                    ClipToBounds="True"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="SelectedScreenshot_MouseLeftButtonUp">
                                 <Grid>
                                     <Image Source="{Binding SelectedMoment.AnnotatedScreenshotPath}"
                                            Stretch="Uniform"/>
