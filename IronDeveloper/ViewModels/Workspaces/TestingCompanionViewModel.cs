@@ -358,6 +358,15 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         MarkMomentCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnSelectedMomentChanged(TestMomentItemViewModel? value)
+    {
+        if (value == null)
+            return;
+
+        LlmDebugPrompt = BuildCopyPrompt(value.Moment);
+        StatusText = $"Selected captured moment from {value.Moment.MarkedAt:HH:mm:ss}.";
+    }
+
     private static string ResolveDefaultIronDevLogPath()
     {
         var logDir = Path.Combine(
