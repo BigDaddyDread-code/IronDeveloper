@@ -404,6 +404,42 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     }
                 }
 
+                if (agentResult.RequiresAction && !agentResult.AllowsProseResponse)
+                {
+                    if (createTicketIntent != null)
+                    {
+                        var contexts = BuildTicketContextsFromIntent(createTicketIntent, sessionId, userDbId);
+                        if (contexts.Count > 1 && OnCreateTicketsFromChat != null)
+                        {
+                            OnCreateTicketsFromChat.Invoke(contexts);
+                            return;
+                        }
+
+                        if (contexts.Count == 1 && OnCreateTicketFromChat != null)
+                        {
+                            OnCreateTicketFromChat.Invoke(contexts[0]);
+                            return;
+                        }
+                    }
+
+                    var blockedText = string.IsNullOrWhiteSpace(agentResult.ActionMessage)
+                        ? "I found an action command, but I could not safely run the matching workflow."
+                        : agentResult.ActionMessage;
+                    if (agentResult.SuggestedActions.Count > 0)
+                    {
+                        blockedText += "\n\nSuggested next steps:\n" +
+                                       string.Join("\n", agentResult.SuggestedActions.Select((a, i) => $"{i + 1}. {a}"));
+                    }
+
+                    Messages.Add(new ChatSummary
+                    {
+                        Role = "assistant",
+                        MessageText = blockedText,
+                        Timestamp = DateTime.UtcNow
+                    });
+                    return;
+                }
+
                 // Use the agent's assembled final prompt for the real LLM call
                 var finalPrompt = agentResult.FinalPrompt ?? packet.FormattedPrompt;
 

@@ -169,6 +169,61 @@ public sealed class ContextAgentService : IContextAgentService
         var route = await _routeJudge.DecideRouteAsync(routeRequest, ct);
         var effectiveWorkText = route.EffectiveWorkText;
 
+        if (request.CreateTicketIntent != null)
+        {
+            if (request.CreateTicketIntent.RequiresClarification)
+            {
+                return new ContextAgentResult
+                {
+                    TraceGroupId = traceGroupId,
+                    ResultType = ContextAgentResultType.Clarification,
+                    IsClarificationRequired = true,
+                    ClarificationQuestions = request.CreateTicketIntent.ClarificationQuestions,
+                    RequiresAction = true,
+                    AllowsProseResponse = false,
+                    ActionIntent = request.CreateTicketIntent.Intent,
+                    WasSuccessful = true,
+                    ContextSummary = "Clarification required before ticket draft action can run.",
+                    Warnings = string.Join("; ", warnings),
+                };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.CreateTicketIntent.WorkText))
+            {
+                return new ContextAgentResult
+                {
+                    TraceGroupId = traceGroupId,
+                    ResultType = ContextAgentResultType.ActionRequired,
+                    RequiresAction = true,
+                    AllowsProseResponse = false,
+                    ActionIntent = request.CreateTicketIntent.Intent,
+                    ActionMessage = "Create draft ticket workflow should handle this command.",
+                    WasSuccessful = true,
+                    ContextSummary = $"Action routed: {request.CreateTicketIntent.Intent}",
+                    Warnings = string.Join("; ", warnings),
+                };
+            }
+
+            return new ContextAgentResult
+            {
+                TraceGroupId = traceGroupId,
+                ResultType = ContextAgentResultType.ActionBlocked,
+                RequiresAction = true,
+                AllowsProseResponse = false,
+                ActionIntent = request.CreateTicketIntent.Intent,
+                ActionMessage = "I found a ticket-creation command, but no source work was available to turn into draft tickets.",
+                SuggestedActions =
+                [
+                    "Select or generate a candidate ticket list first.",
+                    "Use 'ticket this' after an assistant response.",
+                    "Write the work directly after the command."
+                ],
+                WasSuccessful = false,
+                ContextSummary = "Action blocked: missing source work for ticket draft action.",
+                Warnings = string.Join("; ", warnings),
+            };
+        }
+
         // ── Stage 0: Pre-check — clarification-first for vague requests ───────
         // Done before code search if it's obvious from user request (vague 'create ticket')
         var (shouldClarify, matched) = route.AllowConflictBlocking 

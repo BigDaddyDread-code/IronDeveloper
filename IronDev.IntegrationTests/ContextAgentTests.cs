@@ -1511,6 +1511,46 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Context Agent action-required results dispatch workflow actions instead of falling through to prose chat.")]
+    public async Task ChatWorkspaceViewModel_ContextAgentActionRequired_SuppressesProseResponse()
+    {
+        var llm = new StubLlmService("SHOULD NOT BE USED");
+        var spy = new ContextRequestSpyAgentService
+        {
+            Result = new ContextAgentResult
+            {
+                ResultType = ContextAgentResultType.ActionRequired,
+                RequiresAction = true,
+                AllowsProseResponse = false,
+                ActionIntent = "CreateTicket",
+                WasSuccessful = true
+            }
+        };
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            llm,
+            new ContextStubProjectMemoryService(),
+            new ContextStubTicketService(),
+            new StubChatFeedbackService(),
+            new LlmTraceService(),
+            spy);
+
+        IronDev.Agent.Models.ChatTicketContext? captured = null;
+        vm.OnCreateTicketFromChat = ctx => captured = ctx;
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1, Name = "BookSeller" });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Create a ticket to add book sorting";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(spy.LastRequest);
+        Assert.IsNotNull(captured);
+        Assert.AreEqual("add book sorting", captured!.MessageText);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
+    }
+
+    [TestMethod]
     [Description("Test E & F: Conflict assessment receives WorkText, and Trace includes original and WorkText.")]
     public async Task ChatWorkspaceViewModel_PassesWorkText_And_LogsTrace()
     {
