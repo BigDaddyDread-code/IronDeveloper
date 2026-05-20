@@ -321,7 +321,21 @@
                                                 <controls:AssistantResponseCard Text="{Binding MessageText}"
                                                                                ShowSavedState="{Binding HasPersistedMessage}"
                                                                                SavedText="Response saved"
-                                                                               UseChrome="False"/>
+                                                                               UseChrome="False">
+                                                    <controls:AssistantResponseCard.HeaderContent>
+                                                        <controls:MessageActionStrip Label="Create:"
+                                                                                     CommandParameter="{Binding}"
+                                                                                     PlanCommand="{Binding DataContext.CreatePlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     TicketCommand="{Binding DataContext.CreateTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     DecisionCommand="{Binding DataContext.SaveDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     DocumentCommand="{Binding DataContext.CreateDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     SummaryCommand="{Binding DataContext.SaveSummaryFromMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     CopyCommand="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     UsefulCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     WeakCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                     FeedbackSaved="{Binding FeedbackSaved}"/>
+                                                    </controls:AssistantResponseCard.HeaderContent>
+                                                </controls:AssistantResponseCard>
                                             </Border>
 
                                             <Border CornerRadius="8" Padding="12,9" MaxWidth="560"
@@ -371,32 +385,6 @@
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                     </Grid>
-
-                                    <!-- Action strip - assistant only -->
-                                                    <controls:MessageActionStrip Grid.Row="1"
-                                                                                 Margin="0,6,0,0"
-                                                                 CommandParameter="{Binding}"
-                                                                 PlanCommand="{Binding DataContext.CreatePlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 TicketCommand="{Binding DataContext.CreateTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 DecisionCommand="{Binding DataContext.SaveDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 DocumentCommand="{Binding DataContext.CreateDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 SummaryCommand="{Binding DataContext.SaveSummaryFromMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 CopyCommand="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 UsefulCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 WeakCommand="{Binding DataContext.BeginFeedbackCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                 FeedbackSaved="{Binding FeedbackSaved}">
-                                        <controls:MessageActionStrip.Style>
-                                            <Style TargetType="controls:MessageActionStrip">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Role}" Value="assistant">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </controls:MessageActionStrip.Style>
-                                    </controls:MessageActionStrip>
-
 
                                     <!-- Reason picker - shown when AwaitingReason is true -->
                                     <Border Grid.Row="2"
