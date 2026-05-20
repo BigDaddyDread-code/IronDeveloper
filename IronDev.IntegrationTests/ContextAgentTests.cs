@@ -1549,6 +1549,43 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Candidate-ticket assistant fallback response is deterministic Markdown, not loose LLM prose.")]
+    public void ChatWorkspaceViewModel_CandidateReviewResponse_UsesStandardMarkdown()
+    {
+        var method = typeof(ChatWorkspaceViewModel).GetMethod(
+            "BuildTicketCandidateReviewMarkdown",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.IsNotNull(method);
+
+        var candidates = new List<TicketCandidate>
+        {
+            new()
+            {
+                Title = "Implement SQL Server Integration",
+                SuggestedDomain = "Database",
+                Summary = "Integrate SQL Server as the persistent data storage solution."
+            },
+            new()
+            {
+                Title = "Integrate Dapper ORM",
+                SuggestedDomain = "Database",
+                Summary = "Use Dapper as the ORM layer."
+            }
+        };
+
+        var markdown = (string)method.Invoke(null, [candidates])!;
+
+        StringAssert.Contains(markdown, "## Candidate Ticket Drafts");
+        StringAssert.Contains(markdown, "These have **not** been saved yet.");
+        StringAssert.Contains(markdown, "1. **Implement SQL Server Integration**");
+        StringAssert.Contains(markdown, "   - **Domain:** Database");
+        StringAssert.Contains(markdown, "Review these candidates, then say `create tickets`");
+        Assert.IsFalse(markdown.Contains("I have created", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(markdown.Contains("Domain:Database", StringComparison.Ordinal));
+        Assert.IsFalse(markdown.Contains("Summary:Integrate", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     [Description("Context Agent action-required results dispatch workflow actions instead of falling through to prose chat.")]
     public async Task ChatWorkspaceViewModel_ContextAgentActionRequired_SuppressesProseResponse()
     {

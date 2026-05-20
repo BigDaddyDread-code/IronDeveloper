@@ -402,6 +402,30 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                         OnCreateTicketFromChat.Invoke(contexts[0]);
                         return;
                     }
+
+                    var candidateText = BuildTicketCandidateReviewMarkdown(agentResult.TicketCandidates);
+                    var candidateMsg = new ChatSummary
+                    {
+                        Role = "assistant",
+                        MessageText = candidateText,
+                        FormattedPrompt = agentResult.FinalPrompt ?? string.Empty,
+                        ContextPacket = packet,
+                        Timestamp = DateTime.UtcNow
+                    };
+                    Messages.Add(candidateMsg);
+
+                    var candidateDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                    {
+                        ProjectId = projectId,
+                        ChatSessionId = sessionId,
+                        Role = "assistant",
+                        Message = candidateText,
+                        ContextSummary = agentResult.ContextSummary
+                    });
+                    candidateMsg.PersistedMessageId = candidateDbId;
+                    SelectedSession.UpdatedDate = DateTime.UtcNow;
+                    await _chatHistoryService.SaveSessionAsync(SelectedSession);
+                    return;
                 }
 
                 if (agentResult.RequiresAction && !agentResult.AllowsProseResponse)
@@ -721,6 +745,43 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         }
 
         return contexts;
+    }
+
+    private static string BuildTicketCandidateReviewMarkdown(IReadOnlyList<TicketCandidate> candidates)
+    {
+        var usableCandidates = candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c.Title) || !string.IsNullOrWhiteSpace(c.Summary))
+            .Take(5)
+            .ToList();
+
+        if (usableCandidates.Count == 0)
+            return "I could not extract any distinct actionable ticket candidates from the recent discussion.";
+
+        var message = new StringBuilder();
+        message.AppendLine("## Candidate Ticket Drafts");
+        message.AppendLine();
+        message.AppendLine("These have **not** been saved yet.");
+        message.AppendLine();
+
+        for (var i = 0; i < usableCandidates.Count; i++)
+        {
+            var candidate = usableCandidates[i];
+            var title = string.IsNullOrWhiteSpace(candidate.Title)
+                ? MakeTicketTitle(candidate.Summary)
+                : MakeTicketTitle(candidate.Title);
+
+            message.AppendLine($"{i + 1}. **{title}**");
+            if (!string.IsNullOrWhiteSpace(candidate.SuggestedDomain))
+                message.AppendLine($"   - **Domain:** {candidate.SuggestedDomain.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.Summary))
+                message.AppendLine($"   - **Summary:** {candidate.Summary.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.ExistingRelatedWork))
+                message.AppendLine($"   - **Related work:** {candidate.ExistingRelatedWork.Trim()}");
+            message.AppendLine();
+        }
+
+        message.AppendLine("Review these candidates, then say `create tickets` to open draft ticket review.");
+        return message.ToString().Trim();
     }
 
     private static string MakeTicketTitle(string text)
