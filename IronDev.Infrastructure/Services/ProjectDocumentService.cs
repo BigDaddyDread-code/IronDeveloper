@@ -307,17 +307,19 @@ public sealed class ProjectDocumentService : IProjectDocumentService
         CancellationToken ct = default)
     {
         const string sql = """
-            SELECT Id, DocumentId, VersionMajor, VersionMinor, ContentMarkdown,
-                   ChangeSummary, ParentVersionId, Status, ContentHash, CreatedAtUtc, CreatedBy
-            FROM dbo.ProjectDocumentVersions
-            WHERE DocumentId = @DocumentId
-            ORDER BY VersionMajor DESC, VersionMinor DESC;
+            SELECT v.Id, v.DocumentId, v.VersionMajor, v.VersionMinor, v.ContentMarkdown,
+                   v.ChangeSummary, v.ParentVersionId, v.Status, v.ContentHash, v.CreatedAtUtc, v.CreatedBy
+            FROM dbo.ProjectDocumentVersions v
+            INNER JOIN dbo.ProjectDocuments d ON d.Id = v.DocumentId
+            WHERE v.DocumentId = @DocumentId
+              AND d.TenantId = @TenantId
+            ORDER BY v.VersionMajor DESC, v.VersionMinor DESC;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<ProjectDocumentVersion>(new CommandDefinition(
             sql,
-            new { DocumentId = documentId },
+            new { DocumentId = documentId, TenantId = _tenant.TenantId },
             cancellationToken: ct));
 
         return rows.ToList();
@@ -333,14 +335,22 @@ public sealed class ProjectDocumentService : IProjectDocumentService
     {
         using var connection = _connectionFactory.CreateConnection();
 
+        var version = await GetVersionInternalAsync(connection, request.DocumentVersionId, ct);
+        if (version == null)
+            throw new UnauthorizedAccessException(
+                $"Document version {request.DocumentVersionId} does not belong to tenant {_tenant.TenantId}.");
+
         // Idempotency: skip if identical link already exists
         const string existsSql = """
             SELECT COUNT(1)
-            FROM dbo.ProjectDocumentLinks
-            WHERE DocumentVersionId = @DocumentVersionId
-              AND LinkedEntityType  = @LinkedEntityType
-              AND LinkedEntityId    = @LinkedEntityId
-              AND LinkType          = @LinkType;
+            FROM dbo.ProjectDocumentLinks l
+            INNER JOIN dbo.ProjectDocumentVersions v ON v.Id = l.DocumentVersionId
+            INNER JOIN dbo.ProjectDocuments d ON d.Id = v.DocumentId
+            WHERE l.DocumentVersionId = @DocumentVersionId
+              AND l.LinkedEntityType  = @LinkedEntityType
+              AND l.LinkedEntityId    = @LinkedEntityId
+              AND l.LinkType          = @LinkType
+              AND d.TenantId          = @TenantId;
             """;
 
         var exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
@@ -350,7 +360,8 @@ public sealed class ProjectDocumentService : IProjectDocumentService
                 request.DocumentVersionId,
                 request.LinkedEntityType,
                 request.LinkedEntityId,
-                request.LinkType
+                request.LinkType,
+                TenantId = _tenant.TenantId
             },
             cancellationToken: ct));
 
@@ -372,17 +383,20 @@ public sealed class ProjectDocumentService : IProjectDocumentService
         CancellationToken ct = default)
     {
         const string sql = """
-            SELECT Id, DocumentVersionId, LinkedEntityType, LinkedEntityId,
-                   LinkType, CreatedAtUtc, CreatedBy
-            FROM dbo.ProjectDocumentLinks
-            WHERE DocumentVersionId = @DocumentVersionId
-            ORDER BY CreatedAtUtc ASC;
+            SELECT l.Id, l.DocumentVersionId, l.LinkedEntityType, l.LinkedEntityId,
+                   l.LinkType, l.CreatedAtUtc, l.CreatedBy
+            FROM dbo.ProjectDocumentLinks l
+            INNER JOIN dbo.ProjectDocumentVersions v ON v.Id = l.DocumentVersionId
+            INNER JOIN dbo.ProjectDocuments d ON d.Id = v.DocumentId
+            WHERE l.DocumentVersionId = @DocumentVersionId
+              AND d.TenantId = @TenantId
+            ORDER BY l.CreatedAtUtc ASC;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<ProjectDocumentLink>(new CommandDefinition(
             sql,
-            new { DocumentVersionId = documentVersionId },
+            new { DocumentVersionId = documentVersionId, TenantId = _tenant.TenantId },
             cancellationToken: ct));
 
         return rows.ToList();
@@ -432,21 +446,23 @@ public sealed class ProjectDocumentService : IProjectDocumentService
             cancellationToken: ct));
     }
 
-    private static async Task<ProjectDocumentVersion?> GetVersionInternalAsync(
+    private async Task<ProjectDocumentVersion?> GetVersionInternalAsync(
         System.Data.IDbConnection connection,
         long versionId,
         CancellationToken ct)
     {
         const string sql = """
-            SELECT Id, DocumentId, VersionMajor, VersionMinor, ContentMarkdown,
-                   ChangeSummary, ParentVersionId, Status, ContentHash, CreatedAtUtc, CreatedBy
-            FROM dbo.ProjectDocumentVersions
-            WHERE Id = @VersionId;
+            SELECT v.Id, v.DocumentId, v.VersionMajor, v.VersionMinor, v.ContentMarkdown,
+                   v.ChangeSummary, v.ParentVersionId, v.Status, v.ContentHash, v.CreatedAtUtc, v.CreatedBy
+            FROM dbo.ProjectDocumentVersions v
+            INNER JOIN dbo.ProjectDocuments d ON d.Id = v.DocumentId
+            WHERE v.Id = @VersionId
+              AND d.TenantId = @TenantId;
             """;
 
         return await connection.QuerySingleOrDefaultAsync<ProjectDocumentVersion>(new CommandDefinition(
             sql,
-            new { VersionId = versionId },
+            new { VersionId = versionId, TenantId = _tenant.TenantId },
             cancellationToken: ct));
     }
 
