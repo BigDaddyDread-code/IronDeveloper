@@ -40,6 +40,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
     public bool HasActiveRun => CurrentRun?.Status == TestRunStatus.Running;
     public bool HasMoments => Moments.Count > 0;
     public bool HasRunRecords => RunRecords.Count > 0;
+    public int GroupedMomentCount => Moments.Count(item => item.IsIncludedInGroup);
     public bool CanReturnToWork => !string.IsNullOrWhiteSpace(ReturnWorkspaceName);
     public string RunStatusText => CurrentRun == null
         ? "Idle"
@@ -48,8 +49,29 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
     public TestingCompanionViewModel(ITestingCompanionAgent agent)
     {
         _agent = agent;
-        Moments.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMoments));
+        Moments.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems != null)
+            {
+                foreach (TestMomentItemViewModel item in e.NewItems)
+                    item.PropertyChanged += OnMomentGroupSelectionChanged;
+            }
+            if (e.OldItems != null)
+            {
+                foreach (TestMomentItemViewModel item in e.OldItems)
+                    item.PropertyChanged -= OnMomentGroupSelectionChanged;
+            }
+
+            OnPropertyChanged(nameof(HasMoments));
+            OnPropertyChanged(nameof(GroupedMomentCount));
+        };
         RunRecords.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRunRecords));
+    }
+
+    private void OnMomentGroupSelectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TestMomentItemViewModel.IsIncludedInGroup))
+            OnPropertyChanged(nameof(GroupedMomentCount));
     }
 
     public async Task LoadAsync(Project project)
@@ -232,7 +254,15 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
     [RelayCommand]
     private async Task CopyCombinedPromptAsync()
     {
-        var moments = Moments
+        var grouped = Moments
+            .Where(item => item.IsIncludedInGroup)
+            .Select(item => item.Moment)
+            .OrderByDescending(moment => moment.MarkedAt)
+            .ToList();
+
+        var moments = grouped.Count > 0
+            ? grouped
+            : Moments
             .Select(item => item.Moment)
             .OrderByDescending(moment => moment.MarkedAt)
             .Take(12)
@@ -248,7 +278,27 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
             string.IsNullOrWhiteSpace(_projectPath) ? WorkingDirectory : _projectPath,
             moments);
         System.Windows.Clipboard.SetText(LlmDebugPrompt);
-        StatusText = $"Copied combined prompt for {moments.Count} captured moment(s).";
+        StatusText = grouped.Count > 0
+            ? $"Copied grouped prompt for {moments.Count} selected bug(s)."
+            : $"Copied combined prompt for {moments.Count} recent captured moment(s).";
+    }
+
+    [RelayCommand]
+    private void SelectAllMomentGroup()
+    {
+        foreach (var item in Moments)
+            item.IsIncludedInGroup = true;
+        OnPropertyChanged(nameof(GroupedMomentCount));
+        StatusText = $"Selected {GroupedMomentCount} captured moment(s) for grouped prompt.";
+    }
+
+    [RelayCommand]
+    private void ClearMomentGroup()
+    {
+        foreach (var item in Moments)
+            item.IsIncludedInGroup = false;
+        OnPropertyChanged(nameof(GroupedMomentCount));
+        StatusText = "Cleared grouped prompt selection.";
     }
 
     public Task CopyLastPromptAsync()
@@ -544,12 +594,14 @@ public sealed partial class MarkMomentViewModel : ObservableObject
     }
 }
 
-public sealed class TestMomentItemViewModel
+public sealed partial class TestMomentItemViewModel : ObservableObject
 {
     public TestMomentItemViewModel(TestMoment moment)
     {
         Moment = moment;
     }
+
+    [ObservableProperty] private bool _isIncludedInGroup = true;
 
     public TestMoment Moment { get; }
     public string TimeText => Moment.MarkedAt.ToString("HH:mm:ss");

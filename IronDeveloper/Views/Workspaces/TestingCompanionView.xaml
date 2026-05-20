@@ -142,7 +142,7 @@
 
                     <DockPanel Grid.Row="0" Margin="0,0,0,12">
                         <primitives:StatusBadge DockPanel.Dock="Right"
-                                                Text="{Binding Moments.Count}"
+                                                Text="{Binding GroupedMomentCount}"
                                                 Status="Info"/>
                         <TextBlock Text="CAPTURED MOMENTS"
                                    Style="{StaticResource Typography.Eyebrow}"/>
@@ -160,9 +160,15 @@
                                 <Grid Margin="2,8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0"
+                                    <CheckBox Grid.Column="0"
+                                              IsChecked="{Binding IsIncludedInGroup, Mode=TwoWay}"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,10,0"
+                                              ToolTip="Include this bug in the grouped LLM prompt"/>
+                                    <Border Grid.Column="1"
                                             Width="58"
                                             Height="40"
                                             Background="{StaticResource Background/Interactive}"
@@ -174,7 +180,7 @@
                                                Stretch="UniformToFill"
                                                ClipToBounds="True"/>
                                     </Border>
-                                    <StackPanel Grid.Column="1">
+                                    <StackPanel Grid.Column="2">
                                         <DockPanel LastChildFill="True">
                                             <TextBlock DockPanel.Dock="Right"
                                                        Text="{Binding TimeText}"
@@ -211,6 +217,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="190"/>
                         <RowDefinition Height="160"/>
                         <RowDefinition Height="*"/>
@@ -231,12 +238,27 @@
                                 Command="{Binding CopyLlmPromptCommand}"
                                 Style="{StaticResource AppButton.CompactGhost}"
                                 Margin="0,0,8,0"/>
-                        <Button Content="Copy Bundle"
+                        <Button Content="Copy Group"
                                 Command="{Binding CopyCombinedPromptCommand}"
                                 Style="{StaticResource AppButton.CompactGhost}"/>
                     </StackPanel>
 
-                    <Border Grid.Row="2"
+                    <StackPanel Grid.Row="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12">
+                        <Button Content="Select All"
+                                Command="{Binding SelectAllMomentGroupCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Padding="8,2"
+                                Margin="0,0,6,0"/>
+                        <Button Content="Clear"
+                                Command="{Binding ClearMomentGroupCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Padding="8,2"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="3"
                             BorderBrush="{StaticResource Border/Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
@@ -288,7 +310,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="3"
+                    <Border Grid.Row="4"
                             BorderBrush="{StaticResource Border/Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
@@ -346,14 +368,14 @@
                         </Grid>
                     </Border>
 
-                    <TextBox Grid.Row="4"
+                    <TextBox Grid.Row="5"
                              Text="{Binding LlmDebugPrompt}"
                              AcceptsReturn="True"
                              IsReadOnly="True"
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"/>
 
-                    <TextBlock Grid.Row="5"
+                    <TextBlock Grid.Row="6"
                                Text="{Binding ReportPath}"
                                Foreground="{StaticResource Text/Muted}"
                                FontSize="11"
