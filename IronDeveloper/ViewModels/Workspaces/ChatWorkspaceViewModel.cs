@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -381,6 +382,28 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     return;
                 }
 
+                if (agentResult.TicketCandidates.Count > 0)
+                {
+                    var contexts = BuildTicketContextsFromCandidates(
+                        agentResult.TicketCandidates,
+                        sessionId,
+                        userDbId,
+                        text,
+                        agentRequest.RecentConversationSummary);
+
+                    if (contexts.Count > 1 && OnCreateTicketsFromChat != null)
+                    {
+                        OnCreateTicketsFromChat.Invoke(contexts);
+                        return;
+                    }
+
+                    if (contexts.Count == 1 && OnCreateTicketFromChat != null)
+                    {
+                        OnCreateTicketFromChat.Invoke(contexts[0]);
+                        return;
+                    }
+                }
+
                 // Use the agent's assembled final prompt for the real LLM call
                 var finalPrompt = agentResult.FinalPrompt ?? packet.FormattedPrompt;
 
@@ -602,6 +625,58 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 ProposedTitle = MakeTicketTitle(hint),
                 SplitIndex = i + 1,
                 SplitCount = count
+            });
+        }
+
+        return contexts;
+    }
+
+    private static IReadOnlyList<IronDev.Agent.Models.ChatTicketContext> BuildTicketContextsFromCandidates(
+        IReadOnlyList<TicketCandidate> candidates,
+        long sessionId,
+        long messageId,
+        string sourceRequest,
+        string recentConversationSummary)
+    {
+        var usableCandidates = candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c.Title) || !string.IsNullOrWhiteSpace(c.Summary))
+            .Take(5)
+            .ToList();
+
+        var contexts = new List<IronDev.Agent.Models.ChatTicketContext>(usableCandidates.Count);
+        for (var i = 0; i < usableCandidates.Count; i++)
+        {
+            var candidate = usableCandidates[i];
+            var title = string.IsNullOrWhiteSpace(candidate.Title)
+                ? MakeTicketTitle(candidate.Summary)
+                : MakeTicketTitle(candidate.Title);
+
+            var message = new StringBuilder();
+            message.AppendLine($"Candidate ticket {i + 1} of {usableCandidates.Count}: {title}");
+            if (!string.IsNullOrWhiteSpace(candidate.SuggestedDomain))
+                message.AppendLine($"Domain: {candidate.SuggestedDomain.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.Summary))
+                message.AppendLine($"Summary: {candidate.Summary.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.ExistingRelatedWork))
+                message.AppendLine($"Related work: {candidate.ExistingRelatedWork.Trim()}");
+            message.AppendLine();
+            message.AppendLine("Source request:");
+            message.AppendLine(sourceRequest.Trim());
+            if (!string.IsNullOrWhiteSpace(recentConversationSummary))
+            {
+                message.AppendLine();
+                message.AppendLine("Recent discussion:");
+                message.AppendLine(recentConversationSummary.Trim());
+            }
+
+            contexts.Add(new IronDev.Agent.Models.ChatTicketContext
+            {
+                SessionId = sessionId,
+                MessageId = messageId,
+                MessageText = message.ToString().Trim(),
+                ProposedTitle = title,
+                SplitIndex = i + 1,
+                SplitCount = usableCandidates.Count
             });
         }
 
