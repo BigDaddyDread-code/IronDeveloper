@@ -98,7 +98,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         await LoadPersistedRunsAsync();
         ReportPath = "";
         LlmDebugPrompt = "";
-        StatusText = "Testing session running. Use Ctrl+Shift+M to mark a moment.";
+        StatusText = $"Test started at {CurrentRun.StartedAt:HH:mm:ss}. Collecting logs and LLM traces until you mark a bug or end the test.";
         RefreshState();
 
         if (AutoReturnAfterStart && CanReturnToWork)
@@ -193,7 +193,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         Moments.Insert(0, item);
         SelectedMoment = item;
         LlmDebugPrompt = BuildCopyPrompt(moment);
-        StatusText = $"Saved moment at {moment.MarkedAt:HH:mm:ss}.";
+        StatusText = $"Saved moment at {moment.MarkedAt:HH:mm:ss}. Logs and LLM traces were captured from test start to this bug.";
         RefreshState();
     }
 
@@ -296,7 +296,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
 
         var report = await _agent.EndSessionAndGenerateReportAsync(CurrentRun.Id);
         ReportPath = report.ReportPath ?? "";
-        StatusText = $"Report generated: {ReportPath}";
+        StatusText = $"Test ended. Report, session logs, and LLM traces generated: {ReportPath}";
         await LoadPersistedRunsAsync();
         RefreshState();
     }

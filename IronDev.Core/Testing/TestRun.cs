@@ -26,6 +26,10 @@ public sealed class TestRun
     public string? ScreenshotFolderPath { get; set; }
     public string? AudioFolderPath { get; set; }
     public string? ReportFolderPath { get; set; }
+    public DateTimeOffset? TraceCollectionStartedAt { get; set; }
+    public DateTimeOffset? TraceCollectionEndedAt { get; set; }
+    public string? SessionLogPath { get; set; }
+    public string? SessionTracePath { get; set; }
 
     public string? Summary { get; set; }
 }

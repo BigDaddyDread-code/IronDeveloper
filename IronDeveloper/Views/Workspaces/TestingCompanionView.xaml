@@ -22,7 +22,7 @@
                             Style="{StaticResource AppButton.CompactGhost}"
                             Margin="0,0,8,0"
                             Visibility="{Binding CanReturnToWork, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                    <Button Content="Start Session"
+                    <Button Content="Start Test"
                             Command="{Binding StartSessionCommand}"
                             Style="{StaticResource AppButton.Primary}"
                             Margin="0,0,8,0"/>
@@ -30,7 +30,7 @@
                             Command="{Binding MarkMomentCommand}"
                             Style="{StaticResource AppButton.CompactGhost}"
                             Margin="0,0,8,0"/>
-                    <Button Content="End / Report"
+                    <Button Content="End Test / Report"
                             Command="{Binding EndSessionCommand}"
                             Style="{StaticResource AppButton.CompactGhost}"/>
                 </StackPanel>

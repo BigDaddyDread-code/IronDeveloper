@@ -68,6 +68,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             AudioFolderPath = Path.Combine(root, "audio"),
             ReportFolderPath = Path.Combine(root, "reports")
         };
+        run.TraceCollectionStartedAt = run.StartedAt;
 
         Directory.CreateDirectory(run.ScreenshotFolderPath);
         Directory.CreateDirectory(run.AudioFolderPath);
@@ -102,8 +103,8 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             ScreenshotPath = screenshotPath,
             ActiveWorkspace = activeWorkspace,
             ActiveProjectName = run.ProjectName,
-            RelevantLogsText = CaptureLogWindow(run.LogFilePath, capturedAt),
-            RelevantTraceText = CaptureLlmTraceWindow(capturedAt)
+            RelevantLogsText = CaptureLogWindow(run.LogFilePath, run.TraceCollectionStartedAt ?? run.StartedAt, capturedAt),
+            RelevantTraceText = CaptureLlmTraceWindow(run.TraceCollectionStartedAt ?? run.StartedAt, capturedAt, "test start to marked moment")
         };
     }
 
@@ -299,6 +300,8 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             AppendOptionalSection(sb, "Expected", moment.ExpectedBehavior);
             AppendOptionalSection(sb, "Actual", moment.ActualBehavior);
             AppendOptionalSection(sb, "Suspected area", moment.SuspectedArea);
+            AppendCodeSection(sb, "Relevant logs", moment.RelevantLogsText);
+            AppendCodeSection(sb, "Relevant traces", moment.RelevantTraceText);
         }
 
         return Task.FromResult(sb.ToString().Trim());
@@ -308,8 +311,17 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
     {
         var run = EnsureRun(testRunId);
         run.EndedAt = DateTimeOffset.Now;
+        run.TraceCollectionEndedAt = run.EndedAt;
         run.Status = TestRunStatus.Completed;
         run.Summary = $"{_moments.Count} captured test moments.";
+        run.SessionLogPath = await PersistTextIfAnyAsync(
+            Path.Combine(run.ReportFolderPath!, "session-logs.txt"),
+            CaptureLogWindow(run.LogFilePath, run.TraceCollectionStartedAt ?? run.StartedAt, run.EndedAt.Value),
+            ct);
+        run.SessionTracePath = await PersistTextIfAnyAsync(
+            Path.Combine(run.ReportFolderPath!, "session-llm-traces.txt"),
+            CaptureLlmTraceWindow(run.TraceCollectionStartedAt ?? run.StartedAt, run.EndedAt.Value, "full test session"),
+            ct);
 
         var markdown = BuildMarkdown(run, _moments);
         var reportPath = Path.Combine(run.ReportFolderPath!, "debug-package.md");
@@ -393,6 +405,16 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         await File.WriteAllTextAsync(path, json, ct);
     }
 
+    private static async Task<string?> PersistTextIfAnyAsync(string path, string? value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, value.Trim(), ct);
+        return path;
+    }
+
     private static string? TryGit(string? workingDirectory, string arguments)
     {
         if (string.IsNullOrWhiteSpace(workingDirectory) || !Directory.Exists(workingDirectory))
@@ -420,15 +442,25 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         }
     }
 
-    private static string? CaptureLogWindow(string? logFilePath, DateTimeOffset markedAt)
+    private static string? CaptureLogWindow(string? logFilePath, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         if (string.IsNullOrWhiteSpace(logFilePath) || !File.Exists(logFilePath))
             return null;
 
         try
         {
-            var lines = File.ReadLines(logFilePath).TakeLast(80);
-            return string.Join(Environment.NewLine, lines);
+            var lines = File.ReadLines(logFilePath).TakeLast(160).ToList();
+            if (lines.Count == 0)
+                return null;
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Log window captured for test interval {startedAt:yyyy-MM-dd HH:mm:ss} -> {endedAt:yyyy-MM-dd HH:mm:ss}.");
+            sb.AppendLine($"Source log: {logFilePath}");
+            sb.AppendLine();
+            foreach (var line in lines)
+                sb.AppendLine(line);
+
+            return sb.ToString().Trim();
         }
         catch
         {
@@ -436,22 +468,24 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         }
     }
 
-    private string? CaptureLlmTraceWindow(DateTimeOffset markedAt)
+    private string? CaptureLlmTraceWindow(DateTimeOffset startedAt, DateTimeOffset endedAt, string windowName)
     {
-        var capturedUtc = markedAt.UtcDateTime;
+        var startedUtc = startedAt.UtcDateTime;
+        var endedUtc = endedAt.UtcDateTime;
         var traces = _llmTraceService
-            .GetRecentTraces(80)
-            .Where(t => t.CreatedAt >= capturedUtc.AddMinutes(-20) &&
-                        t.CreatedAt <= capturedUtc.AddMinutes(2))
-            .OrderByDescending(t => t.CreatedAt)
-            .Take(12)
+            .GetRecentTraces(250)
+            .Where(t => t.CreatedAt >= startedUtc &&
+                        t.CreatedAt <= endedUtc.AddSeconds(15))
+            .OrderBy(t => t.CreatedAt)
+            .Take(80)
             .ToList();
 
         if (traces.Count == 0)
-            return "No recent LLM traces were captured in the 20 minutes before this moment.";
+            return $"No LLM traces were captured for the {windowName} window.";
 
         var sb = new StringBuilder();
-        sb.AppendLine($"Recent LLM traces around marked moment ({traces.Count}):");
+        sb.AppendLine($"LLM traces captured for {windowName} ({traces.Count}):");
+        sb.AppendLine($"Window: {startedAt:yyyy-MM-dd HH:mm:ss} -> {endedAt:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
 
         foreach (var trace in traces)
@@ -532,6 +566,12 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         sb.AppendLine($"- Commit: {run.GitCommit ?? "Unknown"}");
         sb.AppendLine($"- Started: {run.StartedAt:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine($"- Ended: {run.EndedAt:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"- Trace collection started: {run.TraceCollectionStartedAt:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"- Trace collection ended: {run.TraceCollectionEndedAt:yyyy-MM-dd HH:mm:ss}");
+        if (!string.IsNullOrWhiteSpace(run.SessionLogPath))
+            sb.AppendLine($"- Session logs: `{run.SessionLogPath}`");
+        if (!string.IsNullOrWhiteSpace(run.SessionTracePath))
+            sb.AppendLine($"- Session LLM traces: `{run.SessionTracePath}`");
         sb.AppendLine();
         sb.AppendLine("## Captured Moments");
         sb.AppendLine();
@@ -621,6 +661,8 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         sb.AppendLine();
         AppendImage(sb, "Screenshot image", moment.ScreenshotPath);
         AppendImage(sb, "Annotated screenshot image", moment.AnnotatedScreenshotPath);
+        AppendCodeSection(sb, "Relevant logs", moment.RelevantLogsText);
+        AppendCodeSection(sb, "Relevant traces", moment.RelevantTraceText);
         sb.AppendLine("Please identify likely causes, suggest the files/components to inspect, and propose a fix plan.");
         return sb.ToString().Trim();
     }
