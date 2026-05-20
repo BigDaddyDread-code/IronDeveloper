@@ -1444,6 +1444,33 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Messy spoken plural create-ticket commands use the previous assistant context instead of falling through to chat.")]
+    public void ChatIntentParser_CreateMeSomeTicketsTodoThisWork_UsesPreviousContext()
+    {
+        var previous = """
+            ### Task: Create Tickets for Implementing Multi-Location Storage in BookSeller
+
+            1. **Add storage locations data model**
+            - Summary: Add entities for book storage locations.
+
+            2. **Update book persistence**
+            - Summary: Link books to storage locations.
+            """;
+
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(
+            "ok create me some tickets todo this work",
+            previous);
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("CreateTickets", intent.Intent);
+        Assert.AreEqual(2, intent.TicketCount);
+        Assert.AreEqual(previous.Trim(), intent.WorkText);
+        Assert.AreEqual("Add storage locations data model", intent.SplitHints[0]);
+        Assert.AreEqual("Update book persistence", intent.SplitHints[1]);
+        Assert.IsFalse(intent.RequiresClarification);
+    }
+
+    [TestMethod]
     [Description("Bare create-ticket commands are explicit but need scope clarification.")]
     public void ChatIntentParser_CreateTicketWithoutScope_AsksClarification()
     {

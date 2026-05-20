@@ -108,7 +108,7 @@ public static class ChatIntentParser
 
     private static CreateTicketIntent? ParseSplitTickets(string request, string? previousMessage)
     {
-        var text = request.Trim();
+        var text = StripLeadingAcknowledgement(request.Trim());
         var lower = text.ToLowerInvariant();
 
         var isSplitCommand =
@@ -119,6 +119,13 @@ public static class ChatIntentParser
             lower.StartsWith("turn this into tickets") ||
             lower.StartsWith("turn this plan into tickets") ||
             lower.StartsWith("turn the plan into tickets") ||
+            lower.StartsWith("create me some tickets") ||
+            lower.StartsWith("create some tickets") ||
+            lower.StartsWith("make me some tickets") ||
+            lower.StartsWith("make some tickets") ||
+            lower.StartsWith("raise some tickets") ||
+            lower.StartsWith("draft tickets") ||
+            lower.StartsWith("create ticket drafts") ||
             lower == "create tickets" ||
             lower == "create draft tickets" ||
             lower.StartsWith("create tickets ") ||
@@ -151,6 +158,29 @@ public static class ChatIntentParser
                 ? ["Which work should I create tickets from?"]
                 : Array.Empty<string>()
         };
+    }
+
+    private static string StripLeadingAcknowledgement(string text)
+    {
+        var prefixes = new[]
+        {
+            "ok ",
+            "okay ",
+            "yep ",
+            "yes ",
+            "yeah ",
+            "cool ",
+            "right ",
+            "alright "
+        };
+
+        foreach (var prefix in prefixes)
+        {
+            if (text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return text[prefix.Length..].TrimStart();
+        }
+
+        return text;
     }
 
     private static int ExtractTicketCount(string lower)
@@ -245,7 +275,46 @@ public static class ChatIntentParser
                 return tail;
         }
 
+        var commandTail = ExtractCreateTicketsCommandTail(request);
+        if (!string.IsNullOrWhiteSpace(commandTail) && !IsPreviousContextReference(commandTail))
+            return commandTail;
+
         return previousMessage?.Trim() ?? string.Empty;
+    }
+
+    private static string ExtractCreateTicketsCommandTail(string request)
+    {
+        var prefixes = new[]
+        {
+            "create me some tickets",
+            "create some tickets",
+            "make me some tickets",
+            "make some tickets",
+            "raise some tickets",
+            "create draft tickets",
+            "create tickets",
+            "draft tickets",
+            "create ticket drafts"
+        };
+
+        foreach (var prefix in prefixes)
+        {
+            if (request.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return request[prefix.Length..].Trim();
+        }
+
+        return string.Empty;
+    }
+
+    private static bool IsPreviousContextReference(string text)
+    {
+        var normalized = text
+            .Trim()
+            .Trim('.', ',', ';', ':')
+            .Replace("todo", "to do", StringComparison.OrdinalIgnoreCase)
+            .ToLowerInvariant();
+
+        return normalized is "" or "this" or "that" or "this work" or "that work" or "to do this work" or "for this work";
     }
 
     public static bool IsChangeIntent(string request, CreateTicketIntent? ticketIntent)
