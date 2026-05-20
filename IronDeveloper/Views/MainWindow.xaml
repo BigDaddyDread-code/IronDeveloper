@@ -192,6 +192,11 @@
                                                       CommandParameter="Tickets"
                                                       ToolTip="Tickets"
                                                       IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Tickets}"/>
+                                <controls:NavRailItem IconData="{StaticResource Icon.Nav.Search}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="Testing"
+                                                      ToolTip="Testing"
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=Testing}"/>
                                 <controls:NavRailItem IconData="{StaticResource Icon.Action.Build}"
                                                       Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       CommandParameter="Builder"

@@ -20,6 +20,7 @@ public enum ProjectWorkspace
     Discovery,
     Chat,
     Tickets,
+    Testing,
     Plans,
     Decisions,
     Documents,
