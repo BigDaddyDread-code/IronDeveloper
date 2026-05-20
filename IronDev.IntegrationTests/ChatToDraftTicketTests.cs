@@ -527,6 +527,37 @@ public class ChatToDraftTicketTests
         Assert.AreEqual(2, vm.Tickets.Count(t => t.IsDraft));
         Assert.AreEqual(DraftPreflightState.None, vm.DraftPreflight);
     }
+
+    [TestMethod]
+    [Description("Saving one generated split draft preserves the remaining unsaved drafts for review.")]
+    public async Task ApproveDraftAsync_MultiDraft_PreservesRemainingDrafts()
+    {
+        var ticketService = new StubTicketService();
+        var vm = new TicketsWorkspaceViewModel(
+            ticketService,
+            null!,
+            new StubOrchestrator(),
+            new StubDraftTicketService(),
+            null!);
+
+        await vm.BeginDraftsFromChatAsync(
+        [
+            MakeContext("Location model", "Split ticket 1 of 2: add location model"),
+            MakeContext("Location persistence", "Split ticket 2 of 2: add persistence")
+        ]);
+
+        Assert.AreEqual(2, vm.Tickets.Count(t => t.IsDraft));
+
+        await vm.ApproveDraftCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(1, ticketService.SavedTickets.Count);
+        Assert.AreEqual(1, vm.Tickets.Count(t => t.IsDraft), "Saving one draft must not discard the rest of the review queue.");
+        Assert.AreEqual("Location persistence", vm.SelectedTicket?.Title);
+        Assert.IsTrue(vm.IsDraftMode, "The next unsaved draft should stay selected for review.");
+        Assert.AreEqual(42L, ticketService.SavedTickets[0].SourceChatSessionId);
+        Assert.AreEqual(7L, ticketService.SavedTickets[0].SourceChatMessageId);
+        StringAssert.Contains(vm.SaveStatus, "1 draft(s) still waiting");
+    }
 }
 
 /// <summary>
@@ -536,11 +567,15 @@ public class ChatToDraftTicketTests
 internal sealed class StubTicketService : IronDev.Services.ITicketService
 {
     private long _nextId = 100;
+    public System.Collections.Generic.List<IronDev.Data.Models.ProjectTicket> SavedTickets { get; } = [];
 
     public Task<long> SaveTicketAsync(
         IronDev.Data.Models.ProjectTicket ticket,
         System.Threading.CancellationToken cancellationToken = default)
-        => Task.FromResult(_nextId++);
+    {
+        SavedTickets.Add(ticket);
+        return Task.FromResult(_nextId++);
+    }
 
     public Task<System.Collections.Generic.IReadOnlyList<IronDev.Data.Models.ProjectTicket>> GetRecentTicketsAsync(
         int projectId, int take = 10,

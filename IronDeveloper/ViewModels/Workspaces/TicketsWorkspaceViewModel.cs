@@ -1147,6 +1147,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task ApproveDraftAsync()
     {
+        var draftBeingSaved = SelectedTicket?.IsDraft == true ? SelectedTicket : null;
+        var remainingDrafts = CaptureRemainingDrafts(draftBeingSaved);
+
         var savedId = await SaveDraftTicketAsync();
         if (savedId <= 0) return;
 
@@ -1161,6 +1164,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         DraftStatusMessage = string.Empty;
 
         await RefreshListAsync();  // ClearEditor() is called inside
+        RestoreUnsavedDrafts(remainingDrafts);
 
         var created = Tickets.FirstOrDefault(t => t.Id == savedId);
         if (created != null)
@@ -1168,8 +1172,14 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             await LoadTicketIntoEditorAsync(created);
             SelectedTicket = created;
         }
+        else if (remainingDrafts.Count > 0)
+        {
+            SelectedTicket = remainingDrafts[0];
+        }
 
-        SaveStatus = "Ticket created \u2713";
+        SaveStatus = remainingDrafts.Count > 0
+            ? $"Ticket created \u2713  {remainingDrafts.Count} draft(s) still waiting."
+            : "Ticket created \u2713";
     }
 
     private async Task SaveLinkedPlanAsync(long ticketId)
@@ -1213,6 +1223,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task ApproveDraftWithPlanAsync()
     {
+        var draftBeingSaved = SelectedTicket?.IsDraft == true ? SelectedTicket : null;
+        var remainingDrafts = CaptureRemainingDrafts(draftBeingSaved);
+
         // If plan is empty, generate it first
         if (!HasPlan || string.IsNullOrWhiteSpace(PlanProposedSteps))
         {
@@ -1243,6 +1256,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         DraftStatusMessage = string.Empty;
 
         await RefreshListAsync();
+        RestoreUnsavedDrafts(remainingDrafts);
 
         // Re-select the saved ticket
         SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
@@ -1510,6 +1524,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         try
         {
+            var selectedDraft = SelectedTicket?.IsDraft == true ? SelectedTicket : null;
+
             // Pack test sub-fields into TechnicalNotes before save
             SyncTestsToTechnicalNotes();
 
@@ -1536,11 +1552,11 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 ManualTests            = string.IsNullOrWhiteSpace(EditTestsManualTests)      ? null : EditTestsManualTests.Trim(),
                 RegressionTests        = string.IsNullOrWhiteSpace(EditTestsRegressionTests)  ? null : EditTestsRegressionTests.Trim(),
                 BuildValidation        = string.IsNullOrWhiteSpace(EditTestsBuildValidation)  ? null : EditTestsBuildValidation.Trim(),
-                ContextSummary         = CurrentDraft?.Summary, // Or from build preview if generated
+                ContextSummary         = CurrentDraft?.Summary ?? selectedDraft?.ContextSummary,
                 IsGenerated            = true,
-                GenerationNote         = CurrentDraft?.GenerationNote,
-                SourceChatSessionId    = CurrentDraft?.SourceChatSessionId,
-                SourceChatMessageId    = CurrentDraft?.SourceMessageId
+                GenerationNote         = CurrentDraft?.GenerationNote ?? selectedDraft?.GenerationNote,
+                SourceChatSessionId    = CurrentDraft?.SourceChatSessionId ?? selectedDraft?.SourceChatSessionId,
+                SourceChatMessageId    = CurrentDraft?.SourceMessageId ?? selectedDraft?.SourceChatMessageId
             };
 
             var savedId = await _ticketService.SaveTicketAsync(ticket);
@@ -1625,9 +1641,26 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             ContextSummary     = draft.Summary,
             IsGenerated        = true,
             GenerationNote     = draft.GenerationNote,
+            SourceChatSessionId = draft.SourceChatSessionId,
+            SourceChatMessageId = draft.SourceMessageId,
+            SourceMessageText   = draft.SourceMessageText,
             IsDraft            = true,
             CreatedDate        = DateTime.UtcNow
         };
+
+    private List<TicketItem> CaptureRemainingDrafts(TicketItem? draftBeingSaved)
+        => Tickets
+            .Where(t => t.IsDraft && !ReferenceEquals(t, draftBeingSaved))
+            .ToList();
+
+    private void RestoreUnsavedDrafts(IReadOnlyList<TicketItem> drafts)
+    {
+        for (var i = drafts.Count - 1; i >= 0; i--)
+        {
+            if (!Tickets.Contains(drafts[i]))
+                Tickets.Insert(0, drafts[i]);
+        }
+    }
 
     private void ClearEditor()
     {
