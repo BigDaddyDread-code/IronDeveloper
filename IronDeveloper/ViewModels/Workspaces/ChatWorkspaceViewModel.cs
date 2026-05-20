@@ -278,24 +278,57 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
 
             if (commandRoute.RequiresAction && !commandRoute.AllowsProseResponse)
             {
+                if (commandRoute.Intent == ChatRouteIntent.SaveDecision)
+                {
+                    if (OnCreateDecisionFromChat == null)
+                    {
+                        await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a save-decision command, but the decision workflow is not available.");
+                        return;
+                    }
+
+                    var detail = TrimForAction(commandRoute.ActionText ?? text, 4000);
+                    OnCreateDecisionFromChat.Invoke(CleanActionTitle(commandRoute.ActionTitle, "Decision"), detail, null, null, FindSourceDocumentIdForMessage(Messages.Count - 2));
+                    return;
+                }
+
+                if (commandRoute.Intent == ChatRouteIntent.CreateImplementationPlan)
+                {
+                    if (OnCreatePlanFromChat == null)
+                    {
+                        await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a create-plan command, but the plan workflow is not available.");
+                        return;
+                    }
+
+                    var goal = TrimForAction(commandRoute.ActionText ?? text, 6000);
+                    var steps = ExtractPlanSteps(goal);
+                    OnCreatePlanFromChat.Invoke(CleanActionTitle(commandRoute.ActionTitle, "Implementation plan"), goal, steps, null, null);
+                    return;
+                }
+
+                if (commandRoute.Intent == ChatRouteIntent.SaveDiscussionDocument)
+                {
+                    if (OnCreateDocumentFromChat == null)
+                    {
+                        await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a create-document command, but the document workflow is not available.");
+                        return;
+                    }
+
+                    var content = TrimForAction(commandRoute.ActionText ?? text, 8000);
+                    OnCreateDocumentFromChat.Invoke(CleanActionTitle(commandRoute.ActionTitle, "Discussion document"), content, MakeDocumentSummary(content), null, null, FindSourceDocumentIdForMessage(Messages.Count - 2));
+                    return;
+                }
+
+                if (commandRoute.Intent == ChatRouteIntent.BuildTicket)
+                {
+                    OnNavigateToTicket?.Invoke();
+                    await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a build-ticket command. Select the ticket in Tickets, then use Build This so the run is tied to a saved ticket.");
+                    return;
+                }
+
                 var ticketIntent = commandRoute.CreateTicketIntent;
                 if (ticketIntent == null)
                 {
-                    var blockedText = "I understood this as an action command, but no workflow handler is wired for it yet.";
-                    var assistantMsg = new ChatSummary
-                    {
-                        Role = "assistant",
-                        MessageText = blockedText,
-                        Timestamp = DateTime.UtcNow
-                    };
-                    Messages.Add(assistantMsg);
-                    await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
-                    {
-                        ProjectId = projectId,
-                        ChatSessionId = sessionId,
-                        Role = "assistant",
-                        Message = blockedText
-                    });
+                    await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as an action command, but no workflow handler is wired for it yet.");
                     return;
                 }
 
@@ -645,6 +678,51 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    private async Task AddAssistantNoticeAsync(int projectId, long sessionId, string message)
+    {
+        Messages.Add(new ChatSummary
+        {
+            Role = "assistant",
+            MessageText = message,
+            Timestamp = DateTime.UtcNow
+        });
+
+        await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = message
+        });
+    }
+
+    private static string TrimForAction(string value, int maxLength)
+        => value.Length > maxLength
+            ? value[..maxLength] + "\n...[truncated]"
+            : value;
+
+    private static string CleanActionTitle(string? routeTitle, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(routeTitle))
+            return fallback;
+
+        var separatorIndex = routeTitle.IndexOf(':');
+        var title = separatorIndex >= 0 ? routeTitle[(separatorIndex + 1)..].Trim() : routeTitle.Trim();
+        return string.IsNullOrWhiteSpace(title) ? fallback : title;
+    }
+
+    private static string? ExtractPlanSteps(string text)
+    {
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var steps = string.Join("\n", lines.Where(l =>
+        {
+            var trimmed = l.Trim();
+            return trimmed.StartsWith("-") || trimmed.StartsWith("*") || char.IsDigit(trimmed.FirstOrDefault());
+        }));
+
+        return string.IsNullOrWhiteSpace(steps) ? null : steps;
     }
 
     [RelayCommand]

@@ -65,6 +65,8 @@ public sealed class ChatRouteResult
     public DraftCountMode DraftCountMode { get; init; }
 
     public CreateTicketIntent? CreateTicketIntent { get; init; }
+    public string? ActionText { get; init; }
+    public string? ActionTitle { get; init; }
     public IReadOnlyList<string> MatchedSignals { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
 

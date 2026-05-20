@@ -850,15 +850,21 @@
                                             Style="{StaticResource AppButton.CompactGhost}"
                                             Margin="0,0,8,0"
                                             ToolTip="Discard draft and return to Chat"/>
-                                    <Button Content="Save Ticket"
-                                            Command="{Binding ApproveDraftCommand}"
-                                            Style="{StaticResource AppButton.Primary}"
-                                            IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
-                                            Margin="0,0,6,0"
-                                            ToolTip="Save this ticket to the database"/>
-                                    <Button Content="Save Ticket + Plan"
-                                            Command="{Binding ApproveDraftWithPlanCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
+                                     <Button Content="Save Ticket"
+                                             Command="{Binding ApproveDraftCommand}"
+                                             Style="{StaticResource AppButton.Primary}"
+                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
+                                             Margin="0,0,6,0"
+                                             ToolTip="Save this ticket to the database"/>
+                                     <Button Content="Save All Drafts"
+                                             Command="{Binding SaveAllDraftsCommand}"
+                                             Style="{StaticResource AppButton.CompactGhost}"
+                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
+                                             Margin="0,0,6,0"
+                                             ToolTip="Save all generated draft tickets in the review queue"/>
+                                     <Button Content="Save Ticket + Plan"
+                                             Command="{Binding ApproveDraftWithPlanCommand}"
+                                             Style="{StaticResource AppButton.CompactGhost}"
                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
                                             ToolTip="Save ticket and navigate to Plans to create an implementation plan"/>
                                 </StackPanel>

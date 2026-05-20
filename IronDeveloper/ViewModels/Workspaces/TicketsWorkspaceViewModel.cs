@@ -1182,6 +1182,37 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             : "Ticket created \u2713";
     }
 
+    [RelayCommand]
+    private async Task SaveAllDraftsAsync()
+    {
+        var drafts = Tickets.Where(t => t.IsDraft).ToList();
+        if (drafts.Count == 0)
+        {
+            SaveStatus = "No draft tickets to save.";
+            return;
+        }
+
+        var savedCount = 0;
+        foreach (var draft in drafts)
+        {
+            SelectedTicket = draft;
+            LoadTicketIntoEditor(draft);
+
+            var savedId = await SaveDraftTicketAsync();
+            if (savedId <= 0)
+                break;
+
+            savedCount++;
+            Tickets.Remove(draft);
+        }
+
+        IsDraftMode = false;
+        CurrentDraft = null;
+        DraftStatusMessage = string.Empty;
+        await RefreshListAsync();
+        SaveStatus = $"Saved {savedCount} draft ticket(s).";
+    }
+
     private async Task SaveLinkedPlanAsync(long ticketId)
     {
         if (_memoryService == null)
@@ -1807,6 +1838,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         ContextSummary         = t.ContextSummary,
         IsGenerated            = t.IsGenerated,
         GenerationNote         = t.GenerationNote,
+        SourceChatSessionId    = t.SourceChatSessionId,
+        SourceChatMessageId    = t.SourceChatMessageId,
         CreatedDate            = t.CreatedDate
     };
 

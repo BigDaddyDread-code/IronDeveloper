@@ -1517,6 +1517,58 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("ChatCommandRouter treats save-decision commands as action routes with no prose fallback.")]
+    public async Task ChatCommandRouter_SaveDecision_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            UserMessage = "save this as decision",
+            PreviousAssistantMessage = "Use SQL Server as the canonical source of truth."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.SaveDecision, route.Intent);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+        Assert.AreEqual(ContextReferenceKind.PreviousAssistantMessage, route.ContextReference);
+        StringAssert.Contains(route.ActionText!, "SQL Server");
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter treats create-plan commands as action routes with no prose fallback.")]
+    public async Task ChatCommandRouter_CreatePlan_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            UserMessage = "turn this into a plan",
+            PreviousAssistantMessage = "- Add command routing\n- Add review UI"
+        });
+
+        Assert.AreEqual(ChatRouteIntent.CreateImplementationPlan, route.Intent);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter does not route explanatory build-ticket questions as build actions.")]
+    public async Task ChatCommandRouter_BuildTicketQuestion_AllowsProse()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            UserMessage = "what is build ticket?"
+        });
+
+        Assert.AreEqual(ChatRouteIntent.GeneralChat, route.Intent);
+        Assert.IsFalse(route.RequiresAction);
+        Assert.IsTrue(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
     [Description("Bare create-ticket commands are explicit but need scope clarification.")]
     public void ChatIntentParser_CreateTicketWithoutScope_AsksClarification()
     {

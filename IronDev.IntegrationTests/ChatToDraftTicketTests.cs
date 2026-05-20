@@ -558,6 +558,32 @@ public class ChatToDraftTicketTests
         Assert.AreEqual(7L, ticketService.SavedTickets[0].SourceChatMessageId);
         StringAssert.Contains(vm.SaveStatus, "1 draft(s) still waiting");
     }
+
+    [TestMethod]
+    [Description("SaveAllDraftsCommand persists every generated split draft in one action.")]
+    public async Task SaveAllDraftsCommand_MultiDraft_SavesEntireQueue()
+    {
+        var ticketService = new StubTicketService();
+        var vm = new TicketsWorkspaceViewModel(
+            ticketService,
+            null!,
+            new StubOrchestrator(),
+            new StubDraftTicketService(),
+            null!);
+
+        await vm.BeginDraftsFromChatAsync(
+        [
+            MakeContext("Location model", "Split ticket 1 of 2: add location model"),
+            MakeContext("Location persistence", "Split ticket 2 of 2: add persistence")
+        ]);
+
+        await vm.SaveAllDraftsCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(2, ticketService.SavedTickets.Count);
+        Assert.AreEqual(0, vm.Tickets.Count(t => t.IsDraft));
+        Assert.IsFalse(vm.IsDraftMode);
+        StringAssert.Contains(vm.SaveStatus, "Saved 2 draft ticket(s)");
+    }
 }
 
 /// <summary>
