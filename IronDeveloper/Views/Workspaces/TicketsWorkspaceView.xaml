@@ -431,8 +431,12 @@
                         </Border>
 
                         <!-- Content Area -->
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="16">
-                            <Grid>
+                        <ScrollViewer x:Name="TicketDetailScroll"
+                                      Grid.Row="2"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Padding="16">
+                            <Grid Width="{Binding ViewportWidth, ElementName=TicketDetailScroll}">
                                 <!-- TAB: Overview -->
                                 <StackPanel>
                                     <StackPanel.Style>
