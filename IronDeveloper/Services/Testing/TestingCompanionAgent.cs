@@ -282,6 +282,8 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         sb.AppendLine();
         sb.AppendLine("Please triage these together, identify likely shared causes, group related bugs, suggest files/components to inspect, and propose a fix order.");
         sb.AppendLine();
+        AppendBuildAgentGradingInstructions(sb);
+        sb.AppendLine();
 
         for (var i = 0; i < moments.Count; i++)
         {
@@ -663,8 +665,23 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         AppendImage(sb, "Annotated screenshot image", moment.AnnotatedScreenshotPath);
         AppendCodeSection(sb, "Relevant logs", moment.RelevantLogsText);
         AppendCodeSection(sb, "Relevant traces", moment.RelevantTraceText);
+        AppendBuildAgentGradingInstructions(sb);
         sb.AppendLine("Please identify likely causes, suggest the files/components to inspect, and propose a fix plan.");
         return sb.ToString().Trim();
+    }
+
+    private static void AppendBuildAgentGradingInstructions(StringBuilder sb)
+    {
+        sb.AppendLine("## Build Agent dogfood check");
+        sb.AppendLine();
+        sb.AppendLine("Before applying fixes directly, use this bug evidence to run or mentally simulate the Build Agent workflow as a proposal generator:");
+        sb.AppendLine();
+        sb.AppendLine("1. Create or select a focused bug ticket from this evidence.");
+        sb.AppendLine("2. Ask the Build Agent for an implementation plan and proposed affected files.");
+        sb.AppendLine("3. Grade whether the Build Agent used the screenshots, notes, logs, LLM traces, and project memory correctly.");
+        sb.AppendLine("4. Do not auto-apply broad code changes; treat the Build Agent output as a reviewable proposal.");
+        sb.AppendLine("5. In the answer, include a short Build Agent grade: Useful / Partially useful / Weak, with why.");
+        sb.AppendLine();
     }
 
     private static void AppendImage(StringBuilder sb, string title, string? path)
