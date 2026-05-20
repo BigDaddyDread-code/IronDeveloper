@@ -347,6 +347,43 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         });
     }
 
+    [RelayCommand]
+    private void OpenSelectedScreenshot()
+    {
+        var path = SelectedMoment?.AnnotatedScreenshotPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            path = SelectedMoment?.OriginalScreenshotPath;
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            StatusText = "Selected moment does not have an available screenshot.";
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true
+        });
+    }
+
+    [RelayCommand]
+    private void CopySelectedScreenshotMarkdown()
+    {
+        var path = SelectedMoment?.AnnotatedScreenshotPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            path = SelectedMoment?.OriginalScreenshotPath;
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            StatusText = "Selected moment does not have an available screenshot.";
+            return;
+        }
+
+        System.Windows.Clipboard.SetText($"![Annotated screenshot]({ToMarkdownImagePath(path)})");
+        StatusText = "Copied screenshot Markdown.";
+    }
+
     private void RefreshState()
     {
         OnPropertyChanged(nameof(HasActiveRun));
@@ -399,6 +436,9 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
 
     private string BuildCopyPrompt(TestMoment moment)
     {
+        var screenshot = ToMarkdownImagePath(moment.ScreenshotPath);
+        var annotatedScreenshot = ToMarkdownImagePath(moment.AnnotatedScreenshotPath);
+
         return $"""
         I found this issue while testing with IronDev Testing Companion.
 
@@ -424,9 +464,20 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         Screenshot: {moment.ScreenshotPath}
         Annotated screenshot: {moment.AnnotatedScreenshotPath}
 
+        Screenshot image:
+        ![Screenshot]({screenshot})
+
+        Annotated screenshot image:
+        ![Annotated screenshot]({annotatedScreenshot})
+
         Please identify likely causes, suggest files/components to inspect, and propose a fix plan.
         """;
     }
+
+    private static string ToMarkdownImagePath(string? path)
+        => string.IsNullOrWhiteSpace(path)
+            ? ""
+            : $"<{path.Replace('\\', '/')}>";
 }
 
 public sealed class TestRunRecordItemViewModel
@@ -505,6 +556,8 @@ public sealed class TestMomentItemViewModel
     public string Title => FirstLine(Moment.ActualBehavior ?? Moment.UserTextNote ?? "Captured moment");
     public string Detail => Moment.ExpectedBehavior ?? Moment.SuspectedArea ?? "";
     public string ScreenshotPath => Moment.AnnotatedScreenshotPath ?? Moment.ScreenshotPath ?? "";
+    public string OriginalScreenshotPath => Moment.ScreenshotPath ?? "";
+    public string AnnotatedScreenshotPath => Moment.AnnotatedScreenshotPath ?? Moment.ScreenshotPath ?? "";
 
     private static string FirstLine(string value)
         => value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "Captured moment";

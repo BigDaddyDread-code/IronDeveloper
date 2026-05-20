@@ -287,6 +287,8 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             sb.AppendLine($"- Workspace: {moment.ActiveWorkspace ?? "Unknown"}");
             sb.AppendLine($"- Screenshot: {moment.ScreenshotPath}");
             sb.AppendLine($"- Annotated screenshot: {moment.AnnotatedScreenshotPath}");
+            AppendImage(sb, "Screenshot image", moment.ScreenshotPath);
+            AppendImage(sb, "Annotated screenshot image", moment.AnnotatedScreenshotPath);
             AppendOptionalSection(sb, "Tester note", moment.UserTextNote);
             AppendOptionalSection(sb, "Expected", moment.ExpectedBehavior);
             AppendOptionalSection(sb, "Actual", moment.ActualBehavior);
@@ -485,6 +487,8 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             sb.AppendLine();
             sb.AppendLine($"- Screenshot: `{moment.ScreenshotPath}`");
             sb.AppendLine($"- Annotated screenshot: `{moment.AnnotatedScreenshotPath}`");
+            AppendImage(sb, "Screenshot image", moment.ScreenshotPath);
+            AppendImage(sb, "Annotated screenshot image", moment.AnnotatedScreenshotPath);
             if (moment.MarkedAreaWidth is > 0 && moment.MarkedAreaHeight is > 0)
                 sb.AppendLine($"- Marked area: x={moment.MarkedAreaX}, y={moment.MarkedAreaY}, width={moment.MarkedAreaWidth}, height={moment.MarkedAreaHeight}");
             sb.AppendLine();
@@ -548,7 +552,19 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         sb.AppendLine($"Screenshot: {moment.ScreenshotPath}");
         sb.AppendLine($"Annotated screenshot: {moment.AnnotatedScreenshotPath}");
         sb.AppendLine();
+        AppendImage(sb, "Screenshot image", moment.ScreenshotPath);
+        AppendImage(sb, "Annotated screenshot image", moment.AnnotatedScreenshotPath);
         sb.AppendLine("Please identify likely causes, suggest the files/components to inspect, and propose a fix plan.");
         return sb.ToString().Trim();
+    }
+
+    private static void AppendImage(StringBuilder sb, string title, string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        sb.AppendLine($"{title}:");
+        sb.AppendLine($"![{title}](<{path.Replace('\\', '/')}>)");
+        sb.AppendLine();
     }
 }
