@@ -1008,16 +1008,19 @@ Return JSON only.";
             sb.AppendLine("=== TICKET CANDIDATES EXTRACTED FROM DISCUSSION ===");
             if (candidates.Count > 0)
             {
-                sb.AppendLine("I have extracted the following candidate tickets for your review. These have NOT been saved yet.");
+                sb.AppendLine("The following candidate tickets were extracted for review. These have NOT been saved yet.");
                 sb.AppendLine();
-                foreach (var c in candidates)
+                for (var i = 0; i < candidates.Count; i++)
                 {
-                    sb.AppendLine($"Candidate: {c.Title}");
-                    sb.AppendLine($"Domain:    {c.SuggestedDomain}");
-                    sb.AppendLine($"Summary:   {c.Summary}");
+                    var c = candidates[i];
+                    sb.AppendLine($"{i + 1}. **{c.Title}**");
+                    if (!string.IsNullOrWhiteSpace(c.SuggestedDomain))
+                        sb.AppendLine($"   - **Domain:** {c.SuggestedDomain}");
+                    if (!string.IsNullOrWhiteSpace(c.Summary))
+                        sb.AppendLine($"   - **Summary:** {c.Summary}");
                     if (!string.IsNullOrWhiteSpace(c.ExistingRelatedWork))
-                        sb.AppendLine($"Related:   {c.ExistingRelatedWork}");
-                    sb.AppendLine("---");
+                        sb.AppendLine($"   - **Related:** {c.ExistingRelatedWork}");
+                    sb.AppendLine();
                 }
             }
             else
@@ -1026,8 +1029,11 @@ Return JSON only.";
             }
 
             sb.AppendLine();
-            sb.AppendLine("INSTRUCTION: Present these candidates to the user for review. Explain that they can select which ones to create as draft tickets.");
-            sb.AppendLine("Do NOT claim you have implemented these or that they exist in the database yet.");
+            sb.AppendLine("INSTRUCTION: Present these candidates using standard Markdown only.");
+            sb.AppendLine("Use the exact shape shown above: numbered items, bold titles, and indented bullets with bold labels followed by a space.");
+            sb.AppendLine("Do NOT write compact labels such as Domain:Database or Summary:Text.");
+            sb.AppendLine("Do NOT claim you have created, saved, or implemented these tickets yet.");
+            sb.AppendLine("End by telling the user to review the candidates and say `create tickets` to open draft ticket review.");
             return sb.ToString();
         }
 

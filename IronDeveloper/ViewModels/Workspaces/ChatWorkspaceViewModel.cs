@@ -688,20 +688,24 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 : MakeTicketTitle(candidate.Title);
 
             var message = new StringBuilder();
-            message.AppendLine($"Candidate ticket {i + 1} of {usableCandidates.Count}: {title}");
-            if (!string.IsNullOrWhiteSpace(candidate.SuggestedDomain))
-                message.AppendLine($"Domain: {candidate.SuggestedDomain.Trim()}");
-            if (!string.IsNullOrWhiteSpace(candidate.Summary))
-                message.AppendLine($"Summary: {candidate.Summary.Trim()}");
-            if (!string.IsNullOrWhiteSpace(candidate.ExistingRelatedWork))
-                message.AppendLine($"Related work: {candidate.ExistingRelatedWork.Trim()}");
+            message.AppendLine($"## Candidate ticket {i + 1} of {usableCandidates.Count}");
             message.AppendLine();
-            message.AppendLine("Source request:");
+            message.AppendLine($"**Title:** {title}");
+            if (!string.IsNullOrWhiteSpace(candidate.SuggestedDomain))
+                message.AppendLine($"**Domain:** {candidate.SuggestedDomain.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.Summary))
+                message.AppendLine($"**Summary:** {candidate.Summary.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.ExistingRelatedWork))
+                message.AppendLine($"**Related work:** {candidate.ExistingRelatedWork.Trim()}");
+            message.AppendLine();
+            message.AppendLine("### Source request");
+            message.AppendLine();
             message.AppendLine(sourceRequest.Trim());
             if (!string.IsNullOrWhiteSpace(recentConversationSummary))
             {
                 message.AppendLine();
-                message.AppendLine("Recent discussion:");
+                message.AppendLine("### Recent discussion");
+                message.AppendLine();
                 message.AppendLine(recentConversationSummary.Trim());
             }
 

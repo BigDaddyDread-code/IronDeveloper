@@ -1511,6 +1511,44 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Plural candidate-ticket commands produce reusable standard Markdown ticket context.")]
+    public void ChatWorkspaceViewModel_CreateTicketsFromCandidates_UsesStandardMarkdown()
+    {
+        var method = typeof(ChatWorkspaceViewModel).GetMethod(
+            "BuildTicketContextsFromCandidates",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.IsNotNull(method);
+
+        var candidates = new List<TicketCandidate>
+        {
+            new()
+            {
+                Title = "Implement SQL Server Integration",
+                SuggestedDomain = "Database",
+                Summary = "Integrate SQL Server as the persistent data storage solution."
+            },
+            new()
+            {
+                Title = "Integrate Dapper ORM",
+                SuggestedDomain = "Database",
+                Summary = "Use Dapper as the ORM layer."
+            }
+        };
+
+        var captured = (IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>)method.Invoke(
+            null,
+            [candidates, 10L, 20L, "create tickets", "Previous assistant candidate list"])!;
+
+        Assert.IsNotNull(captured);
+        Assert.AreEqual(2, captured!.Count);
+        StringAssert.Contains(captured[0].MessageText, "## Candidate ticket 1 of 2");
+        StringAssert.Contains(captured[0].MessageText, "**Title:** Implement SQL Server Integration");
+        StringAssert.Contains(captured[0].MessageText, "### Source request");
+        Assert.IsFalse(captured[0].MessageText.Contains("Domain:Database", StringComparison.Ordinal));
+        Assert.IsFalse(captured[0].MessageText.Contains("Summary:Integrate", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     [Description("Context Agent action-required results dispatch workflow actions instead of falling through to prose chat.")]
     public async Task ChatWorkspaceViewModel_ContextAgentActionRequired_SuppressesProseResponse()
     {
