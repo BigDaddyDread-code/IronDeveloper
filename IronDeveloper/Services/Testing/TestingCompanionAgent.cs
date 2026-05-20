@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Core.Testing;
 
 namespace IronDev.Agent.Services.Testing;
@@ -15,12 +17,16 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         "TestRuns");
 
     private readonly IScreenshotCaptureService _screenshotCaptureService;
+    private readonly ILlmTraceService _llmTraceService;
     private readonly List<TestMoment> _moments = [];
     private TestRun? _currentRun;
 
-    public TestingCompanionAgent(IScreenshotCaptureService screenshotCaptureService)
+    public TestingCompanionAgent(
+        IScreenshotCaptureService screenshotCaptureService,
+        ILlmTraceService llmTraceService)
     {
         _screenshotCaptureService = screenshotCaptureService;
+        _llmTraceService = llmTraceService;
     }
 
     public TestRun? CurrentRun => _currentRun;
@@ -97,7 +103,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             ActiveWorkspace = activeWorkspace,
             ActiveProjectName = run.ProjectName,
             RelevantLogsText = CaptureLogWindow(run.LogFilePath, capturedAt),
-            RelevantTraceText = "Trace capture is not wired yet. This placeholder keeps the report shape stable."
+            RelevantTraceText = CaptureLlmTraceWindow(capturedAt)
         };
     }
 
@@ -428,6 +434,67 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         {
             return null;
         }
+    }
+
+    private string? CaptureLlmTraceWindow(DateTimeOffset markedAt)
+    {
+        var capturedUtc = markedAt.UtcDateTime;
+        var traces = _llmTraceService
+            .GetRecentTraces(80)
+            .Where(t => t.CreatedAt >= capturedUtc.AddMinutes(-20) &&
+                        t.CreatedAt <= capturedUtc.AddMinutes(2))
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(12)
+            .ToList();
+
+        if (traces.Count == 0)
+            return "No recent LLM traces were captured in the 20 minutes before this moment.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Recent LLM traces around marked moment ({traces.Count}):");
+        sb.AppendLine();
+
+        foreach (var trace in traces)
+            AppendLlmTraceSummary(sb, trace);
+
+        return sb.ToString().Trim();
+    }
+
+    private static void AppendLlmTraceSummary(StringBuilder sb, LlmTraceEntry trace)
+    {
+        sb.AppendLine($"- {trace.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss} | {trace.FeatureName} | {trace.Model} | Success={trace.WasSuccessful} | Duration={trace.DurationMs}ms");
+
+        if (trace.ProjectId.HasValue)
+            sb.AppendLine($"  ProjectId: {trace.ProjectId}");
+        if (trace.TicketId.HasValue)
+            sb.AppendLine($"  TicketId: {trace.TicketId}");
+        if (!string.IsNullOrWhiteSpace(trace.TraceGroupId))
+            sb.AppendLine($"  TraceGroupId: {trace.TraceGroupId}");
+        if (!string.IsNullOrWhiteSpace(trace.CurrentUserMessage))
+            sb.AppendLine($"  User: {TrimForTrace(trace.CurrentUserMessage)}");
+        if (!string.IsNullOrWhiteSpace(trace.ContextSummary))
+            sb.AppendLine($"  Context: {TrimForTrace(trace.ContextSummary)}");
+        if (!string.IsNullOrWhiteSpace(trace.ParsedResponseSummary))
+            sb.AppendLine($"  Result: {TrimForTrace(trace.ParsedResponseSummary)}");
+        if (!string.IsNullOrWhiteSpace(trace.Warnings))
+            sb.AppendLine($"  Warnings: {TrimForTrace(trace.Warnings)}");
+        if (!string.IsNullOrWhiteSpace(trace.ErrorMessage))
+            sb.AppendLine($"  Error: {TrimForTrace(trace.ErrorMessage)}");
+
+        if (trace.IndexWarnings.Count > 0)
+            sb.AppendLine($"  Index warnings: {string.Join("; ", trace.IndexWarnings.Take(4))}");
+        if (trace.FilesReferencedByGeneratedTickets.Count > 0)
+            sb.AppendLine($"  Files: {string.Join(", ", trace.FilesReferencedByGeneratedTickets.Take(6))}");
+        if (trace.SymbolsReferencedByGeneratedTickets.Count > 0)
+            sb.AppendLine($"  Symbols: {string.Join(", ", trace.SymbolsReferencedByGeneratedTickets.Take(6))}");
+
+        sb.AppendLine();
+    }
+
+    private static string TrimForTrace(string value)
+    {
+        var compact = value.Replace("\r", " ").Replace("\n", " ").Trim();
+        return compact.Length <= 420 ? compact : compact[..420] + "...";
     }
 
     private static string ResolveDefaultIronDevLogPath()

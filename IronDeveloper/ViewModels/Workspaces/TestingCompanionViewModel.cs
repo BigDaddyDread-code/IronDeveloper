@@ -503,6 +503,7 @@ public sealed partial class MarkMomentViewModel : ObservableObject
 {
     public BrokenMomentCaptureDraft Draft { get; }
 
+    [ObservableProperty] private double _screenshotZoom = 1.0;
     [ObservableProperty] private TestMomentType _momentType = TestMomentType.Bug;
     [ObservableProperty] private string _userTextNote = "";
     [ObservableProperty] private string _expectedBehavior = "";

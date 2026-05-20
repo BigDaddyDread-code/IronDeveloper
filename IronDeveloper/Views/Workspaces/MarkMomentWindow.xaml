@@ -44,22 +44,57 @@
                     Style="{StaticResource SurfacePanel.Subtle}"
                     Padding="10"
                     Margin="0,0,14,0">
-                <Grid x:Name="ScreenshotHost"
-                      Background="Transparent"
-                      MouseLeftButtonDown="ScreenshotHost_MouseLeftButtonDown"
-                      MouseMove="ScreenshotHost_MouseMove"
-                      MouseLeftButtonUp="ScreenshotHost_MouseLeftButtonUp">
-                    <Image x:Name="ScreenshotImage"
-                           Source="{Binding ScreenshotPath}"
-                           Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <Canvas x:Name="AnnotationCanvas"
-                            IsHitTestVisible="False">
-                        <Rectangle x:Name="SelectionRectangle"
-                                   Stroke="Red"
-                                   StrokeThickness="3"
-                                   Visibility="Collapsed"/>
-                    </Canvas>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="ZOOM"
+                                   Style="{StaticResource Typography.Eyebrow}"
+                                   Margin="0,0,10,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding ScreenshotZoom, StringFormat={}{0:P0}}"
+                                   Foreground="{StaticResource Text/Muted}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"/>
+                        <Slider Minimum="0.35"
+                                Maximum="2.5"
+                                TickFrequency="0.25"
+                                IsSnapToTickEnabled="False"
+                                Value="{Binding ScreenshotZoom, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </DockPanel>
+
+                    <ScrollViewer Grid.Row="1"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Background="Transparent">
+                        <Grid x:Name="ScreenshotHost"
+                              Background="Transparent"
+                              MouseLeftButtonDown="ScreenshotHost_MouseLeftButtonDown"
+                              MouseMove="ScreenshotHost_MouseMove"
+                              MouseLeftButtonUp="ScreenshotHost_MouseLeftButtonUp">
+                            <Grid.LayoutTransform>
+                                <ScaleTransform ScaleX="{Binding ScreenshotZoom}"
+                                                ScaleY="{Binding ScreenshotZoom}"/>
+                            </Grid.LayoutTransform>
+                            <Image x:Name="ScreenshotImage"
+                                   Source="{Binding ScreenshotPath}"
+                                   Stretch="None"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                            <Canvas x:Name="AnnotationCanvas"
+                                    IsHitTestVisible="False">
+                                <Rectangle x:Name="SelectionRectangle"
+                                           Stroke="Red"
+                                           StrokeThickness="3"
+                                           Visibility="Collapsed"/>
+                            </Canvas>
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
             </Border>
 
