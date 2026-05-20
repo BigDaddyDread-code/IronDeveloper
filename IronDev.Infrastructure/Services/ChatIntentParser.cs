@@ -118,15 +118,21 @@ public static class ChatIntentParser
             lower.StartsWith("split this plan into ") ||
             lower.StartsWith("turn this into tickets") ||
             lower.StartsWith("turn this plan into tickets") ||
-            lower.StartsWith("turn the plan into tickets");
+            lower.StartsWith("turn the plan into tickets") ||
+            lower == "create tickets" ||
+            lower == "create draft tickets" ||
+            lower.StartsWith("create tickets ") ||
+            lower.StartsWith("create draft tickets ");
 
         if (!isSplitCommand) return null;
 
         var count = ExtractTicketCount(lower);
         var hints = ExtractSplitHints(text);
+        if (hints.Count == 0)
+            hints = ExtractCandidateTitles(previousMessage);
         if (count <= 1 && hints.Count > 1)
             count = hints.Count;
-        if (count <= 1)
+        if (count <= 1 && !string.IsNullOrWhiteSpace(previousMessage))
             count = 2;
 
         var workText = ExtractSplitWorkText(text, previousMessage);
@@ -142,7 +148,7 @@ public static class ChatIntentParser
             SplitHints = hints,
             RequiresClarification = requiresClarification,
             ClarificationQuestions = requiresClarification
-                ? ["What should I split into tickets?"]
+                ? ["Which work should I create tickets from?"]
                 : Array.Empty<string>()
         };
     }
@@ -175,6 +181,58 @@ public static class ChatIntentParser
             .Where(part => part.Length > 0)
             .Take(5)
             .ToList();
+    }
+
+    private static List<string> ExtractCandidateTitles(string? previousMessage)
+    {
+        if (string.IsNullOrWhiteSpace(previousMessage))
+            return [];
+
+        var titles = new List<string>();
+        foreach (var rawLine in previousMessage.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            var candidate = TryExtractNumberedTitle(line) ?? TryExtractCandidateTitle(line);
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+
+            titles.Add(candidate.Trim());
+            if (titles.Count >= 5)
+                break;
+        }
+
+        return titles;
+    }
+
+    private static string? TryExtractNumberedTitle(string line)
+    {
+        var dotIndex = line.IndexOf('.');
+        if (dotIndex <= 0 || dotIndex >= line.Length - 1)
+            return null;
+
+        var prefix = line[..dotIndex].Trim();
+        if (!int.TryParse(prefix, out _))
+            return null;
+
+        return CleanTitle(line[(dotIndex + 1)..]);
+    }
+
+    private static string? TryExtractCandidateTitle(string line)
+    {
+        const string candidatePrefix = "candidate:";
+        if (!line.StartsWith(candidatePrefix, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return CleanTitle(line[candidatePrefix.Length..]);
+    }
+
+    private static string? CleanTitle(string value)
+    {
+        var title = value.Trim().Trim('-', '*', ' ', '\t');
+        if (title.StartsWith("**") && title.EndsWith("**") && title.Length > 4)
+            title = title[2..^2].Trim();
+
+        return string.IsNullOrWhiteSpace(title) ? null : title;
     }
 
     private static string ExtractSplitWorkText(string request, string? previousMessage)

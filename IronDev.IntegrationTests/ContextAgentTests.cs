@@ -1417,6 +1417,33 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Bare plural create-tickets command uses candidate titles from the previous assistant message.")]
+    public void ChatIntentParser_CreateTickets_UsesPreviousCandidateTitles()
+    {
+        var previous = """
+            Here are the candidate tickets:
+
+            1. **Implement SQL Server Integration**
+            - Domain: Database
+            - Summary: Integrate SQL Server as the persistent data storage solution.
+
+            2. **Integrate Dapper ORM**
+            - Domain: Database
+            - Summary: Use Dapper as the ORM layer.
+            """;
+
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("create tickets", previous);
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("CreateTickets", intent.Intent);
+        Assert.AreEqual(2, intent.TicketCount);
+        Assert.AreEqual("Implement SQL Server Integration", intent.SplitHints[0]);
+        Assert.AreEqual("Integrate Dapper ORM", intent.SplitHints[1]);
+        Assert.AreEqual(previous.Trim(), intent.WorkText);
+        Assert.IsFalse(intent.RequiresClarification);
+    }
+
+    [TestMethod]
     [Description("Bare create-ticket commands are explicit but need scope clarification.")]
     public void ChatIntentParser_CreateTicketWithoutScope_AsksClarification()
     {
