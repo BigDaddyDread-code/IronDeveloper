@@ -31,6 +31,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private readonly IChatFeedbackService   _feedbackService;
     private readonly ILlmTraceService       _llmTraceService;
     private readonly IContextAgentService?  _contextAgentService;
+    private readonly IChatCommandRouter     _chatCommandRouter;
 
     /// <summary>
     /// When true and <see cref="_contextAgentService"/> is wired, the chat send
@@ -87,7 +88,8 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         ITicketService        ticketService,
         IChatFeedbackService  feedbackService,
         ILlmTraceService      llmTraceService,
-        IContextAgentService? contextAgentService = null)
+        IContextAgentService? contextAgentService = null,
+        IChatCommandRouter?   chatCommandRouter = null)
     {
         _chatHistoryService   = chatHistoryService;
         _promptContextBuilder = promptContextBuilder;
@@ -97,6 +99,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         _feedbackService      = feedbackService;
         _llmTraceService      = llmTraceService;
         _contextAgentService  = contextAgentService;
+        _chatCommandRouter    = chatCommandRouter ?? new IronDev.Infrastructure.Services.ChatCommandRouter();
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
@@ -254,9 +257,48 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             }
 
             var previousMessage = Messages.Count > 1 ? Messages[Messages.Count - 2].MessageText : null;
-            var ticketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
-            if (ticketIntent != null && (!UseContextAgent || _contextAgentService == null))
+            var previousAssistantMessage = Messages
+                .Take(Messages.Count - 1)
+                .LastOrDefault(m => m.Role == "assistant")
+                ?.MessageText;
+            var previousUserMessage = Messages
+                .Take(Messages.Count - 1)
+                .LastOrDefault(m => m.Role == "user")
+                ?.MessageText;
+
+            var commandRoute = await _chatCommandRouter.RouteAsync(new ChatTurnInput
             {
+                ProjectId = projectId,
+                ChatSessionId = sessionId,
+                UserMessage = text,
+                PreviousAssistantMessage = previousAssistantMessage,
+                PreviousUserMessage = previousUserMessage,
+                ActiveWorkspace = "Chat"
+            });
+
+            if (commandRoute.RequiresAction && !commandRoute.AllowsProseResponse)
+            {
+                var ticketIntent = commandRoute.CreateTicketIntent;
+                if (ticketIntent == null)
+                {
+                    var blockedText = "I understood this as an action command, but no workflow handler is wired for it yet.";
+                    var assistantMsg = new ChatSummary
+                    {
+                        Role = "assistant",
+                        MessageText = blockedText,
+                        Timestamp = DateTime.UtcNow
+                    };
+                    Messages.Add(assistantMsg);
+                    await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                    {
+                        ProjectId = projectId,
+                        ChatSessionId = sessionId,
+                        Role = "assistant",
+                        Message = blockedText
+                    });
+                    return;
+                }
+
                 if (ticketIntent.RequiresClarification)
                 {
                     var clarificationText = string.Join("\n", ticketIntent.ClarificationQuestions);

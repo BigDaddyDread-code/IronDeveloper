@@ -105,6 +105,9 @@ public partial class App : Application
                     global::IronDev.Infrastructure.Services.KnowledgeCompiler.KnowledgeArtefactApplyService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
                 services.AddTransient<
+                    global::IronDev.Core.Interfaces.IChatCommandRouter,
+                    global::IronDev.Infrastructure.Services.ChatCommandRouter>();
+                services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentService,
                     global::IronDev.Infrastructure.Services.ContextAgentService>();
                 services.AddTransient<

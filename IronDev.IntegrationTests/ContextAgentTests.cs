@@ -1471,6 +1471,52 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("ChatCommandRouter gives explicit ticket actions precedence over prose and architecture routing.")]
+    public async Task ChatCommandRouter_CreateTickets_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "ok create me some tickets todo this work",
+            PreviousAssistantMessage = """
+                1. **Add storage locations data model**
+                2. **Update book persistence**
+                """
+        });
+
+        Assert.AreEqual(ChatRouteIntent.CreateMultipleDraftTickets, route.Intent);
+        Assert.IsTrue(route.IsAction);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+        Assert.AreEqual(ContextReferenceKind.PreviousAssistantMessage, route.ContextReference);
+        Assert.AreEqual(DraftCountMode.Multiple, route.DraftCountMode);
+        Assert.IsNotNull(route.CreateTicketIntent);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter leaves non-action questions available for normal chat fallback.")]
+    public async Task ChatCommandRouter_NormalTicketQuestion_AllowsProse()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "how should we structure tickets for this work?",
+            PreviousAssistantMessage = "Use SQL Server and Dapper."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.GeneralChat, route.Intent);
+        Assert.IsFalse(route.IsAction);
+        Assert.IsFalse(route.RequiresAction);
+        Assert.IsTrue(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
     [Description("Bare create-ticket commands are explicit but need scope clarification.")]
     public void ChatIntentParser_CreateTicketWithoutScope_AsksClarification()
     {
@@ -1636,7 +1682,8 @@ public sealed class ContextAgentTests
             new ContextStubTicketService(),
             new StubChatFeedbackService(),
             new LlmTraceService(),
-            spy);
+            spy,
+            new AlwaysGeneralChatRouter());
 
         IronDev.Agent.Models.ChatTicketContext? captured = null;
         vm.OnCreateTicketFromChat = ctx => captured = ctx;
@@ -1672,7 +1719,8 @@ public sealed class ContextAgentTests
             ticketService,
             new StubChatFeedbackService(),
             traceService,
-            spy);
+            spy,
+            new AlwaysGeneralChatRouter());
 
         await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
 
@@ -1719,6 +1767,12 @@ internal sealed class ContextRequestSpyAgentService : IContextAgentService
         LastRequest = request;
         return Task.FromResult(Result);
     }
+}
+
+internal sealed class AlwaysGeneralChatRouter : IChatCommandRouter
+{
+    public Task<ChatRouteResult> RouteAsync(ChatTurnInput input, CancellationToken cancellationToken = default)
+        => Task.FromResult(ChatRouteResult.GeneralChat());
 }
 
 internal sealed class ContextStubTicketService : IronDev.Services.ITicketService
