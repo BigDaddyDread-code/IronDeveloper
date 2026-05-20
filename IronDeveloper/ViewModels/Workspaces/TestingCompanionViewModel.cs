@@ -20,6 +20,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
 
     [ObservableProperty] private TestRun? _currentRun;
     [ObservableProperty] private TestMomentItemViewModel? _selectedMoment;
+    [ObservableProperty] private TestRunRecordItemViewModel? _selectedRunRecord;
     [ObservableProperty] private string _statusText = "No active test session";
     [ObservableProperty] private string _targetName = "IronDev";
     [ObservableProperty] private TestTargetType _targetType = TestTargetType.IronDev;
@@ -32,11 +33,13 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
     [ObservableProperty] private bool _autoReturnAfterStart = true;
 
     public ObservableCollection<TestMomentItemViewModel> Moments { get; } = [];
+    public ObservableCollection<TestRunRecordItemViewModel> RunRecords { get; } = [];
     public IReadOnlyList<TestTargetType> TargetTypes { get; } = Enum.GetValues<TestTargetType>();
     public Action? OnRequestReturnToWork { get; set; }
 
     public bool HasActiveRun => CurrentRun?.Status == TestRunStatus.Running;
     public bool HasMoments => Moments.Count > 0;
+    public bool HasRunRecords => RunRecords.Count > 0;
     public bool CanReturnToWork => !string.IsNullOrWhiteSpace(ReturnWorkspaceName);
     public string RunStatusText => CurrentRun == null
         ? "Idle"
@@ -46,6 +49,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
     {
         _agent = agent;
         Moments.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMoments));
+        RunRecords.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRunRecords));
     }
 
     public async Task LoadAsync(Project project)
@@ -58,6 +62,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         WorkingDirectory = string.IsNullOrWhiteSpace(project.LocalPath) ? ResolveLikelyRepoRoot() : project.LocalPath;
         LogPath = ResolveDefaultIronDevLogPath();
         StatusText = "Ready to start a testing session.";
+        await LoadPersistedRunsAsync();
         await LoadPersistedMomentsAsync();
     }
 
@@ -90,6 +95,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         });
 
         Moments.Clear();
+        await LoadPersistedRunsAsync();
         ReportPath = "";
         LlmDebugPrompt = "";
         StatusText = "Testing session running. Use Ctrl+Shift+M to mark a moment.";
@@ -208,6 +214,22 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task LoadPersistedRunsAsync()
+    {
+        var loaded = await _agent.LoadPersistedRunsAsync(
+            string.IsNullOrWhiteSpace(_projectPath) ? WorkingDirectory : _projectPath);
+
+        RunRecords.Clear();
+        foreach (var record in loaded)
+            RunRecords.Add(new TestRunRecordItemViewModel(record));
+
+        if (SelectedRunRecord == null && RunRecords.Count > 0)
+            SelectedRunRecord = RunRecords[0];
+
+        OnPropertyChanged(nameof(HasRunRecords));
+    }
+
+    [RelayCommand]
     private async Task CopyCombinedPromptAsync()
     {
         var moments = Moments
@@ -275,6 +297,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         var report = await _agent.EndSessionAndGenerateReportAsync(CurrentRun.Id);
         ReportPath = report.ReportPath ?? "";
         StatusText = $"Report generated: {ReportPath}";
+        await LoadPersistedRunsAsync();
         RefreshState();
     }
 
@@ -307,10 +330,28 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         StatusText = "Copied LLM debug prompt.";
     }
 
+    [RelayCommand]
+    private void OpenSelectedRunReport()
+    {
+        var path = SelectedRunRecord?.ReportPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            StatusText = "Selected run does not have a generated report yet.";
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true
+        });
+    }
+
     private void RefreshState()
     {
         OnPropertyChanged(nameof(HasActiveRun));
         OnPropertyChanged(nameof(HasMoments));
+        OnPropertyChanged(nameof(HasRunRecords));
         OnPropertyChanged(nameof(RunStatusText));
         StartSessionCommand.NotifyCanExecuteChanged();
         EndSessionCommand.NotifyCanExecuteChanged();
@@ -377,6 +418,25 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         Please identify likely causes, suggest files/components to inspect, and propose a fix plan.
         """;
     }
+}
+
+public sealed class TestRunRecordItemViewModel
+{
+    public TestRunRecordItemViewModel(TestRunRecord record)
+    {
+        Record = record;
+    }
+
+    public TestRunRecord Record { get; }
+    public string TimeText => Record.StartedAt.ToString("yyyy-MM-dd HH:mm");
+    public string TargetText => $"{Record.TargetName} ({Record.TargetType})";
+    public string StatusText => Record.Status.ToString();
+    public string MomentCountText => $"{Record.MomentCount} moment(s)";
+    public string Summary => string.IsNullOrWhiteSpace(Record.Summary)
+        ? "No report summary yet"
+        : Record.Summary;
+    public string? ReportPath => Record.ReportPath;
+    public string? RunFolderPath => Record.RunFolderPath;
 }
 
 public sealed partial class MarkMomentViewModel : ObservableObject

@@ -13,5 +13,6 @@ public interface ITestingCompanionAgent
     Task<TestMoment> SaveMarkedMomentAsync(Guid testRunId, SaveMarkedMomentRequest request, CancellationToken ct = default);
     Task<TestRunReport> EndSessionAndGenerateReportAsync(Guid testRunId, CancellationToken ct = default);
     Task<IReadOnlyList<TestMoment>> LoadPersistedMomentsAsync(string? projectPath, int take = 25, CancellationToken ct = default);
+    Task<IReadOnlyList<TestRunRecord>> LoadPersistedRunsAsync(string? projectPath, int take = 25, CancellationToken ct = default);
     Task<string> BuildCombinedPromptAsync(string? projectPath, IReadOnlyList<TestMoment> moments, CancellationToken ct = default);
 }

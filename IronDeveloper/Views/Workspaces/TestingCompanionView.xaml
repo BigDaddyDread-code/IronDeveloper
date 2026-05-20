@@ -211,6 +211,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="160"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -234,14 +235,72 @@
                                 Style="{StaticResource AppButton.CompactGhost}"/>
                     </StackPanel>
 
-                    <TextBox Grid.Row="2"
+                    <Border Grid.Row="2"
+                            BorderBrush="{StaticResource Border/Subtle}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="10"
+                            Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right"
+                                        Content="Open"
+                                        Command="{Binding OpenSelectedRunReportCommand}"
+                                        Style="{StaticResource AppButton.CompactGhost}"
+                                        Padding="8,2"/>
+                                <TextBlock Text="PERSISTED REPORTS"
+                                           Style="{StaticResource Typography.Eyebrow}"/>
+                            </DockPanel>
+
+                            <ListBox Grid.Row="1"
+                                     ItemsSource="{Binding RunRecords}"
+                                     SelectedItem="{Binding SelectedRunRecord, Mode=TwoWay}"
+                                     ItemContainerStyle="{StaticResource AppListBoxItem.Compact}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="2,5">
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Right"
+                                                           Text="{Binding MomentCountText}"
+                                                           Foreground="{StaticResource Accent/Primary}"
+                                                           FontSize="10"
+                                                           Margin="8,0,0,0"/>
+                                                <TextBlock Text="{Binding TimeText}"
+                                                           Foreground="{StaticResource Text/Primary}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="12"/>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding TargetText}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Summary}"
+                                                       Foreground="{StaticResource Text/Muted}"
+                                                       FontSize="10"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <TextBox Grid.Row="3"
                              Text="{Binding LlmDebugPrompt}"
                              AcceptsReturn="True"
                              IsReadOnly="True"
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"/>
 
-                    <TextBlock Grid.Row="3"
+                    <TextBlock Grid.Row="4"
                                Text="{Binding ReportPath}"
                                Foreground="{StaticResource Text/Muted}"
                                FontSize="11"

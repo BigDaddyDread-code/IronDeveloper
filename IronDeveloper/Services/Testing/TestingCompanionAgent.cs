@@ -187,6 +187,75 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             .ToList();
     }
 
+    public async Task<IReadOnlyList<TestRunRecord>> LoadPersistedRunsAsync(string? projectPath, int take = 25, CancellationToken ct = default)
+    {
+        var runRoots = GetCandidateRunRoots(projectPath)
+            .Where(Directory.Exists)
+            .SelectMany(root => Directory.EnumerateDirectories(root))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(Directory.GetLastWriteTimeUtc);
+
+        var records = new List<TestRunRecord>();
+        foreach (var runFolder in runRoots)
+        {
+            ct.ThrowIfCancellationRequested();
+            var runPath = Path.Combine(runFolder, "test-run.json");
+            if (!File.Exists(runPath))
+                continue;
+
+            try
+            {
+                var runJson = await File.ReadAllTextAsync(runPath, ct);
+                var run = JsonSerializer.Deserialize<TestRun>(runJson);
+                if (run == null)
+                    continue;
+
+                var momentsPath = Path.Combine(runFolder, "moments.json");
+                var momentCount = 0;
+                if (File.Exists(momentsPath))
+                {
+                    var momentsJson = await File.ReadAllTextAsync(momentsPath, ct);
+                    momentCount = JsonSerializer.Deserialize<List<TestMoment>>(momentsJson)?.Count ?? 0;
+                }
+
+                var reportPath = Path.Combine(runFolder, "report.json");
+                TestRunReport? report = null;
+                if (File.Exists(reportPath))
+                {
+                    var reportJson = await File.ReadAllTextAsync(reportPath, ct);
+                    report = JsonSerializer.Deserialize<TestRunReport>(reportJson);
+                }
+
+                records.Add(new TestRunRecord
+                {
+                    TestRunId = run.Id,
+                    ProjectName = run.ProjectName,
+                    TargetName = run.TargetName,
+                    TargetType = run.TargetType,
+                    Status = run.Status,
+                    StartedAt = run.StartedAt,
+                    EndedAt = run.EndedAt,
+                    MomentCount = momentCount,
+                    Summary = report?.Summary ?? run.Summary,
+                    RunFolderPath = run.RunFolderPath ?? runFolder,
+                    ReportPath = report?.ReportPath ?? Path.Combine(runFolder, "reports", "debug-package.md")
+                });
+            }
+            catch
+            {
+                // Ignore malformed old captures; one bad run should not hide the rest.
+            }
+
+            if (records.Count >= take)
+                break;
+        }
+
+        return records
+            .OrderByDescending(r => r.StartedAt)
+            .Take(take)
+            .ToList();
+    }
+
     public Task<string> BuildCombinedPromptAsync(string? projectPath, IReadOnlyList<TestMoment> moments, CancellationToken ct = default)
     {
         var projectName = string.IsNullOrWhiteSpace(projectPath)
