@@ -55,6 +55,9 @@ DbRebuildTest/
 *.log
 logs/
 
+## Local IronDev runtime data
+ProjectData/
+
 ## WPF designer temp artifacts (can be 10MB+)
 *_wpftmp.csproj
 *_wpftmp.zip

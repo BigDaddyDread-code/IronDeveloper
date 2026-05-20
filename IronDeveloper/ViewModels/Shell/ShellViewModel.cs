@@ -26,6 +26,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly KnowledgeCompilerViewModel _knowledgeCompilerVm;
     private readonly ChatWorkspaceViewModel   _chatVm;
     private readonly TicketsWorkspaceViewModel _ticketsVm;
+    private readonly TestingCompanionViewModel _testingVm;
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
     private readonly DocumentsWorkspaceViewModel _documentsVm;
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
@@ -33,6 +34,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly BuilderWorkspaceViewModel   _builderVm;
     private readonly ProjectProfileViewModel     _profileVm;
     private readonly AgentTenantContext          _tenantContext;
+    private ProjectWorkspace _lastWorkspaceBeforeTesting = ProjectWorkspace.Overview;
 
     // ── Observable shell state ────────────────────────────────────────────────
 
@@ -78,6 +80,9 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool ShowHeader  => HasActiveProject && CurrentShellMode == ShellMode.ProjectActive;
     public bool StatusNeedsIndex => IsIndexActionableStatus(ActiveStatus);
     public bool StatusCanIndex => IsIndexActionableStatus(ActiveStatus);
+    public bool CanUseTestingCompanion => true;
+    public TestingCompanionViewModel TestingCompanion => _testingVm;
+    public string CurrentWorkspaceDisplayName => GetWorkspaceDisplayName(CurrentWorkspace);
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -89,6 +94,7 @@ public sealed partial class ShellViewModel : ObservableObject
         KnowledgeCompilerViewModel knowledgeCompilerVm,
         ChatWorkspaceViewModel     chatVm,
         TicketsWorkspaceViewModel  ticketsVm,
+        TestingCompanionViewModel  testingVm,
         DecisionsWorkspaceViewModel          decisionsVm,
         DocumentsWorkspaceViewModel          documentsVm,
         ImplementationPlansWorkspaceViewModel plansVm,
@@ -104,6 +110,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _knowledgeCompilerVm = knowledgeCompilerVm;
         _chatVm      = chatVm;
         _ticketsVm   = ticketsVm;
+        _testingVm   = testingVm;
         _decisionsVm = decisionsVm;
         _documentsVm = documentsVm;
         _plansVm     = plansVm;
@@ -184,6 +191,8 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentWorkspace = ProjectWorkspace.Chat;
             CurrentView = _chatVm;
         };
+
+        _testingVm.OnRequestReturnToWork = NavigateBackFromTesting;
 
         // Ticket draft approved with plan → navigate to Plans after save
         _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols, scope, risks) =>
@@ -271,7 +280,16 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
         }
 
+        if (!HasActiveProject || CurrentShellMode != ShellMode.ProjectActive)
+            return;
+
         if (!System.Enum.TryParse<ProjectWorkspace>(workspaceName, out var ws)) return;
+        if (ws == ProjectWorkspace.Testing && CurrentWorkspace != ProjectWorkspace.Testing)
+        {
+            _lastWorkspaceBeforeTesting = CurrentWorkspace;
+            _testingVm.SetReturnWorkspace(GetWorkspaceDisplayName(_lastWorkspaceBeforeTesting));
+        }
+
         CurrentWorkspace = ws;
         CurrentView = ws switch
         {
@@ -279,6 +297,7 @@ public sealed partial class ShellViewModel : ObservableObject
             ProjectWorkspace.Discovery      => _knowledgeCompilerVm,
             ProjectWorkspace.Chat           => _chatVm,
             ProjectWorkspace.Tickets        => _ticketsVm,
+            ProjectWorkspace.Testing        => _testingVm,
             ProjectWorkspace.Plans          => _plansVm,
             ProjectWorkspace.Decisions      => _decisionsVm,
             ProjectWorkspace.Documents      => _documentsVm,
@@ -347,6 +366,54 @@ public sealed partial class ShellViewModel : ObservableObject
 
     // ── Private navigation helpers ───────────────────────────────────────────
 
+    public async Task MarkTestingMomentAsync()
+    {
+        if (CurrentWorkspace != ProjectWorkspace.Testing)
+        {
+            _lastWorkspaceBeforeTesting = CurrentWorkspace;
+            _testingVm.SetReturnWorkspace(GetWorkspaceDisplayName(_lastWorkspaceBeforeTesting));
+        }
+
+        await _testingVm.EnsureSessionStartedAsync();
+
+        await _testingVm.MarkMomentForWorkspaceAsync(GetActiveTestingContextName());
+    }
+
+    public async Task EnsureTestingSessionStartedAsync()
+    {
+        if (CurrentWorkspace != ProjectWorkspace.Testing)
+        {
+            _lastWorkspaceBeforeTesting = CurrentWorkspace;
+            _testingVm.SetReturnWorkspace(GetWorkspaceDisplayName(_lastWorkspaceBeforeTesting));
+        }
+
+        await _testingVm.EnsureSessionStartedAsync();
+    }
+
+    private void NavigateBackFromTesting()
+    {
+        if (!HasActiveProject || CurrentShellMode != ShellMode.ProjectActive)
+            return;
+
+        NavigateWorkspace(_lastWorkspaceBeforeTesting.ToString());
+    }
+
+    private string GetActiveTestingContextName()
+    {
+        if (CurrentShellMode != ShellMode.ProjectActive)
+            return CurrentShellMode.ToString();
+
+        return GetWorkspaceDisplayName(CurrentWorkspace);
+    }
+
+    private static string GetWorkspaceDisplayName(ProjectWorkspace workspace)
+        => workspace switch
+        {
+            ProjectWorkspace.ProjectProfile => "Profile",
+            ProjectWorkspace.Discovery => "Discovery",
+            _ => workspace.ToString()
+        };
+
     private void NavigateToHub()
     {
         IsAuthenticated = true;
@@ -402,6 +469,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 _knowledgeCompilerVm.LoadAsync(project),
                 _chatVm.LoadAsync(project),
                 _ticketsVm.LoadAsync(project),
+                _testingVm.LoadAsync(project),
                 _decisionsVm.LoadAsync(project),
                 _documentsVm.LoadAsync(project),
                 _plansVm.LoadAsync(project),

@@ -1,0 +1,254 @@
+<UserControl x:Class="IronDev.Agent.Views.Workspaces.TestingCompanionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="http://schemas.irondeveloper.com/controls"
+             xmlns:primitives="clr-namespace:IronDeveloperControls.Primitives;assembly=IronDeveloperControls"
+             Background="Transparent">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <controls:WorkspaceHeader Grid.Row="0"
+                                  Eyebrow="TESTING"
+                                  Title="Testing Companion Agent"
+                                  Subtitle="{Binding RunStatusText}">
+            <controls:WorkspaceHeader.Actions>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="{Binding ReturnWorkspaceName, StringFormat=Back to {0}}"
+                            Command="{Binding ReturnToWorkCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding CanReturnToWork, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <Button Content="Start Session"
+                            Command="{Binding StartSessionCommand}"
+                            Style="{StaticResource AppButton.Primary}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="Mark Moment"
+                            Command="{Binding MarkMomentCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="End / Report"
+                            Command="{Binding EndSessionCommand}"
+                            Style="{StaticResource AppButton.CompactGhost}"/>
+                </StackPanel>
+            </controls:WorkspaceHeader.Actions>
+        </controls:WorkspaceHeader>
+
+        <primitives:InfoBanner Grid.Row="1"
+                               Title="Testing loop"
+                               Message="{Binding StatusText}"
+                               Status="Info"
+                               BadgeText="STATE"
+                               Margin="0,14,0,14"/>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340" MinWidth="300"/>
+                <ColumnDefinition Width="*" MinWidth="420"/>
+                <ColumnDefinition Width="360" MinWidth="320"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource SurfacePanel.Subtle}"
+                    Padding="16"
+                    Margin="0,0,12,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="TARGET APP"
+                               Style="{StaticResource Typography.Eyebrow}"
+                               Margin="0,0,0,8"/>
+
+                    <TextBox Grid.Row="1"
+                             Text="{Binding TargetName, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,10"/>
+
+                    <ComboBox Grid.Row="2"
+                              ItemsSource="{Binding TargetTypes}"
+                              SelectedItem="{Binding TargetType}"
+                              Margin="0,0,0,10"/>
+
+                    <TextBlock Grid.Row="3"
+                               Text="LAUNCH COMMAND"
+                               Style="{StaticResource Typography.Eyebrow}"
+                               Margin="0,4,0,8"/>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding LaunchCommand, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,8,0"/>
+                        <Button Grid.Column="1"
+                                Content="Browse"
+                                Command="{Binding BrowseExecutableCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"/>
+                    </Grid>
+
+                    <StackPanel Grid.Row="5" Margin="0,12,0,0">
+                        <TextBlock Text="WORKING DIRECTORY"
+                                   Style="{StaticResource Typography.Eyebrow}"
+                                   Margin="0,0,0,8"/>
+                        <TextBox Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="LOG FILE"
+                                   Style="{StaticResource Typography.Eyebrow}"
+                                   Margin="0,0,0,8"/>
+                        <TextBox Text="{Binding LogPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,12"/>
+
+                        <Button Content="Launch Target"
+                                Command="{Binding LaunchTargetCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12"/>
+
+                        <CheckBox Content="Return to work after start"
+                                  IsChecked="{Binding AutoReturnAfterStart, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text/Secondary}"
+                                  Margin="0,0,0,12"/>
+
+                        <Button Content="Reload Captures"
+                                Command="{Binding LoadPersistedMomentsCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Style="{StaticResource SurfacePanel.Subtle}"
+                    Padding="16"
+                    Margin="0,0,12,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <primitives:StatusBadge DockPanel.Dock="Right"
+                                                Text="{Binding Moments.Count}"
+                                                Status="Info"/>
+                        <TextBlock Text="CAPTURED MOMENTS"
+                                   Style="{StaticResource Typography.Eyebrow}"/>
+                    </DockPanel>
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Moments}"
+                             SelectedItem="{Binding SelectedMoment, Mode=TwoWay}"
+                             ItemContainerStyle="{StaticResource AppListBoxItem.Compact}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="2,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0"
+                                            Width="58"
+                                            Height="40"
+                                            Background="{StaticResource Background/Interactive}"
+                                            BorderBrush="{StaticResource Border/Subtle}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Margin="0,0,12,0">
+                                        <Image Source="{Binding ScreenshotPath}"
+                                               Stretch="UniformToFill"
+                                               ClipToBounds="True"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1">
+                                        <DockPanel LastChildFill="True">
+                                            <TextBlock DockPanel.Dock="Right"
+                                                       Text="{Binding TimeText}"
+                                                       Foreground="{StaticResource Text/Muted}"
+                                                       FontSize="11"
+                                                       Margin="8,0,0,0"/>
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="{StaticResource Text/Primary}"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding TypeText}"
+                                                   Foreground="{StaticResource Accent/Primary}"
+                                                   FontSize="10"
+                                                   Margin="0,3,0,0"/>
+                                        <TextBlock Text="{Binding Detail}"
+                                                   Foreground="{StaticResource Text/Secondary}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   MaxHeight="38"
+                                                   Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Style="{StaticResource SurfacePanel.Subtle}"
+                    Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="REPORT / LLM HANDOFF"
+                               Style="{StaticResource Typography.Eyebrow}"
+                               Margin="0,0,0,10"/>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Open Report"
+                                Command="{Binding OpenReportCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Margin="0,0,8,0"/>
+                        <Button Content="Copy Prompt"
+                                Command="{Binding CopyLlmPromptCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Margin="0,0,8,0"/>
+                        <Button Content="Copy Bundle"
+                                Command="{Binding CopyCombinedPromptCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"/>
+                    </StackPanel>
+
+                    <TextBox Grid.Row="2"
+                             Text="{Binding LlmDebugPrompt}"
+                             AcceptsReturn="True"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"/>
+
+                    <TextBlock Grid.Row="3"
+                               Text="{Binding ReportPath}"
+                               Foreground="{StaticResource Text/Muted}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

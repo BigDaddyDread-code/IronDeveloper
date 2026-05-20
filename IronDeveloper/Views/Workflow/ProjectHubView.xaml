@@ -19,7 +19,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <ContentPresenter/>
+                        <Border Background="Transparent">
+                            <ContentPresenter/>
+                        </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

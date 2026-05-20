@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Core.Interfaces;
+using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDeveloperControls.Primitives;
@@ -20,6 +21,7 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
     private readonly IDiscussionSeedService _seedService;
     private readonly IDiscussionResolverService _resolverService;
     private readonly IKnowledgeArtefactApplyService _applyService;
+    private readonly ISemanticMemoryService _semanticMemoryService;
     private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
     private readonly global::IronDev.Services.ITicketService _ticketService;
 
@@ -38,12 +40,18 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
     [ObservableProperty] private bool _isSavingDiscussions;
     [ObservableProperty] private bool _isResolving;
     [ObservableProperty] private bool _isApplying;
+    [ObservableProperty] private bool _isSemanticMemoryBusy;
     [ObservableProperty] private int _resolutionConfidenceScore;
+    [ObservableProperty] private string _semanticMemoryStatusText = "Memory not checked";
+    [ObservableProperty] private string _semanticMemoryDetailText = "Rebuild the semantic index after adding or changing project knowledge.";
+    [ObservableProperty] private string _semanticSearchQuery = string.Empty;
+    [ObservableProperty] private string _semanticSearchStatusText = "Enter a search query to test project memory retrieval.";
 
     public ObservableCollection<DiscussionDocumentItemViewModel> DiscussionDocuments { get; } = [];
     public ObservableCollection<ArtefactProposalItemViewModel> Proposals { get; } = [];
     public ObservableCollection<string> OpenQuestions { get; } = [];
     public ObservableCollection<string> BuildOrder { get; } = [];
+    public ObservableCollection<SemanticSearchResultItemViewModel> SemanticSearchResults { get; } = [];
 
     public bool HasDiscussions => DiscussionDocuments.Count > 0;
     public bool HasSelectedDiscussion => SelectedDiscussion != null;
@@ -59,12 +67,14 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
         IDiscussionSeedService seedService,
         IDiscussionResolverService resolverService,
         IKnowledgeArtefactApplyService applyService,
+        ISemanticMemoryService semanticMemoryService,
         global::IronDev.Services.IProjectMemoryService memoryService,
         global::IronDev.Services.ITicketService ticketService)
     {
         _seedService = seedService;
         _resolverService = resolverService;
         _applyService = applyService;
+        _semanticMemoryService = semanticMemoryService;
         _memoryService = memoryService;
         _ticketService = ticketService;
 
@@ -80,6 +90,7 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
         var summary = await _memoryService.GetLatestSummaryAsync(project.Id);
         ProjectSummaryText = summary?.Summary ?? project.Description ?? string.Empty;
         await LoadDiscussionDocumentsAsync();
+        await RefreshSemanticHealthAsync();
         StatusText = "Ready";
         SetBanner("Knowledge Compiler", "Start from a project summary, then compile the useful parts into reviewable artefacts.", BadgeStatus.Info);
     }
@@ -161,6 +172,8 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
             {
                 var document = draft.ToContextDocument(_activeProjectId);
                 var id = await _memoryService.SaveContextDocumentAsync(document);
+                document.Id = id;
+                await TryEmbedDocumentAsync(document);
                 draft.MarkPersisted(id);
             }
 
@@ -281,11 +294,118 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
             SetBanner("Artefacts applied", $"Applied {result.AppliedCount} of {selected.Count} selected proposals.", BadgeStatus.Ready);
             StatusText = $"Applied {result.AppliedCount} proposals.";
             await LoadDiscussionDocumentsAsync(keepSelection: true);
+            await RefreshSemanticHealthAsync();
         }
         finally
         {
             IsApplying = false;
             RefreshComputedState();
+        }
+    }
+
+    [RelayCommand]
+    private async Task RefreshSemanticHealthAsync()
+    {
+        if (_activeProjectId <= 0)
+            return;
+
+        IsSemanticMemoryBusy = true;
+        try
+        {
+            var health = await _semanticMemoryService.GetHealthAsync(_activeProjectId);
+            var provider = string.IsNullOrWhiteSpace(health.ProviderName) ? "Semantic" : health.ProviderName;
+            var providerStatus = string.IsNullOrWhiteSpace(health.ProviderStatus) ? "Unknown" : health.ProviderStatus;
+            SemanticMemoryStatusText = $"{provider} {providerStatus} | Documents {health.DocumentCount} | Embedded {health.EmbeddedCount} | Stale {health.StaleEmbeddingCount}";
+            SemanticMemoryDetailText = health.LastEmbeddedAtUtc.HasValue
+                ? $"Last embedded {health.LastEmbeddedAtUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm}"
+                : "No semantic embeddings have been created for this project yet.";
+        }
+        catch (Exception ex)
+        {
+            SemanticMemoryStatusText = "Memory health unavailable";
+            SemanticMemoryDetailText = ex.Message;
+        }
+        finally
+        {
+            IsSemanticMemoryBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RebuildSemanticIndexAsync()
+    {
+        if (_activeProjectId <= 0 || IsSemanticMemoryBusy)
+            return;
+
+        IsSemanticMemoryBusy = true;
+        SemanticMemoryStatusText = "Rebuilding semantic index...";
+        SemanticMemoryDetailText = "Embedding active project context documents.";
+
+        try
+        {
+            var progress = new Progress<SemanticIndexRebuildProgress>(p =>
+            {
+                SemanticMemoryStatusText = p.IsCompleted
+                    ? $"Rebuild complete: {p.ProcessedDocuments}/{p.TotalDocuments}"
+                    : $"Rebuilding {p.ProcessedDocuments}/{p.TotalDocuments}";
+                SemanticMemoryDetailText = string.IsNullOrWhiteSpace(p.CurrentDocumentTitle)
+                    ? "Semantic memory is up to date."
+                    : p.CurrentDocumentTitle;
+            });
+
+            await _semanticMemoryService.RebuildIndexAsync(_activeProjectId, progress);
+            await RefreshSemanticHealthAsync();
+        }
+        catch (Exception ex)
+        {
+            SemanticMemoryStatusText = "Semantic rebuild failed";
+            SemanticMemoryDetailText = ex.Message;
+        }
+        finally
+        {
+            IsSemanticMemoryBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RunSemanticSearchAsync()
+    {
+        SemanticSearchResults.Clear();
+
+        if (_activeProjectId <= 0)
+            return;
+
+        if (string.IsNullOrWhiteSpace(SemanticSearchQuery))
+        {
+            SemanticSearchStatusText = "Enter a search query first.";
+            return;
+        }
+
+        IsSemanticMemoryBusy = true;
+        SemanticSearchStatusText = "Searching semantic project memory...";
+
+        try
+        {
+            var results = await _semanticMemoryService.SearchAsync(
+                _activeProjectId,
+                SemanticSearchQuery,
+                limit: 8,
+                minSimilarity: 0.0);
+
+            foreach (var result in results)
+                SemanticSearchResults.Add(SemanticSearchResultItemViewModel.FromResult(result));
+
+            SemanticSearchStatusText = results.Count == 0
+                ? "No semantic matches found. Rebuild the index if this looks wrong."
+                : $"Found {results.Count} semantic matches.";
+        }
+        catch (Exception ex)
+        {
+            SemanticSearchStatusText = $"Semantic search failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSemanticMemoryBusy = false;
         }
     }
 
@@ -330,6 +450,19 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
             : DiscussionDocuments.FirstOrDefault();
 
         RefreshComputedState();
+    }
+
+    private async Task TryEmbedDocumentAsync(ProjectContextDocument document)
+    {
+        try
+        {
+            await _semanticMemoryService.EmbedAndStoreAsync(document);
+        }
+        catch (Exception ex)
+        {
+            SemanticMemoryStatusText = "Document saved, embedding failed";
+            SemanticMemoryDetailText = ex.Message;
+        }
     }
 
     private void SetBanner(string title, string message, BadgeStatus status)
@@ -381,6 +514,48 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
         OnPropertyChanged(nameof(HasOpenQuestions));
         OnPropertyChanged(nameof(HasBuildOrder));
         OnPropertyChanged(nameof(CompilerStatusText));
+    }
+}
+
+public sealed class SemanticSearchResultItemViewModel
+{
+    public string Title { get; init; } = string.Empty;
+    public string DocumentType { get; init; } = string.Empty;
+    public string AuthorityLevel { get; init; } = string.Empty;
+    public string ScoreText { get; init; } = string.Empty;
+    public string SimilarityText { get; init; } = string.Empty;
+    public string MatchReason { get; init; } = string.Empty;
+    public string Snippet { get; init; } = string.Empty;
+    public bool IsStale { get; init; }
+    public string StaleText => IsStale ? "Stale" : "Fresh";
+
+    public static SemanticSearchResultItemViewModel FromResult(SemanticSearchResult result)
+    {
+        var document = result.Document;
+        return new SemanticSearchResultItemViewModel
+        {
+            Title = document.Title,
+            DocumentType = document.DocumentType,
+            AuthorityLevel = result.AuthorityLevel,
+            ScoreText = $"Score {result.FinalScore:F2}",
+            SimilarityText = $"Similarity {result.SimilarityScore:F2}",
+            MatchReason = result.MatchReason,
+            Snippet = BuildSnippet(document),
+            IsStale = result.IsStale
+        };
+    }
+
+    private static string BuildSnippet(ProjectContextDocument document)
+    {
+        var text = string.IsNullOrWhiteSpace(document.Summary)
+            ? document.Content
+            : document.Summary;
+
+        if (string.IsNullOrWhiteSpace(text))
+            return "No summary available.";
+
+        text = text.Replace("\r", " ").Replace("\n", " ").Trim();
+        return text.Length <= 180 ? text : text[..180] + "...";
     }
 }
 

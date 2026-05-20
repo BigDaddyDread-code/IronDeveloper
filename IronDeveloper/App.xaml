@@ -72,6 +72,10 @@
                 <vws:TicketsWorkspaceView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type ws:TestingCompanionViewModel}">
+                <vws:TestingCompanionView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type ws:ImplementationPlansWorkspaceViewModel}">
                 <vws:ImplementationPlansWorkspaceView/>
             </DataTemplate>

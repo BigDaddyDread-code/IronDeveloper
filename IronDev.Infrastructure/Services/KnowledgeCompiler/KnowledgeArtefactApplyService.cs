@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
+using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
@@ -18,17 +19,20 @@ public sealed class KnowledgeArtefactApplyService : IKnowledgeArtefactApplyServi
     private readonly ITicketService _ticketService;
     private readonly IArtifactSourceReferenceService _referenceService;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly ISemanticMemoryService _semanticMemoryService;
 
     public KnowledgeArtefactApplyService(
         IProjectMemoryService memoryService,
         ITicketService ticketService,
         IArtifactSourceReferenceService referenceService,
-        ICurrentTenantContext tenantContext)
+        ICurrentTenantContext tenantContext,
+        ISemanticMemoryService semanticMemoryService)
     {
         _memoryService = memoryService;
         _ticketService = ticketService;
         _referenceService = referenceService;
         _tenantContext = tenantContext;
+        _semanticMemoryService = semanticMemoryService;
     }
 
     public async Task<ArtefactApplyResult> ApplyAsync(
@@ -156,9 +160,25 @@ public sealed class KnowledgeArtefactApplyService : IKnowledgeArtefactApplyServi
         };
 
         var id = await _memoryService.SaveContextDocumentAsync(document, cancellationToken);
+        document.Id = id;
         await RecordSourceReferenceAsync("ProjectContextDocument", id, projectId, proposal, cancellationToken);
+        await TryEmbedContextDocumentAsync(document, cancellationToken);
 
         return Applied(proposal, "ProjectContextDocument", id, $"Document saved: {proposal.Title}");
+    }
+
+    private async Task TryEmbedContextDocumentAsync(
+        ProjectContextDocument document,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _semanticMemoryService.EmbedAndStoreAsync(document, cancellationToken);
+        }
+        catch
+        {
+            // Saving project knowledge must not fail just because the retrieval index is unavailable.
+        }
     }
 
     private async Task RecordSourceReferenceAsync(

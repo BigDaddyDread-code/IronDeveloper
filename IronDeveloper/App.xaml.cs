@@ -16,6 +16,7 @@ using IronDev.Agent.Services;
 using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Agent.Services.Interfaces;
 using IronDev.Agent.Services.Mock;
+using IronDev.Agent.Services.Testing;
 
 namespace IronDev.Agent;
 
@@ -161,6 +162,9 @@ public partial class App : Application
                 services.AddTransient<KnowledgeCompilerViewModel>();
                 services.AddTransient<DocumentsWorkspaceViewModel>();
                 services.AddTransient<TicketsWorkspaceViewModel>();
+                services.AddSingleton<IScreenshotCaptureService, ScreenshotCaptureService>();
+                services.AddSingleton<ITestingCompanionAgent, TestingCompanionAgent>();
+                services.AddSingleton<TestingCompanionViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();
                 services.AddSingleton<PromptPlaygroundViewModel>(sp =>

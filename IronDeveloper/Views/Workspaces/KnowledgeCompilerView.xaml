@@ -51,6 +51,8 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="260"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -79,7 +81,113 @@
                                 Style="{StaticResource AppButton.CompactGhost}"/>
                     </StackPanel>
 
-                    <Grid Grid.Row="3">
+                    <Border Grid.Row="3"
+                            Style="{StaticResource SurfacePanel.Interactive}"
+                            Padding="12"
+                            Margin="0,0,0,12">
+                        <StackPanel>
+                            <DockPanel LastChildFill="False"
+                                       Margin="0,0,0,8">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="SEMANTIC MEMORY"
+                                           Style="{StaticResource Typography.Eyebrow}"
+                                           VerticalAlignment="Center"/>
+                                <Button DockPanel.Dock="Right"
+                                        Content="Refresh"
+                                        Command="{Binding RefreshSemanticHealthCommand}"
+                                        Style="{StaticResource AppButton.CompactGhost}"
+                                        Margin="8,0,0,0"/>
+                            </DockPanel>
+                            <TextBlock Text="{Binding SemanticMemoryStatusText}"
+                                       Foreground="{StaticResource Text/Primary}"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding SemanticMemoryDetailText}"
+                                       Foreground="{StaticResource Text/Secondary}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,10"/>
+                            <Button Content="Rebuild Semantic Index"
+                                    Command="{Binding RebuildSemanticIndexCommand}"
+                                    Style="{StaticResource AppButton.CompactGhost}"
+                                    HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="4"
+                            Style="{StaticResource SurfacePanel.Interactive}"
+                            Padding="12"
+                            Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0"
+                                       Text="SEMANTIC SEARCH"
+                                       Style="{StaticResource Typography.Eyebrow}"
+                                       Margin="0,0,0,8"/>
+                            <DockPanel Grid.Row="1"
+                                       LastChildFill="True"
+                                       Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right"
+                                        Content="Search"
+                                        Command="{Binding RunSemanticSearchCommand}"
+                                        Style="{StaticResource AppButton.CompactGhost}"
+                                        Margin="8,0,0,0"/>
+                                <TextBox Text="{Binding SemanticSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                         MinHeight="34"/>
+                            </DockPanel>
+                            <TextBlock Grid.Row="2"
+                                       Text="{Binding SemanticSearchStatusText}"
+                                       Foreground="{StaticResource Text/Secondary}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8"/>
+                            <ListBox Grid.Row="3"
+                                     ItemsSource="{Binding SemanticSearchResults}"
+                                     ItemContainerStyle="{StaticResource AppListBoxItem.Compact}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="2,6">
+                                            <DockPanel LastChildFill="True">
+                                                <StackPanel DockPanel.Dock="Right"
+                                                            Orientation="Horizontal"
+                                                            Margin="8,0,0,0">
+                                                    <primitives:StatusBadge Text="{Binding StaleText}"
+                                                                            Status="Info"
+                                                                            Margin="0,0,6,0"/>
+                                                    <primitives:StatusBadge Text="{Binding ScoreText}"
+                                                                            Status="ReviewRequired"/>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Title}"
+                                                           Foreground="{StaticResource Text/Primary}"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Snippet}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"
+                                                       MaxHeight="44"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding SimilarityText}"
+                                                       Foreground="{StaticResource Text/Muted}"
+                                                       FontSize="10"
+                                                       Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="5">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
