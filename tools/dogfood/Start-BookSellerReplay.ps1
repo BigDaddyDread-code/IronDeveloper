@@ -93,17 +93,39 @@ $promptNoiseSuffixes = @(
     " and show me what happened"
 )
 
+function Get-ArrayOrDefault {
+    param(
+        [object]$Value,
+        [object[]]$Default
+    )
+
+    if ($null -eq $Value) {
+        return $Default
+    }
+
+    $items = @($Value)
+    if ($items.Count -eq 0) {
+        return $Default
+    }
+
+    return $items
+}
+
 $cases = New-Object System.Collections.Generic.List[object]
 
 for ($i = 1; $i -le $Reps; $i++) {
     $variant = Pick-Random $variants
-    $basePrompt = [string]$variant.prompt
-    $prompt = "$(Pick-Random $promptNoisePrefixes)$basePrompt$(Pick-Random $promptNoiseSuffixes)".Trim()
+    $basePrompts = Get-ArrayOrDefault -Value $variant.promptVariants -Default @([string]$variant.prompt)
+    $basePrompt = [string](Pick-Random $basePrompts)
+    $prefixes = Get-ArrayOrDefault -Value $variant.promptPrefixes -Default $promptNoisePrefixes
+    $suffixes = Get-ArrayOrDefault -Value $variant.promptSuffixes -Default $promptNoiseSuffixes
+    $prompt = "$(Pick-Random $prefixes)$basePrompt$(Pick-Random $suffixes)".Trim()
 
     $workspace = if ($variant.randomizeWorkspace -eq $false) {
         [string]$variant.workspace
     } else {
-        $choices = @($variant.workspace) + $workspaceNoise
+        $workspaceOptions = Get-ArrayOrDefault -Value $variant.workspaceOptions -Default (@($variant.workspace) + $workspaceNoise)
+        $choices = @($workspaceOptions)
         [string](Pick-Random $choices)
     }
 
@@ -121,6 +143,7 @@ for ($i = 1; $i -le $Reps; $i++) {
         prompt = $prompt
         basePrompt = $basePrompt
         expected = $variant.expected
+        tags = @($variant.tags)
         status = "Planned"
         createdAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
     }
@@ -152,6 +175,62 @@ $summary = [ordered]@{
     replayPlanPath = $planPath
     createdAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
 }
+
+$workspaceGroups = $cases | Group-Object { $_['workspace'] } | Sort-Object Name | ForEach-Object {
+    [ordered]@{
+        workspace = $_.Name
+        count = $_.Count
+    }
+}
+
+$stepGroups = $cases | Group-Object { $_['step'] } | Sort-Object Name | ForEach-Object {
+    [ordered]@{
+        step = [int]$_.Name
+        count = $_.Count
+    }
+}
+
+$reportPath = Join-Path $resultsRoot "replay-report.md"
+$report = New-Object System.Text.StringBuilder
+[void]($report.AppendLine("# Dogfood Replay Plan"))
+[void]($report.AppendLine())
+[void]($report.AppendLine("- RunId: $RunId"))
+[void]($report.AppendLine("- Scenario: $($scenarioJson.scenarioId)"))
+[void]($report.AppendLine("- Seed: $Seed"))
+[void]($report.AppendLine("- Cases: $Reps"))
+[void]($report.AppendLine("- Dry run: $([bool]$DryRun)"))
+[void]($report.AppendLine())
+[void]($report.AppendLine("## Workspace Mix"))
+[void]($report.AppendLine())
+foreach ($group in $workspaceGroups) {
+    [void]($report.AppendLine("- $($group['workspace']): $($group['count'])"))
+}
+[void]($report.AppendLine())
+[void]($report.AppendLine("## Step Mix"))
+[void]($report.AppendLine())
+foreach ($group in $stepGroups) {
+    [void]($report.AppendLine("- Step $($group['step']): $($group['count'])"))
+}
+[void]($report.AppendLine())
+[void]($report.AppendLine("## Cases"))
+[void]($report.AppendLine())
+foreach ($case in $cases) {
+    [void]($report.AppendLine("### $($case.caseNumber). $($case.name)"))
+    [void]($report.AppendLine())
+    [void]($report.AppendLine("- CaseId: $($case.caseId)"))
+    [void]($report.AppendLine("- Workspace: $($case.workspace)"))
+    [void]($report.AppendLine("- Expected intent: $($case.expected.intent)"))
+    [void]($report.AppendLine())
+    [void]($report.AppendLine('```text'))
+    [void]($report.AppendLine($case.prompt))
+    [void]($report.AppendLine('```'))
+    [void]($report.AppendLine())
+}
+
+$report.ToString() | Set-Content -Path $reportPath -Encoding UTF8
+$summary.replayReportPath = $reportPath
+$summary.workspaceMix = $workspaceGroups
+$summary.stepMix = $stepGroups
 
 if ([string]::IsNullOrWhiteSpace($RunnerCommand)) {
     $summary.message = "Replay plan generated. Wire RunnerCommand to execute cases through IronDev internals."

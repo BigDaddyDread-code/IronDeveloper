@@ -93,11 +93,22 @@ Every run should be different. The replay script adds a seed and randomizes prom
   -StopOnFailure
 ```
 
+Run reset and replay planning together:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-BookSellerDogfood.ps1 `
+  -Reset `
+  -DryRun `
+  -Reps 100 `
+  -StopOnFailure
+```
+
 The output is written to:
 
 ```text
 tools/dogfood/runs/{DogfoodRunId}/replay/replay-plan.json
 tools/dogfood/runs/{DogfoodRunId}/replay/replay-summary.json
+tools/dogfood/runs/{DogfoodRunId}/replay/replay-report.md
 ```
 
 For deterministic debugging, reuse the saved seed:
@@ -121,3 +132,13 @@ DogfoodRunId -> CaseId -> TraceGroupId -> LLMTrace / RouteDecision / SemanticSea
 ```
 
 Replay must default to dry-run and assert behaviours rather than exact wording.
+
+## Compare two replay plans
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Compare-DogfoodReplayRuns.ps1 `
+  -LeftRunId BookSellerMvp-20260521-001 `
+  -RightRunId BookSellerMvp-20260521-002
+```
+
+The comparison reports seed equality, prompt overlap, case counts, and workspace mix. A healthy chaos batch should usually have different seeds and low prompt overlap.
