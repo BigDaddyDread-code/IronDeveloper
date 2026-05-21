@@ -64,6 +64,37 @@ function Pick-Random {
     return $Items[$random.Next(0, $Items.Count)]
 }
 
+function Pick-WeightedVariant {
+    param([object[]]$Variants)
+
+    $total = 0
+    foreach ($variant in $Variants) {
+        $weight = 1
+        if ($null -ne $variant.weight) {
+            $weight = [Math]::Max(1, [int]$variant.weight)
+        }
+
+        $total += $weight
+    }
+
+    $ticket = $random.Next(1, $total + 1)
+    $cursor = 0
+
+    foreach ($variant in $Variants) {
+        $weight = 1
+        if ($null -ne $variant.weight) {
+            $weight = [Math]::Max(1, [int]$variant.weight)
+        }
+
+        $cursor += $weight
+        if ($ticket -le $cursor) {
+            return $variant
+        }
+    }
+
+    return $Variants[-1]
+}
+
 function New-CaseId {
     param([int]$Index)
 
@@ -82,7 +113,10 @@ $promptNoisePrefixes = @(
     "right ",
     "can you ",
     "quick one, ",
-    "I think "
+    "I think ",
+    "hmm ",
+    "not sure but ",
+    "maybe "
 )
 $promptNoiseSuffixes = @(
     "",
@@ -90,7 +124,10 @@ $promptNoiseSuffixes = @(
     " for this",
     " and keep it safe",
     " but don't change code yet",
-    " and show me what happened"
+    " and show me what happened",
+    " if that makes sense",
+    " you know what I mean",
+    " from what we were doing"
 )
 
 function Get-ArrayOrDefault {
@@ -114,7 +151,7 @@ function Get-ArrayOrDefault {
 $cases = New-Object System.Collections.Generic.List[object]
 
 for ($i = 1; $i -le $Reps; $i++) {
-    $variant = Pick-Random $variants
+    $variant = Pick-WeightedVariant $variants
     $basePrompts = Get-ArrayOrDefault -Value $variant.promptVariants -Default @([string]$variant.prompt)
     $basePrompt = [string](Pick-Random $basePrompts)
     $prefixes = Get-ArrayOrDefault -Value $variant.promptPrefixes -Default $promptNoisePrefixes
@@ -144,6 +181,8 @@ for ($i = 1; $i -le $Reps; $i++) {
         basePrompt = $basePrompt
         expected = $variant.expected
         tags = @($variant.tags)
+        ambiguityLevel = if ($null -eq $variant.ambiguityLevel) { "Normal" } else { [string]$variant.ambiguityLevel }
+        allowedOutcomes = @($variant.allowedOutcomes)
         status = "Planned"
         createdAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
     }
