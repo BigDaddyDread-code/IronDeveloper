@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://irondev.local/schemas/test-agent-report.schema.json",
+  "title": "IronDev Test Agent Report",
+  "type": "object",
+  "required": [
+    "test_run_id",
+    "goal_id",
+    "status",
+    "summary",
+    "commands_run",
+    "expected",
+    "actual",
+    "evidence",
+    "time_taken_seconds"
+  ],
+  "properties": {
+    "test_run_id": {
+      "type": "string"
+    },
+    "goal_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "partial",
+        "blocked",
+        "skipped"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 1600
+    },
+    "commands_run": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "actual": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "path"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "problem": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "likely_cause": {
+      "type": "string"
+    },
+    "recommendation_for_codex": {
+      "type": "string"
+    },
+    "key_metrics": {
+      "type": "object",
+      "properties": {
+        "model_calls": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "estimated_cost": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cli_commands_run": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "failures_found": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "useful_failures": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "wasted_runs": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "full_log_location": {
+      "type": "string"
+    },
+    "time_taken_seconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}

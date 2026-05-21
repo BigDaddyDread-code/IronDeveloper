@@ -1,5 +1,27 @@
 [
   {
+    "Id": "20260521221802569-discussion-irondev-self-improvement-loop",
+    "Project": "IronDev",
+    "Title": "DISCUSSION_IRONDEV_SELF_IMPROVEMENT_LOOP",
+    "DocumentType": "Discussion",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\DISCUSSION_IRONDEV_SELF_IMPROVEMENT_LOOP.md",
+    "DogfoodRunId": "CodexGoals-001",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521221802569-discussion-irondev-self-improvement-loop.md",
+    "CreatedUtc": "2026-05-21T22:18:02.5872255+00:00"
+  },
+  {
+    "Id": "20260521221802568-codex-goals",
+    "Project": "IronDev",
+    "Title": "CODEX_GOALS",
+    "DocumentType": "Architecture",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CODEX_GOALS.md",
+    "DogfoodRunId": "CodexGoals-001",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521221802568-codex-goals.md",
+    "CreatedUtc": "2026-05-21T22:18:02.581757+00:00"
+  },
+  {
     "Id": "20260521215546001-agent-model-settings",
     "Project": "IronDev",
     "Title": "AGENT_MODEL_SETTINGS",

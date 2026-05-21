@@ -461,8 +461,13 @@ static async Task<int> HandleDocsSearchCommandAsync(string[] args, JsonSerialize
     {
         var content = await File.ReadAllTextAsync(document.Path);
         var body = StripFrontmatter(content);
-        var haystack = $"{document.Title}\n{document.DocumentType}\n{document.Authority}\n{body}";
-        var score = terms.Sum(term => CountOccurrences(haystack, term));
+        var bodyScore = terms.Sum(term => CountOccurrences(body, term));
+        var titleScore = terms.Sum(term => CountOccurrences(document.Title, term)) * 8;
+        var typeScore = terms.Sum(term => CountOccurrences(document.DocumentType, term)) * 4;
+        var authorityScore = terms.Sum(term => CountOccurrences(document.Authority, term)) * 2;
+        var architectureBoost = document.DocumentType.Contains("Architecture", StringComparison.OrdinalIgnoreCase) ? 8 : 0;
+        var acceptedBoost = document.Authority.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ? 6 : 0;
+        var score = bodyScore + titleScore + typeScore + authorityScore + architectureBoost + acceptedBoost;
         if (score <= 0)
             continue;
 
