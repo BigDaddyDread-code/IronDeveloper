@@ -274,8 +274,26 @@ The local executor currently supports:
 - `chat_conversation`
 - `replay_run`
 - `failure_package`
+- `dotnet_build`
+- `dotnet_test`
+- `coverage_run`
+- `coverage_report`
+- `format_check`
+- `package_audit`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
+`coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
+
+Run the deterministic toolchain smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-toolchain-smoke.json `
+  -RunId TestAgentToolchain-001 `
+  -Json
+```
+
+Every report includes a `trace` envelope, per-step trace data, command list, evidence paths, and `report_schema_valid`.
 
 Conversation-mode sample:
 

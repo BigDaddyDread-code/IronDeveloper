@@ -72,6 +72,12 @@ Initial Alpha actions:
 | `chat_conversation` | Run a bounded multi-turn chat using only supplied scenario facts | `IronDev.ReplayRunner chat send` |
 | `replay_run` | Run a replay scenario batch | `Start-BookSellerReplay.ps1` |
 | `failure_package` | Generate a Codex handoff package | `IronDev.ReplayRunner failure latest --for-codex` |
+| `dotnet_build` | Compile a solution/project and capture analyzer/build warnings | `dotnet build` |
+| `dotnet_test` | Run unit/integration tests with TRX output | `dotnet test --logger trx` |
+| `coverage_run` | Run tests with Coverlet collector | `dotnet test --collect:"XPlat Code Coverage"` |
+| `coverage_report` | Convert Cobertura coverage into a readable report, failing with evidence if ReportGenerator is not installed | `dotnet tool run reportgenerator` or `reportgenerator` |
+| `format_check` | Verify formatting/style drift | `dotnet format --verify-no-changes` |
+| `package_audit` | Check vulnerable NuGet packages | `dotnet package list --project <target> --vulnerable --include-transitive` |
 
 Example `chat_conversation` step:
 
@@ -96,6 +102,18 @@ Example `chat_conversation` step:
 ```
 
 The Test Agent may send only the supplied messages and facts. It must not invent requirements.
+
+Example toolchain step:
+
+```json
+{
+  "step": 1,
+  "action": "dotnet_build",
+  "params": {
+    "target": "IronDev.slnx"
+  }
+}
+```
 
 Planned CLI actions:
 
@@ -153,6 +171,8 @@ Unsupported actions must be reported as `SKIPPED_UNSUPPORTED` or `FAILED_UNSUPPO
 - Never convert an unsupported command into a fake success.
 - Prefer dry-run unless the plan explicitly allows writes.
 - Capture raw command output.
+- Include a trace envelope for each step.
+- Validate the final report shape before returning it.
 - Keep the final report under roughly 800 tokens.
 - Put full evidence in the log folder.
 

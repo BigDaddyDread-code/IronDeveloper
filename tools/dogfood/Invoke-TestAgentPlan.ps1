@@ -11,8 +11,10 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $runnerProject = Join-Path $repoRoot "tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj"
+$defaultSolution = Join-Path $repoRoot "IronDev.slnx"
 $scenarioRoot = Join-Path $repoRoot "tools\dogfood\dogfood-scenarios"
 $runsRoot = Join-Path $repoRoot "tools\dogfood\runs"
+$schemaPath = Join-Path $repoRoot "tools\dogfood\TestAgentReport.schema.json"
 $planFullPath = [System.IO.Path]::GetFullPath($PlanPath)
 
 if (-not (Test-Path -LiteralPath $planFullPath)) {
@@ -30,7 +32,9 @@ if ([string]::IsNullOrWhiteSpace($RunId)) {
 
 $runRoot = Join-Path $runsRoot $RunId
 $logRoot = Join-Path $runRoot "logs"
+$artifactsRoot = Join-Path $runRoot "artifacts"
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $artifactsRoot | Out-Null
 
 $buildLogPath = Join-Path $logRoot "runner-build.log"
 $buildOutput = & dotnet build $runnerProject -p:UseSharedCompilation=false -nr:false 2>&1
@@ -43,6 +47,22 @@ if ($buildExitCode -ne 0) {
 $started = Get-Date
 $stepResults = New-Object System.Collections.Generic.List[object]
 $previousResponses = @{}
+$traceGroupId = [Guid]::NewGuid().ToString("N")
+
+function Resolve-TargetPath {
+    param($Value)
+
+    if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) {
+        return $defaultSolution
+    }
+
+    $text = [string]$Value
+    if ([System.IO.Path]::IsPathRooted($text)) {
+        return $text
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $text))
+}
 
 function Invoke-CommandCapture {
     param(
@@ -51,8 +71,15 @@ function Invoke-CommandCapture {
         [string]$StepLogPath
     )
 
-    $output = & $FilePath @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $FilePath @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
     $text = ($output | Out-String)
     Set-Content -LiteralPath $StepLogPath -Value $text -Encoding UTF8
 
@@ -66,6 +93,49 @@ function Convert-ToBool {
     param($Value, [bool]$Default)
     if ($null -eq $Value) { return $Default }
     return [System.Convert]::ToBoolean($Value)
+}
+
+function Get-OutputLineValue {
+    param(
+        [string]$Output,
+        [string]$Pattern
+    )
+
+    $match = [regex]::Match($Output, $Pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if ($match.Success -and $match.Groups.Count -gt 1) {
+        return $match.Groups[1].Value
+    }
+
+    return $null
+}
+
+function Test-ReportShape {
+    param($Report)
+
+    $required = @(
+        "test_run_id",
+        "goal_id",
+        "status",
+        "summary",
+        "commands_run",
+        "expected",
+        "actual",
+        "evidence",
+        "time_taken_seconds"
+    )
+
+    $missing = New-Object System.Collections.Generic.List[string]
+    foreach ($name in $required) {
+        if ($null -eq $Report[$name]) {
+            $missing.Add($name) | Out-Null
+        }
+    }
+
+    return [ordered]@{
+        valid = $missing.Count -eq 0
+        missing = $missing
+        schema_path = $schemaPath
+    }
 }
 
 function Invoke-ChatSendStep {
@@ -302,6 +372,188 @@ foreach ($step in $plan.steps) {
                 $summary = "Failure package: $($parsed.markdownPath)"
             }
 
+            "dotnet_build" {
+                $target = Resolve-TargetPath $params.target
+                $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")
+                if ($params.configuration) {
+                    $arguments += @("--configuration", [string]$params.configuration)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                $warningCount = Get-OutputLineValue -Output $capture.output -Pattern "(\d+)\s+Warning\(s\)"
+                $errorCount = Get-OutputLineValue -Output $capture.output -Pattern "(\d+)\s+Error\(s\)"
+                $parsed = [ordered]@{
+                    target = $target
+                    warnings = if ($warningCount -ne $null) { [int]$warningCount } else { $null }
+                    errors = if ($errorCount -ne $null) { [int]$errorCount } else { $null }
+                    log_path = $stepLogPath
+                }
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "dotnet build failed with code $exitCode"
+                } else {
+                    $summary = "dotnet build succeeded; warnings=$($parsed.warnings); errors=$($parsed.errors)"
+                }
+            }
+
+            "dotnet_test" {
+                $target = Resolve-TargetPath $params.target
+                $resultsDir = Join-Path $artifactsRoot ("test-results-step-{0:000}" -f $stepNumber)
+                New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
+                $arguments = @(
+                    "test", $target,
+                    "--logger", "trx",
+                    "--results-directory", $resultsDir,
+                    "-p:UseSharedCompilation=false",
+                    "-nr:false"
+                )
+                if ($params.filter) {
+                    $arguments += @("--filter", [string]$params.filter)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                $passedCount = Get-OutputLineValue -Output $capture.output -Pattern "Passed:\s+(\d+)"
+                $failedCount = Get-OutputLineValue -Output $capture.output -Pattern "Failed:\s+(\d+)"
+                $skippedCount = Get-OutputLineValue -Output $capture.output -Pattern "Skipped:\s+(\d+)"
+                $parsed = [ordered]@{
+                    target = $target
+                    results_directory = $resultsDir
+                    trx_files = @(Get-ChildItem -Path $resultsDir -Recurse -Filter *.trx -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+                    passed = if ($passedCount -ne $null) { [int]$passedCount } else { $null }
+                    failed = if ($failedCount -ne $null) { [int]$failedCount } else { $null }
+                    skipped = if ($skippedCount -ne $null) { [int]$skippedCount } else { $null }
+                }
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "dotnet test failed with code $exitCode"
+                } else {
+                    $summary = "dotnet test succeeded; passed=$($parsed.passed); failed=$($parsed.failed); skipped=$($parsed.skipped)"
+                }
+            }
+
+            "coverage_run" {
+                $target = Resolve-TargetPath $params.target
+                $coverageDir = Join-Path $artifactsRoot ("coverage-step-{0:000}" -f $stepNumber)
+                New-Item -ItemType Directory -Force -Path $coverageDir | Out-Null
+                $arguments = @(
+                    "test", $target,
+                    "--collect:XPlat Code Coverage",
+                    "--results-directory", $coverageDir,
+                    "-p:UseSharedCompilation=false",
+                    "-nr:false"
+                )
+                if ($params.filter) {
+                    $arguments += @("--filter", [string]$params.filter)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                $coverageFiles = @(Get-ChildItem -Path $coverageDir -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+                $parsed = [ordered]@{
+                    target = $target
+                    coverage_directory = $coverageDir
+                    coverage_files = $coverageFiles
+                }
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "coverage test run failed with code $exitCode"
+                } elseif ($coverageFiles.Count -eq 0) {
+                    $status = "FAILED"
+                    $summary = "coverage test run succeeded but no coverage.cobertura.xml was found"
+                } else {
+                    $summary = "coverage test run succeeded; files=$($coverageFiles.Count)"
+                }
+            }
+
+            "coverage_report" {
+                $reports = if ($params.reports) { [string]$params.reports } else { Join-Path $artifactsRoot "**\coverage.cobertura.xml" }
+                $targetDir = if ($params.targetdir) { [string]$params.targetdir } else { Join-Path $artifactsRoot "coverage-report" }
+                if (-not [System.IO.Path]::IsPathRooted($targetDir)) {
+                    $targetDir = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $targetDir))
+                }
+
+                $toolArgs = @("-reports:$reports", "-targetdir:$targetDir")
+                $attempts = New-Object System.Collections.Generic.List[string]
+                $localToolCommand = "dotnet tool run reportgenerator -- " + ($toolArgs -join " ")
+                $attempts.Add($localToolCommand) | Out-Null
+                $toolCapture = Invoke-CommandCapture -FilePath "dotnet" -Arguments (@("tool", "run", "reportgenerator", "--") + $toolArgs) -StepLogPath $stepLogPath
+                $exitCode = $toolCapture.exit_code
+                $commandText = $localToolCommand
+
+                if ($exitCode -ne 0) {
+                    $globalTool = Get-Command "reportgenerator" -ErrorAction SilentlyContinue
+                    if ($null -ne $globalTool) {
+                        $globalToolCommand = "reportgenerator " + ($toolArgs -join " ")
+                        $attempts.Add($globalToolCommand) | Out-Null
+                        $toolCapture = Invoke-CommandCapture -FilePath "reportgenerator" -Arguments $toolArgs -StepLogPath $stepLogPath
+                        $exitCode = $toolCapture.exit_code
+                        $commandText = $globalToolCommand
+                    } else {
+                        $missingMessage = "ReportGenerator is not installed as a local dotnet tool or global command. Install with: dotnet tool install dotnet-reportgenerator-globaltool --global"
+                        Add-Content -LiteralPath $stepLogPath -Value "`n$missingMessage" -Encoding UTF8
+                    }
+                }
+
+                $parsed = [ordered]@{
+                    reports = $reports
+                    target_directory = $targetDir
+                    index_html = Join-Path $targetDir "index.html"
+                    attempted_commands = $attempts
+                }
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "ReportGenerator failed or is not installed; see log"
+                } else {
+                    $summary = "coverage report generated at $targetDir"
+                }
+            }
+
+            "format_check" {
+                $target = Resolve-TargetPath $params.target
+                $arguments = @("format", $target, "--verify-no-changes")
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                $parsed = [ordered]@{
+                    target = $target
+                    log_path = $stepLogPath
+                }
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "dotnet format found formatting/style drift or failed"
+                } else {
+                    $summary = "dotnet format verify passed"
+                }
+            }
+
+            "package_audit" {
+                $target = Resolve-TargetPath $params.target
+                $arguments = @("package", "list", "--project", $target, "--vulnerable", "--include-transitive")
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                $hasVulnerable = $capture.output -match "(?i)(critical|high|moderate|low)\s+https?://"
+                $parsed = [ordered]@{
+                    target = $target
+                    vulnerabilities_detected = [bool]$hasVulnerable
+                    log_path = $stepLogPath
+                }
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "NuGet vulnerability audit command failed with code $exitCode"
+                } elseif ($hasVulnerable) {
+                    $status = "FAILED"
+                    $summary = "NuGet vulnerability audit found vulnerable packages"
+                } else {
+                    $summary = "NuGet vulnerability audit found no vulnerable packages"
+                }
+            }
+
             default {
                 $status = "SKIPPED_UNSUPPORTED"
                 $summary = "Unsupported Test Agent action: $action"
@@ -324,6 +576,15 @@ foreach ($step in $plan.steps) {
         exit_code = $exitCode
         log_path = $stepLogPath
         duration_seconds = $duration
+        trace = [ordered]@{
+            trace_group_id = $traceGroupId
+            dogfood_run_id = $RunId
+            agent_role = "TestAgent"
+            provider = "LocalCli"
+            model = "deterministic-headless"
+            command = $commandText
+        }
+        parsed = $parsed
     }) | Out-Null
 
     if ($earlyStop -and $status -in @("FAILED", "BLOCKED")) {
@@ -344,13 +605,49 @@ $overall = if ($failed -gt 0) {
 
 $report = [ordered]@{
     test_run_id = $RunId
+    goal_id = if ($plan.goal_id) { [string]$plan.goal_id } else { "ad-hoc" }
+    status = switch ($overall) {
+        "SUCCESS" { "passed" }
+        "FAILED" { "failed" }
+        "PARTIAL_SUCCESS" { "partial" }
+        "BLOCKED" { "blocked" }
+        default { "skipped" }
+    }
     overall_result = $overall
     summary = "Steps passed: $passed; failed: $failed; skipped: $skipped."
+    commands_run = @($stepResults | ForEach-Object { $_.command } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    expected = if ($plan.expected) { $plan.expected } else { [ordered]@{} }
+    actual = [ordered]@{
+        steps_passed = $passed
+        steps_failed = $failed
+        steps_skipped = $skipped
+    }
+    evidence = @($stepResults | ForEach-Object {
+        [ordered]@{
+            type = $_.action
+            id = "step-$($_.step)"
+            path = $_.log_path
+            problem = if ($_.status -eq "FAILED") { $_.summary } else { "" }
+        }
+    })
+    trace = [ordered]@{
+        trace_group_id = $traceGroupId
+        dogfood_run_id = $RunId
+        agent_role = "TestAgent"
+        provider = "LocalCli"
+        model = "deterministic-headless"
+    }
     key_metrics = [ordered]@{
         build_success = $null
         unit_test_pass_rate = $null
         coverage_percent = $null
         api_drive_success_rate = $null
+        model_calls = 0
+        estimated_cost = 0
+        cli_commands_run = @($stepResults | Where-Object { -not [string]::IsNullOrWhiteSpace($_.command) }).Count
+        failures_found = $failed
+        useful_failures = $failed
+        wasted_runs = 0
         steps_passed = $passed
         steps_failed = $failed
         steps_skipped = $skipped
@@ -364,6 +661,10 @@ $report = [ordered]@{
     )
     steps = $stepResults
 }
+
+$schemaValidation = Test-ReportShape -Report $report
+$report["report_schema_valid"] = $schemaValidation.valid
+$report["report_schema_validation"] = $schemaValidation
 
 $reportPath = Join-Path $runRoot "test-agent-report.json"
 $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $reportPath -Encoding UTF8

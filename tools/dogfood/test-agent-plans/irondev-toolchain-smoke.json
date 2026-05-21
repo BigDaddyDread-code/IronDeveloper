@@ -1,0 +1,54 @@
+{
+  "test_run_id": "test-irondev-toolchain-smoke-001",
+  "goal_id": "toolchain-smoke-001",
+  "project_id": 5,
+  "description": "Exercise real deterministic Test Agent tools for build, focused tests, formatting, audit, and report schema shape.",
+  "expected": {
+    "build_success": true,
+    "focused_tests_success": true,
+    "dry_run": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "dotnet_build",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 2,
+      "action": "dotnet_test",
+      "params": {
+        "target": "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj",
+        "filter": "ChatCommandRouter_CreateTickets_IsActionFirst|ChatCommandRouter_SaveDecision_IsActionFirst|ChatCommandRouter_CreatePlan_IsActionFirst|ChatCommandRouter_BuildTicketQuestion_AllowsProse"
+      }
+    },
+    {
+      "step": 3,
+      "action": "format_check",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 4,
+      "action": "package_audit",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 5,
+      "action": "replay_run",
+      "params": {
+        "scenario": "BookSellerMvp",
+        "reps": 10,
+        "dry_run": true,
+        "stop_on_failure": true
+      }
+    }
+  ],
+  "max_turns": 8,
+  "early_stop_on_failure": true
+}
