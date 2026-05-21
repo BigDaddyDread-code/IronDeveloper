@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -97,8 +98,10 @@ public sealed partial class ShellViewModel : ObservableObject
         TicketsWorkspaceViewModel tickets => tickets.SelectedTicket?.Title ?? (tickets.HasDetail ? tickets.EditTitle : "No ticket selected"),
         DecisionsWorkspaceViewModel => "Project knowledge",
         ChatWorkspaceViewModel => "Current conversation",
+        KnowledgeCompilerViewModel knowledgeCompiler => knowledgeCompiler.SelectedDiscussion?.Title ?? "Knowledge Compiler",
         TestingCompanionViewModel => "Testing session",
         BuilderWorkspaceViewModel => "Build workflow",
+        DevToolsWorkspaceViewModel => "Diagnostics workspace",
         _ => CurrentWorkspaceDisplayName
     };
     public string SourceVersionContextText => CurrentView switch
@@ -107,6 +110,8 @@ public sealed partial class ShellViewModel : ObservableObject
             ? $"Source/version: {version}"
             : "Source/version: none selected",
         TicketsWorkspaceViewModel tickets when tickets.SelectedTicket != null => $"Source: Ticket #{tickets.SelectedTicket.Id}",
+        KnowledgeCompilerViewModel => "Source: project summary, discussions, and proposals",
+        DevToolsWorkspaceViewModel => "Source: traces, test reports, and prompt runs",
         _ => "Source/version: current workspace"
     };
     public string RelatedContextText => CurrentWorkspace switch
@@ -114,9 +119,16 @@ public sealed partial class ShellViewModel : ObservableObject
         ProjectWorkspace.Documents => "Related tickets and decisions load from document context.",
         ProjectWorkspace.Tickets => "Related docs, decisions, and build traces load from ticket context.",
         ProjectWorkspace.Chat => "Related memory appears in route and LLM traces.",
+        ProjectWorkspace.Discovery => $"Discussions: {_knowledgeCompilerVm.DiscussionDocuments.Count} | Proposals: {_knowledgeCompilerVm.Proposals.Count} | Selected: {_knowledgeCompilerVm.Proposals.Count(p => p.IsSelected)}",
+        ProjectWorkspace.DevTools => "LLM traces, test defects, and prompt experiments.",
         _ => "Related items are available in workspace-specific panels."
     };
-    public string LatestTraceContextText => "Open Dev Tools for LLM and route traces.";
+    public string LatestTraceContextText => CurrentWorkspace switch
+    {
+        ProjectWorkspace.DevTools => "Trace tools are open in this workspace.",
+        ProjectWorkspace.Discovery => "Apply selected proposals to create project memory.",
+        _ => "Open Dev Tools for LLM and route traces."
+    };
 
     // ── Constructor ──────────────────────────────────────────────────────────
 

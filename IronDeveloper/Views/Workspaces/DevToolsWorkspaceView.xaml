@@ -19,20 +19,85 @@
                                   Title="Dev Tools"
                                   Subtitle="Trace LLM calls, inspect prompts, and review testing companion defects"/>
 
-        <TabControl Grid.Row="1"
-                    Margin="0,12,0,0"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    ItemContainerStyle="{StaticResource AppTabItem.Workspace}">
-            <TabItem Header="LLM RESPONSE TRACE">
-                <ContentControl Content="{Binding LlmConsole}"/>
-            </TabItem>
-            <TabItem Header="TEST AGENT DEFECTS">
-                <ContentControl Content="{Binding TestingCompanion}"/>
-            </TabItem>
-            <TabItem Header="PROMPT PLAYGROUND">
-                <ContentControl Content="{Binding PromptPlayground}"/>
-            </TabItem>
-        </TabControl>
+        <Grid Grid.Row="1"
+              Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource SurfacePanel.Subtle}"
+                    Padding="14"
+                    Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="DIAGNOSTIC GROUPS"
+                               Style="{StaticResource Typography.Eyebrow}"
+                               Margin="0,0,0,12"/>
+
+                    <Border Style="{StaticResource SurfacePanel.Interactive}"
+                            Padding="12"
+                            Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="LLM Response Trace"
+                                       Foreground="{StaticResource Text/Primary}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Prompts, responses, routing, and timing."
+                                       Foreground="{StaticResource Text/Secondary}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SurfacePanel.Interactive}"
+                            Padding="12"
+                            Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Test Agent Defects"
+                                       Foreground="{StaticResource Text/Primary}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Captured moments, reports, and grouped bug prompts."
+                                       Foreground="{StaticResource Text/Secondary}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SurfacePanel.Interactive}"
+                            Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="Prompt Playground"
+                                       Foreground="{StaticResource Text/Primary}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Manual prompt experiments and response checks."
+                                       Foreground="{StaticResource Text/Secondary}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Style="{StaticResource SurfacePanel.Subtle}"
+                    Padding="14">
+                <TabControl Background="Transparent"
+                            BorderThickness="0"
+                            ItemContainerStyle="{StaticResource AppTabItem.Workspace}">
+                    <TabItem Header="LLM RESPONSE TRACE">
+                        <ContentControl Content="{Binding LlmConsole}"/>
+                    </TabItem>
+                    <TabItem Header="TEST AGENT DEFECTS">
+                        <ContentControl Content="{Binding TestingCompanion}"/>
+                    </TabItem>
+                    <TabItem Header="PROMPT PLAYGROUND">
+                        <ContentControl Content="{Binding PromptPlayground}"/>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

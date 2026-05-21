@@ -39,7 +39,6 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="320" MinWidth="280"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="400" MinWidth="340"/>
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
@@ -240,10 +239,16 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1"
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" MinHeight="360"/>
+                    <RowDefinition Height="360" MinHeight="280"/>
+                </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
                     Style="{StaticResource SurfacePanel.Subtle}"
                     Padding="16"
-                    Margin="0,0,12,0">
+                    Margin="0,0,0,12">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -304,7 +309,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2"
+            <Border Grid.Row="1"
                     Style="{StaticResource SurfacePanel.Subtle}"
                     Padding="16">
                 <Grid>
@@ -423,6 +428,7 @@
                     </ScrollViewer>
                 </Grid>
             </Border>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
