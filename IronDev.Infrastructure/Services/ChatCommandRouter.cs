@@ -143,17 +143,19 @@ public sealed class ChatCommandRouter : IChatCommandRouter
     private static string? ResolveActionText(ChatTurnInput input)
     {
         var lower = Normalize(input.UserMessage);
+        var currentActionText = StripTrailingActionCommand(StripActionCommand(input.UserMessage)).Trim();
+        var isBareReferenceCommand = IsBareReferenceCommand(lower);
         var refersToPrevious =
             ContainsAny(lower, " this", " that", " above", " it") ||
             lower is "save this" or "save that" or "create plan" or "make plan";
 
-        if (refersToPrevious && !string.IsNullOrWhiteSpace(input.PreviousAssistantMessage))
+        if (refersToPrevious && isBareReferenceCommand && !string.IsNullOrWhiteSpace(input.PreviousAssistantMessage))
             return input.PreviousAssistantMessage.Trim();
 
-        if (refersToPrevious && !string.IsNullOrWhiteSpace(input.PreviousUserMessage))
+        if (refersToPrevious && isBareReferenceCommand && !string.IsNullOrWhiteSpace(input.PreviousUserMessage))
             return input.PreviousUserMessage.Trim();
 
-        return StripActionCommand(input.UserMessage).Trim();
+        return currentActionText;
     }
 
     private static string BuildActionTitle(string userMessage, string? actionText, ChatRouteIntent intent)
@@ -299,6 +301,49 @@ public sealed class ChatCommandRouter : IChatCommandRouter
         }
 
         return trimmed;
+    }
+
+    private static string StripTrailingActionCommand(string text)
+    {
+        var trimmed = text.Trim();
+        var lower = trimmed.ToLowerInvariant();
+        foreach (var suffix in new[]
+        {
+            ". save that as project knowledge",
+            " save that as project knowledge",
+            ". save this as project knowledge",
+            " save this as project knowledge",
+            ". save that as a document",
+            " save that as a document",
+            ". save this as a document",
+            " save this as a document"
+        })
+        {
+            if (!lower.EndsWith(suffix, StringComparison.Ordinal))
+                continue;
+
+            return trimmed[..^suffix.Length].TrimEnd(' ', '.', ';', ':');
+        }
+
+        return trimmed;
+    }
+
+    private static bool IsBareReferenceCommand(string lower)
+    {
+        var trimmed = lower.Trim();
+        return trimmed is
+            "save this" or
+            "save that" or
+            "save this as project knowledge" or
+            "save that as project knowledge" or
+            "save this as a document" or
+            "save that as a document" or
+            "create plan" or
+            "make plan" ||
+            trimmed.StartsWith("save this as ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("save that as ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("turn this into ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("turn that into ", StringComparison.Ordinal);
     }
 
     private static bool IsNonActionQuestion(string lower)

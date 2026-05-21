@@ -127,7 +127,7 @@ For deterministic debugging, reuse the saved seed:
 
 ## Runner integration
 
-The script currently generates a replay plan. It can call a future IronDev replay runner by passing `-RunnerCommand`.
+The script currently generates a replay plan. It can call the IronDev replay runner by passing `-RunnerCommand`.
 
 The runner should read `replay-plan.json`, execute each case through IronDev internals, and save results linked by:
 
@@ -158,6 +158,44 @@ Runner assertion: creates a reviewable discussion document, changes no files
 ```
 
 This lets the harness test whether IronDev can ask, receive an answer, route the follow-up, and produce a reviewable action without going through the WPF interface.
+
+## Headless chat feedback
+
+The runner also exposes a small CLI-style chat command for Codex/headless testing. It routes one chat turn through the same deterministic command router and returns JSON feedback:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  chat send "I need to save data" `
+  --workspace Chat `
+  --dogfood-run-id cli-smoke-001
+```
+
+Follow-up turns can pass the prior assistant and user text:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  chat send "BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge." `
+  --workspace Chat `
+  --previous-assistant "I need a little more detail before I can safely turn that into project memory, tickets, or a build action." `
+  --previous-user "I need to save data" `
+  --dogfood-run-id cli-smoke-001
+```
+
+The command returns:
+
+```text
+assistantResponse
+intent
+confidence
+isAction / requiresAction / allowsProseResponse
+contextReference
+matchedSignals
+simulated discussion docs / draft tickets / plans / build runs
+simulated files changed
+dryRun
+```
+
+That JSON is the Codex feedback contract: send a prompt, read IronDev's response, decide the next prompt or patch, and run again.
 
 ## Vague prompt pressure
 

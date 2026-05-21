@@ -2,11 +2,20 @@ using System.Text.Json;
 using IronDev.Core.Models;
 using IronDev.Infrastructure.Services;
 
+var options = new JsonSerializerOptions
+{
+    PropertyNameCaseInsensitive = true,
+    WriteIndented = true
+};
+
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json>");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | chat send <message> [--workspace Chat] [--previous-assistant text] [--previous-user text] [--dogfood-run-id id]");
     return 2;
 }
+
+if (IsCommand(args, "chat", "send"))
+    return await HandleChatSendCommandAsync(args, options);
 
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
@@ -14,12 +23,6 @@ if (!File.Exists(planPath))
     Console.Error.WriteLine($"Replay plan not found: {planPath}");
     return 2;
 }
-
-var options = new JsonSerializerOptions
-{
-    PropertyNameCaseInsensitive = true,
-    WriteIndented = true
-};
 
 var plan = JsonSerializer.Deserialize<ReplayPlan>(
     await File.ReadAllTextAsync(planPath),
@@ -126,6 +129,127 @@ if (failed)
 }
 
 return failed ? 1 : 0;
+
+static bool IsCommand(string[] args, string first, string second)
+    => args.Length >= 2 &&
+       string.Equals(args[0], first, StringComparison.OrdinalIgnoreCase) &&
+       string.Equals(args[1], second, StringComparison.OrdinalIgnoreCase);
+
+static async Task<int> HandleChatSendCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var message = ReadPositionalText(args, startIndex: 2);
+    if (string.IsNullOrWhiteSpace(message))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner chat send <message> [--workspace Chat] [--previous-assistant text] [--previous-user text] [--dogfood-run-id id]");
+        return 2;
+    }
+
+    var workspace = ReadOption(args, "--workspace") ?? "Chat";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"cli-chat-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var previousAssistant = ReadOption(args, "--previous-assistant");
+    var previousUser = ReadOption(args, "--previous-user") ?? "We are planning the BookSeller MVP.";
+    var dryRun = !HasFlag(args, "--allow-writes");
+    var projectId = int.TryParse(ReadOption(args, "--project-id"), out var parsedProjectId)
+        ? parsedProjectId
+        : 0;
+
+    var router = new ChatCommandRouter();
+    var input = new ChatTurnInput
+    {
+        ProjectId = projectId,
+        ChatSessionId = 0,
+        UserMessage = message,
+        ActiveWorkspace = workspace,
+        PreviousAssistantMessage = previousAssistant,
+        PreviousUserMessage = previousUser
+    };
+
+    var route = await router.RouteAsync(input);
+    var replayCase = new ReplayCase
+    {
+        DogfoodRunId = dogfoodRunId,
+        CaseId = $"chat-{Guid.NewGuid():N}"[..18],
+        CaseNumber = 1,
+        Name = "chat send",
+        Workspace = workspace,
+        Prompt = message,
+        Expected = new ReplayExpected
+        {
+            NoUnsafeWrites = dryRun,
+            AllowsProseResponse = true
+        }
+    };
+    var expected = replayCase.Expected;
+    var actionResult = ExecuteDryRunAction(replayCase, expected, route, turnNumber: 1, message);
+    var assistantResponse = GenerateAssistantResponse(expected, route, actionResult);
+
+    var result = new CliChatSendResult
+    {
+        DogfoodRunId = dogfoodRunId,
+        Command = "chat send",
+        ProjectId = projectId,
+        Workspace = workspace,
+        DryRun = dryRun,
+        UserMessage = message,
+        PreviousAssistantMessage = previousAssistant,
+        PreviousUserMessage = previousUser,
+        AssistantResponse = assistantResponse,
+        Intent = route.Intent.ToString(),
+        Confidence = route.Confidence,
+        IsAction = route.IsAction,
+        RequiresAction = route.RequiresAction,
+        AllowsProseResponse = route.AllowsProseResponse,
+        ContextReference = route.ContextReference.ToString(),
+        DraftCountMode = route.DraftCountMode.ToString(),
+        MatchedSignals = route.MatchedSignals.ToArray(),
+        SimulatedDiscussionDocuments = actionResult.DiscussionDocuments.Count,
+        SimulatedDraftTickets = actionResult.DraftTickets.Count,
+        SimulatedImplementationPlans = actionResult.ImplementationPlans.Count,
+        SimulatedBuildRuns = actionResult.BuildRuns.Count,
+        SimulatedApprovalsRequested = actionResult.ApprovalsRequested,
+        SimulatedFilesChanged = actionResult.FilesChanged,
+        SimulatedBlocked = actionResult.Blocked,
+        BlockReason = actionResult.BlockReason,
+        ActionResult = actionResult,
+        CreatedAtUtc = DateTimeOffset.UtcNow
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return 0;
+}
+
+static string ReadPositionalText(string[] args, int startIndex)
+{
+    var parts = new List<string>();
+    for (var i = startIndex; i < args.Length; i++)
+    {
+        if (args[i].StartsWith("--", StringComparison.Ordinal))
+            break;
+
+        parts.Add(args[i]);
+    }
+
+    return string.Join(' ', parts).Trim();
+}
+
+static string? ReadOption(string[] args, string optionName)
+{
+    for (var i = 0; i < args.Length; i++)
+    {
+        if (!string.Equals(args[i], optionName, StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            return string.Empty;
+
+        return args[i + 1];
+    }
+
+    return null;
+}
+
+static bool HasFlag(string[] args, string optionName)
+    => args.Any(arg => string.Equals(arg, optionName, StringComparison.OrdinalIgnoreCase));
 
 static async Task<ReplayCaseRun> ExecuteCaseAsync(ChatCommandRouter router, ReplayCase replayCase)
 {
@@ -643,6 +767,37 @@ public sealed class ReplayCaseRun
     public IReadOnlyList<ReplayActionResult> ActionResults { get; init; } = [];
     public IReadOnlyList<ReplayResponseResult> ResponseResults { get; init; } = [];
     public Exception? Exception { get; init; }
+}
+
+public sealed class CliChatSendResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string Command { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public string Workspace { get; init; } = string.Empty;
+    public bool DryRun { get; init; }
+    public string UserMessage { get; init; } = string.Empty;
+    public string? PreviousAssistantMessage { get; init; }
+    public string? PreviousUserMessage { get; init; }
+    public string AssistantResponse { get; init; } = string.Empty;
+    public string Intent { get; init; } = string.Empty;
+    public double Confidence { get; init; }
+    public bool IsAction { get; init; }
+    public bool RequiresAction { get; init; }
+    public bool AllowsProseResponse { get; init; }
+    public string ContextReference { get; init; } = string.Empty;
+    public string DraftCountMode { get; init; } = string.Empty;
+    public IReadOnlyList<string> MatchedSignals { get; init; } = [];
+    public int SimulatedDiscussionDocuments { get; init; }
+    public int SimulatedDraftTickets { get; init; }
+    public int SimulatedImplementationPlans { get; init; }
+    public int SimulatedBuildRuns { get; init; }
+    public int SimulatedApprovalsRequested { get; init; }
+    public int SimulatedFilesChanged { get; init; }
+    public bool SimulatedBlocked { get; init; }
+    public string BlockReason { get; init; } = string.Empty;
+    public ReplayActionResult ActionResult { get; init; } = new();
+    public DateTimeOffset CreatedAtUtc { get; init; }
 }
 
 public sealed class SimulatedDiscussionDocument
