@@ -80,6 +80,7 @@ Initial Alpha actions:
 | `package_audit` | Check vulnerable NuGet packages | `dotnet package list --project <target> --vulnerable --include-transitive` |
 | `weaviate_health` | Verify local Weaviate REST/schema availability | `Invoke-RestMethod http://localhost:8080/v1/meta` |
 | `docs_search` | Probe headless dogfood knowledge retrieval and ranking evidence | `IronDev.ReplayRunner docs search` |
+| `sql_document_version_smoke` | Create SQL-backed project document versions, index them into semantic memory tables, and assert the current version outranks the stale version | `IronDev.ReplayRunner memory sql-version-smoke` |
 
 Example `chat_conversation` step:
 
@@ -130,6 +131,8 @@ Planned CLI actions:
 | `retrieve` | Force semantic retrieval | `irondev retrieve` |
 
 Unsupported actions must be reported as `SKIPPED_UNSUPPORTED` or `FAILED_UNSUPPORTED`. The Test Agent must not fake success for actions that do not have a real backing command.
+
+Memory spine actions are deliberately small and evidence-first. `weaviate_health` proves the local Weaviate endpoint is reachable. `docs_search` proves the local dogfood knowledge store can return project-scoped ranking evidence. `sql_document_version_smoke` proves a SQL `ProjectDocument`/`ProjectDocumentVersion` pair can be indexed into semantic artefact/chunk tables, linked back to a source discussion, ranked with current-version authority over a stale version, and recorded with a semantic search trace id.
 
 ## Output Shape
 

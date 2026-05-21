@@ -1,6 +1,15 @@
 using System.Text.Json;
+using Dapper;
+using IronDev.Core.Auth;
+using IronDev.Core.Interfaces;
+using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
+using IronDev.Data;
+using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
+using IronDev.Infrastructure.Services.SemanticMemory;
+using IronDev.Services;
+using Microsoft.Data.SqlClient;
 
 var options = new JsonSerializerOptions
 {
@@ -34,6 +43,9 @@ if (IsCommand(args, "docs", "search"))
 
 if (IsCommand(args, "failure", "latest"))
     return await HandleFailureLatestCommandAsync(args, options);
+
+if (IsCommand(args, "memory", "sql-version-smoke"))
+    return await HandleMemorySqlVersionSmokeCommandAsync(args, options);
 
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
@@ -507,6 +519,187 @@ static async Task<int> HandleDocsSearchCommandAsync(string[] args, JsonSerialize
     return 0;
 }
 
+static async Task<int> HandleMemorySqlVersionSmokeCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var requestedProjectName = ReadOption(args, "--project") ?? "IronDev";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"memory-sql-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var queryText = ReadOption(args, "--query") ?? "current first goal";
+    var connectionString = ResolveIronDevConnectionString(args);
+    var repoRoot = FindRepositoryRoot();
+    var connectionFactory = new CliConnectionFactory(connectionString);
+
+    await ApplySqlScriptAsync(
+        connectionFactory,
+        Path.Combine(repoRoot, "Database", "migrate_project_documents.sql"));
+
+    var project = await ResolveProjectAsync(connectionFactory, requestedProjectName);
+    if (project is null)
+    {
+        Console.Error.WriteLine($"Project not found: {requestedProjectName}");
+        return 1;
+    }
+
+    var tenant = new CliTenantContext(project.TenantId);
+    var documentService = new ProjectDocumentService(connectionFactory, tenant);
+    var artefactRepository = new SemanticArtefactRepository(connectionFactory);
+    var chunkRepository = new SemanticChunkRepository(connectionFactory);
+    var traceRepository = new SemanticSearchTraceRepository(connectionFactory);
+    var ranker = new SemanticRankingService();
+
+    var stamp = dogfoodRunId.Replace(':', '-').Replace('\\', '-').Replace('/', '-');
+    var titleSeed = $"CODEX_GOALS_SQL_SPINE_{stamp}_{Guid.NewGuid():N}";
+    var title = titleSeed[..Math.Min(120, titleSeed.Length)];
+    var oldContent = """
+        # Codex Goals SQL Spine
+
+        Old first goal = test builder output.
+        This historical version is intentionally stale and must not outrank the current version.
+        """;
+    var currentContent = """
+        # Codex Goals SQL Spine
+
+        Current first goal = prove memory spine retrieval.
+        IronDev must retrieve the current SQL ProjectDocumentVersion as authoritative memory.
+        """;
+
+    var document = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = project.ProjectId,
+        Title = title,
+        DocumentType = "Architecture",
+        ContentMarkdown = oldContent,
+        ChangeSummary = "Historical dogfood version",
+        CreatedBy = "TestAgent",
+        SourceEntityType = "Discussion",
+        SourceEntityId = 9001
+    });
+
+    var oldVersion = await documentService.GetCurrentVersionAsync(document.Id)
+        ?? throw new InvalidOperationException("Initial document version was not created.");
+
+    var currentVersion = await documentService.AddVersionAsync(new AddProjectDocumentVersionRequest
+    {
+        DocumentId = document.Id,
+        ContentMarkdown = currentContent,
+        ChangeSummary = "Current dogfood version",
+        CreatedBy = "TestAgent",
+        IncrementMajorVersion = true,
+        Status = "Approved"
+    });
+
+    await documentService.LinkVersionAsync(new LinkProjectDocumentVersionRequest
+    {
+        DocumentVersionId = currentVersion.Id,
+        LinkedEntityType = "Discussion",
+        LinkedEntityId = 9002,
+        LinkType = "CurrentGoalSource",
+        CreatedBy = "TestAgent"
+    });
+
+    var oldArtefactId = Guid.NewGuid();
+    var currentArtefactId = Guid.NewGuid();
+    await IndexDocumentVersionAsync(
+        artefactRepository,
+        chunkRepository,
+        project.TenantId,
+        project.ProjectId,
+        oldArtefactId,
+        document,
+        oldVersion,
+        authorityLevel: "LowAuthorityNote",
+        content: oldContent);
+    await IndexDocumentVersionAsync(
+        artefactRepository,
+        chunkRepository,
+        project.TenantId,
+        project.ProjectId,
+        currentArtefactId,
+        document,
+        currentVersion,
+        authorityLevel: "AcceptedArchitecture",
+        content: currentContent);
+
+    await artefactRepository.MarkStaleAsync(new SemanticStaleRequest
+    {
+        ProjectId = project.ProjectId,
+        SourceEntityType = "ProjectDocument",
+        SourceEntityId = document.Id.ToString(),
+        SourceVersionId = oldVersion.Id.ToString()
+    });
+
+    var oldArtefact = await artefactRepository.GetArtefactAsync(oldArtefactId)
+        ?? throw new InvalidOperationException("Old semantic artefact was not persisted.");
+    var currentArtefact = await artefactRepository.GetArtefactAsync(currentArtefactId)
+        ?? throw new InvalidOperationException("Current semantic artefact was not persisted.");
+    var oldChunk = (await chunkRepository.GetChunksAsync(oldArtefactId, includeStale: true)).Single();
+    var currentChunk = (await chunkRepository.GetChunksAsync(currentArtefactId, includeStale: true)).Single();
+
+    var query = new SemanticSearchQuery
+    {
+        ProjectId = project.ProjectId,
+        QueryText = queryText,
+        Consumer = "MemorySpineSmoke",
+        Limit = 5,
+        IncludeStale = true
+    };
+
+    var candidates = new[]
+    {
+        BuildCandidate(project.TenantId, project.ProjectId, document, oldVersion, oldArtefact, oldChunk, oldContent, vectorSimilarity: 0.88, contentHashMismatch: false),
+        BuildCandidate(project.TenantId, project.ProjectId, document, currentVersion, currentArtefact, currentChunk, currentContent, vectorSimilarity: 0.82, contentHashMismatch: false)
+    };
+
+    var results = ranker.Rank(query, candidates);
+    var traceId = await traceRepository.CreateTraceAsync(query);
+    await traceRepository.AddResultsAsync(traceId, results);
+    var links = await documentService.GetLinksForVersionAsync(currentVersion.Id);
+
+    var top = results.FirstOrDefault();
+    var passed = top is not null &&
+                 top.SourceVersionId == currentVersion.Id.ToString() &&
+                 !top.IsStale &&
+                 links.Any(link => link.LinkType == "CurrentGoalSource");
+
+    var result = new MemorySqlVersionSmokeResult
+    {
+        DogfoodRunId = dogfoodRunId,
+        ProjectId = project.ProjectId,
+        TenantId = project.TenantId,
+        ProjectName = project.ProjectName,
+        DocumentId = document.Id,
+        CurrentVersionId = currentVersion.Id,
+        OldVersionId = oldVersion.Id,
+        Query = queryText,
+        SemanticTraceId = traceId,
+        SourceLinkCount = links.Count,
+        Passed = passed,
+        Expected = new MemorySqlVersionExpected
+        {
+            TopSourceVersionId = currentVersion.Id.ToString(),
+            OldVersionShouldBeStale = true,
+            SourceLinkRequired = true
+        },
+        Results = results.Select(result => new MemorySqlVersionSearchResult
+        {
+            Title = result.Title,
+            SourceEntityType = result.SourceEntityType,
+            SourceEntityId = result.SourceEntityId,
+            SourceVersionId = result.SourceVersionId,
+            FinalScore = result.FinalScore,
+            VectorSimilarity = result.VectorSimilarity,
+            AuthorityBoost = result.AuthorityBoost,
+            SourceTypeBoost = result.SourceTypeBoost,
+            RecencyBoost = result.RecencyBoost,
+            StalePenalty = result.StalePenalty,
+            IsStale = result.IsStale,
+            MatchReason = result.MatchReason
+        }).ToArray()
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return passed ? 0 : 1;
+}
+
 static ReplayFailure? FindLatestReplayFailure(string runsRoot, string? selectedRunId)
 {
     var resultFiles = Directory
@@ -665,6 +858,182 @@ static string BuildFailurePackageMarkdown(FailurePackage package)
 
     {string.Join(Environment.NewLine, package.SafetyRules.Select(rule => $"- {rule}"))}
     """;
+}
+
+static async Task IndexDocumentVersionAsync(
+    SemanticArtefactRepository artefactRepository,
+    SemanticChunkRepository chunkRepository,
+    int tenantId,
+    int projectId,
+    Guid artefactId,
+    ProjectDocument document,
+    ProjectDocumentVersion version,
+    string authorityLevel,
+    string content)
+{
+    var hash = ComputeSha256(content);
+    var artefact = new SemanticArtefactDraft
+    {
+        Id = artefactId,
+        TenantId = tenantId,
+        ProjectId = projectId,
+        SourceEntityType = "ProjectDocument",
+        SourceEntityId = document.Id.ToString(),
+        SourceVersionId = version.Id.ToString(),
+        ArtefactType = document.DocumentType,
+        AuthorityLevel = authorityLevel,
+        Title = document.Title,
+        Summary = version.ChangeSummary,
+        SearchableText = content,
+        ContentHash = hash
+    };
+
+    await artefactRepository.UpsertArtefactAsync(artefact);
+    await chunkRepository.ReplaceChunksAsync(artefactId, [
+        new SemanticChunkDraft
+        {
+            Id = Guid.NewGuid(),
+            ArtefactId = artefactId,
+            ProjectId = projectId,
+            ChunkIndex = 0,
+            ChunkText = content,
+            TokenEstimate = Math.Max(1, content.Length / 4),
+            ContentHash = hash
+        }
+    ]);
+}
+
+static SemanticSearchCandidate BuildCandidate(
+    int tenantId,
+    int projectId,
+    ProjectDocument document,
+    ProjectDocumentVersion version,
+    SemanticArtefact artefact,
+    SemanticChunk chunk,
+    string content,
+    double vectorSimilarity,
+    bool contentHashMismatch)
+{
+    return new SemanticSearchCandidate
+    {
+        Document = new ProjectContextDocument
+        {
+            TenantId = tenantId,
+            ProjectId = projectId,
+            DocumentType = document.DocumentType,
+            AuthorityLevel = artefact.AuthorityLevel,
+            Status = version.Id == document.CurrentVersionId ? "Active" : "Superseded",
+            Title = document.Title,
+            Content = content,
+            Summary = version.ChangeSummary,
+            Source = $"ProjectDocumentVersion:{version.Id}",
+            CreatedDate = version.CreatedAtUtc,
+            UpdatedDate = version.CreatedAtUtc
+        },
+        Artefact = artefact,
+        Chunk = chunk,
+        VectorSimilarity = vectorSimilarity,
+        ContentHashMismatch = contentHashMismatch
+    };
+}
+
+static async Task<CliProjectContext?> ResolveProjectAsync(IDbConnectionFactory connectionFactory, string projectName)
+{
+    using var connection = connectionFactory.CreateConnection();
+    return await connection.QuerySingleOrDefaultAsync<CliProjectContext?>(new CommandDefinition(
+        """
+        SELECT TOP (1)
+            Id AS ProjectId,
+            TenantId,
+            Name AS ProjectName
+        FROM dbo.Projects
+        WHERE Name = @ProjectName OR Name = @FallbackProjectName
+        ORDER BY CASE WHEN Name = @ProjectName THEN 0 ELSE 1 END, Id;
+        """,
+        new
+        {
+            ProjectName = projectName,
+            FallbackProjectName = projectName == "IronDev" ? "IronDeveloper" : "IronDev"
+        }));
+}
+
+static async Task ApplySqlScriptAsync(IDbConnectionFactory connectionFactory, string scriptPath)
+{
+    if (!File.Exists(scriptPath))
+        return;
+
+    var script = await File.ReadAllTextAsync(scriptPath);
+    var batches = script
+        .Split(["\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n"], StringSplitOptions.RemoveEmptyEntries)
+        .Select(batch => batch.Trim())
+        .Where(batch => !string.IsNullOrWhiteSpace(batch) && !batch.StartsWith("USE ", StringComparison.OrdinalIgnoreCase));
+
+    using var connection = connectionFactory.CreateConnection();
+    foreach (var batch in batches)
+        await connection.ExecuteAsync(batch);
+}
+
+static string ResolveIronDevConnectionString(string[] args)
+{
+    var explicitConnection = ReadOption(args, "--connection-string");
+    if (!string.IsNullOrWhiteSpace(explicitConnection))
+        return explicitConnection;
+
+    var envConnection = Environment.GetEnvironmentVariable("IRONDEV_CONNECTION_STRING");
+    if (!string.IsNullOrWhiteSpace(envConnection))
+        return envConnection;
+
+    var repoRoot = FindRepositoryRoot();
+    foreach (var path in new[]
+    {
+        Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
+        Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+    })
+    {
+        var connection = TryReadConnectionString(path, "IronDeveloperDb");
+        if (!string.IsNullOrWhiteSpace(connection))
+            return connection;
+    }
+
+    throw new InvalidOperationException("Could not resolve IronDeveloperDb connection string.");
+}
+
+static string? TryReadConnectionString(string path, string name)
+{
+    if (!File.Exists(path))
+        return null;
+
+    using var document = JsonDocument.Parse(File.ReadAllText(path));
+    if (document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings) &&
+        connectionStrings.TryGetProperty(name, out var value))
+    {
+        return value.GetString();
+    }
+
+    return null;
+}
+
+static string FindRepositoryRoot()
+{
+    var current = new DirectoryInfo(AppContext.BaseDirectory);
+    while (current is not null)
+    {
+        if (Directory.Exists(Path.Combine(current.FullName, ".git")) ||
+            File.Exists(Path.Combine(current.FullName, "IronDev.slnx")))
+        {
+            return current.FullName;
+        }
+
+        current = current.Parent;
+    }
+
+    return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+}
+
+static string ComputeSha256(string text)
+{
+    var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text));
+    return Convert.ToHexString(bytes);
 }
 
 static string ReadPositionalText(string[] args, int startIndex)
@@ -1660,4 +2029,67 @@ public sealed class DocsSearchMatch
     public int Score { get; init; }
     public IReadOnlyDictionary<string, int> Ranking { get; init; } = new Dictionary<string, int>();
     public string Snippet { get; init; } = string.Empty;
+}
+
+public sealed class MemorySqlVersionSmokeResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public string ProjectName { get; init; } = string.Empty;
+    public long DocumentId { get; init; }
+    public long CurrentVersionId { get; init; }
+    public long OldVersionId { get; init; }
+    public string Query { get; init; } = string.Empty;
+    public Guid SemanticTraceId { get; init; }
+    public int SourceLinkCount { get; init; }
+    public bool Passed { get; init; }
+    public MemorySqlVersionExpected Expected { get; init; } = new();
+    public IReadOnlyList<MemorySqlVersionSearchResult> Results { get; init; } = [];
+}
+
+public sealed class MemorySqlVersionExpected
+{
+    public string TopSourceVersionId { get; init; } = string.Empty;
+    public bool OldVersionShouldBeStale { get; init; }
+    public bool SourceLinkRequired { get; init; }
+}
+
+public sealed class MemorySqlVersionSearchResult
+{
+    public string Title { get; init; } = string.Empty;
+    public string SourceEntityType { get; init; } = string.Empty;
+    public string SourceEntityId { get; init; } = string.Empty;
+    public string? SourceVersionId { get; init; }
+    public double FinalScore { get; init; }
+    public double VectorSimilarity { get; init; }
+    public double AuthorityBoost { get; init; }
+    public double SourceTypeBoost { get; init; }
+    public double RecencyBoost { get; init; }
+    public double StalePenalty { get; init; }
+    public bool IsStale { get; init; }
+    public string MatchReason { get; init; } = string.Empty;
+}
+
+public sealed class CliProjectContext
+{
+    public int ProjectId { get; init; }
+    public int TenantId { get; init; }
+    public string ProjectName { get; init; } = string.Empty;
+}
+
+public sealed class CliTenantContext : ICurrentTenantContext
+{
+    public CliTenantContext(int tenantId) => TenantId = tenantId;
+
+    public int TenantId { get; }
+}
+
+public sealed class CliConnectionFactory : IDbConnectionFactory
+{
+    private readonly string _connectionString;
+
+    public CliConnectionFactory(string connectionString) => _connectionString = connectionString;
+
+    public System.Data.IDbConnection CreateConnection() => new SqlConnection(_connectionString);
 }

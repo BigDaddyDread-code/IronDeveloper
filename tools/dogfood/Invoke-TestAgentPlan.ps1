@@ -492,6 +492,45 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "sql_document_version_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $query = if ($params.query) { [string]$params.query } else { "current first goal" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "memory", "sql-version-smoke",
+                    "--project", $project,
+                    "--query", $query,
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.connection_string) {
+                    $arguments += @("--connection-string", [string]$params.connection_string)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed -and $parsed.results) {
+                        "SQL document version smoke failed; top version=$($parsed.results[0].sourceVersionId), expected=$($parsed.expected.topSourceVersionId)"
+                    } else {
+                        "sql_document_version_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "SQL document version smoke returned Passed=false"
+                } else {
+                    $summary = "SQL current document version wins; trace=$($parsed.semanticTraceId)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

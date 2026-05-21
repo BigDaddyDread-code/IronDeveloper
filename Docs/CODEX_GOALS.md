@@ -55,6 +55,11 @@ Expected retrieval:
 - no cross-project bleed
 - trace explains why each chunk was selected
 
+Current smoke slices:
+
+- `irondev-memory-spine-smoke.json` proves Weaviate health and local dogfood document ranking evidence.
+- `irondev-memory-spine-sql-version-smoke.json` proves a SQL-backed project document version can be indexed into semantic memory tables, linked to source context, ranked above a stale version, and traced.
+
 ### Failure Examples
 
 - old architecture outranks current decision

@@ -280,6 +280,9 @@ The local executor currently supports:
 - `coverage_report`
 - `format_check`
 - `package_audit`
+- `weaviate_health`
+- `docs_search`
+- `sql_document_version_smoke`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
 `coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
@@ -305,6 +308,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 This proves the current headless slice only: Weaviate health plus local dogfood document retrieval with project, authority, source, and ranking evidence. Full SQL-backed document/version/ticket links and Weaviate semantic trace assertions are still the next layer.
+
+Run the SQL-backed document version authority smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-sql-version-smoke.json `
+  -RunId IronDevMemorySpine006-SqlVersion `
+  -Json
+```
+
+This creates a disposable `ProjectDocument` in the active IronDev SQL database, adds an old and current document version, links the current version to a source discussion, indexes both versions into semantic artefact/chunk tables, marks the old version stale, and asserts the current version wins with a recorded semantic trace id. It is still a deterministic SQL semantic-memory smoke, not yet a full Weaviate vector-query assertion.
 
 Conversation-mode sample:
 
