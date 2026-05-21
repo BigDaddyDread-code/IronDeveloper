@@ -86,4 +86,5 @@ public sealed class TicketItem
     public bool IsDeleted { get; set; }
     public DateTime CreatedDate { get; set; }
     public bool IsDraft { get; set; }
+    public string DisplayMetadata => $"{Status}  •  {TicketType}  •  {Priority}";
 }

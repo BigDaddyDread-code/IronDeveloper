@@ -106,7 +106,11 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
             SyncTechnicalNotesToTests();
     }
 
-    partial void OnEditTitleChanged(string value) => MarkTicketDirty();
+    partial void OnEditTitleChanged(string value)
+    {
+        MarkTicketDirty();
+        SaveTicketCommand.NotifyCanExecuteChanged();
+    }
     partial void OnEditStatusChanged(string value) => MarkTicketDirty();
     partial void OnEditPriorityChanged(string value) => MarkTicketDirty();
     partial void OnEditTicketTypeChanged(string value) => MarkTicketDirty();
@@ -116,6 +120,10 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
     partial void OnEditAcceptanceCriteriaChanged(string value) => MarkTicketDirty();
     partial void OnEditLinkedFilePathsChanged(string value) => MarkTicketDirty();
     partial void OnEditLinkedSymbolsChanged(string value) => MarkTicketDirty();
+
+    partial void OnHasDetailChanged(bool value) => SaveTicketCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsSavingChanged(bool value) => SaveTicketCommand.NotifyCanExecuteChanged();
 
     // ── Implementation Plan ──
     [ObservableProperty] private TicketDetailTab _activeTab = TicketDetailTab.Overview;
@@ -161,6 +169,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
+    public bool CanSaveTicket => HasDetail && !IsSaving && !IsDraftMode && HasDirtyEditState && !string.IsNullOrWhiteSpace(EditTitle);
     public bool HasDirtyEditState => _hasUnsavedTicketChanges && HasDetail && !IsSaving && !IsDraftMode;
     public string DirtyEditMessage => "This ticket has unsaved edit text. Leave Tickets and discard those changes?";
 
@@ -458,7 +467,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
     // ── Save ────────────────────────────────────────────────────────────────
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveTicket))]
     private async Task SaveTicketAsync()
     {
         if (string.IsNullOrWhiteSpace(EditTitle))
@@ -1986,6 +1995,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
         _hasUnsavedTicketChanges = true;
         OnPropertyChanged(nameof(HasDirtyEditState));
+        OnPropertyChanged(nameof(CanSaveTicket));
+        SaveTicketCommand.NotifyCanExecuteChanged();
     }
 
     private void ClearTicketDirtyState()
@@ -1995,6 +2006,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
         _hasUnsavedTicketChanges = false;
         OnPropertyChanged(nameof(HasDirtyEditState));
+        OnPropertyChanged(nameof(CanSaveTicket));
+        SaveTicketCommand.NotifyCanExecuteChanged();
     }
 
     private void ClearTestSubFields()

@@ -18,11 +18,7 @@
                                   Title="Ticket Management"
                                   Margin="0">
             <controls:WorkspaceHeader.Actions>
-                <controls:CrudCommandBar ShowCreate="True"
-                                         CreateText="+ New Ticket"
-                                         CreateCommand="{Binding NewTicketCommand}"
-                                         CreateToolTip="Create a new draft ticket."
-                                         ShowRefresh="False">
+                <controls:CrudCommandBar ShowRefresh="False">
                     <controls:CrudCommandBar.SecondaryActions>
                         <StackPanel Orientation="Horizontal">
                             <Button Command="{Binding GenerateCodebaseTicketsCommand}"
@@ -62,11 +58,18 @@
             <controls:WorkspaceListPane Grid.Column="0" Title="PROJECT TICKETS" Margin="0,0,12,0"
                                         ItemsSource="{Binding Tickets}"
                                         SelectedItem="{Binding SelectedTicket, Mode=TwoWay}">
+                <controls:WorkspaceListPane.HeaderActions>
+                    <Button Content="+ New"
+                            Command="{Binding NewTicketCommand}"
+                            Style="{StaticResource AppButton.Primary}"
+                            Padding="12,6"
+                            ToolTip="Create a new draft ticket."/>
+                </controls:WorkspaceListPane.HeaderActions>
                 <controls:WorkspaceListPane.ItemTemplate>
                     <DataTemplate>
                         <controls:WorkspaceListItem Title="{Binding Title}"
                                                     Subtitle="{Binding Summary, Converter={StaticResource MarkdownPreviewConverter}}"
-                                                    Metadata="{Binding Status}"
+                                                    Metadata="{Binding DisplayMetadata}"
                                                     IconData="{StaticResource Icon.Nav.Tickets}"/>
                     </DataTemplate>
                 </controls:WorkspaceListPane.ItemTemplate>
@@ -371,9 +374,10 @@
                     <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>  <!-- 0: draft banner -->
-                            <RowDefinition Height="Auto"/>  <!-- 1: tab header -->
-                            <RowDefinition Height="*"/>     <!-- 2: content -->
-                            <RowDefinition Height="Auto"/>  <!-- 3: footer -->
+                            <RowDefinition Height="Auto"/>  <!-- 1: selected ticket header -->
+                            <RowDefinition Height="Auto"/>  <!-- 2: tab header -->
+                            <RowDefinition Height="*"/>     <!-- 3: content -->
+                            <RowDefinition Height="Auto"/>  <!-- 4: footer -->
                         </Grid.RowDefinitions>
 
                         <!-- Draft Banner: compact single row -->
@@ -425,8 +429,106 @@
                             </Grid>
                         </Border>
 
-                        <!-- Tab Header (shifted to row 1 when draft banner shown) -->
-                        <Border Grid.Row="1" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1" Padding="16,0">
+                        <!-- Selected ticket workbench header -->
+                        <Border Grid.Row="1"
+                                Background="{StaticResource Background/Surface}"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="0,0,0,1"
+                                Padding="20,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="TICKET WORK AREA"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               Margin="0,0,0,6"/>
+                                    <WrapPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding EditTitle, FallbackValue='Select a ticket'}"
+                                                   Foreground="{StaticResource Text/Primary}"
+                                                   FontSize="20"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"
+                                                   MaxWidth="640"
+                                                   Margin="0,0,12,0"/>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="7,3"
+                                                Margin="0,2,6,2">
+                                            <TextBlock Text="{Binding EditStatus}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="7,3"
+                                                Margin="0,2,6,2">
+                                            <TextBlock Text="{Binding EditTicketType}"
+                                                       Foreground="{StaticResource Text/Secondary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Border Background="{StaticResource Background/Interactive}"
+                                                BorderBrush="{StaticResource Border/Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="7,3"
+                                                Margin="0,2,0,2">
+                                            <TextBlock Text="{Binding EditPriority}"
+                                                       Foreground="{StaticResource Accent/Primary}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                    </WrapPanel>
+                                    <TextBlock Text="{Binding SaveStatus}"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="11"
+                                               Margin="0,6,0,0"/>
+                                </StackPanel>
+
+                                <controls:CrudCommandBar Grid.Column="1"
+                                                         ShowSave="True"
+                                                         SaveText="Save Ticket"
+                                                         SaveCommand="{Binding SaveTicketCommand}"
+                                                         SaveToolTip="Save ticket changes. Disabled until the ticket has unsaved edits."
+                                                         ShowCancel="True"
+                                                         CancelCommand="{Binding CancelEditCommand}"
+                                                         CancelToolTip="Cancel ticket editing and reload the selected ticket."
+                                                         ShowCopy="True"
+                                                         CopyCommand="{Binding CopySelectedTicketCommand}"
+                                                         CopyToolTip="Copy this ticket as Markdown."
+                                                         ShowArchive="True"
+                                                         ArchiveCommand="{Binding ArchiveSelectedTicketCommand}"
+                                                         ArchiveToolTip="Archive this ticket after confirmation."
+                                                         VerticalAlignment="Center"
+                                                         Visibility="{Binding IsDraftMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                    <controls:CrudCommandBar.SecondaryActions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Generate Plan"
+                                                    Command="{Binding GenerateImplementationPlanCommand}"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Margin="0,0,8,0"
+                                                    ToolTip="Generate or refresh an implementation plan for this ticket."/>
+                                            <Button Content="Build Ticket"
+                                                    Command="{Binding BuildSelectedTicketProposalCommand}"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    ToolTipService.ShowOnDisabled="True"
+                                                    ToolTip="Generate a code change proposal. Disabled until the ticket is ready and the project context is available."/>
+                                        </StackPanel>
+                                    </controls:CrudCommandBar.SecondaryActions>
+                                </controls:CrudCommandBar>
+                            </Grid>
+                        </Border>
+
+                        <!-- Tab Header -->
+                        <Border Grid.Row="2" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="0,0,0,1" Padding="16,0">
                             <StackPanel Orientation="Horizontal">
                                 
                                 <RadioButton Content="Overview" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Overview, Mode=TwoWay}"
@@ -442,7 +544,7 @@
 
                         <!-- Content Area -->
                         <ScrollViewer x:Name="TicketDetailScroll"
-                                      Grid.Row="2"
+                                      Grid.Row="3"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled"
                                       Padding="16">
@@ -513,40 +615,6 @@
                                             </controls:FormField>
                                         </StackPanel>
                                     </controls:SurfacePanel>
-                                             
-                                    <controls:EditorActionBar Margin="0,8,0,0"
-                                                              StatusText="{Binding SaveStatus}"
-                                                              Visibility="{Binding IsDraftMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                                        <controls:EditorActionBar.LeftActions>
-                                            <controls:CrudCommandBar ShowSave="True"
-                                                                     SaveText="Save Ticket"
-                                                                     SaveCommand="{Binding SaveTicketCommand}"
-                                                                     SaveToolTip="Save ticket changes."
-                                                                     ShowCancel="True"
-                                                                     CancelCommand="{Binding CancelEditCommand}"
-                                                                     CancelToolTip="Cancel ticket editing."
-                                                                     ShowCopy="True"
-                                                                     CopyCommand="{Binding CopySelectedTicketCommand}"
-                                                                     CopyToolTip="Copy this ticket as Markdown."
-                                                                     ShowArchive="True"
-                                                                     ArchiveCommand="{Binding ArchiveSelectedTicketCommand}"
-                                                                     ArchiveToolTip="Archive this ticket after confirmation.">
-                                                <controls:CrudCommandBar.SecondaryActions>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Button Content="Generate Plan"
-                                                                Command="{Binding GenerateImplementationPlanCommand}"
-                                                                Style="{StaticResource AppButton.CompactGhost}"
-                                                                Margin="0,0,8,0"
-                                                                ToolTip="Generate or refresh an implementation plan for this ticket."/>
-                                                        <Button Content="Build Ticket"
-                                                                Command="{Binding BuildSelectedTicketProposalCommand}"
-                                                                Style="{StaticResource AppButton.CompactGhost}"
-                                                                ToolTip="Generate a code change proposal and open in Workbench"/>
-                                                    </StackPanel>
-                                                </controls:CrudCommandBar.SecondaryActions>
-                                            </controls:CrudCommandBar>
-                                        </controls:EditorActionBar.LeftActions>
-                                    </controls:EditorActionBar>
                                 </StackPanel>
 
                                 <!-- TAB: Plan -->
