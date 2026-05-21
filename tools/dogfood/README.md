@@ -29,6 +29,10 @@ tools/dogfood/
       replay/
         replay-plan.json
         replay-summary.json
+        replay-results.json
+        action-results.json
+        response-results.json
+        runner-summary.json
       traces/
       screenshots/
       reports/
@@ -138,10 +142,22 @@ The current runner executes routing plus dry-run action simulation. It writes:
 ```text
 replay-results.json   # route, assertion, and simulated count summary
 action-results.json   # dry-run discussion docs, draft tickets, plans, build approvals, blocked actions
+response-results.json # per-turn user prompt, assistant response, and final-turn marker
 runner-summary.json   # aggregate pass/fail result
 ```
 
 Dry-run action simulation must never write project files or persist tickets. It exists to prove that a routed command would create the expected reviewable artefacts, request approval where required, and block unsafe or contradictory instructions.
+
+Replay cases may include `followUpTurns`. The runner feeds the previous assistant response and previous user message into the next turn so it can test real conversational flow:
+
+```text
+User: I need to save data
+Assistant: asks for clarification / blocks action safely
+User: BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge.
+Runner assertion: creates a reviewable discussion document, changes no files
+```
+
+This lets the harness test whether IronDev can ask, receive an answer, route the follow-up, and produce a reviewable action without going through the WPF interface.
 
 ## Vague prompt pressure
 

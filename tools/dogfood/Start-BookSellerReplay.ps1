@@ -180,6 +180,7 @@ for ($i = 1; $i -le $Reps; $i++) {
         prompt = $prompt
         basePrompt = $basePrompt
         expected = $variant.expected
+        followUpTurns = @($variant.followUpTurns)
         tags = @($variant.tags)
         ambiguityLevel = if ($null -eq $variant.ambiguityLevel) { "Normal" } else { [string]$variant.ambiguityLevel }
         allowedOutcomes = @($variant.allowedOutcomes)

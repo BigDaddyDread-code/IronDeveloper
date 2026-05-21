@@ -247,6 +247,42 @@
       }
     },
     {
+      "step": 12,
+      "name": "Clarify then save project data",
+      "weight": 4,
+      "workspace": "Chat",
+      "prompt": "I need to save data",
+      "promptVariants": [
+        "I need to save data",
+        "we need store stuff",
+        "can it remember the book info",
+        "need persistence but not sure what to save"
+      ],
+      "workspaceOptions": [ "Chat", "Discovery", "Documents" ],
+      "tags": [ "multi-turn", "clarification", "project-knowledge", "persistence" ],
+      "ambiguityLevel": "High",
+      "expected": {
+        "intent": "ClarificationRequired",
+        "requiresClarificationWhenNoContext": true,
+        "allowsProseResponse": true,
+        "filesChanged": 0,
+        "noUnsafeWrites": true
+      },
+      "followUpTurns": [
+        {
+          "userMessage": "BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge.",
+          "workspace": "Chat",
+          "expected": {
+            "intent": "CreateDiscussionDocument",
+            "minDiscussionDocuments": 1,
+            "allowsProseResponse": false,
+            "filesChanged": 0,
+            "noUnsafeWrites": true
+          }
+        }
+      ]
+    },
+    {
       "step": 11,
       "name": "Contradictory instruction",
       "weight": 5,

@@ -136,6 +136,8 @@ public static class ChatIntentParser
             lower.StartsWith("raise some tickets") ||
             lower.StartsWith("draft tickets") ||
             lower.StartsWith("ticket these") ||
+            lower.StartsWith("ticket all") ||
+            lower.StartsWith("ticket this stuff") ||
             lower.StartsWith("turn those into draft tickets") ||
             lower.StartsWith("create ticket drafts") ||
             lower == "create tickets" ||
@@ -189,7 +191,8 @@ public static class ChatIntentParser
             "not sure but ",
             "maybe ",
             "quick one, ",
-            "can you "
+            "can you ",
+            "can "
         };
 
         var changed = true;

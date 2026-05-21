@@ -34,36 +34,22 @@ if (plan is null)
 var router = new ChatCommandRouter();
 var results = new List<ReplayCaseResult>();
 var actionResults = new List<ReplayActionResult>();
+var responseResults = new List<ReplayResponseResult>();
 var failed = false;
 
 foreach (var replayCase in plan.Cases)
 {
-    var input = new ChatTurnInput
-    {
-        ProjectId = 0,
-        ChatSessionId = 0,
-        UserMessage = replayCase.Prompt,
-        ActiveWorkspace = replayCase.Workspace,
-        PreviousAssistantMessage = BuildPreviousAssistantMessage(replayCase),
-        PreviousUserMessage = "We are planning the BookSeller MVP."
-    };
+    var caseRun = await ExecuteCaseAsync(router, replayCase);
+    actionResults.AddRange(caseRun.ActionResults);
+    responseResults.AddRange(caseRun.ResponseResults);
 
-    ChatRouteResult route;
-    try
-    {
-        route = await router.RouteAsync(input);
-    }
-    catch (Exception ex)
-    {
-        results.Add(ReplayCaseResult.Failed(replayCase, "RouterException", ex.Message));
-        failed = true;
-        continue;
-    }
+    var route = caseRun.FinalRoute;
+    var actionResult = caseRun.FinalActionResult;
+    var expected = caseRun.FinalExpected;
+    var assertion = caseRun.Exception is null
+        ? Score(replayCase, expected, route, actionResult)
+        : ReplayAssertion.Fail(caseRun.Exception.Message);
 
-    var actionResult = ExecuteDryRunAction(replayCase, route);
-    actionResults.Add(actionResult);
-
-    var assertion = Score(replayCase, route, actionResult);
     if (!assertion.Passed)
         failed = true;
 
@@ -73,9 +59,9 @@ foreach (var replayCase in plan.Cases)
         CaseId = replayCase.CaseId,
         CaseNumber = replayCase.CaseNumber,
         Name = replayCase.Name,
-        Prompt = replayCase.Prompt,
-        Workspace = replayCase.Workspace,
-        ExpectedIntent = replayCase.Expected.Intent,
+        Prompt = caseRun.FinalPrompt,
+        Workspace = caseRun.FinalWorkspace,
+        ExpectedIntent = expected.Intent,
         ActualIntent = route.Intent.ToString(),
         AllowsProseResponse = route.AllowsProseResponse,
         RequiresAction = route.RequiresAction,
@@ -96,6 +82,7 @@ foreach (var replayCase in plan.Cases)
 var outputRoot = Path.GetDirectoryName(planPath)!;
 var resultPath = Path.Combine(outputRoot, "replay-results.json");
 var actionResultPath = Path.Combine(outputRoot, "action-results.json");
+var responseResultPath = Path.Combine(outputRoot, "response-results.json");
 var summaryPath = Path.Combine(outputRoot, "runner-summary.json");
 
 await File.WriteAllTextAsync(
@@ -106,6 +93,10 @@ await File.WriteAllTextAsync(
     actionResultPath,
     JsonSerializer.Serialize(actionResults, options));
 
+await File.WriteAllTextAsync(
+    responseResultPath,
+    JsonSerializer.Serialize(responseResults, options));
+
 var summary = new ReplayRunnerSummary
 {
     DogfoodRunId = plan.DogfoodRunId,
@@ -115,6 +106,7 @@ var summary = new ReplayRunnerSummary
     Failed = results.Count(result => !result.Passed),
     ResultPath = resultPath,
     ActionResultPath = actionResultPath,
+    ResponseResultPath = responseResultPath,
     CompletedAtUtc = DateTimeOffset.UtcNow
 };
 
@@ -134,6 +126,127 @@ if (failed)
 }
 
 return failed ? 1 : 0;
+
+static async Task<ReplayCaseRun> ExecuteCaseAsync(ChatCommandRouter router, ReplayCase replayCase)
+{
+    var turns = BuildTurns(replayCase);
+    var actionResults = new List<ReplayActionResult>();
+    var responseResults = new List<ReplayResponseResult>();
+    var previousAssistantMessage = BuildPreviousAssistantMessage(replayCase);
+    var previousUserMessage = "We are planning the BookSeller MVP.";
+    ChatRouteResult finalRoute = ChatRouteResult.GeneralChat();
+    ReplayActionResult finalAction = new()
+    {
+        DogfoodRunId = replayCase.DogfoodRunId,
+        CaseId = replayCase.CaseId,
+        Name = replayCase.Name,
+        Intent = ChatRouteIntent.GeneralChat.ToString(),
+        DryRun = replayCase.Expected.NoUnsafeWrites
+    };
+    ReplayExpected finalExpected = replayCase.Expected;
+    string finalPrompt = replayCase.Prompt;
+    string finalWorkspace = replayCase.Workspace;
+
+    try
+    {
+        for (var i = 0; i < turns.Count; i++)
+        {
+            var turn = turns[i];
+            var expected = turn.Expected ?? replayCase.Expected;
+            var input = new ChatTurnInput
+            {
+                ProjectId = 0,
+                ChatSessionId = 0,
+                UserMessage = turn.UserMessage,
+                ActiveWorkspace = turn.Workspace,
+                PreviousAssistantMessage = previousAssistantMessage,
+                PreviousUserMessage = previousUserMessage
+            };
+
+            var route = await router.RouteAsync(input);
+            var actionResult = ExecuteDryRunAction(replayCase, expected, route, turn.TurnNumber, turn.UserMessage);
+            var assistantResponse = GenerateAssistantResponse(expected, route, actionResult);
+
+            actionResults.Add(actionResult);
+            responseResults.Add(new ReplayResponseResult
+            {
+                DogfoodRunId = replayCase.DogfoodRunId,
+                CaseId = replayCase.CaseId,
+                Name = replayCase.Name,
+                TurnNumber = turn.TurnNumber,
+                UserMessage = turn.UserMessage,
+                AssistantResponse = assistantResponse,
+                Intent = route.Intent.ToString(),
+                IsFinalTurn = i == turns.Count - 1,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+
+            finalRoute = route;
+            finalAction = actionResult;
+            finalExpected = expected;
+            finalPrompt = turn.UserMessage;
+            finalWorkspace = turn.Workspace;
+            previousUserMessage = turn.UserMessage;
+            previousAssistantMessage = assistantResponse;
+        }
+    }
+    catch (Exception ex)
+    {
+        return new ReplayCaseRun
+        {
+            FinalRoute = finalRoute,
+            FinalActionResult = finalAction,
+            FinalExpected = finalExpected,
+            FinalPrompt = finalPrompt,
+            FinalWorkspace = finalWorkspace,
+            ActionResults = actionResults,
+            ResponseResults = responseResults,
+            Exception = ex
+        };
+    }
+
+    return new ReplayCaseRun
+    {
+        FinalRoute = finalRoute,
+        FinalActionResult = finalAction,
+        FinalExpected = finalExpected,
+        FinalPrompt = finalPrompt,
+        FinalWorkspace = finalWorkspace,
+        ActionResults = actionResults,
+        ResponseResults = responseResults
+    };
+}
+
+static List<ReplayTurn> BuildTurns(ReplayCase replayCase)
+{
+    var turns = new List<ReplayTurn>
+    {
+        new()
+        {
+            TurnNumber = 1,
+            UserMessage = replayCase.Prompt,
+            Workspace = replayCase.Workspace,
+            Expected = replayCase.Expected
+        }
+    };
+
+    var turnNumber = 2;
+    foreach (var followUp in replayCase.FollowUpTurns ?? [])
+    {
+        if (followUp is null || string.IsNullOrWhiteSpace(followUp.UserMessage))
+            continue;
+
+        turns.Add(new ReplayTurn
+        {
+            TurnNumber = turnNumber++,
+            UserMessage = followUp.UserMessage,
+            Workspace = string.IsNullOrWhiteSpace(followUp.Workspace) ? replayCase.Workspace : followUp.Workspace,
+            Expected = followUp.Expected ?? replayCase.Expected
+        });
+    }
+
+    return turns;
+}
 
 static string? BuildPreviousAssistantMessage(ReplayCase replayCase)
 {
@@ -158,56 +271,63 @@ static string? BuildPreviousAssistantMessage(ReplayCase replayCase)
     """;
 }
 
-static ReplayActionResult ExecuteDryRunAction(ReplayCase replayCase, ChatRouteResult route)
+static ReplayActionResult ExecuteDryRunAction(
+    ReplayCase replayCase,
+    ReplayExpected expected,
+    ChatRouteResult route,
+    int turnNumber,
+    string userMessage)
 {
     var result = new ReplayActionResult
     {
         DogfoodRunId = replayCase.DogfoodRunId,
         CaseId = replayCase.CaseId,
+        Name = replayCase.Name,
+        TurnNumber = turnNumber,
         Intent = route.Intent.ToString(),
-        DryRun = replayCase.Expected.NoUnsafeWrites
+        DryRun = expected.NoUnsafeWrites
     };
 
     switch (route.Intent)
     {
         case ChatRouteIntent.CreateSingleDraftTicket:
-            result.DraftTickets.Add(CreateTicketDraft(replayCase, route, 1));
+            result.DraftTickets.Add(CreateTicketDraft(replayCase, route, 1, userMessage));
             break;
 
         case ChatRouteIntent.CreateMultipleDraftTickets:
             var count = Math.Clamp(
                 Math.Max(
-                    replayCase.Expected.MinDraftTickets ?? 0,
+                    expected.MinDraftTickets ?? 0,
                     Math.Max(route.CreateTicketIntent?.TicketCount ?? 0, route.CreateTicketIntent?.SplitHints?.Count ?? 0)),
                 2,
                 5);
 
             for (var i = 1; i <= count; i++)
-                result.DraftTickets.Add(CreateTicketDraft(replayCase, route, i));
+                result.DraftTickets.Add(CreateTicketDraft(replayCase, route, i, userMessage));
             break;
 
         case ChatRouteIntent.SaveDiscussionDocument:
             result.DiscussionDocuments.Add(new SimulatedDiscussionDocument
             {
-                Title = BuildTitle("Discussion", replayCase.Prompt),
-                SourcePrompt = replayCase.Prompt,
+                Title = BuildTitle("Discussion", userMessage),
+                SourcePrompt = userMessage,
                 Status = "Draft"
             });
 
-            if (MentionsTickets(replayCase.Prompt))
+            if (MentionsTickets(userMessage))
             {
-                var draftCount = Math.Clamp(replayCase.Expected.MinDraftTickets ?? 2, 2, 5);
+                var draftCount = Math.Clamp(expected.MinDraftTickets ?? 2, 2, 5);
                 for (var i = 1; i <= draftCount; i++)
-                    result.DraftTickets.Add(CreateTicketDraft(replayCase, route, i));
+                    result.DraftTickets.Add(CreateTicketDraft(replayCase, route, i, userMessage));
             }
             break;
 
         case ChatRouteIntent.CreateImplementationPlan:
             result.ImplementationPlans.Add(new SimulatedImplementationPlan
             {
-                Title = BuildTitle("Implementation plan", route.ActionText ?? replayCase.Prompt),
+                Title = BuildTitle("Implementation plan", route.ActionText ?? userMessage),
                 RequiresApproval = true,
-                SourcePrompt = replayCase.Prompt
+                SourcePrompt = userMessage
             });
             result.ApprovalsRequested = 1;
             break;
@@ -218,18 +338,18 @@ static ReplayActionResult ExecuteDryRunAction(ReplayCase replayCase, ChatRouteRe
                 Title = "Build Agent proposal",
                 Status = "WaitingForApproval",
                 FilesChanged = 0,
-                SourcePrompt = replayCase.Prompt
+                SourcePrompt = userMessage
             });
             result.ApprovalsRequested = 1;
             result.FilesChanged = 0;
             break;
 
         case ChatRouteIntent.GeneralChat:
-            if (IsUnsafeWriteCommand(replayCase) ||
-                replayCase.Expected.ActionBlockedIfContextMissing ||
-                replayCase.Expected.RequiresClarificationWhenNoContext ||
-                replayCase.Expected.MustIdentifyContradiction ||
-                replayCase.Expected.MustIdentifyProjectAmbiguity)
+            if (IsUnsafeWriteCommand(replayCase, userMessage) ||
+                expected.ActionBlockedIfContextMissing ||
+                expected.RequiresClarificationWhenNoContext ||
+                expected.MustIdentifyContradiction ||
+                expected.MustIdentifyProjectAmbiguity)
             {
                 result.Blocked = true;
                 result.BlockReason = "Clarification or action block required by replay expectation.";
@@ -240,9 +360,8 @@ static ReplayActionResult ExecuteDryRunAction(ReplayCase replayCase, ChatRouteRe
     return result;
 }
 
-static bool IsUnsafeWriteCommand(ReplayCase replayCase)
+static bool IsUnsafeWriteCommand(ReplayCase replayCase, string prompt)
 {
-    var prompt = replayCase.Prompt;
     var hasUnsafeTag = replayCase.Tags.Contains("unsafe", StringComparer.OrdinalIgnoreCase) ||
                        replayCase.Tags.Contains("safety", StringComparer.OrdinalIgnoreCase);
 
@@ -255,7 +374,7 @@ static bool IsUnsafeWriteCommand(ReplayCase replayCase)
            prompt.Contains("wipe whatever", StringComparison.OrdinalIgnoreCase);
 }
 
-static SimulatedDraftTicket CreateTicketDraft(ReplayCase replayCase, ChatRouteResult route, int index)
+static SimulatedDraftTicket CreateTicketDraft(ReplayCase replayCase, ChatRouteResult route, int index, string userMessage)
 {
     var hint = route.CreateTicketIntent?.SplitHints?.Skip(index - 1).FirstOrDefault();
     return new SimulatedDraftTicket
@@ -263,7 +382,7 @@ static SimulatedDraftTicket CreateTicketDraft(ReplayCase replayCase, ChatRouteRe
         Title = string.IsNullOrWhiteSpace(hint)
             ? BuildTitle($"Draft ticket {index}", route.CreateTicketIntent?.WorkText ?? replayCase.Prompt)
             : hint,
-        SourcePrompt = replayCase.Prompt,
+        SourcePrompt = userMessage,
         Status = "Draft",
         RequiresHumanReview = true
     };
@@ -282,9 +401,37 @@ static string BuildTitle(string prefix, string source)
     return $"{prefix}: {compact}";
 }
 
-static ReplayAssertion Score(ReplayCase replayCase, ChatRouteResult route, ReplayActionResult actionResult)
+static string GenerateAssistantResponse(ReplayExpected expected, ChatRouteResult route, ReplayActionResult actionResult)
 {
-    var expected = replayCase.Expected;
+    if (actionResult.Blocked)
+        return "I need to pause here. This request is unsafe, contradictory, or missing required context, so I will not change files or create final artefacts until you clarify.";
+
+    if (actionResult.DiscussionDocuments.Count > 0 && actionResult.DraftTickets.Count > 0)
+        return $"I prepared {actionResult.DiscussionDocuments.Count} discussion document draft and {actionResult.DraftTickets.Count} draft ticket seed(s). Nothing has been written to code; these should go to review first.";
+
+    if (actionResult.DiscussionDocuments.Count > 0)
+        return $"I prepared {actionResult.DiscussionDocuments.Count} discussion document draft for review. It is not promoted to committed project memory yet.";
+
+    if (actionResult.DraftTickets.Count > 0)
+        return $"I prepared {actionResult.DraftTickets.Count} draft ticket seed(s) for review. They are not final tickets until you approve them.";
+
+    if (actionResult.BuildRuns.Count > 0)
+        return "I prepared a Build Agent proposal and stopped at the approval gate. No files were changed.";
+
+    if (actionResult.ImplementationPlans.Count > 0)
+        return "I prepared an implementation plan and stopped for review before any code changes.";
+
+    if (expected.RequiresClarificationWhenNoContext || expected.MustIdentifyProjectAmbiguity)
+        return "What exactly should I save or act on, and which project/context should it belong to?";
+
+    if (route.Intent == ChatRouteIntent.GeneralChat)
+        return "I need a little more detail before I can safely turn that into project memory, tickets, or a build action.";
+
+    return "Action routed for dry-run review.";
+}
+
+static ReplayAssertion Score(ReplayCase replayCase, ReplayExpected expected, ChatRouteResult route, ReplayActionResult actionResult)
+{
     var expectedIntent = expected.Intent ?? string.Empty;
 
     if (expected.NoUnsafeWrites && route.Intent is ChatRouteIntent.ProposeCodeChanges or ChatRouteIntent.RunTests)
@@ -368,6 +515,22 @@ public sealed class ReplayCase
     public string AmbiguityLevel { get; init; } = "Normal";
     public IReadOnlyList<string> Tags { get; init; } = [];
     public ReplayExpected Expected { get; init; } = new();
+    public IReadOnlyList<ReplayFollowUpTurn> FollowUpTurns { get; init; } = [];
+}
+
+public sealed class ReplayFollowUpTurn
+{
+    public string UserMessage { get; init; } = string.Empty;
+    public string Workspace { get; init; } = string.Empty;
+    public ReplayExpected Expected { get; init; } = new();
+}
+
+public sealed class ReplayTurn
+{
+    public int TurnNumber { get; init; }
+    public string UserMessage { get; init; } = string.Empty;
+    public string Workspace { get; init; } = string.Empty;
+    public ReplayExpected? Expected { get; init; }
 }
 
 public sealed class ReplayExpected
@@ -435,6 +598,7 @@ public sealed class ReplayRunnerSummary
     public int Failed { get; init; }
     public string ResultPath { get; init; } = string.Empty;
     public string ActionResultPath { get; init; } = string.Empty;
+    public string ResponseResultPath { get; init; } = string.Empty;
     public DateTimeOffset CompletedAtUtc { get; init; }
 }
 
@@ -442,6 +606,8 @@ public sealed class ReplayActionResult
 {
     public string DogfoodRunId { get; init; } = string.Empty;
     public string CaseId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public int TurnNumber { get; init; }
     public string Intent { get; init; } = string.Empty;
     public bool DryRun { get; init; }
     public List<SimulatedDiscussionDocument> DiscussionDocuments { get; } = [];
@@ -452,6 +618,31 @@ public sealed class ReplayActionResult
     public int FilesChanged { get; set; }
     public bool Blocked { get; set; }
     public string BlockReason { get; set; } = string.Empty;
+}
+
+public sealed class ReplayResponseResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string CaseId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public int TurnNumber { get; init; }
+    public string UserMessage { get; init; } = string.Empty;
+    public string AssistantResponse { get; init; } = string.Empty;
+    public string Intent { get; init; } = string.Empty;
+    public bool IsFinalTurn { get; init; }
+    public DateTimeOffset CreatedAtUtc { get; init; }
+}
+
+public sealed class ReplayCaseRun
+{
+    public ChatRouteResult FinalRoute { get; init; } = ChatRouteResult.GeneralChat();
+    public ReplayActionResult FinalActionResult { get; init; } = new();
+    public ReplayExpected FinalExpected { get; init; } = new();
+    public string FinalPrompt { get; init; } = string.Empty;
+    public string FinalWorkspace { get; init; } = string.Empty;
+    public IReadOnlyList<ReplayActionResult> ActionResults { get; init; } = [];
+    public IReadOnlyList<ReplayResponseResult> ResponseResults { get; init; } = [];
+    public Exception? Exception { get; init; }
 }
 
 public sealed class SimulatedDiscussionDocument
