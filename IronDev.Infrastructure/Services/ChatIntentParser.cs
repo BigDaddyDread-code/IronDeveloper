@@ -109,7 +109,7 @@ public static class ChatIntentParser
     private static CreateTicketIntent? ParseSplitTickets(string request, string? previousMessage)
     {
         var text = StripLeadingAcknowledgement(request.Trim());
-        var lower = text.ToLowerInvariant();
+        var lower = NormalizeCommonCommandTypos(text.ToLowerInvariant());
 
         var isSplitCommand =
             lower.StartsWith("split this into ") ||
@@ -121,10 +121,17 @@ public static class ChatIntentParser
             lower.StartsWith("turn the plan into tickets") ||
             lower.StartsWith("create me some tickets") ||
             lower.StartsWith("create some tickets") ||
+            lower.StartsWith("crate tickets") ||
+            lower.StartsWith("creat tickets") ||
             lower.StartsWith("make me some tickets") ||
             lower.StartsWith("make some tickets") ||
+            lower.StartsWith("make tickets") ||
+            lower.StartsWith("make ticket list real") ||
+            lower.StartsWith("make the ticket list real") ||
             lower.StartsWith("raise some tickets") ||
             lower.StartsWith("draft tickets") ||
+            lower.StartsWith("ticket these") ||
+            lower.StartsWith("turn those into draft tickets") ||
             lower.StartsWith("create ticket drafts") ||
             lower == "create tickets" ||
             lower == "create draft tickets" ||
@@ -171,7 +178,13 @@ public static class ChatIntentParser
             "yeah ",
             "cool ",
             "right ",
-            "alright "
+            "alright ",
+            "i think ",
+            "hmm ",
+            "not sure but ",
+            "maybe ",
+            "quick one, ",
+            "can you "
         };
 
         foreach (var prefix in prefixes)
@@ -282,15 +295,29 @@ public static class ChatIntentParser
         return previousMessage?.Trim() ?? string.Empty;
     }
 
+    private static string NormalizeCommonCommandTypos(string text)
+        => text
+            .Replace("tikets", "tickets", StringComparison.Ordinal)
+            .Replace("tiket", "ticket", StringComparison.Ordinal)
+            .Replace("tickts", "tickets", StringComparison.Ordinal)
+            .Replace("tickt", "ticket", StringComparison.Ordinal);
+
     private static string ExtractCreateTicketsCommandTail(string request)
     {
         var prefixes = new[]
         {
             "create me some tickets",
             "create some tickets",
+            "crate tickets",
+            "creat tickets",
             "make me some tickets",
             "make some tickets",
+            "make tickets",
+            "make ticket list real",
+            "make the ticket list real",
             "raise some tickets",
+            "ticket these",
+            "turn those into draft tickets",
             "create draft tickets",
             "create tickets",
             "draft tickets",

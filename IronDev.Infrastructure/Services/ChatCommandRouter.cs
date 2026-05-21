@@ -74,6 +74,12 @@ public sealed class ChatCommandRouter : IChatCommandRouter
         if (IsBuildTicketCommand(lower))
             return BuildActionRoute(ChatRouteIntent.BuildTicket, 0.86, "deterministic-build-ticket-command", input, actionText, contextReference);
 
+        if (IsMultiStepWorkflowCommand(lower))
+            return BuildActionRoute(ChatRouteIntent.CreateImplementationPlan, 0.78, "deterministic-multi-step-workflow-command", input, actionText, contextReference);
+
+        if (IsVagueContextActionCommand(lower))
+            return BuildActionRoute(ChatRouteIntent.CreateImplementationPlan, 0.72, "deterministic-vague-context-action-command", input, actionText, contextReference);
+
         return ChatRouteResult.GeneralChat();
     }
 
@@ -204,7 +210,17 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "save this as architecture doc",
             "save this as architecture document",
             "create architecture doc",
-            "create architecture document");
+            "create architecture document",
+            "turn that into discussion docs",
+            "turn this into discussion docs",
+            "discussion docs and tickets",
+            "create the project docs",
+            "set up the planning package",
+            "turn that into docs",
+            "turn this into docs",
+            "save this as project knowledge",
+            "save that as project knowledge",
+            "project knowledge then make tickets");
 
     private static bool IsBuildTicketCommand(string lower)
         => ContainsAny(lower,
@@ -213,7 +229,38 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "build ticket",
             "build selected ticket",
             "start build agent",
-            "run build agent");
+            "run build agent",
+            "start the build agent",
+            "use the build agent",
+            "make a plan and proposed patch",
+            "proposed patch for ticket",
+            "approval gate only");
+
+    private static bool IsVagueContextActionCommand(string lower)
+        => ContainsAny(lower,
+            "turn that into the thing",
+            "turn this into the thing",
+            "do that now",
+            "do this now",
+            "make those real",
+            "make that real",
+            "make this real",
+            "use the last bit",
+            "from above",
+            "make it happen",
+            "that one",
+            "same as before",
+            "finish what we were doing",
+            "make it official");
+
+    private static bool IsMultiStepWorkflowCommand(string lower)
+        => ContainsAny(lower,
+            "set it all up then build",
+            "make the docs tickets and start building",
+            "do the whole flow",
+            "create everything and run the first build",
+            "plan it, ticket it, build it",
+            "turn this into work and start");
 
     private static string StripActionCommand(string text)
     {

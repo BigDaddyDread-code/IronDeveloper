@@ -185,7 +185,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-Dogfo
   -Iterations 1000 `
   -DryRun `
   -StopOnFailure `
-  -RunnerCommand "dotnet run --project .\tools\IronDev.ReplayRunner --"
+  -RunnerCommand "dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj --"
 ```
 
 Each iteration writes:

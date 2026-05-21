@@ -291,3 +291,7 @@ Write-Host "Seed: $Seed"
 Write-Host "Cases: $Reps"
 Write-Host "Plan: $planPath"
 Write-Host "Summary: $summaryPath"
+
+if ($summary.status -eq "Failed") {
+    exit 1
+}
