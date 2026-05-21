@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -35,6 +36,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly BuilderWorkspaceViewModel   _builderVm;
     private readonly ProjectProfileViewModel     _profileVm;
     private readonly AgentTenantContext          _tenantContext;
+    private readonly Dictionary<ProjectWorkspace, bool> _inspectorCollapsedByWorkspace = new();
     private ProjectWorkspace _lastWorkspaceBeforeTesting = ProjectWorkspace.Overview;
 
     // ── Observable shell state ────────────────────────────────────────────────
@@ -83,6 +85,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool StatusCanIndex => IsIndexActionableStatus(ActiveStatus);
     public bool CanUseTestingCompanion => true;
     public TestingCompanionViewModel TestingCompanion => _testingVm;
+    [ObservableProperty] private bool _isContextInspectorCollapsed;
     public string CurrentWorkspaceDisplayName => GetWorkspaceDisplayName(CurrentWorkspace);
     public string ContextDomain => IsIronDevProductContext() ? "IronDev Product" : "External Project";
     public string MemoryStatusText => string.IsNullOrWhiteSpace(ActiveStatus)
@@ -634,7 +637,14 @@ public sealed partial class ShellViewModel : ObservableObject
 
     partial void OnCurrentWorkspaceChanged(ProjectWorkspace value)
     {
+        IsContextInspectorCollapsed = _inspectorCollapsedByWorkspace.TryGetValue(value, out var collapsed) && collapsed;
         RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnIsContextInspectorCollapsedChanged(bool value)
+    {
+        if (CurrentShellMode == ShellMode.ProjectActive)
+            _inspectorCollapsedByWorkspace[CurrentWorkspace] = value;
     }
 
     partial void OnCurrentViewChanged(object value)

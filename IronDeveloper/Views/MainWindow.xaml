@@ -158,6 +158,7 @@
                                             MemoryStatusText="{Binding MemoryStatusText}"
                                             ProjectStatusText="{Binding ActiveStatus}"
                                             HasRightSidebar="{Binding ShowHeader}"
+                                            IsRightSidebarCollapsed="{Binding IsContextInspectorCollapsed, Mode=TwoWay}"
                                             RightSidebarWidth="320"
                                             Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVisibilityConverter}}">
                 <controls:ProjectWorkspaceFrame.MainContent>
