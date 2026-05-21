@@ -162,3 +162,37 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Compare-Dogf
 ```
 
 The comparison reports seed equality, prompt overlap, case counts, and workspace mix. A healthy chaos batch should usually have different seeds and low prompt overlap.
+
+## Run one case at a time
+
+For long hardening loops, run one randomized case per iteration. This creates a separate run folder for each iteration and a JSONL loop log.
+
+Plan-only smoke loop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-DogfoodIterationLoop.ps1 `
+  -LoopId BookSellerLoop-001 `
+  -Iterations 25 `
+  -DryRun `
+  -StopOnFailure
+```
+
+Future internal runner loop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-DogfoodIterationLoop.ps1 `
+  -LoopId BookSellerLoop-001 `
+  -Iterations 1000 `
+  -DryRun `
+  -StopOnFailure `
+  -RunnerCommand "dotnet run --project .\tools\IronDev.ReplayRunner --"
+```
+
+Each iteration writes:
+
+```text
+tools/dogfood/runs/{LoopId}-iter-0001/replay/replay-plan.json
+tools/dogfood/runs/{LoopId}-iter-0001/replay/replay-summary.json
+tools/dogfood/runs/{LoopId}/iteration-loop.jsonl
+tools/dogfood/runs/{LoopId}/iteration-loop-summary.json
+```
