@@ -243,6 +243,39 @@ It verifies:
 - a 10-case replay batch passes.
 - an intentional replay failure produces `failure-package.json` and `failure-package.md`.
 
+## Test Agent plans
+
+The Test Agent is the cheap execution layer. It receives a JSON plan, runs steps literally, captures logs, and returns a compact JSON report to Codex.
+
+Prompt template:
+
+```text
+tools/dogfood/test-agent-prompt.md
+```
+
+Sample plan:
+
+```text
+tools/dogfood/test-agent-plans/bookseller-storage-vague.json
+```
+
+Run the sample plan locally:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\bookseller-storage-vague.json `
+  -RunId TestAgentSmoke-001 `
+  -Json
+```
+
+The local executor currently supports:
+
+- `chat_send`
+- `replay_run`
+- `failure_package`
+
+Unsupported future actions must be reported as unsupported. They must not be faked.
+
 ## Vague prompt pressure
 
 The BookSeller scenario intentionally includes vague and contradictory prompts such as:
