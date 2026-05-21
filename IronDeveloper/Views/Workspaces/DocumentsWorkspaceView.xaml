@@ -18,15 +18,13 @@
                                   Title="Documents"
                                   Subtitle="Versioned Markdown project artefacts">
             <controls:WorkspaceHeader.Actions>
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="+ New"
-                            Command="{Binding NewDocumentCommand}"
-                            Style="{StaticResource AppButton.Primary}"
-                            Margin="0,0,8,0"/>
-                    <Button Content="Refresh"
-                            Command="{Binding RefreshCommand}"
-                            Style="{StaticResource AppButton.CompactGhost}"/>
-                </StackPanel>
+                <controls:CrudCommandBar ShowCreate="True"
+                                         CreateText="+ New Document"
+                                         CreateCommand="{Binding NewDocumentCommand}"
+                                         CreateToolTip="Create a new project document."
+                                         ShowRefresh="True"
+                                         RefreshCommand="{Binding RefreshCommand}"
+                                         RefreshToolTip="Reload document list."/>
             </controls:WorkspaceHeader.Actions>
         </controls:WorkspaceHeader>
 
@@ -204,38 +202,48 @@
                                         Orientation="Horizontal"
                                         VerticalAlignment="Center">
                                 <!-- View mode buttons -->
-                                <StackPanel Orientation="Horizontal"
-                                            Visibility="{Binding IsViewMode,
-                                                         Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Button Content="Edit"
-                                            Command="{Binding StartEditingCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            Margin="0,0,6,0"
-                                            IsEnabled="{Binding HasSelectedVersion}"/>
-                                    <Button Content="Copy"
-                                            Command="{Binding CopyDocumentCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            Margin="0,0,6,0"
-                                            IsEnabled="{Binding HasSelectedVersion}"/>
-                                    <Button Content="Archive"
-                                            Command="{Binding ArchiveDocumentCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            IsEnabled="{Binding HasSelectedDocument}"/>
-                                </StackPanel>
+                                <controls:CrudCommandBar ShowEdit="True"
+                                                         EditCommand="{Binding StartEditingCommand}"
+                                                         EditToolTip="Edit the selected document version."
+                                                         ShowCopy="True"
+                                                         CopyCommand="{Binding CopyDocumentCommand}"
+                                                         CopyToolTip="Copy the selected document version as Markdown."
+                                                         ShowArchive="True"
+                                                         ArchiveCommand="{Binding ArchiveDocumentCommand}"
+                                                         ArchiveToolTip="Archive the selected document."
+                                                         Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <controls:CrudCommandBar.SecondaryActions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Resolve Discussion"
+                                                    IsEnabled="False"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Margin="0,0,8,0"
+                                                    ToolTipService.ShowOnDisabled="True"
+                                                    ToolTip="Resolve Discussion is not wired for this document workspace yet."/>
+                                            <Button Content="Create Tickets"
+                                                    IsEnabled="False"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Margin="0,0,8,0"
+                                                    ToolTipService.ShowOnDisabled="True"
+                                                    ToolTip="Create Tickets from documents is not service-backed in this workspace yet."/>
+                                            <Button Content="Send to Chat"
+                                                    IsEnabled="False"
+                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    ToolTipService.ShowOnDisabled="True"
+                                                    ToolTip="Send to Chat is not service-backed in this workspace yet."/>
+                                        </StackPanel>
+                                    </controls:CrudCommandBar.SecondaryActions>
+                                </controls:CrudCommandBar>
 
                                 <!-- Edit mode buttons -->
-                                <StackPanel Orientation="Horizontal"
-                                            Visibility="{Binding IsEditing,
-                                                         Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Button Content="Cancel"
-                                            Command="{Binding CancelEditingCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
-                                            Margin="0,0,6,0"/>
-                                    <Button Content="Save New Version"
-                                            Command="{Binding SaveNewVersionCommand}"
-                                            Style="{StaticResource AppButton.Primary}"
-                                            IsEnabled="{Binding CanSaveVersion}"/>
-                                </StackPanel>
+                                <controls:CrudCommandBar ShowCancel="True"
+                                                         CancelCommand="{Binding CancelEditingCommand}"
+                                                         CancelToolTip="Cancel document editing."
+                                                         ShowSave="True"
+                                                         SaveText="Save Version"
+                                                         SaveCommand="{Binding SaveNewVersionCommand}"
+                                                         SaveToolTip="Save the document as a new version. Disabled until title, markdown, and change summary are present."
+                                                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                             </StackPanel>
                         </Grid>
                     </Border>

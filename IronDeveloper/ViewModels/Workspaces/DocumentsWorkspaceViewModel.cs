@@ -11,7 +11,7 @@ using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
-public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
+public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWorkspaceDirtyState
 {
     private readonly IProjectDocumentService _documentService;
     private readonly IMarkdownRenderService _markdownRenderer;
@@ -51,6 +51,8 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     public bool HasSelectedVersion => SelectedVersion != null;
     public bool IsViewMode => !IsEditing;
     public bool HasStatusText => !string.IsNullOrEmpty(StatusText);
+    public bool HasDirtyEditState => IsEditing && CanSaveVersion;
+    public string DirtyEditMessage => "This document has unsaved edit text. Leave Documents and discard those changes?";
     public bool CanSaveVersion => IsEditing
         && (!IsCreatingDocument || !string.IsNullOrWhiteSpace(EditorTitle))
         && !string.IsNullOrWhiteSpace(EditorMarkdown)
@@ -382,6 +384,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(IsViewMode));
         OnPropertyChanged(nameof(HasStatusText));
         OnPropertyChanged(nameof(CanSaveVersion));
+        OnPropertyChanged(nameof(HasDirtyEditState));
     }
 }
 

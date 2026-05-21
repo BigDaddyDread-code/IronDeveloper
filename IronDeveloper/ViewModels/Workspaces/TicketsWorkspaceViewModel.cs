@@ -17,7 +17,7 @@ using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
-public sealed partial class TicketsWorkspaceViewModel : ObservableObject
+public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorkspaceDirtyState
 {
     private readonly global::IronDev.Services.ITicketService         _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
@@ -146,6 +146,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
+    public bool HasDirtyEditState => IsEditing && HasDetail && !IsSaving && !IsDraftMode;
+    public string DirtyEditMessage => "This ticket has unsaved edit text. Leave Tickets and discard those changes?";
 
     // ── Draft Ticket state ────────────────────────────────────────────────────
     [ObservableProperty] 

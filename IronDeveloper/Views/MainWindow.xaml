@@ -153,7 +153,12 @@
                                             ProjectName="{Binding ActiveProjectName}"
                                             ProjectPath="{Binding ActiveProjectPath}"
                                             ModelName="{Binding ActiveModel}"
+                                            WorkspaceName="{Binding CurrentWorkspaceDisplayName}"
+                                            ContextDomain="{Binding ContextDomain}"
+                                            MemoryStatusText="{Binding MemoryStatusText}"
                                             ProjectStatusText="{Binding ActiveStatus}"
+                                            HasRightSidebar="{Binding ShowHeader}"
+                                            RightSidebarWidth="320"
                                             Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVisibilityConverter}}">
                 <controls:ProjectWorkspaceFrame.MainContent>
                     <ContentControl Content="{Binding CurrentView}"
@@ -242,6 +247,16 @@
                                 Style="{StaticResource AppButton.CompactGhost}"/>
                     </StackPanel>
                 </controls:ProjectWorkspaceFrame.ProjectActions>
+
+                <controls:ProjectWorkspaceFrame.RightSidebarContent>
+                    <controls:ContextInspector ContextDomain="{Binding ContextDomain}"
+                                               WorkspaceName="{Binding CurrentWorkspaceDisplayName}"
+                                               SelectedObjectName="{Binding SelectedObjectContextText}"
+                                               SourceVersionText="{Binding SourceVersionContextText}"
+                                               MemoryStatusText="{Binding MemoryStatusText}"
+                                               RelatedItemsText="{Binding RelatedContextText}"
+                                               LatestTraceText="{Binding LatestTraceContextText}"/>
+                </controls:ProjectWorkspaceFrame.RightSidebarContent>
             </controls:ProjectWorkspaceFrame>
         </Grid>
     </Border>

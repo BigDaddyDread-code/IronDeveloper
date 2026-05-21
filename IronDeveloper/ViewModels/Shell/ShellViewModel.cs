@@ -84,6 +84,36 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool CanUseTestingCompanion => true;
     public TestingCompanionViewModel TestingCompanion => _testingVm;
     public string CurrentWorkspaceDisplayName => GetWorkspaceDisplayName(CurrentWorkspace);
+    public string ContextDomain => IsIronDevProductContext() ? "IronDev Product" : "External Project";
+    public string MemoryStatusText => string.IsNullOrWhiteSpace(ActiveStatus)
+        ? "Memory unknown"
+        : $"Index {ActiveStatus}";
+    public string SelectedObjectContextText => CurrentView switch
+    {
+        DocumentsWorkspaceViewModel documents => documents.SelectedDocument?.Title ?? "No document selected",
+        TicketsWorkspaceViewModel tickets => tickets.SelectedTicket?.Title ?? (tickets.HasDetail ? tickets.EditTitle : "No ticket selected"),
+        DecisionsWorkspaceViewModel => "Project knowledge",
+        ChatWorkspaceViewModel => "Current conversation",
+        TestingCompanionViewModel => "Testing session",
+        BuilderWorkspaceViewModel => "Build workflow",
+        _ => CurrentWorkspaceDisplayName
+    };
+    public string SourceVersionContextText => CurrentView switch
+    {
+        DocumentsWorkspaceViewModel documents => documents.SelectedVersion?.VersionLabel is { Length: > 0 } version
+            ? $"Source/version: {version}"
+            : "Source/version: none selected",
+        TicketsWorkspaceViewModel tickets when tickets.SelectedTicket != null => $"Source: Ticket #{tickets.SelectedTicket.Id}",
+        _ => "Source/version: current workspace"
+    };
+    public string RelatedContextText => CurrentWorkspace switch
+    {
+        ProjectWorkspace.Documents => "Related tickets and decisions load from document context.",
+        ProjectWorkspace.Tickets => "Related docs, decisions, and build traces load from ticket context.",
+        ProjectWorkspace.Chat => "Related memory appears in route and LLM traces.",
+        _ => "Related items are available in workspace-specific panels."
+    };
+    public string LatestTraceContextText => "Open Dev Tools for LLM and route traces.";
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -159,6 +189,17 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Ticket → Builder Proposal bridge
+        _ticketsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(TicketsWorkspaceViewModel.SelectedTicket) or nameof(TicketsWorkspaceViewModel.EditTitle) or nameof(TicketsWorkspaceViewModel.HasDetail))
+                RaiseContextInspectorProperties();
+        };
+        _documentsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(DocumentsWorkspaceViewModel.SelectedDocument) or nameof(DocumentsWorkspaceViewModel.SelectedVersion))
+                RaiseContextInspectorProperties();
+        };
+
         _ticketsVm.OnRequestProposal = (ticketId) =>
         {
             _ = _builderVm.GenerateProposalForTicketAsync(ticketId);
@@ -287,6 +328,9 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
 
         if (!System.Enum.TryParse<ProjectWorkspace>(workspaceName, out var ws)) return;
+        if (!ConfirmDiscardDirtyWorkspace())
+            return;
+
         if (ws == ProjectWorkspace.Testing && CurrentWorkspace != ProjectWorkspace.Testing)
         {
             _lastWorkspaceBeforeTesting = CurrentWorkspace;
@@ -418,6 +462,32 @@ public sealed partial class ShellViewModel : ObservableObject
             _ => workspace.ToString()
         };
 
+    private bool ConfirmDiscardDirtyWorkspace()
+    {
+        if (CurrentView is not IWorkspaceDirtyState dirty || !dirty.HasDirtyEditState)
+            return true;
+
+        var message = string.IsNullOrWhiteSpace(dirty.DirtyEditMessage)
+            ? "You have unsaved changes. Leave this workspace and discard them?"
+            : dirty.DirtyEditMessage;
+
+        return MessageBox.Show(
+            message,
+            "Unsaved Changes",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
+    private bool IsIronDevProductContext()
+    {
+        if (!string.IsNullOrWhiteSpace(ActiveProjectName) &&
+            ActiveProjectName.Contains("IronDev", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return !string.IsNullOrWhiteSpace(ActiveProjectPath) &&
+               ActiveProjectPath.Contains("IronDeveloper", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void NavigateToHub()
     {
         IsAuthenticated = true;
@@ -534,6 +604,18 @@ public sealed partial class ShellViewModel : ObservableObject
         OnPropertyChanged(nameof(HasActiveProject));
         OnPropertyChanged(nameof(CurrentView));
         OnPropertyChanged(nameof(CurrentWorkspace));
+        OnPropertyChanged(nameof(CurrentWorkspaceDisplayName));
+        OnPropertyChanged(nameof(ContextDomain));
+        OnPropertyChanged(nameof(MemoryStatusText));
+        RaiseContextInspectorProperties();
+    }
+
+    private void RaiseContextInspectorProperties()
+    {
+        OnPropertyChanged(nameof(SelectedObjectContextText));
+        OnPropertyChanged(nameof(SourceVersionContextText));
+        OnPropertyChanged(nameof(RelatedContextText));
+        OnPropertyChanged(nameof(LatestTraceContextText));
     }
 
     private static bool IsIndexActionableStatus(string status)
@@ -553,6 +635,11 @@ public sealed partial class ShellViewModel : ObservableObject
     partial void OnCurrentWorkspaceChanged(ProjectWorkspace value)
     {
         RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnCurrentViewChanged(object value)
+    {
+        RaiseContextInspectorProperties();
     }
 
     partial void OnHasActiveProjectChanged(bool value)
