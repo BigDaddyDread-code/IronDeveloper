@@ -133,6 +133,16 @@ DogfoodRunId -> CaseId -> TraceGroupId -> LLMTrace / RouteDecision / SemanticSea
 
 Replay must default to dry-run and assert behaviours rather than exact wording.
 
+The current runner executes routing plus dry-run action simulation. It writes:
+
+```text
+replay-results.json   # route, assertion, and simulated count summary
+action-results.json   # dry-run discussion docs, draft tickets, plans, build approvals, blocked actions
+runner-summary.json   # aggregate pass/fail result
+```
+
+Dry-run action simulation must never write project files or persist tickets. It exists to prove that a routed command would create the expected reviewable artefacts, request approval where required, and block unsafe or contradictory instructions.
+
 ## Vague prompt pressure
 
 The BookSeller scenario intentionally includes vague and contradictory prompts such as:

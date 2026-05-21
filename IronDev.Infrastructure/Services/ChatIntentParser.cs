@@ -45,6 +45,8 @@ public static class ChatIntentParser
         if (string.IsNullOrWhiteSpace(request)) return null;
 
         var lower = request.ToLowerInvariant().Trim();
+        if (ContainsContradictoryTicketCommand(lower))
+            return null;
 
         var splitIntent = ParseSplitTickets(request, previousMessage);
         if (splitIntent != null) return splitIntent;
@@ -117,15 +119,18 @@ public static class ChatIntentParser
             lower.StartsWith("split into ") ||
             lower.StartsWith("split this plan into ") ||
             lower.StartsWith("turn this into tickets") ||
+            lower.StartsWith("turn this lot into tickets") ||
             lower.StartsWith("turn this plan into tickets") ||
             lower.StartsWith("turn the plan into tickets") ||
             lower.StartsWith("create me some tickets") ||
             lower.StartsWith("create some tickets") ||
+            lower.StartsWith("create the tickets") ||
             lower.StartsWith("crate tickets") ||
             lower.StartsWith("creat tickets") ||
             lower.StartsWith("make me some tickets") ||
             lower.StartsWith("make some tickets") ||
             lower.StartsWith("make tickets") ||
+            lower.StartsWith("make the draft tickets") ||
             lower.StartsWith("make ticket list real") ||
             lower.StartsWith("make the ticket list real") ||
             lower.StartsWith("raise some tickets") ||
@@ -187,10 +192,19 @@ public static class ChatIntentParser
             "can you "
         };
 
-        foreach (var prefix in prefixes)
+        var changed = true;
+        while (changed)
         {
-            if (text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                return text[prefix.Length..].TrimStart();
+            changed = false;
+            foreach (var prefix in prefixes)
+            {
+                if (!text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                text = text[prefix.Length..].TrimStart();
+                changed = true;
+                break;
+            }
         }
 
         return text;
@@ -302,22 +316,35 @@ public static class ChatIntentParser
             .Replace("tickts", "tickets", StringComparison.Ordinal)
             .Replace("tickt", "ticket", StringComparison.Ordinal);
 
+    private static bool ContainsContradictoryTicketCommand(string lower)
+        => (lower.Contains("create ticket", StringComparison.Ordinal) ||
+            lower.Contains("create tickets", StringComparison.Ordinal) ||
+            lower.Contains("make ticket", StringComparison.Ordinal) ||
+            lower.Contains("make tickets", StringComparison.Ordinal)) &&
+           (lower.Contains("don't create any ticket", StringComparison.Ordinal) ||
+            lower.Contains("do not create any ticket", StringComparison.Ordinal) ||
+            lower.Contains("don't make any ticket", StringComparison.Ordinal) ||
+            lower.Contains("do not make any ticket", StringComparison.Ordinal));
+
     private static string ExtractCreateTicketsCommandTail(string request)
     {
         var prefixes = new[]
         {
             "create me some tickets",
             "create some tickets",
+            "create the tickets",
             "crate tickets",
             "creat tickets",
             "make me some tickets",
             "make some tickets",
             "make tickets",
+            "make the draft tickets",
             "make ticket list real",
             "make the ticket list real",
             "raise some tickets",
             "ticket these",
             "turn those into draft tickets",
+            "turn this lot into tickets",
             "create draft tickets",
             "create tickets",
             "draft tickets",
