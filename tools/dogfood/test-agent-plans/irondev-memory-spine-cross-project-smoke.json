@@ -1,0 +1,39 @@
+{
+  "test_run_id": "test-irondev-memory-spine-cross-project-008",
+  "goal_id": "retrieval-correctness-008",
+  "project_id": 2,
+  "description": "Prove real Weaviate retrieval can surface a stronger cross-project candidate while IronDev project filtering rejects it and accepts the active IronDev project memory as primary authority.",
+  "expected": {
+    "weaviate_health": true,
+    "irondev_project_context_resolved": true,
+    "bleed_project_context_resolved": true,
+    "sql_docs_created_for_both_projects": true,
+    "chunks_upserted_to_weaviate": true,
+    "raw_weaviate_prefers_cross_project_candidate": true,
+    "cross_project_candidate_rejected": true,
+    "irondev_candidate_primary_after_filtering": true,
+    "source_link_belongs_to_irondev": true,
+    "semantic_trace_written": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "weaviate_health",
+      "params": {
+        "endpoint": "http://localhost:8080"
+      }
+    },
+    {
+      "step": 2,
+      "action": "cross_project_memory_smoke",
+      "params": {
+        "project": "IronDev",
+        "bleed_project": "BookSeller",
+        "query": "first Codex goal checkout flow",
+        "weaviate_endpoint": "http://localhost:8080"
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}

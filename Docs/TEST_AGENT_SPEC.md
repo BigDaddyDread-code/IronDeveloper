@@ -82,6 +82,7 @@ Initial Alpha actions:
 | `docs_search` | Probe headless dogfood knowledge retrieval and ranking evidence | `IronDev.ReplayRunner docs search` |
 | `sql_document_version_smoke` | Create SQL-backed project document versions, index them into semantic memory tables, and assert the current version outranks the stale version | `IronDev.ReplayRunner memory sql-version-smoke` |
 | `weaviate_sql_document_version_smoke` | Upsert SQL-backed document-version chunks into Weaviate, run a real near-vector query, and assert final authority ranking corrects stale raw vector preference | `IronDev.ReplayRunner memory weaviate-sql-version-smoke` |
+| `cross_project_memory_smoke` | Upsert similar SQL-backed chunks for IronDev and BookSeller, run a real near-vector query, and assert cross-project candidates are rejected for IronDev context | `IronDev.ReplayRunner memory cross-project-smoke` |
 
 Example `chat_conversation` step:
 
@@ -133,7 +134,7 @@ Planned CLI actions:
 
 Unsupported actions must be reported as `SKIPPED_UNSUPPORTED` or `FAILED_UNSUPPORTED`. The Test Agent must not fake success for actions that do not have a real backing command.
 
-Memory spine actions are deliberately small and evidence-first. `weaviate_health` proves the local Weaviate endpoint is reachable. `docs_search` proves the local dogfood knowledge store can return project-scoped ranking evidence. `sql_document_version_smoke` proves a SQL `ProjectDocument`/`ProjectDocumentVersion` pair can be indexed into semantic artefact/chunk tables, linked back to a source discussion, ranked with current-version authority over a stale version, and recorded with a semantic search trace id. `weaviate_sql_document_version_smoke` proves the next link: SQL-backed chunks can be written to Weaviate, returned by a real vector query, and then corrected by IronDev's authority/current/stale ranking when raw vector retrieval prefers stale content.
+Memory spine actions are deliberately small and evidence-first. `weaviate_health` proves the local Weaviate endpoint is reachable. `docs_search` proves the local dogfood knowledge store can return project-scoped ranking evidence. `sql_document_version_smoke` proves a SQL `ProjectDocument`/`ProjectDocumentVersion` pair can be indexed into semantic artefact/chunk tables, linked back to a source discussion, ranked with current-version authority over a stale version, and recorded with a semantic search trace id. `weaviate_sql_document_version_smoke` proves the next link: SQL-backed chunks can be written to Weaviate, returned by a real vector query, and then corrected by IronDev's authority/current/stale ranking when raw vector retrieval prefers stale content. `cross_project_memory_smoke` proves project boundaries hold when raw Weaviate retrieval prefers another project's more similar document.
 
 ## Output Shape
 

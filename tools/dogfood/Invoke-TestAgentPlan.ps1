@@ -574,6 +574,52 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "cross_project_memory_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $bleedProject = if ($params.bleed_project) { [string]$params.bleed_project } else { "BookSeller" }
+                $query = if ($params.query) { [string]$params.query } else { "first Codex goal checkout flow" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "memory", "cross-project-smoke",
+                    "--project", $project,
+                    "--bleed-project", $bleedProject,
+                    "--query", $query,
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.connection_string) {
+                    $arguments += @("--connection-string", [string]$params.connection_string)
+                }
+                if ($params.weaviate_endpoint) {
+                    $arguments += @("--weaviate-endpoint", [string]$params.weaviate_endpoint)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed -and $parsed.decisions) {
+                        "Cross-project smoke failed; raw top project=$($parsed.decisions[0].projectName)"
+                    } else {
+                        "cross_project_memory_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "Cross-project memory smoke returned Passed=false"
+                } else {
+                    $rawTop = $parsed.decisions | Select-Object -First 1
+                    $accepted = $parsed.decisions | Where-Object { $_.decision -eq "accepted_project_authority" } | Select-Object -First 1
+                    $summary = "Cross-project raw retrieval rejected; rawTop=$($rawTop.projectName), accepted=$($accepted.projectName), trace=$($parsed.semanticTraceId)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

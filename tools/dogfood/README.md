@@ -284,6 +284,7 @@ The local executor currently supports:
 - `docs_search`
 - `sql_document_version_smoke`
 - `weaviate_sql_document_version_smoke`
+- `cross_project_memory_smoke`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
 `coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
@@ -331,6 +332,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 This creates the same style of disposable SQL document/version pair, writes both version chunks into a temporary Weaviate dogfood collection, runs a real `nearVector` query, and verifies that final IronDev ranking promotes the current authoritative version even when raw Weaviate distance ranks the stale version first.
+
+Run the cross-project retrieval isolation smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-cross-project-smoke.json `
+  -RunId IronDevMemorySpine008-CrossProject `
+  -Json
+```
+
+This creates SQL-backed memory for IronDev and BookSeller, writes both to Weaviate, runs a real `nearVector` query that intentionally prefers the BookSeller chunk, and verifies IronDev context rejects the cross-project candidate before final ranking.
 
 Conversation-mode sample:
 
