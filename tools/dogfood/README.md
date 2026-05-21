@@ -1,0 +1,123 @@
+# IronDev Dogfood Replay Harness
+
+This folder contains the resettable BookSeller dogfood harness.
+
+The harness is built around one rule:
+
+```text
+Every run gets a DogfoodRunId, and every trace/result/artifact should be stamped with it.
+```
+
+Example:
+
+```text
+20260521-BookSellerMvp-001
+```
+
+## Layout
+
+```text
+tools/dogfood/
+  Reset-BookSellerDogfood.ps1
+  Start-BookSellerReplay.ps1
+  dogfood-scenarios/
+    BookSellerMvp.json
+  runs/
+    {DogfoodRunId}/
+      dogfood-run.json
+      reset-log.json
+      replay/
+        replay-plan.json
+        replay-summary.json
+      traces/
+      screenshots/
+      reports/
+```
+
+## Reset BookSeller
+
+Dry-run first:
+
+```powershell
+.\tools\dogfood\Reset-BookSellerDogfood.ps1 `
+  -BaselinePath C:\repo\BookSeller_Baseline `
+  -TargetPath C:\repo\BookSeller `
+  -DatabaseName BookSellerDogfood `
+  -RunId 20260521-BookSellerMvp-001 `
+  -DryRun
+```
+
+If local execution policy blocks scripts, run the same script through PowerShell explicitly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Reset-BookSellerDogfood.ps1 `
+  -BaselinePath C:\repo\BookSeller_Baseline `
+  -TargetPath C:\repo\BookSeller `
+  -DatabaseName BookSellerDogfood `
+  -RunId 20260521-BookSellerMvp-001 `
+  -DryRun
+```
+
+Real reset:
+
+```powershell
+.\tools\dogfood\Reset-BookSellerDogfood.ps1 `
+  -BaselinePath C:\repo\BookSeller_Baseline `
+  -TargetPath C:\repo\BookSeller `
+  -DatabaseName BookSellerDogfood `
+  -RunId 20260521-BookSellerMvp-001 `
+  -SqlServer . `
+  -StopIronDev `
+  -Force
+```
+
+Safety rules:
+
+- `BaselinePath` must end with `\BookSeller_Baseline`.
+- `TargetPath` must end with `\BookSeller`.
+- Baseline and target cannot be the same path.
+- The target cannot be `C:\`, `C:\repo`, the user profile, or the IronDev repo root.
+- Destructive reset requires `-Force`.
+- `-DryRun` shows intent without deleting/copying/resetting.
+
+## Generate a randomized replay plan
+
+Every run should be different. The replay script adds a seed and randomizes prompt prefixes, suffixes, and eligible workspace context.
+
+```powershell
+.\tools\dogfood\Start-BookSellerReplay.ps1 `
+  -RunId 20260521-BookSellerMvp-001 `
+  -Scenario .\tools\dogfood\dogfood-scenarios\BookSellerMvp.json `
+  -Reps 100 `
+  -DryRun `
+  -StopOnFailure
+```
+
+The output is written to:
+
+```text
+tools/dogfood/runs/{DogfoodRunId}/replay/replay-plan.json
+tools/dogfood/runs/{DogfoodRunId}/replay/replay-summary.json
+```
+
+For deterministic debugging, reuse the saved seed:
+
+```powershell
+.\tools\dogfood\Start-BookSellerReplay.ps1 `
+  -RunId 20260521-BookSellerMvp-002 `
+  -Reps 100 `
+  -DryRun `
+  -Seed 123456
+```
+
+## Runner integration
+
+The script currently generates a replay plan. It can call a future IronDev replay runner by passing `-RunnerCommand`.
+
+The runner should read `replay-plan.json`, execute each case through IronDev internals, and save results linked by:
+
+```text
+DogfoodRunId -> CaseId -> TraceGroupId -> LLMTrace / RouteDecision / SemanticSearchTrace / WorkflowRun
+```
+
+Replay must default to dry-run and assert behaviours rather than exact wording.

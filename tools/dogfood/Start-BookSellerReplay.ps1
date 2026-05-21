@@ -1,0 +1,175 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$RunId,
+
+    [string]$Scenario = "",
+
+    [int]$Reps = 25,
+
+    [switch]$DryRun,
+
+    [switch]$StopOnFailure,
+
+    [int]$Seed = 0,
+
+    [string]$RunnerCommand = ""
+)
+
+$ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($Scenario)) {
+    $Scenario = Join-Path $PSScriptRoot "dogfood-scenarios\BookSellerMvp.json"
+}
+
+if (-not (Test-Path -LiteralPath $Scenario)) {
+    throw "Scenario file does not exist: $Scenario"
+}
+
+if ($Reps -lt 1) {
+    throw "Reps must be at least 1."
+}
+
+$scenarioJson = Get-Content -LiteralPath $Scenario -Raw | ConvertFrom-Json
+$runRoot = Join-Path $PSScriptRoot "runs\$RunId"
+$resultsRoot = Join-Path $runRoot "replay"
+$planPath = Join-Path $resultsRoot "replay-plan.json"
+$summaryPath = Join-Path $resultsRoot "replay-summary.json"
+
+if ($Seed -eq 0) {
+    $buffer = New-Object byte[] 4
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($buffer)
+    }
+    finally {
+        $rng.Dispose()
+    }
+    $Seed = [System.BitConverter]::ToInt32($buffer, 0) -band 0x7fffffff
+    if ($Seed -eq 0) {
+        $Seed = 1
+    }
+}
+
+$random = [Random]::new($Seed)
+
+New-Item -ItemType Directory -Force -Path $resultsRoot | Out-Null
+
+function Pick-Random {
+    param([object[]]$Items)
+
+    if ($Items.Count -eq 0) {
+        return $null
+    }
+
+    return $Items[$random.Next(0, $Items.Count)]
+}
+
+function New-CaseId {
+    param([int]$Index)
+
+    return "{0:D4}-{1}" -f $Index, ([Guid]::NewGuid().ToString("N").Substring(0, 8))
+}
+
+$variants = @($scenarioJson.variants)
+if ($variants.Count -eq 0) {
+    throw "Scenario has no variants: $Scenario"
+}
+
+$workspaceNoise = @("Chat", "Discovery", "Tickets", "Documents")
+$promptNoisePrefixes = @(
+    "",
+    "ok ",
+    "right ",
+    "can you ",
+    "quick one, ",
+    "I think "
+)
+$promptNoiseSuffixes = @(
+    "",
+    " please",
+    " for this",
+    " and keep it safe",
+    " but don't change code yet",
+    " and show me what happened"
+)
+
+$cases = New-Object System.Collections.Generic.List[object]
+
+for ($i = 1; $i -le $Reps; $i++) {
+    $variant = Pick-Random $variants
+    $basePrompt = [string]$variant.prompt
+    $prompt = "$(Pick-Random $promptNoisePrefixes)$basePrompt$(Pick-Random $promptNoiseSuffixes)".Trim()
+
+    $workspace = if ($variant.randomizeWorkspace -eq $false) {
+        [string]$variant.workspace
+    } else {
+        $choices = @($variant.workspace) + $workspaceNoise
+        [string](Pick-Random $choices)
+    }
+
+    $case = [ordered]@{
+        dogfoodRunId = $RunId
+        caseId = New-CaseId -Index $i
+        caseNumber = $i
+        scenarioId = $scenarioJson.scenarioId
+        seed = $Seed
+        dryRun = [bool]$DryRun
+        stopOnFailure = [bool]$StopOnFailure
+        step = $variant.step
+        name = $variant.name
+        workspace = $workspace
+        prompt = $prompt
+        basePrompt = $basePrompt
+        expected = $variant.expected
+        status = "Planned"
+        createdAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
+    }
+
+    $cases.Add($case)
+}
+
+$plan = [ordered]@{
+    dogfoodRunId = $RunId
+    scenarioId = $scenarioJson.scenarioId
+    scenarioPath = (Resolve-Path -LiteralPath $Scenario).Path
+    seed = $Seed
+    reps = $Reps
+    dryRun = [bool]$DryRun
+    stopOnFailure = [bool]$StopOnFailure
+    createdAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
+    runnerCommand = $RunnerCommand
+    cases = $cases
+}
+
+$plan | ConvertTo-Json -Depth 20 | Set-Content -Path $planPath -Encoding UTF8
+
+$summary = [ordered]@{
+    dogfoodRunId = $RunId
+    scenarioId = $scenarioJson.scenarioId
+    seed = $Seed
+    reps = $Reps
+    status = if ([string]::IsNullOrWhiteSpace($RunnerCommand)) { "PlanOnly" } else { "RunnerRequested" }
+    replayPlanPath = $planPath
+    createdAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
+}
+
+if ([string]::IsNullOrWhiteSpace($RunnerCommand)) {
+    $summary.message = "Replay plan generated. Wire RunnerCommand to execute cases through IronDev internals."
+} else {
+    Write-Host "Runner command requested:"
+    Write-Host $RunnerCommand
+    Write-Host "Passing replay plan path as final argument."
+
+    & powershell -NoProfile -ExecutionPolicy Bypass -Command "$RunnerCommand `"$planPath`""
+    $summary.runnerExitCode = $LASTEXITCODE
+    $summary.status = if ($LASTEXITCODE -eq 0) { "Completed" } else { "Failed" }
+}
+
+$summary | ConvertTo-Json -Depth 10 | Set-Content -Path $summaryPath -Encoding UTF8
+
+Write-Host "Dogfood replay plan ready"
+Write-Host "RunId: $RunId"
+Write-Host "Seed: $Seed"
+Write-Host "Cases: $Reps"
+Write-Host "Plan: $planPath"
+Write-Host "Summary: $summaryPath"
