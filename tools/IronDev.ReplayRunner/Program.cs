@@ -47,6 +47,9 @@ if (IsCommand(args, "failure", "latest"))
 if (IsCommand(args, "memory", "sql-version-smoke"))
     return await HandleMemorySqlVersionSmokeCommandAsync(args, options);
 
+if (IsCommand(args, "memory", "weaviate-sql-version-smoke"))
+    return await HandleMemoryWeaviateSqlVersionSmokeCommandAsync(args, options);
+
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
 {
@@ -700,6 +703,256 @@ static async Task<int> HandleMemorySqlVersionSmokeCommandAsync(string[] args, Js
     return passed ? 0 : 1;
 }
 
+static async Task<int> HandleMemoryWeaviateSqlVersionSmokeCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var requestedProjectName = ReadOption(args, "--project") ?? "IronDev";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"memory-weaviate-sql-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var queryText = ReadOption(args, "--query") ?? "first Codex goal builder output";
+    var connectionString = ResolveIronDevConnectionString(args);
+    var repoRoot = FindRepositoryRoot();
+    var connectionFactory = new CliConnectionFactory(connectionString);
+
+    await ApplySqlScriptAsync(
+        connectionFactory,
+        Path.Combine(repoRoot, "Database", "migrate_project_documents.sql"));
+
+    var project = await ResolveProjectAsync(connectionFactory, requestedProjectName);
+    if (project is null)
+    {
+        Console.Error.WriteLine($"Project not found: {requestedProjectName}");
+        return 1;
+    }
+
+    var tenant = new CliTenantContext(project.TenantId);
+    var documentService = new ProjectDocumentService(connectionFactory, tenant);
+    var artefactRepository = new SemanticArtefactRepository(connectionFactory);
+    var chunkRepository = new SemanticChunkRepository(connectionFactory);
+    var traceRepository = new SemanticSearchTraceRepository(connectionFactory);
+    var ranker = new SemanticRankingService();
+
+    var stamp = dogfoodRunId.Replace(':', '-').Replace('\\', '-').Replace('/', '-');
+    var titleSeed = $"CODEX_GOALS_WEAVIATE_SQL_SPINE_{stamp}_{Guid.NewGuid():N}";
+    var title = titleSeed[..Math.Min(120, titleSeed.Length)];
+    var oldContent = """
+        # Codex Goals Weaviate Spine
+
+        The first Codex goal is to test builder output and patch generation.
+        This historical version is intentionally stale but semantically tempting for builder-output queries.
+        """;
+    var currentContent = """
+        # Codex Goals Weaviate Spine
+
+        The first Codex goal is to prove SQL-backed memory retrieval and authority ranking.
+        Current authoritative memory must beat stale vector matches before builder context is trusted.
+        """;
+
+    var document = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = project.ProjectId,
+        Title = title,
+        DocumentType = "Architecture",
+        ContentMarkdown = oldContent,
+        ChangeSummary = "Historical Weaviate dogfood version",
+        CreatedBy = "TestAgent",
+        SourceEntityType = "Discussion",
+        SourceEntityId = 9101
+    });
+
+    var oldVersion = await documentService.GetCurrentVersionAsync(document.Id)
+        ?? throw new InvalidOperationException("Initial document version was not created.");
+
+    var currentVersion = await documentService.AddVersionAsync(new AddProjectDocumentVersionRequest
+    {
+        DocumentId = document.Id,
+        ContentMarkdown = currentContent,
+        ChangeSummary = "Current Weaviate dogfood version",
+        CreatedBy = "TestAgent",
+        IncrementMajorVersion = true,
+        Status = "Approved"
+    });
+
+    await documentService.LinkVersionAsync(new LinkProjectDocumentVersionRequest
+    {
+        DocumentVersionId = currentVersion.Id,
+        LinkedEntityType = "Discussion",
+        LinkedEntityId = 9102,
+        LinkType = "CurrentGoalSource",
+        CreatedBy = "TestAgent"
+    });
+
+    var oldArtefactId = Guid.NewGuid();
+    var currentArtefactId = Guid.NewGuid();
+    await IndexDocumentVersionAsync(
+        artefactRepository,
+        chunkRepository,
+        project.TenantId,
+        project.ProjectId,
+        oldArtefactId,
+        document,
+        oldVersion,
+        authorityLevel: "LowAuthorityNote",
+        content: oldContent);
+    await IndexDocumentVersionAsync(
+        artefactRepository,
+        chunkRepository,
+        project.TenantId,
+        project.ProjectId,
+        currentArtefactId,
+        document,
+        currentVersion,
+        authorityLevel: "AcceptedArchitecture",
+        content: currentContent);
+
+    await artefactRepository.MarkStaleAsync(new SemanticStaleRequest
+    {
+        ProjectId = project.ProjectId,
+        SourceEntityType = "ProjectDocument",
+        SourceEntityId = document.Id.ToString(),
+        SourceVersionId = oldVersion.Id.ToString()
+    });
+
+    var oldArtefact = await artefactRepository.GetArtefactAsync(oldArtefactId)
+        ?? throw new InvalidOperationException("Old semantic artefact was not persisted.");
+    var currentArtefact = await artefactRepository.GetArtefactAsync(currentArtefactId)
+        ?? throw new InvalidOperationException("Current semantic artefact was not persisted.");
+    var oldChunk = (await chunkRepository.GetChunksAsync(oldArtefactId, includeStale: true)).Single();
+    var currentChunk = (await chunkRepository.GetChunksAsync(currentArtefactId, includeStale: true)).Single();
+
+    var weaviateEndpoint = ReadOption(args, "--weaviate-endpoint") ?? ResolveWeaviateEndpoint();
+    var collectionName = BuildWeaviateDogfoodCollectionName(dogfoodRunId);
+    var queryVector = new[] { 1.0, 0.0, 0.0, 0.0 };
+    var staleVector = new[] { 1.0, 0.0, 0.0, 0.0 };
+    var currentVector = new[] { 0.8, 0.6, 0.0, 0.0 };
+
+    using var httpClient = new HttpClient { BaseAddress = new Uri(weaviateEndpoint.TrimEnd('/') + "/") };
+    await EnsureWeaviateDogfoodCollectionAsync(httpClient, collectionName);
+    await UpsertWeaviateChunkAsync(
+        httpClient,
+        collectionName,
+        oldChunk.Id,
+        oldArtefact,
+        oldChunk,
+        project.TenantId,
+        isStale: true,
+        vector: staleVector);
+    await UpsertWeaviateChunkAsync(
+        httpClient,
+        collectionName,
+        currentChunk.Id,
+        currentArtefact,
+        currentChunk,
+        project.TenantId,
+        isStale: false,
+        vector: currentVector);
+
+    var rawMatches = await QueryWeaviateDogfoodCollectionAsync(httpClient, collectionName, queryVector, limit: 5);
+    var rawRelevantMatches = rawMatches
+        .Where(match => match.ProjectId == project.ProjectId &&
+                        (string.Equals(match.SourceVersionId, oldVersion.Id.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(match.SourceVersionId, currentVersion.Id.ToString(), StringComparison.OrdinalIgnoreCase)))
+        .OrderBy(match => match.RawWeaviateRank)
+        .ToArray();
+
+    var artefactsById = new Dictionary<Guid, SemanticArtefact>
+    {
+        [oldArtefact.Id] = oldArtefact,
+        [currentArtefact.Id] = currentArtefact
+    };
+    var chunksById = new Dictionary<Guid, SemanticChunk>
+    {
+        [oldChunk.Id] = oldChunk,
+        [currentChunk.Id] = currentChunk
+    };
+    var versionsById = new Dictionary<string, ProjectDocumentVersion>(StringComparer.OrdinalIgnoreCase)
+    {
+        [oldVersion.Id.ToString()] = oldVersion,
+        [currentVersion.Id.ToString()] = currentVersion
+    };
+
+    var candidates = rawRelevantMatches
+        .Where(match => artefactsById.ContainsKey(match.ArtefactId) &&
+                        chunksById.ContainsKey(match.ChunkId) &&
+                        versionsById.ContainsKey(match.SourceVersionId ?? string.Empty))
+        .Select(match =>
+        {
+            var version = versionsById[match.SourceVersionId!];
+            return BuildCandidate(
+                project.TenantId,
+                project.ProjectId,
+                document,
+                version,
+                artefactsById[match.ArtefactId],
+                chunksById[match.ChunkId],
+                version.Id == currentVersion.Id ? currentContent : oldContent,
+                vectorSimilarity: match.VectorSimilarity,
+                contentHashMismatch: false);
+        })
+        .ToArray();
+
+    var query = new SemanticSearchQuery
+    {
+        ProjectId = project.ProjectId,
+        QueryText = queryText,
+        Consumer = "MemorySpineWeaviateSmoke",
+        Limit = 5,
+        IncludeStale = true
+    };
+
+    var results = ranker.Rank(query, candidates);
+    var traceId = await traceRepository.CreateTraceAsync(query);
+    await traceRepository.AddResultsAsync(traceId, results);
+    var links = await documentService.GetLinksForVersionAsync(currentVersion.Id);
+
+    var top = results.FirstOrDefault();
+    var staleRawRank = rawRelevantMatches.FirstOrDefault(match => match.SourceVersionId == oldVersion.Id.ToString())?.RawWeaviateRank;
+    var currentRawRank = rawRelevantMatches.FirstOrDefault(match => match.SourceVersionId == currentVersion.Id.ToString())?.RawWeaviateRank;
+    var passed = top is not null &&
+                 top.SourceVersionId == currentVersion.Id.ToString() &&
+                 !top.IsStale &&
+                 staleRawRank.HasValue &&
+                 currentRawRank.HasValue &&
+                 staleRawRank.Value < currentRawRank.Value &&
+                 links.Any(link => link.LinkType == "CurrentGoalSource");
+
+    var result = new MemoryWeaviateSqlVersionSmokeResult
+    {
+        DogfoodRunId = dogfoodRunId,
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        ProjectName = project.ProjectName,
+        DocumentId = document.Id,
+        CurrentVersionId = currentVersion.Id,
+        OldVersionId = oldVersion.Id,
+        Query = queryText,
+        WeaviateEndpoint = weaviateEndpoint,
+        WeaviateCollection = collectionName,
+        SemanticTraceId = traceId,
+        SourceLinkCount = links.Count,
+        Passed = passed,
+        RawMatches = rawRelevantMatches,
+        Results = results.Select((ranked, index) => new MemoryWeaviateSqlVersionSearchResult
+        {
+            FinalAuthorityRank = index + 1,
+            RawWeaviateRank = rawRelevantMatches.FirstOrDefault(match => match.SourceVersionId == ranked.SourceVersionId)?.RawWeaviateRank,
+            Title = ranked.Title,
+            SourceEntityType = ranked.SourceEntityType,
+            SourceEntityId = ranked.SourceEntityId,
+            SourceVersionId = ranked.SourceVersionId,
+            FinalScore = ranked.FinalScore,
+            VectorSimilarity = ranked.VectorSimilarity,
+            AuthorityBoost = ranked.AuthorityBoost,
+            SourceTypeBoost = ranked.SourceTypeBoost,
+            RecencyBoost = ranked.RecencyBoost,
+            StalePenalty = ranked.StalePenalty,
+            IsStale = ranked.IsStale,
+            MatchReason = ranked.MatchReason
+        }).ToArray()
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return passed ? 0 : 1;
+}
+
 static ReplayFailure? FindLatestReplayFailure(string runsRoot, string? selectedRunId)
 {
     var resultFiles = Directory
@@ -937,6 +1190,215 @@ static SemanticSearchCandidate BuildCandidate(
     };
 }
 
+static async Task EnsureWeaviateDogfoodCollectionAsync(HttpClient httpClient, string collectionName)
+{
+    var existsResponse = await httpClient.GetAsync($"v1/schema/{collectionName}");
+    if (existsResponse.IsSuccessStatusCode)
+        return;
+
+    var schema = new
+    {
+        @class = collectionName,
+        vectorizer = "none",
+        properties = new object[]
+        {
+            new { name = "chunkId", dataType = new[] { "text" } },
+            new { name = "artefactId", dataType = new[] { "text" } },
+            new { name = "tenantId", dataType = new[] { "int" } },
+            new { name = "projectId", dataType = new[] { "int" } },
+            new { name = "sourceEntityType", dataType = new[] { "text" } },
+            new { name = "sourceEntityId", dataType = new[] { "text" } },
+            new { name = "sourceVersionId", dataType = new[] { "text" } },
+            new { name = "artefactType", dataType = new[] { "text" } },
+            new { name = "authorityLevel", dataType = new[] { "text" } },
+            new { name = "title", dataType = new[] { "text" } },
+            new { name = "chunkText", dataType = new[] { "text" } },
+            new { name = "chunkIndex", dataType = new[] { "int" } },
+            new { name = "contentHash", dataType = new[] { "text" } },
+            new { name = "isStale", dataType = new[] { "boolean" } }
+        }
+    };
+
+    var response = await PostJsonAsync(httpClient, "v1/schema", schema);
+    if (!response.IsSuccessStatusCode)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException($"Weaviate schema create failed for {collectionName}: {(int)response.StatusCode} {body}");
+    }
+}
+
+static async Task UpsertWeaviateChunkAsync(
+    HttpClient httpClient,
+    string collectionName,
+    Guid objectId,
+    SemanticArtefact artefact,
+    SemanticChunk chunk,
+    int tenantId,
+    bool isStale,
+    IReadOnlyList<double> vector)
+{
+    var payload = new
+    {
+        @class = collectionName,
+        id = objectId.ToString(),
+        properties = new
+        {
+            chunkId = chunk.Id.ToString(),
+            artefactId = artefact.Id.ToString(),
+            tenantId,
+            projectId = artefact.ProjectId,
+            sourceEntityType = artefact.SourceEntityType,
+            sourceEntityId = artefact.SourceEntityId,
+            sourceVersionId = artefact.SourceVersionId ?? string.Empty,
+            artefactType = artefact.ArtefactType,
+            authorityLevel = artefact.AuthorityLevel,
+            title = artefact.Title,
+            chunkText = chunk.ChunkText,
+            chunkIndex = chunk.ChunkIndex,
+            contentHash = chunk.ContentHash,
+            isStale
+        },
+        vector
+    };
+
+    var response = await PostJsonAsync(httpClient, "v1/objects", payload);
+    if (!response.IsSuccessStatusCode)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException($"Weaviate object upsert failed for {objectId}: {(int)response.StatusCode} {body}");
+    }
+}
+
+static async Task<IReadOnlyList<WeaviateRawMatch>> QueryWeaviateDogfoodCollectionAsync(
+    HttpClient httpClient,
+    string collectionName,
+    IReadOnlyList<double> queryVector,
+    int limit)
+{
+    var vectorText = string.Join(",", queryVector.Select(value => value.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture)));
+    var graphQl = new
+    {
+        query = $$"""
+        {
+          Get {
+            {{collectionName}}(
+              nearVector: { vector: [{{vectorText}}] }
+              limit: {{limit}}
+            ) {
+              chunkId
+              artefactId
+              tenantId
+              projectId
+              sourceEntityType
+              sourceEntityId
+              sourceVersionId
+              title
+              isStale
+              _additional {
+                id
+                distance
+              }
+            }
+          }
+        }
+        """
+    };
+
+    var response = await PostJsonAsync(httpClient, "v1/graphql", graphQl);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+        throw new InvalidOperationException($"Weaviate GraphQL query failed: {(int)response.StatusCode} {body}");
+
+    using var document = JsonDocument.Parse(body);
+    if (!document.RootElement.TryGetProperty("data", out var data) ||
+        !data.TryGetProperty("Get", out var get) ||
+        !get.TryGetProperty(collectionName, out var objects) ||
+        objects.ValueKind != JsonValueKind.Array)
+    {
+        return [];
+    }
+
+    var matches = new List<WeaviateRawMatch>();
+    var rank = 1;
+    foreach (var item in objects.EnumerateArray())
+    {
+        var distance = item.TryGetProperty("_additional", out var additional) &&
+                       additional.TryGetProperty("distance", out var distanceElement) &&
+                       distanceElement.TryGetDouble(out var parsedDistance)
+            ? parsedDistance
+            : 1d;
+
+        matches.Add(new WeaviateRawMatch
+        {
+            RawWeaviateRank = rank++,
+            ChunkId = ParseGuidProperty(item, "chunkId"),
+            ArtefactId = ParseGuidProperty(item, "artefactId"),
+            TenantId = ReadIntProperty(item, "tenantId"),
+            ProjectId = ReadIntProperty(item, "projectId"),
+            SourceEntityType = ReadStringProperty(item, "sourceEntityType"),
+            SourceEntityId = ReadStringProperty(item, "sourceEntityId"),
+            SourceVersionId = ReadStringProperty(item, "sourceVersionId"),
+            Title = ReadStringProperty(item, "title"),
+            IsStale = item.TryGetProperty("isStale", out var staleElement) && staleElement.ValueKind == JsonValueKind.True,
+            Distance = distance,
+            VectorSimilarity = Math.Clamp(1d - distance, 0d, 1d)
+        });
+    }
+
+    return matches;
+}
+
+static async Task<HttpResponseMessage> PostJsonAsync(HttpClient httpClient, string requestUri, object payload)
+{
+    var json = JsonSerializer.Serialize(payload);
+    using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+    return await httpClient.PostAsync(requestUri, content);
+}
+
+static Guid ParseGuidProperty(JsonElement item, string propertyName)
+    => Guid.TryParse(ReadStringProperty(item, propertyName), out var value) ? value : Guid.Empty;
+
+static int ReadIntProperty(JsonElement item, string propertyName)
+{
+    if (!item.TryGetProperty(propertyName, out var value))
+        return 0;
+
+    if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var parsed))
+        return parsed;
+
+    return int.TryParse(value.ToString(), out parsed) ? parsed : 0;
+}
+
+static string ReadStringProperty(JsonElement item, string propertyName)
+    => item.TryGetProperty(propertyName, out var value) ? value.ToString() : string.Empty;
+
+static string BuildWeaviateDogfoodCollectionName(string dogfoodRunId)
+{
+    var hash = ComputeSha256(dogfoodRunId)[..12];
+    return $"IronDevDogfoodMemoryChunks{hash}";
+}
+
+static string ResolveWeaviateEndpoint()
+{
+    var envEndpoint = Environment.GetEnvironmentVariable("IRONDEV_WEAVIATE_ENDPOINT");
+    if (!string.IsNullOrWhiteSpace(envEndpoint))
+        return envEndpoint;
+
+    var repoRoot = FindRepositoryRoot();
+    foreach (var path in new[]
+    {
+        Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
+        Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+    })
+    {
+        var endpoint = TryReadNestedString(path, "Weaviate", "Endpoint");
+        if (!string.IsNullOrWhiteSpace(endpoint))
+            return endpoint;
+    }
+
+    return "http://localhost:8080";
+}
+
 static async Task<CliProjectContext?> ResolveProjectAsync(IDbConnectionFactory connectionFactory, string projectName)
 {
     using var connection = connectionFactory.CreateConnection();
@@ -1006,6 +1468,21 @@ static string? TryReadConnectionString(string path, string name)
     using var document = JsonDocument.Parse(File.ReadAllText(path));
     if (document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings) &&
         connectionStrings.TryGetProperty(name, out var value))
+    {
+        return value.GetString();
+    }
+
+    return null;
+}
+
+static string? TryReadNestedString(string path, string sectionName, string propertyName)
+{
+    if (!File.Exists(path))
+        return null;
+
+    using var document = JsonDocument.Parse(File.ReadAllText(path));
+    if (document.RootElement.TryGetProperty(sectionName, out var section) &&
+        section.TryGetProperty(propertyName, out var value))
     {
         return value.GetString();
     }
@@ -2057,6 +2534,59 @@ public sealed class MemorySqlVersionExpected
 
 public sealed class MemorySqlVersionSearchResult
 {
+    public string Title { get; init; } = string.Empty;
+    public string SourceEntityType { get; init; } = string.Empty;
+    public string SourceEntityId { get; init; } = string.Empty;
+    public string? SourceVersionId { get; init; }
+    public double FinalScore { get; init; }
+    public double VectorSimilarity { get; init; }
+    public double AuthorityBoost { get; init; }
+    public double SourceTypeBoost { get; init; }
+    public double RecencyBoost { get; init; }
+    public double StalePenalty { get; init; }
+    public bool IsStale { get; init; }
+    public string MatchReason { get; init; } = string.Empty;
+}
+
+public sealed class MemoryWeaviateSqlVersionSmokeResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public string ProjectName { get; init; } = string.Empty;
+    public long DocumentId { get; init; }
+    public long CurrentVersionId { get; init; }
+    public long OldVersionId { get; init; }
+    public string Query { get; init; } = string.Empty;
+    public string WeaviateEndpoint { get; init; } = string.Empty;
+    public string WeaviateCollection { get; init; } = string.Empty;
+    public Guid SemanticTraceId { get; init; }
+    public int SourceLinkCount { get; init; }
+    public bool Passed { get; init; }
+    public IReadOnlyList<WeaviateRawMatch> RawMatches { get; init; } = [];
+    public IReadOnlyList<MemoryWeaviateSqlVersionSearchResult> Results { get; init; } = [];
+}
+
+public sealed class WeaviateRawMatch
+{
+    public int RawWeaviateRank { get; init; }
+    public Guid ChunkId { get; init; }
+    public Guid ArtefactId { get; init; }
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public string SourceEntityType { get; init; } = string.Empty;
+    public string SourceEntityId { get; init; } = string.Empty;
+    public string? SourceVersionId { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public bool IsStale { get; init; }
+    public double Distance { get; init; }
+    public double VectorSimilarity { get; init; }
+}
+
+public sealed class MemoryWeaviateSqlVersionSearchResult
+{
+    public int FinalAuthorityRank { get; init; }
+    public int? RawWeaviateRank { get; init; }
     public string Title { get; init; } = string.Empty;
     public string SourceEntityType { get; init; } = string.Empty;
     public string SourceEntityId { get; init; } = string.Empty;

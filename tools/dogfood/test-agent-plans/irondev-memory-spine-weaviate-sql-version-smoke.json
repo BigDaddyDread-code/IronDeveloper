@@ -1,0 +1,35 @@
+{
+  "test_run_id": "test-irondev-memory-spine-weaviate-sql-version-007",
+  "goal_id": "retrieval-correctness-007",
+  "project_id": 2,
+  "description": "Prove SQL-backed ProjectDocumentVersion chunks can be written to Weaviate, returned by a real nearVector query, and corrected by authority/current/stale ranking when raw vector retrieval prefers the stale version.",
+  "expected": {
+    "weaviate_health": true,
+    "sql_document_exists": true,
+    "chunks_upserted_to_weaviate": true,
+    "raw_weaviate_prefers_stale_version": true,
+    "current_version_primary_after_authority_ranking": true,
+    "source_link_present": true,
+    "semantic_trace_written": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "weaviate_health",
+      "params": {
+        "endpoint": "http://localhost:8080"
+      }
+    },
+    {
+      "step": 2,
+      "action": "weaviate_sql_document_version_smoke",
+      "params": {
+        "project": "IronDev",
+        "query": "first Codex goal builder output",
+        "weaviate_endpoint": "http://localhost:8080"
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}

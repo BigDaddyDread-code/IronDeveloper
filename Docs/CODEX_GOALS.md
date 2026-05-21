@@ -59,6 +59,7 @@ Current smoke slices:
 
 - `irondev-memory-spine-smoke.json` proves Weaviate health and local dogfood document ranking evidence.
 - `irondev-memory-spine-sql-version-smoke.json` proves a SQL-backed project document version can be indexed into semantic memory tables, linked to source context, ranked above a stale version, and traced.
+- `irondev-memory-spine-weaviate-sql-version-smoke.json` proves SQL-backed chunks can be upserted into Weaviate and returned by a real vector query while final authority ranking still corrects stale raw vector preference.
 
 ### Failure Examples
 
