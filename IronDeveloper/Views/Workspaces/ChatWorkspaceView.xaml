@@ -164,14 +164,16 @@
                                   Width="13" Height="13"
                                   Stretch="Uniform"/>
                         </Button>
-                        <Button Style="{StaticResource AppButton.HeaderIcon}"
-                                ToolTip="More conversation actions"
-                                Margin="4,0,0,0">
-                            <Path Data="{StaticResource Icon.Action.More}"
-                                  Fill="{StaticResource Text/Muted}"
-                                  Width="14" Height="14"
-                                  Stretch="Uniform"/>
-                        </Button>
+                        <Button Content="Copy"
+                                Command="{Binding CopyConversationCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                ToolTip="Copy conversation"
+                                Margin="4,0,0,0"/>
+                        <Button Content="Delete"
+                                Command="{Binding DeleteConversationCommand}"
+                                Style="{StaticResource AppButton.CompactGhost}"
+                                Margin="6,0,0,0"
+                                ToolTip="Delete conversation"/>
                     </StackPanel>
                 </controls:WorkspaceHeader.Actions>
             </controls:WorkspaceHeader>

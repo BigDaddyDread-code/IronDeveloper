@@ -1,7 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Data.Models;
@@ -379,6 +381,40 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         {
             IsSaving = false;
         }
+    }
+
+    [RelayCommand]
+    private void CopyDocument()
+    {
+        if (!HasDetail)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {EditTitle}");
+        sb.AppendLine();
+        sb.AppendLine($"- Type: {EditDocumentType}");
+        sb.AppendLine($"- Authority: {EditAuthorityLevel}");
+        sb.AppendLine($"- Status: {EditStatus}");
+        if (!string.IsNullOrWhiteSpace(EditSource))
+            sb.AppendLine($"- Source: {EditSource.Trim()}");
+        if (!string.IsNullOrWhiteSpace(EditAppliesToArea))
+            sb.AppendLine($"- Area: {EditAppliesToArea.Trim()}");
+        if (!string.IsNullOrWhiteSpace(EditTags))
+            sb.AppendLine($"- Tags: {EditTags.Trim()}");
+        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(EditSummary))
+        {
+            sb.AppendLine("## Summary");
+            sb.AppendLine(EditSummary.Trim());
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("## Content");
+        sb.AppendLine(EditContent.Trim());
+
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        SaveStatus = "Knowledge item copied.";
     }
 
     [RelayCommand]

@@ -762,6 +762,59 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void CopyConversation()
+    {
+        if (SelectedSession == null)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {SelectedSession.Title}");
+        sb.AppendLine();
+
+        foreach (var message in Messages)
+        {
+            var role = string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
+                ? "User"
+                : "IronDev";
+            sb.AppendLine($"## {role} - {message.Timestamp:yyyy-MM-dd HH:mm}");
+            sb.AppendLine(message.MessageText);
+            sb.AppendLine();
+        }
+
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        StatusMessage = "Conversation copied.";
+        HasStatusMessage = true;
+    }
+
+    [RelayCommand]
+    private async Task DeleteConversationAsync()
+    {
+        var currentSession = SelectedSession;
+        if (currentSession == null)
+            return;
+
+        var result = MessageBox.Show(
+            $"Delete conversation \"{currentSession.Title}\"?",
+            "Delete Conversation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        await _chatHistoryService.DeleteSessionAsync(currentSession.Id);
+        Sessions.Remove(currentSession);
+        SelectedSession = Sessions.FirstOrDefault();
+        Messages.Clear();
+
+        if (SelectedSession != null)
+            await LoadMessagesAsync(SelectedSession.Id);
+
+        StatusMessage = "Conversation deleted.";
+        HasStatusMessage = true;
+    }
+
+    [RelayCommand]
     private void CancelRename()
     {
         IsRenamingTitle = false;

@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
@@ -528,6 +530,31 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             IsSaving = false;
             OnPropertyChanged(nameof(CanArchiveTicket));
         }
+    }
+
+    [RelayCommand]
+    private void CopySelectedTicket()
+    {
+        if (!HasDetail)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {EditTitle}");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EditStatus}");
+        sb.AppendLine($"- Priority: {EditPriority}");
+        sb.AppendLine($"- Type: {EditTicketType}");
+        sb.AppendLine();
+        AppendSection(sb, "Summary", EditSummary);
+        AppendSection(sb, "Background", EditBackground);
+        AppendSection(sb, "Problem", EditProblem);
+        AppendSection(sb, "Acceptance Criteria", EditAcceptanceCriteria);
+        AppendSection(sb, "Technical Notes", EditTechnicalNotes);
+        AppendSection(sb, "Linked Files", EditLinkedFilePaths);
+        AppendSection(sb, "Linked Symbols", EditLinkedSymbols);
+
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        SaveStatus = "Ticket copied.";
     }
 
     [RelayCommand]

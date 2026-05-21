@@ -19,6 +19,10 @@
                                   Subtitle="Versioned Markdown project artefacts">
             <controls:WorkspaceHeader.Actions>
                 <StackPanel Orientation="Horizontal">
+                    <Button Content="+ New"
+                            Command="{Binding NewDocumentCommand}"
+                            Style="{StaticResource AppButton.Primary}"
+                            Margin="0,0,8,0"/>
                     <Button Content="Refresh"
                             Command="{Binding RefreshCommand}"
                             Style="{StaticResource AppButton.CompactGhost}"/>
@@ -208,6 +212,11 @@
                                             Style="{StaticResource AppButton.CompactGhost}"
                                             Margin="0,0,6,0"
                                             IsEnabled="{Binding HasSelectedVersion}"/>
+                                    <Button Content="Copy"
+                                            Command="{Binding CopyDocumentCommand}"
+                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            Margin="0,0,6,0"
+                                            IsEnabled="{Binding HasSelectedVersion}"/>
                                     <Button Content="Archive"
                                             Command="{Binding ArchiveDocumentCommand}"
                                             Style="{StaticResource AppButton.CompactGhost}"
@@ -265,11 +274,47 @@
                           Visibility="{Binding IsEditing,
                                        Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBox Grid.Row="0"
+                        <Border Grid.Row="0"
+                                Background="#0D1117"
+                                Padding="14,10"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="0,0,0,1"
+                                Visibility="{Binding IsCreatingDocument, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="220"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="TITLE"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding EditorTitle, UpdateSourceTrigger=PropertyChanged}"
+                                             MinHeight="34"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="TYPE"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               Margin="0,0,0,4"/>
+                                    <ComboBox Text="{Binding EditorDocumentType, UpdateSourceTrigger=PropertyChanged}"
+                                              IsEditable="True"
+                                              MinHeight="34">
+                                        <ComboBoxItem Content="DiscussionSummary"/>
+                                        <ComboBoxItem Content="Architecture"/>
+                                        <ComboBoxItem Content="BuildPlan"/>
+                                        <ComboBoxItem Content="DecisionLog"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <TextBox Grid.Row="1"
                                  x:Name="MarkdownEditor"
                                  Text="{Binding EditorMarkdown, UpdateSourceTrigger=PropertyChanged}"
                                  AcceptsReturn="True"
@@ -285,7 +330,7 @@
                                  Padding="16"/>
 
                         <!-- Change summary bar -->
-                        <Border Grid.Row="1"
+                        <Border Grid.Row="2"
                                 Background="#0D1117"
                                 Padding="14,10"
                                 BorderBrush="{StaticResource Border/Subtle}"

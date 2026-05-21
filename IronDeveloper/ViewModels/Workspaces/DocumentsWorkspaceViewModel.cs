@@ -1,7 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Core.Interfaces;
@@ -27,6 +29,9 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
 
     // ── Editor state ──────────────────────────────────────────────────
     [ObservableProperty] private bool _isEditing;
+    [ObservableProperty] private bool _isCreatingDocument;
+    [ObservableProperty] private string _editorTitle = string.Empty;
+    [ObservableProperty] private string _editorDocumentType = "DiscussionSummary";
     [ObservableProperty] private string _editorMarkdown = string.Empty;
     [ObservableProperty] private string _editorChangeSummary = string.Empty;
     [ObservableProperty] private bool _isSavingVersion;
@@ -47,6 +52,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     public bool IsViewMode => !IsEditing;
     public bool HasStatusText => !string.IsNullOrEmpty(StatusText);
     public bool CanSaveVersion => IsEditing
+        && (!IsCreatingDocument || !string.IsNullOrWhiteSpace(EditorTitle))
         && !string.IsNullOrWhiteSpace(EditorMarkdown)
         && !string.IsNullOrWhiteSpace(EditorChangeSummary)
         && !IsSavingVersion;
@@ -89,6 +95,24 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     private async Task RefreshAsync()
         => await LoadDocumentsAsync();
 
+    [RelayCommand]
+    private void NewDocument()
+    {
+        SelectedDocument = null;
+        SelectedVersion = null;
+        VersionHistory.Clear();
+        RenderedHtml = string.Empty;
+        EditorTitle = string.Empty;
+        EditorDocumentType = "DiscussionSummary";
+        EditorMarkdown = "# New discussion document\n\n";
+        EditorChangeSummary = "Initial version";
+        IsCreatingDocument = true;
+        IsEditing = true;
+        StatusText = "Creating a new document.";
+        RefreshComputedState();
+        SaveNewVersionCommand.NotifyCanExecuteChanged();
+    }
+
     // ------------------------------------------------------------------
     // Commands — editor
     // ------------------------------------------------------------------
@@ -98,6 +122,9 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     {
         if (SelectedVersion == null) return;
 
+        IsCreatingDocument = false;
+        EditorTitle = SelectedDocument?.Title ?? string.Empty;
+        EditorDocumentType = SelectedDocument?.DocumentType ?? "DiscussionSummary";
         EditorMarkdown = SelectedVersion.ContentMarkdown;
         EditorChangeSummary = string.Empty;
         IsEditing = true;
@@ -108,6 +135,8 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     private void CancelEditing()
     {
         IsEditing = false;
+        IsCreatingDocument = false;
+        EditorTitle = string.Empty;
         EditorMarkdown = string.Empty;
         EditorChangeSummary = string.Empty;
         RefreshComputedState();
@@ -116,7 +145,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSaveVersion))]
     private async Task SaveNewVersionAsync()
     {
-        if (SelectedDocument == null || string.IsNullOrWhiteSpace(EditorMarkdown)
+        if (string.IsNullOrWhiteSpace(EditorMarkdown)
             || string.IsNullOrWhiteSpace(EditorChangeSummary))
             return;
 
@@ -125,6 +154,38 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
 
         try
         {
+            if (IsCreatingDocument)
+            {
+                if (string.IsNullOrWhiteSpace(EditorTitle))
+                {
+                    StatusText = "Title is required.";
+                    HasError = true;
+                    return;
+                }
+
+                var document = await _documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+                {
+                    ProjectId = _activeProjectId,
+                    Title = EditorTitle.Trim(),
+                    DocumentType = string.IsNullOrWhiteSpace(EditorDocumentType) ? "DiscussionSummary" : EditorDocumentType,
+                    ContentMarkdown = EditorMarkdown,
+                    ChangeSummary = EditorChangeSummary,
+                    CreatedBy = "IronDev"
+                });
+
+                IsEditing = false;
+                IsCreatingDocument = false;
+                EditorMarkdown = string.Empty;
+                EditorChangeSummary = string.Empty;
+                await LoadDocumentsAsync();
+                SelectedDocument = Documents.FirstOrDefault(d => d.Id == document.Id);
+                StatusText = $"Created \"{document.Title}\".";
+                return;
+            }
+
+            if (SelectedDocument == null)
+                return;
+
             var newVersion = await _documentService.AddVersionAsync(new AddProjectDocumentVersionRequest
             {
                 DocumentId      = SelectedDocument.Id,
@@ -171,6 +232,24 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
         await LoadDocumentsAsync();
     }
 
+    [RelayCommand]
+    private void CopyDocument()
+    {
+        if (SelectedDocument == null || SelectedVersion == null)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {SelectedDocument.Title}");
+        sb.AppendLine();
+        sb.AppendLine($"- Type: {SelectedDocument.DocumentType}");
+        sb.AppendLine($"- Status: {SelectedDocument.Status}");
+        sb.AppendLine($"- Version: {SelectedVersion.VersionLabel}");
+        sb.AppendLine();
+        sb.AppendLine(SelectedVersion.ContentMarkdown.Trim());
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        StatusText = "Document copied.";
+    }
+
     // ------------------------------------------------------------------
     // Property change handlers
     // ------------------------------------------------------------------
@@ -178,6 +257,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
     partial void OnSelectedDocumentChanged(ProjectDocumentItemViewModel? value)
     {
         IsEditing = false;
+        IsCreatingDocument = false;
         VersionHistory.Clear();
         SelectedVersion = null;
         RenderedHtml = string.Empty;
@@ -204,7 +284,16 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject
         => RefreshComputedState();
 
     partial void OnEditorMarkdownChanged(string value)
-        => RefreshComputedState();
+    {
+        RefreshComputedState();
+        SaveNewVersionCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnEditorTitleChanged(string value)
+    {
+        RefreshComputedState();
+        SaveNewVersionCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnEditorChangeSummaryChanged(string value)
     {

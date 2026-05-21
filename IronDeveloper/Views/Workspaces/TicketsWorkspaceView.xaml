@@ -518,6 +518,14 @@
                                                         Command="{Binding CancelEditCommand}"
                                                         Style="{StaticResource AppButton.CompactGhost}"
                                                         Margin="0,0,8,0"/>
+                                                <Button Content="Copy"
+                                                        Command="{Binding CopySelectedTicketCommand}"
+                                                        Style="{StaticResource AppButton.CompactGhost}"
+                                                        Margin="0,0,8,0"/>
+                                                <Button Content="Archive"
+                                                        Command="{Binding ArchiveSelectedTicketCommand}"
+                                                        Style="{StaticResource AppButton.CompactGhost}"
+                                                        Margin="0,0,8,0"/>
                                                 <Button Content="Build This"
                                                         Command="{Binding BuildSelectedTicketProposalCommand}"
                                                         Style="{StaticResource AppButton.CompactGhost}"
