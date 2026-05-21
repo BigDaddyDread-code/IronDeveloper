@@ -68,6 +68,46 @@ function Convert-ToBool {
     return [System.Convert]::ToBoolean($Value)
 }
 
+function Invoke-ChatSendStep {
+    param(
+        [string]$Message,
+        [string]$Workspace,
+        [string]$StepLogPath,
+        [string]$PreviousAssistant,
+        [string]$PreviousUser
+    )
+
+    $arguments = @(
+        "run", "--no-build", "--project", $runnerProject, "--",
+        "chat", "send", $Message,
+        "--workspace", $Workspace,
+        "--dogfood-run-id", $RunId,
+        "--project-id", ([string]$plan.project_id)
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($PreviousAssistant)) {
+        $arguments += @("--previous-assistant", $PreviousAssistant)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PreviousUser)) {
+        $arguments += @("--previous-user", $PreviousUser)
+    }
+
+    $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $StepLogPath
+    $parsed = $null
+    if ($capture.exit_code -eq 0) {
+        $parsed = $capture.output | ConvertFrom-Json
+    }
+
+    return [ordered]@{
+        arguments = $arguments
+        command_text = "dotnet " + ($arguments -join " ")
+        exit_code = $capture.exit_code
+        parsed = $parsed
+        output = $capture.output
+    }
+}
+
 $earlyStop = Convert-ToBool $plan.early_stop_on_failure $true
 
 foreach ($step in $plan.steps) {
@@ -88,39 +128,117 @@ foreach ($step in $plan.steps) {
             "chat_send" {
                 $message = [string]$params.message
                 $workspace = if ([string]::IsNullOrWhiteSpace($params.workspace)) { "Chat" } else { [string]$params.workspace }
-                $arguments = @(
-                    "run", "--no-build", "--project", $runnerProject, "--",
-                    "chat", "send", $message,
-                    "--workspace", $workspace,
-                    "--dogfood-run-id", $RunId,
-                    "--project-id", ([string]$plan.project_id)
-                )
-
+                $previousAssistant = ""
+                $previousUser = ""
                 if ($params.previous_from_step) {
                     $previousStep = [int]$params.previous_from_step
                     $previous = $previousResponses[$previousStep]
                     if ($previous) {
-                        $arguments += @("--previous-assistant", [string]$previous.assistantResponse)
-                        $arguments += @("--previous-user", [string]$previous.userMessage)
+                        $previousAssistant = [string]$previous.assistantResponse
+                        $previousUser = [string]$previous.userMessage
                     }
                 }
 
-                $commandText = "dotnet " + ($arguments -join " ")
-                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
-                $exitCode = $capture.exit_code
+                $chat = Invoke-ChatSendStep -Message $message -Workspace $workspace -StepLogPath $stepLogPath -PreviousAssistant $previousAssistant -PreviousUser $previousUser
+                $commandText = $chat.command_text
+                $exitCode = $chat.exit_code
                 if ($exitCode -ne 0) {
                     $status = "FAILED"
                     $summary = "chat_send exited with code $exitCode"
                     break
                 }
 
-                $parsed = $capture.output | ConvertFrom-Json
+                $parsed = $chat.parsed
                 $previousResponses[$stepNumber] = $parsed
                 $summary = "Intent=$($parsed.intent); Response=$($parsed.assistantResponse)"
 
                 if ($params.expect_intent -and $parsed.intent -ne [string]$params.expect_intent) {
                     $status = "FAILED"
                     $summary = "Expected intent $($params.expect_intent), actual $($parsed.intent)"
+                }
+            }
+
+            "chat_conversation" {
+                $workspace = if ([string]::IsNullOrWhiteSpace($params.workspace)) { "Chat" } else { [string]$params.workspace }
+                $maxTurns = if ($params.max_turns) { [int]$params.max_turns } elseif ($plan.max_turns) { [int]$plan.max_turns } else { 6 }
+                $expectedIntent = [string]$params.expected_outcome.intent
+                $facts = @($params.facts_to_reveal)
+                $messages = New-Object System.Collections.Generic.List[string]
+                if ($params.messages) {
+                    foreach ($message in @($params.messages)) {
+                        if (-not [string]::IsNullOrWhiteSpace([string]$message)) {
+                            $messages.Add([string]$message) | Out-Null
+                        }
+                    }
+                } elseif (-not [string]::IsNullOrWhiteSpace([string]$params.initial_message)) {
+                    $messages.Add([string]$params.initial_message) | Out-Null
+                }
+
+                if ($messages.Count -eq 0) {
+                    $status = "FAILED"
+                    $summary = "chat_conversation requires messages or initial_message."
+                    break
+                }
+
+                $conversationLog = New-Object System.Collections.Generic.List[object]
+                $previousAssistant = ""
+                $previousUser = ""
+                $factIndex = 0
+                $lastParsed = $null
+                $commandText = "chat_conversation via dotnet run --no-build --project $runnerProject"
+
+                for ($turn = 1; $turn -le $maxTurns; $turn++) {
+                    if ($turn -le $messages.Count) {
+                        $message = $messages[$turn - 1]
+                    } elseif ($factIndex -lt $facts.Count) {
+                        $message = [string]$facts[$factIndex]
+                        $factIndex++
+                    } else {
+                        break
+                    }
+
+                    $turnLogPath = Join-Path $logRoot ("step-{0:000}-{1}-turn-{2:00}.log" -f $stepNumber, $action, $turn)
+                    $chat = Invoke-ChatSendStep -Message $message -Workspace $workspace -StepLogPath $turnLogPath -PreviousAssistant $previousAssistant -PreviousUser $previousUser
+                    if ($chat.exit_code -ne 0) {
+                        $status = "FAILED"
+                        $summary = "chat_conversation turn $turn exited with code $($chat.exit_code)"
+                        $exitCode = $chat.exit_code
+                        break
+                    }
+
+                    $lastParsed = $chat.parsed
+                    $conversationLog.Add([ordered]@{
+                        turn = $turn
+                        user_message = $message
+                        intent = $lastParsed.intent
+                        assistant_response = $lastParsed.assistantResponse
+                        log_path = $turnLogPath
+                    }) | Out-Null
+
+                    $previousUser = $message
+                    $previousAssistant = [string]$lastParsed.assistantResponse
+
+                    if (-not [string]::IsNullOrWhiteSpace($expectedIntent) -and $lastParsed.intent -eq $expectedIntent) {
+                        break
+                    }
+                }
+
+                $conversationLog | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $stepLogPath -Encoding UTF8
+                $parsed = [ordered]@{
+                    turns = $conversationLog
+                    final = $lastParsed
+                }
+
+                if ($status -ne "FAILED") {
+                    if ($null -eq $lastParsed) {
+                        $status = "FAILED"
+                        $summary = "chat_conversation produced no turns."
+                    } elseif (-not [string]::IsNullOrWhiteSpace($expectedIntent) -and $lastParsed.intent -ne $expectedIntent) {
+                        $status = "FAILED"
+                        $summary = "Expected final intent $expectedIntent, actual $($lastParsed.intent)"
+                    } else {
+                        $summary = "Conversation final intent=$($lastParsed.intent); turns=$($conversationLog.Count)"
+                    }
                 }
             }
 

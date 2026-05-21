@@ -1,0 +1,68 @@
+[
+  {
+    "Id": "20260521215546001-agent-model-settings",
+    "Project": "IronDev",
+    "Title": "AGENT_MODEL_SETTINGS",
+    "DocumentType": "Architecture",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\AGENT_MODEL_SETTINGS.md",
+    "DogfoodRunId": "TestAgentConversationCheck",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215546001-agent-model-settings.md",
+    "CreatedUtc": "2026-05-21T21:55:46.0185723+00:00"
+  },
+  {
+    "Id": "20260521215545985-test-agent-spec",
+    "Project": "IronDev",
+    "Title": "TEST_AGENT_SPEC",
+    "DocumentType": "Architecture",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\TEST_AGENT_SPEC.md",
+    "DogfoodRunId": "TestAgentConversationCheck",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215545985-test-agent-spec.md",
+    "CreatedUtc": "2026-05-21T21:55:46.0001244+00:00"
+  },
+  {
+    "Id": "20260521215528085-model-role-settings-direction",
+    "Project": "IronDev",
+    "Title": "Model Role Settings Direction",
+    "DocumentType": "Discussion",
+    "Authority": "WorkingDraft",
+    "Source": "SeedBaseline",
+    "DogfoodRunId": "",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528085-model-role-settings-direction.md",
+    "CreatedUtc": "2026-05-21T21:55:28.0858398+00:00"
+  },
+  {
+    "Id": "20260521215528085-test-agent-contract",
+    "Project": "IronDev",
+    "Title": "Test Agent Contract",
+    "DocumentType": "Architecture",
+    "Authority": "WorkingDraft",
+    "Source": "SeedBaseline",
+    "DogfoodRunId": "",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528085-test-agent-contract.md",
+    "CreatedUtc": "2026-05-21T21:55:28.0850753+00:00"
+  },
+  {
+    "Id": "20260521215528084-headless-dogfood-loop",
+    "Project": "IronDev",
+    "Title": "Headless Dogfood Loop",
+    "DocumentType": "Discussion",
+    "Authority": "WorkingDraft",
+    "Source": "SeedBaseline",
+    "DogfoodRunId": "",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528084-headless-dogfood-loop.md",
+    "CreatedUtc": "2026-05-21T21:55:28.0843294+00:00"
+  },
+  {
+    "Id": "20260521215528072-irondev-alpha-stabilisation-principles",
+    "Project": "IronDev",
+    "Title": "IronDev Alpha Stabilisation Principles",
+    "DocumentType": "Architecture",
+    "Authority": "Accepted",
+    "Source": "SeedBaseline",
+    "DogfoodRunId": "",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528072-irondev-alpha-stabilisation-principles.md",
+    "CreatedUtc": "2026-05-21T21:55:28.0738589+00:00"
+  }
+]

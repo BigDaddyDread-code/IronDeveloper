@@ -32,6 +32,18 @@ function Invoke-RunnerJson {
     return ($output | Out-String | ConvertFrom-Json)
 }
 
+function New-SmokeDoc {
+    param(
+        [string]$Path
+    )
+
+    @"
+# Smoke Imported Note
+
+The Test Agent should use cheap model execution and report concise results back to Codex.
+"@ | Set-Content -LiteralPath $Path -Encoding UTF8
+}
+
 Write-Host "Building headless runner..."
 dotnet build $runnerProject -p:UseSharedCompilation=false -nr:false | Out-Host
 if ($LASTEXITCODE -ne 0) {
@@ -79,11 +91,44 @@ if (-not $SkipReplayBatch) {
 
     $summaryPath = Join-Path $runsRoot "$RunId-replay\replay\runner-summary.json"
     $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
-    Assert-True ($summary.TotalCases -eq 10) "Replay did not run requested repetition count."
-    Assert-True ($summary.Failed -eq 0) "Replay had failures."
+Assert-True ($summary.TotalCases -eq 10) "Replay did not run requested repetition count."
+Assert-True ($summary.Failed -eq 0) "Replay had failures."
 }
 
-Write-Host "Smoke 4: failure package command creates Markdown and JSON..."
+Write-Host "Smoke 4: docs command cleans, imports, and searches local knowledge..."
+$docsStore = Join-Path $runsRoot "$RunId-docs-store"
+$docsClean = Invoke-RunnerJson @(
+    "docs", "clean",
+    "--project", "IronDev",
+    "--store-root", $docsStore,
+    "--force"
+)
+Assert-True ($docsClean.SeededDocuments -ge 4) "docs clean did not seed baseline docs."
+Assert-True ($docsClean.TotalDocuments -ge 4) "docs clean did not return baseline documents."
+
+$smokeDocPath = Join-Path $docsStore "smoke-note.md"
+New-SmokeDoc -Path $smokeDocPath
+$docsImport = Invoke-RunnerJson @(
+    "docs", "import",
+    "--file", $smokeDocPath,
+    "--project", "IronDev",
+    "--store-root", $docsStore,
+    "--type", "Discussion",
+    "--authority", "WorkingDraft",
+    "--dogfood-run-id", $RunId
+)
+Assert-True ($docsImport.TotalDocuments -ge 5) "docs import did not add a document."
+
+$docsSearch = Invoke-RunnerJson @(
+    "docs", "search",
+    "cheap model execution",
+    "--project", "IronDev",
+    "--store-root", $docsStore,
+    "--take", "3"
+)
+Assert-True (@($docsSearch.Matches).Count -gt 0) "docs search returned no matches."
+
+Write-Host "Smoke 5: failure package command creates Markdown and JSON..."
 $failureRunId = "$RunId-failure"
 $failureReplay = Join-Path $runsRoot "$failureRunId\replay"
 New-Item -ItemType Directory -Force -Path $failureReplay | Out-Null

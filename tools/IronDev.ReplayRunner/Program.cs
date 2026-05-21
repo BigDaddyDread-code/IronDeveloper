@@ -10,12 +10,27 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | chat send <message> [...] | failure latest --for-codex [...]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | chat send <message> [...] | docs <clean|import|list|show|search> [...] | failure latest --for-codex [...]");
     return 2;
 }
 
 if (IsCommand(args, "chat", "send"))
     return await HandleChatSendCommandAsync(args, options);
+
+if (IsCommand(args, "docs", "clean"))
+    return await HandleDocsCleanCommandAsync(args, options);
+
+if (IsCommand(args, "docs", "import"))
+    return await HandleDocsImportCommandAsync(args, options);
+
+if (IsCommand(args, "docs", "list"))
+    return await HandleDocsListCommandAsync(args, options);
+
+if (IsCommand(args, "docs", "show"))
+    return await HandleDocsShowCommandAsync(args, options);
+
+if (IsCommand(args, "docs", "search"))
+    return await HandleDocsSearchCommandAsync(args, options);
 
 if (IsCommand(args, "failure", "latest"))
     return await HandleFailureLatestCommandAsync(args, options);
@@ -270,6 +285,209 @@ static async Task<int> HandleFailureLatestCommandAsync(string[] args, JsonSerial
     return 0;
 }
 
+static async Task<int> HandleDocsCleanCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var store = GetDogfoodKnowledgeStore(args);
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var force = HasFlag(args, "--force");
+    if (!force)
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner docs clean --project IronDev --force [--store-root path]");
+        Console.Error.WriteLine("Clean archives local dogfood knowledge docs before seeding a fresh baseline. It does not delete SQL data.");
+        return 2;
+    }
+
+    var projectRoot = GetKnowledgeProjectRoot(store, project);
+    var docsRoot = Path.Combine(projectRoot, "docs");
+    var archiveRoot = Path.Combine(projectRoot, "archive", DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
+    var archived = 0;
+
+    if (Directory.Exists(docsRoot))
+    {
+        var existing = Directory.GetFiles(docsRoot, "*.md", SearchOption.TopDirectoryOnly);
+        if (existing.Length > 0)
+        {
+            Directory.CreateDirectory(archiveRoot);
+            foreach (var file in existing)
+            {
+                File.Move(file, Path.Combine(archiveRoot, Path.GetFileName(file)), overwrite: true);
+                archived++;
+            }
+        }
+    }
+
+    Directory.CreateDirectory(docsRoot);
+    var seeded = await SeedIronDevBaselineDocsAsync(project, docsRoot);
+    var index = await BuildKnowledgeIndexAsync(project, docsRoot);
+    await WriteKnowledgeIndexAsync(projectRoot, index, options);
+
+    Console.WriteLine(JsonSerializer.Serialize(new DocsCleanResult
+    {
+        Project = project,
+        StoreRoot = store,
+        DocsRoot = docsRoot,
+        ArchiveRoot = archived > 0 ? archiveRoot : string.Empty,
+        ArchivedDocuments = archived,
+        SeededDocuments = seeded,
+        TotalDocuments = index.Count,
+        Message = "Local dogfood knowledge cleaned by archive-and-seed. SQL project data was not modified."
+    }, options));
+
+    return 0;
+}
+
+static async Task<int> HandleDocsImportCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var source = ReadOption(args, "--file") ?? ReadOption(args, "--path") ?? ReadPositionalText(args, 2);
+    if (string.IsNullOrWhiteSpace(source))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner docs import --file <path> [--project IronDev] [--type Discussion] [--title title] [--authority Draft]");
+        return 2;
+    }
+
+    var sourcePath = Path.GetFullPath(source);
+    if (!File.Exists(sourcePath))
+    {
+        Console.Error.WriteLine($"Document file not found: {sourcePath}");
+        return 2;
+    }
+
+    var store = GetDogfoodKnowledgeStore(args);
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var documentType = ReadOption(args, "--type") ?? "Discussion";
+    var title = ReadOption(args, "--title") ?? Path.GetFileNameWithoutExtension(sourcePath);
+    var authority = ReadOption(args, "--authority") ?? "Draft";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? string.Empty;
+    var content = await File.ReadAllTextAsync(sourcePath);
+    var docsRoot = EnsureKnowledgeDocsRoot(store, project);
+    var imported = await WriteKnowledgeDocumentAsync(docsRoot, new KnowledgeDocumentWrite
+    {
+        Project = project,
+        Title = title,
+        DocumentType = documentType,
+        Authority = authority,
+        Source = sourcePath,
+        DogfoodRunId = dogfoodRunId,
+        Content = content
+    });
+
+    var projectRoot = GetKnowledgeProjectRoot(store, project);
+    var index = await BuildKnowledgeIndexAsync(project, docsRoot);
+    await WriteKnowledgeIndexAsync(projectRoot, index, options);
+
+    Console.WriteLine(JsonSerializer.Serialize(new DocsImportResult
+    {
+        Project = project,
+        Id = imported.Id,
+        Title = imported.Title,
+        DocumentType = imported.DocumentType,
+        Authority = imported.Authority,
+        Path = imported.Path,
+        TotalDocuments = index.Count
+    }, options));
+
+    return 0;
+}
+
+static async Task<int> HandleDocsListCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var store = GetDogfoodKnowledgeStore(args);
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var docsRoot = EnsureKnowledgeDocsRoot(store, project);
+    var index = await BuildKnowledgeIndexAsync(project, docsRoot);
+    await WriteKnowledgeIndexAsync(GetKnowledgeProjectRoot(store, project), index, options);
+
+    Console.WriteLine(JsonSerializer.Serialize(new DocsListResult
+    {
+        Project = project,
+        StoreRoot = store,
+        Documents = index
+    }, options));
+
+    return 0;
+}
+
+static async Task<int> HandleDocsShowCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var id = ReadOption(args, "--id") ?? ReadPositionalText(args, 2);
+    if (string.IsNullOrWhiteSpace(id))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner docs show <id> [--project IronDev]");
+        return 2;
+    }
+
+    var store = GetDogfoodKnowledgeStore(args);
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var docsRoot = EnsureKnowledgeDocsRoot(store, project);
+    var index = await BuildKnowledgeIndexAsync(project, docsRoot);
+    var document = index.FirstOrDefault(doc =>
+        string.Equals(doc.Id, id, StringComparison.OrdinalIgnoreCase) ||
+        doc.Title.Contains(id, StringComparison.OrdinalIgnoreCase));
+
+    if (document is null)
+    {
+        Console.Error.WriteLine($"Document not found: {id}");
+        return 1;
+    }
+
+    Console.WriteLine(JsonSerializer.Serialize(new DocsShowResult
+    {
+        Project = project,
+        Document = document,
+        Content = await File.ReadAllTextAsync(document.Path)
+    }, options));
+
+    return 0;
+}
+
+static async Task<int> HandleDocsSearchCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var query = ReadOption(args, "--query") ?? ReadPositionalText(args, 2);
+    if (string.IsNullOrWhiteSpace(query))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner docs search <query> [--project IronDev] [--take 5]");
+        return 2;
+    }
+
+    var take = int.TryParse(ReadOption(args, "--take"), out var parsedTake) ? parsedTake : 5;
+    var store = GetDogfoodKnowledgeStore(args);
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var docsRoot = EnsureKnowledgeDocsRoot(store, project);
+    var index = await BuildKnowledgeIndexAsync(project, docsRoot);
+    var terms = query.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var matches = new List<DocsSearchMatch>();
+
+    foreach (var document in index)
+    {
+        var content = await File.ReadAllTextAsync(document.Path);
+        var body = StripFrontmatter(content);
+        var haystack = $"{document.Title}\n{document.DocumentType}\n{document.Authority}\n{body}";
+        var score = terms.Sum(term => CountOccurrences(haystack, term));
+        if (score <= 0)
+            continue;
+
+        matches.Add(new DocsSearchMatch
+        {
+            Document = document,
+            Score = score,
+            Snippet = BuildSearchSnippet(body, terms)
+        });
+    }
+
+    Console.WriteLine(JsonSerializer.Serialize(new DocsSearchResult
+    {
+        Project = project,
+        Query = query,
+        Matches = matches
+            .OrderByDescending(match => match.Score)
+            .ThenBy(match => match.Document.Title, StringComparer.OrdinalIgnoreCase)
+            .Take(take)
+            .ToArray()
+    }, options));
+
+    return 0;
+}
+
 static ReplayFailure? FindLatestReplayFailure(string runsRoot, string? selectedRunId)
 {
     var resultFiles = Directory
@@ -462,6 +680,255 @@ static string? ReadOption(string[] args, string optionName)
 
 static bool HasFlag(string[] args, string optionName)
     => args.Any(arg => string.Equals(arg, optionName, StringComparison.OrdinalIgnoreCase));
+
+static string GetDogfoodKnowledgeStore(string[] args)
+    => Path.GetFullPath(ReadOption(args, "--store-root") ?? Path.Combine("tools", "dogfood", "knowledge"));
+
+static string GetKnowledgeProjectRoot(string storeRoot, string project)
+    => Path.Combine(storeRoot, Slugify(project));
+
+static string EnsureKnowledgeDocsRoot(string storeRoot, string project)
+{
+    var docsRoot = Path.Combine(GetKnowledgeProjectRoot(storeRoot, project), "docs");
+    Directory.CreateDirectory(docsRoot);
+    return docsRoot;
+}
+
+static async Task<int> SeedIronDevBaselineDocsAsync(string project, string docsRoot)
+{
+    if (!project.Contains("IronDev", StringComparison.OrdinalIgnoreCase))
+        return 0;
+
+    var docs = new[]
+    {
+        new KnowledgeDocumentWrite
+        {
+            Project = project,
+            Title = "IronDev Alpha Stabilisation Principles",
+            DocumentType = "Architecture",
+            Authority = "Accepted",
+            Source = "SeedBaseline",
+            Content = """
+            # IronDev Alpha Stabilisation Principles
+
+            SQL Server remains the canonical source of truth. Weaviate and local dogfood stores are retrieval/index layers only.
+
+            The stabilisation branch should prefer bug fixes, traceability, and dogfood loops over broad new product surface.
+            Unsafe writes, code changes, and destructive actions must pause at review or approval gates.
+            """
+        },
+        new KnowledgeDocumentWrite
+        {
+            Project = project,
+            Title = "Headless Dogfood Loop",
+            DocumentType = "Discussion",
+            Authority = "WorkingDraft",
+            Source = "SeedBaseline",
+            Content = """
+            # Headless Dogfood Loop
+
+            IronDev needs a command-line control port so Codex can reset a test world, run messy prompt variants, inspect traces, patch IronDev, and run again.
+
+            Dogfood runs are identified by DogfoodRunId. Replay tests assert behaviour such as route, action blocking, dry-run safety, and generated draft artefacts rather than exact prose.
+            """
+        },
+        new KnowledgeDocumentWrite
+        {
+            Project = project,
+            Title = "Test Agent Contract",
+            DocumentType = "Architecture",
+            Authority = "WorkingDraft",
+            Source = "SeedBaseline",
+            Content = """
+            # Test Agent Contract
+
+            The Test Agent is cheap and literal. It executes structured plans, captures logs, and returns concise reports to Codex.
+
+            It does not patch code or invent fixes. It may continue a bounded conversation when the test plan provides scenario facts and expected outcomes.
+            """
+        },
+        new KnowledgeDocumentWrite
+        {
+            Project = project,
+            Title = "Model Role Settings Direction",
+            DocumentType = "Discussion",
+            Authority = "WorkingDraft",
+            Source = "SeedBaseline",
+            Content = """
+            # Model Role Settings Direction
+
+            IronDev should choose models by agent role. Cheap models should handle routing, summarisation, and Test Agent execution. Stronger models should handle planning, difficult failure diagnosis, and code proposal review.
+
+            Every trace should record agent role, provider, model, and DogfoodRunId when present.
+            """
+        }
+    };
+
+    foreach (var doc in docs)
+        await WriteKnowledgeDocumentAsync(docsRoot, doc);
+
+    return docs.Length;
+}
+
+static async Task<KnowledgeDocument> WriteKnowledgeDocumentAsync(string docsRoot, KnowledgeDocumentWrite write)
+{
+    Directory.CreateDirectory(docsRoot);
+    var id = $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Slugify(write.Title)}";
+    var path = Path.Combine(docsRoot, $"{id}.md");
+    var markdown = $"""
+    ---
+    id: {id}
+    project: {write.Project}
+    title: {write.Title}
+    document_type: {write.DocumentType}
+    authority: {write.Authority}
+    source: {write.Source}
+    dogfood_run_id: {write.DogfoodRunId}
+    created_utc: {DateTimeOffset.UtcNow:o}
+    ---
+
+    {write.Content.Trim()}
+    """;
+
+    await File.WriteAllTextAsync(path, markdown);
+
+    return new KnowledgeDocument
+    {
+        Id = id,
+        Project = write.Project,
+        Title = write.Title,
+        DocumentType = write.DocumentType,
+        Authority = write.Authority,
+        Source = write.Source,
+        DogfoodRunId = write.DogfoodRunId,
+        Path = path,
+        CreatedUtc = DateTimeOffset.UtcNow
+    };
+}
+
+static async Task<List<KnowledgeDocument>> BuildKnowledgeIndexAsync(string project, string docsRoot)
+{
+    var documents = new List<KnowledgeDocument>();
+    if (!Directory.Exists(docsRoot))
+        return documents;
+
+    foreach (var file in Directory.GetFiles(docsRoot, "*.md", SearchOption.TopDirectoryOnly))
+    {
+        var text = await File.ReadAllTextAsync(file);
+        var frontmatter = ParseFrontmatter(text);
+        var created = DateTimeOffset.TryParse(GetMeta(frontmatter, "created_utc"), out var parsedCreated)
+            ? parsedCreated
+            : File.GetCreationTimeUtc(file);
+
+        documents.Add(new KnowledgeDocument
+        {
+            Id = GetMeta(frontmatter, "id", Path.GetFileNameWithoutExtension(file)),
+            Project = GetMeta(frontmatter, "project", project),
+            Title = GetMeta(frontmatter, "title", Path.GetFileNameWithoutExtension(file)),
+            DocumentType = GetMeta(frontmatter, "document_type", "Discussion"),
+            Authority = GetMeta(frontmatter, "authority", "Draft"),
+            Source = GetMeta(frontmatter, "source", "Unknown"),
+            DogfoodRunId = GetMeta(frontmatter, "dogfood_run_id", string.Empty),
+            Path = Path.GetFullPath(file),
+            CreatedUtc = created
+        });
+    }
+
+    return documents
+        .OrderByDescending(document => document.CreatedUtc)
+        .ThenBy(document => document.Title, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
+
+static async Task WriteKnowledgeIndexAsync(string projectRoot, IReadOnlyList<KnowledgeDocument> index, JsonSerializerOptions options)
+{
+    Directory.CreateDirectory(projectRoot);
+    await File.WriteAllTextAsync(
+        Path.Combine(projectRoot, "knowledge-index.json"),
+        JsonSerializer.Serialize(index, options));
+}
+
+static Dictionary<string, string> ParseFrontmatter(string text)
+{
+    var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    using var reader = new StringReader(text);
+    if (!string.Equals(reader.ReadLine(), "---", StringComparison.Ordinal))
+        return result;
+
+    string? line;
+    while ((line = reader.ReadLine()) is not null)
+    {
+        if (string.Equals(line, "---", StringComparison.Ordinal))
+            break;
+
+        var separator = line.IndexOf(':', StringComparison.Ordinal);
+        if (separator <= 0)
+            continue;
+
+        result[line[..separator].Trim()] = line[(separator + 1)..].Trim();
+    }
+
+    return result;
+}
+
+static string StripFrontmatter(string text)
+{
+    using var reader = new StringReader(text);
+    if (!string.Equals(reader.ReadLine(), "---", StringComparison.Ordinal))
+        return text;
+
+    string? line;
+    while ((line = reader.ReadLine()) is not null)
+    {
+        if (string.Equals(line, "---", StringComparison.Ordinal))
+            return reader.ReadToEnd().Trim();
+    }
+
+    return text;
+}
+
+static string GetMeta(IReadOnlyDictionary<string, string> metadata, string key, string fallback = "")
+    => metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+        ? value
+        : fallback;
+
+static int CountOccurrences(string text, string term)
+{
+    var count = 0;
+    var index = 0;
+    while ((index = text.IndexOf(term, index, StringComparison.OrdinalIgnoreCase)) >= 0)
+    {
+        count++;
+        index += term.Length;
+    }
+
+    return count;
+}
+
+static string BuildSearchSnippet(string content, IReadOnlyList<string> terms)
+{
+    var firstHit = terms
+        .Select(term => content.IndexOf(term, StringComparison.OrdinalIgnoreCase))
+        .Where(index => index >= 0)
+        .DefaultIfEmpty(0)
+        .Min();
+
+    var start = Math.Max(0, firstHit - 80);
+    var length = Math.Min(content.Length - start, 260);
+    return string.Join(' ', content.Substring(start, length)
+        .Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+}
+
+static string Slugify(string value)
+{
+    var chars = value
+        .Trim()
+        .ToLowerInvariant()
+        .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+        .ToArray();
+    var compact = string.Join('-', new string(chars).Split('-', StringSplitOptions.RemoveEmptyEntries));
+    return string.IsNullOrWhiteSpace(compact) ? "document" : compact[..Math.Min(compact.Length, 72)];
+}
 
 static async Task<ReplayCaseRun> ExecuteCaseAsync(ChatCommandRouter router, ReplayCase replayCase)
 {
@@ -1098,4 +1565,79 @@ public readonly record struct ReplayAssertion(bool Passed, string FailureReason)
 {
     public static ReplayAssertion Pass() => new(true, string.Empty);
     public static ReplayAssertion Fail(string reason) => new(false, reason);
+}
+
+public sealed class KnowledgeDocumentWrite
+{
+    public string Project { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string DocumentType { get; init; } = "Discussion";
+    public string Authority { get; init; } = "Draft";
+    public string Source { get; init; } = string.Empty;
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string Content { get; init; } = string.Empty;
+}
+
+public sealed class KnowledgeDocument
+{
+    public string Id { get; init; } = string.Empty;
+    public string Project { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string DocumentType { get; init; } = string.Empty;
+    public string Authority { get; init; } = string.Empty;
+    public string Source { get; init; } = string.Empty;
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
+    public DateTimeOffset CreatedUtc { get; init; }
+}
+
+public sealed class DocsCleanResult
+{
+    public string Project { get; init; } = string.Empty;
+    public string StoreRoot { get; init; } = string.Empty;
+    public string DocsRoot { get; init; } = string.Empty;
+    public string ArchiveRoot { get; init; } = string.Empty;
+    public int ArchivedDocuments { get; init; }
+    public int SeededDocuments { get; init; }
+    public int TotalDocuments { get; init; }
+    public string Message { get; init; } = string.Empty;
+}
+
+public sealed class DocsImportResult
+{
+    public string Project { get; init; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string DocumentType { get; init; } = string.Empty;
+    public string Authority { get; init; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
+    public int TotalDocuments { get; init; }
+}
+
+public sealed class DocsListResult
+{
+    public string Project { get; init; } = string.Empty;
+    public string StoreRoot { get; init; } = string.Empty;
+    public IReadOnlyList<KnowledgeDocument> Documents { get; init; } = [];
+}
+
+public sealed class DocsShowResult
+{
+    public string Project { get; init; } = string.Empty;
+    public KnowledgeDocument Document { get; init; } = new();
+    public string Content { get; init; } = string.Empty;
+}
+
+public sealed class DocsSearchResult
+{
+    public string Project { get; init; } = string.Empty;
+    public string Query { get; init; } = string.Empty;
+    public IReadOnlyList<DocsSearchMatch> Matches { get; init; } = [];
+}
+
+public sealed class DocsSearchMatch
+{
+    public KnowledgeDocument Document { get; init; } = new();
+    public int Score { get; init; }
+    public string Snippet { get; init; } = string.Empty;
 }

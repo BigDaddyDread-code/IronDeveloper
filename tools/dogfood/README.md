@@ -271,10 +271,59 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 The local executor currently supports:
 
 - `chat_send`
+- `chat_conversation`
 - `replay_run`
 - `failure_package`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
+
+Conversation-mode sample:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\bookseller-conversation-storage.json `
+  -RunId TestAgentConversation-001 `
+  -Json
+```
+
+## Local IronDev dogfood knowledge
+
+The headless runner has a local file-backed knowledge store for dogfood documents. This is intentionally archive-and-seed; it does not delete SQL project data.
+
+Clean and seed the IronDev dogfood knowledge baseline:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs clean --project IronDev --force
+```
+
+Import an outside ChatGPT/Grok note:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs import `
+  --file .\Docs\TEST_AGENT_SPEC.md `
+  --project IronDev `
+  --type Architecture `
+  --authority WorkingDraft
+```
+
+Search local dogfood knowledge:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs search "cheap model test agent" --project IronDev
+```
+
+The local store lives under:
+
+```text
+tools/dogfood/knowledge/IronDev
+```
+
+Model-role defaults are documented in:
+
+```text
+Docs/AGENT_MODEL_SETTINGS.md
+tools/dogfood/agent-model-settings.sample.json
+```
 
 ## Vague prompt pressure
 
