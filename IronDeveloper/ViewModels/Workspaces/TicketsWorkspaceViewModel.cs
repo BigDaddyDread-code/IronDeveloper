@@ -65,31 +65,33 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
     private string _editTestsManualTests      = string.Empty;
     private string _editTestsRegressionTests  = string.Empty;
     private string _editTestsBuildValidation  = string.Empty;
+    private bool _suppressTicketDirtyTracking;
+    private bool _hasUnsavedTicketChanges;
 
     public string EditTestsUnitTests
     {
         get => _editTestsUnitTests;
-        set { if (SetProperty(ref _editTestsUnitTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsUnitTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsIntegrationTests
     {
         get => _editTestsIntegrationTests;
-        set { if (SetProperty(ref _editTestsIntegrationTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsIntegrationTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsManualTests
     {
         get => _editTestsManualTests;
-        set { if (SetProperty(ref _editTestsManualTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsManualTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsRegressionTests
     {
         get => _editTestsRegressionTests;
-        set { if (SetProperty(ref _editTestsRegressionTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsRegressionTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsBuildValidation
     {
         get => _editTestsBuildValidation;
-        set { if (SetProperty(ref _editTestsBuildValidation, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsBuildValidation, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
 
     /// <summary>Full formatted test plan — used by AI builder context.</summary>
@@ -99,8 +101,21 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
     // EditTechnicalNotes is set (including direct assignment from load methods).
     partial void OnEditTechnicalNotesChanged(string value)
     {
-        SyncTechnicalNotesToTests();
+        MarkTicketDirty();
+        if (!_suppressTicketDirtyTracking)
+            SyncTechnicalNotesToTests();
     }
+
+    partial void OnEditTitleChanged(string value) => MarkTicketDirty();
+    partial void OnEditStatusChanged(string value) => MarkTicketDirty();
+    partial void OnEditPriorityChanged(string value) => MarkTicketDirty();
+    partial void OnEditTicketTypeChanged(string value) => MarkTicketDirty();
+    partial void OnEditSummaryChanged(string value) => MarkTicketDirty();
+    partial void OnEditBackgroundChanged(string value) => MarkTicketDirty();
+    partial void OnEditProblemChanged(string value) => MarkTicketDirty();
+    partial void OnEditAcceptanceCriteriaChanged(string value) => MarkTicketDirty();
+    partial void OnEditLinkedFilePathsChanged(string value) => MarkTicketDirty();
+    partial void OnEditLinkedSymbolsChanged(string value) => MarkTicketDirty();
 
     // ── Implementation Plan ──
     [ObservableProperty] private TicketDetailTab _activeTab = TicketDetailTab.Overview;
@@ -146,7 +161,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
-    public bool HasDirtyEditState => IsEditing && HasDetail && !IsSaving && !IsDraftMode;
+    public bool HasDirtyEditState => _hasUnsavedTicketChanges && HasDetail && !IsSaving && !IsDraftMode;
     public string DirtyEditMessage => "This ticket has unsaved edit text. Leave Tickets and discard those changes?";
 
     // ── Draft Ticket state ────────────────────────────────────────────────────
@@ -299,62 +314,80 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
     private void LoadTicketIntoEditor(TicketItem item)
     {
-        IsNewTicket = item.Id == 0;
-        IsEditing = true;
-        HasDetail = true;
-        ActiveTab = TicketDetailTab.Overview;
-
-        EditId                   = item.Id;
-        EditTitle                = item.Title;
-        EditStatus               = item.Status;
-        EditPriority             = item.Priority;
-        EditTicketType           = item.TicketType;
-        EditSummary              = item.Summary ?? string.Empty;
-        EditBackground           = item.Background ?? string.Empty;
-        EditProblem              = item.Problem ?? string.Empty;
-        EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
-        EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(item.UnitTests) || !string.IsNullOrWhiteSpace(item.IntegrationTests))
+        _suppressTicketDirtyTracking = true;
+        try
         {
-            _editTestsUnitTests        = item.UnitTests ?? string.Empty;
-            _editTestsIntegrationTests = item.IntegrationTests ?? string.Empty;
-            _editTestsManualTests      = item.ManualTests ?? string.Empty;
-            _editTestsRegressionTests  = item.RegressionTests ?? string.Empty;
-            _editTestsBuildValidation  = item.BuildValidation ?? string.Empty;
-            SyncTestsToTechnicalNotes();
-        }
-        else
-        {
-            SyncTechnicalNotesToTests();
-        }
-        EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
-        EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+            IsNewTicket = item.Id == 0;
+            IsEditing = true;
+            HasDetail = true;
+            ActiveTab = TicketDetailTab.Overview;
 
-        SaveStatus = string.Empty;
+            EditId                   = item.Id;
+            EditTitle                = item.Title;
+            EditStatus               = item.Status;
+            EditPriority             = item.Priority;
+            EditTicketType           = item.TicketType;
+            EditSummary              = item.Summary ?? string.Empty;
+            EditBackground           = item.Background ?? string.Empty;
+            EditProblem              = item.Problem ?? string.Empty;
+            EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
+            EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(item.UnitTests) || !string.IsNullOrWhiteSpace(item.IntegrationTests))
+            {
+                _editTestsUnitTests        = item.UnitTests ?? string.Empty;
+                _editTestsIntegrationTests = item.IntegrationTests ?? string.Empty;
+                _editTestsManualTests      = item.ManualTests ?? string.Empty;
+                _editTestsRegressionTests  = item.RegressionTests ?? string.Empty;
+                _editTestsBuildValidation  = item.BuildValidation ?? string.Empty;
+                SyncTestsToTechnicalNotes();
+            }
+            else
+            {
+                SyncTechnicalNotesToTests();
+            }
+            EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
+            EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+
+            SaveStatus = string.Empty;
+        }
+        finally
+        {
+            _suppressTicketDirtyTracking = false;
+            ClearTicketDirtyState();
+        }
     }
 
     private async Task LoadTicketIntoEditorAsync(TicketItem item)
     {
-        IsNewTicket = false;
-        IsEditing = true;
-        HasDetail = true;
-        ActiveTab = TicketDetailTab.Overview;
+        _suppressTicketDirtyTracking = true;
+        try
+        {
+            IsNewTicket = false;
+            IsEditing = true;
+            HasDetail = true;
+            ActiveTab = TicketDetailTab.Overview;
 
-        EditId                   = item.Id;
-        EditTitle                = item.Title;
-        EditStatus               = item.Status;
-        EditPriority             = item.Priority;
-        EditTicketType           = item.TicketType;
-        EditSummary              = item.Summary ?? string.Empty;
-        EditBackground           = item.Background ?? string.Empty;
-        EditProblem              = item.Problem ?? string.Empty;
-        EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
-        EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(item.UnitTests)) { _editTestsUnitTests = item.UnitTests; SyncTestsToTechnicalNotes(); } else { SyncTechnicalNotesToTests(); }
-        EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
-        EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+            EditId                   = item.Id;
+            EditTitle                = item.Title;
+            EditStatus               = item.Status;
+            EditPriority             = item.Priority;
+            EditTicketType           = item.TicketType;
+            EditSummary              = item.Summary ?? string.Empty;
+            EditBackground           = item.Background ?? string.Empty;
+            EditProblem              = item.Problem ?? string.Empty;
+            EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
+            EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(item.UnitTests)) { _editTestsUnitTests = item.UnitTests; SyncTestsToTechnicalNotes(); } else { SyncTechnicalNotesToTests(); }
+            EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
+            EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
 
-        SaveStatus = string.Empty;
+            SaveStatus = string.Empty;
+        }
+        finally
+        {
+            _suppressTicketDirtyTracking = false;
+            ClearTicketDirtyState();
+        }
 
         // Load plan for this ticket
         await RefreshPlanAsync(item.Id);
@@ -420,6 +453,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
         EditLinkedSymbols      = string.Empty;
 
         SaveStatus = string.Empty;
+        ClearTicketDirtyState();
     }
 
     // ── Save ────────────────────────────────────────────────────────────────
@@ -469,6 +503,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
             var savedId = await _ticketService.SaveTicketAsync(ticket);
             EditId = savedId;
             IsNewTicket = false;
+            ClearTicketDirtyState();
 
             SaveStatus = "Saved ✓";
             await RefreshListAsync();
@@ -954,6 +989,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
         {
             ClearEditor();
         }
+        ClearTicketDirtyState();
     }
 
     // ── Prefill from chat (called by ShellViewModel) ────────────────────────
@@ -1757,6 +1793,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
         ClearBuildState();
         ClearBuildReadiness();
+        ClearTicketDirtyState();
     }
 
     private async Task RefreshBuildReadinessAsync()
@@ -1934,6 +1971,30 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
         AppendSection(parts, SecRegression,  _editTestsRegressionTests);
         AppendSection(parts, SecBuild,       _editTestsBuildValidation);
         EditTechnicalNotes = parts.ToString().TrimEnd();
+    }
+
+    private void MarkTicketDirty()
+    {
+        if (_suppressTicketDirtyTracking)
+            return;
+
+        if (!HasDetail || !IsEditing)
+            return;
+
+        if (_hasUnsavedTicketChanges)
+            return;
+
+        _hasUnsavedTicketChanges = true;
+        OnPropertyChanged(nameof(HasDirtyEditState));
+    }
+
+    private void ClearTicketDirtyState()
+    {
+        if (!_hasUnsavedTicketChanges)
+            return;
+
+        _hasUnsavedTicketChanges = false;
+        OnPropertyChanged(nameof(HasDirtyEditState));
     }
 
     private void ClearTestSubFields()
