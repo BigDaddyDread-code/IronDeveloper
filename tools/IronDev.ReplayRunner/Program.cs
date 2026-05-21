@@ -10,12 +10,15 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | chat send <message> [--workspace Chat] [--previous-assistant text] [--previous-user text] [--dogfood-run-id id]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | chat send <message> [...] | failure latest --for-codex [...]");
     return 2;
 }
 
 if (IsCommand(args, "chat", "send"))
     return await HandleChatSendCommandAsync(args, options);
+
+if (IsCommand(args, "failure", "latest"))
+    return await HandleFailureLatestCommandAsync(args, options);
 
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
@@ -216,6 +219,215 @@ static async Task<int> HandleChatSendCommandAsync(string[] args, JsonSerializerO
 
     Console.WriteLine(JsonSerializer.Serialize(result, options));
     return 0;
+}
+
+static async Task<int> HandleFailureLatestCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    if (!HasFlag(args, "--for-codex"))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner failure latest --for-codex [--runs-root path] [--run-id id]");
+        return 2;
+    }
+
+    var runsRoot = Path.GetFullPath(ReadOption(args, "--runs-root") ?? Path.Combine("tools", "dogfood", "runs"));
+    if (!Directory.Exists(runsRoot))
+    {
+        Console.Error.WriteLine($"Dogfood runs root not found: {runsRoot}");
+        return 3;
+    }
+
+    var selectedRunId = ReadOption(args, "--run-id");
+    var failure = FindLatestReplayFailure(runsRoot, selectedRunId);
+    if (failure is null)
+    {
+        Console.Error.WriteLine("No failed replay result found.");
+        return 1;
+    }
+
+    var runRoot = Directory.GetParent(failure.ResultFile.DirectoryName!)!.FullName;
+    var package = BuildFailurePackage(failure, runRoot);
+    var jsonPath = Path.Combine(runRoot, "failure-package.json");
+    var markdownPath = Path.Combine(runRoot, "failure-package.md");
+    await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(package, options));
+    await File.WriteAllTextAsync(markdownPath, BuildFailurePackageMarkdown(package));
+
+    var result = new FailurePackageCommandResult
+    {
+        DogfoodRunId = package.DogfoodRunId,
+        ScenarioId = package.ScenarioId,
+        CaseId = package.CaseId,
+        Prompt = package.Prompt,
+        ExpectedIntent = package.ExpectedIntent,
+        ActualIntent = package.ActualIntent,
+        FailureReason = package.FailureReason,
+        JsonPath = jsonPath,
+        MarkdownPath = markdownPath,
+        ReproCommand = package.ReproCommand,
+        ValidationCommand = package.ValidationCommand
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return 0;
+}
+
+static ReplayFailure? FindLatestReplayFailure(string runsRoot, string? selectedRunId)
+{
+    var resultFiles = Directory
+        .EnumerateFiles(runsRoot, "replay-results.json", SearchOption.AllDirectories)
+        .Select(path => new FileInfo(path))
+        .Where(file => string.IsNullOrWhiteSpace(selectedRunId) ||
+                       file.FullName.Contains($"{Path.DirectorySeparatorChar}{selectedRunId}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+                       file.FullName.Contains($"{Path.AltDirectorySeparatorChar}{selectedRunId}{Path.AltDirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(file => file.LastWriteTimeUtc);
+
+    foreach (var file in resultFiles)
+    {
+        var text = File.ReadAllText(file.FullName);
+        var results = JsonSerializer.Deserialize<List<ReplayCaseResult>>(text, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }) ?? [];
+        var failed = results.FirstOrDefault(result => !result.Passed);
+        if (failed is null)
+            continue;
+
+        var replayDirectory = file.DirectoryName!;
+        var planPath = Path.Combine(replayDirectory, "replay-plan.json");
+        ReplayCase? replayCase = null;
+        ReplayPlan? plan = null;
+        if (File.Exists(planPath))
+        {
+            plan = JsonSerializer.Deserialize<ReplayPlan>(
+                File.ReadAllText(planPath),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            replayCase = plan?.Cases.FirstOrDefault(item => string.Equals(item.CaseId, failed.CaseId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return new ReplayFailure(file, failed, replayCase, plan);
+    }
+
+    return null;
+}
+
+static FailurePackage BuildFailurePackage(ReplayFailure failure, string runRoot)
+{
+    var result = failure.Result;
+    var replayCase = failure.ReplayCase;
+    var plan = failure.Plan;
+    var replayPlanPath = Path.Combine(failure.ResultFile.DirectoryName!, "replay-plan.json");
+    var seed = replayCase?.Seed;
+    var reps = plan?.Cases.Count > 0 ? plan.Cases.Count : 1;
+    var reproCommand = seed is null
+        ? $"dotnet run --project .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj -- \"{replayPlanPath}\""
+        : $"powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\dogfood\\Start-BookSellerReplay.ps1 -RunId {result.DogfoodRunId}-repro -Scenario .\\tools\\dogfood\\dogfood-scenarios\\BookSellerMvp.json -Reps {reps} -DryRun -StopOnFailure -Seed {seed} -RunnerCommand \"dotnet run --project .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj --\"";
+
+    return new FailurePackage
+    {
+        DogfoodRunId = result.DogfoodRunId,
+        ScenarioId = replayCase?.ScenarioId ?? plan?.ScenarioId ?? "Unknown",
+        Step = replayCase?.Step,
+        PromptVariantId = result.CaseId,
+        CaseId = result.CaseId,
+        CaseName = result.Name,
+        Workspace = result.Workspace,
+        Prompt = result.Prompt,
+        ExpectedIntent = result.ExpectedIntent,
+        ActualIntent = result.ActualIntent,
+        AllowsProseResponse = result.AllowsProseResponse,
+        RequiresAction = result.RequiresAction,
+        ContextReference = result.ContextReference,
+        DraftCountMode = result.DraftCountMode,
+        FailureReason = result.FailureReason,
+        MatchedSignals = result.MatchedSignals,
+        ResultPath = failure.ResultFile.FullName,
+        ReplayPlanPath = replayPlanPath,
+        RunRoot = runRoot,
+        LikelyAreas = InferLikelyAreas(result).ToArray(),
+        ReproCommand = reproCommand,
+        ValidationCommand = "dotnet build .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj -p:UseSharedCompilation=false -nr:false; dotnet test .\\IronDev.IntegrationTests\\IronDev.IntegrationTests.csproj --no-restore --filter \"ChatCommandRouter_CreateTickets_IsActionFirst|ChatCommandRouter_SaveDecision_IsActionFirst|ChatCommandRouter_CreatePlan_IsActionFirst|ChatCommandRouter_BuildTicketQuestion_AllowsProse\" -p:UseSharedCompilation=false -nr:false",
+        SafetyRules = [
+            "Replay defaults to dry-run.",
+            "Do not modify target project files while repairing routing failures.",
+            "Patch deterministic routing/context logic before weakening assertions.",
+            "Rerun the same seed before running chaos batches."
+        ],
+        CreatedAtUtc = DateTimeOffset.UtcNow
+    };
+}
+
+static IEnumerable<string> InferLikelyAreas(ReplayCaseResult result)
+{
+    if (result.AllowsProseResponse && result.ExpectedIntent.Contains("Ticket", StringComparison.OrdinalIgnoreCase))
+    {
+        yield return "IronDev.Infrastructure/Services/ChatIntentParser.cs";
+        yield return "IronDev.Infrastructure/Services/ChatCommandRouter.cs";
+        yield break;
+    }
+
+    if (result.ExpectedIntent.Contains("Discussion", StringComparison.OrdinalIgnoreCase) ||
+        result.ExpectedIntent.Contains("Document", StringComparison.OrdinalIgnoreCase))
+    {
+        yield return "IronDev.Infrastructure/Services/ChatCommandRouter.cs";
+        yield break;
+    }
+
+    yield return "tools/IronDev.ReplayRunner/Program.cs";
+}
+
+static string BuildFailurePackageMarkdown(FailurePackage package)
+{
+    return $"""
+    # Codex Failure Package
+
+    DogfoodRunId: {package.DogfoodRunId}
+    ScenarioId: {package.ScenarioId}
+    CaseId: {package.CaseId}
+    Step: {package.Step?.ToString() ?? "Unknown"}
+    Workspace: {package.Workspace}
+
+    ## Prompt
+
+    ```text
+    {package.Prompt}
+    ```
+
+    ## Expected
+
+    ```text
+    Intent: {package.ExpectedIntent}
+    ```
+
+    ## Actual
+
+    ```text
+    Intent: {package.ActualIntent}
+    AllowsProseResponse: {package.AllowsProseResponse}
+    RequiresAction: {package.RequiresAction}
+    ContextReference: {package.ContextReference}
+    DraftCountMode: {package.DraftCountMode}
+    Failure: {package.FailureReason}
+    ```
+
+    ## Likely Areas
+
+    {string.Join(Environment.NewLine, package.LikelyAreas.Select(area => $"- {area}"))}
+
+    ## Repro
+
+    ```powershell
+    {package.ReproCommand}
+    ```
+
+    ## Validation
+
+    ```powershell
+    {package.ValidationCommand}
+    ```
+
+    ## Safety Rules
+
+    {string.Join(Environment.NewLine, package.SafetyRules.Select(rule => $"- {rule}"))}
+    """;
 }
 
 static string ReadPositionalText(string[] args, int startIndex)
@@ -633,6 +845,9 @@ public sealed class ReplayCase
     public string DogfoodRunId { get; init; } = string.Empty;
     public string CaseId { get; init; } = string.Empty;
     public int CaseNumber { get; init; }
+    public string ScenarioId { get; init; } = string.Empty;
+    public int? Seed { get; init; }
+    public int? Step { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Workspace { get; init; } = "Chat";
     public string Prompt { get; init; } = string.Empty;
@@ -797,6 +1012,55 @@ public sealed class CliChatSendResult
     public bool SimulatedBlocked { get; init; }
     public string BlockReason { get; init; } = string.Empty;
     public ReplayActionResult ActionResult { get; init; } = new();
+    public DateTimeOffset CreatedAtUtc { get; init; }
+}
+
+public sealed record ReplayFailure(
+    FileInfo ResultFile,
+    ReplayCaseResult Result,
+    ReplayCase? ReplayCase,
+    ReplayPlan? Plan);
+
+public sealed class FailurePackageCommandResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string ScenarioId { get; init; } = string.Empty;
+    public string CaseId { get; init; } = string.Empty;
+    public string Prompt { get; init; } = string.Empty;
+    public string ExpectedIntent { get; init; } = string.Empty;
+    public string ActualIntent { get; init; } = string.Empty;
+    public string FailureReason { get; init; } = string.Empty;
+    public string JsonPath { get; init; } = string.Empty;
+    public string MarkdownPath { get; init; } = string.Empty;
+    public string ReproCommand { get; init; } = string.Empty;
+    public string ValidationCommand { get; init; } = string.Empty;
+}
+
+public sealed class FailurePackage
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string ScenarioId { get; init; } = string.Empty;
+    public int? Step { get; init; }
+    public string PromptVariantId { get; init; } = string.Empty;
+    public string CaseId { get; init; } = string.Empty;
+    public string CaseName { get; init; } = string.Empty;
+    public string Workspace { get; init; } = string.Empty;
+    public string Prompt { get; init; } = string.Empty;
+    public string ExpectedIntent { get; init; } = string.Empty;
+    public string ActualIntent { get; init; } = string.Empty;
+    public bool AllowsProseResponse { get; init; }
+    public bool RequiresAction { get; init; }
+    public string ContextReference { get; init; } = string.Empty;
+    public string DraftCountMode { get; init; } = string.Empty;
+    public string FailureReason { get; init; } = string.Empty;
+    public IReadOnlyList<string> MatchedSignals { get; init; } = [];
+    public string ResultPath { get; init; } = string.Empty;
+    public string ReplayPlanPath { get; init; } = string.Empty;
+    public string RunRoot { get; init; } = string.Empty;
+    public IReadOnlyList<string> LikelyAreas { get; init; } = [];
+    public string ReproCommand { get; init; } = string.Empty;
+    public string ValidationCommand { get; init; } = string.Empty;
+    public IReadOnlyList<string> SafetyRules { get; init; } = [];
     public DateTimeOffset CreatedAtUtc { get; init; }
 }
 

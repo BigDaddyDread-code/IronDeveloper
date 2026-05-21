@@ -197,6 +197,52 @@ dryRun
 
 That JSON is the Codex feedback contract: send a prompt, read IronDev's response, decide the next prompt or patch, and run again.
 
+## Failure package for Codex
+
+When a replay assertion fails, generate a Codex handoff package from the latest failed replay result:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  failure latest `
+  --for-codex `
+  --runs-root .\tools\dogfood\runs
+```
+
+For a specific run:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  failure latest `
+  --for-codex `
+  --runs-root .\tools\dogfood\runs `
+  --run-id BookSellerLoop-001-iter-0007
+```
+
+The command writes:
+
+```text
+failure-package.json
+failure-package.md
+```
+
+The package includes expected intent, actual intent, failed prompt, likely files, repro command, validation command, and safety rules.
+
+## Headless CLI smoke test
+
+Run the first smoke suite for the headless control port:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Test-HeadlessCliSmoke.ps1
+```
+
+It verifies:
+
+- `chat send` returns JSON feedback.
+- a vague prompt returns a clarification-style response.
+- a follow-up answer routes to a dry-run action.
+- a 10-case replay batch passes.
+- an intentional replay failure produces `failure-package.json` and `failure-package.md`.
+
 ## Vague prompt pressure
 
 The BookSeller scenario intentionally includes vague and contradictory prompts such as:
