@@ -280,6 +280,7 @@ The local executor currently supports:
 - `coverage_report`
 - `format_check`
 - `package_audit`
+- `code_standards_check`
 - `weaviate_health`
 - `docs_search`
 - `sql_document_version_smoke`
@@ -299,6 +300,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 Every report includes a `trace` envelope, per-step trace data, command list, evidence paths, and `report_schema_valid`.
+
+Run the Alpha code standards gate:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-code-standards-alpha.json `
+  -RunId IronDevCodeStandardsAlpha-009 `
+  -Json
+```
+
+The code standards gate is deterministic and non-repairing. It runs build/test/format/audit steps plus code-shape checks such as large file and large method warnings. Warnings are allowed in Alpha; the purpose is to give Codex a structured quality report before widening the branch.
 
 Run the first Memory Spine smoke while Weaviate is running:
 

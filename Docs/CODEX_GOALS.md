@@ -62,6 +62,23 @@ Current smoke slices:
 - `irondev-memory-spine-weaviate-sql-version-smoke.json` proves SQL-backed chunks can be upserted into Weaviate and returned by a real vector query while final authority ranking still corrects stale raw vector preference.
 - `irondev-memory-spine-cross-project-smoke.json` proves raw Weaviate retrieval can prefer a similar BookSeller document while IronDev project context rejects it before final ranking.
 
+## Goal 1B: Code Standards Alpha
+
+Goal id: `code-standards-alpha-009`
+
+Before adding more memory-spine ribs, prove the Test Agent can run a deterministic quality gate and return structured findings for Codex.
+
+Expected:
+
+- build passes
+- focused router tests pass
+- format check passes
+- package audit passes
+- large harness/code-shape warnings are reported, not hidden
+- proof-boundary docs exist for the dogfood slices
+
+Warnings are allowed at this stage. The purpose is to prevent silent codebase drift and identify extraction candidates before broadening the branch.
+
 ### Failure Examples
 
 - old architecture outranks current decision

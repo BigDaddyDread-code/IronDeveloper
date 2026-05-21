@@ -148,6 +148,178 @@ function Test-StringContains {
         $Value.IndexOf($Expected, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
+function Get-CSharpMethodMeasurements {
+    param(
+        [string]$Path
+    )
+
+    $lines = Get-Content -LiteralPath $Path
+    $measurements = New-Object System.Collections.Generic.List[object]
+    $insideMethod = $false
+    $methodName = ""
+    $startLine = 0
+    $braceDepth = 0
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = [string]$lines[$i]
+        if (-not $insideMethod) {
+            $match = [regex]::Match(
+                $line,
+                '^\s*(?:public|private|internal|protected|static|async|\s)+\s*(?:Task(?:<[^>]+>)?|void|int|string|bool|[A-Za-z0-9_<>?]+)\s+([A-Za-z0-9_]+)\s*\(')
+            if (-not $match.Success) {
+                continue
+            }
+
+            $insideMethod = $true
+            $methodName = $match.Groups[1].Value
+            $startLine = $i + 1
+            $braceDepth = 0
+        }
+
+        $opens = ([regex]::Matches($line, '\{')).Count
+        $closes = ([regex]::Matches($line, '\}')).Count
+        $braceDepth += $opens - $closes
+
+        if ($insideMethod -and $braceDepth -le 0 -and $i + 1 -gt $startLine) {
+            $measurements.Add([ordered]@{
+                method = $methodName
+                start_line = $startLine
+                end_line = $i + 1
+                line_count = ($i + 1) - $startLine + 1
+            }) | Out-Null
+            $insideMethod = $false
+            $methodName = ""
+            $startLine = 0
+            $braceDepth = 0
+        }
+    }
+
+    return $measurements.ToArray()
+}
+
+function Invoke-CodeStandardsCheck {
+    param(
+        $Params,
+        [string]$StepLogPath
+    )
+
+    $targetValues = @()
+    if ($Params.targets) {
+        foreach ($target in $Params.targets) {
+            $targetValues += [string]$target
+        }
+    } elseif ($Params.target) {
+        $targetValues += [string]$Params.target
+    } else {
+        $targetValues += "tools/IronDev.ReplayRunner/Program.cs"
+    }
+
+    $maxFileLines = if ($Params.max_file_lines) { [int]$Params.max_file_lines } else { 1800 }
+    $maxMethodLines = if ($Params.max_method_lines) { [int]$Params.max_method_lines } else { 180 }
+    $requireProofBoundaryDocs = Convert-ToBool $Params.require_proof_boundary_docs $true
+    $failOnWarnings = Convert-ToBool $Params.fail_on_warnings $false
+
+    $findings = New-Object System.Collections.Generic.List[object]
+    $metrics = New-Object System.Collections.Generic.List[object]
+
+    foreach ($target in $targetValues) {
+        $path = Resolve-TargetPath $target
+        if (-not (Test-Path -LiteralPath $path)) {
+            $findings.Add([ordered]@{
+                severity = "error"
+                area = $target
+                rule = "TargetExists"
+                message = "Code standards target does not exist."
+                recommendation = "Fix the test plan target path or add the expected file."
+            }) | Out-Null
+            continue
+        }
+
+        $lineCount = @(Get-Content -LiteralPath $path).Count
+        $metrics.Add([ordered]@{
+            path = $path
+            line_count = $lineCount
+        }) | Out-Null
+
+        if ($lineCount -gt $maxFileLines) {
+            $findings.Add([ordered]@{
+                severity = "warning"
+                area = $path
+                rule = "LargeFile"
+                message = "File has $lineCount lines; threshold is $maxFileLines."
+                recommendation = "Extract stable dogfood helpers after proof slices stabilise."
+            }) | Out-Null
+        }
+
+        if ([System.IO.Path]::GetExtension($path).Equals(".cs", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $methods = Get-CSharpMethodMeasurements -Path $path
+            foreach ($method in $methods) {
+                if ([int]$method.line_count -gt $maxMethodLines) {
+                    $findings.Add([ordered]@{
+                        severity = "warning"
+                        area = $path
+                        rule = "LargeMethod"
+                        message = "Method $($method.method) has $($method.line_count) lines; threshold is $maxMethodLines."
+                        recommendation = "Extract focused services or command handlers once this smoke path is stable."
+                    }) | Out-Null
+                }
+            }
+        }
+    }
+
+    if ($requireProofBoundaryDocs) {
+        $docsToCheck = @(
+            (Join-Path $repoRoot "Docs\CODEX_GOALS.md"),
+            (Join-Path $repoRoot "Docs\TEST_AGENT_SPEC.md"),
+            (Join-Path $repoRoot "tools\dogfood\README.md")
+        )
+
+        foreach ($docPath in $docsToCheck) {
+            $text = if (Test-Path -LiteralPath $docPath) { Get-Content -LiteralPath $docPath -Raw } else { "" }
+            $hasProofLanguage = $text -match '(?i)proves?|not yet|does not yet|still|boundary|evidence'
+            if (-not $hasProofLanguage) {
+                $findings.Add([ordered]@{
+                    severity = "warning"
+                    area = $docPath
+                    rule = "ProofBoundaryDocumentation"
+                    message = "Document does not clearly state proof boundaries or evidence language."
+                    recommendation = "Add what this proves and what it does not prove before broadening the memory spine."
+                }) | Out-Null
+            }
+        }
+    }
+
+    $errors = @($findings | Where-Object { $_.severity -eq "error" })
+    $warnings = @($findings | Where-Object { $_.severity -eq "warning" })
+    $qualityStatus = "passed"
+    if ($errors.Count -gt 0) {
+        $qualityStatus = "failed"
+    } elseif ($warnings.Count -gt 0) {
+        $qualityStatus = "warning"
+    }
+
+    $result = [ordered]@{
+        goal = "code-standards-alpha"
+        status = $qualityStatus
+        build = "not_run_by_this_step"
+        tests = "not_run_by_this_step"
+        format = "not_run_by_this_step"
+        package_audit = "not_run_by_this_step"
+        metrics = @($metrics.ToArray())
+        findings = @($findings.ToArray())
+        warning_count = $warnings.Count
+        error_count = $errors.Count
+    }
+
+    $json = $result | ConvertTo-Json -Depth 20
+    Set-Content -LiteralPath $StepLogPath -Value $json -Encoding UTF8
+
+    return [ordered]@{
+        result = $result
+        exit_code = if ($errors.Count -gt 0 -or ($failOnWarnings -and $warnings.Count -gt 0)) { 1 } else { 0 }
+    }
+}
+
 function Invoke-ChatSendStep {
     param(
         [string]$Message,
@@ -802,6 +974,22 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "code_standards_check" {
+                $commandText = "Invoke-CodeStandardsCheck"
+                $quality = Invoke-CodeStandardsCheck -Params $params -StepLogPath $stepLogPath
+                $exitCode = [int]$quality.exit_code
+                $parsed = $quality.result
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "Code standards gate failed; errors=$($parsed.error_count), warnings=$($parsed.warning_count)"
+                } elseif ([int]$parsed.warning_count -gt 0) {
+                    $summary = "Code standards gate passed with warnings=$($parsed.warning_count)"
+                } else {
+                    $summary = "Code standards gate passed with no findings"
+                }
+            }
+
             default {
                 $status = "SKIPPED_UNSUPPORTED"
                 $summary = "Unsupported Test Agent action: $action"
@@ -810,8 +998,8 @@ foreach ($step in $plan.steps) {
         }
     } catch {
         $status = "FAILED"
-        $summary = $_.Exception.Message
-        Set-Content -LiteralPath $stepLogPath -Value $summary -Encoding UTF8
+        $summary = "$($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"
+        Set-Content -LiteralPath $stepLogPath -Value ($summary + "`n" + ($_.ScriptStackTrace | Out-String)) -Encoding UTF8
     }
 
     $duration = [int]((Get-Date) - $stepStarted).TotalSeconds
