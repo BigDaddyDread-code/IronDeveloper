@@ -138,6 +138,16 @@ function Test-ReportShape {
     }
 }
 
+function Test-StringContains {
+    param(
+        [string]$Value,
+        [string]$Expected
+    )
+
+    return -not [string]::IsNullOrWhiteSpace($Expected) -and
+        $Value.IndexOf($Expected, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+}
+
 function Invoke-ChatSendStep {
     param(
         [string]$Message,
@@ -370,6 +380,116 @@ foreach ($step in $plan.steps) {
 
                 $parsed = $capture.output | ConvertFrom-Json
                 $summary = "Failure package: $($parsed.markdownPath)"
+            }
+
+            "weaviate_health" {
+                $endpoint = if ($params.endpoint) { [string]$params.endpoint } else { "http://localhost:8080" }
+                $metaUri = "$endpoint/v1/meta"
+                $schemaUri = "$endpoint/v1/schema"
+                $commandText = "Invoke-RestMethod $metaUri; Invoke-RestMethod $schemaUri"
+
+                $health = [ordered]@{
+                    endpoint = $endpoint
+                    meta_uri = $metaUri
+                    schema_uri = $schemaUri
+                    meta_ok = $false
+                    schema_ok = $false
+                    version = $null
+                    collections = $null
+                }
+
+                try {
+                    $meta = Invoke-RestMethod -Uri $metaUri -Method Get -TimeoutSec 5
+                    $schema = Invoke-RestMethod -Uri $schemaUri -Method Get -TimeoutSec 5
+                    $health.meta_ok = $true
+                    $health.schema_ok = $true
+                    $health.version = $meta.version
+                    $health.collections = @($schema.classes).Count
+                    $parsed = $health
+                    $health | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $stepLogPath -Encoding UTF8
+                    $summary = "Weaviate healthy; version=$($health.version); collections=$($health.collections)"
+                } catch {
+                    $status = "FAILED"
+                    $summary = "Weaviate health check failed: $($_.Exception.Message)"
+                    $health.error = $_.Exception.Message
+                    $parsed = $health
+                    $health | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $stepLogPath -Encoding UTF8
+                }
+            }
+
+            "docs_search" {
+                $query = [string]$params.query
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $take = if ($params.take) { [string]$params.take } else { "5" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "docs", "search", $query,
+                    "--project", $project,
+                    "--take", $take
+                )
+                if ($params.store_root) {
+                    $arguments += @("--store-root", [string]$params.store_root)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "docs_search exited with code $exitCode"
+                    break
+                }
+
+                $parsed = $capture.output | ConvertFrom-Json
+                $matches = @($parsed.matches)
+                $top = if ($matches.Count -gt 0) { $matches[0] } else { $null }
+
+                if ($null -eq $top) {
+                    $status = "FAILED"
+                    $summary = "docs_search returned no matches"
+                    break
+                }
+
+                $expectedTitle = [string]$params.expect_top_title_contains
+                $expectedProject = [string]$params.expect_top_project
+                $expectedType = [string]$params.expect_top_document_type
+                $expectedAuthority = [string]$params.expect_top_authority
+                $expectSourcePresent = Convert-ToBool $params.expect_source_present $false
+                $mustNotContain = @($params.must_not_primary_title_contain)
+                $failures = New-Object System.Collections.Generic.List[string]
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedTitle) -and -not (Test-StringContains -Value ([string]$top.document.title) -Expected $expectedTitle)) {
+                    $failures.Add("Expected top title to contain '$expectedTitle', actual '$($top.document.title)'.") | Out-Null
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedProject) -and -not [string]::Equals([string]$top.document.project, $expectedProject, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $failures.Add("Expected top project '$expectedProject', actual '$($top.document.project)'.") | Out-Null
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedType) -and -not [string]::Equals([string]$top.document.documentType, $expectedType, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $failures.Add("Expected top document type '$expectedType', actual '$($top.document.documentType)'.") | Out-Null
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedAuthority) -and -not [string]::Equals([string]$top.document.authority, $expectedAuthority, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $failures.Add("Expected top authority '$expectedAuthority', actual '$($top.document.authority)'.") | Out-Null
+                }
+
+                if ($expectSourcePresent -and [string]::IsNullOrWhiteSpace([string]$top.document.source)) {
+                    $failures.Add("Expected top document to include a source link.") | Out-Null
+                }
+
+                foreach ($forbidden in $mustNotContain) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$forbidden) -and (Test-StringContains -Value ([string]$top.document.title) -Expected ([string]$forbidden))) {
+                        $failures.Add("Top title must not contain '$forbidden', actual '$($top.document.title)'.") | Out-Null
+                    }
+                }
+
+                if ($failures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $failures[0]
+                } else {
+                    $summary = "docs_search top match '$($top.document.title)' score=$($top.score)"
+                }
             }
 
             "dotnet_build" {

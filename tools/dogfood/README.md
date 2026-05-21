@@ -295,6 +295,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 
 Every report includes a `trace` envelope, per-step trace data, command list, evidence paths, and `report_schema_valid`.
 
+Run the first Memory Spine smoke while Weaviate is running:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-smoke.json `
+  -RunId IronDevMemorySpineSmoke-001 `
+  -Json
+```
+
+This proves the current headless slice only: Weaviate health plus local dogfood document retrieval with project, authority, source, and ranking evidence. Full SQL-backed document/version/ticket links and Weaviate semantic trace assertions are still the next layer.
+
 Conversation-mode sample:
 
 ```powershell

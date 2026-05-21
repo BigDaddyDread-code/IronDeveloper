@@ -78,6 +78,8 @@ Initial Alpha actions:
 | `coverage_report` | Convert Cobertura coverage into a readable report, failing with evidence if ReportGenerator is not installed | `dotnet tool run reportgenerator` or `reportgenerator` |
 | `format_check` | Verify formatting/style drift | `dotnet format --verify-no-changes` |
 | `package_audit` | Check vulnerable NuGet packages | `dotnet package list --project <target> --vulnerable --include-transitive` |
+| `weaviate_health` | Verify local Weaviate REST/schema availability | `Invoke-RestMethod http://localhost:8080/v1/meta` |
+| `docs_search` | Probe headless dogfood knowledge retrieval and ranking evidence | `IronDev.ReplayRunner docs search` |
 
 Example `chat_conversation` step:
 

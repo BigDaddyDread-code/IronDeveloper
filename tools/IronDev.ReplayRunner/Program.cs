@@ -462,12 +462,16 @@ static async Task<int> HandleDocsSearchCommandAsync(string[] args, JsonSerialize
         var content = await File.ReadAllTextAsync(document.Path);
         var body = StripFrontmatter(content);
         var bodyScore = terms.Sum(term => CountOccurrences(body, term));
-        var titleScore = terms.Sum(term => CountOccurrences(document.Title, term)) * 8;
-        var typeScore = terms.Sum(term => CountOccurrences(document.DocumentType, term)) * 4;
-        var authorityScore = terms.Sum(term => CountOccurrences(document.Authority, term)) * 2;
-        var architectureBoost = document.DocumentType.Contains("Architecture", StringComparison.OrdinalIgnoreCase) ? 8 : 0;
-        var acceptedBoost = document.Authority.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ? 6 : 0;
-        var score = bodyScore + titleScore + typeScore + authorityScore + architectureBoost + acceptedBoost;
+        var titleScore = terms.Sum(term => CountOccurrences(document.Title, term)) * 20;
+        var typeScore = terms.Sum(term => CountOccurrences(document.DocumentType, term)) * 8;
+        var authorityScore = terms.Sum(term => CountOccurrences(document.Authority, term)) * 4;
+        var architectureBoost = document.DocumentType.Contains("Architecture", StringComparison.OrdinalIgnoreCase) ? 28 : 0;
+        var acceptedBoost = document.Authority.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ? 90 : 0;
+        var goalIntentBoost = terms.Any(term => term.Contains("goal", StringComparison.OrdinalIgnoreCase)) &&
+                              document.Title.Contains("goal", StringComparison.OrdinalIgnoreCase)
+            ? 70
+            : 0;
+        var score = bodyScore + titleScore + typeScore + authorityScore + architectureBoost + acceptedBoost + goalIntentBoost;
         if (score <= 0)
             continue;
 
@@ -475,6 +479,16 @@ static async Task<int> HandleDocsSearchCommandAsync(string[] args, JsonSerialize
         {
             Document = document,
             Score = score,
+            Ranking = new Dictionary<string, int>
+            {
+                ["body"] = bodyScore,
+                ["title"] = titleScore,
+                ["type"] = typeScore,
+                ["authority"] = authorityScore,
+                ["architectureBoost"] = architectureBoost,
+                ["acceptedBoost"] = acceptedBoost,
+                ["goalIntentBoost"] = goalIntentBoost
+            },
             Snippet = BuildSearchSnippet(body, terms)
         });
     }
@@ -1644,5 +1658,6 @@ public sealed class DocsSearchMatch
 {
     public KnowledgeDocument Document { get; init; } = new();
     public int Score { get; init; }
+    public IReadOnlyDictionary<string, int> Ranking { get; init; } = new Dictionary<string, int>();
     public string Snippet { get; init; } = string.Empty;
 }
