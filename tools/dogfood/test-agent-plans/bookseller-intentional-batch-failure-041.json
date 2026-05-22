@@ -1,0 +1,46 @@
+{
+  "test_run_id": "BookSeller041-IntentionalBatchFailure",
+  "goal_id": "bookseller-intentional-batch-failure-041",
+  "project_id": 5,
+  "description": "Intentionally fail a BookSeller batch after one passing memory search so Codex handoff can prove evidence from a real multi-step failed batch.",
+  "expected": {
+    "intentional_failure": true,
+    "first_step_passes": true,
+    "second_step_fails": true,
+    "failed_action": "memory_search",
+    "failure_reason_contains": "Expected top memory title"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller SQL Server Dapper inventory architecture",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_ARCHITECTURE_CURRENT",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BOOK-001 add book inventory ticket SQL stock",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "THIS_BOOKSELLER_DOC_SHOULD_NOT_EXIST_041",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 2,
+  "early_stop_on_failure": true
+}

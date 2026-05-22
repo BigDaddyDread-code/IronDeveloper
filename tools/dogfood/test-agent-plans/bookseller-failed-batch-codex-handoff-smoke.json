@@ -1,0 +1,26 @@
+{
+  "test_run_id": "BookSeller041-FailedBatchCodexHandoff",
+  "goal_id": "bookseller-failed-batch-codex-handoff-041",
+  "project_id": 5,
+  "description": "Prove a failed BookSeller batch produces a compact Codex-readable failure package with evidence paths, repro command, validation command, and recommended next action.",
+  "expected": {
+    "intentional_failed_batch_report_created": true,
+    "failure_package_json_created": true,
+    "failure_package_markdown_created": true,
+    "expected_actual_evidence_included": true,
+    "codex_repro_and_validation_commands_included": true,
+    "project_scoped_failure": "BookSeller"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "failure_package_smoke",
+      "params": {
+        "failure_plan_path": "tools/dogfood/test-agent-plans/bookseller-intentional-batch-failure-041.json",
+        "expect_nested_goal_id": "bookseller-intentional-batch-failure-041"
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}

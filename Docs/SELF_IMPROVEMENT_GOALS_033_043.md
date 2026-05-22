@@ -96,6 +96,8 @@ The proof must show project and authority ranking still protect the result.
 
 ### 041: Codex Handoff From Failed Batch
 
+Status: implemented in this branch.
+
 Run a failing batch and prove the system produces a compact Codex handoff with failure package, evidence paths, repro command, validation command, and recommended next action.
 
 ### 042: Batch Regression Pack
