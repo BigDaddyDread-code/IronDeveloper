@@ -29,6 +29,7 @@ public sealed partial class ProjectHubViewModel : ObservableObject
         
         // Order by most recently updated/created to find "sensible default"
         var sortedProjects = projects
+            .Where(p => !IsDogfoodGeneratedProject(p))
             .OrderByDescending(p => p.UpdatedDate ?? p.CreatedDate)
             .ToList();
 
@@ -43,6 +44,17 @@ public sealed partial class ProjectHubViewModel : ObservableObject
         // NOTE: We could also implement "Prefer last-used if count > 1" but usually 
         // the user wants to see the Hub if they have multiple projects, 
         // unless they specifically set a "Default Project" setting later.
+    }
+
+    private static bool IsDogfoodGeneratedProject(global::IronDev.Data.Models.Project project)
+    {
+        var name = project.Name ?? string.Empty;
+        var description = project.Description ?? string.Empty;
+
+        return name.StartsWith("IronDevBuilderProposalSafety", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("IronDevMemorySpine", StringComparison.OrdinalIgnoreCase)
+            || description.Contains("Disposable project for Memory Spine", StringComparison.OrdinalIgnoreCase)
+            || description.Contains("same-tenant wrong-project control for Memory Spine", StringComparison.OrdinalIgnoreCase);
     }
 
     [RelayCommand]

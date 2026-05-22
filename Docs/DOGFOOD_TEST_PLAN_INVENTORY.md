@@ -10,8 +10,8 @@ The full inventory is stored at:
 
 ## Current Counts
 
-- Total plans: 93
-- BookSeller-scoped plans: 42
+- Total plans: 94
+- BookSeller-scoped plans: 43
 - IronDev/self-improvement plans: 51
 
 ## Major Plan Groups
@@ -26,6 +26,7 @@ The full inventory is stored at:
 - QualityAgent/code standards plans.
 - CriticAgent/failure review plans.
 - Builder preview safety plans.
+- Disposable workspace apply proof.
 - BookSeller project-scoped fixture and chaos plans.
 - Self-improvement regression packs.
 

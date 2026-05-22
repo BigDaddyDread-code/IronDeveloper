@@ -129,6 +129,9 @@ if (IsCommand(args, "memory", "builder-context-source-smoke"))
 if (IsCommand(args, "builder", "proposal-safety-smoke"))
     return await BuilderProposalSafetySmokeCommand.HandleAsync(args, options);
 
+if (IsCommand(args, "builder", "disposable-workspace-apply-smoke"))
+    return await DisposableWorkspaceApplySmokeCommand.HandleAsync(args, options);
+
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
 {

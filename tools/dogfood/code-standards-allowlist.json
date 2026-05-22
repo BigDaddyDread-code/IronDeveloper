@@ -25,6 +25,12 @@
       "rule": "LargeFile",
       "reason": "Test Agent local executor is intentionally centralised until CLI command surface stabilises.",
       "expiresAfter": "Test Agent CLI extraction"
+    },
+    {
+      "path": "tools/IronDev.ReplayRunner/DisposableWorkspaceApplySmokeCommand.cs",
+      "rule": "LargeFile",
+      "reason": "Disposable workspace apply proof intentionally keeps evidence contracts together for the first safety-cage slice.",
+      "expiresAfter": "Disposable workspace command extraction"
     }
   ]
 }

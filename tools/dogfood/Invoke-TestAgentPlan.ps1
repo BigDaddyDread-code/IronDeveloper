@@ -2018,6 +2018,98 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "disposable_workspace_apply_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "builder", "disposable-workspace-apply-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.workspace_root) {
+                    $arguments += @("--workspace-root", [string]$params.workspace_root)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed) {
+                        "Disposable workspace apply smoke failed; project=$($parsed.project); passed=$($parsed.passed); workspace=$($parsed.workspace.workspacePath)"
+                    } else {
+                        "disposable_workspace_apply_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "Disposable workspace apply smoke returned Passed=false"
+                } else {
+                    $summary = "Disposable workspace apply passed; project=$($parsed.project); changedFiles=$(@($parsed.apply.changedFiles).Count); recommendation=$($parsed.comparison.recommendation)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    $expectedProject = if ($params.expect_project) { [string]$params.expect_project } else { $null }
+
+                    if ($expectedProject -and [string]$parsed.project -ne $expectedProject) {
+                        $validationFailures.Add("Expected project '$expectedProject', actual '$($parsed.project)'.") | Out-Null
+                    }
+                    if ($params.expect_workspace_outside_repo -and -not [bool]$parsed.workspace.isOutsideRealRepo) {
+                        $validationFailures.Add("Expected disposable workspace outside the real repo.") | Out-Null
+                    }
+                    if ($params.expect_real_repo_unchanged -and -not [bool]$parsed.workspace.realRepoUnchanged) {
+                        $validationFailures.Add("Expected real repository fixture source to remain unchanged.") | Out-Null
+                    }
+                    if ($params.expect_patch_applied -and -not [bool]$parsed.apply.patchApplied) {
+                        $validationFailures.Add("Expected patch to be applied inside disposable workspace.") | Out-Null
+                    }
+                    if ($params.expect_apply_inside_workspace_only -and -not [bool]$parsed.apply.appliedInsideDisposableWorkspaceOnly) {
+                        $validationFailures.Add("Expected apply to be restricted to disposable workspace.") | Out-Null
+                    }
+                    if ($params.expect_build_success -and [int]$parsed.build.exitCode -ne 0) {
+                        $validationFailures.Add("Expected disposable workspace build to succeed.") | Out-Null
+                    }
+                    if ($params.expect_test_success -and [int]$parsed.test.exitCode -ne 0) {
+                        $validationFailures.Add("Expected disposable workspace tests to succeed.") | Out-Null
+                    }
+                    if ($params.expect_scope_match -and -not [bool]$parsed.comparison.scopeMatch) {
+                        $validationFailures.Add("Expected changed files to match proposal scope.") | Out-Null
+                    }
+                    if ($params.expect_no_unsafe_changes -and [bool]$parsed.comparison.unsafeChangesFound) {
+                        $validationFailures.Add("Expected no unsafe changes.") | Out-Null
+                    }
+                    if ($params.expect_failure_package_path -and -not (Test-Path ([string]$parsed.failurePackage.resultPath))) {
+                        $validationFailures.Add("Expected disposable apply result/failure package path to exist.") | Out-Null
+                    }
+                    if ($params.expect_human_gate_no_real_repo_write -and -not [bool]$parsed.approvalGate.approvalDoesNotMeanRealRepoWrite) {
+                        $validationFailures.Add("Expected human approval gate to keep real repo writes blocked.") | Out-Null
+                    }
+
+                    foreach ($source in @($params.expect_included_sources)) {
+                        if ($source -and @($parsed.contextBundle.includedSources | Where-Object { [string]$_.source -eq [string]$source }).Count -eq 0) {
+                            $validationFailures.Add("Expected weighted context to include source '$source'.") | Out-Null
+                        }
+                    }
+                    foreach ($source in @($params.expect_rejected_sources)) {
+                        if ($source -and @($parsed.contextBundle.rejectedSources | Where-Object { [string]$_.source -eq [string]$source -and [bool]$_.rejected }).Count -eq 0) {
+                            $validationFailures.Add("Expected weighted context to reject source '$source'.") | Out-Null
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

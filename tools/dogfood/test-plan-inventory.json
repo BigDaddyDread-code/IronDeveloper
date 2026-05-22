@@ -49,6 +49,18 @@
         "description":  "Start with a vague persistence request, let IronDev ask for detail, then answer with storage facts and require a saved discussion document route."
     },
     {
+        "planFile":  "bookseller-disposable-workspace-apply-smoke.json",
+        "goalId":  "disposable-workspace-apply-proof-104-115",
+        "project":  "BookSeller",
+        "actions":  [
+                        "disposable_workspace_apply_smoke"
+                    ],
+        "stepCount":  1,
+        "maxTurns":  1,
+        "earlyStopOnFailure":  true,
+        "description":  "Prove BookSeller patch application is restricted to an explicit disposable workspace with hashes, build/test evidence, comparison review, and no real repo writes."
+    },
+    {
         "planFile":  "bookseller-critic-failed-batch-review-050.json",
         "goalId":  "bookseller-critic-failed-batch-review-050",
         "project":  "BookSeller",
