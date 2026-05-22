@@ -93,7 +93,7 @@ public static class MemorySearchCommand
             httpClient,
             collectionName,
             BuildLexicalVector(query),
-            limit: Math.Max(take * 3, take));
+            limit: Math.Max(take * 10, 50));
 
         return rawMatches
             .Where(match => match.ProjectId == StableProjectId(projectName))

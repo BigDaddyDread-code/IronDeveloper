@@ -1,0 +1,26 @@
+{
+  "test_run_id": "IronDev079-CriticFailureReview",
+  "goal_id": "critic-irondev-failure-review-079",
+  "description": "Keep CriticAgent review of IronDev failure evidence green.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "critic_failure_package_review_smoke",
+      "params": {
+        "failure_plan_path": "tools/dogfood/test-agent-plans/irondev-intentional-memory-search-failure.json",
+        "expect_nested_goal_id": "intentional-memory-search-failure-017",
+        "expect_model_profile": "strong-reviewer",
+        "expect_actionable": true,
+        "expect_evidence_backed": true,
+        "expect_recommendation_contains": "memory search"
+      }
+    }
+  ],
+  "expected": {
+    "critic_agent_review_path": true,
+    "failure_evidence_used": true,
+    "actionable_recommendation": true
+  }
+}

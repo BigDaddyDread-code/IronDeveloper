@@ -1,0 +1,58 @@
+{
+  "test_run_id": "SelfImprovement092-CrossBatchRegression",
+  "goal_id": "self-improvement-goals-033-090-cross-batch-regression-092",
+  "description": "Run the 033-043, 044-053, 054-073, and 074-090 proof packs as a compact cross-batch confidence gate.",
+  "expected": {
+    "all_prior_batches_pass": true,
+    "current_batch_passes": true,
+    "cross_batch_report_compact": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-033-043-pr-ready-quality-gate.json",
+        "expect_nested_goal_id": "self-improvement-goals-033-043-pr-ready-quality-gate",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-044-053-pr-ready-quality-gate.json",
+        "expect_nested_goal_id": "self-improvement-goals-044-053-pr-ready-quality-gate",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-054-073-pr-ready-quality-gate.json",
+        "expect_nested_goal_id": "self-improvement-goals-054-073-pr-ready-quality-gate",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 4,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-074-090-regression-pack.json",
+        "expect_nested_goal_id": "self-improvement-goals-074-090-regression-pack-091",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}

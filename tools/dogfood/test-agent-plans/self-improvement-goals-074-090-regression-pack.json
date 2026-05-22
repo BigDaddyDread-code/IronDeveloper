@@ -1,0 +1,32 @@
+{
+  "test_run_id": "SelfImprovement091-BatchRegressionPack",
+  "goal_id": "self-improvement-goals-074-090-regression-pack-091",
+  "description": "Run the key 074-090 self-improvement proofs through TesterAgent as one compact regression pack.",
+  "expected": {
+    "batch_goal_document_exists": true,
+    "tester_agent_runs_nested_plans": true,
+    "goals_074_through_090_pass": true,
+    "compact_pass_fail_report": true
+  },
+  "steps": [
+    { "step": 1, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-self-improvement-goals-074-memory-smoke.json", "expect_nested_goal_id": "self-improvement-goals-074-memory-import", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 2, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-retriever-current-batch-context-075.json", "expect_nested_goal_id": "retriever-current-batch-context-075", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 3, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-planner-memory-first-076.json", "expect_nested_goal_id": "planner-agent-memory-first-076", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 4, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-current-batch-loop-077.json", "expect_nested_goal_id": "supervisor-current-batch-loop-077", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 5, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-quality-agent-gate-regression-078.json", "expect_nested_goal_id": "quality-agent-gate-regression-078", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 6, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-critic-failure-review-079.json", "expect_nested_goal_id": "critic-irondev-failure-review-079", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 7, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-handoff-regression-080.json", "expect_nested_goal_id": "irondev-failure-handoff-regression-080", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 8, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-architecture-memory-regression-081.json", "expect_nested_goal_id": "bookseller-architecture-memory-regression-081", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 9, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-retriever-context-082.json", "expect_nested_goal_id": "bookseller-retriever-context-082", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 10, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-planner-vague-goal-draft-083.json", "expect_nested_goal_id": "bookseller-planner-vague-goal-draft-083", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 11, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-supervisor-project-smoke-084.json", "expect_nested_goal_id": "bookseller-supervisor-project-smoke-084", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 12, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-supervisor-builder-preview-085.json", "expect_nested_goal_id": "bookseller-supervisor-builder-preview-085", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 13, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-failed-handoff-regression-086.json", "expect_nested_goal_id": "bookseller-failed-handoff-regression-086", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 14, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-critic-failed-review-087.json", "expect_nested_goal_id": "bookseller-critic-failed-review-087", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 15, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-messy-prompt-regression-088.json", "expect_nested_goal_id": "bookseller-messy-prompt-regression-088", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 16, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/bookseller-retrieval-chaos-regression-089.json", "expect_nested_goal_id": "bookseller-retrieval-chaos-regression-089", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } },
+    { "step": 17, "action": "agent_tester_run_plan", "params": { "plan_path": "tools/dogfood/test-agent-plans/irondev-codex-memory-title-promotion-090.json", "expect_nested_goal_id": "codex-memory-title-promotion-090", "expect_nested_status": "passed", "expect_nested_overall_result": "SUCCESS", "compact_report": true } }
+  ],
+  "max_turns": 17,
+  "early_stop_on_failure": true
+}
