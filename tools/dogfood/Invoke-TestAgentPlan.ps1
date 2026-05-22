@@ -2043,7 +2043,10 @@ foreach ($step in $plan.steps) {
                     $parsed = $null
                 }
 
-                if ($exitCode -ne 0) {
+                $expectFailure = [bool]$params.expect_failure
+                if ($expectFailure -and $parsed -and -not [bool]$parsed.passed) {
+                    $summary = "Disposable workspace apply failed closed as expected; project=$($parsed.project); workspace=$($parsed.workspace.workspacePath)"
+                } elseif ($exitCode -ne 0) {
                     $status = "FAILED"
                     $summary = if ($parsed) {
                         "Disposable workspace apply smoke failed; project=$($parsed.project); passed=$($parsed.passed); workspace=$($parsed.workspace.workspacePath)"
@@ -2072,6 +2075,9 @@ foreach ($step in $plan.steps) {
                     }
                     if ($params.expect_patch_applied -and -not [bool]$parsed.apply.patchApplied) {
                         $validationFailures.Add("Expected patch to be applied inside disposable workspace.") | Out-Null
+                    }
+                    if ($params.expect_patch_not_applied -and [bool]$parsed.apply.patchApplied) {
+                        $validationFailures.Add("Expected patch not to be applied.") | Out-Null
                     }
                     if ($params.expect_apply_inside_workspace_only -and -not [bool]$parsed.apply.appliedInsideDisposableWorkspaceOnly) {
                         $validationFailures.Add("Expected apply to be restricted to disposable workspace.") | Out-Null
@@ -2109,6 +2115,16 @@ foreach ($step in $plan.steps) {
                     foreach ($source in @($params.expect_rejected_sources)) {
                         if ($source -and @($parsed.contextBundle.rejectedSources | Where-Object { [string]$_.source -eq [string]$source -and [bool]$_.rejected }).Count -eq 0) {
                             $validationFailures.Add("Expected weighted context to reject source '$source'.") | Out-Null
+                        }
+                    }
+                    foreach ($failureText in @($params.expect_apply_failure_contains)) {
+                        if ($failureText -and @($parsed.apply.failures | Where-Object { ([string]$_).IndexOf([string]$failureText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count -eq 0) {
+                            $validationFailures.Add("Expected apply failure containing '$failureText'.") | Out-Null
+                        }
+                    }
+                    foreach ($failureText in @($params.expect_safety_failure_contains)) {
+                        if ($failureText -and @($parsed.workspace.safety.failClosedReasons | Where-Object { ([string]$_).IndexOf([string]$failureText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count -eq 0) {
+                            $validationFailures.Add("Expected workspace safety failure containing '$failureText'.") | Out-Null
                         }
                     }
 

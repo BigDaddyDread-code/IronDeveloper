@@ -1,4 +1,15 @@
-[
+﻿[
+    {
+        "Id":  "20260523103000000-disposable-workspace-phase-report",
+        "Project":  "IronDev",
+        "Title":  "DISPOSABLE_WORKSPACE_PHASE_REPORT",
+        "DocumentType":  "Decision",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\DISPOSABLE_WORKSPACE_PHASE_REPORT.md",
+        "DogfoodRunId":  "DogfoodDocsSeed-20260523-DisposableWorkspacePhase",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523103000000-disposable-workspace-phase-report.md",
+        "CreatedUtc":  "2026-05-23T10:30:00.0000000+00:00"
+    },
     {
         "Id":  "20260523090000001-research-and-sentinel-agents-future-discussion",
         "Project":  "IronDev",

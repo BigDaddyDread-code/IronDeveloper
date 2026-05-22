@@ -429,6 +429,14 @@ tools/dogfood/test-agent-plans/bookseller-disposable-workspace-apply-smoke.json
 
 This proof uses a controlled BookSeller fixture, copies it to a temp disposable workspace, captures before hashes, applies a proposal-file patch only inside that workspace, captures after hashes, runs build/test inside the workspace, compares changed files against the proposal scope, and writes a Codex-readable result package.
 
+The fail-closed companion plan is:
+
+```text
+tools/dogfood/test-agent-plans/bookseller-disposable-workspace-fail-closed-smoke.json
+```
+
+That proof feeds an unsafe proposal file that attempts to write outside the disposable workspace. The expected result is failure, no patch applied, real repo unchanged, and a result package that explains the blocked path.
+
 Boundary:
 
 - It does not mutate the real repository.
