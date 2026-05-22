@@ -7,8 +7,8 @@ authority: Accepted
 source: C:\Users\bob\source\repos\AIDeveloper\Docs\IRONDEV_SELF_IMPROVEMENT_SYSTEM.md
 dogfood_run_id: DogfoodDocsSeed-20260522-SelfImprovement
 created_utc: 2026-05-22T02:03:56.6914667+00:00
+updated_utc: 2026-05-22T05:45:00Z
 ---
-
 # IronDev Self-Improvement System
 
 ## 1. Core Vision
@@ -28,7 +28,22 @@ The core flow is:
 
 The long-term goal is not just "LLM writes code." The goal is a persistent development system that remembers project intent, retrieves the right context, avoids drift, tests itself, and continuously improves.
 
-## 2. Core Architecture
+## 2. Current Operating Rules
+
+These rules are current as of 2026-05-22 and should be treated as accepted architecture unless superseded by a newer accepted document.
+
+- SQL Server owns truth and traceability.
+- Weaviate is a retrieval and indexing layer, not the source of truth.
+- Raw vector ranking is evidence, not authority.
+- IronDev final ranking must apply project scope, authority, currentness, stale penalties, source type, and source links.
+- Every project-scoped proof must show project identity in its report.
+- BookSeller must never use IronDev or CODEX documents as authority.
+- Builder work remains preview-first until a later proof explicitly allows writes.
+- Test Agent executes and reports; it does not make architectural decisions.
+- Codex/strong model analyses condensed evidence and decides the next fix or test.
+- Code standards may pass with intentional warnings, but warnings must be visible, structured, and allowlisted when temporary.
+
+## 3. Core Architecture
 
 ### SQL Server
 
@@ -69,11 +84,11 @@ It should store embedded chunks with strong metadata:
 - Created/modified timestamps
 - Chunk role or section type
 
-The main risk is retrieval drift: Weaviate may return the wrong project, stale version, or semantically similar but contextually wrong document. IronDev must compensate with metadata filtering, authority scoring, stale penalties, and semantic trace evidence.
+The main risk is retrieval drift: Weaviate may return the wrong project, stale version, or semantically similar but contextually wrong document. IronDev compensates with metadata filtering, authority scoring, stale penalties, project isolation, and semantic trace evidence.
 
 ### Native C# LangGraph-Style Workflow
 
-IronDev currently uses a native C# LangGraph-style workflow rather than depending directly on external LangGraph.
+IronDev uses a native C# LangGraph-style workflow rather than depending directly on external LangGraph.
 
 The build workflow direction is:
 
@@ -90,21 +105,22 @@ The build workflow direction is:
 
 The important design decision is that each step is explicit, inspectable, and traceable.
 
-## 3. Why IronDev Needs a CLI
+## 4. Why IronDev Needs A CLI
 
 The CLI is the programmable backend interface for dogfooding and automated testing.
 
-Manual testing will not scale to the thousands of iterations needed to harden IronDev. The CLI gives Codex, test agents, scripts, and future automation a stable surface to drive the system without relying on the WPF UI.
+Manual testing will not scale to the hundreds or thousands of iterations needed to harden IronDev. The CLI gives Codex, test agents, scripts, and future automation a stable surface to drive the system without relying on the WPF UI.
 
 The CLI should be built in C# and runnable from command line or PowerShell.
 
-Initial examples:
+Representative command surface:
 
 ```bash
-irondev project create
+irondev health
 irondev project list
+irondev project current
 irondev document add
-irondev document version
+irondev document list
 irondev ticket add
 irondev ticket list
 irondev build run
@@ -115,9 +131,9 @@ irondev memory sql-version-smoke
 irondev memory weaviate-version-smoke
 ```
 
-No UI is required at first. The first priority is a clean, scriptable backend surface.
+No UI is required for early proof slices. The first priority is a clean, scriptable backend surface.
 
-## 4. Testing Strategy
+## 5. Testing Strategy
 
 The intended testing loop is split by model cost and responsibility.
 
@@ -139,7 +155,7 @@ Codex should not be wasted on repetitive command execution.
 
 ### Cheap Model / Test Agent
 
-A cheaper model handles repetitive grunt work.
+A cheaper model handles repetitive evidence gathering.
 
 Responsibilities:
 
@@ -164,24 +180,7 @@ The testing strategy should include:
 - Regression plans for known memory-spine behaviours.
 - Build/test/format/package-audit checks.
 
-The early testing focus should be retrieval quality, not full autonomous coding.
-
-## 5. First Major Testing Target: Retrieval Quality
-
-Before IronDev can safely build from memory, it must prove it retrieves the right memory.
-
-Important retrieval tests:
-
-1. Create multiple similar projects.
-2. Add similar documents across projects.
-3. Add multiple versions of the same document.
-4. Mark old versions stale and current versions authoritative.
-5. Ask vague questions such as "what is the current goal?"
-6. Confirm the correct project, document type, and current version wins.
-7. Confirm stale or wrong-project chunks are either filtered out or demoted.
-8. Record semantic trace evidence showing why the winning chunk won.
-
-This is the right first self-dogfooding target because bad retrieval will poison every later builder, tester, and planning flow.
+The early testing focus is retrieval quality, traceability, and write safety, not full autonomous coding.
 
 ## 6. Agent Brain Architecture
 
@@ -364,17 +363,9 @@ Mitigations:
 - Semantic traces.
 - Human-reviewable context bundles.
 
-## 8. Current State
+## 8. Checkpoint Log As Of 2026-05-22
 
-The original summary was directionally correct but is now slightly behind the current IronDev state.
-
-Important current facts:
-
-- IronDev has moved beyond pure discussion.
-- The native C# LangGraph-style build workflow exists through the approval pause stage.
-- The Roslyn-backed semantic layer exists.
-- Weaviate has been accepted as the memory/retrieval direction.
-- The Memory Spine proof slices have begun.
+This section is a checkpoint log, not a permanent architecture rule. Newer accepted checkpoint documents may supersede these facts.
 
 ### Memory Spine 005
 
@@ -385,11 +376,11 @@ Proved:
 - Authority-aware retrieval can answer a vague current-goal query.
 - No obvious BookSeller primary bleed in the tested slice.
 
-Did not yet prove:
+Boundary:
 
-- SQL-backed document versions.
-- Full source document version flow.
-- Real Weaviate vector retrieval over SQL-backed chunks.
+- Did not yet prove SQL-backed document versions.
+- Did not yet prove full source document version flow.
+- Did not yet prove real Weaviate vector retrieval over SQL-backed chunks.
 
 ### Memory Spine 006
 
@@ -401,9 +392,9 @@ Proved:
 - Current version beats stale version through ranking logic.
 - Semantic trace creation.
 
-Did not yet prove:
+Boundary:
 
-- Real Weaviate vector query over those SQL-backed chunks.
+- Did not yet prove real Weaviate vector query over those SQL-backed chunks.
 
 ### Memory Spine 007
 
@@ -415,111 +406,183 @@ Proved:
 - IronDev final ranking can promote the current authoritative version above stale content.
 - Source links and semantic traces are recorded.
 
+### Memory Spine 008
+
+Proved:
+
+- Wrong-project memory can be rejected under real Weaviate retrieval.
+- A raw BookSeller hit can be rejected when querying from IronDev context.
+- Final authority ranking respects project identity over vector temptation.
+
+### Code Standards 009 And 012
+
+Proved:
+
+- Code standards can run as a Test Agent quality gate.
+- Build, focused tests, format, package audit, and code-shape checks are reportable.
+- Large procedural files/methods can be allowed intentionally while still visible as debt.
+
+Current rule:
+
+- Code standards may say "pass with warnings," but those warnings must remain structured and explicit.
+
+### Ticket Source-Link 010
+
+Proved:
+
+- A real SQL ProjectTicket created from a project document can preserve SourceDocumentVersionId.
+- The linked ProjectDocumentVersion resolves back to the exact SQL source version.
+- Orphan tickets with missing source links are detected as failures.
+
+### Builder Context Source Memory 011
+
+Proved:
+
+- Builder context assembly includes the ticket's linked ProjectDocumentVersion.
+- Source document metadata, source markdown/excerpt, tenant/project identity, and source link evidence are included.
+- Orphan, missing-version, wrong-project, and historical-source controls fail or mark context cleanly.
+
+Boundary:
+
+- This proves context assembly only. It does not prove code generation or patch application.
+
 ### Memory Search CLI 013
 
-Implemented as a Codex-facing memory search command on draft PR #5.
+Proved:
 
-Command:
-
-```bash
-memory search "<query>" --project IronDev --json
-```
-
-What it proves:
-
-- IronDev now has a CLI-accessible memory search surface for Codex and the Test Agent.
+- Codex can query accepted IronDev project memory through CLI-accessible memory search.
 - Dogfood knowledge documents can be indexed into a Weaviate-backed collection.
-- Raw Weaviate vector ranking can be compared against IronDev's final authority/currentness ranking.
-- JSON output includes source IDs, raw Weaviate rank/vector score, final IronDev rank/authority score, source links, excerpt, match reason, and semantic trace ID.
-- Test Agent can call the memory search command through the `memory_search` action.
-
-Validated smoke cases:
-
-- `current Codex goals` -> `CODEX_GOALS`
-- `current test agent rules` -> `TEST_AGENT_SPEC`
-- `code standards large method allowlist` -> `CODE_STANDARDS`
-- `builder approval before code changes` -> `CODEX_GOALS`
-
-Additional validation:
-
-- 012 code standards gate passed.
-- 005 memory spine smoke still passed.
-- Runner build passed.
+- Raw Weaviate vector ranking can be compared against IronDev final authority/currentness ranking.
+- JSON output includes source IDs, raw rank/vector score, final rank/authority score, source links, excerpt, match reason, and semantic trace ID.
 
 Important evidence:
 
 - For `current Codex goals`, `CODEX_GOALS` was raw Weaviate rank 8 but final IronDev rank 1 after authority/currentness correction.
 
-This is exactly the behaviour IronDev needs: raw semantic search alone is not trusted; final ranking must apply project authority, currentness, and source intent.
+### Agent Model Profiles And Stubs 014
 
-Next clean ribs:
+Proved:
 
-- 014: configurable agent model profiles and initial agent stubs.
-- 008-style cross-project bleed protection under real Weaviate retrieval.
+- Agent model choices are configurable instead of hardcoded.
+- Eight agent stubs exist: Supervisor, Planner, Architect, Builder, Tester, Quality, Retriever, Critic.
+- TesterAgent is the first real execution path and can run existing Test Agent plans.
+
+Current rule:
+
+- All agent model profiles are OpenAI-only for now and configurable through settings.
+
+### CLI And Dogfood Slices 015-019
+
+Proved:
+
+- 015: Cross-project memory proof can run through TesterAgent.
+- 016: Builder proposal safety can be proven before file writes.
+- 017: Failed Test Agent evidence can be packaged for Codex handoff.
+- 018: Codex-facing memory search was extracted from Program.cs.
+- 019: SQL/Weaviate/cross-project memory smoke commands were extracted from Program.cs.
+
+Current CLI dogfood shape:
+
+```text
+Codex asks memory
+        ↓
+TesterAgent runs validation
+        ↓
+Builder preview proves no writes
+        ↓
+Failure package gives repair evidence
+        ↓
+Quality gate keeps debt visible
+```
+
+### BookSeller Controlled Fixture 020
+
+Proved:
+
+- BookSeller exists as a controlled non-IronDev dogfood fixture.
+- BookSeller has accepted architecture, ticket, and test-plan memory documents.
+- BookSeller has a simple BOOK-001 ticket fixture.
+- Test Agent can run a BookSeller-specific plan through the CLI.
+- Reports remain project-scoped to BookSeller.
+- Memory search can reject IronDev/CODEX title fragments from BookSeller result sets.
+
+Current rule:
+
+- BookSeller is an explicit sample/test project, not a hidden CLI default.
+- Commands should remain project-scoped through `--project BookSeller` or an explicitly selected current project.
+
+### BookSeller Ticket Source-Link 021
+
+Proved:
+
+- The existing ticket source-link proof can run under `project = BookSeller`.
+- The generated BookSeller ticket has SourceDocumentVersionId.
+- The linked ProjectDocumentVersion resolves exactly.
+- The orphan/missing-source control fails cleanly.
+- The report carries BookSeller project identity.
+
+Boundary:
+
+- This does not build the BookSeller app.
+- This does not prove builder preview.
+- This does not apply patches or mutate the target BookSeller repository.
 
 ## 9. Practical Next Build Order
 
-### Step 1: CLI Foundation
+The next slices should stay narrow and evidence-first.
 
-Build a clean CLI surface that can run against IronDev itself.
+### 022: BookSeller Builder Preview Proof
 
-Minimum commands:
+Goal:
 
-```bash
-irondev health
-irondev project list
-irondev project current
-irondev document add
-irondev document list
-irondev ticket add
-irondev ticket list
-irondev memory search
-irondev memory sql-version-smoke
-irondev memory weaviate-version-smoke
-irondev test run
-```
+- Prove BookSeller builder preview for BOOK-001 is project-scoped, uses BookSeller memory, excludes IronDev/CODEX bleed, and performs no file writes.
 
-### Step 2: Test Agent Execution Contract
+Acceptance:
 
-Define the handoff format between Codex and the Test Agent.
+- Project identity is BookSeller.
+- Source ticket is BOOK-001 or a BookSeller-scoped SQL ticket derived from it.
+- Builder context includes BookSeller source memory.
+- Preview/proposal reports files it would touch.
+- No writes occur before approval.
+- IronDev/CODEX documents are not accepted as BookSeller authority.
 
-The Test Agent should accept:
+### 023: BookSeller Test-After-Preview Proof
 
-- Goal
-- Scope
-- Preconditions
-- Commands to run
-- Expected checks
-- Evidence to collect
-- Stop conditions
+Goal:
 
-It should return:
+- Prove the test harness can run a BookSeller-scoped test plan after builder preview without applying code.
 
-- Pass/fail status
-- Command results
-- Key logs
-- Coverage summary if relevant
-- Evidence paths
-- Concise explanation
-- Suggested next action
+Acceptance:
 
-### Step 3: Memory Spine 008
+- The run is project-scoped to BookSeller.
+- The report states what was tested and what was not tested.
+- No target project files are modified.
 
-Prove cross-project isolation under real Weaviate retrieval.
+### 024: RetrieverAgent Real Path
 
-This is the most valuable next target because it attacks the highest-risk memory failure: IronDev confidently using the wrong project's context.
+Goal:
 
-### Step 4: Codex/Test-Agent Loop
+- Make RetrieverAgent the next real agent by wrapping the existing memory search path into structured context packages.
 
-Let Codex generate a test plan, pass it to the Test Agent, receive a condensed report, and decide the next step.
+Acceptance:
 
-At this point, Codex is no longer just reading the repo. It is starting to drive IronDev through a repeatable testing interface.
+- RetrieverAgent returns project-scoped context bundles.
+- Raw/final ranking evidence remains visible.
+- Source document/version IDs are included.
+- Wrong-project and stale evidence are excluded or marked clearly.
 
-### Step 5: Expand Into Builder Dogfooding
+### 025: Supervisor/Codex Loop Proof
 
-After retrieval is trustworthy, begin feeding selected IronDev tickets through the builder workflow.
+Goal:
 
-The first targets should be small, testable, and strongly traceable.
+- Prove the first simple orchestration loop: Codex/Supervisor creates a test plan, TesterAgent executes it, IronDev records evidence, and Codex receives a repair-ready report.
+
+Acceptance:
+
+- Loop is traceable.
+- Test Agent remains execution-only.
+- Codex receives structured evidence rather than raw noise.
+- No uncontrolled writes.
 
 ## 10. Agent Model Settings And Stub Strategy
 
@@ -547,31 +610,31 @@ This allows IronDev to swap between cheaper models, stronger models, Codex-style
   "ModelProfiles": {
     "cheap-runner": {
       "Provider": "OpenAI",
-      "Model": "cheap-model-here",
+      "Model": "gpt-4o-mini",
       "Temperature": 0.1,
       "MaxOutputTokens": 1200
     },
     "standard-reasoner": {
       "Provider": "OpenAI",
-      "Model": "standard-model-here",
+      "Model": "configured-standard-model",
       "Temperature": 0.2,
       "MaxOutputTokens": 3000
     },
     "strong-reasoner": {
       "Provider": "OpenAI",
-      "Model": "strong-model-here",
+      "Model": "configured-strong-model",
       "Temperature": 0.2,
       "MaxOutputTokens": 5000
     },
     "code-builder": {
       "Provider": "OpenAI",
-      "Model": "code-model-here",
+      "Model": "configured-code-model",
       "Temperature": 0.1,
       "MaxOutputTokens": 6000
     },
     "strong-reviewer": {
       "Provider": "OpenAI",
-      "Model": "strong-review-model-here",
+      "Model": "configured-review-model",
       "Temperature": 0.1,
       "MaxOutputTokens": 4000
     }
@@ -596,7 +659,7 @@ The Architect and Critic should not run on every small loop. They should be used
 
 ### Recommended Agent Stub Contract
 
-Create all eight agent stubs now, even before each agent is intelligent.
+Create all eight agent stubs before each agent is intelligent.
 
 The purpose is to give IronDev a stable orchestration skeleton.
 
@@ -609,29 +672,6 @@ public interface IIronDevAgent
     IReadOnlyList<string> AllowedTools { get; }
 
     Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default);
-}
-```
-
-Initial supporting models:
-
-```csharp
-public sealed class AgentDefinition
-{
-    public required string Name { get; init; }
-    public required string Purpose { get; init; }
-    public required string DefaultModelProfile { get; init; }
-    public bool Enabled { get; init; } = true;
-    public IReadOnlyList<string> AllowedTools { get; init; } = [];
-}
-
-public sealed class ModelProfile
-{
-    public required string Name { get; init; }
-    public required string Provider { get; init; }
-    public required string Model { get; init; }
-    public double Temperature { get; init; } = 0.2;
-    public int MaxOutputTokens { get; init; } = 2000;
-    public decimal? MaxCostPerRun { get; init; }
 }
 ```
 
@@ -658,7 +698,23 @@ Supervisor/Codex decides next action
 
 Do not make all agents fully intelligent immediately. The right move is to create the stubs, settings, and model-profile resolution first, then make only the Tester path real.
 
-## 11. Blunt Assessment
+## 11. Documentation Split Rule
+
+This document is useful as an accepted architecture checkpoint, but it should not become a permanent catch-all.
+
+When it grows again, split it into:
+
+- `IRONDEV_SELF_IMPROVEMENT_ARCHITECTURE.md` for stable rules.
+- `IRONDEV_SELF_IMPROVEMENT_ROADMAP.md` for future sequencing.
+- `IRONDEV_SELF_IMPROVEMENT_CHECKPOINT_LOG.md` for completed proof slices.
+
+Until that split happens, keep the distinction clear inside this document:
+
+- Current Operating Rules are authoritative.
+- Checkpoint Log is history.
+- Practical Next Build Order is roadmap.
+
+## 12. Blunt Assessment
 
 The direction is good.
 
@@ -666,13 +722,9 @@ The biggest risk is not whether IronDev can call an LLM or generate code. That p
 
 The real risk is whether IronDev can reliably know what context matters, prove where that context came from, and avoid slowly corrupting its own understanding over many iterations.
 
-That is why the current Memory Spine work is the right move. It is not glamorous, but it is the foundation that decides whether the later self-improvement loop is credible or just another code-generation wrapper.
+That is why the Memory Spine work is the right foundation. It is not glamorous, but it decides whether the later self-improvement loop is credible or just another code-generation wrapper.
 
-The CLI should come next because it gives Codex and future agents a stable way to drive IronDev repeatedly without relying on the UI.
-
-The agent/model-profile layer should be added early because it prevents hardcoded model choices and gives IronDev cost control from day one.
-
-The next serious milestone should be:
+The next serious milestone remains:
 
 > Codex creates a test plan -> Test Agent executes it through the CLI -> IronDev records evidence -> Codex analyses the report -> a traceable ticket or fix proposal is produced.
 
