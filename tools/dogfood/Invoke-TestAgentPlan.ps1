@@ -687,6 +687,109 @@ foreach ($step in $plan.steps) {
                 $summary = "Failure package: $($parsed.markdownPath)"
             }
 
+            "agent_list" {
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "list"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "agent_list exited with code $exitCode"
+                    break
+                }
+
+                $parsed = $capture.output | ConvertFrom-Json
+                $agents = @($parsed.agents)
+                $expectedCount = if ($params.expect_agent_count) { [int]$params.expect_agent_count } else { 8 }
+                $tester = $agents | Where-Object { $_.name -eq "TesterAgent" } | Select-Object -First 1
+
+                if ($agents.Count -ne $expectedCount) {
+                    $status = "FAILED"
+                    $summary = "Expected $expectedCount agents, actual $($agents.Count)."
+                } elseif ($null -eq $tester) {
+                    $status = "FAILED"
+                    $summary = "Expected TesterAgent to be registered."
+                } elseif ($tester.defaultModelProfile -ne "cheap-runner") {
+                    $status = "FAILED"
+                    $summary = "Expected TesterAgent profile cheap-runner, actual $($tester.defaultModelProfile)."
+                } else {
+                    $summary = "Registered agents=$($agents.Count); TesterAgent profile=$($tester.defaultModelProfile)"
+                }
+            }
+
+            "agent_profiles" {
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "profiles"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "agent_profiles exited with code $exitCode"
+                    break
+                }
+
+                $parsed = $capture.output | ConvertFrom-Json
+                $profiles = @($parsed.profiles)
+                $nonOpenAi = @($profiles | Where-Object { $_.Provider -ne "OpenAI" })
+                $cheapRunner = $profiles | Where-Object { $_.Name -eq "cheap-runner" } | Select-Object -First 1
+
+                if ($profiles.Count -lt 5) {
+                    $status = "FAILED"
+                    $summary = "Expected at least 5 model profiles, actual $($profiles.Count)."
+                } elseif ($nonOpenAi.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = "014 allows OpenAI profiles only; found $($nonOpenAi[0].Provider)."
+                } elseif ($null -eq $cheapRunner -or $cheapRunner.Model -ne "gpt-4o-mini") {
+                    $status = "FAILED"
+                    $summary = "Expected cheap-runner to use gpt-4o-mini."
+                } else {
+                    $summary = "Model profiles=$($profiles.Count); provider boundary OpenAI-only."
+                }
+            }
+
+            "agent_tester_run_plan" {
+                $planPath = [string]$params.plan_path
+                $testerRunId = "$RunId-agent-step-$stepNumber"
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "tester", "run-plan",
+                    "--plan", $planPath,
+                    "--run-id", $testerRunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "agent_tester_run_plan exited with code $exitCode"
+                    break
+                }
+
+                $parsed = $capture.output | ConvertFrom-Json
+                if ($parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected TesterAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($parsed.modelProfile -ne "cheap-runner") {
+                    $status = "FAILED"
+                    $summary = "Expected TesterAgent model profile cheap-runner, actual $($parsed.modelProfile)."
+                } elseif ($parsed.provider -ne "OpenAI") {
+                    $status = "FAILED"
+                    $summary = "Expected TesterAgent provider OpenAI, actual $($parsed.provider)."
+                } else {
+                    $summary = "TesterAgent ran plan with profile=$($parsed.modelProfile); summary=$($parsed.summary)"
+                }
+            }
+
             "weaviate_health" {
                 $endpoint = if ($params.endpoint) { [string]$params.endpoint } else { "http://localhost:8080" }
                 $metaUri = "$endpoint/v1/meta"

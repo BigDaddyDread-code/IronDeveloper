@@ -431,6 +431,34 @@ dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj --
 
 `memory search` returns compact JSON with the query, project identity, source document/version ids, raw Weaviate rank/vector score, final IronDev rank/authority score, source links, excerpt, match reason, and a semantic trace id. This is the 013 slice: it proves Codex can fetch grounded IronDev memory before editing, not that Codex automatically obeys that memory during code generation.
 
+## Agent model profiles and stubs
+
+014 adds OpenAI-only model profiles and eight registered agent stubs. Agents reference profile names, not hardcoded model names.
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- agent list
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- agent profiles
+```
+
+The first real agent path is `TesterAgent`, which uses the `cheap-runner` profile and executes an existing Test Agent plan:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  agent tester run-plan `
+  --plan tools\dogfood\test-agent-plans\irondev-codex-memory-search-cli-smoke.json `
+  --run-id IronDevAgentTester014-Smoke `
+  --json
+```
+
+Run the 014 proof:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-agent-model-profiles-smoke.json `
+  -RunId IronDevAgentModelProfiles014 `
+  -Json
+```
+
 The local store lives under:
 
 ```text

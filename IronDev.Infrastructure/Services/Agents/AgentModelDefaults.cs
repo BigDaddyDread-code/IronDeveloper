@@ -1,0 +1,110 @@
+using IronDev.Core.Agents;
+
+namespace IronDev.Infrastructure.Services.Agents;
+
+public static class AgentModelDefaults
+{
+    public static IReadOnlyList<ModelProfile> CreateDefaultProfiles() =>
+    [
+        new()
+        {
+            Name = "cheap-runner",
+            Provider = "OpenAI",
+            Model = "gpt-4o-mini",
+            Temperature = 0.1,
+            MaxOutputTokens = 1200
+        },
+        new()
+        {
+            Name = "standard-reasoner",
+            Provider = "OpenAI",
+            Model = "gpt-4o",
+            Temperature = 0.2,
+            MaxOutputTokens = 3000
+        },
+        new()
+        {
+            Name = "strong-reasoner",
+            Provider = "OpenAI",
+            Model = "gpt-5.5",
+            Temperature = 0.2,
+            MaxOutputTokens = 5000
+        },
+        new()
+        {
+            Name = "code-builder",
+            Provider = "OpenAI",
+            Model = "gpt-5.5",
+            Temperature = 0.1,
+            MaxOutputTokens = 6000
+        },
+        new()
+        {
+            Name = "strong-reviewer",
+            Provider = "OpenAI",
+            Model = "gpt-5.5",
+            Temperature = 0.1,
+            MaxOutputTokens = 4000
+        }
+    ];
+
+    public static IReadOnlyList<AgentDefinition> CreateDefaultDefinitions() =>
+    [
+        new()
+        {
+            Name = "SupervisorAgent",
+            Purpose = "Coordinate the agent workflow and decide when enough evidence exists.",
+            DefaultModelProfile = "strong-reasoner",
+            AllowedTools = ["agent.dispatch", "memory.search", "trace.read"]
+        },
+        new()
+        {
+            Name = "PlannerAgent",
+            Purpose = "Turn vague goals into ordered implementation and validation plans.",
+            DefaultModelProfile = "standard-reasoner",
+            AllowedTools = ["memory.search", "ticket.read", "document.read"]
+        },
+        new()
+        {
+            Name = "ArchitectAgent",
+            Purpose = "Protect architecture direction and update project decisions.",
+            DefaultModelProfile = "strong-reasoner",
+            AllowedTools = ["memory.search", "document.read", "document.write"]
+        },
+        new()
+        {
+            Name = "BuilderAgent",
+            Purpose = "Create implementation proposals from grounded context.",
+            DefaultModelProfile = "code-builder",
+            AllowedTools = ["repo.read", "repo.patch", "test.run"]
+        },
+        new()
+        {
+            Name = "TesterAgent",
+            Purpose = "Execute structured test plans and return compact evidence reports.",
+            DefaultModelProfile = "cheap-runner",
+            AllowedTools = ["cli.run", "test.plan", "logs.read"]
+        },
+        new()
+        {
+            Name = "QualityAgent",
+            Purpose = "Run deterministic code quality, format, build, and package checks.",
+            DefaultModelProfile = "cheap-runner",
+            AllowedTools = ["dotnet.build", "dotnet.test", "dotnet.format", "package.audit"]
+        },
+        new()
+        {
+            Name = "RetrieverAgent",
+            Purpose = "Select project memory with metadata-aware filtering and ranking.",
+            DefaultModelProfile = "cheap-runner",
+            AllowedTools = ["memory.search", "memory.trace"]
+        },
+        new()
+        {
+            Name = "CriticAgent",
+            Purpose = "Challenge assumptions, detect drift, and review deeper risks.",
+            DefaultModelProfile = "strong-reviewer",
+            AllowedTools = ["memory.search", "trace.read", "repo.read"]
+        }
+    ];
+}

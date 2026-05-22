@@ -1,49 +1,102 @@
+---
+id: agent-model-settings
+title: AGENT_MODEL_SETTINGS
+version: 2
+status: accepted
+project: IronDev
+type: architecture
+document_type: Architecture
+authority: Accepted
+created: 2026-05-22
+created_utc: 2026-05-22T00:42:43.6489925+00:00
+source: dogfood-discussion
+dogfood_run_id: DogfoodDocsSeed-20260522-014
+---
+
 # IronDev Agent Model Settings
 
 ## Purpose
 
-IronDev should choose models by agent role, not by one global chat setting.
+IronDev chooses models by agent role, not by one global chat setting.
 
-Cheap, fast models should handle literal execution, routing smoke tests, summarisation, and low-risk transformation work. Stronger models should handle high-level planning, ambiguous failure diagnosis, build proposal review, and code-facing reasoning.
+014 keeps the provider boundary deliberately narrow: model profiles are OpenAI-only for now, but agents reference profile names instead of hardcoded model names. Later provider expansion should happen behind the profile resolver, not inside individual agents.
 
-## Initial Roles
+## Model Profiles
 
-| Role | Default Tier | Purpose |
+| Profile | Provider | Default model | Purpose |
+| --- | --- | --- | --- |
+| `cheap-runner` | OpenAI | `gpt-4o-mini` | Literal execution, Test Agent, quality checks, retrieval shaping |
+| `standard-reasoner` | OpenAI | `gpt-4o` | Planning and ordinary reasoning |
+| `strong-reasoner` | OpenAI | `gpt-5.5` | Architecture and supervision decisions |
+| `code-builder` | OpenAI | `gpt-5.5` | Code proposal generation |
+| `strong-reviewer` | OpenAI | `gpt-5.5` | Critic/review gates |
+
+## Agent Defaults
+
+| Agent | Default model profile | Purpose |
 | --- | --- | --- |
-| `ContextRouter` | Cheap | Route user messages, detect action intent, and block unsafe prose fallback. |
-| `TestAgent` | Cheap | Execute structured plans and report results. It does not patch code. |
-| `Summarizer` | Cheap | Compress traces, test reports, and conversation history. |
-| `KnowledgeImporter` | Cheap/Medium | Convert external notes into reviewable discussion documents. |
-| `BuildPlanner` | Strong | Create ticket implementation plans and affected-file proposals. |
-| `FailureDiagnoser` | Medium/Strong | Analyse failed replay/build/test evidence and propose likely fix areas. |
-| `CodeProposalReviewer` | Strong | Review proposed code changes before approval. |
+| `SupervisorAgent` | `strong-reasoner` | Coordinate agent workflow and decide when enough evidence exists |
+| `PlannerAgent` | `standard-reasoner` | Turn vague goals into ordered plans |
+| `ArchitectAgent` | `strong-reasoner` | Protect technical direction and architecture decisions |
+| `BuilderAgent` | `code-builder` | Create implementation proposals from grounded context |
+| `TesterAgent` | `cheap-runner` | Execute structured plans and return compact evidence reports |
+| `QualityAgent` | `cheap-runner` | Run deterministic build/test/format/package checks |
+| `RetrieverAgent` | `cheap-runner` | Select project memory with metadata-aware filtering |
+| `CriticAgent` | `strong-reviewer` | Challenge assumptions and review deeper risks |
 
 ## Settings Shape
 
 ```json
 {
-  "agent_model_settings": [
-    {
-      "agent_role": "TestAgent",
-      "provider": "OpenAI",
-      "model": "gpt-4o-mini",
-      "temperature": 0.1,
-      "max_tokens": 1200,
-      "fallback_model": "gpt-4o-mini",
-      "enabled": true
+  "ModelProfiles": {
+    "cheap-runner": {
+      "Provider": "OpenAI",
+      "Model": "gpt-4o-mini",
+      "Temperature": 0.1,
+      "MaxOutputTokens": 1200
     },
-    {
-      "agent_role": "BuildPlanner",
-      "provider": "OpenAI",
-      "model": "gpt-5.5",
-      "temperature": 0.2,
-      "max_tokens": 8000,
-      "fallback_model": "gpt-5.4",
-      "enabled": true
+    "standard-reasoner": {
+      "Provider": "OpenAI",
+      "Model": "gpt-4o",
+      "Temperature": 0.2,
+      "MaxOutputTokens": 3000
+    },
+    "strong-reasoner": {
+      "Provider": "OpenAI",
+      "Model": "gpt-5.5",
+      "Temperature": 0.2,
+      "MaxOutputTokens": 5000
+    },
+    "code-builder": {
+      "Provider": "OpenAI",
+      "Model": "gpt-5.5",
+      "Temperature": 0.1,
+      "MaxOutputTokens": 6000
+    },
+    "strong-reviewer": {
+      "Provider": "OpenAI",
+      "Model": "gpt-5.5",
+      "Temperature": 0.1,
+      "MaxOutputTokens": 4000
     }
-  ]
+  }
 }
 ```
+
+## 014 Implementation Boundary
+
+014 adds the shared skeleton only:
+
+- `ModelProfile`
+- `AgentDefinition`
+- `IIronDevAgent`
+- `IAgentRegistry`
+- `IAgentModelResolver`
+- `IAgentRunner`
+- eight registered agent stubs
+- one working `TesterAgent` path that executes an existing Test Agent plan
+
+The other seven agents are registered but intentionally not intelligent yet. They return skipped/static results until their proof slices exist.
 
 ## Trace Requirement
 
@@ -53,7 +106,7 @@ Every LLM or agent trace should eventually record:
 - `AgentRole`
 - `Provider`
 - `Model`
-- `PromptVariantId` when applicable
+- `ModelProfile`
 - dry-run/write mode
 - cost estimate when available
 
