@@ -13,8 +13,10 @@ using IronDev.Agent.ViewModels.Workflow;
 using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Agent.Views;
 using IronDev.Agent.Services;
+using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Agent.Services.Interfaces;
 using IronDev.Agent.Services.Mock;
+using IronDev.Agent.Services.Testing;
 
 namespace IronDev.Agent;
 
@@ -79,7 +81,12 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
                 services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
                 services.AddTransient<global::IronDev.Services.IProjectContextExportService, global::IronDev.Infrastructure.Services.ProjectContextExportService>();
-                services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IProjectDocumentService,
+                    global::IronDev.Services.ProjectDocumentService>();
+                services.AddSingleton<
+                    global::IronDev.Core.Interfaces.IMarkdownRenderService,
+                    global::IronDev.Infrastructure.Services.MarkdownRenderService>();
                 services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
                 services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
                 services.AddSingleton<global::IronDev.Agent.Services.IAppSettingsService, global::IronDev.Agent.Services.AppSettingsService>();
@@ -87,7 +94,19 @@ public partial class App : Application
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.BuilderWorkspaceViewModel>();
                 services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.ProjectProfileViewModel>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDiscussionSeedService,
+                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.DiscussionSeedService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IDiscussionResolverService,
+                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.DiscussionResolverService>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IKnowledgeArtefactApplyService,
+                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.KnowledgeArtefactApplyService>();
                 services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
+                services.AddTransient<
+                    global::IronDev.Core.Interfaces.IChatCommandRouter,
+                    global::IronDev.Infrastructure.Services.ChatCommandRouter>();
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentService,
                     global::IronDev.Infrastructure.Services.ContextAgentService>();
@@ -97,6 +116,8 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IContextAgentRouteJudge,
                     global::IronDev.Infrastructure.Services.ContextAgentRouteJudgeService>();
+                // ── Code intelligence (semantic indexers, snapshot, grounding, prompt/parse) ──
+                services.AddCodeIntelligenceServices();
 
                 var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
                                 ?? new global::IronDev.Core.Models.LlmOptions();
@@ -141,7 +162,12 @@ public partial class App : Application
 
                 // ── Workspace ViewModels ──────────────────────────────────────
                 services.AddTransient<ChatWorkspaceViewModel>();
+                services.AddTransient<KnowledgeCompilerViewModel>();
+                services.AddTransient<DocumentsWorkspaceViewModel>();
                 services.AddTransient<TicketsWorkspaceViewModel>();
+                services.AddSingleton<IScreenshotCaptureService, ScreenshotCaptureService>();
+                services.AddSingleton<ITestingCompanionAgent, TestingCompanionAgent>();
+                services.AddSingleton<TestingCompanionViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();
                 services.AddSingleton<PromptPlaygroundViewModel>(sp =>
@@ -158,11 +184,11 @@ public partial class App : Application
                         sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
                 services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel(
                     sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>(),
-                    sp.GetRequiredService<global::IronDev.Agent.Services.IAppSettingsService>())
-                {
-                    PromptPlaygroundFactory = () => sp.GetRequiredService<PromptPlaygroundViewModel>(),
-                    LlmConsoleFactory       = () => sp.GetRequiredService<LlmConsoleViewModel>()
-                });
+                    sp.GetRequiredService<global::IronDev.Agent.Services.IAppSettingsService>()));
+                services.AddSingleton(sp => new DevToolsWorkspaceViewModel(
+                    () => sp.GetRequiredService<LlmConsoleViewModel>(),
+                    () => sp.GetRequiredService<TestingCompanionViewModel>(),
+                    () => sp.GetRequiredService<PromptPlaygroundViewModel>()));
 
 
                 // Shell

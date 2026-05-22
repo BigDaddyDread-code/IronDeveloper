@@ -1,0 +1,45 @@
+<Window x:Class="IronDev.Agent.Views.Workspaces.ScreenshotPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Screenshot Preview"
+        Width="1280"
+        Height="820"
+        MinWidth="720"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource Background/App}">
+    <Border BorderBrush="{StaticResource Border/Subtle}"
+            BorderThickness="1"
+            Padding="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock DockPanel.Dock="Right"
+                           Text="Resize this window to inspect the capture"
+                           Foreground="{StaticResource Text/Muted}"
+                           FontSize="11"
+                           VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Title}"
+                           Foreground="{StaticResource Text/Primary}"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+
+            <Border Grid.Row="1"
+                    Background="{StaticResource Background/Interactive}"
+                    BorderBrush="{StaticResource Border/Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    ClipToBounds="True">
+                <Image Source="{Binding ImagePath}"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

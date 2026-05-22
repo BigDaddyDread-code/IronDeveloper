@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -23,14 +25,20 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly ProjectHubViewModel  _hubVm;
     private readonly CreateProjectViewModel _createVm;
     private readonly ProjectOverviewViewModel _overviewVm;
+    private readonly KnowledgeCompilerViewModel _knowledgeCompilerVm;
     private readonly ChatWorkspaceViewModel   _chatVm;
     private readonly TicketsWorkspaceViewModel _ticketsVm;
+    private readonly TestingCompanionViewModel _testingVm;
     private readonly DecisionsWorkspaceViewModel _decisionsVm;
+    private readonly DocumentsWorkspaceViewModel _documentsVm;
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
+    private readonly DevToolsWorkspaceViewModel _devToolsVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
     private readonly BuilderWorkspaceViewModel   _builderVm;
     private readonly ProjectProfileViewModel     _profileVm;
     private readonly AgentTenantContext          _tenantContext;
+    private readonly Dictionary<ProjectWorkspace, bool> _inspectorCollapsedByWorkspace = new();
+    private ProjectWorkspace _lastWorkspaceBeforeTesting = ProjectWorkspace.Overview;
 
     // ── Observable shell state ────────────────────────────────────────────────
 
@@ -76,6 +84,51 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool ShowHeader  => HasActiveProject && CurrentShellMode == ShellMode.ProjectActive;
     public bool StatusNeedsIndex => IsIndexActionableStatus(ActiveStatus);
     public bool StatusCanIndex => IsIndexActionableStatus(ActiveStatus);
+    public bool CanUseTestingCompanion => true;
+    public TestingCompanionViewModel TestingCompanion => _testingVm;
+    [ObservableProperty] private bool _isContextInspectorCollapsed;
+    public string CurrentWorkspaceDisplayName => GetWorkspaceDisplayName(CurrentWorkspace);
+    public string ContextDomain => IsIronDevProductContext() ? "IronDev Product" : "External Project";
+    public string MemoryStatusText => string.IsNullOrWhiteSpace(ActiveStatus)
+        ? "Memory unknown"
+        : $"Index {ActiveStatus}";
+    public string SelectedObjectContextText => CurrentView switch
+    {
+        DocumentsWorkspaceViewModel documents => documents.SelectedDocument?.Title ?? "No document selected",
+        TicketsWorkspaceViewModel tickets => tickets.SelectedTicket?.Title ?? (tickets.HasDetail ? tickets.EditTitle : "No ticket selected"),
+        DecisionsWorkspaceViewModel => "Project knowledge",
+        ChatWorkspaceViewModel => "Current conversation",
+        KnowledgeCompilerViewModel knowledgeCompiler => knowledgeCompiler.SelectedDiscussion?.Title ?? "Knowledge Compiler",
+        TestingCompanionViewModel => "Testing session",
+        BuilderWorkspaceViewModel => "Build workflow",
+        DevToolsWorkspaceViewModel => "Diagnostics workspace",
+        _ => CurrentWorkspaceDisplayName
+    };
+    public string SourceVersionContextText => CurrentView switch
+    {
+        DocumentsWorkspaceViewModel documents => documents.SelectedVersion?.VersionLabel is { Length: > 0 } version
+            ? $"Source/version: {version}"
+            : "Source/version: none selected",
+        TicketsWorkspaceViewModel tickets when tickets.SelectedTicket != null => $"Source: Ticket #{tickets.SelectedTicket.Id}",
+        KnowledgeCompilerViewModel => "Source: project summary, discussions, and proposals",
+        DevToolsWorkspaceViewModel => "Source: traces, test reports, and prompt runs",
+        _ => "Source/version: current workspace"
+    };
+    public string RelatedContextText => CurrentWorkspace switch
+    {
+        ProjectWorkspace.Documents => "Related tickets and decisions load from document context.",
+        ProjectWorkspace.Tickets => "Related docs, decisions, and build traces load from ticket context.",
+        ProjectWorkspace.Chat => "Related memory appears in route and LLM traces.",
+        ProjectWorkspace.Discovery => $"Discussions: {_knowledgeCompilerVm.DiscussionDocuments.Count} | Proposals: {_knowledgeCompilerVm.Proposals.Count} | Selected: {_knowledgeCompilerVm.Proposals.Count(p => p.IsSelected)}",
+        ProjectWorkspace.DevTools => "LLM traces, test defects, and prompt experiments.",
+        _ => "Related items are available in workspace-specific panels."
+    };
+    public string LatestTraceContextText => CurrentWorkspace switch
+    {
+        ProjectWorkspace.DevTools => "Trace tools are open in this workspace.",
+        ProjectWorkspace.Discovery => "Apply selected proposals to create project memory.",
+        _ => "Open Dev Tools for LLM and route traces."
+    };
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -84,10 +137,14 @@ public sealed partial class ShellViewModel : ObservableObject
         ProjectHubViewModel        hubVm,
         CreateProjectViewModel     createVm,
         ProjectOverviewViewModel   overviewVm,
+        KnowledgeCompilerViewModel knowledgeCompilerVm,
         ChatWorkspaceViewModel     chatVm,
         TicketsWorkspaceViewModel  ticketsVm,
-        DecisionsWorkspaceViewModel         decisionsVm,
+        TestingCompanionViewModel  testingVm,
+        DecisionsWorkspaceViewModel          decisionsVm,
+        DocumentsWorkspaceViewModel          documentsVm,
         ImplementationPlansWorkspaceViewModel plansVm,
+        DevToolsWorkspaceViewModel           devToolsVm,
         SettingsWorkspaceViewModel  settingsVm,
         BuilderWorkspaceViewModel   builderVm,
         ProjectProfileViewModel     profileVm,
@@ -97,10 +154,14 @@ public sealed partial class ShellViewModel : ObservableObject
         _hubVm       = hubVm;
         _createVm    = createVm;
         _overviewVm  = overviewVm;
+        _knowledgeCompilerVm = knowledgeCompilerVm;
         _chatVm      = chatVm;
         _ticketsVm   = ticketsVm;
+        _testingVm   = testingVm;
         _decisionsVm = decisionsVm;
+        _documentsVm = documentsVm;
         _plansVm     = plansVm;
+        _devToolsVm  = devToolsVm;
         _settingsVm  = settingsVm;
         _builderVm   = builderVm;
         _profileVm   = profileVm;
@@ -143,6 +204,17 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Ticket → Builder Proposal bridge
+        _ticketsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(TicketsWorkspaceViewModel.SelectedTicket) or nameof(TicketsWorkspaceViewModel.EditTitle) or nameof(TicketsWorkspaceViewModel.HasDetail))
+                RaiseContextInspectorProperties();
+        };
+        _documentsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(DocumentsWorkspaceViewModel.SelectedDocument) or nameof(DocumentsWorkspaceViewModel.SelectedVersion))
+                RaiseContextInspectorProperties();
+        };
+
         _ticketsVm.OnRequestProposal = (ticketId) =>
         {
             _ = _builderVm.GenerateProposalForTicketAsync(ticketId);
@@ -159,8 +231,6 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Chat → Ticket draft review bridge
-        // Phase 1-3: navigates to Tickets in draft mode with stub-generated draft.
-        // Phase 4: DraftTicketService will call the real LLM.
         _chatVm.OnCreateTicketFromChat = (ctx) =>
         {
             _ = _ticketsVm.BeginDraftFromChatAsync(ctx);
@@ -181,8 +251,9 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentView = _chatVm;
         };
 
+        _testingVm.OnRequestReturnToWork = NavigateBackFromTesting;
+
         // Ticket draft approved with plan → navigate to Plans after save
-        // Receives: title, goal, steps, filePaths, symbols, scope, risksNotes
         _ticketsVm.OnApproveDraftWithPlan = (title, goal, steps, filePaths, symbols, scope, risks) =>
         {
             _plansVm.PrefillFromChat(title, goal, steps, filePaths, symbols, scope, risks);
@@ -208,11 +279,25 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // Chat → Decision creation bridge
-        _chatVm.OnCreateDecisionFromChat = (title, detail, linkedFilePaths, linkedSymbols) =>
+        _chatVm.OnCreateDecisionFromChat = (title, detail, linkedFilePaths, linkedSymbols, sourceDocumentId) =>
         {
-            _decisionsVm.PrefillFromChat(title, detail, linkedFilePaths, linkedSymbols);
+            _decisionsVm.PrefillFromChat(title, detail, linkedFilePaths, linkedSymbols, sourceDocumentId);
             CurrentWorkspace = ProjectWorkspace.Decisions;
             CurrentView = _decisionsVm;
+        };
+
+        _chatVm.OnCreateDocumentFromChat = (title, content, summary, linkedFilePaths, linkedSymbols, sourceDocumentId) =>
+        {
+            _decisionsVm.PrefillDocumentFromChat(title, content, summary, linkedFilePaths, linkedSymbols, sourceDocumentId);
+            CurrentWorkspace = ProjectWorkspace.Decisions;
+            CurrentView = _decisionsVm;
+        };
+
+        _decisionsVm.OnDiscussDocumentInChat = (prompt) =>
+        {
+            _chatVm.PromptText = prompt;
+            CurrentWorkspace = ProjectWorkspace.Chat;
+            CurrentView = _chatVm;
         };
 
         // Chat quick-nav: Plans / Tickets / Decisions
@@ -233,8 +318,6 @@ public sealed partial class ShellViewModel : ObservableObject
         };
 
         // ── Propagate SettingsWorkspaceViewModel flags → Chat VM ─────────────
-        // UseContextAgent: toggled in Settings BEHAVIOUR panel; read by
-        // ChatWorkspaceViewModel.SendMessageAsync on every send.
         _chatVm.UseContextAgent = _settingsVm.UseContextAgent; // sync initial value
         _settingsVm.PropertyChanged += (_, e) =>
         {
@@ -256,19 +339,35 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
         }
 
+        if (!HasActiveProject || CurrentShellMode != ShellMode.ProjectActive)
+            return;
+
         if (!System.Enum.TryParse<ProjectWorkspace>(workspaceName, out var ws)) return;
+        if (!ConfirmDiscardDirtyWorkspace())
+            return;
+
+        if (ws == ProjectWorkspace.Testing && CurrentWorkspace != ProjectWorkspace.Testing)
+        {
+            _lastWorkspaceBeforeTesting = CurrentWorkspace;
+            _testingVm.SetReturnWorkspace(GetWorkspaceDisplayName(_lastWorkspaceBeforeTesting));
+        }
+
         CurrentWorkspace = ws;
         CurrentView = ws switch
         {
-            ProjectWorkspace.Overview   => _overviewVm,
-            ProjectWorkspace.Chat       => _chatVm,
-            ProjectWorkspace.Tickets    => _ticketsVm,
-            ProjectWorkspace.Plans      => _plansVm,
-            ProjectWorkspace.Decisions  => _decisionsVm,
-            ProjectWorkspace.Settings   => _settingsVm,
-            ProjectWorkspace.Builder    => _builderVm,
+            ProjectWorkspace.Overview       => _overviewVm,
+            ProjectWorkspace.Discovery      => _knowledgeCompilerVm,
+            ProjectWorkspace.Chat           => _chatVm,
+            ProjectWorkspace.Tickets        => _ticketsVm,
+            ProjectWorkspace.Testing        => _testingVm,
+            ProjectWorkspace.Plans          => _plansVm,
+            ProjectWorkspace.Decisions      => _decisionsVm,
+            ProjectWorkspace.Documents      => _documentsVm,
+            ProjectWorkspace.DevTools       => _devToolsVm,
+            ProjectWorkspace.Settings       => _settingsVm,
+            ProjectWorkspace.Builder        => _builderVm,
             ProjectWorkspace.ProjectProfile => _profileVm,
-            _                           => _overviewVm
+            _                               => _overviewVm
         };
     }
 
@@ -330,6 +429,80 @@ public sealed partial class ShellViewModel : ObservableObject
 
     // ── Private navigation helpers ───────────────────────────────────────────
 
+    public async Task MarkTestingMomentAsync()
+    {
+        if (CurrentWorkspace != ProjectWorkspace.Testing)
+        {
+            _lastWorkspaceBeforeTesting = CurrentWorkspace;
+            _testingVm.SetReturnWorkspace(GetWorkspaceDisplayName(_lastWorkspaceBeforeTesting));
+        }
+
+        await _testingVm.EnsureSessionStartedAsync();
+
+        await _testingVm.MarkMomentForWorkspaceAsync(GetActiveTestingContextName());
+    }
+
+    public async Task EnsureTestingSessionStartedAsync()
+    {
+        if (CurrentWorkspace != ProjectWorkspace.Testing)
+        {
+            _lastWorkspaceBeforeTesting = CurrentWorkspace;
+            _testingVm.SetReturnWorkspace(GetWorkspaceDisplayName(_lastWorkspaceBeforeTesting));
+        }
+
+        await _testingVm.EnsureSessionStartedAsync();
+    }
+
+    private void NavigateBackFromTesting()
+    {
+        if (!HasActiveProject || CurrentShellMode != ShellMode.ProjectActive)
+            return;
+
+        NavigateWorkspace(_lastWorkspaceBeforeTesting.ToString());
+    }
+
+    private string GetActiveTestingContextName()
+    {
+        if (CurrentShellMode != ShellMode.ProjectActive)
+            return CurrentShellMode.ToString();
+
+        return GetWorkspaceDisplayName(CurrentWorkspace);
+    }
+
+    private static string GetWorkspaceDisplayName(ProjectWorkspace workspace)
+        => workspace switch
+        {
+            ProjectWorkspace.ProjectProfile => "Profile",
+            ProjectWorkspace.Discovery => "Discovery",
+            _ => workspace.ToString()
+        };
+
+    private bool ConfirmDiscardDirtyWorkspace()
+    {
+        if (CurrentView is not IWorkspaceDirtyState dirty || !dirty.HasDirtyEditState)
+            return true;
+
+        var message = string.IsNullOrWhiteSpace(dirty.DirtyEditMessage)
+            ? "You have unsaved changes. Leave this workspace and discard them?"
+            : dirty.DirtyEditMessage;
+
+        return MessageBox.Show(
+            message,
+            "Unsaved Changes",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
+    private bool IsIronDevProductContext()
+    {
+        if (!string.IsNullOrWhiteSpace(ActiveProjectName) &&
+            ActiveProjectName.Contains("IronDev", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return !string.IsNullOrWhiteSpace(ActiveProjectPath) &&
+               ActiveProjectPath.Contains("IronDeveloper", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void NavigateToHub()
     {
         IsAuthenticated = true;
@@ -382,9 +555,12 @@ public sealed partial class ShellViewModel : ObservableObject
             // Populate child ViewModels with real data
             await Task.WhenAll(
                 _overviewVm.LoadAsync(project),
+                _knowledgeCompilerVm.LoadAsync(project),
                 _chatVm.LoadAsync(project),
                 _ticketsVm.LoadAsync(project),
+                _testingVm.LoadAsync(project),
                 _decisionsVm.LoadAsync(project),
+                _documentsVm.LoadAsync(project),
                 _plansVm.LoadAsync(project),
                 _profileVm.LoadAsync(project)
             );
@@ -407,22 +583,15 @@ public sealed partial class ShellViewModel : ObservableObject
             if (ActiveStatus == "Checking...")
                 ActiveStatus = "Offline";
 
-            // Task 3: Ensure opening a project sets a default workspace
             if (CurrentWorkspace == default)
-            {
                 CurrentWorkspace = ProjectWorkspace.Overview;
-            }
 
-            // Task 4: Ensure CurrentView is assigned and NavigateWorkspace is called
             NavigateWorkspace(CurrentWorkspace.ToString());
             if (CurrentView == null)
-            {
                 CurrentView = _overviewVm;
-            }
 
             RaiseAllActiveProjectProperties();
 
-            // Task 2: Add temporary debug logging after ActivateProjectAsync completes
             Serilog.Log.Information("[ShellDebug] Project activation diagnostics complete: ProjectName='{ProjectName}', Path='{Path}', Model='{Model}', Status='{Status}', Workspace='{Workspace}', ViewIsNull='{ViewIsNull}', View='{View}', ShowHeader='{ShowHeader}', HasActiveProject='{HasActiveProject}'",
                 ActiveProjectName, ActiveProjectPath, ActiveModel, ActiveStatus, CurrentWorkspace, CurrentView == null, CurrentView?.GetType().FullName, ShowHeader, HasActiveProject);
 
@@ -450,6 +619,18 @@ public sealed partial class ShellViewModel : ObservableObject
         OnPropertyChanged(nameof(HasActiveProject));
         OnPropertyChanged(nameof(CurrentView));
         OnPropertyChanged(nameof(CurrentWorkspace));
+        OnPropertyChanged(nameof(CurrentWorkspaceDisplayName));
+        OnPropertyChanged(nameof(ContextDomain));
+        OnPropertyChanged(nameof(MemoryStatusText));
+        RaiseContextInspectorProperties();
+    }
+
+    private void RaiseContextInspectorProperties()
+    {
+        OnPropertyChanged(nameof(SelectedObjectContextText));
+        OnPropertyChanged(nameof(SourceVersionContextText));
+        OnPropertyChanged(nameof(RelatedContextText));
+        OnPropertyChanged(nameof(LatestTraceContextText));
     }
 
     private static bool IsIndexActionableStatus(string status)
@@ -468,7 +649,19 @@ public sealed partial class ShellViewModel : ObservableObject
 
     partial void OnCurrentWorkspaceChanged(ProjectWorkspace value)
     {
+        IsContextInspectorCollapsed = _inspectorCollapsedByWorkspace.TryGetValue(value, out var collapsed) && collapsed;
         RaiseAllActiveProjectProperties();
+    }
+
+    partial void OnIsContextInspectorCollapsedChanged(bool value)
+    {
+        if (CurrentShellMode == ShellMode.ProjectActive)
+            _inspectorCollapsedByWorkspace[CurrentWorkspace] = value;
+    }
+
+    partial void OnCurrentViewChanged(object value)
+    {
+        RaiseContextInspectorProperties();
     }
 
     partial void OnHasActiveProjectChanged(bool value)

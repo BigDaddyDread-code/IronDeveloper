@@ -60,12 +60,20 @@
                 <vwf:ProjectOverviewView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type ws:KnowledgeCompilerViewModel}">
+                <vws:KnowledgeCompilerView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type ws:ChatWorkspaceViewModel}">
                 <vws:ChatWorkspaceView/>
             </DataTemplate>
 
             <DataTemplate DataType="{x:Type ws:TicketsWorkspaceViewModel}">
                 <vws:TicketsWorkspaceView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type ws:TestingCompanionViewModel}">
+                <vws:TestingCompanionView/>
             </DataTemplate>
 
             <DataTemplate DataType="{x:Type ws:ImplementationPlansWorkspaceViewModel}">
@@ -76,8 +84,16 @@
                 <vws:DecisionsWorkspaceView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type ws:DocumentsWorkspaceViewModel}">
+                <vws:DocumentsWorkspaceView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type ws:SettingsWorkspaceViewModel}">
                 <vws:SettingsWorkspaceView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type ws:DevToolsWorkspaceViewModel}">
+                <vws:DevToolsWorkspaceView/>
             </DataTemplate>
 
             <DataTemplate DataType="{x:Type ws:BuilderWorkspaceViewModel}">

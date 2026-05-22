@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
@@ -15,7 +17,7 @@ using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
-public sealed partial class TicketsWorkspaceViewModel : ObservableObject
+public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorkspaceDirtyState
 {
     private readonly global::IronDev.Services.ITicketService         _ticketService;
     private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
@@ -63,31 +65,33 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     private string _editTestsManualTests      = string.Empty;
     private string _editTestsRegressionTests  = string.Empty;
     private string _editTestsBuildValidation  = string.Empty;
+    private bool _suppressTicketDirtyTracking;
+    private bool _hasUnsavedTicketChanges;
 
     public string EditTestsUnitTests
     {
         get => _editTestsUnitTests;
-        set { if (SetProperty(ref _editTestsUnitTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsUnitTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsIntegrationTests
     {
         get => _editTestsIntegrationTests;
-        set { if (SetProperty(ref _editTestsIntegrationTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsIntegrationTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsManualTests
     {
         get => _editTestsManualTests;
-        set { if (SetProperty(ref _editTestsManualTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsManualTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsRegressionTests
     {
         get => _editTestsRegressionTests;
-        set { if (SetProperty(ref _editTestsRegressionTests, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsRegressionTests, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
     public string EditTestsBuildValidation
     {
         get => _editTestsBuildValidation;
-        set { if (SetProperty(ref _editTestsBuildValidation, value)) SyncTestsToTechnicalNotes(); }
+        set { if (SetProperty(ref _editTestsBuildValidation, value)) { MarkTicketDirty(); SyncTestsToTechnicalNotes(); } }
     }
 
     /// <summary>Full formatted test plan — used by AI builder context.</summary>
@@ -97,8 +101,31 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     // EditTechnicalNotes is set (including direct assignment from load methods).
     partial void OnEditTechnicalNotesChanged(string value)
     {
-        SyncTechnicalNotesToTests();
+        MarkTicketDirty();
+        if (!_suppressTicketDirtyTracking)
+            SyncTechnicalNotesToTests();
     }
+
+    partial void OnEditTitleChanged(string value)
+    {
+        MarkTicketDirty();
+        SaveTicketCommand.NotifyCanExecuteChanged();
+    }
+    partial void OnEditStatusChanged(string value) => MarkTicketDirty();
+    partial void OnEditPriorityChanged(string value) => MarkTicketDirty();
+    partial void OnEditTicketTypeChanged(string value) => MarkTicketDirty();
+    partial void OnEditSummaryChanged(string value) => MarkTicketDirty();
+    partial void OnEditBackgroundChanged(string value) => MarkTicketDirty();
+    partial void OnEditProblemChanged(string value) => MarkTicketDirty();
+    partial void OnEditAcceptanceCriteriaChanged(string value) => MarkTicketDirty();
+    partial void OnEditLinkedFilePathsChanged(string value) => MarkTicketDirty();
+    partial void OnEditLinkedSymbolsChanged(string value) => MarkTicketDirty();
+
+    partial void OnHasDetailChanged(bool value) => SaveTicketCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsSavingChanged(bool value) => SaveTicketCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsDraftModeChanged(bool value) => SaveTicketCommand.NotifyCanExecuteChanged();
 
     // ── Implementation Plan ──
     [ObservableProperty] private TicketDetailTab _activeTab = TicketDetailTab.Overview;
@@ -144,6 +171,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     /// <summary>True when the Archive button should be enabled.</summary>
     public bool CanArchiveTicket => SelectedTicket != null && !IsDraftMode && !IsBuildingTicket && !IsSaving;
+    public bool CanSaveTicket => HasDetail && !IsSaving && !IsDraftMode && HasDirtyEditState && !string.IsNullOrWhiteSpace(EditTitle);
+    public bool HasDirtyEditState => _hasUnsavedTicketChanges && HasDetail && !IsSaving && !IsDraftMode;
+    public string DirtyEditMessage => "This ticket has unsaved edit text. Leave Tickets and discard those changes?";
 
     // ── Draft Ticket state ────────────────────────────────────────────────────
     [ObservableProperty] 
@@ -155,6 +185,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     // ── Codebase Ticket Generation state ──────────────────────────────────────
     [ObservableProperty] private bool _isGeneratingCodebaseTickets;
+    public CodexTicketReviewViewModel CodexReview { get; }
 
 
     // ── Draft Preflight state ─────────────────────────────────────────────────
@@ -226,6 +257,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         _generatorService = generatorService;
         _readinessService = readinessService;
         _llmTraceService  = llmTraceService;
+        CodexReview = new CodexTicketReviewViewModel(
+            GenerateCodexTicketsForReviewAsync,
+            ImportCodexReviewTicketsAsync);
     }
 
     // ── Load ────────────────────────────────────────────────────────────────
@@ -291,62 +325,80 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
     private void LoadTicketIntoEditor(TicketItem item)
     {
-        IsNewTicket = item.Id == 0;
-        IsEditing = true;
-        HasDetail = true;
-        ActiveTab = TicketDetailTab.Overview;
-
-        EditId                   = item.Id;
-        EditTitle                = item.Title;
-        EditStatus               = item.Status;
-        EditPriority             = item.Priority;
-        EditTicketType           = item.TicketType;
-        EditSummary              = item.Summary ?? string.Empty;
-        EditBackground           = item.Background ?? string.Empty;
-        EditProblem              = item.Problem ?? string.Empty;
-        EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
-        EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(item.UnitTests) || !string.IsNullOrWhiteSpace(item.IntegrationTests))
+        _suppressTicketDirtyTracking = true;
+        try
         {
-            _editTestsUnitTests        = item.UnitTests ?? string.Empty;
-            _editTestsIntegrationTests = item.IntegrationTests ?? string.Empty;
-            _editTestsManualTests      = item.ManualTests ?? string.Empty;
-            _editTestsRegressionTests  = item.RegressionTests ?? string.Empty;
-            _editTestsBuildValidation  = item.BuildValidation ?? string.Empty;
-            SyncTestsToTechnicalNotes();
-        }
-        else
-        {
-            SyncTechnicalNotesToTests();
-        }
-        EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
-        EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+            IsNewTicket = item.Id == 0;
+            IsEditing = true;
+            HasDetail = true;
+            ActiveTab = TicketDetailTab.Overview;
 
-        SaveStatus = string.Empty;
+            EditId                   = item.Id;
+            EditTitle                = item.Title;
+            EditStatus               = item.Status;
+            EditPriority             = item.Priority;
+            EditTicketType           = item.TicketType;
+            EditSummary              = item.Summary ?? string.Empty;
+            EditBackground           = item.Background ?? string.Empty;
+            EditProblem              = item.Problem ?? string.Empty;
+            EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
+            EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(item.UnitTests) || !string.IsNullOrWhiteSpace(item.IntegrationTests))
+            {
+                _editTestsUnitTests        = item.UnitTests ?? string.Empty;
+                _editTestsIntegrationTests = item.IntegrationTests ?? string.Empty;
+                _editTestsManualTests      = item.ManualTests ?? string.Empty;
+                _editTestsRegressionTests  = item.RegressionTests ?? string.Empty;
+                _editTestsBuildValidation  = item.BuildValidation ?? string.Empty;
+                SyncTestsToTechnicalNotes();
+            }
+            else
+            {
+                SyncTechnicalNotesToTests();
+            }
+            EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
+            EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+
+            SaveStatus = string.Empty;
+        }
+        finally
+        {
+            _suppressTicketDirtyTracking = false;
+            ClearTicketDirtyState();
+        }
     }
 
     private async Task LoadTicketIntoEditorAsync(TicketItem item)
     {
-        IsNewTicket = false;
-        IsEditing = true;
-        HasDetail = true;
-        ActiveTab = TicketDetailTab.Overview;
+        _suppressTicketDirtyTracking = true;
+        try
+        {
+            IsNewTicket = false;
+            IsEditing = true;
+            HasDetail = true;
+            ActiveTab = TicketDetailTab.Overview;
 
-        EditId                   = item.Id;
-        EditTitle                = item.Title;
-        EditStatus               = item.Status;
-        EditPriority             = item.Priority;
-        EditTicketType           = item.TicketType;
-        EditSummary              = item.Summary ?? string.Empty;
-        EditBackground           = item.Background ?? string.Empty;
-        EditProblem              = item.Problem ?? string.Empty;
-        EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
-        EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(item.UnitTests)) { _editTestsUnitTests = item.UnitTests; SyncTestsToTechnicalNotes(); } else { SyncTechnicalNotesToTests(); }
-        EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
-        EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
+            EditId                   = item.Id;
+            EditTitle                = item.Title;
+            EditStatus               = item.Status;
+            EditPriority             = item.Priority;
+            EditTicketType           = item.TicketType;
+            EditSummary              = item.Summary ?? string.Empty;
+            EditBackground           = item.Background ?? string.Empty;
+            EditProblem              = item.Problem ?? string.Empty;
+            EditAcceptanceCriteria   = item.AcceptanceCriteria ?? string.Empty;
+            EditTechnicalNotes       = item.TechnicalNotes ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(item.UnitTests)) { _editTestsUnitTests = item.UnitTests; SyncTestsToTechnicalNotes(); } else { SyncTechnicalNotesToTests(); }
+            EditLinkedFilePaths      = item.LinkedFilePaths ?? string.Empty;
+            EditLinkedSymbols        = item.LinkedSymbols ?? string.Empty;
 
-        SaveStatus = string.Empty;
+            SaveStatus = string.Empty;
+        }
+        finally
+        {
+            _suppressTicketDirtyTracking = false;
+            ClearTicketDirtyState();
+        }
 
         // Load plan for this ticket
         await RefreshPlanAsync(item.Id);
@@ -412,11 +464,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         EditLinkedSymbols      = string.Empty;
 
         SaveStatus = string.Empty;
+        ClearTicketDirtyState();
     }
 
     // ── Save ────────────────────────────────────────────────────────────────
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveTicket))]
     private async Task SaveTicketAsync()
     {
         if (string.IsNullOrWhiteSpace(EditTitle))
@@ -461,6 +514,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             var savedId = await _ticketService.SaveTicketAsync(ticket);
             EditId = savedId;
             IsNewTicket = false;
+            ClearTicketDirtyState();
 
             SaveStatus = "Saved ✓";
             await RefreshListAsync();
@@ -524,6 +578,31 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             IsSaving = false;
             OnPropertyChanged(nameof(CanArchiveTicket));
         }
+    }
+
+    [RelayCommand]
+    private void CopySelectedTicket()
+    {
+        if (!HasDetail)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {EditTitle}");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EditStatus}");
+        sb.AppendLine($"- Priority: {EditPriority}");
+        sb.AppendLine($"- Type: {EditTicketType}");
+        sb.AppendLine();
+        AppendSection(sb, "Summary", EditSummary);
+        AppendSection(sb, "Background", EditBackground);
+        AppendSection(sb, "Problem", EditProblem);
+        AppendSection(sb, "Acceptance Criteria", EditAcceptanceCriteria);
+        AppendSection(sb, "Technical Notes", EditTechnicalNotes);
+        AppendSection(sb, "Linked Files", EditLinkedFilePaths);
+        AppendSection(sb, "Linked Symbols", EditLinkedSymbols);
+
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        SaveStatus = "Ticket copied.";
     }
 
     [RelayCommand]
@@ -921,6 +1000,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         {
             ClearEditor();
         }
+        ClearTicketDirtyState();
     }
 
     // ── Prefill from chat (called by ShellViewModel) ────────────────────────
@@ -1143,6 +1223,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task ApproveDraftAsync()
     {
+        var draftBeingSaved = SelectedTicket?.IsDraft == true ? SelectedTicket : null;
+        var remainingDrafts = CaptureRemainingDrafts(draftBeingSaved);
+
         var savedId = await SaveDraftTicketAsync();
         if (savedId <= 0) return;
 
@@ -1157,6 +1240,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         DraftStatusMessage = string.Empty;
 
         await RefreshListAsync();  // ClearEditor() is called inside
+        RestoreUnsavedDrafts(remainingDrafts);
 
         var created = Tickets.FirstOrDefault(t => t.Id == savedId);
         if (created != null)
@@ -1164,8 +1248,45 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             await LoadTicketIntoEditorAsync(created);
             SelectedTicket = created;
         }
+        else if (remainingDrafts.Count > 0)
+        {
+            SelectedTicket = remainingDrafts[0];
+        }
 
-        SaveStatus = "Ticket created \u2713";
+        SaveStatus = remainingDrafts.Count > 0
+            ? $"Ticket created \u2713  {remainingDrafts.Count} draft(s) still waiting."
+            : "Ticket created \u2713";
+    }
+
+    [RelayCommand]
+    private async Task SaveAllDraftsAsync()
+    {
+        var drafts = Tickets.Where(t => t.IsDraft).ToList();
+        if (drafts.Count == 0)
+        {
+            SaveStatus = "No draft tickets to save.";
+            return;
+        }
+
+        var savedCount = 0;
+        foreach (var draft in drafts)
+        {
+            SelectedTicket = draft;
+            LoadTicketIntoEditor(draft);
+
+            var savedId = await SaveDraftTicketAsync();
+            if (savedId <= 0)
+                break;
+
+            savedCount++;
+            Tickets.Remove(draft);
+        }
+
+        IsDraftMode = false;
+        CurrentDraft = null;
+        DraftStatusMessage = string.Empty;
+        await RefreshListAsync();
+        SaveStatus = $"Saved {savedCount} draft ticket(s).";
     }
 
     private async Task SaveLinkedPlanAsync(long ticketId)
@@ -1209,6 +1330,9 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task ApproveDraftWithPlanAsync()
     {
+        var draftBeingSaved = SelectedTicket?.IsDraft == true ? SelectedTicket : null;
+        var remainingDrafts = CaptureRemainingDrafts(draftBeingSaved);
+
         // If plan is empty, generate it first
         if (!HasPlan || string.IsNullOrWhiteSpace(PlanProposedSteps))
         {
@@ -1239,6 +1363,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         DraftStatusMessage = string.Empty;
 
         await RefreshListAsync();
+        RestoreUnsavedDrafts(remainingDrafts);
 
         // Re-select the saved ticket
         SelectedTicket = Tickets.FirstOrDefault(t => t.Id == savedId);
@@ -1343,54 +1468,55 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task GenerateCodebaseTicketsAsync()
     {
-        if (IsGeneratingCodebaseTickets) return;
+        await CodexReview.GenerateCodexTicketsCommand.ExecuteAsync(null);
+    }
+
+    private async Task<CodebaseTicketGenerationResult> GenerateCodexTicketsForReviewAsync()
+    {
+        if (_generatorService == null)
+        {
+            return new CodebaseTicketGenerationResult
+            {
+                Success = false,
+                ErrorMessage = "Codebase ticket generator is not available."
+            };
+        }
+
+        if (IsGeneratingCodebaseTickets)
+        {
+            return new CodebaseTicketGenerationResult
+            {
+                Success = false,
+                ErrorMessage = "Codebase ticket generation is already running."
+            };
+        }
 
         IsGeneratingCodebaseTickets = true;
         DraftStatusMessage = "Analyzing codebase...";
 
         try
         {
-            // Remove any existing (unsaved) drafts from the list first
             var existingDrafts = Tickets.Where(t => t.IsDraft).ToList();
-            foreach (var d in existingDrafts) Tickets.Remove(d);
+            foreach (var draft in existingDrafts)
+            {
+                Tickets.Remove(draft);
+            }
 
+            ClearEditor();
             var result = await _generatorService.GenerateTicketsAsync(_activeProjectId);
-            if (result.Success)
-            {
-                foreach (var draft in result.Drafts)
-                {
-                    var item = new TicketItem
-                    {
-                        Id                 = 0,
-                        Title              = draft.Title,
-                        Summary            = draft.Summary,
-                        Background         = draft.Background,
-                        AcceptanceCriteria = draft.AcceptanceCriteria,
-                        Priority           = draft.Priority,
-                        TicketType         = draft.TicketType,
-                        IsDraft            = true,
-                        Status             = "Draft",
-                        TechnicalNotes     = PackTechnicalNotes(draft)
-                    };
-                    Tickets.Insert(0, item);
-                }
-
-                DraftStatusMessage = $"Generated {result.Drafts.Count} codebase improvement drafts.";
-                
-                // Select the first one to start review
-                if (Tickets.Count > 0 && Tickets[0].IsDraft)
-                {
-                    SelectedTicket = Tickets[0];
-                }
-            }
-            else
-            {
-                DraftStatusMessage = $"Generation failed: {result.ErrorMessage}";
-            }
+            DraftStatusMessage = result.Success
+                ? $"Generated {result.Drafts.Count} Codex tickets for review."
+                : $"Generation failed: {result.ErrorMessage}";
+            return result;
         }
         catch (Exception ex)
         {
             DraftStatusMessage = $"Error: {ex.Message}";
+            return new CodebaseTicketGenerationResult
+            {
+                Success = false,
+                ErrorMessage = $"Generation failed: {ex.Message}"
+            };
         }
         finally
         {
@@ -1398,15 +1524,91 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         }
     }
 
-    private string PackTechnicalNotes(CodebaseTicketDraft draft)
+    private async Task ImportCodexReviewTicketsAsync(IReadOnlyList<TicketReviewItemViewModel> selectedTickets)
     {
-        var sb = new System.Text.StringBuilder();
-        if (!string.IsNullOrWhiteSpace(draft.UnitTests))        { sb.AppendLine(SecUnit); sb.AppendLine(draft.UnitTests); }
-        if (!string.IsNullOrWhiteSpace(draft.IntegrationTests)) { sb.AppendLine(SecIntegration); sb.AppendLine(draft.IntegrationTests); }
-        if (!string.IsNullOrWhiteSpace(draft.ManualTests))      { sb.AppendLine(SecManual); sb.AppendLine(draft.ManualTests); }
-        if (!string.IsNullOrWhiteSpace(draft.RegressionTests))  { sb.AppendLine(SecRegression); sb.AppendLine(draft.RegressionTests); }
-        if (!string.IsNullOrWhiteSpace(draft.BuildValidation))  { sb.AppendLine(SecBuild); sb.AppendLine(draft.BuildValidation); }
-        return sb.ToString();
+        if (_ticketService == null)
+        {
+            throw new InvalidOperationException("Ticket service is not available.");
+        }
+
+        foreach (var reviewItem in selectedTickets)
+        {
+            var ticket = BuildCodexImportedTicket(reviewItem);
+            await _ticketService.SaveTicketAsync(ticket);
+        }
+
+        await RefreshListAsync();
+    }
+
+    private ProjectTicket BuildCodexImportedTicket(TicketReviewItemViewModel reviewItem)
+    {
+        var contextWarnings = GetCodexContextWarnings();
+        return new ProjectTicket
+        {
+            Id = 0,
+            ProjectId = _activeProjectId,
+            SessionId = Guid.NewGuid(),
+            Title = reviewItem.Title.Trim(),
+            TicketType = string.IsNullOrWhiteSpace(reviewItem.TicketType) ? "Task" : reviewItem.TicketType,
+            Priority = string.IsNullOrWhiteSpace(reviewItem.Priority) ? "Medium" : reviewItem.Priority,
+            Summary = string.IsNullOrWhiteSpace(reviewItem.Summary) ? null : reviewItem.Summary.Trim(),
+            Background = string.IsNullOrWhiteSpace(reviewItem.Background) ? null : reviewItem.Background.Trim(),
+            Problem = string.IsNullOrWhiteSpace(reviewItem.Problem) ? null : reviewItem.Problem.Trim(),
+            AcceptanceCriteria = BuildListText(reviewItem.AcceptanceCriteria),
+            TechnicalNotes = reviewItem.BuildCodexTechnicalNotes(CodexReview.ContextQualityScore, contextWarnings),
+            Status = "Draft",
+            Content = string.IsNullOrWhiteSpace(reviewItem.Summary) ? reviewItem.Problem : reviewItem.Summary,
+            LinkedFilePaths = reviewItem.AffectedFiles.Count == 0 ? null : string.Join("\n", reviewItem.AffectedFiles),
+            LinkedCodeIndexEntryIds = null,
+            LinkedSymbols = reviewItem.AffectedSymbols.Count == 0 ? null : string.Join("\n", reviewItem.AffectedSymbols),
+            UnitTests = string.IsNullOrWhiteSpace(reviewItem.UnitTests) ? null : reviewItem.UnitTests.Trim(),
+            IntegrationTests = string.IsNullOrWhiteSpace(reviewItem.IntegrationTests) ? null : reviewItem.IntegrationTests.Trim(),
+            ManualTests = string.IsNullOrWhiteSpace(reviewItem.ManualTests) ? null : reviewItem.ManualTests.Trim(),
+            RegressionTests = string.IsNullOrWhiteSpace(reviewItem.RegressionTests) ? null : reviewItem.RegressionTests.Trim(),
+            BuildValidation = string.IsNullOrWhiteSpace(reviewItem.BuildValidation) ? null : reviewItem.BuildValidation.Trim(),
+            ContextSummary = $"Codex dogfood import. Context quality: {CodexReview.ContextQualityScore}/100.",
+            IsGenerated = true,
+            GenerationNote = BuildCodexGenerationNote(reviewItem, contextWarnings)
+        };
+    }
+
+    private IReadOnlyList<string> GetCodexContextWarnings()
+        => string.IsNullOrWhiteSpace(CodexReview.ContextWarningText)
+            ? []
+            : CodexReview.ContextWarningText
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+    private static string? BuildListText(IReadOnlyList<string> values)
+        => values.Count == 0 ? null : string.Join("\n", values.Select(value => $"- {value}"));
+
+    private string BuildCodexGenerationNote(
+        TicketReviewItemViewModel reviewItem,
+        IReadOnlyList<string> contextWarnings)
+    {
+        var parts = new List<string>
+        {
+            "Generated by IronDev Self-Dogfood Loop",
+            $"Source: Codex",
+            $"Context quality: {CodexReview.ContextQualityScore}/100",
+            $"Confidence: {reviewItem.ConfidenceScore}/100",
+            $"Suggested build order: {reviewItem.SuggestedBuildOrder}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(reviewItem.Category))
+            parts.Add($"Category: {reviewItem.Category}");
+        if (!string.IsNullOrWhiteSpace(reviewItem.RiskLevel))
+            parts.Add($"Risk: {reviewItem.RiskLevel}");
+        if (reviewItem.AffectedFiles.Count > 0)
+            parts.Add($"Affected files: {string.Join("; ", reviewItem.AffectedFiles.Take(6))}");
+        if (reviewItem.AffectedSymbols.Count > 0)
+            parts.Add($"Affected symbols: {string.Join("; ", reviewItem.AffectedSymbols.Take(6))}");
+        if (contextWarnings.Count > 0)
+            parts.Add("Context warnings: " + string.Join("; ", contextWarnings.Take(4)));
+        if (reviewItem.GroundingWarnings.Count > 0)
+            parts.Add("Grounding warnings: " + string.Join("; ", reviewItem.GroundingWarnings.Take(4)));
+
+        return string.Join("\n", parts);
     }
 
     // ── Private draft helpers ────────────────────────────────────────────────
@@ -1429,6 +1631,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         try
         {
+            var selectedDraft = SelectedTicket?.IsDraft == true ? SelectedTicket : null;
+
             // Pack test sub-fields into TechnicalNotes before save
             SyncTestsToTechnicalNotes();
 
@@ -1455,11 +1659,11 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
                 ManualTests            = string.IsNullOrWhiteSpace(EditTestsManualTests)      ? null : EditTestsManualTests.Trim(),
                 RegressionTests        = string.IsNullOrWhiteSpace(EditTestsRegressionTests)  ? null : EditTestsRegressionTests.Trim(),
                 BuildValidation        = string.IsNullOrWhiteSpace(EditTestsBuildValidation)  ? null : EditTestsBuildValidation.Trim(),
-                ContextSummary         = CurrentDraft?.Summary, // Or from build preview if generated
+                ContextSummary         = CurrentDraft?.Summary ?? selectedDraft?.ContextSummary,
                 IsGenerated            = true,
-                GenerationNote         = CurrentDraft?.GenerationNote,
-                SourceChatSessionId    = CurrentDraft?.SourceChatSessionId,
-                SourceChatMessageId    = CurrentDraft?.SourceMessageId
+                GenerationNote         = CurrentDraft?.GenerationNote ?? selectedDraft?.GenerationNote,
+                SourceChatSessionId    = CurrentDraft?.SourceChatSessionId ?? selectedDraft?.SourceChatSessionId,
+                SourceChatMessageId    = CurrentDraft?.SourceMessageId ?? selectedDraft?.SourceChatMessageId
             };
 
             var savedId = await _ticketService.SaveTicketAsync(ticket);
@@ -1544,9 +1748,26 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
             ContextSummary     = draft.Summary,
             IsGenerated        = true,
             GenerationNote     = draft.GenerationNote,
+            SourceChatSessionId = draft.SourceChatSessionId,
+            SourceChatMessageId = draft.SourceMessageId,
+            SourceMessageText   = draft.SourceMessageText,
             IsDraft            = true,
             CreatedDate        = DateTime.UtcNow
         };
+
+    private List<TicketItem> CaptureRemainingDrafts(TicketItem? draftBeingSaved)
+        => Tickets
+            .Where(t => t.IsDraft && !ReferenceEquals(t, draftBeingSaved))
+            .ToList();
+
+    private void RestoreUnsavedDrafts(IReadOnlyList<TicketItem> drafts)
+    {
+        for (var i = drafts.Count - 1; i >= 0; i--)
+        {
+            if (!Tickets.Contains(drafts[i]))
+                Tickets.Insert(0, drafts[i]);
+        }
+    }
 
     private void ClearEditor()
     {
@@ -1583,6 +1804,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
 
         ClearBuildState();
         ClearBuildReadiness();
+        ClearTicketDirtyState();
     }
 
     private async Task RefreshBuildReadinessAsync()
@@ -1693,6 +1915,8 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         ContextSummary         = t.ContextSummary,
         IsGenerated            = t.IsGenerated,
         GenerationNote         = t.GenerationNote,
+        SourceChatSessionId    = t.SourceChatSessionId,
+        SourceChatMessageId    = t.SourceChatMessageId,
         CreatedDate            = t.CreatedDate
     };
 
@@ -1758,6 +1982,34 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject
         AppendSection(parts, SecRegression,  _editTestsRegressionTests);
         AppendSection(parts, SecBuild,       _editTestsBuildValidation);
         EditTechnicalNotes = parts.ToString().TrimEnd();
+    }
+
+    private void MarkTicketDirty()
+    {
+        if (_suppressTicketDirtyTracking)
+            return;
+
+        if (!HasDetail || !IsEditing)
+            return;
+
+        if (_hasUnsavedTicketChanges)
+            return;
+
+        _hasUnsavedTicketChanges = true;
+        OnPropertyChanged(nameof(HasDirtyEditState));
+        OnPropertyChanged(nameof(CanSaveTicket));
+        SaveTicketCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ClearTicketDirtyState()
+    {
+        if (!_hasUnsavedTicketChanges)
+            return;
+
+        _hasUnsavedTicketChanges = false;
+        OnPropertyChanged(nameof(HasDirtyEditState));
+        OnPropertyChanged(nameof(CanSaveTicket));
+        SaveTicketCommand.NotifyCanExecuteChanged();
     }
 
     private void ClearTestSubFields()

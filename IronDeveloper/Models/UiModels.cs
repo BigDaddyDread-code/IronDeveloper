@@ -80,6 +80,9 @@ public sealed class TicketItem
     public string? ContextSummary { get; set; }
     public bool IsGenerated { get; set; }
     public string? GenerationNote { get; set; }
+    public long? SourceChatSessionId { get; set; }
+    public long? SourceChatMessageId { get; set; }
+    public string? SourceMessageText { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime CreatedDate { get; set; }
     public bool IsDraft { get; set; }

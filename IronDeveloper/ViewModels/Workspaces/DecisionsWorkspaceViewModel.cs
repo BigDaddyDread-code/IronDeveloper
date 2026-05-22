@@ -1,7 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Data.Models;
@@ -14,8 +16,12 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     private int _activeProjectId;
 
     [ObservableProperty] private ObservableCollection<ProjectContextDocument> _documents = [];
-    [ObservableProperty] private ProjectContextDocument? _selectedDocument;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DiscussSelectedDocumentCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditSelectedDocumentCommand))]
+    private ProjectContextDocument? _selectedDocument;
     [ObservableProperty] private bool _hasDetail;
+    [ObservableProperty] private bool _isEditingDocument;
     [ObservableProperty] private bool _isSaving;
     [ObservableProperty] private string _saveStatus = string.Empty;
 
@@ -36,6 +42,7 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
     [ObservableProperty] private string _filterDocumentType = "All";
     [ObservableProperty] private string _filterStatus = "Active";
+    [ObservableProperty] private string _filterText = string.Empty;
 
     public string SelectedDocumentBody
     {
@@ -147,6 +154,8 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         "Archived"
     ];
 
+    public Action<string>? OnDiscussDocumentInChat { get; set; }
+
     public DecisionsWorkspaceViewModel(
         global::IronDev.Services.IProjectMemoryService memoryService,
         global::IronDev.Services.ILookupService lookupService)
@@ -185,11 +194,16 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RefreshListAsync()
+    private Task RefreshListAsync()
     {
-        Documents.Clear();
-        ClearEditor();
+        var preferredDocumentId = SelectedDocument?.Id > 0 ? SelectedDocument.Id : (long?)null;
+        return RefreshDocumentsAsync(preferredDocumentId);
+    }
 
+    private async Task RefreshDocumentsAsync(
+        long? preferredDocumentId = null,
+        bool includePreferredIfFilteredOut = false)
+    {
         var documentType = FilterDocumentType == "All" ? null : FilterDocumentType;
         var status = FilterStatus == "All" ? null : FilterStatus;
         var documents = await _memoryService.GetContextDocumentsAsync(
@@ -198,8 +212,40 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
             status: status,
             take: 200);
 
-        foreach (var document in documents)
+        var documentList = documents.ToList();
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            var filterText = FilterText.Trim();
+            documentList = documentList
+                .Where(d => ContainsFilterText(d, filterText))
+                .ToList();
+        }
+
+        if (preferredDocumentId is > 0 &&
+            includePreferredIfFilteredOut &&
+            documentList.All(d => d.Id != preferredDocumentId.Value))
+        {
+            var preferredDocument = await _memoryService.GetContextDocumentByIdAsync(preferredDocumentId.Value);
+            if (preferredDocument != null && preferredDocument.ProjectId == _activeProjectId)
+                documentList.Insert(0, preferredDocument);
+        }
+
+        Documents.Clear();
+        foreach (var document in documentList)
             Documents.Add(document);
+
+        var selectedDocument = preferredDocumentId is > 0
+            ? Documents.FirstOrDefault(d => d.Id == preferredDocumentId.Value)
+            : null;
+
+        if (selectedDocument != null)
+        {
+            SelectedDocument = selectedDocument;
+        }
+        else if (!IsEditingDocument)
+        {
+            SelectedDocument = null;
+        }
     }
 
     partial void OnSelectedDocumentChanged(ProjectContextDocument? value)
@@ -243,11 +289,15 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     partial void OnFilterStatusChanged(string value)
         => _ = RefreshListAsync();
 
+    partial void OnFilterTextChanged(string value)
+        => _ = RefreshListAsync();
+
     [RelayCommand]
     private void NewDocument()
     {
         SelectedDocument = null;
         HasDetail = true;
+        IsEditingDocument = true;
         EditId = 0;
         EditDocumentType = "ProjectFact";
         EditAuthorityLevel = "ObservedFact";
@@ -300,9 +350,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 
             var savedId = await _memoryService.SaveContextDocumentAsync(document);
             EditId = savedId;
+            await RefreshDocumentsAsync(savedId, includePreferredIfFilteredOut: true);
+            IsEditingDocument = false;
             SaveStatus = "Saved";
-            await RefreshListAsync();
-            SelectedDocument = Documents.FirstOrDefault(d => d.Id == savedId);
         }
         catch (Exception ex)
         {
@@ -323,8 +373,9 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         try
         {
             await _memoryService.ArchiveContextDocumentAsync(EditId);
+            await RefreshDocumentsAsync();
+            SelectedDocument = null;
             SaveStatus = "Archived";
-            await RefreshListAsync();
         }
         finally
         {
@@ -333,17 +384,86 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void CopyDocument()
+    {
+        if (!HasDetail)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {EditTitle}");
+        sb.AppendLine();
+        sb.AppendLine($"- Type: {EditDocumentType}");
+        sb.AppendLine($"- Authority: {EditAuthorityLevel}");
+        sb.AppendLine($"- Status: {EditStatus}");
+        if (!string.IsNullOrWhiteSpace(EditSource))
+            sb.AppendLine($"- Source: {EditSource.Trim()}");
+        if (!string.IsNullOrWhiteSpace(EditAppliesToArea))
+            sb.AppendLine($"- Area: {EditAppliesToArea.Trim()}");
+        if (!string.IsNullOrWhiteSpace(EditTags))
+            sb.AppendLine($"- Tags: {EditTags.Trim()}");
+        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(EditSummary))
+        {
+            sb.AppendLine("## Summary");
+            sb.AppendLine(EditSummary.Trim());
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("## Content");
+        sb.AppendLine(EditContent.Trim());
+
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        SaveStatus = "Knowledge item copied.";
+    }
+
+    [RelayCommand]
     private void CancelEdit()
     {
         if (SelectedDocument != null)
+        {
             LoadDocumentIntoEditor(SelectedDocument);
+            IsEditingDocument = false;
+        }
         else
             ClearEditor();
     }
 
-    public void PrefillFromChat(string title, string detail, string? linkedFilePaths, string? linkedSymbols)
+    private bool CanDiscussSelectedDocument()
+        => SelectedDocument != null && HasDetail;
+
+    [RelayCommand(CanExecute = nameof(CanDiscussSelectedDocument))]
+    private void DiscussSelectedDocument()
+    {
+        if (SelectedDocument == null || OnDiscussDocumentInChat == null)
+            return;
+
+        OnDiscussDocumentInChat(BuildChatPrompt(SelectedDocument));
+    }
+
+    private bool CanEditSelectedDocument()
+        => SelectedDocument != null && HasDetail;
+
+    [RelayCommand(CanExecute = nameof(CanEditSelectedDocument))]
+    private void EditSelectedDocument()
+    {
+        if (SelectedDocument == null)
+            return;
+
+        IsEditingDocument = true;
+    }
+
+    public void PrefillFromChat(
+        string title,
+        string detail,
+        string? linkedFilePaths,
+        string? linkedSymbols,
+        long? sourceDocumentId = null)
     {
         NewDocument();
+        if (sourceDocumentId is > 0)
+            EditId = sourceDocumentId.Value;
+
         EditDocumentType = "ArchitectureDecision";
         EditAuthorityLevel = "Binding";
         EditStatus = "Accepted";
@@ -351,7 +471,34 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         EditContent = detail;
         EditTags = linkedSymbols ?? string.Empty;
         EditAppliesToArea = linkedFilePaths ?? string.Empty;
-        EditSource = "Chat";
+        EditSource = sourceDocumentId is > 0 ? $"Chat update of DocumentId {sourceDocumentId.Value}" : "Chat";
+        if (sourceDocumentId is > 0)
+            SaveStatus = $"Updating knowledge item #{sourceDocumentId.Value} from chat.";
+    }
+
+    public void PrefillDocumentFromChat(
+        string title,
+        string content,
+        string? summary,
+        string? linkedFilePaths,
+        string? linkedSymbols,
+        long? sourceDocumentId = null)
+    {
+        NewDocument();
+        if (sourceDocumentId is > 0)
+            EditId = sourceDocumentId.Value;
+
+        EditDocumentType = "DiscussionNote";
+        EditAuthorityLevel = "Pending";
+        EditStatus = "Pending";
+        EditTitle = string.IsNullOrWhiteSpace(title) ? "Chat-generated project document" : title.Trim();
+        EditSummary = summary ?? string.Empty;
+        EditContent = content.Trim();
+        EditTags = linkedSymbols ?? string.Empty;
+        EditAppliesToArea = linkedFilePaths ?? string.Empty;
+        EditSource = sourceDocumentId is > 0 ? $"Chat update of DocumentId {sourceDocumentId.Value}" : "Chat";
+        if (sourceDocumentId is > 0)
+            SaveStatus = $"Updating knowledge item #{sourceDocumentId.Value} from chat.";
     }
 
     private void LoadDocumentIntoEditor(ProjectContextDocument document)
@@ -369,12 +516,14 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
         EditAppliesToCapability = document.AppliesToCapability ?? string.Empty;
         EditSource = document.Source ?? string.Empty;
         SaveStatus = string.Empty;
+        IsEditingDocument = false;
         NotifyDocumentPreviewChanged();
     }
 
     private void ClearEditor()
     {
         HasDetail = false;
+        IsEditingDocument = false;
         EditId = 0;
         EditDocumentType = "ProjectFact";
         EditAuthorityLevel = "ObservedFact";
@@ -393,9 +542,40 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     private static string? EmptyToNull(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static bool ContainsFilterText(ProjectContextDocument document, string filterText)
+    {
+        return Contains(document.Title, filterText) ||
+               Contains(document.Summary, filterText) ||
+               Contains(document.Content, filterText) ||
+               Contains(document.DocumentType, filterText) ||
+               Contains(document.Status, filterText);
+    }
+
+    private static bool Contains(string? value, string filterText)
+        => value?.Contains(filterText, StringComparison.OrdinalIgnoreCase) == true;
+
     private void NotifyDocumentPreviewChanged()
     {
         OnPropertyChanged(nameof(SelectedDocumentBody));
         OnPropertyChanged(nameof(SelectedDocumentMeta));
+    }
+
+    private static string BuildChatPrompt(ProjectContextDocument document)
+    {
+        var summary = string.IsNullOrWhiteSpace(document.Summary)
+            ? string.Empty
+            : $"Summary:\n{document.Summary.Trim()}\n\n";
+
+        return
+            "Discuss this project memory item.\n\n" +
+            $"DocumentId: {document.Id}\n" +
+            $"Type: {document.DocumentType}\n" +
+            $"Status: {document.Status}\n" +
+            $"Authority: {document.AuthorityLevel}\n" +
+            $"Title: {document.Title}\n\n" +
+            summary +
+            "Content:\n" +
+            document.Content.Trim() +
+            "\n\nIf we update this memory item during the discussion, keep the DocumentId visible so it can be saved back to the original record.";
     }
 }

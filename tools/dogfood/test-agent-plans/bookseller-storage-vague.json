@@ -1,0 +1,39 @@
+{
+  "test_run_id": "test-bookseller-storage-vague-001",
+  "project_id": 5,
+  "description": "Exercise a vague BookSeller storage request, answer IronDev's clarification, then verify replay stays green.",
+  "steps": [
+    {
+      "step": 1,
+      "action": "chat_send",
+      "params": {
+        "message": "I need to save data",
+        "workspace": "Chat",
+        "dry_run": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "chat_send",
+      "params": {
+        "message": "BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge.",
+        "workspace": "Chat",
+        "previous_from_step": 1,
+        "dry_run": true,
+        "expect_intent": "SaveDiscussionDocument"
+      }
+    },
+    {
+      "step": 3,
+      "action": "replay_run",
+      "params": {
+        "scenario": "BookSellerMvp",
+        "reps": 10,
+        "dry_run": true,
+        "stop_on_failure": true
+      }
+    }
+  ],
+  "max_turns": 8,
+  "early_stop_on_failure": true
+}

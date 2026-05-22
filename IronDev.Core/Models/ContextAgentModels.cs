@@ -325,6 +325,15 @@ public sealed class SelectedEvidenceEntry
 /// The complete output of a single ContextAgent run.
 /// The caller uses <see cref="FinalPrompt"/> to call the real LLM.
 /// </summary>
+public enum ContextAgentResultType
+{
+    Prompt,
+    Clarification,
+    ActionRequired,
+    ActionBlocked,
+    Failed
+}
+
 public sealed class ContextAgentResult
 {
     // ── The assembled prompt ──────────────────────────────────────────────
@@ -333,6 +342,12 @@ public sealed class ContextAgentResult
     /// Null when <see cref="IsClarificationRequired"/> is true.
     /// </summary>
     public string? FinalPrompt { get; init; }
+    public ContextAgentResultType ResultType { get; init; } = ContextAgentResultType.Prompt;
+    public bool RequiresAction { get; init; }
+    public bool AllowsProseResponse { get; init; } = true;
+    public string ActionIntent { get; init; } = string.Empty;
+    public string ActionMessage { get; init; } = string.Empty;
+    public IReadOnlyList<string> SuggestedActions { get; init; } = Array.Empty<string>();
 
     // ── Clarification path ────────────────────────────────────────────────
     /// <summary>True when the agent needs user input before it can continue.</summary>

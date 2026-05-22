@@ -29,7 +29,7 @@ public sealed class ContextAgentRouteJudgeTests
         var request = new ContextAgentRouteRequest
         {
             UserRequest = "industry standard",
-            RecentConversationSummary = "User: I want to save books to a database.\nAssistant: I can help with that. What kind of database are you thinking of?",
+            RecentConversationSummary = "User: I want to save BookSeller books to a database.\nAssistant: I can help with that. What kind of database are you thinking of?",
             ProjectId = 1,
             SessionId = 123
         };
@@ -39,9 +39,9 @@ public sealed class ContextAgentRouteJudgeTests
             {
               "requestKind": "ArchitectureAdvice",
               "confidence": 0.95,
-              "effectiveWorkText": "What is the industry-standard persistence approach for the BookSeller project?",
+              "effectiveWorkText": "What is the industry-standard persistence approach for BookSeller?",
               "reason": "Resolved 'industry standard' follow-up from recent persistence discussion.",
-              "allowCodeSearch": true,
+              "allowCodeSearch": false,
               "allowDeepLookup": true,
               "allowConflictAssessment": false,
               "allowConflictBlocking": false,
@@ -57,8 +57,8 @@ public sealed class ContextAgentRouteJudgeTests
 
         // Assert
         Assert.AreEqual(ContextRequestKind.ArchitectureAdvice, decision.RequestKind);
-        Assert.AreEqual("What is the industry-standard persistence approach for the BookSeller project?", decision.EffectiveWorkText);
-        Assert.IsTrue(decision.AllowCodeSearch);
+        Assert.AreEqual("What is the industry-standard persistence approach for BookSeller?", decision.EffectiveWorkText);
+        Assert.IsFalse(decision.AllowCodeSearch);
         Assert.IsFalse(decision.AllowConflictAssessment);
     }
 

@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Services;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
@@ -19,7 +17,6 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private bool   _streamResponses    = true;
     [ObservableProperty] private bool   _autoIndex          = false;
     [ObservableProperty] private int    _maxContextTokens   = 8000;
-    [ObservableProperty] private bool   _isDevToolsExpanded = false;
 
     /// <summary>
     /// When true, the Chat workspace uses the ContextAgentService pipeline
@@ -48,34 +45,6 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
         }
     }
 
-    // ── Lazy Dev Tools ────────────────────────────────────────────────────
-    //
-    // PromptPlaygroundViewModel pulls in IPromptContextBuilder → IChatFeedbackService
-    // → SqlConnectionFactory, so it MUST NOT be resolved at app startup.
-    //
-    // The factory is wired by App.xaml.cs. The VM is created only the first time
-    // the user expands Developer Tools. WPF is notified via OnPropertyChanged so
-    // the DataContext binding on PromptPlaygroundView updates correctly.
-
-    /// <summary>Deferred factory — set by App.xaml.cs DI registration.</summary>
-    public Func<PromptPlaygroundViewModel>? PromptPlaygroundFactory { get; init; }
-    public Func<LlmConsoleViewModel>?       LlmConsoleFactory       { get; init; }
-
-    private PromptPlaygroundViewModel? _promptPlayground;
-    private LlmConsoleViewModel?       _llmConsole;
-
-    public PromptPlaygroundViewModel? PromptPlayground
-    {
-        get => _promptPlayground;
-        private set => SetProperty(ref _promptPlayground, value);
-    }
-
-    public LlmConsoleViewModel? LlmConsole
-    {
-        get => _llmConsole;
-        private set => SetProperty(ref _llmConsole, value);
-    }
-
     public IReadOnlyList<string> AvailableModels { get; } =
     [
         "gpt-4o",
@@ -101,21 +70,6 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
         _traceService = traceService;
         _settingsService = settingsService;
         LoadPersistedSettings();
-    }
-
-    [RelayCommand]
-    private void ToggleDevTools()
-    {
-        if (!IsDevToolsExpanded)
-        {
-            if (PromptPlayground is null && PromptPlaygroundFactory is not null)
-                PromptPlayground = PromptPlaygroundFactory();
-
-            if (LlmConsole is null && LlmConsoleFactory is not null)
-                LlmConsole = LlmConsoleFactory();
-        }
-
-        IsDevToolsExpanded = !IsDevToolsExpanded;
     }
 
     private void LoadPersistedSettings()

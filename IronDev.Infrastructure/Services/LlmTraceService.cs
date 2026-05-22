@@ -120,6 +120,41 @@ public class LlmTraceService : ILlmTraceService
         sb.AppendLine(string.IsNullOrEmpty(trace.ContextSummary) ? "(not captured)" : trace.ContextSummary);
         sb.AppendLine();
 
+        if (trace.ContextQualityScore > 0 ||
+            trace.SemanticSymbolCount > 0 ||
+            trace.SymbolsIncludedInPrompt > 0 ||
+            trace.MissingContextReasons.Count > 0 ||
+            trace.SymbolsReferenced.Count > 0 ||
+            trace.SymbolsReferencedByGeneratedTickets.Count > 0 ||
+            trace.FilesReferencedByGeneratedTickets.Count > 0 ||
+            trace.IndexWarnings.Count > 0)
+        {
+            sb.AppendLine("=== CODE INTELLIGENCE TRACE ===");
+            if (trace.ContextQualityScore > 0)
+                sb.AppendLine($"Context quality: {trace.ContextQualityScore}/100");
+            sb.AppendLine($"Semantic symbols available: {trace.SemanticSymbolCount}");
+            sb.AppendLine($"Symbols included in prompt: {trace.SymbolsIncludedInPrompt}");
+            if (trace.MissingContextReasons.Count > 0)
+            {
+                sb.AppendLine("Missing context reasons:");
+                foreach (var reason in trace.MissingContextReasons)
+                    sb.AppendLine($"- {reason}");
+            }
+            if (trace.FilesReferencedByGeneratedTickets.Count > 0)
+                sb.AppendLine($"Files referenced by generated tickets: {string.Join(", ", trace.FilesReferencedByGeneratedTickets)}");
+            if (trace.SymbolsReferencedByGeneratedTickets.Count > 0)
+                sb.AppendLine($"Symbols referenced by generated tickets: {string.Join(", ", trace.SymbolsReferencedByGeneratedTickets)}");
+            if (trace.SymbolsReferenced.Count > 0)
+                sb.AppendLine($"Symbols referenced: {string.Join(", ", trace.SymbolsReferenced)}");
+            if (trace.IndexWarnings.Count > 0)
+            {
+                sb.AppendLine("Index warnings:");
+                foreach (var warning in trace.IndexWarnings)
+                    sb.AppendLine($"- {warning}");
+            }
+            sb.AppendLine();
+        }
+
         sb.AppendLine("=== PROMPT SENT ===");
         sb.AppendLine(trace.RequestText ?? "N/A");
         sb.AppendLine();

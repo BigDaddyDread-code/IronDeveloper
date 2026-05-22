@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace IronDev.Core.Models;
 
@@ -42,6 +43,15 @@ public class LlmTraceEntry
     public int? TokenUsageInput { get; set; }
     public int? TokenUsageOutput { get; set; }
     public int? TokenUsageTotal { get; set; }
+
+    public int SemanticSymbolCount { get; set; }
+    public int SymbolsIncludedInPrompt { get; set; }
+    public List<string> MissingContextReasons { get; set; } = [];
+    public List<string> SymbolsReferenced { get; set; } = [];
+    public List<string> SymbolsReferencedByGeneratedTickets { get; set; } = [];
+    public List<string> FilesReferencedByGeneratedTickets { get; set; } = [];
+    public List<string> IndexWarnings { get; set; } = [];
+    public int ContextQualityScore { get; set; }
 
     // ── Write Root Guard Diagnostics ──────────────────────────────────────
     public string AllowedWriteRoot { get; set; } = string.Empty;

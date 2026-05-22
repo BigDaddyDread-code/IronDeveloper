@@ -49,9 +49,30 @@ IronDev.slnx                   Root solution file
 - SQL Server / LocalDB / SQL Express
 - Visual Studio or another .NET-capable IDE
 - Optional: OpenAI API key, local OpenAI-compatible endpoint, or Ollama
+- Optional: Docker Desktop for Weaviate semantic-memory dogfooding
 - `IronDeveloper.Controls` cloned locally if using the source-referenced controls project
 
 > **Note:** Do not convert `IronDeveloper.Controls` to a NuGet package yet. The controls library is still evolving and should remain source/project referenced for now.
+
+---
+
+## Quick bootstrap script
+
+For a local dev machine with .NET and Docker Desktop installed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
+```
+
+This restores packages, starts and smoke-tests Weaviate, builds the WPF app, and runs a small stabilisation smoke test set.
+
+Database setup is opt-in:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1 -RunDatabaseSetup
+```
+
+The script intentionally does not run DB setup by default, so it will not reseed or change an existing database unless you ask it to.
 
 ---
 
@@ -86,6 +107,32 @@ Recommended setup flow:
 ```
 
 For full instructions, see [Docs/local-development.md](Docs/local-development.md).
+
+---
+
+## Optional Weaviate semantic memory
+
+Local Weaviate is used as a rebuildable semantic index. SQL Server remains the source of truth.
+
+Start it with:
+
+```powershell
+.\Scripts\weaviate-dev.ps1 up
+```
+
+If PowerShell blocks local scripts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\weaviate-dev.ps1 up
+```
+
+Smoke test it with:
+
+```powershell
+.\Scripts\weaviate-dev.ps1 smoke
+```
+
+For settings and troubleshooting, see [Docs/weaviate-local-setup.md](Docs/weaviate-local-setup.md).
 
 ---
 

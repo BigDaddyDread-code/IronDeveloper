@@ -1,0 +1,33 @@
+{
+  "test_run_id": "test-irondev-memory-spine-sql-version-006",
+  "goal_id": "retrieval-correctness-006",
+  "project_id": 2,
+  "description": "Prove a SQL-backed ProjectDocumentVersion can be indexed into semantic memory tables and retrieved as the current authoritative version over an older stale version.",
+  "expected": {
+    "sql_document_exists": true,
+    "current_version_indexed": true,
+    "old_version_indexed_as_stale": true,
+    "current_version_primary": true,
+    "source_link_present": true,
+    "semantic_trace_written": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "weaviate_health",
+      "params": {
+        "endpoint": "http://localhost:8080"
+      }
+    },
+    {
+      "step": 2,
+      "action": "sql_document_version_smoke",
+      "params": {
+        "project": "IronDev",
+        "query": "current first goal"
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}

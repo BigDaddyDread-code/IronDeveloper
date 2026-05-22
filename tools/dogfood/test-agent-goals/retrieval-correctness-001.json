@@ -1,0 +1,47 @@
+{
+  "goal_id": "retrieval-correctness-001",
+  "title": "Prove IronDev retrieves current authority-aware memory",
+  "mission": "Use the Test Agent and CLI to verify IronDev retrieves current, project-scoped, authority-aware context before builder workflows trust memory.",
+  "hard_rules": [
+    "Do not change UI.",
+    "Do not patch code until a failing retrieval trace exists.",
+    "Do not weaken assertions to make the run pass.",
+    "All commands must run dry-run unless explicitly stated otherwise.",
+    "Every failure must produce a Codex-readable evidence package."
+  ],
+  "scenario": {
+    "project": "IronDev",
+    "query": "builder safety rules approval before code changes",
+    "confusers": [
+      "old IronDev architecture version",
+      "BookSeller architecture document with similar wording",
+      "low-authority discussion note"
+    ]
+  },
+  "expected": {
+    "project": "IronDev",
+    "document_version": "current",
+    "authority": [
+      "Accepted",
+      "CommittedDecision",
+      "Architecture"
+    ],
+    "must_not_include": [
+      "BookSeller",
+      "superseded",
+      "stale"
+    ],
+    "trace_required": true,
+    "source_link_required": true
+  },
+  "success_metrics": [
+    "Correct ProjectId or project name",
+    "Correct DocumentVersionId or current document marker",
+    "Authority/freshness outranks semantic similarity",
+    "No cross-project bleed",
+    "Trace explains why the chunk was selected"
+  ],
+  "first_commands": [
+    "dotnet run --project .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj -- docs search \"builder safety rules approval before code changes\" --project IronDev --take 5"
+  ]
+}

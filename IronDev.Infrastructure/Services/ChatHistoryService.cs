@@ -16,6 +16,7 @@ public interface IChatHistoryService
     Task<IReadOnlyList<ProjectChatSession>> GetRecentSessionsAsync(int projectId, int take = 50, CancellationToken cancellationToken = default);
     Task<ProjectChatSession?> GetSessionByIdAsync(long sessionId, CancellationToken cancellationToken = default);
     Task<long> SaveSessionAsync(ProjectChatSession session, CancellationToken cancellationToken = default);
+    Task DeleteSessionAsync(long sessionId, CancellationToken cancellationToken = default);
 
     // Messages
     Task<long> SaveMessageAsync(ChatMessage message, CancellationToken cancellationToken = default);
@@ -163,6 +164,33 @@ public sealed class ChatHistoryService : IChatHistoryService
                 },
                 cancellationToken: cancellationToken));
         }
+    }
+
+    public async Task DeleteSessionAsync(long sessionId, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+
+        const string deleteMessagesSql = """
+            DELETE FROM dbo.ChatMessages
+            WHERE ChatSessionId = @SessionId
+              AND TenantId = @TenantId;
+            """;
+
+        const string deleteSessionSql = """
+            DELETE FROM dbo.ProjectChatSessions
+            WHERE Id = @SessionId
+              AND TenantId = @TenantId;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            deleteMessagesSql,
+            new { SessionId = sessionId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            deleteSessionSql,
+            new { SessionId = sessionId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
     }
 
     public async Task<long> SaveMessageAsync(ChatMessage message, CancellationToken cancellationToken = default)

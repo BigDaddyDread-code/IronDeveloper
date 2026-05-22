@@ -1,4 +1,4 @@
-<UserControl x:Class="IronDev.Agent.Views.Workspaces.BuilderWorkspaceView"
+﻿<UserControl x:Class="IronDev.Agent.Views.Workspaces.BuilderWorkspaceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -8,41 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:BuilderWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
-    <UserControl.Resources>
-        <Style TargetType="TabControl">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-        </Style>
-        <Style TargetType="TabItem">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource Text/Muted}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="20,12"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource Text/Primary}"/>
-                                <Setter TargetName="border" Property="BorderBrush" Value="#7C6BE8"/>
-                                <Setter Property="Background" Value="#0A7C6BE8"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource Text/Primary}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
-    <Grid Background="{StaticResource Background/App}" Margin="24">
+    <Grid Background="{StaticResource Background/App}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -51,20 +17,17 @@
                                   Eyebrow="BUILDER"
                                   Title="Builder Workbench"
                                   Subtitle="{Binding ProjectRoot}"
-                                  Margin="0,0,0,18">
+                                  Margin="0">
             <controls:WorkspaceHeader.Actions>
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1A34D16A|#1A7C6BE8'}"
-                            BorderBrush="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}"
-                            BorderThickness="1"
-                            CornerRadius="4"
-                            Padding="10,4"
-                            Margin="0,0,8,0">
-                        <TextBlock Text="{Binding ApplyModeLabel, FallbackValue=PROPOSAL-ONLY, TargetNullValue=PROPOSAL-ONLY}"
-                                   Foreground="{Binding IsApplyEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#34D16A|#7C6BE8'}"
-                                   FontSize="10"
-                                   FontWeight="Bold"/>
-                    </Border>
+                    <controls:StatusBadge Text="{Binding ApplyModeLabel, FallbackValue=PROPOSAL-ONLY, TargetNullValue=PROPOSAL-ONLY}"
+                                          Status="Ready"
+                                          Margin="0,0,8,0"
+                                          Visibility="{Binding IsApplyEnabled, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <controls:StatusBadge Text="{Binding ApplyModeLabel, FallbackValue=PROPOSAL-ONLY, TargetNullValue=PROPOSAL-ONLY}"
+                                          Status="Info"
+                                          Margin="0,0,8,0"
+                                          Visibility="{Binding IsApplyEnabled, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
                     <Button Content="Close Workbench"
                             Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="Tickets"
@@ -75,63 +38,29 @@
         <!-- Workbench Body -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="320" MinWidth="240"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="350" MinWidth="250"/>
+                <ColumnDefinition Width="360" MinWidth="270"/>
             </Grid.ColumnDefinitions>
 
             <!-- LEFT: Proposed Files -->
-            <controls:WorkspaceListPane Grid.Column="0" Title="PROPOSED CHANGES" Margin="0,0,16,0"
+            <controls:WorkspaceListPane Grid.Column="0" Title="PROPOSED CHANGES" Margin="0,0,12,0"
                                         ItemsSource="{Binding ProposedFiles}"
                                         SelectedItem="{Binding SelectedFileChange, Mode=TwoWay}">
                 <controls:WorkspaceListPane.ItemTemplate>
                     <DataTemplate>
-                        <Border Padding="10,8" CornerRadius="6" Margin="0,1">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource Background/Interactive}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <TextBlock Grid.Column="0" Text="Δ" Foreground="#7C6BE8" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="{Binding FilePath}" FontSize="13" FontWeight="SemiBold"
-                                               Foreground="{StaticResource Text/Primary}"
-                                               TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Description}" FontSize="11"
-                                               Foreground="{StaticResource Text/Muted}"
-                                               TextTrimming="CharacterEllipsis" MaxWidth="9999" Margin="0,2,0,0"/>
-                                </StackPanel>
-
-                                <Border Grid.Column="2" Visibility="{Binding IsValid, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                                        ToolTip="{Binding ValidationMessage}"
-                                        Background="#1AEE4444" CornerRadius="10" Width="16" Height="16" Margin="4,0,0,0">
-                                    <TextBlock Text="!" Foreground="#EE4444" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </Grid>
-                        </Border>
+                        <controls:WorkspaceListItem Title="{Binding FilePath}"
+                                                    Subtitle="{Binding Description}"
+                                                    IconData="{StaticResource Icon.Action.Build}"/>
                     </DataTemplate>
                 </controls:WorkspaceListPane.ItemTemplate>
             </controls:WorkspaceListPane>
 
             <!-- CENTRE: Body (Diff / Output) -->
-            <Border Grid.Column="1" Background="{StaticResource Background/Panel}"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                    CornerRadius="10" Margin="0,0,16,0">
+            <controls:SurfacePanel Grid.Column="1" Variant="Subtle" Margin="0,0,12,0">
                 <Grid>
-                    <TabControl>
+                    <TabControl Background="Transparent" BorderThickness="0"
+                                ItemContainerStyle="{StaticResource AppTabItem.Workspace}">
                         <TabItem Header="FILE DIFF">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -146,19 +75,19 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding SelectedFileChange.FilePath}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         <Border Visibility="{Binding SelectedFileChange.IsNewFile, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Background="#1A10B981" BorderBrush="#10B981" BorderThickness="1"
+                                                Background="{StaticResource Brush.Status.Ready.Background}" BorderBrush="{StaticResource Brush.Status.Ready.Border}" BorderThickness="1"
                                                 CornerRadius="3" Padding="6,1" Margin="8,0,0,0">
-                                            <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="#10B981"/>
+                                            <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="{StaticResource Brush.Status.Ready.Foreground}"/>
                                         </Border>
                                     </StackPanel>
                                 </Border>
 
                                 <!-- Diff Content -->
-                                <ScrollViewer Grid.Row="1" Background="#0F1117" Padding="16">
+                                <ScrollViewer Grid.Row="1" Background="{StaticResource Background/App}" Padding="16">
                                     <TextBox Text="{Binding SelectedFileChange.Diff, Mode=OneWay}"
                                              IsReadOnly="True"
                                              Background="Transparent"
-                                             Foreground="#D1D5DB"
+                                             Foreground="{StaticResource Text/Primary}"
                                              BorderThickness="0"
                                              FontFamily="Consolas"
                                              FontSize="13"
@@ -169,14 +98,14 @@
                         </TabItem>
 
                         <TabItem Header="BUILD &amp; TEST OUTPUT">
-                            <ScrollViewer Background="#0F1117" Padding="20">
+                            <ScrollViewer Background="{StaticResource Background/App}" Padding="20">
                                 <StackPanel>
-                                    <TextBlock Text="BUILD OUTPUT" Foreground="#7C6BE8" FontWeight="Bold" FontSize="11" Margin="0,0,0,8"/>
-                                    <Border Background="#161B22" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,24">
+                                    <TextBlock Text="BUILD OUTPUT" Foreground="{StaticResource Accent/Primary}" FontWeight="Bold" FontSize="11" Margin="0,0,0,8"/>
+                                    <Border Background="{StaticResource Background/Panel}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,24">
                                         <TextBox Text="{Binding BuildOutput, Mode=OneWay}"
                                                  IsReadOnly="True"
                                                  Background="Transparent"
-                                                 Foreground="#D1D5DB"
+                                                 Foreground="{StaticResource Text/Primary}"
                                                  BorderThickness="0"
                                                  FontFamily="Consolas"
                                                  FontSize="12"
@@ -185,12 +114,12 @@
                                                  MinHeight="150"/>
                                     </Border>
 
-                                    <TextBlock Text="TEST OUTPUT" Foreground="#7C6BE8" FontWeight="Bold" FontSize="11" Margin="0,0,0,8"/>
-                                    <Border Background="#161B22" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6" Padding="12">
+                                    <TextBlock Text="TEST OUTPUT" Foreground="{StaticResource Accent/Primary}" FontWeight="Bold" FontSize="11" Margin="0,0,0,8"/>
+                                    <Border Background="{StaticResource Background/Panel}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6" Padding="12">
                                         <TextBox Text="{Binding TestOutput, Mode=OneWay}"
                                                  IsReadOnly="True"
                                                  Background="Transparent"
-                                                 Foreground="#D1D5DB"
+                                                 Foreground="{StaticResource Text/Primary}"
                                                  BorderThickness="0"
                                                  FontFamily="Consolas"
                                                  FontSize="12"
@@ -208,16 +137,14 @@
                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock Text="Processing..." Foreground="White" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                            <TextBlock Text="{Binding StatusMessage}" Foreground="#99FFFFFF" FontSize="13" Margin="0,8,0,0" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource Text/Secondary}" FontSize="13" Margin="0,8,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </Grid>
-            </Border>
+            </controls:SurfacePanel>
 
             <!-- RIGHT: Agent Info -->
-            <Border Grid.Column="2" Background="{StaticResource Background/Panel}"
-                    BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                    CornerRadius="10">
+            <controls:SurfacePanel Grid.Column="2" Variant="Subtle">
                 <ScrollViewer Padding="20">
                     <StackPanel>
                         <!-- BUILD READINESS SECTION -->
@@ -243,9 +170,9 @@
                         <ItemsControl ItemsSource="{Binding CurrentProposal.ValidationIssues}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#1AEE4444" BorderBrush="#EE4444" BorderThickness="1"
+                                    <Border Background="{StaticResource Brush.Status.Danger.Background}" BorderBrush="{StaticResource Brush.Status.Danger.Border}" BorderThickness="1"
                                             CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding}" Foreground="#EE4444" FontSize="11" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource Brush.Status.Danger.Foreground}" FontSize="11" TextWrapping="Wrap"/>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -254,9 +181,9 @@
                         <ItemsControl ItemsSource="{Binding CurrentProposal.ValidationWarnings}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#1AEEA244" BorderBrush="#EEA244" BorderThickness="1"
+                                    <Border Background="{StaticResource Brush.Status.Warning.Background}" BorderBrush="{StaticResource Brush.Status.Warning.Border}" BorderThickness="1"
                                             CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding}" Foreground="#EEA244" FontSize="11" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource Brush.Status.Warning.Foreground}" FontSize="11" TextWrapping="Wrap"/>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -266,11 +193,11 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Visibility="{Binding IsValid, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                                            Background="#1AEE4444" BorderBrush="#EE4444" BorderThickness="1"
+                                            Background="{StaticResource Brush.Status.Danger.Background}" BorderBrush="{StaticResource Brush.Status.Danger.Border}" BorderThickness="1"
                                             CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
                                         <StackPanel>
-                                            <TextBlock Text="{Binding FilePath}" FontWeight="Bold" Foreground="#EE4444" FontSize="12"/>
-                                            <TextBlock Text="{Binding ValidationMessage}" Foreground="#EE4444" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding FilePath}" FontWeight="Bold" Foreground="{StaticResource Brush.Status.Danger.Foreground}" FontSize="12"/>
+                                            <TextBlock Text="{Binding ValidationMessage}" Foreground="{StaticResource Brush.Status.Danger.Foreground}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -278,32 +205,32 @@
                         </ItemsControl>
                         
                         <Border Visibility="{Binding CurrentProposal.IsAllValid, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Background="#1234D16A" BorderBrush="#34D16A" BorderThickness="1"
+                                Background="{StaticResource Brush.Status.Ready.Background}" BorderBrush="{StaticResource Brush.Status.Ready.Border}" BorderThickness="1"
                                 CornerRadius="6" Padding="12,10">
-                            <TextBlock Text="✓ All proposed changes pass security validation." Foreground="#34D16A" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="All proposed changes pass security validation." Foreground="{StaticResource Brush.Status.Ready.Foreground}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
                         </Border>
 
                         <!-- RECONCILIATION SECTION -->
                         <Border Visibility="{Binding HasReconciliation, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Background="#1AEEA244" BorderBrush="#EEA244" BorderThickness="1"
+                                Background="{StaticResource Brush.Status.Warning.Background}" BorderBrush="{StaticResource Brush.Status.Warning.Border}" BorderThickness="1"
                                 CornerRadius="6" Padding="16,16" Margin="0,20,0,0">
                             <StackPanel>
-                                <TextBlock Text="ARCHITECTURE RECONCILIATION" Foreground="#EEA244" FontWeight="Bold" FontSize="12" Margin="0,0,0,8"/>
-                                <TextBlock Text="Build failed because project architecture/profile information is missing or inconsistent." Foreground="#D1D5DB" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <TextBlock Text="ARCHITECTURE RECONCILIATION" Foreground="{StaticResource Brush.Status.Warning.Foreground}" FontWeight="Bold" FontSize="12" Margin="0,0,0,8"/>
+                                <TextBlock Text="Build failed because project architecture/profile information is missing or inconsistent." Foreground="{StaticResource Text/Primary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
                                 
-                                <TextBlock Text="Category:" Foreground="#9CA3AF" FontSize="11"/>
-                                <TextBlock Text="{Binding Reconciliation.FailureCategory}" Foreground="#F3F4F6" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock Text="Category:" Foreground="{StaticResource Text/Secondary}" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.FailureCategory}" Foreground="{StaticResource Text/Primary}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                 
-                                <TextBlock Text="Evidence:" Foreground="#9CA3AF" FontSize="11"/>
-                                <TextBlock Text="{Binding Reconciliation.Evidence}" Foreground="#F3F4F6" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <TextBlock Text="Evidence:" Foreground="{StaticResource Text/Secondary}" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.Evidence}" Foreground="{StaticResource Text/Primary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 
-                                <TextBlock Text="Current Profile:" Foreground="#9CA3AF" FontSize="11"/>
-                                <TextBlock Text="{Binding Reconciliation.CurrentProfileValue}" Foreground="#F3F4F6" FontSize="12" Margin="0,0,0,8"/>
+                                <TextBlock Text="Current Profile:" Foreground="{StaticResource Text/Secondary}" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.CurrentProfileValue}" Foreground="{StaticResource Text/Primary}" FontSize="12" Margin="0,0,0,8"/>
                                 
-                                <TextBlock Text="Detected Facts:" Foreground="#9CA3AF" FontSize="11"/>
-                                <TextBlock Text="{Binding Reconciliation.DetectedProjectFacts}" Foreground="#F3F4F6" FontSize="12" Margin="0,0,0,16"/>
+                                <TextBlock Text="Detected Facts:" Foreground="{StaticResource Text/Secondary}" FontSize="11"/>
+                                <TextBlock Text="{Binding Reconciliation.DetectedProjectFacts}" Foreground="{StaticResource Text/Primary}" FontSize="12" Margin="0,0,0,16"/>
                                 
-                                <TextBlock Text="Recommended Actions:" Foreground="#EEA244" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock Text="Recommended Actions:" Foreground="{StaticResource Brush.Status.Warning.Foreground}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                 
                                 <ItemsControl ItemsSource="{Binding Reconciliation.AvailableActions}">
                                     <ItemsControl.ItemTemplate>
@@ -360,7 +287,7 @@
                         <TextBlock Text="{Binding CurrentProposal.OriginalRequest}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Text/Muted}" FontStyle="Italic"/>
                     </StackPanel>
                 </ScrollViewer>
-            </Border>
+            </controls:SurfacePanel>
         </Grid>
     </Grid>
 </UserControl>

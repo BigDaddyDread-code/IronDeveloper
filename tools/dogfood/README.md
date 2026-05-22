@@ -1,0 +1,481 @@
+# IronDev Dogfood Replay Harness
+
+This folder contains the resettable BookSeller dogfood harness.
+
+The harness is built around one rule:
+
+```text
+Every run gets a DogfoodRunId, and every trace/result/artifact should be stamped with it.
+```
+
+Example:
+
+```text
+20260521-BookSellerMvp-001
+```
+
+## Layout
+
+```text
+tools/dogfood/
+  Reset-BookSellerDogfood.ps1
+  Start-BookSellerReplay.ps1
+  dogfood-scenarios/
+    BookSellerMvp.json
+  runs/
+    {DogfoodRunId}/
+      dogfood-run.json
+      reset-log.json
+      replay/
+        replay-plan.json
+        replay-summary.json
+        replay-results.json
+        action-results.json
+        response-results.json
+        runner-summary.json
+      traces/
+      screenshots/
+      reports/
+```
+
+## Reset BookSeller
+
+Dry-run first:
+
+```powershell
+.\tools\dogfood\Reset-BookSellerDogfood.ps1 `
+  -BaselinePath C:\repo\BookSeller_Baseline `
+  -TargetPath C:\repo\BookSeller `
+  -DatabaseName BookSellerDogfood `
+  -RunId 20260521-BookSellerMvp-001 `
+  -DryRun
+```
+
+If local execution policy blocks scripts, run the same script through PowerShell explicitly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Reset-BookSellerDogfood.ps1 `
+  -BaselinePath C:\repo\BookSeller_Baseline `
+  -TargetPath C:\repo\BookSeller `
+  -DatabaseName BookSellerDogfood `
+  -RunId 20260521-BookSellerMvp-001 `
+  -DryRun
+```
+
+Real reset:
+
+```powershell
+.\tools\dogfood\Reset-BookSellerDogfood.ps1 `
+  -BaselinePath C:\repo\BookSeller_Baseline `
+  -TargetPath C:\repo\BookSeller `
+  -DatabaseName BookSellerDogfood `
+  -RunId 20260521-BookSellerMvp-001 `
+  -SqlServer . `
+  -StopIronDev `
+  -Force
+```
+
+Safety rules:
+
+- `BaselinePath` must end with `\BookSeller_Baseline`.
+- `TargetPath` must end with `\BookSeller`.
+- Baseline and target cannot be the same path.
+- The target cannot be `C:\`, `C:\repo`, the user profile, or the IronDev repo root.
+- Destructive reset requires `-Force`.
+- `-DryRun` shows intent without deleting/copying/resetting.
+
+## Generate a randomized replay plan
+
+Every run should be different. The replay script adds a seed and randomizes prompt prefixes, suffixes, and eligible workspace context.
+
+```powershell
+.\tools\dogfood\Start-BookSellerReplay.ps1 `
+  -RunId 20260521-BookSellerMvp-001 `
+  -Scenario .\tools\dogfood\dogfood-scenarios\BookSellerMvp.json `
+  -Reps 100 `
+  -DryRun `
+  -StopOnFailure
+```
+
+Run reset and replay planning together:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-BookSellerDogfood.ps1 `
+  -Reset `
+  -DryRun `
+  -Reps 100 `
+  -StopOnFailure
+```
+
+The output is written to:
+
+```text
+tools/dogfood/runs/{DogfoodRunId}/replay/replay-plan.json
+tools/dogfood/runs/{DogfoodRunId}/replay/replay-summary.json
+tools/dogfood/runs/{DogfoodRunId}/replay/replay-report.md
+```
+
+For deterministic debugging, reuse the saved seed:
+
+```powershell
+.\tools\dogfood\Start-BookSellerReplay.ps1 `
+  -RunId 20260521-BookSellerMvp-002 `
+  -Reps 100 `
+  -DryRun `
+  -Seed 123456
+```
+
+## Runner integration
+
+The script currently generates a replay plan. It can call the IronDev replay runner by passing `-RunnerCommand`.
+
+The runner should read `replay-plan.json`, execute each case through IronDev internals, and save results linked by:
+
+```text
+DogfoodRunId -> CaseId -> TraceGroupId -> LLMTrace / RouteDecision / SemanticSearchTrace / WorkflowRun
+```
+
+Replay must default to dry-run and assert behaviours rather than exact wording.
+
+The current runner executes routing plus dry-run action simulation. It writes:
+
+```text
+replay-results.json   # route, assertion, and simulated count summary
+action-results.json   # dry-run discussion docs, draft tickets, plans, build approvals, blocked actions
+response-results.json # per-turn user prompt, assistant response, and final-turn marker
+runner-summary.json   # aggregate pass/fail result
+```
+
+Dry-run action simulation must never write project files or persist tickets. It exists to prove that a routed command would create the expected reviewable artefacts, request approval where required, and block unsafe or contradictory instructions.
+
+Replay cases may include `followUpTurns`. The runner feeds the previous assistant response and previous user message into the next turn so it can test real conversational flow:
+
+```text
+User: I need to save data
+Assistant: asks for clarification / blocks action safely
+User: BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge.
+Runner assertion: creates a reviewable discussion document, changes no files
+```
+
+This lets the harness test whether IronDev can ask, receive an answer, route the follow-up, and produce a reviewable action without going through the WPF interface.
+
+## Headless chat feedback
+
+The runner also exposes a small CLI-style chat command for Codex/headless testing. It routes one chat turn through the same deterministic command router and returns JSON feedback:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  chat send "I need to save data" `
+  --workspace Chat `
+  --dogfood-run-id cli-smoke-001
+```
+
+Follow-up turns can pass the prior assistant and user text:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  chat send "BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge." `
+  --workspace Chat `
+  --previous-assistant "I need a little more detail before I can safely turn that into project memory, tickets, or a build action." `
+  --previous-user "I need to save data" `
+  --dogfood-run-id cli-smoke-001
+```
+
+The command returns:
+
+```text
+assistantResponse
+intent
+confidence
+isAction / requiresAction / allowsProseResponse
+contextReference
+matchedSignals
+simulated discussion docs / draft tickets / plans / build runs
+simulated files changed
+dryRun
+```
+
+That JSON is the Codex feedback contract: send a prompt, read IronDev's response, decide the next prompt or patch, and run again.
+
+## Failure package for Codex
+
+When a replay assertion fails, generate a Codex handoff package from the latest failed replay result:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  failure latest `
+  --for-codex `
+  --runs-root .\tools\dogfood\runs
+```
+
+For a specific run:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  failure latest `
+  --for-codex `
+  --runs-root .\tools\dogfood\runs `
+  --run-id BookSellerLoop-001-iter-0007
+```
+
+The command writes:
+
+```text
+failure-package.json
+failure-package.md
+```
+
+The package includes expected intent, actual intent, failed prompt, likely files, repro command, validation command, and safety rules.
+
+## Headless CLI smoke test
+
+Run the first smoke suite for the headless control port:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Test-HeadlessCliSmoke.ps1
+```
+
+It verifies:
+
+- `chat send` returns JSON feedback.
+- a vague prompt returns a clarification-style response.
+- a follow-up answer routes to a dry-run action.
+- a 10-case replay batch passes.
+- an intentional replay failure produces `failure-package.json` and `failure-package.md`.
+
+## Test Agent plans
+
+The Test Agent is the cheap execution layer. It receives a JSON plan, runs steps literally, captures logs, and returns a compact JSON report to Codex.
+
+Prompt template:
+
+```text
+tools/dogfood/test-agent-prompt.md
+```
+
+Sample plan:
+
+```text
+tools/dogfood/test-agent-plans/bookseller-storage-vague.json
+```
+
+Run the sample plan locally:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\bookseller-storage-vague.json `
+  -RunId TestAgentSmoke-001 `
+  -Json
+```
+
+The local executor currently supports:
+
+- `chat_send`
+- `chat_conversation`
+- `replay_run`
+- `failure_package`
+- `dotnet_build`
+- `dotnet_test`
+- `coverage_run`
+- `coverage_report`
+- `format_check`
+- `package_audit`
+- `code_standards_check`
+- `weaviate_health`
+- `docs_search`
+- `sql_document_version_smoke`
+- `weaviate_sql_document_version_smoke`
+- `cross_project_memory_smoke`
+- `ticket_source_link_smoke`
+
+Unsupported future actions must be reported as unsupported. They must not be faked.
+`coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
+
+Run the deterministic toolchain smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-toolchain-smoke.json `
+  -RunId TestAgentToolchain-001 `
+  -Json
+```
+
+Every report includes a `trace` envelope, per-step trace data, command list, evidence paths, and `report_schema_valid`.
+
+Run the Alpha code standards gate:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-code-standards-alpha.json `
+  -RunId IronDevCodeStandardsAlpha-009 `
+  -Json
+```
+
+The code standards gate is deterministic and non-repairing. It runs build/test/format/audit steps plus code-shape checks such as large file and large method warnings. Warnings are allowed in Alpha; the purpose is to give Codex a structured quality report before widening the branch.
+
+Run the first Memory Spine smoke while Weaviate is running:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-smoke.json `
+  -RunId IronDevMemorySpineSmoke-001 `
+  -Json
+```
+
+This proves the current headless slice only: Weaviate health plus local dogfood document retrieval with project, authority, source, and ranking evidence. Full SQL-backed document/version/ticket links and Weaviate semantic trace assertions are still the next layer.
+
+Run the SQL-backed document version authority smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-sql-version-smoke.json `
+  -RunId IronDevMemorySpine006-SqlVersion `
+  -Json
+```
+
+This creates a disposable `ProjectDocument` in the active IronDev SQL database, adds an old and current document version, links the current version to a source discussion, indexes both versions into semantic artefact/chunk tables, marks the old version stale, and asserts the current version wins with a recorded semantic trace id. It is still a deterministic SQL semantic-memory smoke, not yet a full Weaviate vector-query assertion.
+
+Run the Weaviate-backed SQL document version authority smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-weaviate-sql-version-smoke.json `
+  -RunId IronDevMemorySpine007-WeaviateSqlVersion `
+  -Json
+```
+
+This creates the same style of disposable SQL document/version pair, writes both version chunks into a temporary Weaviate dogfood collection, runs a real `nearVector` query, and verifies that final IronDev ranking promotes the current authoritative version even when raw Weaviate distance ranks the stale version first.
+
+Run the cross-project retrieval isolation smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-cross-project-smoke.json `
+  -RunId IronDevMemorySpine008-CrossProject `
+  -Json
+```
+
+This creates SQL-backed memory for IronDev and BookSeller, writes both to Weaviate, runs a real `nearVector` query that intentionally prefers the BookSeller chunk, and verifies IronDev context rejects the cross-project candidate before final ranking.
+
+Run the ticket source document-version integrity smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-ticket-source-link-smoke.json `
+  -RunId IronDevMemorySpine010-TicketSourceLink `
+  -Json
+```
+
+This creates a disposable SQL `ProjectDocument` and `ProjectDocumentVersion`, saves a real `ProjectTicket` through `TicketService`, persists `SourceDocumentVersionId`, records source references, and verifies the link resolves back to the exact SQL version. It also creates an intentional orphan control ticket and verifies that missing source links are reported as validation failure. It does not touch builder context.
+
+Conversation-mode sample:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\bookseller-conversation-storage.json `
+  -RunId TestAgentConversation-001 `
+  -Json
+```
+
+## Local IronDev dogfood knowledge
+
+The headless runner has a local file-backed knowledge store for dogfood documents. This is intentionally archive-and-seed; it does not delete SQL project data.
+
+Clean and seed the IronDev dogfood knowledge baseline:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs clean --project IronDev --force
+```
+
+Import an outside ChatGPT/Grok note:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs import `
+  --file .\Docs\TEST_AGENT_SPEC.md `
+  --project IronDev `
+  --type Architecture `
+  --authority WorkingDraft
+```
+
+Search local dogfood knowledge:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs search "cheap model test agent" --project IronDev
+```
+
+The local store lives under:
+
+```text
+tools/dogfood/knowledge/IronDev
+```
+
+Model-role defaults are documented in:
+
+```text
+Docs/AGENT_MODEL_SETTINGS.md
+tools/dogfood/agent-model-settings.sample.json
+```
+
+## Vague prompt pressure
+
+The BookSeller scenario intentionally includes vague and contradictory prompts such as:
+
+```text
+make it better
+turn that into the thing
+same as before but better
+set it all up then build the first one
+build it now but don't change anything
+```
+
+These cases should not assert exact prose. They assert routing safety:
+
+- ask for clarification when context is missing
+- resolve `this/that/above` only when a source context exists
+- block unsafe or contradictory actions
+- stop at approval before code changes
+- never create tickets or files from a vague prompt without source evidence
+
+## Compare two replay plans
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Compare-DogfoodReplayRuns.ps1 `
+  -LeftRunId BookSellerMvp-20260521-001 `
+  -RightRunId BookSellerMvp-20260521-002
+```
+
+The comparison reports seed equality, prompt overlap, case counts, and workspace mix. A healthy chaos batch should usually have different seeds and low prompt overlap.
+
+## Run one case at a time
+
+For long hardening loops, run one randomized case per iteration. This creates a separate run folder for each iteration and a JSONL loop log.
+
+Plan-only smoke loop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-DogfoodIterationLoop.ps1 `
+  -LoopId BookSellerLoop-001 `
+  -Iterations 25 `
+  -DryRun `
+  -StopOnFailure
+```
+
+Future internal runner loop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-DogfoodIterationLoop.ps1 `
+  -LoopId BookSellerLoop-001 `
+  -Iterations 1000 `
+  -DryRun `
+  -StopOnFailure `
+  -RunnerCommand "dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj --"
+```
+
+Each iteration writes:
+
+```text
+tools/dogfood/runs/{LoopId}-iter-0001/replay/replay-plan.json
+tools/dogfood/runs/{LoopId}-iter-0001/replay/replay-summary.json
+tools/dogfood/runs/{LoopId}/iteration-loop.jsonl
+tools/dogfood/runs/{LoopId}/iteration-loop-summary.json
+```

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -30,6 +31,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     private readonly IChatFeedbackService   _feedbackService;
     private readonly ILlmTraceService       _llmTraceService;
     private readonly IContextAgentService?  _contextAgentService;
+    private readonly IChatCommandRouter     _chatCommandRouter;
 
     /// <summary>
     /// When true and <see cref="_contextAgentService"/> is wired, the chat send
@@ -70,7 +72,8 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public Action<IronDev.Agent.Models.ChatTicketContext>? OnCreateTicketFromChat { get; set; }
     public Action<IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>>? OnCreateTicketsFromChat { get; set; }
     public Action<string, string, string?, string?, string?>? OnCreatePlanFromChat { get; set; }
-    public Action<string, string, string?, string?>? OnCreateDecisionFromChat { get; set; }
+    public Action<string, string, string?, string?, long?>? OnCreateDecisionFromChat { get; set; }
+    public Action<string, string, string?, string?, string?, long?>? OnCreateDocumentFromChat { get; set; }
 
     // Navigation shortcuts — wired by ShellViewModel
     public Action? OnNavigateToPlan     { get; set; }
@@ -85,7 +88,8 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         ITicketService        ticketService,
         IChatFeedbackService  feedbackService,
         ILlmTraceService      llmTraceService,
-        IContextAgentService? contextAgentService = null)
+        IContextAgentService? contextAgentService = null,
+        IChatCommandRouter?   chatCommandRouter = null)
     {
         _chatHistoryService   = chatHistoryService;
         _promptContextBuilder = promptContextBuilder;
@@ -95,6 +99,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         _feedbackService      = feedbackService;
         _llmTraceService      = llmTraceService;
         _contextAgentService  = contextAgentService;
+        _chatCommandRouter    = chatCommandRouter ?? new IronDev.Infrastructure.Services.ChatCommandRouter();
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
@@ -252,9 +257,81 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             }
 
             var previousMessage = Messages.Count > 1 ? Messages[Messages.Count - 2].MessageText : null;
-            var ticketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
-            if (ticketIntent != null && (!UseContextAgent || _contextAgentService == null))
+            var previousAssistantMessage = Messages
+                .Take(Messages.Count - 1)
+                .LastOrDefault(m => m.Role == "assistant")
+                ?.MessageText;
+            var previousUserMessage = Messages
+                .Take(Messages.Count - 1)
+                .LastOrDefault(m => m.Role == "user")
+                ?.MessageText;
+
+            var commandRoute = await _chatCommandRouter.RouteAsync(new ChatTurnInput
             {
+                ProjectId = projectId,
+                ChatSessionId = sessionId,
+                UserMessage = text,
+                PreviousAssistantMessage = previousAssistantMessage,
+                PreviousUserMessage = previousUserMessage,
+                ActiveWorkspace = "Chat"
+            });
+
+            if (commandRoute.RequiresAction && !commandRoute.AllowsProseResponse)
+            {
+                if (commandRoute.Intent == ChatRouteIntent.SaveDecision)
+                {
+                    if (OnCreateDecisionFromChat == null)
+                    {
+                        await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a save-decision command, but the decision workflow is not available.");
+                        return;
+                    }
+
+                    var detail = TrimForAction(commandRoute.ActionText ?? text, 4000);
+                    OnCreateDecisionFromChat.Invoke(CleanActionTitle(commandRoute.ActionTitle, "Decision"), detail, null, null, FindSourceDocumentIdForMessage(Messages.Count - 2));
+                    return;
+                }
+
+                if (commandRoute.Intent == ChatRouteIntent.CreateImplementationPlan)
+                {
+                    if (OnCreatePlanFromChat == null)
+                    {
+                        await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a create-plan command, but the plan workflow is not available.");
+                        return;
+                    }
+
+                    var goal = TrimForAction(commandRoute.ActionText ?? text, 6000);
+                    var steps = ExtractPlanSteps(goal);
+                    OnCreatePlanFromChat.Invoke(CleanActionTitle(commandRoute.ActionTitle, "Implementation plan"), goal, steps, null, null);
+                    return;
+                }
+
+                if (commandRoute.Intent == ChatRouteIntent.SaveDiscussionDocument)
+                {
+                    if (OnCreateDocumentFromChat == null)
+                    {
+                        await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a create-document command, but the document workflow is not available.");
+                        return;
+                    }
+
+                    var content = TrimForAction(commandRoute.ActionText ?? text, 8000);
+                    OnCreateDocumentFromChat.Invoke(CleanActionTitle(commandRoute.ActionTitle, "Discussion document"), content, MakeDocumentSummary(content), null, null, FindSourceDocumentIdForMessage(Messages.Count - 2));
+                    return;
+                }
+
+                if (commandRoute.Intent == ChatRouteIntent.BuildTicket)
+                {
+                    OnNavigateToTicket?.Invoke();
+                    await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as a build-ticket command. Select the ticket in Tickets, then use Build This so the run is tied to a saved ticket.");
+                    return;
+                }
+
+                var ticketIntent = commandRoute.CreateTicketIntent;
+                if (ticketIntent == null)
+                {
+                    await AddAssistantNoticeAsync(projectId, sessionId, "I understood this as an action command, but no workflow handler is wired for it yet.");
+                    return;
+                }
+
                 if (ticketIntent.RequiresClarification)
                 {
                     var clarificationText = string.Join("\n", ticketIntent.ClarificationQuestions);
@@ -376,6 +453,88 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                         Role        = "assistant",
                         MessageText = clarificationText,
                         Timestamp   = DateTime.UtcNow
+                    });
+                    return;
+                }
+
+                if (agentResult.TicketCandidates.Count > 0)
+                {
+                    var contexts = BuildTicketContextsFromCandidates(
+                        agentResult.TicketCandidates,
+                        sessionId,
+                        userDbId,
+                        text,
+                        agentRequest.RecentConversationSummary);
+
+                    if (contexts.Count > 1 && OnCreateTicketsFromChat != null)
+                    {
+                        OnCreateTicketsFromChat.Invoke(contexts);
+                        return;
+                    }
+
+                    if (contexts.Count == 1 && OnCreateTicketFromChat != null)
+                    {
+                        OnCreateTicketFromChat.Invoke(contexts[0]);
+                        return;
+                    }
+
+                    var candidateText = BuildTicketCandidateReviewMarkdown(agentResult.TicketCandidates);
+                    var candidateMsg = new ChatSummary
+                    {
+                        Role = "assistant",
+                        MessageText = candidateText,
+                        FormattedPrompt = agentResult.FinalPrompt ?? string.Empty,
+                        ContextPacket = packet,
+                        Timestamp = DateTime.UtcNow
+                    };
+                    Messages.Add(candidateMsg);
+
+                    var candidateDbId = await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+                    {
+                        ProjectId = projectId,
+                        ChatSessionId = sessionId,
+                        Role = "assistant",
+                        Message = candidateText,
+                        ContextSummary = agentResult.ContextSummary
+                    });
+                    candidateMsg.PersistedMessageId = candidateDbId;
+                    SelectedSession.UpdatedDate = DateTime.UtcNow;
+                    await _chatHistoryService.SaveSessionAsync(SelectedSession);
+                    return;
+                }
+
+                if (agentResult.RequiresAction && !agentResult.AllowsProseResponse)
+                {
+                    if (createTicketIntent != null)
+                    {
+                        var contexts = BuildTicketContextsFromIntent(createTicketIntent, sessionId, userDbId);
+                        if (contexts.Count > 1 && OnCreateTicketsFromChat != null)
+                        {
+                            OnCreateTicketsFromChat.Invoke(contexts);
+                            return;
+                        }
+
+                        if (contexts.Count == 1 && OnCreateTicketFromChat != null)
+                        {
+                            OnCreateTicketFromChat.Invoke(contexts[0]);
+                            return;
+                        }
+                    }
+
+                    var blockedText = string.IsNullOrWhiteSpace(agentResult.ActionMessage)
+                        ? "I found an action command, but I could not safely run the matching workflow."
+                        : agentResult.ActionMessage;
+                    if (agentResult.SuggestedActions.Count > 0)
+                    {
+                        blockedText += "\n\nSuggested next steps:\n" +
+                                       string.Join("\n", agentResult.SuggestedActions.Select((a, i) => $"{i + 1}. {a}"));
+                    }
+
+                    Messages.Add(new ChatSummary
+                    {
+                        Role = "assistant",
+                        MessageText = blockedText,
+                        Timestamp = DateTime.UtcNow
                     });
                     return;
                 }
@@ -521,6 +680,51 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         }
     }
 
+    private async Task AddAssistantNoticeAsync(int projectId, long sessionId, string message)
+    {
+        Messages.Add(new ChatSummary
+        {
+            Role = "assistant",
+            MessageText = message,
+            Timestamp = DateTime.UtcNow
+        });
+
+        await _chatHistoryService.SaveMessageAsync(new global::IronDev.Data.Models.ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = message
+        });
+    }
+
+    private static string TrimForAction(string value, int maxLength)
+        => value.Length > maxLength
+            ? value[..maxLength] + "\n...[truncated]"
+            : value;
+
+    private static string CleanActionTitle(string? routeTitle, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(routeTitle))
+            return fallback;
+
+        var separatorIndex = routeTitle.IndexOf(':');
+        var title = separatorIndex >= 0 ? routeTitle[(separatorIndex + 1)..].Trim() : routeTitle.Trim();
+        return string.IsNullOrWhiteSpace(title) ? fallback : title;
+    }
+
+    private static string? ExtractPlanSteps(string text)
+    {
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var steps = string.Join("\n", lines.Where(l =>
+        {
+            var trimmed = l.Trim();
+            return trimmed.StartsWith("-") || trimmed.StartsWith("*") || char.IsDigit(trimmed.FirstOrDefault());
+        }));
+
+        return string.IsNullOrWhiteSpace(steps) ? null : steps;
+    }
+
     [RelayCommand]
     private void StartRename()
     {
@@ -555,6 +759,59 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         SelectedSession = currentSession;
 
         IsRenamingTitle = false;
+    }
+
+    [RelayCommand]
+    private void CopyConversation()
+    {
+        if (SelectedSession == null)
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {SelectedSession.Title}");
+        sb.AppendLine();
+
+        foreach (var message in Messages)
+        {
+            var role = string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
+                ? "User"
+                : "IronDev";
+            sb.AppendLine($"## {role} - {message.Timestamp:yyyy-MM-dd HH:mm}");
+            sb.AppendLine(message.MessageText);
+            sb.AppendLine();
+        }
+
+        Clipboard.SetText(sb.ToString().TrimEnd());
+        StatusMessage = "Conversation copied.";
+        HasStatusMessage = true;
+    }
+
+    [RelayCommand]
+    private async Task DeleteConversationAsync()
+    {
+        var currentSession = SelectedSession;
+        if (currentSession == null)
+            return;
+
+        var result = MessageBox.Show(
+            $"Delete conversation \"{currentSession.Title}\"?",
+            "Delete Conversation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        await _chatHistoryService.DeleteSessionAsync(currentSession.Id);
+        Sessions.Remove(currentSession);
+        SelectedSession = Sessions.FirstOrDefault();
+        Messages.Clear();
+
+        if (SelectedSession != null)
+            await LoadMessagesAsync(SelectedSession.Id);
+
+        StatusMessage = "Conversation deleted.";
+        HasStatusMessage = true;
     }
 
     [RelayCommand]
@@ -607,6 +864,99 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         return contexts;
     }
 
+    private static IReadOnlyList<IronDev.Agent.Models.ChatTicketContext> BuildTicketContextsFromCandidates(
+        IReadOnlyList<TicketCandidate> candidates,
+        long sessionId,
+        long messageId,
+        string sourceRequest,
+        string recentConversationSummary)
+    {
+        var usableCandidates = candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c.Title) || !string.IsNullOrWhiteSpace(c.Summary))
+            .Take(5)
+            .ToList();
+
+        var contexts = new List<IronDev.Agent.Models.ChatTicketContext>(usableCandidates.Count);
+        for (var i = 0; i < usableCandidates.Count; i++)
+        {
+            var candidate = usableCandidates[i];
+            var title = string.IsNullOrWhiteSpace(candidate.Title)
+                ? MakeTicketTitle(candidate.Summary)
+                : MakeTicketTitle(candidate.Title);
+
+            var message = new StringBuilder();
+            message.AppendLine($"## Candidate ticket {i + 1} of {usableCandidates.Count}");
+            message.AppendLine();
+            message.AppendLine($"**Title:** {title}");
+            if (!string.IsNullOrWhiteSpace(candidate.SuggestedDomain))
+                message.AppendLine($"**Domain:** {candidate.SuggestedDomain.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.Summary))
+                message.AppendLine($"**Summary:** {candidate.Summary.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.ExistingRelatedWork))
+                message.AppendLine($"**Related work:** {candidate.ExistingRelatedWork.Trim()}");
+            message.AppendLine();
+            message.AppendLine("### Source request");
+            message.AppendLine();
+            message.AppendLine(sourceRequest.Trim());
+            if (!string.IsNullOrWhiteSpace(recentConversationSummary))
+            {
+                message.AppendLine();
+                message.AppendLine("### Recent discussion");
+                message.AppendLine();
+                message.AppendLine(recentConversationSummary.Trim());
+            }
+
+            contexts.Add(new IronDev.Agent.Models.ChatTicketContext
+            {
+                SessionId = sessionId,
+                MessageId = messageId,
+                MessageText = message.ToString().Trim(),
+                ProposedTitle = title,
+                SplitIndex = i + 1,
+                SplitCount = usableCandidates.Count
+            });
+        }
+
+        return contexts;
+    }
+
+    private static string BuildTicketCandidateReviewMarkdown(IReadOnlyList<TicketCandidate> candidates)
+    {
+        var usableCandidates = candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c.Title) || !string.IsNullOrWhiteSpace(c.Summary))
+            .Take(5)
+            .ToList();
+
+        if (usableCandidates.Count == 0)
+            return "I could not extract any distinct actionable ticket candidates from the recent discussion.";
+
+        var message = new StringBuilder();
+        message.AppendLine("## Candidate Ticket Drafts");
+        message.AppendLine();
+        message.AppendLine("These have **not** been saved yet.");
+        message.AppendLine();
+
+        for (var i = 0; i < usableCandidates.Count; i++)
+        {
+            var candidate = usableCandidates[i];
+            var title = string.IsNullOrWhiteSpace(candidate.Title)
+                ? MakeTicketTitle(candidate.Summary)
+                : MakeTicketTitle(candidate.Title);
+
+            message.AppendLine($"{i + 1}. **{title}**");
+            if (!string.IsNullOrWhiteSpace(candidate.SuggestedDomain))
+                message.AppendLine($"   - **Domain:** {candidate.SuggestedDomain.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.Summary))
+                message.AppendLine($"   - **Summary:** {candidate.Summary.Trim()}");
+            if (!string.IsNullOrWhiteSpace(candidate.ExistingRelatedWork))
+                message.AppendLine($"   - **Related work:** {candidate.ExistingRelatedWork.Trim()}");
+            message.AppendLine();
+        }
+
+        message.AppendLine("Review these candidates, then say `create tickets` to open draft ticket review.");
+        return message.ToString().Trim();
+    }
+
     private static string MakeTicketTitle(string text)
     {
         var normalized = string.Join(" ", text.Split(['\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries));
@@ -614,6 +964,15 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             return "Chat-generated ticket";
 
         return normalized.Length > 80 ? normalized[..80] + "..." : normalized;
+    }
+
+    private static string MakeDocumentSummary(string text)
+    {
+        var normalized = string.Join(" ", text.Split(['\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries));
+        if (string.IsNullOrWhiteSpace(normalized))
+            return string.Empty;
+
+        return normalized.Length > 240 ? normalized[..240] + "..." : normalized;
     }
 
     [RelayCommand]
@@ -670,6 +1029,13 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         }
 
         var detail = message.MessageText;
+        var decisionTag = TryExtractDecisionTag(message.MessageText);
+        if (decisionTag != null)
+        {
+            userQuestion = decisionTag.Value.Title;
+            detail = decisionTag.Value.Detail;
+        }
+
         if (detail.Length > 2000)
             detail = detail.Substring(0, 2000) + "\n...[truncated]";
 
@@ -683,7 +1049,101 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 linkedSymbols = string.Join("\n", message.ContextPacket.MatchedSymbols);
         }
 
-        OnCreateDecisionFromChat.Invoke(userQuestion, detail, linkedFilePaths, linkedSymbols);
+        OnCreateDecisionFromChat.Invoke(userQuestion, detail, linkedFilePaths, linkedSymbols, FindSourceDocumentIdForMessage(idx));
+    }
+
+    [RelayCommand]
+    private void CreateDocument(ChatSummary message)
+    {
+        if (message == null || OnCreateDocumentFromChat == null) return;
+
+        var idx = Messages.IndexOf(message);
+        var title = "Chat-generated project document";
+        if (idx > 0 && Messages[idx - 1].Role == "user")
+        {
+            var q = Messages[idx - 1].MessageText;
+            title = q.Length > 80 ? q[..80] + "..." : q;
+        }
+
+        var content = message.MessageText;
+        if (content.Length > 6000)
+            content = content[..6000] + "\n...[truncated]";
+
+        string? linkedFilePaths = null;
+        string? linkedSymbols = null;
+        if (message.ContextPacket != null)
+        {
+            if (message.ContextPacket.MatchedFilePaths.Count > 0)
+                linkedFilePaths = string.Join("\n", message.ContextPacket.MatchedFilePaths);
+            if (message.ContextPacket.MatchedSymbols.Count > 0)
+                linkedSymbols = string.Join("\n", message.ContextPacket.MatchedSymbols);
+        }
+
+        OnCreateDocumentFromChat.Invoke(title, content, MakeDocumentSummary(content), linkedFilePaths, linkedSymbols, FindSourceDocumentIdForMessage(idx));
+    }
+
+    private long? FindSourceDocumentIdForMessage(int messageIndex)
+    {
+        if (messageIndex < 0)
+            return null;
+
+        for (var i = messageIndex; i >= 0 && i >= messageIndex - 12; i--)
+        {
+            var documentId = TryExtractDocumentId(Messages[i].MessageText);
+            if (documentId.HasValue)
+                return documentId.Value;
+        }
+
+        return null;
+    }
+
+    private static long? TryExtractDocumentId(string text)
+    {
+        foreach (var line in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!line.StartsWith("DocumentId", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var separatorIndex = line.IndexOf(':');
+            if (separatorIndex < 0)
+                separatorIndex = line.IndexOf('=');
+
+            if (separatorIndex < 0)
+                continue;
+
+            var rawValue = line[(separatorIndex + 1)..].Trim();
+            if (long.TryParse(rawValue, out var documentId))
+                return documentId;
+        }
+
+        return null;
+    }
+
+    private static (string Title, string Detail)? TryExtractDecisionTag(string text)
+    {
+        const string startTag = "<decision>";
+        const string endTag = "</decision>";
+
+        var startIndex = text.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+        if (startIndex < 0)
+            return null;
+
+        startIndex += startTag.Length;
+        var endIndex = text.IndexOf(endTag, startIndex, StringComparison.OrdinalIgnoreCase);
+        if (endIndex <= startIndex)
+            return null;
+
+        var body = text[startIndex..endIndex].Trim();
+        var separatorIndex = body.IndexOf('|');
+        if (separatorIndex <= 0 || separatorIndex >= body.Length - 1)
+            return null;
+
+        var title = body[..separatorIndex].Trim();
+        var detail = body[(separatorIndex + 1)..].Trim();
+
+        return string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(detail)
+            ? null
+            : (title, detail);
     }
 
     [RelayCommand]

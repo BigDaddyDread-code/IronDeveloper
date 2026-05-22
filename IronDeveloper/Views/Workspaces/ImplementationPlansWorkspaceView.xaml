@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ImplementationPlansWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Background="{StaticResource Background/App}" Margin="24">
+    <Grid Background="{StaticResource Background/App}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -16,7 +16,7 @@
         <controls:WorkspaceHeader Grid.Row="0"
                                   Eyebrow="PLANS"
                                   Title="Implementation Plans"
-                                  Margin="0,0,0,18">
+                                  Margin="0">
             <controls:WorkspaceHeader.Actions>
                 <Button Content="+ New Plan"
                         Command="{Binding NewPlanCommand}"
@@ -26,7 +26,7 @@
         <!-- ── Master-Detail ─────────────────────────────────────────────── -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="320" MinWidth="240"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -54,7 +54,7 @@
             <Border Grid.Column="1"
                     Background="{StaticResource Background/Panel}"
                     BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1"
-                    CornerRadius="10">
+                    CornerRadius="{StaticResource Radius/Large}">
                 <Grid>
                     <!-- Empty state: no plan selected -->
                     <controls:EmptyResultsState

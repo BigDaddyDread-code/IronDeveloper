@@ -1,0 +1,61 @@
+{
+  "test_run_id": "test-irondev-code-standards-alpha-009",
+  "goal_id": "code-standards-alpha-009",
+  "project_id": 2,
+  "description": "Run the deterministic Alpha code standards gate so Codex can see build/test/format/audit status plus code-shape warnings before adding more memory-spine ribs.",
+  "expected": {
+    "build_success": true,
+    "focused_tests_success": true,
+    "format_success": true,
+    "package_audit_success": true,
+    "quality_gate_runs": true,
+    "warnings_are_allowed": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "dotnet_build",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 2,
+      "action": "dotnet_test",
+      "params": {
+        "target": "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj",
+        "filter": "ChatCommandRouter_CreateTickets_IsActionFirst|ChatCommandRouter_SaveDecision_IsActionFirst|ChatCommandRouter_CreatePlan_IsActionFirst|ChatCommandRouter_BuildTicketQuestion_AllowsProse"
+      }
+    },
+    {
+      "step": 3,
+      "action": "format_check",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 4,
+      "action": "package_audit",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 5,
+      "action": "code_standards_check",
+      "params": {
+        "targets": [
+          "tools/IronDev.ReplayRunner/Program.cs",
+          "tools/dogfood/Invoke-TestAgentPlan.ps1"
+        ],
+        "max_file_lines": 1800,
+        "max_method_lines": 180,
+        "require_proof_boundary_docs": true,
+        "fail_on_warnings": false
+      }
+    }
+  ],
+  "max_turns": 8,
+  "early_stop_on_failure": true
+}

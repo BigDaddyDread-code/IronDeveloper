@@ -66,7 +66,8 @@ public sealed class TicketService : ITicketService
                     BuildValidation = @BuildValidation, ContextSummary = @ContextSummary,
                     IsGenerated = @IsGenerated, GenerationNote = @GenerationNote,
                     SourceChatSessionId = @SourceChatSessionId,
-                    SourceChatMessageId = @SourceChatMessageId
+                    SourceChatMessageId = @SourceChatMessageId,
+                    SourceDocumentVersionId = @SourceDocumentVersionId
                 WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
                 """;
 
@@ -99,7 +100,8 @@ public sealed class TicketService : ITicketService
                     ticket.IsGenerated,
                     ticket.GenerationNote,
                     ticket.SourceChatSessionId,
-                    ticket.SourceChatMessageId
+                    ticket.SourceChatMessageId,
+                    ticket.SourceDocumentVersionId
                 },
                 cancellationToken: cancellationToken));
                 
@@ -119,7 +121,7 @@ public sealed class TicketService : ITicketService
                      Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                      UnitTests, IntegrationTests, ManualTests, RegressionTests,
                      BuildValidation, ContextSummary, IsGenerated, GenerationNote,
-                     SourceChatSessionId, SourceChatMessageId)
+                     SourceChatSessionId, SourceChatMessageId, SourceDocumentVersionId)
                 OUTPUT inserted.Id
                 VALUES
                     (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
@@ -127,7 +129,7 @@ public sealed class TicketService : ITicketService
                      @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols,
                      @UnitTests, @IntegrationTests, @ManualTests, @RegressionTests,
                      @BuildValidation, @ContextSummary, @IsGenerated, @GenerationNote,
-                     @SourceChatSessionId, @SourceChatMessageId);
+                     @SourceChatSessionId, @SourceChatMessageId, @SourceDocumentVersionId);
                 """;
 
             var ticketId = await connection.QuerySingleAsync<long>(new CommandDefinition(
@@ -159,7 +161,8 @@ public sealed class TicketService : ITicketService
                     ticket.IsGenerated,
                     ticket.GenerationNote,
                     ticket.SourceChatSessionId,
-                    ticket.SourceChatMessageId
+                    ticket.SourceChatMessageId,
+                    ticket.SourceDocumentVersionId
                 },
                 cancellationToken: cancellationToken));
 
@@ -177,7 +180,7 @@ public sealed class TicketService : ITicketService
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                 UnitTests, IntegrationTests, ManualTests, RegressionTests,
                 BuildValidation, ContextSummary, IsGenerated, GenerationNote,
-                SourceChatSessionId, SourceChatMessageId, CreatedDate
+                SourceChatSessionId, SourceChatMessageId, SourceDocumentVersionId, CreatedDate
             FROM dbo.ProjectTickets
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -205,7 +208,7 @@ public sealed class TicketService : ITicketService
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                 UnitTests, IntegrationTests, ManualTests, RegressionTests,
                 BuildValidation, ContextSummary, IsGenerated, GenerationNote,
-                SourceChatSessionId, SourceChatMessageId, CreatedDate
+                SourceChatSessionId, SourceChatMessageId, SourceDocumentVersionId, CreatedDate
             FROM dbo.ProjectTickets
                 WHERE Id = @TicketId
               AND TenantId = @TenantId
@@ -251,6 +254,11 @@ public sealed class TicketService : ITicketService
             BEGIN
                 ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
             END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'SourceDocumentVersionId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD SourceDocumentVersionId BIGINT NULL;
+            END
             """;
 
         await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
@@ -258,7 +266,9 @@ public sealed class TicketService : ITicketService
 
     private async Task EnsureCreatedFromReferencesAsync(ProjectTicket ticket, long ticketId, CancellationToken cancellationToken)
     {
-        if (ticket.SourceChatSessionId == null && ticket.SourceChatMessageId == null)
+        if (ticket.SourceChatSessionId == null &&
+            ticket.SourceChatMessageId == null &&
+            ticket.SourceDocumentVersionId == null)
             return;
 
         var existing = await _artifactSourceReferenceService.GetForArtifactAsync(
@@ -301,6 +311,24 @@ public sealed class TicketService : ITicketService
                 SourceId = sourceChatMessageId,
                 ReferenceType = "CreatedFrom",
                 Summary = "Ticket was created from this chat message.",
+                IsRequired = true,
+                CreatedBy = "IronDev"
+            });
+        }
+
+        if (ticket.SourceDocumentVersionId is { } sourceDocumentVersionId &&
+            !existing.Any(r => r.SourceType == "ProjectDocumentVersion" && r.SourceId == sourceDocumentVersionId && r.ReferenceType == "CreatedFrom"))
+        {
+            references.Add(new ArtifactSourceReference
+            {
+                TenantId = _tenant.TenantId,
+                ProjectId = ticket.ProjectId,
+                ArtifactType = "Ticket",
+                ArtifactId = ticketId,
+                SourceType = "ProjectDocumentVersion",
+                SourceId = sourceDocumentVersionId,
+                ReferenceType = "CreatedFrom",
+                Summary = "Ticket was created from this project document version.",
                 IsRequired = true,
                 CreatedBy = "IronDev"
             });

@@ -17,10 +17,14 @@ public enum ShellMode
 public enum ProjectWorkspace
 {
     Overview,
+    Discovery,
     Chat,
     Tickets,
+    Testing,
     Plans,
     Decisions,
+    Documents,
+    DevTools,
     Settings,
     Builder,
     ProjectProfile

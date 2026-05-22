@@ -1,0 +1,36 @@
+{
+  "test_run_id": "test-bookseller-conversation-storage-001",
+  "project_id": 5,
+  "description": "Start with a vague persistence request, let IronDev ask for detail, then answer with storage facts and require a saved discussion document route.",
+  "steps": [
+    {
+      "step": 1,
+      "action": "chat_conversation",
+      "params": {
+        "workspace": "Chat",
+        "initial_message": "I want to persist data",
+        "facts_to_reveal": [
+          "BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge."
+        ],
+        "expected_outcome": {
+          "intent": "SaveDiscussionDocument",
+          "requires_action": true,
+          "allows_prose_response": false
+        },
+        "max_turns": 4
+      }
+    },
+    {
+      "step": 2,
+      "action": "replay_run",
+      "params": {
+        "scenario": "BookSellerMvp",
+        "reps": 10,
+        "dry_run": true,
+        "stop_on_failure": true
+      }
+    }
+  ],
+  "max_turns": 8,
+  "early_stop_on_failure": true
+}

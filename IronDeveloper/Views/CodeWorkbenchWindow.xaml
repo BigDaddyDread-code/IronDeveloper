@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance Type=viewmodels:CodeWorkbenchViewModel, IsDesignTimeCreatable=False}">
     
-    <Grid Margin="10">
+    <Grid Margin="12" Background="{StaticResource Background/App}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="320" />
             <ColumnDefinition Width="*" />
@@ -17,7 +17,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- Left Panel: Ticket & Plan -->
-        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+        <Border Grid.Column="0" Style="{StaticResource SurfacePanel.Subtle}" Padding="16" Margin="0,0,12,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -25,43 +25,43 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 
-                <TextBlock Grid.Row="0" Text="Target Outline" Style="{StaticResource CardTitleStyle}" />
+                <TextBlock Grid.Row="0" Text="Target Outline" Style="{StaticResource Typography.SectionTitle}" />
                 
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- Loaded Ticket Info -->
-                        <Border Background="{StaticResource SoftPanelBrush}" BorderBrush="{StaticResource BorderSoftBrush}"
-                                BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,12">
+                        <Border Background="{StaticResource Background/Interactive}" BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="1" CornerRadius="{StaticResource Radius/Large}" Padding="12" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="Loaded Ticket" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
                                 <TextBlock Text="{Binding LoadedTicket.Title}" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,8" />
-                                <TextBlock Text="{Binding LoadedTicket.Problem}" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding LoadedTicket.Problem}" Foreground="{StaticResource Text/Secondary}" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
 
                         <!-- Implementation Plan Details -->
-                        <Border Background="{StaticResource SoftPanelBrush}" BorderBrush="{StaticResource BorderSoftBrush}"
-                                BorderThickness="1" CornerRadius="12" Padding="12">
+                        <Border Background="{StaticResource Background/Interactive}" BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="1" CornerRadius="{StaticResource Radius/Large}" Padding="12">
                             <StackPanel>
                                 <TextBlock Text="Implementation Plan" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
                                 
-                                <TextBlock Text="Target Block:" Style="{StaticResource LabelStyle}" />
-                                <TextBox Text="{Binding SelectedTargetFilePath}" Style="{StaticResource ModernTextBoxStyle}" MinHeight="36" IsReadOnly="True" Margin="0,0,0,10"/>
+                                <TextBlock Text="Target Block:" Style="{StaticResource Typography.Eyebrow}" />
+                                <TextBox Text="{Binding SelectedTargetFilePath}" MinHeight="36" IsReadOnly="True" Margin="0,0,0,10"/>
                                 
-                                <TextBlock Text="Strategy Summary:" Style="{StaticResource LabelStyle}" />
-                                <TextBlock Text="{Binding ImplementationPlan.Summary}" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                <TextBlock Text="Strategy Summary:" Style="{StaticResource Typography.Eyebrow}" />
+                                <TextBlock Text="{Binding ImplementationPlan.Summary}" Foreground="{StaticResource Text/Secondary}" TextWrapping="Wrap" Margin="0,0,0,10"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
                 
                 <Button Grid.Row="2" Content="Generate Plan" Command="{Binding GeneratePlanCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}" MinHeight="40" Margin="0,10,0,0" />
+                        Style="{StaticResource AppButton.Primary}" MinHeight="40" Margin="0,10,0,0" />
             </Grid>
         </Border>
 
         <!-- Center Panel: Draft Editors -->
-        <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+        <Border Grid.Column="1" Style="{StaticResource SurfacePanel.Subtle}" Padding="16" Margin="0,0,12,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -69,7 +69,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Draft Workbench" Style="{StaticResource CardTitleStyle}" />
+                <TextBlock Grid.Row="0" Text="Draft Workbench" Style="{StaticResource Typography.SectionTitle}" />
 
                 <TabControl Grid.Row="1" Margin="0,0,0,12" Background="Transparent" BorderThickness="0">
                     <TabControl.Resources>
@@ -91,7 +91,7 @@
                     </TabControl.Resources>
                     
                     <TabItem Header="Code Draft">
-                        <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="10">
+                        <Border Background="{StaticResource Background/App}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="{StaticResource Radius/Medium}" Padding="10">
                             <TextBox Text="{Binding GeneratedCode, UpdateSourceTrigger=PropertyChanged}" 
                                      AcceptsReturn="True" AcceptsTab="True" 
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
@@ -99,7 +99,7 @@
                         </Border>
                     </TabItem>
                     <TabItem Header="Test Draft">
-                        <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSoftBrush}" BorderThickness="1" CornerRadius="8" Padding="10">
+                        <Border Background="{StaticResource Background/App}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="{StaticResource Radius/Medium}" Padding="10">
                             <TextBox Text="{Binding GeneratedTestCode, UpdateSourceTrigger=PropertyChanged}" 
                                      AcceptsReturn="True" AcceptsTab="True" 
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
@@ -110,15 +110,15 @@
                 
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Draft Code" Command="{Binding GenerateCodeDraftCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" MinWidth="130" Margin="0,0,10,0" />
+                            Style="{StaticResource AppButton.Primary}" MinWidth="130" Margin="0,0,10,0" />
                     <Button Content="Draft Test" Command="{Binding GenerateTestDraftCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}" MinWidth="130" />
+                            Style="{StaticResource AppButton.Secondary}" MinWidth="130" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Right Panel: Validation Log -->
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+        <Border Grid.Column="2" Style="{StaticResource SurfacePanel.Subtle}" Padding="16">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -126,21 +126,21 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Console &amp; Validation" Style="{StaticResource CardTitleStyle}" />
+                <TextBlock Grid.Row="0" Text="Console &amp; Validation" Style="{StaticResource Typography.SectionTitle}" />
                 
-                <Border Grid.Row="1" Background="#1E293B" CornerRadius="12" Padding="12" Margin="0,0,0,10">
+                <Border Grid.Row="1" Background="{StaticResource Background/App}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="{StaticResource Radius/Large}" Padding="12" Margin="0,0,0,10">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <TextBlock Text="{Binding OutputLog}" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding OutputLog}" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource Text/Primary}" TextWrapping="Wrap" />
                     </ScrollViewer>
                 </Border>
                 
                 <Button Grid.Row="2" Content="Clear Console" Command="{Binding ClearLogCommand}"
-                        Style="{StaticResource SecondaryButtonStyle}" MinHeight="40" />
+                        Style="{StaticResource AppButton.Secondary}" MinHeight="40" />
             </Grid>
         </Border>
         
         <!-- Loading Overlay -->
-        <Border Grid.ColumnSpan="3" Background="#80FFFFFF" Panel.ZIndex="100">
+        <Border Grid.ColumnSpan="3" Background="#CC000000" Panel.ZIndex="100">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -151,7 +151,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border Background="#2563EB" CornerRadius="12" Padding="30,20" HorizontalAlignment="Center" VerticalAlignment="Center" Effect="{StaticResource CardShadow}">
+            <Border Background="{StaticResource Background/Elevated}" BorderBrush="{StaticResource Accent/Primary}" BorderThickness="1" CornerRadius="{StaticResource Radius/Large}" Padding="30,20" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock Text="AI IS THINKING..." Foreground="White" FontWeight="Bold" FontSize="16" />
             </Border>
         </Border>

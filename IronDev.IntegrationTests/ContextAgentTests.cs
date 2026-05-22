@@ -1417,6 +1417,158 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Bare plural create-tickets command uses candidate titles from the previous assistant message.")]
+    public void ChatIntentParser_CreateTickets_UsesPreviousCandidateTitles()
+    {
+        var previous = """
+            Here are the candidate tickets:
+
+            1. **Implement SQL Server Integration**
+            - Domain: Database
+            - Summary: Integrate SQL Server as the persistent data storage solution.
+
+            2. **Integrate Dapper ORM**
+            - Domain: Database
+            - Summary: Use Dapper as the ORM layer.
+            """;
+
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket("create tickets", previous);
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("CreateTickets", intent.Intent);
+        Assert.AreEqual(2, intent.TicketCount);
+        Assert.AreEqual("Implement SQL Server Integration", intent.SplitHints[0]);
+        Assert.AreEqual("Integrate Dapper ORM", intent.SplitHints[1]);
+        Assert.AreEqual(previous.Trim(), intent.WorkText);
+        Assert.IsFalse(intent.RequiresClarification);
+    }
+
+    [TestMethod]
+    [Description("Messy spoken plural create-ticket commands use the previous assistant context instead of falling through to chat.")]
+    public void ChatIntentParser_CreateMeSomeTicketsTodoThisWork_UsesPreviousContext()
+    {
+        var previous = """
+            ### Task: Create Tickets for Implementing Multi-Location Storage in BookSeller
+
+            1. **Add storage locations data model**
+            - Summary: Add entities for book storage locations.
+
+            2. **Update book persistence**
+            - Summary: Link books to storage locations.
+            """;
+
+        var intent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(
+            "ok create me some tickets todo this work",
+            previous);
+
+        Assert.IsNotNull(intent);
+        Assert.AreEqual("CreateTickets", intent.Intent);
+        Assert.AreEqual(2, intent.TicketCount);
+        Assert.AreEqual(previous.Trim(), intent.WorkText);
+        Assert.AreEqual("Add storage locations data model", intent.SplitHints[0]);
+        Assert.AreEqual("Update book persistence", intent.SplitHints[1]);
+        Assert.IsFalse(intent.RequiresClarification);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter gives explicit ticket actions precedence over prose and architecture routing.")]
+    public async Task ChatCommandRouter_CreateTickets_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "ok create me some tickets todo this work",
+            PreviousAssistantMessage = """
+                1. **Add storage locations data model**
+                2. **Update book persistence**
+                """
+        });
+
+        Assert.AreEqual(ChatRouteIntent.CreateMultipleDraftTickets, route.Intent);
+        Assert.IsTrue(route.IsAction);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+        Assert.AreEqual(ContextReferenceKind.PreviousAssistantMessage, route.ContextReference);
+        Assert.AreEqual(DraftCountMode.Multiple, route.DraftCountMode);
+        Assert.IsNotNull(route.CreateTicketIntent);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter leaves non-action questions available for normal chat fallback.")]
+    public async Task ChatCommandRouter_NormalTicketQuestion_AllowsProse()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "how should we structure tickets for this work?",
+            PreviousAssistantMessage = "Use SQL Server and Dapper."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.GeneralChat, route.Intent);
+        Assert.IsFalse(route.IsAction);
+        Assert.IsFalse(route.RequiresAction);
+        Assert.IsTrue(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter treats save-decision commands as action routes with no prose fallback.")]
+    public async Task ChatCommandRouter_SaveDecision_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            UserMessage = "save this as decision",
+            PreviousAssistantMessage = "Use SQL Server as the canonical source of truth."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.SaveDecision, route.Intent);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+        Assert.AreEqual(ContextReferenceKind.PreviousAssistantMessage, route.ContextReference);
+        StringAssert.Contains(route.ActionText!, "SQL Server");
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter treats create-plan commands as action routes with no prose fallback.")]
+    public async Task ChatCommandRouter_CreatePlan_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            UserMessage = "turn this into a plan",
+            PreviousAssistantMessage = "- Add command routing\n- Add review UI"
+        });
+
+        Assert.AreEqual(ChatRouteIntent.CreateImplementationPlan, route.Intent);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter does not route explanatory build-ticket questions as build actions.")]
+    public async Task ChatCommandRouter_BuildTicketQuestion_AllowsProse()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            UserMessage = "what is build ticket?"
+        });
+
+        Assert.AreEqual(ChatRouteIntent.GeneralChat, route.Intent);
+        Assert.IsFalse(route.RequiresAction);
+        Assert.IsTrue(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
     [Description("Bare create-ticket commands are explicit but need scope clarification.")]
     public void ChatIntentParser_CreateTicketWithoutScope_AsksClarification()
     {
@@ -1484,6 +1636,122 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("Plural candidate-ticket commands produce reusable standard Markdown ticket context.")]
+    public void ChatWorkspaceViewModel_CreateTicketsFromCandidates_UsesStandardMarkdown()
+    {
+        var method = typeof(ChatWorkspaceViewModel).GetMethod(
+            "BuildTicketContextsFromCandidates",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.IsNotNull(method);
+
+        var candidates = new List<TicketCandidate>
+        {
+            new()
+            {
+                Title = "Implement SQL Server Integration",
+                SuggestedDomain = "Database",
+                Summary = "Integrate SQL Server as the persistent data storage solution."
+            },
+            new()
+            {
+                Title = "Integrate Dapper ORM",
+                SuggestedDomain = "Database",
+                Summary = "Use Dapper as the ORM layer."
+            }
+        };
+
+        var captured = (IReadOnlyList<IronDev.Agent.Models.ChatTicketContext>)method.Invoke(
+            null,
+            [candidates, 10L, 20L, "create tickets", "Previous assistant candidate list"])!;
+
+        Assert.IsNotNull(captured);
+        Assert.AreEqual(2, captured!.Count);
+        StringAssert.Contains(captured[0].MessageText, "## Candidate ticket 1 of 2");
+        StringAssert.Contains(captured[0].MessageText, "**Title:** Implement SQL Server Integration");
+        StringAssert.Contains(captured[0].MessageText, "### Source request");
+        Assert.IsFalse(captured[0].MessageText.Contains("Domain:Database", StringComparison.Ordinal));
+        Assert.IsFalse(captured[0].MessageText.Contains("Summary:Integrate", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [Description("Candidate-ticket assistant fallback response is deterministic Markdown, not loose LLM prose.")]
+    public void ChatWorkspaceViewModel_CandidateReviewResponse_UsesStandardMarkdown()
+    {
+        var method = typeof(ChatWorkspaceViewModel).GetMethod(
+            "BuildTicketCandidateReviewMarkdown",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.IsNotNull(method);
+
+        var candidates = new List<TicketCandidate>
+        {
+            new()
+            {
+                Title = "Implement SQL Server Integration",
+                SuggestedDomain = "Database",
+                Summary = "Integrate SQL Server as the persistent data storage solution."
+            },
+            new()
+            {
+                Title = "Integrate Dapper ORM",
+                SuggestedDomain = "Database",
+                Summary = "Use Dapper as the ORM layer."
+            }
+        };
+
+        var markdown = (string)method.Invoke(null, [candidates])!;
+
+        StringAssert.Contains(markdown, "## Candidate Ticket Drafts");
+        StringAssert.Contains(markdown, "These have **not** been saved yet.");
+        StringAssert.Contains(markdown, "1. **Implement SQL Server Integration**");
+        StringAssert.Contains(markdown, "   - **Domain:** Database");
+        StringAssert.Contains(markdown, "Review these candidates, then say `create tickets`");
+        Assert.IsFalse(markdown.Contains("I have created", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(markdown.Contains("Domain:Database", StringComparison.Ordinal));
+        Assert.IsFalse(markdown.Contains("Summary:Integrate", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [Description("Context Agent action-required results dispatch workflow actions instead of falling through to prose chat.")]
+    public async Task ChatWorkspaceViewModel_ContextAgentActionRequired_SuppressesProseResponse()
+    {
+        var llm = new StubLlmService("SHOULD NOT BE USED");
+        var spy = new ContextRequestSpyAgentService
+        {
+            Result = new ContextAgentResult
+            {
+                ResultType = ContextAgentResultType.ActionRequired,
+                RequiresAction = true,
+                AllowsProseResponse = false,
+                ActionIntent = "CreateTicket",
+                WasSuccessful = true
+            }
+        };
+        var vm = new IronDev.Agent.ViewModels.Workspaces.ChatWorkspaceViewModel(
+            new StubChatHistoryService(),
+            new StubPromptContextBuilder(),
+            llm,
+            new ContextStubProjectMemoryService(),
+            new ContextStubTicketService(),
+            new StubChatFeedbackService(),
+            new LlmTraceService(),
+            spy,
+            new AlwaysGeneralChatRouter());
+
+        IronDev.Agent.Models.ChatTicketContext? captured = null;
+        vm.OnCreateTicketFromChat = ctx => captured = ctx;
+        await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1, Name = "BookSeller" });
+
+        vm.UseContextAgent = true;
+        vm.PromptText = "Create a ticket to add book sorting";
+        await vm.SendMessageCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(spy.LastRequest);
+        Assert.IsNotNull(captured);
+        Assert.AreEqual("add book sorting", captured!.MessageText);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
+    }
+
+    [TestMethod]
     [Description("Test E & F: Conflict assessment receives WorkText, and Trace includes original and WorkText.")]
     public async Task ChatWorkspaceViewModel_PassesWorkText_And_LogsTrace()
     {
@@ -1503,7 +1771,8 @@ public sealed class ContextAgentTests
             ticketService,
             new StubChatFeedbackService(),
             traceService,
-            spy);
+            spy,
+            new AlwaysGeneralChatRouter());
 
         await vm.LoadAsync(new IronDev.Data.Models.Project { Id = 1 });
 
@@ -1550,6 +1819,12 @@ internal sealed class ContextRequestSpyAgentService : IContextAgentService
         LastRequest = request;
         return Task.FromResult(Result);
     }
+}
+
+internal sealed class AlwaysGeneralChatRouter : IChatCommandRouter
+{
+    public Task<ChatRouteResult> RouteAsync(ChatTurnInput input, CancellationToken cancellationToken = default)
+        => Task.FromResult(ChatRouteResult.GeneralChat());
 }
 
 internal sealed class ContextStubTicketService : IronDev.Services.ITicketService

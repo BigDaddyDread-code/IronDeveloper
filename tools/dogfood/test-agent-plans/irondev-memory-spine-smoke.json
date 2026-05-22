@@ -1,0 +1,57 @@
+{
+  "test_run_id": "test-irondev-memory-spine-001",
+  "goal_id": "retrieval-correctness-001",
+  "project_id": 5,
+  "description": "Prove the first slice of IronDev's memory spine: Weaviate health plus current IronDev dogfood knowledge retrieval with authority-aware expectations.",
+  "expected": {
+    "weaviate_health": true,
+    "current_goal_document_primary": true,
+    "project_scoped_to_irondev": true,
+    "source_links_present": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "weaviate_health",
+      "params": {
+        "endpoint": "http://localhost:8080"
+      }
+    },
+    {
+      "step": 2,
+      "action": "docs_search",
+      "params": {
+        "project": "IronDev",
+        "query": "current first goal Test Agent project memory retrieval correctness",
+        "take": 5,
+        "expect_top_project": "IronDev",
+        "expect_top_title_contains": "CODEX_GOALS",
+        "expect_top_document_type": "Architecture",
+        "expect_source_present": true,
+        "must_not_primary_title_contain": [
+          "BookSeller",
+          "SELF_IMPROVEMENT_LOOP"
+        ]
+      }
+    },
+    {
+      "step": 3,
+      "action": "docs_search",
+      "params": {
+        "project": "IronDev",
+        "query": "builder safety rules approval before code changes",
+        "take": 5,
+        "expect_top_project": "IronDev",
+        "expect_top_title_contains": "Alpha Stabilisation",
+        "expect_top_document_type": "Architecture",
+        "expect_top_authority": "Accepted",
+        "expect_source_present": true,
+        "must_not_primary_title_contain": [
+          "BookSeller"
+        ]
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}

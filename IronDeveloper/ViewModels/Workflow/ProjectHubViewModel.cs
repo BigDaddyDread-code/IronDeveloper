@@ -48,6 +48,7 @@ public sealed partial class ProjectHubViewModel : ObservableObject
     [RelayCommand]
     private void OpenProject(global::IronDev.Data.Models.Project project)
     {
+        Serilog.Log.Information("[ProjectHub] Opening project from card: {ProjectId} {ProjectName}", project.Id, project.Name);
         OnOpenProject?.Invoke(project);
     }
 

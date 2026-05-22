@@ -10,6 +10,35 @@ This guide helps you set up a local development environment for IronDev.
 
 ---
 
+## Quick Bootstrap
+
+For a local machine that already has .NET and Docker Desktop installed, run this from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
+```
+
+This restores packages, starts/smoke-tests Weaviate, builds the WPF app, and runs a small stabilisation smoke test set.
+
+Database setup is opt-in so the script does not accidentally reseed an existing database:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1 -RunDatabaseSetup
+```
+
+Useful switches:
+
+```text
+-SkipWeaviate
+-SkipBuild
+-SkipTests
+-RunDatabaseSetup
+-SqlServerInstance "(localdb)\MSSQLLocalDB"
+-DatabaseName "IronDeveloper"
+```
+
+---
+
 ## 1. Local Database Setup
 
 1.  **Create Database**: Create a new database named `IronDeveloper`.
@@ -61,7 +90,40 @@ IronDev supports multiple AI providers. Configure your choice in `appsettings.De
 
 ---
 
-## 3. Build & Launch
+## 3. Optional Weaviate Semantic Memory
+
+Weaviate is optional for local development. IronDev defaults to safe startup with Weaviate disabled, while `IronDeveloper/appsettings.Development.json` can enable it when Docker is running.
+
+Start the local container:
+
+```powershell
+.\Scripts\weaviate-dev.ps1 up
+```
+
+If local script execution is blocked:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\weaviate-dev.ps1 up
+```
+
+Run a smoke test:
+
+```powershell
+.\Scripts\weaviate-dev.ps1 smoke
+```
+
+Expected local endpoints:
+
+```text
+HTTP: http://localhost:8080
+gRPC: localhost:50051
+```
+
+For full setup and settings, see [Docs/weaviate-local-setup.md](weaviate-local-setup.md).
+
+---
+
+## 4. Build & Launch
 
 ### Controls Library
 The controls are currently source-referenced. Ensure the repo is cloned at the expected path (or update the `.slnx` if moved):
@@ -87,7 +149,7 @@ dotnet run
 
 ---
 
-## 4. Login & First Steps
+## 5. Login & First Steps
 
 1.  **Login**:
     *   **Email**: `bob@irondev.local`
@@ -97,7 +159,7 @@ dotnet run
 
 ---
 
-## 5. Running Tests
+## 6. Running Tests
 
 ### Integration Tests
 Requires a local SQL Server instance (configured in `appsettings.Test.json`).

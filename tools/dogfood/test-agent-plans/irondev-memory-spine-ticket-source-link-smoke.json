@@ -1,0 +1,22 @@
+{
+  "test_run_id": "IronDevMemorySpine010-TicketSourceLink",
+  "goal_id": "memory-spine-010-ticket-source-link",
+  "project_id": 2,
+  "description": "Prove tickets created from SQL-backed project documents preserve and resolve the exact ProjectDocumentVersion source link.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "ticket_source_link_smoke",
+      "params": {
+        "project": "IronDev"
+      }
+    }
+  ],
+  "expected": {
+    "ticket_has_source_document_version_id": true,
+    "source_document_version_resolves": true,
+    "orphan_missing_source_is_reported_as_failure": true
+  }
+}
