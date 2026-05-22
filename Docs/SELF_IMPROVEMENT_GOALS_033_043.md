@@ -108,6 +108,8 @@ Create a single batch plan that runs the key 033-041 proofs and returns a compac
 
 ### 043: PR-Ready Quality Gate
 
+Status: implemented in this branch.
+
 Run build, focused tests, format, package audit, code standards, and the 033-041 batch regression pack. The branch is PR-ready only when these pass.
 
 ## Current First Slice
