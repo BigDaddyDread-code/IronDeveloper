@@ -9,34 +9,6 @@
     {
       "path": "tools/IronDev.ReplayRunner/Program.cs",
       "rule": "LargeMethod",
-      "method": "HandleMemorySearchCommandAsync",
-      "reason": "013 Codex-facing memory search CLI is intentionally kept in the replay runner until the final irondev CLI command surface is extracted.",
-      "expiresAfter": "Codex-facing CLI extraction"
-    },
-    {
-      "path": "tools/IronDev.ReplayRunner/Program.cs",
-      "rule": "LargeMethod",
-      "method": "HandleMemorySqlVersionSmokeCommandAsync",
-      "reason": "006 proof command is stable but not yet extracted into focused dogfood harness helpers.",
-      "expiresAfter": "Memory Spine 012 extraction pass"
-    },
-    {
-      "path": "tools/IronDev.ReplayRunner/Program.cs",
-      "rule": "LargeMethod",
-      "method": "HandleMemoryWeaviateSqlVersionSmokeCommandAsync",
-      "reason": "007 proof command is stable but not yet extracted into focused dogfood harness helpers.",
-      "expiresAfter": "Memory Spine 012 extraction pass"
-    },
-    {
-      "path": "tools/IronDev.ReplayRunner/Program.cs",
-      "rule": "LargeMethod",
-      "method": "HandleMemoryCrossProjectSmokeCommandAsync",
-      "reason": "008 proof command is stable but not yet extracted into focused dogfood harness helpers.",
-      "expiresAfter": "Memory Spine 012 extraction pass"
-    },
-    {
-      "path": "tools/IronDev.ReplayRunner/Program.cs",
-      "rule": "LargeMethod",
       "method": "HandleMemoryTicketSourceLinkSmokeCommandAsync",
       "reason": "010 proof command is stable but not yet extracted into focused dogfood harness helpers.",
       "expiresAfter": "Memory Spine 012 extraction pass"
