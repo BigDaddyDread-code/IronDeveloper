@@ -687,6 +687,115 @@ foreach ($step in $plan.steps) {
                 $summary = "Failure package: $($parsed.markdownPath)"
             }
 
+            "failure_package_smoke" {
+                $failurePlanPath = Resolve-TargetPath $params.failure_plan_path
+                $expectedNestedGoalId = [string]$params.expect_nested_goal_id
+                $intentionalFailureRunId = "$RunId-intentional-failure"
+                $nestedArguments = @(
+                    "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", $PSCommandPath,
+                    "-PlanPath", $failurePlanPath,
+                    "-RunId", $intentionalFailureRunId,
+                    "-Json"
+                )
+
+                $nestedLogPath = Join-Path $logRoot "step-$($stepNumber.ToString('000'))-intentional-failure.log"
+                $nestedCapture = Invoke-CommandCapture -FilePath "powershell" -Arguments $nestedArguments -StepLogPath $nestedLogPath
+                if ($nestedCapture.exit_code -ne 0) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan runner exited with code $($nestedCapture.exit_code)"
+                    break
+                }
+
+                $nestedReportPath = Join-Path $runsRoot "$intentionalFailureRunId\test-agent-report.json"
+                if (-not (Test-Path -LiteralPath $nestedReportPath)) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan did not write a Test Agent report."
+                    break
+                }
+
+                $nestedReport = Get-Content -LiteralPath $nestedReportPath -Raw | ConvertFrom-Json
+                $nestedFailures = [int]$nestedReport.actual.steps_failed
+                if ($nestedFailures -lt 1) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan unexpectedly passed."
+                    break
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedNestedGoalId) -and
+                    -not [string]::Equals([string]$nestedReport.goal_id, $expectedNestedGoalId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $status = "FAILED"
+                    $summary = "Expected nested goal '$expectedNestedGoalId', actual '$($nestedReport.goal_id)'."
+                    break
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "failure", "latest",
+                    "--for-codex",
+                    "--runs-root", $runsRoot,
+                    "--run-id", $intentionalFailureRunId
+                )
+
+                $commandText = "powershell " + ($nestedArguments -join " ") + "; dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "failure_package_smoke exited with code $exitCode"
+                    break
+                }
+
+                $parsed = $capture.output | ConvertFrom-Json
+                $jsonExists = Test-Path -LiteralPath ([string]$parsed.jsonPath)
+                $markdownExists = Test-Path -LiteralPath ([string]$parsed.markdownPath)
+                $reportExists = Test-Path -LiteralPath ([string]$parsed.reportPath)
+                $hasRepro = -not [string]::IsNullOrWhiteSpace([string]$parsed.reproCommand)
+                $hasValidation = -not [string]::IsNullOrWhiteSpace([string]$parsed.validationCommand)
+                $hasFailure = -not [string]::IsNullOrWhiteSpace([string]$parsed.failureReason)
+
+                if (-not $jsonExists -or -not $markdownExists -or -not $reportExists -or -not $hasRepro -or -not $hasValidation -or -not $hasFailure) {
+                    $status = "FAILED"
+                    $summary = "Failure package smoke produced incomplete package."
+                    break
+                }
+
+                $package = Get-Content -LiteralPath ([string]$parsed.jsonPath) -Raw | ConvertFrom-Json
+                $packageFailures = New-Object System.Collections.Generic.List[string]
+                if (-not [string]::Equals([string]$package.goalId, [string]$nestedReport.goal_id, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $packageFailures.Add("Package goalId '$($package.goalId)' did not match nested report goal '$($nestedReport.goal_id)'.") | Out-Null
+                }
+                if ([string]::IsNullOrWhiteSpace([string]$package.expectedJson) -or [string]$package.expectedJson -eq "{}") {
+                    $packageFailures.Add("Package did not include expectedJson evidence.") | Out-Null
+                }
+                if ([string]::IsNullOrWhiteSpace([string]$package.actualJson) -or [string]$package.actualJson -eq "{}") {
+                    $packageFailures.Add("Package did not include actualJson evidence.") | Out-Null
+                }
+                if (@($package.evidencePaths).Count -lt 1) {
+                    $packageFailures.Add("Package did not include evidence paths.") | Out-Null
+                }
+                if (@($package.likelyAreas).Count -lt 1) {
+                    $packageFailures.Add("Package did not include likely areas.") | Out-Null
+                }
+                if (@($package.safetyRules).Count -lt 1) {
+                    $packageFailures.Add("Package did not include safety rules.") | Out-Null
+                }
+
+                if ($packageFailures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $packageFailures[0]
+                } else {
+                    $parsed = [ordered]@{
+                        intentional_failure_report = $nestedReportPath
+                        nested_goal_id = [string]$nestedReport.goal_id
+                        package = $package
+                        package_command = $parsed
+                    }
+                    $summary = "Failure package smoke wrote $($package.runRoot)\failure-package.md"
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
@@ -1473,6 +1582,7 @@ $overall = if ($failed -gt 0) {
 $report = [ordered]@{
     test_run_id = $RunId
     goal_id = if ($plan.goal_id) { [string]$plan.goal_id } else { "ad-hoc" }
+    plan_path = $PlanPath
     status = switch ($overall) {
         "SUCCESS" { "passed" }
         "FAILED" { "failed" }

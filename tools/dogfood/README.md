@@ -199,7 +199,7 @@ That JSON is the Codex feedback contract: send a prompt, read IronDev's response
 
 ## Failure package for Codex
 
-When a replay assertion fails, generate a Codex handoff package from the latest failed replay result:
+When a replay or Test Agent assertion fails, generate a Codex handoff package from the latest failed result:
 
 ```powershell
 dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
@@ -225,7 +225,18 @@ failure-package.json
 failure-package.md
 ```
 
-The package includes expected intent, actual intent, failed prompt, likely files, repro command, validation command, and safety rules.
+The package includes expected intent, actual intent, failed prompt or command, expected/actual JSON evidence, failed report and log paths, likely files, repro command, validation command, and safety rules.
+
+Run the 017 failure-package handoff smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-failure-package-handoff-smoke.json `
+  -RunId IronDevFailurePackage017 `
+  -Json
+```
+
+This intentionally runs a failing Test Agent memory-search plan, then packages that failed report into `failure-package.json` and `failure-package.md`. The smoke proves Codex receives the failed command, expected/actual report evidence, likely investigation areas, repro and validation commands, and safety rules. It does not fix the failure; the failure is deliberate evidence for the handoff.
 
 ## Headless CLI smoke test
 
