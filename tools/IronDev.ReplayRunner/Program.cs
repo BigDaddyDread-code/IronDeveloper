@@ -6,6 +6,7 @@ using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
 using IronDev.Data;
 using IronDev.Data.Models;
+using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.SemanticMemory;
 using IronDev.Services;
@@ -55,6 +56,9 @@ if (IsCommand(args, "memory", "cross-project-smoke"))
 
 if (IsCommand(args, "memory", "ticket-source-link-smoke"))
     return await HandleMemoryTicketSourceLinkSmokeCommandAsync(args, options);
+
+if (IsCommand(args, "memory", "builder-context-source-smoke"))
+    return await HandleMemoryBuilderContextSourceSmokeCommandAsync(args, options);
 
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
@@ -1373,6 +1377,319 @@ static async Task<int> HandleMemoryTicketSourceLinkSmokeCommandAsync(string[] ar
 
     Console.WriteLine(JsonSerializer.Serialize(result, options));
     return passed ? 0 : 1;
+}
+
+static async Task<int> HandleMemoryBuilderContextSourceSmokeCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var requestedProjectName = ReadOption(args, "--project") ?? "IronDev";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"memory-builder-context-source-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var connectionString = ResolveIronDevConnectionString(args);
+    var repoRoot = FindRepositoryRoot();
+    var connectionFactory = new CliConnectionFactory(connectionString);
+
+    await ApplySqlScriptAsync(
+        connectionFactory,
+        Path.Combine(repoRoot, "Database", "migrate_project_documents.sql"));
+
+    var project = await ResolveProjectAsync(connectionFactory, requestedProjectName);
+    if (project is null)
+    {
+        Console.Error.WriteLine($"Project not found: {requestedProjectName}");
+        return 1;
+    }
+
+    var tenant = new CliTenantContext(project.TenantId);
+    var sourceReferenceService = new ArtifactSourceReferenceService(connectionFactory);
+    var documentService = new ProjectDocumentService(connectionFactory, tenant);
+    var ticketService = new TicketService(connectionFactory, tenant, sourceReferenceService);
+    var projectService = new ProjectService(connectionFactory, tenant);
+    var memoryService = new ProjectMemoryService(connectionFactory, tenant, sourceReferenceService);
+    var profileService = new ProjectProfileService(connectionFactory, tenant);
+    var contextService = new BuilderContextService(
+        ticketService,
+        projectService,
+        memoryService,
+        profileService,
+        documentService);
+
+    var stamp = dogfoodRunId.Replace(':', '-').Replace('\\', '-').Replace('/', '-');
+    var titleSeed = $"BUILDER_CONTEXT_SOURCE_SPINE_{stamp}_{Guid.NewGuid():N}";
+    var title = titleSeed[..Math.Min(120, titleSeed.Length)];
+    var content = """
+        # Builder Context Source Memory Spine
+
+        Current rule: builder context must include the exact SQL ProjectDocumentVersion linked from the ticket.
+        This smoke proves context assembly only. It does not generate code, apply patches, or write target project files.
+        The source markdown must be available to the builder as grounded project memory.
+        """;
+
+    var document = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = project.ProjectId,
+        Title = title,
+        DocumentType = "Architecture",
+        ContentMarkdown = content,
+        ChangeSummary = "Builder context source-memory dogfood source",
+        CreatedBy = "TestAgent",
+        SourceEntityType = "Discussion",
+        SourceEntityId = 11011
+    });
+
+    var sourceVersion = await documentService.GetCurrentVersionAsync(document.Id)
+        ?? throw new InvalidOperationException("Builder context source document version was not created.");
+
+    var ticket = new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Prove builder context includes source project memory",
+        TicketType = "Test",
+        Priority = "High",
+        Summary = "Assemble builder context for a ticket grounded in an exact SQL ProjectDocumentVersion.",
+        Problem = "Builder context can drift if it receives a ticket without its linked source document memory.",
+        AcceptanceCriteria = "- Builder context includes the ticket.\n- Builder context includes the exact source document version.\n- Builder context reports source link evidence.",
+        Status = "Draft",
+        Content = "Memory Spine 011 smoke ticket.",
+        ContextSummary = $"Source ProjectDocumentVersion:{sourceVersion.Id}",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 011 smoke",
+        SourceDocumentVersionId = sourceVersion.Id
+    };
+
+    var ticketId = await ticketService.SaveTicketAsync(ticket);
+    await documentService.LinkVersionAsync(new LinkProjectDocumentVersionRequest
+    {
+        DocumentVersionId = sourceVersion.Id,
+        LinkedEntityType = "Ticket",
+        LinkedEntityId = ticketId,
+        LinkType = "GeneratedTicket",
+        CreatedBy = "TestAgent"
+    });
+
+    var context = await contextService.AssembleContextAsync(project.ProjectId, ticketId);
+
+    var orphanTicketId = await ticketService.SaveTicketAsync(new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Intentional builder context orphan control",
+        TicketType = "Test",
+        Priority = "Medium",
+        Summary = "Negative control for Memory Spine 011.",
+        AcceptanceCriteria = "- Builder context reports missing SourceDocumentVersionId.",
+        Status = "Draft",
+        Content = "This ticket intentionally has no SourceDocumentVersionId.",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 011 orphan control"
+    });
+    var orphanContext = await contextService.AssembleContextAsync(project.ProjectId, orphanTicketId);
+
+    var missingVersionId = 9_999_999_999L;
+    var missingVersionTicketId = await ticketService.SaveTicketAsync(new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Intentional missing source document version control",
+        TicketType = "Test",
+        Priority = "Medium",
+        Summary = "Negative control for a missing ProjectDocumentVersion.",
+        AcceptanceCriteria = "- Builder context reports source_document_version_not_found.",
+        Status = "Draft",
+        Content = "This ticket references a nonexistent ProjectDocumentVersion.",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 011 missing version control",
+        SourceDocumentVersionId = missingVersionId
+    });
+    var missingVersionContext = await contextService.AssembleContextAsync(project.ProjectId, missingVersionTicketId);
+
+    var bleedProject = await EnsureBuilderContextBleedProjectAsync(connectionFactory, project, tenant, dogfoodRunId);
+    var bleedDocumentService = new ProjectDocumentService(connectionFactory, tenant);
+    var bleedTitleSeed = $"BUILDER_CONTEXT_WRONG_PROJECT_{stamp}_{Guid.NewGuid():N}";
+    var bleedDocument = await bleedDocumentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = bleedProject.ProjectId,
+        Title = bleedTitleSeed[..Math.Min(120, bleedTitleSeed.Length)],
+        DocumentType = "Architecture",
+        ContentMarkdown = "# Wrong Project Source\n\nThis document belongs to a same-tenant non-IronDev project and must not become authoritative builder context.",
+        ChangeSummary = "Wrong-project builder context control",
+        CreatedBy = "TestAgent"
+    });
+    var bleedVersion = await bleedDocumentService.GetCurrentVersionAsync(bleedDocument.Id)
+        ?? throw new InvalidOperationException("Wrong-project source document version was not created.");
+    var wrongProjectTicketId = await ticketService.SaveTicketAsync(new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Intentional wrong project source document control",
+        TicketType = "Test",
+        Priority = "Medium",
+        Summary = "Negative control for wrong-project source document memory.",
+        AcceptanceCriteria = "- Builder context reports source_document_wrong_project.",
+        Status = "Draft",
+        Content = "This ticket references a document version from a different project.",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 011 wrong project control",
+        SourceDocumentVersionId = bleedVersion.Id
+    });
+    var wrongProjectContext = await contextService.AssembleContextAsync(project.ProjectId, wrongProjectTicketId);
+
+    var historicalTitleSeed = $"BUILDER_CONTEXT_HISTORICAL_SOURCE_{stamp}_{Guid.NewGuid():N}";
+    var historicalDocument = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = project.ProjectId,
+        Title = historicalTitleSeed[..Math.Min(120, historicalTitleSeed.Length)],
+        DocumentType = "Architecture",
+        ContentMarkdown = "# Historical Source\n\nThis version is intentionally marked Superseded for builder context proof.",
+        ChangeSummary = "Historical builder context control",
+        CreatedBy = "TestAgent"
+    });
+    var historicalVersion = await documentService.GetCurrentVersionAsync(historicalDocument.Id)
+        ?? throw new InvalidOperationException("Historical source document version was not created.");
+    await MarkProjectDocumentVersionStatusAsync(connectionFactory, historicalVersion.Id, "Superseded");
+    var historicalTicketId = await ticketService.SaveTicketAsync(new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Intentional historical source document control",
+        TicketType = "Test",
+        Priority = "Medium",
+        Summary = "Negative control for stale/historical source document memory.",
+        AcceptanceCriteria = "- Builder context marks stale source memory historical.",
+        Status = "Draft",
+        Content = "This ticket references a superseded ProjectDocumentVersion.",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 011 historical source control",
+        SourceDocumentVersionId = historicalVersion.Id
+    });
+    var historicalContext = await contextService.AssembleContextAsync(project.ProjectId, historicalTicketId);
+
+    var builderFlags = new BuilderContextSourceFlags
+    {
+        TicketIncluded = context.TicketId == ticketId && context.TicketTitle == ticket.Title,
+        SourceDocumentIncluded = context.SourceDocumentId == document.Id,
+        SourceDocumentVersionIncluded = context.SourceDocumentVersionId == sourceVersion.Id,
+        SourceMarkdownIncluded = !string.IsNullOrWhiteSpace(context.SourceDocumentMarkdownExcerpt) &&
+                                 context.SourceDocumentMarkdownExcerpt.Contains("Current rule: builder context must include", StringComparison.OrdinalIgnoreCase),
+        SourceLinkEvidenceIncluded = context.SourceLinkEvidence.Any(evidence =>
+            evidence.Contains($"GeneratedTicket:Ticket:{ticketId}", StringComparison.OrdinalIgnoreCase)),
+        WrongProjectMemoryExcluded = wrongProjectContext.SourceDocumentResolutionStatus == "source_document_wrong_project",
+        StaleMemoryExcludedOrMarkedHistorical = historicalContext.SourceDocumentResolutionStatus == "resolved_historical_source_document_version"
+    };
+
+    var negativeChecks = new BuilderContextNegativeChecks
+    {
+        OrphanTicketId = orphanTicketId,
+        OrphanTicketFailsCleanly = orphanContext.SourceDocumentResolutionStatus == "missing_source_document_version",
+        MissingDocumentVersionTicketId = missingVersionTicketId,
+        MissingDocumentVersionFailsCleanly = missingVersionContext.SourceDocumentResolutionStatus == "source_document_version_not_found",
+        WrongProjectTicketId = wrongProjectTicketId,
+        WrongProjectFailsCleanly = builderFlags.WrongProjectMemoryExcluded,
+        HistoricalTicketId = historicalTicketId,
+        HistoricalSourceMarkedHistorical = builderFlags.StaleMemoryExcludedOrMarkedHistorical
+    };
+
+    var passed = builderFlags.TicketIncluded &&
+                 builderFlags.SourceDocumentIncluded &&
+                 builderFlags.SourceDocumentVersionIncluded &&
+                 builderFlags.SourceMarkdownIncluded &&
+                 builderFlags.SourceLinkEvidenceIncluded &&
+                 builderFlags.WrongProjectMemoryExcluded &&
+                 builderFlags.StaleMemoryExcludedOrMarkedHistorical &&
+                 negativeChecks.OrphanTicketFailsCleanly &&
+                 negativeChecks.MissingDocumentVersionFailsCleanly;
+
+    var result = new MemoryBuilderContextSourceSmokeResult
+    {
+        Goal = "memory-spine-011-builder-context-source-memory",
+        DogfoodRunId = dogfoodRunId,
+        Passed = passed,
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        ProjectName = project.ProjectName,
+        TicketId = ticketId,
+        TicketTitle = ticket.Title,
+        SourceDocumentId = document.Id,
+        SourceDocumentVersionId = sourceVersion.Id,
+        SourceDocumentTitle = document.Title,
+        BuilderContext = builderFlags,
+        NegativeChecks = negativeChecks,
+        Evidence = new BuilderContextSourceEvidence
+        {
+            ContextProjectId = context.ProjectId,
+            ContextTicketId = context.TicketId,
+            ContextTicketTitle = context.TicketTitle,
+            ContextSourceDocumentId = context.SourceDocumentId,
+            ContextSourceDocumentVersionId = context.SourceDocumentVersionId,
+            ContextSourceDocumentTitle = context.SourceDocumentTitle,
+            ContextSourceResolutionStatus = context.SourceDocumentResolutionStatus,
+            ContextSourceResolutionDetail = context.SourceDocumentResolutionDetail,
+            ContextSourceLinkEvidence = context.SourceLinkEvidence,
+            WrongProjectResolutionStatus = wrongProjectContext.SourceDocumentResolutionStatus,
+            HistoricalResolutionStatus = historicalContext.SourceDocumentResolutionStatus,
+            MissingSourceResolutionStatus = orphanContext.SourceDocumentResolutionStatus,
+            MissingVersionResolutionStatus = missingVersionContext.SourceDocumentResolutionStatus
+        },
+        Boundary = "This proves builder context source inclusion only; it does not prove code generation or patch application."
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return passed ? 0 : 1;
+}
+
+static async Task<CliProjectContext> EnsureBuilderContextBleedProjectAsync(
+    IDbConnectionFactory connectionFactory,
+    CliProjectContext queryProject,
+    ICurrentTenantContext tenant,
+    string dogfoodRunId)
+{
+    var projectService = new ProjectService(connectionFactory, tenant);
+    var name = $"IronDevMemorySpine011_Bleed_{dogfoodRunId.Replace(':', '-').Replace('\\', '-').Replace('/', '-')}";
+    var projects = await projectService.GetProjectsAsync();
+    var existing = projects.FirstOrDefault(project => project.Name == name);
+    if (existing is not null)
+    {
+        return new CliProjectContext
+        {
+            ProjectId = existing.Id,
+            TenantId = existing.TenantId,
+            ProjectName = existing.Name
+        };
+    }
+
+    var projectId = await projectService.CreateProjectAsync(new Project
+    {
+        TenantId = queryProject.TenantId,
+        Name = name,
+        Description = "Same-tenant wrong-project control for Memory Spine 011.",
+        LocalPath = queryProject.ProjectName
+    });
+
+    return new CliProjectContext
+    {
+        ProjectId = projectId,
+        TenantId = queryProject.TenantId,
+        ProjectName = name
+    };
+}
+
+static async Task MarkProjectDocumentVersionStatusAsync(
+    IDbConnectionFactory connectionFactory,
+    long documentVersionId,
+    string status)
+{
+    using var connection = connectionFactory.CreateConnection();
+    await connection.ExecuteAsync(new CommandDefinition(
+        """
+        UPDATE dbo.ProjectDocumentVersions
+        SET Status = @Status
+        WHERE Id = @DocumentVersionId;
+        """,
+        new { DocumentVersionId = documentVersionId, Status = status }));
 }
 
 static TicketSourceLinkValidation BuildTicketSourceLinkValidation(
@@ -3137,6 +3454,65 @@ public sealed class TicketSourceLinkValidation
     public bool Passed { get; init; }
     public string Status { get; init; } = string.Empty;
     public string? FailureReason { get; init; }
+}
+
+public sealed class MemoryBuilderContextSourceSmokeResult
+{
+    public string Goal { get; init; } = string.Empty;
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public bool Passed { get; init; }
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public string ProjectName { get; init; } = string.Empty;
+    public long TicketId { get; init; }
+    public string TicketTitle { get; init; } = string.Empty;
+    public long SourceDocumentId { get; init; }
+    public long SourceDocumentVersionId { get; init; }
+    public string SourceDocumentTitle { get; init; } = string.Empty;
+    public BuilderContextSourceFlags BuilderContext { get; init; } = new();
+    public BuilderContextNegativeChecks NegativeChecks { get; init; } = new();
+    public BuilderContextSourceEvidence Evidence { get; init; } = new();
+    public string Boundary { get; init; } = string.Empty;
+}
+
+public sealed class BuilderContextSourceFlags
+{
+    public bool TicketIncluded { get; init; }
+    public bool SourceDocumentIncluded { get; init; }
+    public bool SourceDocumentVersionIncluded { get; init; }
+    public bool SourceMarkdownIncluded { get; init; }
+    public bool SourceLinkEvidenceIncluded { get; init; }
+    public bool WrongProjectMemoryExcluded { get; init; }
+    public bool StaleMemoryExcludedOrMarkedHistorical { get; init; }
+}
+
+public sealed class BuilderContextNegativeChecks
+{
+    public long OrphanTicketId { get; init; }
+    public bool OrphanTicketFailsCleanly { get; init; }
+    public long MissingDocumentVersionTicketId { get; init; }
+    public bool MissingDocumentVersionFailsCleanly { get; init; }
+    public long WrongProjectTicketId { get; init; }
+    public bool WrongProjectFailsCleanly { get; init; }
+    public long HistoricalTicketId { get; init; }
+    public bool HistoricalSourceMarkedHistorical { get; init; }
+}
+
+public sealed class BuilderContextSourceEvidence
+{
+    public int ContextProjectId { get; init; }
+    public long ContextTicketId { get; init; }
+    public string ContextTicketTitle { get; init; } = string.Empty;
+    public long? ContextSourceDocumentId { get; init; }
+    public long? ContextSourceDocumentVersionId { get; init; }
+    public string? ContextSourceDocumentTitle { get; init; }
+    public string ContextSourceResolutionStatus { get; init; } = string.Empty;
+    public string? ContextSourceResolutionDetail { get; init; }
+    public IReadOnlyList<string> ContextSourceLinkEvidence { get; init; } = [];
+    public string WrongProjectResolutionStatus { get; init; } = string.Empty;
+    public string HistoricalResolutionStatus { get; init; } = string.Empty;
+    public string MissingSourceResolutionStatus { get; init; } = string.Empty;
+    public string MissingVersionResolutionStatus { get; init; } = string.Empty;
 }
 
 public sealed class CliProjectContext

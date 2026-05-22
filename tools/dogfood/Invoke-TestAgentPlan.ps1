@@ -829,6 +829,43 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "builder_context_source_memory_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "memory", "builder-context-source-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.connection_string) {
+                    $arguments += @("--connection-string", [string]$params.connection_string)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed) {
+                        "Builder context source smoke failed; ticket=$($parsed.ticketId); sourceVersion=$($parsed.sourceDocumentVersionId)"
+                    } else {
+                        "builder_context_source_memory_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "Builder context source smoke returned Passed=false"
+                } else {
+                    $summary = "Builder context included ticket $($parsed.ticketId), source ProjectDocumentVersion $($parsed.sourceDocumentVersionId), wrongProjectExcluded=$($parsed.builderContext.wrongProjectMemoryExcluded)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

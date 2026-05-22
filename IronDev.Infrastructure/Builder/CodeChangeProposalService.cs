@@ -158,6 +158,24 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine($"  Implementation Notes: {ctx.TicketImplementationNotes}");
         sb.AppendLine();
 
+        if (ctx.SourceDocumentVersionId.HasValue)
+        {
+            sb.AppendLine("SOURCE PROJECT DOCUMENT:");
+            sb.AppendLine($"  Document Id: {ctx.SourceDocumentId?.ToString() ?? "Unknown"}");
+            sb.AppendLine($"  Version Id: {ctx.SourceDocumentVersionId}");
+            sb.AppendLine($"  Title: {ctx.SourceDocumentTitle ?? "Unknown"}");
+            sb.AppendLine($"  Version: {ctx.SourceDocumentVersionLabel ?? "Unknown"}");
+            sb.AppendLine($"  Resolution: {ctx.SourceDocumentResolutionStatus}");
+            if (!string.IsNullOrWhiteSpace(ctx.SourceDocumentResolutionDetail))
+                sb.AppendLine($"  Detail: {ctx.SourceDocumentResolutionDetail}");
+            if (!string.IsNullOrWhiteSpace(ctx.SourceDocumentMarkdownExcerpt))
+            {
+                sb.AppendLine("  Source Excerpt:");
+                sb.AppendLine(ctx.SourceDocumentMarkdownExcerpt);
+            }
+            sb.AppendLine();
+        }
+
         if (ctx.PlanTitle != null)
         {
             sb.AppendLine("LINKED IMPLEMENTATION PLAN:");
