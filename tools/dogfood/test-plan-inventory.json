@@ -723,6 +723,19 @@
         "description":  "Prove tickets created from SQL-backed project documents preserve and resolve the exact ProjectDocumentVersion source link."
     },
     {
+        "planFile":  "irondev-memory-reindex-freshness-smoke.json",
+        "goalId":  "memory-reindex-freshness-116",
+        "project":  "IronDev",
+        "actions":  [
+                        "weaviate_health",
+                        "memory_reindex_freshness_smoke"
+                    ],
+        "stepCount":  2,
+        "maxTurns":  2,
+        "earlyStopOnFailure":  true,
+        "description":  "Prove repeated memory reindexing keeps current accepted IronDev memory fresh, stale evidence visible, duplicate counts zero, and BookSeller wrong-project candidates rejected."
+    },
+    {
         "planFile":  "irondev-memory-spine-weaviate-sql-version-smoke.json",
         "goalId":  "retrieval-correctness-007",
         "project":  "IronDev",

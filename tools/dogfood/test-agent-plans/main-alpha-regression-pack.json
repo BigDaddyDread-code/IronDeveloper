@@ -11,6 +11,7 @@
     "builder_preview_safety_passes": true,
     "disposable_workspace_apply_passes": true,
     "disposable_workspace_fail_closed_passes": true,
+    "memory_reindex_freshness_passes": true,
     "failure_handoff_passes": true,
     "code_standards_passes": true
   },
@@ -116,6 +117,17 @@
       "step": 9,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-memory-reindex-freshness-smoke.json",
+        "expect_nested_goal_id": "memory-reindex-freshness-116",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 10,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -124,7 +136,7 @@
       }
     },
     {
-      "step": 10,
+      "step": 11,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -135,6 +147,6 @@
       }
     }
   ],
-  "max_turns": 10,
+  "max_turns": 11,
   "early_stop_on_failure": true
 }

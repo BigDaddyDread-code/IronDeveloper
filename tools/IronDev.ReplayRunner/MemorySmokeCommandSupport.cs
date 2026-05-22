@@ -21,7 +21,8 @@ internal static class MemorySmokeCommandSupport
         ProjectDocument document,
         ProjectDocumentVersion version,
         string authorityLevel,
-        string content)
+        string content,
+        Guid? chunkId = null)
     {
         var hash = ComputeSha256(content);
         var artefact = new SemanticArtefactDraft
@@ -44,7 +45,7 @@ internal static class MemorySmokeCommandSupport
         await chunkRepository.ReplaceChunksAsync(artefactId, [
             new SemanticChunkDraft
             {
-                Id = Guid.NewGuid(),
+                Id = chunkId ?? Guid.NewGuid(),
                 ArtefactId = artefactId,
                 ProjectId = projectId,
                 ChunkIndex = 0,
@@ -351,6 +352,12 @@ internal static class MemorySmokeCommandSupport
         return $"IronDevDogfoodMemoryChunks{hash}";
     }
 
+    internal static Guid DeterministicGuid(string value)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return new Guid(bytes[..16]);
+    }
+
     internal static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -445,7 +452,7 @@ internal static class MemorySmokeCommandSupport
         return null;
     }
 
-    private static string ComputeSha256(string text)
+    internal static string ComputeSha256(string text)
     {
         var bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text));
         return Convert.ToHexString(bytes);

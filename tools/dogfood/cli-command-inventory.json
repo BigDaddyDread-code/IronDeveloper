@@ -210,6 +210,16 @@
         "notes":  "Cross-project bleed rejection proof."
     },
     {
+        "command":  "memory reindex-freshness-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "MemoryReindexFreshnessSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "SQL + Weaviate reindex smoke proof",
+        "notes":  "Freshness, stale visibility, project scope, exact title promotion, and idempotency proof."
+    },
+    {
         "command":  "memory ticket-source-link-smoke",
         "category":  "memory",
         "scope":  "smoke",
