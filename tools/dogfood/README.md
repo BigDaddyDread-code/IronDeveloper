@@ -459,6 +459,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
   -Json
 ```
 
+Run the 015 proof that drives the real cross-project memory smoke through `TesterAgent`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-tester-agent-cross-project-memory-smoke.json `
+  -RunId IronDevTesterAgentCrossProjectMemory015 `
+  -Json
+```
+
 The local store lives under:
 
 ```text

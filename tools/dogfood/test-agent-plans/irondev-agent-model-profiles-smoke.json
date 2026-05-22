@@ -29,7 +29,10 @@
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-codex-memory-search-cli-smoke.json",
         "expect_model_profile": "cheap-runner",
-        "expect_provider": "OpenAI"
+        "expect_provider": "OpenAI",
+        "expect_nested_goal_id": "codex-memory-search-cli-013",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS"
       }
     }
   ],
