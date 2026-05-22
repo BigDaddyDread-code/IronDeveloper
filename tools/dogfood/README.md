@@ -388,6 +388,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 
 This creates a disposable SQL `ProjectDocument` and linked `ProjectTicket`, then assembles real builder context through `BuilderContextService`. It verifies the builder context includes the ticket, source document/version metadata, safe source markdown excerpt, and source link evidence. It also verifies missing source links, missing document versions, wrong-project sources, and historical sources are reported cleanly. It does not generate code or apply patches.
 
+Run the builder proposal safety smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-builder-proposal-safety-smoke.json `
+  -RunId IronDevBuilderProposalSafety016 `
+  -Json
+```
+
+This creates a disposable SQL project, source document/version, ticket, and target fixture file under the dogfood run folder. It generates a deterministic builder proposal, runs the real `TicketBuildOrchestrator` preview path, validates the patch in dry-run mode, and proves the target file hash is unchanged after preview and blocked apply attempts. It does not call a real LLM, apply patches, run builds, or modify production project files.
+
 Conversation-mode sample:
 
 ```powershell
