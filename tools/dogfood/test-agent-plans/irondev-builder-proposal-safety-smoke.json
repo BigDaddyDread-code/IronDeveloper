@@ -1,0 +1,23 @@
+{
+  "test_run_id": "test-irondev-builder-proposal-safety-016",
+  "goal_id": "builder-proposal-safety-016",
+  "description": "Prove builder proposal generation remains proposal-first and does not write files before approval.",
+  "expected": {
+    "proposal_generated": true,
+    "dry_run_validation_runs": true,
+    "file_hash_unchanged_after_preview": true,
+    "apply_without_implemented_approval_path_blocked": true,
+    "direct_patch_apply_blocked": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "builder_proposal_safety_smoke",
+      "params": {
+        "project": "IronDev"
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}
