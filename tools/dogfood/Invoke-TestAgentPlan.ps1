@@ -1196,11 +1196,11 @@ foreach ($step in $plan.steps) {
             "agent_supervisor_run_goal" {
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }
                 $query = [string]$params.query
-                $planPath = [string]$params.plan_path
+                $nestedPlanPath = [string]$params.plan_path
                 if ([string]::IsNullOrWhiteSpace($query)) {
                     throw "agent_supervisor_run_goal requires params.query."
                 }
-                if ([string]::IsNullOrWhiteSpace($planPath)) {
+                if ([string]::IsNullOrWhiteSpace($nestedPlanPath)) {
                     throw "agent_supervisor_run_goal requires params.plan_path."
                 }
 
@@ -1209,7 +1209,7 @@ foreach ($step in $plan.steps) {
                     "agent", "supervisor", "run-goal",
                     "--project", $project,
                     "--query", $query,
-                    "--plan", $planPath,
+                    "--plan", $nestedPlanPath,
                     "--run-id", $RunId,
                     "--json"
                 )
@@ -1256,6 +1256,23 @@ foreach ($step in $plan.steps) {
 
                     if ($params.expect_codex_handoff -and -not $loopReport.codexHandoff) {
                         $validationFailures.Add("Expected supervisor loop report to include codexHandoff.") | Out-Null
+                    }
+
+                    if ($params.expect_supervisor_decision -and [string]$loopReport.supervisor.decision -ne [string]$params.expect_supervisor_decision) {
+                        $validationFailures.Add("Expected supervisor decision '$($params.expect_supervisor_decision)', actual '$($loopReport.supervisor.decision)'.") | Out-Null
+                    }
+
+                    if ($params.expect_allowed_decisions) {
+                        $allowed = @($loopReport.supervisor.allowedDecisions)
+                        foreach ($expectedDecision in @($params.expect_allowed_decisions)) {
+                            if ($allowed -notcontains [string]$expectedDecision) {
+                                $validationFailures.Add("Expected supervisor allowed decisions to include '$expectedDecision'.") | Out-Null
+                            }
+                        }
+                    }
+
+                    if ($params.expect_decision_evidence -and (-not $loopReport.supervisor.decisionEvidence -or @($loopReport.supervisor.decisionEvidence).Count -eq 0)) {
+                        $validationFailures.Add("Expected supervisor decision evidence.") | Out-Null
                     }
 
                     if ($params.expect_boundary_contains -and [string]$loopReport.codexHandoff.boundary -notlike "*$($params.expect_boundary_contains)*") {

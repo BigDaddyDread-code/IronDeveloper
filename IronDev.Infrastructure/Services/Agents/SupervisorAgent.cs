@@ -72,6 +72,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         var status = memorySucceeded && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
         var topMemoryTitle = ReadString(memoryJson, "contextPackage", "Matches", "0", "DocumentTitle");
         var testSummary = ReadString(testJson, "summary");
+        var decision = SelectDecision(memorySucceeded, testsSucceeded);
+        var decisionReason = BuildDecisionReason(decision, memorySucceeded, testsSucceeded);
 
         var handoff = new
         {
@@ -86,7 +88,23 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 modelProfile = profile.Name,
                 provider = profile.Provider,
                 model = profile.Model,
-                decision = status == AgentRunStatus.Succeeded ? "ready_for_codex_review" : "needs_repair_package"
+                allowedDecisions = new[]
+                {
+                    "continue",
+                    "stop_on_failure",
+                    "request_failure_package",
+                    "request_retrieval_context",
+                    "report_ready"
+                },
+                decision,
+                decisionReason,
+                decisionEvidence = new[]
+                {
+                    $"memorySucceeded={memorySucceeded}",
+                    $"testerSucceeded={testsSucceeded}",
+                    string.IsNullOrWhiteSpace(topMemoryTitle) ? "topMemoryTitle=<none>" : $"topMemoryTitle={topMemoryTitle}",
+                    string.IsNullOrWhiteSpace(testSummary) ? "testerSummary=<none>" : $"testerSummary={testSummary}"
+                }
             },
             memory = new
             {
@@ -112,7 +130,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 recommendedNextAction = status == AgentRunStatus.Succeeded
                     ? "Codex may inspect the compact handoff and choose the next scoped improvement."
                     : "Generate a failure package from the failed Test Agent run before patching.",
-                boundary = "025 proves memory-to-test orchestration only; it does not change builder behaviour or apply code patches."
+                boundary = "035 proves a tiny memory-to-test supervisor decision loop and preserves the 025 memory-to-test orchestration boundary; it does not plan broadly, change builder behaviour, or apply code patches."
             }
         };
 
@@ -141,6 +159,26 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
     private string RunnerProjectPath() =>
         Path.Combine(_repoRoot, "tools", "IronDev.ReplayRunner", "IronDev.ReplayRunner.csproj");
+
+    private static string SelectDecision(bool memorySucceeded, bool testsSucceeded)
+    {
+        if (!memorySucceeded)
+            return "request_retrieval_context";
+
+        if (!testsSucceeded)
+            return "request_failure_package";
+
+        return "report_ready";
+    }
+
+    private static string BuildDecisionReason(string decision, bool memorySucceeded, bool testsSucceeded) =>
+        decision switch
+        {
+            "request_retrieval_context" => "RetrieverAgent did not return usable project memory context.",
+            "request_failure_package" => "TesterAgent did not return a passing report; Codex needs a failure package before patching.",
+            "report_ready" => "RetrieverAgent returned project memory and TesterAgent returned a passing report.",
+            _ => $"Supervisor selected {decision}; memorySucceeded={memorySucceeded}; testsSucceeded={testsSucceeded}."
+        };
 
     private async Task<CommandRun> RunDotnetAsync(string[] arguments, CancellationToken ct)
     {

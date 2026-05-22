@@ -40,6 +40,8 @@ The bundle should include project, query, accepted sources, rejected or demoted 
 
 ### 035: Supervisor Tiny Decision Loop
 
+Status: implemented in this branch.
+
 Give SupervisorAgent a tiny allowed decision set based on TesterAgent reports.
 
 Allowed decisions should stay narrow:
