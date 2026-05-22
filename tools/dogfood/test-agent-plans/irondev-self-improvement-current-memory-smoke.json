@@ -1,0 +1,59 @@
+{
+  "test_run_id": "IronDevSelfImprovementCurrentMemory",
+  "goal_id": "self-improvement-current-memory-022-docs",
+  "project_id": 2,
+  "description": "Prove the accepted IronDev self-improvement system memory retrieves as the current source for operating rules and next build order.",
+  "expected": {
+    "self_improvement_doc_is_current_authority": true,
+    "current_rules_retrievable": true,
+    "next_build_order_retrievable": true,
+    "source_links_present": true,
+    "semantic_trace_id_returned": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "IRONDEV_SELF_IMPROVEMENT_SYSTEM current operating rules SQL owns truth Weaviate retrieval builder preview before writes",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "IRONDEV_SELF_IMPROVEMENT_SYSTEM next build order 022 BookSeller builder preview proof no file writes",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "IRONDEV_SELF_IMPROVEMENT_SYSTEM BookSeller must never use IronDev or CODEX documents as authority",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 3,
+  "early_stop_on_failure": true
+}
