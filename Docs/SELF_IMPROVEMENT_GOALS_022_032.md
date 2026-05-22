@@ -76,6 +76,8 @@ Prove a failed BookSeller dogfood run creates a Codex-readable failure package w
 
 ### 031: Batch Regression Pack
 
+Status: implemented in this branch.
+
 Create a single batch plan that runs the key 020-030 proofs and returns a compact pass/fail report.
 
 ### 032: PR-Ready Quality Gate

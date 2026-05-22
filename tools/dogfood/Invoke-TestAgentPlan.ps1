@@ -903,17 +903,18 @@ foreach ($step in $plan.steps) {
             }
 
             "agent_tester_run_plan" {
-                $planPath = [string]$params.plan_path
+                $nestedPlanPath = [string]$params.plan_path
                 $testerRunId = "$RunId-agent-step-$stepNumber"
                 $expectedModelProfile = if ($params.expect_model_profile) { [string]$params.expect_model_profile } else { "cheap-runner" }
                 $expectedProvider = if ($params.expect_provider) { [string]$params.expect_provider } else { "OpenAI" }
                 $expectedNestedGoalId = [string]$params.expect_nested_goal_id
                 $expectedNestedStatus = [string]$params.expect_nested_status
                 $expectedNestedOverallResult = [string]$params.expect_nested_overall_result
+                $compactReport = [bool]$params.compact_report
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
                     "agent", "tester", "run-plan",
-                    "--plan", $planPath,
+                    "--plan", $nestedPlanPath,
                     "--run-id", $testerRunId,
                     "--json"
                 )
@@ -948,6 +949,31 @@ foreach ($step in $plan.steps) {
                     $summary = "Expected nested report overall_result $expectedNestedOverallResult, actual $($parsed.report.overall_result)."
                 } else {
                     $summary = "TesterAgent ran plan with profile=$($parsed.modelProfile); summary=$($parsed.summary)"
+                    if ($compactReport) {
+                        $nestedReport = $parsed.report
+                        $parsed = [ordered]@{
+                            command = $parsed.command
+                            agent = $parsed.agent
+                            status = $parsed.status
+                            summary = $parsed.summary
+                            modelProfile = $parsed.modelProfile
+                            provider = $parsed.provider
+                            model = $parsed.model
+                            exitCode = $parsed.exitCode
+                            nestedReport = [ordered]@{
+                                test_run_id = $nestedReport.test_run_id
+                                goal_id = $nestedReport.goal_id
+                                status = $nestedReport.status
+                                overall_result = $nestedReport.overall_result
+                                summary = $nestedReport.summary
+                                steps_passed = $nestedReport.actual.steps_passed
+                                steps_failed = $nestedReport.actual.steps_failed
+                                steps_skipped = $nestedReport.actual.steps_skipped
+                                evidence_count = @($nestedReport.evidence).Count
+                                full_log_location = $nestedReport.full_log_location
+                            }
+                        }
+                    }
                 }
             }
 
