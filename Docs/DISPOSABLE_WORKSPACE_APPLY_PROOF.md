@@ -418,7 +418,7 @@ This is the KilljoyAgent baseline. It should remain boring and deterministic.
 The first disposable workspace apply proof is exposed through the ReplayRunner command:
 
 ```text
-builder disposable-workspace-apply-smoke --project BookSeller --dogfood-run-id <run-id>
+builder disposable-workspace-apply-smoke --project BookSeller --dogfood-run-id <run-id> --proposal <proposal.json>
 ```
 
 The matching Test Agent plan is:
@@ -427,7 +427,7 @@ The matching Test Agent plan is:
 tools/dogfood/test-agent-plans/bookseller-disposable-workspace-apply-smoke.json
 ```
 
-This proof uses a controlled BookSeller fixture, copies it to a temp disposable workspace, captures before hashes, applies a deterministic patch only inside that workspace, captures after hashes, runs build/test inside the workspace, compares changed files against the proposal scope, and writes a Codex-readable result package.
+This proof uses a controlled BookSeller fixture, copies it to a temp disposable workspace, captures before hashes, applies a proposal-file patch only inside that workspace, captures after hashes, runs build/test inside the workspace, compares changed files against the proposal scope, and writes a Codex-readable result package.
 
 Boundary:
 

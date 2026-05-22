@@ -2029,6 +2029,9 @@ foreach ($step in $plan.steps) {
                 if ($params.workspace_root) {
                     $arguments += @("--workspace-root", [string]$params.workspace_root)
                 }
+                if ($params.proposal_path) {
+                    $arguments += @("--proposal", (Resolve-TargetPath $params.proposal_path))
+                }
 
                 $commandText = "dotnet " + ($arguments -join " ")
                 $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
@@ -2090,6 +2093,12 @@ foreach ($step in $plan.steps) {
                     }
                     if ($params.expect_human_gate_no_real_repo_write -and -not [bool]$parsed.approvalGate.approvalDoesNotMeanRealRepoWrite) {
                         $validationFailures.Add("Expected human approval gate to keep real repo writes blocked.") | Out-Null
+                    }
+                    if ($params.expect_patch_proposal_id -and [string]$parsed.proposal.patchProposalId -ne [string]$params.expect_patch_proposal_id) {
+                        $validationFailures.Add("Expected patch proposal id '$($params.expect_patch_proposal_id)', actual '$($parsed.proposal.patchProposalId)'.") | Out-Null
+                    }
+                    if ($params.expect_proposal_source_file -and ([string]$parsed.proposal.proposalSourcePath -eq "built-in" -or -not (Test-Path ([string]$parsed.proposal.proposalSourcePath)))) {
+                        $validationFailures.Add("Expected proposal source path to be a real file.") | Out-Null
                     }
 
                     foreach ($source in @($params.expect_included_sources)) {
