@@ -1,0 +1,28 @@
+﻿{
+  "test_run_id": "test-bookseller-tester-agent-project-smoke-020",
+  "goal_id": "bookseller-tester-agent-project-fixture-020",
+  "description": "Prove TesterAgent can run the BookSeller project-scoped fixture plan and return a structured report for project = BookSeller.",
+  "expected": {
+    "tester_agent_profile": "cheap-runner",
+    "tester_agent_provider": "OpenAI",
+    "nested_goal_id": "bookseller-project-fixture-020",
+    "nested_status": "passed",
+    "project_scoped_to_bookseller": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_nested_goal_id": "bookseller-project-fixture-020",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS"
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}
