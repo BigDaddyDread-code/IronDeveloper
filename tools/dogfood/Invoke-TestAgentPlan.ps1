@@ -834,6 +834,101 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "critic_failure_package_review_smoke" {
+                $failurePlanPath = Resolve-TargetPath $params.failure_plan_path
+                $expectedNestedGoalId = [string]$params.expect_nested_goal_id
+                $intentionalFailureRunId = "$RunId-intentional-failure"
+                $nestedArguments = @(
+                    "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", $PSCommandPath,
+                    "-PlanPath", $failurePlanPath,
+                    "-RunId", $intentionalFailureRunId,
+                    "-Json"
+                )
+
+                $nestedLogPath = Join-Path $logRoot "step-$($stepNumber.ToString('000'))-critic-intentional-failure.log"
+                $nestedCapture = Invoke-CommandCapture -FilePath "powershell" -Arguments $nestedArguments -StepLogPath $nestedLogPath
+                if ($nestedCapture.exit_code -ne 0) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan runner exited with code $($nestedCapture.exit_code)"
+                    break
+                }
+
+                $nestedReportPath = Join-Path $runsRoot "$intentionalFailureRunId\test-agent-report.json"
+                $nestedReport = Get-Content -LiteralPath $nestedReportPath -Raw | ConvertFrom-Json
+                if ([int]$nestedReport.actual.steps_failed -lt 1) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan unexpectedly passed."
+                    break
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedNestedGoalId) -and
+                    -not [string]::Equals([string]$nestedReport.goal_id, $expectedNestedGoalId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $status = "FAILED"
+                    $summary = "Expected nested goal '$expectedNestedGoalId', actual '$($nestedReport.goal_id)'."
+                    break
+                }
+
+                $packageArguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "failure", "latest",
+                    "--for-codex",
+                    "--runs-root", $runsRoot,
+                    "--run-id", $intentionalFailureRunId
+                )
+                $packageCapture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $packageArguments -StepLogPath $stepLogPath
+                if ($packageCapture.exit_code -ne 0) {
+                    $status = "FAILED"
+                    $summary = "failure latest exited with code $($packageCapture.exit_code)"
+                    break
+                }
+
+                $packageCommand = $packageCapture.output | ConvertFrom-Json
+                $packagePath = [string]$packageCommand.jsonPath
+                $criticArguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "critic", "review-failure",
+                    "--package", $packagePath,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "powershell " + ($nestedArguments -join " ") + "; dotnet " + ($packageArguments -join " ") + "; dotnet " + ($criticArguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $criticArguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "CriticAgent review exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_actionable -and -not [bool]$parsed.review.actionable) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent review to be actionable."
+                } elseif ($params.expect_evidence_sufficient -and -not [bool]$parsed.review.evidenceSufficient) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent review to find sufficient evidence."
+                } elseif ($params.expect_recommendation -and [string]$parsed.review.recommendation -ne [string]$params.expect_recommendation) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent recommendation '$($params.expect_recommendation)', actual '$($parsed.review.recommendation)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.review.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.review.boundary)'."
+                } else {
+                    $summary = "CriticAgent reviewed failure package; recommendation=$($parsed.review.recommendation); actionable=$($parsed.review.actionable)."
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",

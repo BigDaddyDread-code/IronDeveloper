@@ -56,6 +56,8 @@ This should not become autonomous planning yet.
 
 ### 036: CriticAgent Failure Package Review
 
+Status: implemented in this branch.
+
 Make CriticAgent review a Codex-facing failure package and return a structured risk/recommendation report.
 
 It should identify whether the failure is actionable, whether evidence is sufficient, likely area, and whether Codex should fix, ask for more evidence, or reject the run as invalid.
