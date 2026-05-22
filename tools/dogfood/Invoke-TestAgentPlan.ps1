@@ -1186,6 +1186,43 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "builder_proposal_safety_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "builder", "proposal-safety-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.connection_string) {
+                    $arguments += @("--connection-string", [string]$params.connection_string)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed) {
+                        "Builder proposal safety smoke failed; ticket=$($parsed.ticketId); fileUnchanged=$($parsed.safety.fileUnchangedAfterPreview)"
+                    } else {
+                        "builder_proposal_safety_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "Builder proposal safety smoke returned Passed=false"
+                } else {
+                    $summary = "Builder proposal safety passed; ticket=$($parsed.ticketId); proposedFiles=$($parsed.proposal.proposedFileCount); applyBlocked=$($parsed.safety.approvalGateBlockedApply)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

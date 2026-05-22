@@ -80,6 +80,9 @@ if (IsCommand(args, "memory", "ticket-source-link-smoke"))
 if (IsCommand(args, "memory", "builder-context-source-smoke"))
     return await HandleMemoryBuilderContextSourceSmokeCommandAsync(args, options);
 
+if (IsCommand(args, "builder", "proposal-safety-smoke"))
+    return await HandleBuilderProposalSafetySmokeCommandAsync(args, options);
+
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
 {
@@ -1974,6 +1977,213 @@ static async Task<int> HandleMemoryBuilderContextSourceSmokeCommandAsync(string[
     return passed ? 0 : 1;
 }
 
+static async Task<int> HandleBuilderProposalSafetySmokeCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var requestedProjectName = ReadOption(args, "--project") ?? "IronDev";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"builder-proposal-safety-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var connectionString = ResolveIronDevConnectionString(args);
+    var repoRoot = FindRepositoryRoot();
+    var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", dogfoodRunId, "builder-safety-target");
+    Directory.CreateDirectory(runRoot);
+
+    var targetFileName = "BuilderSafetyTarget.txt";
+    var targetFilePath = Path.Combine(runRoot, targetFileName);
+    const string beforeContent = "original builder safety fixture";
+    const string afterContent = "changed builder safety fixture";
+    await File.WriteAllTextAsync(targetFilePath, beforeContent);
+    var beforeHash = ComputeFileSha256(targetFilePath);
+
+    var connectionFactory = new CliConnectionFactory(connectionString);
+    await ApplySqlScriptAsync(
+        connectionFactory,
+        Path.Combine(repoRoot, "Database", "migrate_project_documents.sql"));
+
+    var baseProject = await ResolveProjectAsync(connectionFactory, requestedProjectName);
+    if (baseProject is null)
+    {
+        Console.Error.WriteLine($"Project not found: {requestedProjectName}");
+        return 1;
+    }
+
+    var tenant = new CliTenantContext(baseProject.TenantId);
+    var sourceReferenceService = new ArtifactSourceReferenceService(connectionFactory);
+    var documentService = new ProjectDocumentService(connectionFactory, tenant);
+    var ticketService = new TicketService(connectionFactory, tenant, sourceReferenceService);
+    var projectService = new ProjectService(connectionFactory, tenant);
+    var memoryService = new ProjectMemoryService(connectionFactory, tenant, sourceReferenceService);
+    var profileService = new ProjectProfileService(connectionFactory, tenant);
+    var contextService = new BuilderContextService(
+        ticketService,
+        projectService,
+        memoryService,
+        profileService,
+        documentService);
+
+    var stamp = dogfoodRunId.Replace(':', '-').Replace('\\', '-').Replace('/', '-');
+    var disposableProjectName = $"IronDevBuilderProposalSafety016_{stamp}";
+    var projectId = await projectService.CreateProjectAsync(new Project
+    {
+        TenantId = baseProject.TenantId,
+        Name = disposableProjectName[..Math.Min(120, disposableProjectName.Length)],
+        Description = "Disposable project for Memory Spine 016 builder proposal safety smoke.",
+        LocalPath = runRoot
+    });
+
+    var documentTitleSeed = $"BUILDER_PROPOSAL_SAFETY_016_{Guid.NewGuid():N}";
+    var document = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = projectId,
+        Title = documentTitleSeed[..Math.Min(120, documentTitleSeed.Length)],
+        DocumentType = "Architecture",
+        ContentMarkdown = """
+            # Builder Proposal Safety
+
+            Builder must generate reviewable proposals and stop before writes.
+            Dry-run validation may inspect target files, but proposal generation must not modify them.
+            Applying patches requires explicit approval and is outside this smoke.
+            """,
+        ChangeSummary = "Builder proposal safety source document",
+        CreatedBy = "TestAgent",
+        SourceEntityType = "Discussion",
+        SourceEntityId = 16016
+    });
+
+    var sourceVersion = await documentService.GetCurrentVersionAsync(document.Id)
+        ?? throw new InvalidOperationException("Builder proposal safety source document version was not created.");
+
+    var ticket = new ProjectTicket
+    {
+        TenantId = baseProject.TenantId,
+        ProjectId = projectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Prove builder proposal remains approval-first",
+        TicketType = "Test",
+        Priority = "High",
+        Summary = "Generate a deterministic builder proposal and prove no target files are changed before approval.",
+        Problem = "Builder workflows are dangerous if proposal generation writes files or bypasses approval.",
+        AcceptanceCriteria = "- Proposal is generated.\n- Dry-run validation runs.\n- Target file hash is unchanged.\n- Apply without implemented approval path changes no files.",
+        Status = "Draft",
+        Content = "Memory Spine 016 smoke ticket.",
+        ContextSummary = $"Source ProjectDocumentVersion:{sourceVersion.Id}",
+        LinkedFilePaths = targetFileName,
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 016 builder proposal safety smoke",
+        SourceDocumentVersionId = sourceVersion.Id
+    };
+
+    var ticketId = await ticketService.SaveTicketAsync(ticket);
+    await documentService.LinkVersionAsync(new LinkProjectDocumentVersionRequest
+    {
+        DocumentVersionId = sourceVersion.Id,
+        LinkedEntityType = "Ticket",
+        LinkedEntityId = ticketId,
+        LinkType = "GeneratedTicket",
+        CreatedBy = "TestAgent"
+    });
+
+    var proposalService = new DeterministicCodeChangeProposalService(
+        targetFileName,
+        beforeContent,
+        afterContent);
+    var patchService = new CodePatchService();
+    var orchestrator = new TicketBuildOrchestrator(
+        contextService,
+        proposalService,
+        patchService);
+
+    var preview = await orchestrator.CreateBuildPreviewAsync(projectId, ticketId);
+    var afterPreviewHash = ComputeFileSha256(targetFilePath);
+
+    var approvalResult = await orchestrator.ApplyAndBuildAsync(new IronDev.Core.Builder.TicketBuildApproval
+    {
+        ProjectId = projectId,
+        TicketId = ticketId,
+        ProjectPath = runRoot,
+        ApprovedProposal = preview.Proposal
+    });
+    var afterApplyAttemptHash = ComputeFileSha256(targetFilePath);
+
+    var directPatchResult = await patchService.ApplyPatchesAsync(
+        runRoot,
+        preview.Proposal.FileChanges);
+    var afterDirectApplyAttemptHash = ComputeFileSha256(targetFilePath);
+
+    var fileUnchangedAfterPreview = beforeHash == afterPreviewHash;
+    var fileUnchangedAfterApplyAttempt = beforeHash == afterApplyAttemptHash;
+    var fileUnchangedAfterDirectPatchAttempt = beforeHash == afterDirectApplyAttemptHash;
+    var proposalGenerated = preview.Proposal.FileChanges.Count > 0;
+    var dryRunValidated = preview.ValidationResult.FileResults.Count > 0;
+    var approvalGateBlockedApply = !approvalResult.PatchSucceeded &&
+                                   approvalResult.FilesChanged.Count == 0 &&
+                                   approvalResult.ErrorMessage.Contains("not implemented", StringComparison.OrdinalIgnoreCase);
+    var directPatchBlocked = !directPatchResult.Succeeded &&
+                             directPatchResult.FilesWritten.Count == 0;
+    var sourceContextIncluded = preview.ContextSummary.Contains(ticket.Title, StringComparison.OrdinalIgnoreCase) ||
+                                preview.TicketTitle == ticket.Title;
+
+    var passed = proposalGenerated &&
+                 dryRunValidated &&
+                 preview.ValidationResult.AllValid &&
+                 fileUnchangedAfterPreview &&
+                 fileUnchangedAfterApplyAttempt &&
+                 fileUnchangedAfterDirectPatchAttempt &&
+                 approvalGateBlockedApply &&
+                 directPatchBlocked &&
+                 sourceContextIncluded;
+
+    var result = new BuilderProposalSafetySmokeResult
+    {
+        Goal = "builder-proposal-safety-016",
+        DogfoodRunId = dogfoodRunId,
+        Passed = passed,
+        TenantId = baseProject.TenantId,
+        ProjectId = projectId,
+        ProjectName = disposableProjectName,
+        TicketId = ticketId,
+        TicketTitle = ticket.Title,
+        SourceDocumentId = document.Id,
+        SourceDocumentVersionId = sourceVersion.Id,
+        TargetFile = targetFilePath,
+        Proposal = new BuilderProposalSafetyProposalEvidence
+        {
+            ProposalGenerated = proposalGenerated,
+            ProposedFileCount = preview.Proposal.FileChanges.Count,
+            ProposedFiles = preview.Proposal.FileChanges.Select(change => change.FilePath).ToArray(),
+            Summary = preview.Proposal.Summary,
+            Rationale = preview.Proposal.Rationale,
+            RiskNotes = preview.Proposal.RiskNotes,
+            TestPlan = preview.Proposal.TestPlan
+        },
+        Safety = new BuilderProposalSafetyFlags
+        {
+            DryRunValidationRan = dryRunValidated,
+            DryRunValidationPassed = preview.ValidationResult.AllValid,
+            FileUnchangedAfterPreview = fileUnchangedAfterPreview,
+            ApprovalGateBlockedApply = approvalGateBlockedApply,
+            FileUnchangedAfterApplyAttempt = fileUnchangedAfterApplyAttempt,
+            DirectPatchApplyBlocked = directPatchBlocked,
+            FileUnchangedAfterDirectPatchAttempt = fileUnchangedAfterDirectPatchAttempt,
+            SourceContextIncluded = sourceContextIncluded
+        },
+        Evidence = new BuilderProposalSafetyEvidence
+        {
+            BeforeHash = beforeHash,
+            AfterPreviewHash = afterPreviewHash,
+            AfterApplyAttemptHash = afterApplyAttemptHash,
+            AfterDirectPatchAttemptHash = afterDirectApplyAttemptHash,
+            ValidationSummary = preview.ValidationResult.Summary,
+            ValidationMessages = preview.ValidationResult.FileResults.Select(result => result.Message).ToArray(),
+            ApplyErrorMessage = approvalResult.ErrorMessage,
+            DirectPatchErrorMessage = directPatchResult.ErrorMessage,
+            ContextSummary = preview.ContextSummary
+        },
+        Boundary = "This proves builder proposal safety only: context plus deterministic proposal plus dry-run validation. It does not apply patches, run builds, or prove LLM proposal quality."
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return passed ? 0 : 1;
+}
+
 static async Task<CliProjectContext> EnsureBuilderContextBleedProjectAsync(
     IDbConnectionFactory connectionFactory,
     CliProjectContext queryProject,
@@ -2008,6 +2218,13 @@ static async Task<CliProjectContext> EnsureBuilderContextBleedProjectAsync(
         TenantId = queryProject.TenantId,
         ProjectName = name
     };
+}
+
+static string ComputeFileSha256(string path)
+{
+    using var stream = File.OpenRead(path);
+    var hash = System.Security.Cryptography.SHA256.HashData(stream);
+    return Convert.ToHexString(hash);
 }
 
 static async Task MarkProjectDocumentVersionStatusAsync(
@@ -4027,6 +4244,106 @@ public sealed class BuilderContextSourceEvidence
     public string HistoricalResolutionStatus { get; init; } = string.Empty;
     public string MissingSourceResolutionStatus { get; init; } = string.Empty;
     public string MissingVersionResolutionStatus { get; init; } = string.Empty;
+}
+
+public sealed class BuilderProposalSafetySmokeResult
+{
+    public string Goal { get; init; } = string.Empty;
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public bool Passed { get; init; }
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public string ProjectName { get; init; } = string.Empty;
+    public long TicketId { get; init; }
+    public string TicketTitle { get; init; } = string.Empty;
+    public long SourceDocumentId { get; init; }
+    public long SourceDocumentVersionId { get; init; }
+    public string TargetFile { get; init; } = string.Empty;
+    public BuilderProposalSafetyProposalEvidence Proposal { get; init; } = new();
+    public BuilderProposalSafetyFlags Safety { get; init; } = new();
+    public BuilderProposalSafetyEvidence Evidence { get; init; } = new();
+    public string Boundary { get; init; } = string.Empty;
+}
+
+public sealed class BuilderProposalSafetyProposalEvidence
+{
+    public bool ProposalGenerated { get; init; }
+    public int ProposedFileCount { get; init; }
+    public IReadOnlyList<string> ProposedFiles { get; init; } = [];
+    public string Summary { get; init; } = string.Empty;
+    public string Rationale { get; init; } = string.Empty;
+    public string RiskNotes { get; init; } = string.Empty;
+    public string TestPlan { get; init; } = string.Empty;
+}
+
+public sealed class BuilderProposalSafetyFlags
+{
+    public bool DryRunValidationRan { get; init; }
+    public bool DryRunValidationPassed { get; init; }
+    public bool FileUnchangedAfterPreview { get; init; }
+    public bool ApprovalGateBlockedApply { get; init; }
+    public bool FileUnchangedAfterApplyAttempt { get; init; }
+    public bool DirectPatchApplyBlocked { get; init; }
+    public bool FileUnchangedAfterDirectPatchAttempt { get; init; }
+    public bool SourceContextIncluded { get; init; }
+}
+
+public sealed class BuilderProposalSafetyEvidence
+{
+    public string BeforeHash { get; init; } = string.Empty;
+    public string AfterPreviewHash { get; init; } = string.Empty;
+    public string AfterApplyAttemptHash { get; init; } = string.Empty;
+    public string AfterDirectPatchAttemptHash { get; init; } = string.Empty;
+    public string ValidationSummary { get; init; } = string.Empty;
+    public IReadOnlyList<string> ValidationMessages { get; init; } = [];
+    public string ApplyErrorMessage { get; init; } = string.Empty;
+    public string DirectPatchErrorMessage { get; init; } = string.Empty;
+    public string ContextSummary { get; init; } = string.Empty;
+}
+
+public sealed class DeterministicCodeChangeProposalService : ICodeChangeProposalService
+{
+    private readonly string _filePath;
+    private readonly string _beforeSnippet;
+    private readonly string _afterSnippet;
+
+    public DeterministicCodeChangeProposalService(
+        string filePath,
+        string beforeSnippet,
+        string afterSnippet)
+    {
+        _filePath = filePath;
+        _beforeSnippet = beforeSnippet;
+        _afterSnippet = afterSnippet;
+    }
+
+    public Task<IronDev.Core.Builder.CodeChangeProposal> GenerateProposalAsync(
+        IronDev.Core.Builder.TicketBuildContext context,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(new IronDev.Core.Builder.CodeChangeProposal
+        {
+            TicketId = context.TicketId,
+            Summary = "Deterministic proposal generated for builder proposal safety smoke.",
+            Rationale = "The proposal targets a disposable fixture file so dry-run validation can prove no writes happen before approval.",
+            RiskNotes = "No production files are targeted; this smoke validates orchestration safety only.",
+            TestPlan = "Compare file hashes before preview, after preview, and after blocked apply attempts.",
+            OriginalRequest = context.TicketSummary,
+            StandardsCompliance = "Proposal-first, approval-before-writes.",
+            FileChanges =
+            [
+                new IronDev.Core.Builder.FileChangeProposal
+                {
+                    FilePath = _filePath,
+                    ChangeReason = "Exercise dry-run validation without applying the change.",
+                    BeforeSnippet = _beforeSnippet,
+                    AfterSnippet = _afterSnippet,
+                    Patch = $"--- a/{_filePath}\n+++ b/{_filePath}\n@@\n-{_beforeSnippet}\n+{_afterSnippet}",
+                    FullContentAfter = _afterSnippet
+                }
+            ]
+        });
+    }
 }
 
 public sealed class CliProjectContext
