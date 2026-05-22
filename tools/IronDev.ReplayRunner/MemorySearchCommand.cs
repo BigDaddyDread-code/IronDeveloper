@@ -535,7 +535,7 @@ public static class MemorySearchCommand
 
         var titleTerms = normalizedTitle
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(term => term.Length >= 4)
+            .Where(term => term.Length >= 3)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 

@@ -1,0 +1,25 @@
+{
+  "test_run_id": "BookSeller069-RetrievalChaosRegression",
+  "goal_id": "bookseller-retrieval-chaos-regression-069",
+  "description": "Keep the BookSeller retrieval chaos batch green through TesterAgent.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-retrieval-chaos-batch-smoke.json",
+        "expect_nested_goal_id": "bookseller-retrieval-chaos-batch-040",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "expected": {
+    "retrieval_chaos_batch_passes": true,
+    "project_scope_preserved": true,
+    "authority_ranking_visible": true
+  }
+}
