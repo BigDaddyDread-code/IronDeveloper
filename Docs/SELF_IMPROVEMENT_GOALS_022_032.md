@@ -46,6 +46,8 @@ Prove Codex/Supervisor can create a test plan, TesterAgent can execute it, and I
 
 ### 026: BookSeller Vague Prompt Routing
 
+Status: implemented in this branch.
+
 Prove messy BookSeller prompts route to the right action instead of prose fallback when action intent is clear.
 
 ### 027: BookSeller Discussion-To-Document Proof

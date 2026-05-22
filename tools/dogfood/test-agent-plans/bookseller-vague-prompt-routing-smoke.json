@@ -1,0 +1,46 @@
+{
+  "test_run_id": "BookSeller026-VaguePromptRouting",
+  "goal_id": "bookseller-vague-prompt-routing-026",
+  "project_id": 5,
+  "description": "Prove a vague BookSeller persistence prompt asks for more detail first, then routes the clarified answer into a dry-run discussion document action.",
+  "max_turns": 4,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "chat_conversation",
+      "params": {
+        "workspace": "Chat",
+        "initial_message": "I want to persist data",
+        "facts_to_reveal": [
+          "BookSeller should save books, authors, stock counts, storage locations, and sales history in SQL Server with Dapper. Save that as project knowledge."
+        ],
+        "expected_outcome": {
+          "first_turn_intent": "GeneralChat",
+          "intent": "SaveDiscussionDocument",
+          "requires_action": true,
+          "allows_prose_response": false,
+          "min_discussion_documents": 1,
+          "expect_no_file_writes": true
+        },
+        "max_turns": 4
+      }
+    },
+    {
+      "step": 2,
+      "action": "replay_run",
+      "params": {
+        "scenario": "BookSellerMvp",
+        "reps": 10,
+        "dry_run": true,
+        "stop_on_failure": true
+      }
+    }
+  ],
+  "expected": {
+    "vague_prompt_does_not_fake_action": true,
+    "clarified_prompt_routes_to_discussion_document": true,
+    "dry_run_no_file_writes": true,
+    "bookSeller_replay_regression_passes": true
+  }
+}

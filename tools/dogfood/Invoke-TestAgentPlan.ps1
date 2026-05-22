@@ -622,7 +622,45 @@ foreach ($step in $plan.steps) {
                         $status = "FAILED"
                         $summary = "Expected final intent $expectedIntent, actual $($lastParsed.intent)"
                     } else {
-                        $summary = "Conversation final intent=$($lastParsed.intent); turns=$($conversationLog.Count)"
+                        $validationFailures = [System.Collections.Generic.List[string]]::new()
+                        if ($params.expected_outcome.first_turn_intent -and $conversationLog.Count -gt 0) {
+                            $firstIntent = [string]$conversationLog[0].intent
+                            if ($firstIntent -ne [string]$params.expected_outcome.first_turn_intent) {
+                                $validationFailures.Add("Expected first turn intent $($params.expected_outcome.first_turn_intent), actual $firstIntent.") | Out-Null
+                            }
+                        }
+
+                        if ($null -ne $params.expected_outcome.requires_action) {
+                            $expectedRequiresAction = Convert-ToBool $params.expected_outcome.requires_action $false
+                            if ([bool]$lastParsed.requiresAction -ne $expectedRequiresAction) {
+                                $validationFailures.Add("Expected final requiresAction=$expectedRequiresAction, actual $($lastParsed.requiresAction).") | Out-Null
+                            }
+                        }
+
+                        if ($null -ne $params.expected_outcome.allows_prose_response) {
+                            $expectedAllowsProse = Convert-ToBool $params.expected_outcome.allows_prose_response $true
+                            if ([bool]$lastParsed.allowsProseResponse -ne $expectedAllowsProse) {
+                                $validationFailures.Add("Expected final allowsProseResponse=$expectedAllowsProse, actual $($lastParsed.allowsProseResponse).") | Out-Null
+                            }
+                        }
+
+                        if ($params.expected_outcome.min_discussion_documents) {
+                            $minDocuments = [int]$params.expected_outcome.min_discussion_documents
+                            if ([int]$lastParsed.simulatedDiscussionDocuments -lt $minDocuments) {
+                                $validationFailures.Add("Expected at least $minDocuments simulated discussion documents, actual $($lastParsed.simulatedDiscussionDocuments).") | Out-Null
+                            }
+                        }
+
+                        if ($params.expected_outcome.expect_no_file_writes -and [int]$lastParsed.simulatedFilesChanged -ne 0) {
+                            $validationFailures.Add("Expected no file writes, actual $($lastParsed.simulatedFilesChanged).") | Out-Null
+                        }
+
+                        if ($validationFailures.Count -gt 0) {
+                            $status = "FAILED"
+                            $summary = $validationFailures -join " "
+                        } else {
+                            $summary = "Conversation final intent=$($lastParsed.intent); turns=$($conversationLog.Count)"
+                        }
                     }
                 }
             }
