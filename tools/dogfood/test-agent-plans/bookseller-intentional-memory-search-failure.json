@@ -1,0 +1,29 @@
+{
+  "test_run_id": "BookSeller030-IntentionalMemorySearchFailure",
+  "goal_id": "bookseller-intentional-memory-search-failure-030",
+  "project_id": 5,
+  "description": "Intentionally fail a BookSeller memory search assertion so the Codex failure package can prove BookSeller-scoped evidence handoff.",
+  "expected": {
+    "intentional_failure": true,
+    "failed_action": "memory_search",
+    "failure_reason_contains": "Expected top memory title"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BOOK-001 add book inventory ticket SQL stock",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "THIS_BOOKSELLER_DOC_SHOULD_NOT_EXIST_030",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}

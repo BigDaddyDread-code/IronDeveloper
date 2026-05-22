@@ -70,6 +70,8 @@ Prove BookSeller tickets produce builder context packages with linked BookSeller
 
 ### 030: BookSeller Failure Package Proof
 
+Status: implemented in this branch.
+
 Prove a failed BookSeller dogfood run creates a Codex-readable failure package with project, prompt, expected/actual, trace, evidence, and validation command.
 
 ### 031: Batch Regression Pack
