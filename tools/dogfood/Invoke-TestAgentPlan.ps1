@@ -797,6 +797,76 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "memory_search" {
+                $query = [string]$params.query
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $take = if ($params.take) { [string]$params.take } else { "5" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "memory", "search", $query,
+                    "--project", $project,
+                    "--take", $take,
+                    "--json",
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.store_root) {
+                    $arguments += @("--store-root", [string]$params.store_root)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = "memory_search exited with code $exitCode"
+                    break
+                }
+
+                $parsed = $capture.output | ConvertFrom-Json
+                $matches = @($parsed.matches)
+                $top = if ($matches.Count -gt 0) { $matches[0] } else { $null }
+
+                if ($null -eq $top) {
+                    $status = "FAILED"
+                    $summary = "memory_search returned no matches"
+                    break
+                }
+
+                $expectedTitle = [string]$params.expect_top_title_contains
+                $expectedProject = [string]$params.expect_project
+                $expectSourcePresent = Convert-ToBool $params.expect_source_present $true
+                $expectTracePresent = Convert-ToBool $params.expect_semantic_trace_id $true
+                $expectRawAndFinalRank = Convert-ToBool $params.expect_raw_and_final_rank $true
+                $failures = New-Object System.Collections.Generic.List[string]
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedTitle) -and -not (Test-StringContains -Value ([string]$top.documentTitle) -Expected $expectedTitle)) {
+                    $failures.Add("Expected top memory title to contain '$expectedTitle', actual '$($top.documentTitle)'.") | Out-Null
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedProject) -and -not [string]::Equals([string]$parsed.project.name, $expectedProject, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $failures.Add("Expected memory search project '$expectedProject', actual '$($parsed.project.name)'.") | Out-Null
+                }
+
+                if ($expectSourcePresent -and ([string]::IsNullOrWhiteSpace([string]$top.documentId) -or [string]::IsNullOrWhiteSpace([string]$top.documentVersionId) -or @($top.sourceLinks).Count -eq 0)) {
+                    $failures.Add("Expected top memory match to include document/version/source links.") | Out-Null
+                }
+
+                if ($expectTracePresent -and [string]::IsNullOrWhiteSpace([string]$parsed.semanticTraceId)) {
+                    $failures.Add("Expected memory search to include semanticTraceId.") | Out-Null
+                }
+
+                if ($expectRawAndFinalRank -and ($null -eq $top.rawWeaviateRank -or $null -eq $top.finalIronDevRank)) {
+                    $failures.Add("Expected top memory match to include rawWeaviateRank and finalIronDevRank.") | Out-Null
+                }
+
+                if ($failures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $failures[0]
+                } else {
+                    $summary = "memory_search top match '$($top.documentTitle)' rawRank=$($top.rawWeaviateRank) finalRank=$($top.finalIronDevRank)"
+                }
+            }
+
             "sql_document_version_smoke" {
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }
                 $query = if ($params.query) { [string]$params.query } else { "current first goal" }

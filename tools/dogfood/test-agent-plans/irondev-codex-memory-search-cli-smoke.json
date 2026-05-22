@@ -1,0 +1,73 @@
+{
+  "test_run_id": "test-irondev-codex-memory-search-cli-013",
+  "goal_id": "codex-memory-search-cli-013",
+  "project_id": 2,
+  "description": "Prove Codex can query IronDev dogfood project memory through a Weaviate-backed CLI search and receive compact source-linked JSON before editing.",
+  "expected": {
+    "weaviate_backed_search": true,
+    "project_scoped_to_irondev": true,
+    "raw_and_final_ranks_returned": true,
+    "source_links_present": true,
+    "semantic_trace_id_returned": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "current Codex goals",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "CODEX_GOALS",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "current test agent rules",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "TEST_AGENT_SPEC",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "code standards large method allowlist",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "CODE_STANDARDS",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 4,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "builder approval before code changes",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "CODEX_GOALS",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}
