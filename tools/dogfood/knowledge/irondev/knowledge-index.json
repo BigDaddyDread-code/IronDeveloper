@@ -1,4 +1,15 @@
-﻿[
+[
+    {
+        "Id":  "20260523090000001-research-and-sentinel-agents-future-discussion",
+        "Project":  "IronDev",
+        "Title":  "RESEARCH_AND_SENTINEL_AGENTS_FUTURE_DISCUSSION",
+        "DocumentType":  "FutureArchitectureDiscussion",
+        "Authority":  "Draft",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\RESEARCH_AND_SENTINEL_AGENTS_FUTURE_DISCUSSION.md",
+        "DogfoodRunId":  "FutureDiscussion-ResearchSentinelAgents",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523090000001-research-and-sentinel-agents-future-discussion.md",
+        "CreatedUtc":  "2026-05-23T09:00:00.0000000+00:00"
+    },
     {
         "Id":  "20260523090000000-disposable-workspace-apply-proof",
         "Project":  "IronDev",
@@ -374,5 +385,3 @@
         "CreatedUtc":  "2026-05-22T00:42:28.3768738+00:00"
     }
 ]
-
-

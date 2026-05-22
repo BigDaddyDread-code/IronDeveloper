@@ -9,6 +9,7 @@
       "action": "disposable_workspace_apply_smoke",
       "params": {
         "project": "BookSeller",
+        "proposal_path": "tools/dogfood/patch-proposals/bookseller-book-001-negative-stock.json",
         "expect_project": "BookSeller",
         "expect_workspace_outside_repo": true,
         "expect_real_repo_unchanged": true,
@@ -20,6 +21,8 @@
         "expect_no_unsafe_changes": true,
         "expect_failure_package_path": true,
         "expect_human_gate_no_real_repo_write": true,
+        "expect_patch_proposal_id": "bookseller-book-001-negative-stock",
+        "expect_proposal_source_file": true,
         "expect_included_sources": [
           "BOOKSELLER_ARCHITECTURE_CURRENT",
           "BOOKSELLER_TICKET_BOOK_001_ADD_BOOK_INVENTORY",

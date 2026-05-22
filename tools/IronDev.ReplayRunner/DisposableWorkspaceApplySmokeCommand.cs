@@ -41,7 +41,7 @@ public static class DisposableWorkspaceApplySmokeCommand
         var beforeHashes = HashDirectory(workspacePath);
         var manifestPath = await WriteManifestAsync(runRoot, dogfoodRunId, projectName, fixturePath, workspacePath, beforeHashes);
         var contextBundle = BuildWeightedContextBundle(repoRoot, projectName, dogfoodRunId);
-        var proposal = BuildPatchProposal();
+        var proposal = await LoadPatchProposalAsync(args) ?? BuildPatchProposal();
 
         var apply = ApplyProposal(workspacePath, proposal);
         var afterHashes = HashDirectory(workspacePath);
@@ -89,7 +89,7 @@ public static class DisposableWorkspaceApplySmokeCommand
             FailurePackage = package,
             ApprovalGate = approval,
             NaturalLanguageSafety = BuildNaturalLanguageSafety(),
-            Boundary = "This proof applies a deterministic patch only inside an explicit disposable workspace. It does not apply patches to the real repo and does not grant autonomous repair."
+            Boundary = "This proof applies a proposal-file patch only inside an explicit disposable workspace. It does not apply patches to the real repo and does not grant autonomous repair."
         };
 
         await WriteResultAsync(result, resultPath, markdownPath, options);
@@ -274,6 +274,44 @@ public static class DisposableWorkspaceApplySmokeCommand
             ExpectedChangedFiles = [Path.Combine("BookSeller", "InventoryService.cs")]
         };
 
+    private static async Task<DisposablePatchProposal?> LoadPatchProposalAsync(string[] args)
+    {
+        var proposalPath = ReadOption(args, "--proposal");
+        if (string.IsNullOrWhiteSpace(proposalPath))
+            return null;
+
+        var fullPath = Path.GetFullPath(proposalPath);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("Disposable workspace patch proposal file was not found.", fullPath);
+
+        var json = await File.ReadAllTextAsync(fullPath);
+        var proposal = JsonSerializer.Deserialize<DisposablePatchProposal>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        if (proposal is null)
+            throw new InvalidOperationException($"Disposable workspace patch proposal file could not be parsed: {fullPath}");
+
+        if (string.IsNullOrWhiteSpace(proposal.PatchProposalId) ||
+            string.IsNullOrWhiteSpace(proposal.Ticket) ||
+            proposal.FileChanges.Count == 0 ||
+            proposal.ExpectedChangedFiles.Count == 0)
+        {
+            throw new InvalidOperationException($"Disposable workspace patch proposal is incomplete: {fullPath}");
+        }
+
+        return new DisposablePatchProposal
+        {
+            PatchProposalId = proposal.PatchProposalId,
+            ProposalSourcePath = fullPath,
+            Ticket = proposal.Ticket,
+            Summary = proposal.Summary,
+            FileChanges = proposal.FileChanges,
+            ExpectedChangedFiles = proposal.ExpectedChangedFiles
+        };
+    }
+
     private static DisposableApplyEvidence ApplyProposal(string workspacePath, DisposablePatchProposal proposal)
     {
         var changed = new List<string>();
@@ -361,7 +399,7 @@ public static class DisposableWorkspaceApplySmokeCommand
         new()
         {
             PackageKind = build.ExitCode == 0 && test.ExitCode == 0 ? "success-package" : "failure-package",
-            ReproCommand = $"dotnet run --project .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj -- builder disposable-workspace-apply-smoke --project BookSeller --dogfood-run-id {dogfoodRunId}",
+            ReproCommand = BuildReproCommand(dogfoodRunId, proposal),
             ValidationCommand = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\dogfood\\Invoke-TestAgentPlan.ps1 -PlanPath .\\tools\\dogfood\\test-agent-plans\\bookseller-disposable-workspace-apply-smoke.json -RunId validation-after-fix -Json",
             WorkspacePath = workspacePath,
             PatchProposalId = proposal.PatchProposalId,
@@ -380,6 +418,18 @@ public static class DisposableWorkspaceApplySmokeCommand
                 "Human approval remains required before any later controlled write path."
             ]
         };
+
+    private static string BuildReproCommand(string dogfoodRunId, DisposablePatchProposal proposal)
+    {
+        var command = $"dotnet run --project .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj -- builder disposable-workspace-apply-smoke --project BookSeller --dogfood-run-id {dogfoodRunId}";
+        if (!string.IsNullOrWhiteSpace(proposal.ProposalSourcePath) &&
+            !string.Equals(proposal.ProposalSourcePath, "built-in", StringComparison.OrdinalIgnoreCase))
+        {
+            command += $" --proposal \"{proposal.ProposalSourcePath}\"";
+        }
+
+        return command;
+    }
 
     private static HumanApprovalGateEvidence BuildApprovalGate(CodeComparisonEvidence comparison) =>
         new()
@@ -630,6 +680,7 @@ public sealed class WeightedContextRejectedSource
 public sealed class DisposablePatchProposal
 {
     public string PatchProposalId { get; init; } = string.Empty;
+    public string ProposalSourcePath { get; init; } = "built-in";
     public string Ticket { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
     public IReadOnlyList<DisposableFileChange> FileChanges { get; init; } = [];
