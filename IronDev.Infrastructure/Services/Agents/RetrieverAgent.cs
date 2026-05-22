@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
 
@@ -73,6 +74,9 @@ public sealed class RetrieverAgent : StaticIronDevAgent
         var output = string.IsNullOrWhiteSpace(stderr)
             ? stdout
             : stdout + Environment.NewLine + stderr;
+        var contextBundle = process.ExitCode == 0
+            ? BuildContextBundle(stdout)
+            : output;
 
         return new AgentResult
         {
@@ -83,7 +87,7 @@ public sealed class RetrieverAgent : StaticIronDevAgent
             Provider = profile.Provider,
             Model = profile.Model,
             ExitCode = process.ExitCode,
-            OutputJson = output,
+            OutputJson = contextBundle,
             CommandsRun = [command],
             EvidencePaths = [],
             CompletedAtUtc = DateTimeOffset.UtcNow
@@ -126,6 +130,127 @@ public sealed class RetrieverAgent : StaticIronDevAgent
         return string.IsNullOrWhiteSpace(stdout)
             ? "RetrieverAgent completed with no stdout."
             : stdout.Trim().Split(Environment.NewLine).FirstOrDefault() ?? "RetrieverAgent completed.";
+    }
+
+    private static string BuildContextBundle(string stdout)
+    {
+        try
+        {
+            var root = JsonNode.Parse(stdout)?.AsObject();
+            if (root is null)
+                return stdout;
+
+            root["BundleKind"] = "RetrieverContextBundle";
+            root["Boundary"] = "RetrieverAgent packages memory context only; it does not decide implementation or apply code changes.";
+
+            var matches = root["Matches"]?.AsArray();
+            if (matches is null)
+                return root.ToJsonString();
+
+            var acceptedSources = new JsonArray();
+            var demotedSources = new JsonArray();
+            var historicalSources = new JsonArray();
+
+            foreach (var node in matches)
+            {
+                if (node is not JsonObject match)
+                    continue;
+
+                var guidance = BuildGuidance(match);
+                match["Guidance"] = guidance;
+
+                var source = new JsonObject
+                {
+                    ["documentTitle"] = GetString(match, "DocumentTitle"),
+                    ["documentId"] = GetString(match, "DocumentId"),
+                    ["documentVersionId"] = GetString(match, "DocumentVersionId"),
+                    ["sourceEntityType"] = GetString(match, "SourceEntityType"),
+                    ["sourceEntityId"] = GetString(match, "SourceEntityId"),
+                    ["rawWeaviateRank"] = GetInt(match, "RawWeaviateRank"),
+                    ["finalIronDevRank"] = GetInt(match, "FinalIronDevRank"),
+                    ["authorityLevel"] = GetString(match, "AuthorityLevel"),
+                    ["currentStatus"] = GetString(match, "CurrentStatus"),
+                    ["guidance"] = guidance
+                };
+
+                if (string.Equals(guidance, "treat_as_historical", StringComparison.OrdinalIgnoreCase))
+                {
+                    historicalSources.Add(source.DeepClone());
+                }
+                else if (GetInt(match, "FinalIronDevRank") > GetInt(match, "RawWeaviateRank"))
+                {
+                    demotedSources.Add(source.DeepClone());
+                }
+                else
+                {
+                    acceptedSources.Add(source.DeepClone());
+                }
+            }
+
+            root["AcceptedSources"] = acceptedSources;
+            root["DemotedSources"] = demotedSources;
+            root["HistoricalSources"] = historicalSources;
+            root["UseGuidance"] = BuildUseGuidance(matches);
+
+            return root.ToJsonString();
+        }
+        catch (JsonException)
+        {
+            return stdout;
+        }
+    }
+
+    private static string BuildGuidance(JsonObject match)
+    {
+        var finalRank = GetInt(match, "FinalIronDevRank");
+        var authority = GetString(match, "AuthorityLevel");
+        var currentStatus = GetString(match, "CurrentStatus");
+
+        if (!string.Equals(currentStatus, "Current", StringComparison.OrdinalIgnoreCase))
+            return "treat_as_historical";
+
+        if (finalRank == 1 && string.Equals(authority, "Accepted", StringComparison.OrdinalIgnoreCase))
+            return "use_this";
+
+        if (string.Equals(authority, "Accepted", StringComparison.OrdinalIgnoreCase))
+            return "use_as_supporting_context";
+
+        return "review_before_use";
+    }
+
+    private static string BuildUseGuidance(JsonArray matches)
+    {
+        var top = matches.OfType<JsonObject>().FirstOrDefault();
+        if (top is null)
+            return "No memory matches returned; request more context before acting.";
+
+        var title = GetString(top, "DocumentTitle");
+        var guidance = GetString(top, "Guidance");
+        var reason = GetString(top, "MatchReason");
+
+        return $"Top source '{title}' is marked '{guidance}'. {reason}";
+    }
+
+    private static string GetString(JsonObject match, string key) =>
+        match.TryGetPropertyValue(key, out var value) ? value?.GetValue<string>() ?? string.Empty : string.Empty;
+
+    private static int GetInt(JsonObject match, string key)
+    {
+        if (!match.TryGetPropertyValue(key, out var value) || value is null)
+            return 0;
+
+        try
+        {
+            return value.GetValue<int>();
+        }
+        catch (InvalidOperationException)
+        {
+            return 0;
+        }
+        catch (FormatException)
+        {
+            return 0;
+        }
     }
 
     private static string QuoteIfNeeded(string value) =>

@@ -1,0 +1,60 @@
+{
+  "test_run_id": "IronDev034-RetrieverAgentContextBundle",
+  "goal_id": "retriever-agent-context-bundle-034",
+  "project_id": 2,
+  "description": "Prove RetrieverAgent returns a richer context bundle with source guidance while preserving the real memory search path.",
+  "max_turns": 2,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "IronDev",
+        "query": "IronDev self improvement system agent model profiles",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true,
+        "expect_top_guidance": "use_this"
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BOOK-001 add book inventory ticket SQL stock",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "BOOKSELLER_TICKET_BOOK_001",
+        "expect_no_match_title_contains": [
+          "IRONDEV",
+          "CODEX_GOALS"
+        ],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true,
+        "expect_top_guidance": "use_this"
+      }
+    }
+  ],
+  "expected": {
+    "retriever_agent_context_bundle": true,
+    "uses_memory_search": true,
+    "project_scoped_context_package": true,
+    "source_guidance_present": true,
+    "raw_and_final_ranking_visible": true,
+    "no_builder_changes": true
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "test_run_id": "IronDev035-SupervisorTinyDecisionLoop",
+  "goal_id": "supervisor-tiny-decision-loop-035",
+  "description": "Prove SupervisorAgent selects from a tiny allowed decision set after RetrieverAgent and TesterAgent complete.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_supervisor_run_goal",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller controlled fixture BOOK-001 project scoped test plan",
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
+        "expect_model_profile": "strong-reasoner",
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER",
+        "expect_memory_succeeded": true,
+        "expect_tester_succeeded": true,
+        "expect_tester_goal_id": "bookseller-project-fixture-020",
+        "expect_codex_handoff": true,
+        "expect_supervisor_decision": "report_ready",
+        "expect_allowed_decisions": [
+          "continue",
+          "stop_on_failure",
+          "request_failure_package",
+          "request_retrieval_context",
+          "report_ready"
+        ],
+        "expect_decision_evidence": true,
+        "expect_boundary_contains": "tiny memory-to-test supervisor decision loop"
+      }
+    }
+  ],
+  "expected": {
+    "supervisor_tiny_decision_loop": true,
+    "allowed_decision_set_visible": true,
+    "decision_evidence_visible": true,
+    "retriever_agent_used": true,
+    "tester_agent_used": true,
+    "no_broad_planning": true,
+    "no_builder_changes": true
+  }
+}

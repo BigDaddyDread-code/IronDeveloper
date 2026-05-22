@@ -1,0 +1,90 @@
+{
+  "test_run_id": "BookSeller039-MessyPromptBatch",
+  "goal_id": "bookseller-messy-prompt-batch-039",
+  "project_id": 5,
+  "description": "Prove messy BookSeller prompts route by behaviour, not exact wording, across vague storage, typo-heavy ticket creation, shorthand discussion saving, and build-preview safety.",
+  "max_turns": 8,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "chat_conversation",
+      "params": {
+        "workspace": "Chat",
+        "initial_message": "i dunno just make bookseller save stuff somewhre",
+        "facts_to_reveal": [
+          "Use SQL Server with Dapper for BookSeller. Save books, authors, inventory counts, storage locations, and sale history as project knowledge."
+        ],
+        "expected_outcome": {
+          "first_turn_intent": "GeneralChat",
+          "intent": "SaveDiscussionDocument",
+          "requires_action": true,
+          "allows_prose_response": false,
+          "min_discussion_documents": 1,
+          "expect_no_file_writes": true
+        },
+        "max_turns": 4
+      }
+    },
+    {
+      "step": 2,
+      "action": "chat_conversation",
+      "params": {
+        "workspace": "Chat",
+        "messages": [
+          "ok take that and make tickets todo the work pls"
+        ],
+        "expected_outcome": {
+          "intent": "CreateMultipleDraftTickets",
+          "requires_action": true,
+          "allows_prose_response": false,
+          "expect_no_file_writes": true
+        },
+        "max_turns": 2
+      }
+    },
+    {
+      "step": 3,
+      "action": "chat_conversation",
+      "params": {
+        "workspace": "Chat",
+        "messages": [
+          "save this descusion for later so codex can find it"
+        ],
+        "expected_outcome": {
+          "intent": "SaveDiscussionDocument",
+          "requires_action": true,
+          "allows_prose_response": false,
+          "min_discussion_documents": 1,
+          "expect_no_file_writes": true
+        },
+        "max_turns": 2
+      }
+    },
+    {
+      "step": 4,
+      "action": "chat_conversation",
+      "params": {
+        "workspace": "Tickets",
+        "messages": [
+          "build BOOK-001 but dont write files ask first"
+        ],
+        "expected_outcome": {
+          "intent": "BuildTicket",
+          "requires_action": true,
+          "allows_prose_response": false,
+          "expect_no_file_writes": true
+        },
+        "max_turns": 2
+      }
+    }
+  ],
+  "expected": {
+    "messy_prompts_route_by_behaviour": true,
+    "vague_storage_clarifies_then_saves_discussion": true,
+    "typo_ticket_request_creates_draft_tickets": true,
+    "shorthand_discussion_save_routes_to_document": true,
+    "build_prompt_remains_preview_first": true,
+    "no_file_writes": true
+  }
+}

@@ -834,6 +834,205 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "critic_failure_package_review_smoke" {
+                $failurePlanPath = Resolve-TargetPath $params.failure_plan_path
+                $expectedNestedGoalId = [string]$params.expect_nested_goal_id
+                $intentionalFailureRunId = "$RunId-intentional-failure"
+                $nestedArguments = @(
+                    "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", $PSCommandPath,
+                    "-PlanPath", $failurePlanPath,
+                    "-RunId", $intentionalFailureRunId,
+                    "-Json"
+                )
+
+                $nestedLogPath = Join-Path $logRoot "step-$($stepNumber.ToString('000'))-critic-intentional-failure.log"
+                $nestedCapture = Invoke-CommandCapture -FilePath "powershell" -Arguments $nestedArguments -StepLogPath $nestedLogPath
+                if ($nestedCapture.exit_code -ne 0) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan runner exited with code $($nestedCapture.exit_code)"
+                    break
+                }
+
+                $nestedReportPath = Join-Path $runsRoot "$intentionalFailureRunId\test-agent-report.json"
+                $nestedReport = Get-Content -LiteralPath $nestedReportPath -Raw | ConvertFrom-Json
+                if ([int]$nestedReport.actual.steps_failed -lt 1) {
+                    $status = "FAILED"
+                    $summary = "Intentional failure plan unexpectedly passed."
+                    break
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($expectedNestedGoalId) -and
+                    -not [string]::Equals([string]$nestedReport.goal_id, $expectedNestedGoalId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $status = "FAILED"
+                    $summary = "Expected nested goal '$expectedNestedGoalId', actual '$($nestedReport.goal_id)'."
+                    break
+                }
+
+                $packageArguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "failure", "latest",
+                    "--for-codex",
+                    "--runs-root", $runsRoot,
+                    "--run-id", $intentionalFailureRunId
+                )
+                $packageCapture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $packageArguments -StepLogPath $stepLogPath
+                if ($packageCapture.exit_code -ne 0) {
+                    $status = "FAILED"
+                    $summary = "failure latest exited with code $($packageCapture.exit_code)"
+                    break
+                }
+
+                $packageCommand = $packageCapture.output | ConvertFrom-Json
+                $packagePath = [string]$packageCommand.jsonPath
+                $criticArguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "critic", "review-failure",
+                    "--package", $packagePath,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "powershell " + ($nestedArguments -join " ") + "; dotnet " + ($packageArguments -join " ") + "; dotnet " + ($criticArguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $criticArguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "CriticAgent review exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_actionable -and -not [bool]$parsed.review.actionable) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent review to be actionable."
+                } elseif ($params.expect_evidence_sufficient -and -not [bool]$parsed.review.evidenceSufficient) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent review to find sufficient evidence."
+                } elseif ($params.expect_recommendation -and [string]$parsed.review.recommendation -ne [string]$params.expect_recommendation) {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent recommendation '$($params.expect_recommendation)', actual '$($parsed.review.recommendation)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.review.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected CriticAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.review.boundary)'."
+                } else {
+                    $summary = "CriticAgent reviewed failure package; recommendation=$($parsed.review.recommendation); actionable=$($parsed.review.actionable)."
+                }
+            }
+
+            "agent_quality_run_gate" {
+                $qualityPlanPath = if ($params.plan_path) { [string]$params.plan_path } else { "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "quality", "run-gate",
+                    "--plan", $qualityPlanPath,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "QualityAgent gate exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_build_succeeded -and -not [bool]$parsed.qualityReport.BuildSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent build check to pass."
+                } elseif ($params.expect_tests_succeeded -and -not [bool]$parsed.qualityReport.FocusedTestsSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent focused tests check to pass."
+                } elseif ($params.expect_format_succeeded -and -not [bool]$parsed.qualityReport.FormatSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent format check to pass."
+                } elseif ($params.expect_package_audit_succeeded -and -not [bool]$parsed.qualityReport.PackageAuditSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent package audit to pass."
+                } elseif ($params.expect_code_standards_succeeded -and -not [bool]$parsed.qualityReport.CodeStandardsSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent code standards check to pass."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.qualityReport.Boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.qualityReport.Boundary)'."
+                } else {
+                    $summary = "QualityAgent gate status=$($parsed.qualityReport.Status); warnings=$($parsed.qualityReport.WarningCount); errors=$($parsed.qualityReport.ErrorCount)."
+                }
+            }
+
+            "agent_planner_draft_test_plan" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $goal = [string]$params.goal
+                if ([string]::IsNullOrWhiteSpace($goal)) {
+                    throw "agent_planner_draft_test_plan requires params.goal."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "planner", "draft-test-plan",
+                    "--project", $project,
+                    "--goal", $goal,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "PlannerAgent draft exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_project -and [string]$parsed.draftPlan.project -ne [string]$params.expect_project) {
+                    $status = "FAILED"
+                    $summary = "Expected draft project '$($params.expect_project)', actual '$($parsed.draftPlan.project)'."
+                } elseif ($params.expect_min_steps -and @($parsed.draftPlan.steps).Count -lt [int]$params.expect_min_steps) {
+                    $status = "FAILED"
+                    $summary = "Expected draft plan to contain at least $($params.expect_min_steps) steps."
+                } elseif ($params.expect_action_contains -and -not (@($parsed.draftPlan.steps).action -contains [string]$params.expect_action_contains)) {
+                    $status = "FAILED"
+                    $summary = "Expected draft plan to contain action '$($params.expect_action_contains)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.draftPlan.planner.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.draftPlan.planner.boundary)'."
+                } else {
+                    $summary = "PlannerAgent drafted plan goal=$($parsed.draftPlan.goal_id); steps=$(@($parsed.draftPlan.steps).Count)."
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
@@ -1152,6 +1351,32 @@ foreach ($step in $plan.steps) {
                         $validationFailures.Add("Expected top context match to include raw and final ranks.") | Out-Null
                     }
 
+                    if ($params.expect_context_bundle -and [string]$parsed.contextPackage.BundleKind -ne "RetrieverContextBundle") {
+                        $validationFailures.Add("Expected RetrieverAgent context package BundleKind=RetrieverContextBundle.") | Out-Null
+                    }
+
+                    if ($params.expect_guidance_fields) {
+                        if (-not $top.Guidance) {
+                            $validationFailures.Add("Expected top context match to include guidance.") | Out-Null
+                        }
+                        if (-not $parsed.contextPackage.UseGuidance) {
+                            $validationFailures.Add("Expected context package to include use guidance.") | Out-Null
+                        }
+                        if ($null -eq $parsed.contextPackage.AcceptedSources) {
+                            $validationFailures.Add("Expected context package to include accepted sources.") | Out-Null
+                        }
+                        if ($null -eq $parsed.contextPackage.DemotedSources) {
+                            $validationFailures.Add("Expected context package to include demoted sources.") | Out-Null
+                        }
+                        if ($null -eq $parsed.contextPackage.HistoricalSources) {
+                            $validationFailures.Add("Expected context package to include historical sources.") | Out-Null
+                        }
+                    }
+
+                    if ($params.expect_top_guidance -and [string]$top.Guidance -ne [string]$params.expect_top_guidance) {
+                        $validationFailures.Add("Expected top context guidance '$($params.expect_top_guidance)', actual '$($top.Guidance)'.") | Out-Null
+                    }
+
                     foreach ($term in @($params.expect_no_match_title_contains)) {
                         foreach ($match in $matches) {
                             if ($term -and [string]$match.DocumentTitle -like "*$term*") {
@@ -1170,11 +1395,11 @@ foreach ($step in $plan.steps) {
             "agent_supervisor_run_goal" {
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }
                 $query = [string]$params.query
-                $planPath = [string]$params.plan_path
+                $nestedPlanPath = [string]$params.plan_path
                 if ([string]::IsNullOrWhiteSpace($query)) {
                     throw "agent_supervisor_run_goal requires params.query."
                 }
-                if ([string]::IsNullOrWhiteSpace($planPath)) {
+                if ([string]::IsNullOrWhiteSpace($nestedPlanPath)) {
                     throw "agent_supervisor_run_goal requires params.plan_path."
                 }
 
@@ -1183,7 +1408,7 @@ foreach ($step in $plan.steps) {
                     "agent", "supervisor", "run-goal",
                     "--project", $project,
                     "--query", $query,
-                    "--plan", $planPath,
+                    "--plan", $nestedPlanPath,
                     "--run-id", $RunId,
                     "--json"
                 )
@@ -1230,6 +1455,23 @@ foreach ($step in $plan.steps) {
 
                     if ($params.expect_codex_handoff -and -not $loopReport.codexHandoff) {
                         $validationFailures.Add("Expected supervisor loop report to include codexHandoff.") | Out-Null
+                    }
+
+                    if ($params.expect_supervisor_decision -and [string]$loopReport.supervisor.decision -ne [string]$params.expect_supervisor_decision) {
+                        $validationFailures.Add("Expected supervisor decision '$($params.expect_supervisor_decision)', actual '$($loopReport.supervisor.decision)'.") | Out-Null
+                    }
+
+                    if ($params.expect_allowed_decisions) {
+                        $allowed = @($loopReport.supervisor.allowedDecisions)
+                        foreach ($expectedDecision in @($params.expect_allowed_decisions)) {
+                            if ($allowed -notcontains [string]$expectedDecision) {
+                                $validationFailures.Add("Expected supervisor allowed decisions to include '$expectedDecision'.") | Out-Null
+                            }
+                        }
+                    }
+
+                    if ($params.expect_decision_evidence -and (-not $loopReport.supervisor.decisionEvidence -or @($loopReport.supervisor.decisionEvidence).Count -eq 0)) {
+                        $validationFailures.Add("Expected supervisor decision evidence.") | Out-Null
                     }
 
                     if ($params.expect_boundary_contains -and [string]$loopReport.codexHandoff.boundary -notlike "*$($params.expect_boundary_contains)*") {

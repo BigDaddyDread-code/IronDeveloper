@@ -130,6 +130,10 @@ public static class ChatIntentParser
             lower.StartsWith("make me some tickets") ||
             lower.StartsWith("make some tickets") ||
             lower.StartsWith("make tickets") ||
+            lower.StartsWith("take that and make tickets") ||
+            lower.StartsWith("take this and make tickets") ||
+            lower.StartsWith("take that and make draft tickets") ||
+            lower.StartsWith("take this and make draft tickets") ||
             lower.StartsWith("make the draft tickets") ||
             lower.StartsWith("make ticket list real") ||
             lower.StartsWith("make the ticket list real") ||
@@ -341,6 +345,10 @@ public static class ChatIntentParser
             "make me some tickets",
             "make some tickets",
             "make tickets",
+            "take that and make tickets",
+            "take this and make tickets",
+            "take that and make draft tickets",
+            "take this and make draft tickets",
             "make the draft tickets",
             "make ticket list real",
             "make the ticket list real",

@@ -1497,6 +1497,69 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("ChatCommandRouter treats messy make-tickets shorthand as ticket draft creation.")]
+    public async Task ChatCommandRouter_MessyMakeTickets_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "ok take that and make tickets todo the work pls",
+            PreviousUserMessage = "We are planning the BookSeller MVP."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.CreateMultipleDraftTickets, route.Intent);
+        Assert.IsTrue(route.IsAction);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+        Assert.AreEqual(DraftCountMode.Multiple, route.DraftCountMode);
+        Assert.IsNotNull(route.CreateTicketIntent);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter treats clarified project-knowledge capture commands as document actions.")]
+    public async Task ChatCommandRouter_SaveProjectKnowledge_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "Use SQL Server with Dapper for BookSeller. Save books, authors, inventory counts, storage locations, and sale history as project knowledge."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.SaveDiscussionDocument, route.Intent);
+        Assert.IsTrue(route.IsAction);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+        Assert.AreEqual(ContextReferenceKind.CurrentMessage, route.ContextReference);
+        StringAssert.Contains(route.ActionText!, "SQL Server");
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter treats typoed save-discussion commands as document actions.")]
+    public async Task ChatCommandRouter_SaveDiscussionTypo_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "save this descusion for later so codex can find it",
+            PreviousUserMessage = "We are planning the BookSeller MVP."
+        });
+
+        Assert.AreEqual(ChatRouteIntent.SaveDiscussionDocument, route.Intent);
+        Assert.IsTrue(route.IsAction);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
     [Description("ChatCommandRouter leaves non-action questions available for normal chat fallback.")]
     public async Task ChatCommandRouter_NormalTicketQuestion_AllowsProse()
     {
@@ -1566,6 +1629,25 @@ public sealed class ContextAgentTests
         Assert.AreEqual(ChatRouteIntent.GeneralChat, route.Intent);
         Assert.IsFalse(route.RequiresAction);
         Assert.IsTrue(route.AllowsProseResponse);
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter treats BookSeller ticket-key build commands as build actions.")]
+    public async Task ChatCommandRouter_BuildBookTicketKey_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 5,
+            ChatSessionId = 10,
+            UserMessage = "build BOOK-001 but dont write files ask first"
+        });
+
+        Assert.AreEqual(ChatRouteIntent.BuildTicket, route.Intent);
+        Assert.IsTrue(route.IsAction);
+        Assert.IsTrue(route.RequiresAction);
+        Assert.IsFalse(route.AllowsProseResponse);
     }
 
     [TestMethod]

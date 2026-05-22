@@ -1,0 +1,103 @@
+{
+  "test_run_id": "SelfImprovement042-BatchRegressionPack",
+  "goal_id": "self-improvement-goals-033-041-regression-pack-042",
+  "description": "Run the key 034-041 operational self-improvement proofs through TesterAgent as one compact regression pack. Goal 033 is the branch goal document boundary.",
+  "expected": {
+    "branch_goal_document_exists": true,
+    "tester_agent_runs_nested_plans": true,
+    "goals_034_through_041_pass": true,
+    "compact_pass_fail_report": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-retriever-agent-context-bundle-smoke.json",
+        "expect_nested_goal_id": "retriever-agent-context-bundle-034",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-tiny-decision-loop-smoke.json",
+        "expect_nested_goal_id": "supervisor-tiny-decision-loop-035",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-critic-failure-package-review-smoke.json",
+        "expect_nested_goal_id": "critic-failure-package-review-036",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 4,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-quality-agent-real-path-smoke.json",
+        "expect_nested_goal_id": "quality-agent-real-path-037",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 5,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-planner-agent-test-plan-draft-smoke.json",
+        "expect_nested_goal_id": "planner-agent-test-plan-draft-038",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 6,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-messy-prompt-batch-smoke.json",
+        "expect_nested_goal_id": "bookseller-messy-prompt-batch-039",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 7,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-retrieval-chaos-batch-smoke.json",
+        "expect_nested_goal_id": "bookseller-retrieval-chaos-batch-040",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 8,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-failed-batch-codex-handoff-smoke.json",
+        "expect_nested_goal_id": "bookseller-failed-batch-codex-handoff-041",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "max_turns": 8,
+  "early_stop_on_failure": true
+}

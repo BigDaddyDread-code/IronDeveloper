@@ -1,0 +1,30 @@
+{
+  "test_run_id": "IronDev036-CriticFailurePackageReview",
+  "goal_id": "critic-failure-package-review-036",
+  "description": "Prove CriticAgent can review a Codex-facing failure package and return an actionable evidence review.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "critic_failure_package_review_smoke",
+      "params": {
+        "failure_plan_path": "tools/dogfood/test-agent-plans/bookseller-intentional-memory-search-failure.json",
+        "expect_nested_goal_id": "bookseller-intentional-memory-search-failure-030",
+        "expect_model_profile": "strong-reviewer",
+        "expect_actionable": true,
+        "expect_evidence_sufficient": true,
+        "expect_recommendation": "fix_with_smallest_evidence_backed_patch",
+        "expect_boundary_contains": "reviews failure-package evidence only"
+      }
+    }
+  ],
+  "expected": {
+    "critic_agent_real_path": true,
+    "failure_package_reviewed": true,
+    "evidence_sufficiency_reported": true,
+    "actionability_reported": true,
+    "recommendation_reported": true,
+    "no_code_patch": true
+  }
+}

@@ -209,6 +209,10 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "create a document from this",
             "save this as document",
             "save this as a document",
+            "save this discussion",
+            "save that discussion",
+            "save this descusion",
+            "save that descusion",
             "save this as architecture doc",
             "save this as architecture document",
             "create architecture doc",
@@ -230,6 +234,7 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "turn this into docs",
             "save this as project knowledge",
             "save that as project knowledge",
+            "as project knowledge",
             "project knowledge then make tickets");
 
     private static bool IsBuildTicketCommand(string lower)
@@ -238,6 +243,7 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "build the ticket",
             "build ticket",
             "build selected ticket",
+            "build book-",
             "build first ticket",
             "build the first ticket",
             "start build agent",

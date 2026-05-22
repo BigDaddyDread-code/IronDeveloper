@@ -1,0 +1,31 @@
+{
+  "test_run_id": "IronDev037-QualityAgentRealPath",
+  "goal_id": "quality-agent-real-path-037",
+  "description": "Prove QualityAgent wraps the deterministic code standards/toolchain gate and returns a structured quality report.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_quality_run_gate",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+        "expect_model_profile": "cheap-runner",
+        "expect_build_succeeded": true,
+        "expect_tests_succeeded": true,
+        "expect_format_succeeded": true,
+        "expect_package_audit_succeeded": true,
+        "expect_code_standards_succeeded": true,
+        "expect_boundary_contains": "deterministic code standards/toolchain gate"
+      }
+    }
+  ],
+  "expected": {
+    "quality_agent_real_path": true,
+    "uses_code_standards_gate": true,
+    "build_test_format_audit_reported": true,
+    "structured_quality_report": true,
+    "no_llm_code_review": true,
+    "no_code_patch": true
+  }
+}

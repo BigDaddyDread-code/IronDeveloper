@@ -1,0 +1,31 @@
+{
+  "test_run_id": "IronDev038-PlannerAgentTestPlanDraft",
+  "goal_id": "planner-agent-test-plan-draft-038",
+  "description": "Prove PlannerAgent turns a bounded vague goal into valid draft Test Agent plan JSON without executing or patching code.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_planner_draft_test_plan",
+      "params": {
+        "project": "BookSeller",
+        "goal": "check BookSeller can keep inventory memory grounded before builder preview",
+        "expect_model_profile": "standard-reasoner",
+        "expect_project": "BookSeller",
+        "expect_min_steps": 2,
+        "expect_action_contains": "memory_search",
+        "expect_boundary_contains": "drafts Test Agent plan JSON only"
+      }
+    }
+  ],
+  "expected": {
+    "planner_agent_real_path": true,
+    "valid_test_plan_json": true,
+    "project_scoped_plan": true,
+    "memory_first_step": true,
+    "quality_gate_step": true,
+    "no_plan_execution": true,
+    "no_code_patch": true
+  }
+}
