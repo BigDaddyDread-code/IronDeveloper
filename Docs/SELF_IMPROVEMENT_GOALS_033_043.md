@@ -72,6 +72,8 @@ This should reuse the existing deterministic checks rather than inventing LLM re
 
 ### 038: PlannerAgent Test Plan Draft
 
+Status: implemented in this branch.
+
 Make PlannerAgent turn a bounded vague goal into a draft Test Agent plan.
 
 The first version may be deterministic/template-backed, but it must produce valid plan JSON with goal, scope, commands/actions, expected checks, and stop conditions.

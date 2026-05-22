@@ -73,6 +73,14 @@ if (args.Length >= 3 &&
     return await HandleAgentQualityRunGateCommandAsync(args, options);
 }
 
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "planner", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "draft-test-plan", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentPlannerDraftTestPlanCommandAsync(args, options);
+}
+
 if (IsCommand(args, "chat", "send"))
     return await HandleChatSendCommandAsync(args, options);
 
@@ -481,6 +489,48 @@ static async Task<int> HandleAgentQualityRunGateCommandAsync(string[] args, Json
     return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
 }
 
+static async Task<int> HandleAgentPlannerDraftTestPlanCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var project = ReadOption(args, "--project") ?? "BookSeller";
+    var goal = ReadOption(args, "--goal") ?? ReadPositionalText(args, 3);
+    if (string.IsNullOrWhiteSpace(goal))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent planner draft-test-plan --project <project> --goal <goal> [--run-id id] [--json]");
+        return 2;
+    }
+
+    var runId = ReadOption(args, "--run-id") ?? $"PlannerAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "PlannerAgent",
+        GoalId = "planner-agent-test-plan-draft-038",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["project"] = project,
+            ["goal"] = goal
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent planner draft-test-plan",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        commandsRun = result.CommandsRun,
+        draftPlan = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
 static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime()
 {
     var repoRoot = FindRepositoryRoot();
@@ -498,6 +548,8 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                     ? new CriticAgent(definition, modelResolver)
                 : string.Equals(definition.Name, "QualityAgent", StringComparison.OrdinalIgnoreCase)
                     ? new QualityAgent(definition, modelResolver, repoRoot)
+                : string.Equals(definition.Name, "PlannerAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new PlannerAgent(definition, modelResolver)
                 : new StaticIronDevAgent(definition, modelResolver))
         .ToArray();
     var registry = new AgentRegistry(agents, definitions);

@@ -981,6 +981,58 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "agent_planner_draft_test_plan" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $goal = [string]$params.goal
+                if ([string]::IsNullOrWhiteSpace($goal)) {
+                    throw "agent_planner_draft_test_plan requires params.goal."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "planner", "draft-test-plan",
+                    "--project", $project,
+                    "--goal", $goal,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "PlannerAgent draft exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_project -and [string]$parsed.draftPlan.project -ne [string]$params.expect_project) {
+                    $status = "FAILED"
+                    $summary = "Expected draft project '$($params.expect_project)', actual '$($parsed.draftPlan.project)'."
+                } elseif ($params.expect_min_steps -and @($parsed.draftPlan.steps).Count -lt [int]$params.expect_min_steps) {
+                    $status = "FAILED"
+                    $summary = "Expected draft plan to contain at least $($params.expect_min_steps) steps."
+                } elseif ($params.expect_action_contains -and -not (@($parsed.draftPlan.steps).action -contains [string]$params.expect_action_contains)) {
+                    $status = "FAILED"
+                    $summary = "Expected draft plan to contain action '$($params.expect_action_contains)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.draftPlan.planner.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.draftPlan.planner.boundary)'."
+                } else {
+                    $summary = "PlannerAgent drafted plan goal=$($parsed.draftPlan.goal_id); steps=$(@($parsed.draftPlan.steps).Count)."
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
