@@ -64,6 +64,8 @@ It should identify whether the failure is actionable, whether evidence is suffic
 
 ### 037: QualityAgent Real Path
 
+Status: implemented in this branch.
+
 Make QualityAgent wrap the existing code standards/toolchain gate and return a structured quality report.
 
 This should reuse the existing deterministic checks rather than inventing LLM review.

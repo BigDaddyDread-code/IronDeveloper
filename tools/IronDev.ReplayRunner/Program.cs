@@ -65,6 +65,14 @@ if (args.Length >= 3 &&
     return await HandleAgentCriticReviewFailureCommandAsync(args, options);
 }
 
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "quality", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "run-gate", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentQualityRunGateCommandAsync(args, options);
+}
+
 if (IsCommand(args, "chat", "send"))
     return await HandleChatSendCommandAsync(args, options);
 
@@ -438,6 +446,41 @@ static async Task<int> HandleAgentCriticReviewFailureCommandAsync(string[] args,
     return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
 }
 
+static async Task<int> HandleAgentQualityRunGateCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var planPath = ReadOption(args, "--plan") ?? "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json";
+    var runId = ReadOption(args, "--run-id") ?? $"QualityAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "QualityAgent",
+        GoalId = "quality-agent-real-path-037",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["plan_path"] = planPath
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent quality run-gate",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        commandsRun = result.CommandsRun,
+        evidencePaths = result.EvidencePaths,
+        qualityReport = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
 static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime()
 {
     var repoRoot = FindRepositoryRoot();
@@ -453,6 +496,8 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                     ? new RetrieverAgent(definition, modelResolver, repoRoot)
                 : string.Equals(definition.Name, "CriticAgent", StringComparison.OrdinalIgnoreCase)
                     ? new CriticAgent(definition, modelResolver)
+                : string.Equals(definition.Name, "QualityAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new QualityAgent(definition, modelResolver, repoRoot)
                 : new StaticIronDevAgent(definition, modelResolver))
         .ToArray();
     var registry = new AgentRegistry(agents, definitions);

@@ -929,6 +929,58 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "agent_quality_run_gate" {
+                $qualityPlanPath = if ($params.plan_path) { [string]$params.plan_path } else { "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "quality", "run-gate",
+                    "--plan", $qualityPlanPath,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "QualityAgent gate exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_build_succeeded -and -not [bool]$parsed.qualityReport.BuildSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent build check to pass."
+                } elseif ($params.expect_tests_succeeded -and -not [bool]$parsed.qualityReport.FocusedTestsSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent focused tests check to pass."
+                } elseif ($params.expect_format_succeeded -and -not [bool]$parsed.qualityReport.FormatSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent format check to pass."
+                } elseif ($params.expect_package_audit_succeeded -and -not [bool]$parsed.qualityReport.PackageAuditSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent package audit to pass."
+                } elseif ($params.expect_code_standards_succeeded -and -not [bool]$parsed.qualityReport.CodeStandardsSucceeded) {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent code standards check to pass."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.qualityReport.Boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected QualityAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.qualityReport.Boundary)'."
+                } else {
+                    $summary = "QualityAgent gate status=$($parsed.qualityReport.Status); warnings=$($parsed.qualityReport.WarningCount); errors=$($parsed.qualityReport.ErrorCount)."
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
