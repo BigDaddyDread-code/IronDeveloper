@@ -25,7 +25,7 @@
         "query": "current first goal Test Agent project memory retrieval correctness",
         "take": 5,
         "expect_top_project": "IronDev",
-        "expect_top_title_contains": "CODEX_GOALS",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
         "expect_top_document_type": "Architecture",
         "expect_source_present": true,
         "must_not_primary_title_contain": [
@@ -42,7 +42,7 @@
         "query": "builder safety rules approval before code changes",
         "take": 5,
         "expect_top_project": "IronDev",
-        "expect_top_title_contains": "CODEX_GOALS",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
         "expect_top_document_type": "Architecture",
         "expect_top_authority": "Accepted",
         "expect_source_present": true,
