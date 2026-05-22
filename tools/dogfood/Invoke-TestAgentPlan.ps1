@@ -758,6 +758,11 @@ foreach ($step in $plan.steps) {
             "agent_tester_run_plan" {
                 $planPath = [string]$params.plan_path
                 $testerRunId = "$RunId-agent-step-$stepNumber"
+                $expectedModelProfile = if ($params.expect_model_profile) { [string]$params.expect_model_profile } else { "cheap-runner" }
+                $expectedProvider = if ($params.expect_provider) { [string]$params.expect_provider } else { "OpenAI" }
+                $expectedNestedGoalId = [string]$params.expect_nested_goal_id
+                $expectedNestedStatus = [string]$params.expect_nested_status
+                $expectedNestedOverallResult = [string]$params.expect_nested_overall_result
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
                     "agent", "tester", "run-plan",
@@ -779,12 +784,21 @@ foreach ($step in $plan.steps) {
                 if ($parsed.status -ne "Succeeded") {
                     $status = "FAILED"
                     $summary = "Expected TesterAgent status Succeeded, actual $($parsed.status)."
-                } elseif ($parsed.modelProfile -ne "cheap-runner") {
+                } elseif ($parsed.modelProfile -ne $expectedModelProfile) {
                     $status = "FAILED"
-                    $summary = "Expected TesterAgent model profile cheap-runner, actual $($parsed.modelProfile)."
-                } elseif ($parsed.provider -ne "OpenAI") {
+                    $summary = "Expected TesterAgent model profile $expectedModelProfile, actual $($parsed.modelProfile)."
+                } elseif ($parsed.provider -ne $expectedProvider) {
                     $status = "FAILED"
-                    $summary = "Expected TesterAgent provider OpenAI, actual $($parsed.provider)."
+                    $summary = "Expected TesterAgent provider $expectedProvider, actual $($parsed.provider)."
+                } elseif (-not [string]::IsNullOrWhiteSpace($expectedNestedGoalId) -and $parsed.report.goal_id -ne $expectedNestedGoalId) {
+                    $status = "FAILED"
+                    $summary = "Expected nested report goal_id $expectedNestedGoalId, actual $($parsed.report.goal_id)."
+                } elseif (-not [string]::IsNullOrWhiteSpace($expectedNestedStatus) -and $parsed.report.status -ne $expectedNestedStatus) {
+                    $status = "FAILED"
+                    $summary = "Expected nested report status $expectedNestedStatus, actual $($parsed.report.status)."
+                } elseif (-not [string]::IsNullOrWhiteSpace($expectedNestedOverallResult) -and $parsed.report.overall_result -ne $expectedNestedOverallResult) {
+                    $status = "FAILED"
+                    $summary = "Expected nested report overall_result $expectedNestedOverallResult, actual $($parsed.report.overall_result)."
                 } else {
                     $summary = "TesterAgent ran plan with profile=$($parsed.modelProfile); summary=$($parsed.summary)"
                 }

@@ -1,0 +1,27 @@
+{
+  "test_run_id": "test-irondev-tester-agent-cross-project-memory-015",
+  "goal_id": "tester-agent-cross-project-memory-015",
+  "description": "Prove TesterAgent can execute the real cross-project Weaviate memory smoke and return a structured report showing IronDev rejects BookSeller memory as primary authority.",
+  "expected": {
+    "tester_agent_profile": "cheap-runner",
+    "tester_agent_provider": "OpenAI",
+    "nested_goal_id": "retrieval-correctness-008",
+    "cross_project_memory_smoke_passes": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-memory-spine-cross-project-smoke.json",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_nested_goal_id": "retrieval-correctness-008",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS"
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}

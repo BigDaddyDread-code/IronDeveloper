@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using IronDev.Core.Agents;
 using Dapper;
@@ -2385,6 +2386,16 @@ static async Task UpsertWeaviateChunkAsync(
     if (!response.IsSuccessStatusCode)
     {
         var body = await response.Content.ReadAsStringAsync();
+        if (response.StatusCode == HttpStatusCode.UnprocessableEntity &&
+            body.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            response = await PutJsonAsync(httpClient, $"v1/objects/{collectionName}/{objectId}", payload);
+            if (response.IsSuccessStatusCode)
+                return;
+
+            body = await response.Content.ReadAsStringAsync();
+        }
+
         throw new InvalidOperationException($"Weaviate object upsert failed for {objectId}: {(int)response.StatusCode} {body}");
     }
 }
@@ -2473,6 +2484,13 @@ static async Task<HttpResponseMessage> PostJsonAsync(HttpClient httpClient, stri
     var json = JsonSerializer.Serialize(payload);
     using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
     return await httpClient.PostAsync(requestUri, content);
+}
+
+static async Task<HttpResponseMessage> PutJsonAsync(HttpClient httpClient, string requestUri, object payload)
+{
+    var json = JsonSerializer.Serialize(payload);
+    using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+    return await httpClient.PutAsync(requestUri, content);
 }
 
 static Guid ParseGuidProperty(JsonElement item, string propertyName)
