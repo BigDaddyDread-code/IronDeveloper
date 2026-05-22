@@ -1,5 +1,16 @@
 ﻿[
     {
+        "Id":  "20260523090000000-disposable-workspace-apply-proof",
+        "Project":  "IronDev",
+        "Title":  "DISPOSABLE_WORKSPACE_APPLY_PROOF",
+        "DocumentType":  "Architecture",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\DISPOSABLE_WORKSPACE_APPLY_PROOF.md",
+        "DogfoodRunId":  "DisposableWorkspacePhase-104",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523090000000-disposable-workspace-apply-proof.md",
+        "CreatedUtc":  "2026-05-23T09:00:00.0000000+00:00"
+    },
+    {
         "Id":  "20260522120000000-main-branch-alpha-checkpoint-094",
         "Project":  "IronDev",
         "Title":  "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
@@ -363,3 +374,5 @@
         "CreatedUtc":  "2026-05-22T00:42:28.3768738+00:00"
     }
 ]
+
+
