@@ -58,6 +58,8 @@ Prove a BookSeller discussion can become a project-scoped accepted or draft docu
 
 ### 028: BookSeller Document-To-Tickets Proof
 
+Status: implemented in this branch.
+
 Prove a BookSeller document can produce linked draft tickets with source document version IDs.
 
 ### 029: BookSeller Ticket-To-Builder Context Proof

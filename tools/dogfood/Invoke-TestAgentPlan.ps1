@@ -1281,6 +1281,60 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "document_to_tickets_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "tickets", "document-to-tickets-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "document_to_tickets_smoke exited with code $exitCode"
+                } else {
+                    $summary = "Document $($parsed.sourceDocumentId) generated $(@($parsed.ticketIds).Count) tickets; links=$($parsed.generatedTicketLinkCount)."
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.projectName -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+                    if ($params.expect_ticket_count -and @($parsed.ticketIds).Count -ne [int]$params.expect_ticket_count) {
+                        $validationFailures.Add("Expected $($params.expect_ticket_count) generated tickets, actual $(@($parsed.ticketIds).Count).") | Out-Null
+                    }
+                    if ($params.expect_all_tickets_linked -and -not [bool]$parsed.allTicketsLinked) {
+                        $validationFailures.Add("Expected all generated tickets to preserve SourceDocumentVersionId and artifact source references.") | Out-Null
+                    }
+                    if ($params.expect_all_tickets_resolve -and -not [bool]$parsed.allTicketsResolve) {
+                        $validationFailures.Add("Expected all generated tickets to resolve the exact source document version.") | Out-Null
+                    }
+                    if ($params.expect_generated_ticket_links -and [int]$parsed.generatedTicketLinkCount -lt [int]$params.expect_generated_ticket_links) {
+                        $validationFailures.Add("Expected at least $($params.expect_generated_ticket_links) generated ticket document links, actual $($parsed.generatedTicketLinkCount).") | Out-Null
+                    }
+                    if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                    }
+                    if (-not [bool]$parsed.passed) {
+                        $validationFailures.Add("Document-to-tickets smoke reported passed=false.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "memory_search" {
                 $query = [string]$params.query
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }

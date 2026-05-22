@@ -1,0 +1,32 @@
+{
+  "test_run_id": "BookSeller028-DocumentToTickets",
+  "goal_id": "bookseller-document-to-tickets-028",
+  "project_id": 5,
+  "description": "Prove a BookSeller project document can generate multiple SQL ProjectTickets and each ticket preserves the exact ProjectDocumentVersion source link.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "document_to_tickets_smoke",
+      "params": {
+        "project": "BookSeller",
+        "expect_project": "BookSeller",
+        "expect_ticket_count": 3,
+        "expect_all_tickets_linked": true,
+        "expect_all_tickets_resolve": true,
+        "expect_generated_ticket_links": 3,
+        "expect_boundary_contains": "document-to-tickets source traceability"
+      }
+    }
+  ],
+  "expected": {
+    "source_document_version_created": true,
+    "multiple_tickets_generated": true,
+    "all_tickets_preserve_source_document_version": true,
+    "all_tickets_resolve_source_document_version": true,
+    "document_links_generated_tickets": true,
+    "no_builder_context": true,
+    "no_code_writes": true
+  }
+}

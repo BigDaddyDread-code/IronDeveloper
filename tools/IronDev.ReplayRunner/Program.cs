@@ -78,6 +78,9 @@ if (IsCommand(args, "docs", "search"))
 if (IsCommand(args, "docs", "discussion-smoke"))
     return await DocsDiscussionSmokeCommand.HandleAsync(args, options);
 
+if (IsCommand(args, "tickets", "document-to-tickets-smoke"))
+    return await TicketsDocumentToTicketsSmokeCommand.HandleAsync(args, options);
+
 if (IsCommand(args, "failure", "latest"))
     return await HandleFailureLatestCommandAsync(args, options);
 
