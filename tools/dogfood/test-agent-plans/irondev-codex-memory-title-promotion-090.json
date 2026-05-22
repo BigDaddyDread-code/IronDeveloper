@@ -1,0 +1,42 @@
+{
+  "test_run_id": "IronDev090-CodexMemoryTitlePromotion",
+  "goal_id": "codex-memory-title-promotion-090",
+  "description": "Prove named-memory queries promote exact accepted batch documents across current and previous batches.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_074_093",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_074_093",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_054_073",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_054_073",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "expected": {
+    "exact_named_memory_promoted": true,
+    "raw_and_final_rank_visible": true,
+    "older_batch_still_retrievable_by_exact_title": true
+  }
+}

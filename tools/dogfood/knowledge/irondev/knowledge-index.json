@@ -1,5 +1,16 @@
 [
   {
+    "Id": "20260522110000000-self-improvement-goals-074-093",
+    "Project": "IronDev",
+    "Title": "SELF_IMPROVEMENT_GOALS_074_093",
+    "DocumentType": "Planning",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\SELF_IMPROVEMENT_GOALS_074_093.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-074-093",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522110000000-self-improvement-goals-074-093.md",
+    "CreatedUtc": "2026-05-22T11:00:00.0000000+00:00"
+  },
+  {
     "Id": "20260522100000000-self-improvement-goals-054-073",
     "Project": "IronDev",
     "Title": "SELF_IMPROVEMENT_GOALS_054_073",

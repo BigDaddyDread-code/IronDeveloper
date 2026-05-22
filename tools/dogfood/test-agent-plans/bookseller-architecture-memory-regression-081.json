@@ -1,0 +1,29 @@
+{
+  "test_run_id": "BookSeller081-ArchitectureMemoryRegression",
+  "goal_id": "bookseller-architecture-memory-regression-081",
+  "description": "Keep BookSeller architecture memory retrieval green and project-scoped.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller current architecture SQL inventory",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "reject_title_contains": "CODEX"
+      }
+    }
+  ],
+  "expected": {
+    "bookseller_memory_retrieved": true,
+    "project_scope_preserved": true,
+    "irondev_codex_memory_not_primary": true
+  }
+}

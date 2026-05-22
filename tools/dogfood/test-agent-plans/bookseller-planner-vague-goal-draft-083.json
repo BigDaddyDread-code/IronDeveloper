@@ -1,0 +1,28 @@
+{
+  "test_run_id": "BookSeller083-PlannerVagueGoalDraft",
+  "goal_id": "bookseller-planner-vague-goal-draft-083",
+  "description": "Prove PlannerAgent drafts from vague BookSeller intent without executing or patching.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_planner_draft_test_plan",
+      "params": {
+        "project": "BookSeller",
+        "goal": "make the bookseller thing work better with storage and search but do not change code yet",
+        "expect_model_profile": "standard-reasoner",
+        "expect_project": "BookSeller",
+        "expect_min_steps": 2,
+        "expect_action_contains": "memory_search",
+        "expect_boundary_contains": "drafts Test Agent plan JSON only"
+      }
+    }
+  ],
+  "expected": {
+    "planner_handles_vague_goal": true,
+    "bookseller_project_scoped": true,
+    "no_execution": true,
+    "no_code_patch": true
+  }
+}

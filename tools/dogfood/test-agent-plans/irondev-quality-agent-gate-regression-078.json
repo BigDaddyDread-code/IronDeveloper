@@ -1,0 +1,25 @@
+{
+  "test_run_id": "IronDev078-QualityAgentGateRegression",
+  "goal_id": "quality-agent-gate-regression-078",
+  "description": "Keep the QualityAgent deterministic gate green inside the 074-093 batch.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+        "expect_nested_goal_id": "code-standards-alpha-009",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "expected": {
+    "quality_gate_passes": true,
+    "code_standards_visible": true,
+    "warnings_are_structured": true
+  }
+}

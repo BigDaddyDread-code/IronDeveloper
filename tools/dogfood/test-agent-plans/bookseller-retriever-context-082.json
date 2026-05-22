@@ -1,0 +1,34 @@
+{
+  "test_run_id": "BookSeller082-RetrieverContext",
+  "goal_id": "bookseller-retriever-context-082",
+  "description": "Prove RetrieverAgent packages BookSeller accepted memory without IronDev bleed.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller current architecture SQL inventory",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "BOOKSELLER",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true,
+        "expect_top_guidance": "use_this",
+        "reject_title_contains": "CODEX"
+      }
+    }
+  ],
+  "expected": {
+    "bookseller_context_bundle": true,
+    "project_scoped": true,
+    "no_irondev_bleed": true
+  }
+}

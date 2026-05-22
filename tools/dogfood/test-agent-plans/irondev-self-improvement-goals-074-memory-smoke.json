@@ -1,0 +1,28 @@
+{
+  "test_run_id": "IronDev074-SelfImprovementGoalsMemorySmoke",
+  "goal_id": "self-improvement-goals-074-memory-import",
+  "description": "Prove the 074-093 self-improvement goal pack is accepted IronDev memory.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_074_093",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_074_093",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "expected": {
+    "batch_goal_document_exists": true,
+    "accepted_irondev_memory": true,
+    "codex_can_retrieve_current_batch": true
+  }
+}

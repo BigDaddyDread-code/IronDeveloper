@@ -1,0 +1,34 @@
+{
+  "test_run_id": "IronDev075-RetrieverCurrentBatchContext",
+  "goal_id": "retriever-current-batch-context-075",
+  "description": "Prove RetrieverAgent returns the accepted 074-093 batch goal pack as current IronDev context.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_074_093",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_074_093",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true,
+        "expect_top_guidance": "use_this"
+      }
+    }
+  ],
+  "expected": {
+    "retriever_agent_context_bundle": true,
+    "accepted_current_batch_memory": true,
+    "source_guidance_present": true,
+    "raw_and_final_ranking_visible": true
+  }
+}
