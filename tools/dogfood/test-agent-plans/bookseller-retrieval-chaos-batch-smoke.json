@@ -1,0 +1,77 @@
+{
+  "test_run_id": "BookSeller040-RetrievalChaosBatch",
+  "goal_id": "bookseller-retrieval-chaos-batch-040",
+  "project_id": 5,
+  "description": "Prove BookSeller memory search remains project-scoped and authority-ranked when queries contain tempting IronDev/Codex/self-improvement language.",
+  "expected": {
+    "project_fixture": "BookSeller",
+    "chaos_queries_stay_project_scoped": true,
+    "authority_ranking_protects_result": true,
+    "raw_and_final_rank_reported": true,
+    "no_irondev_or_codex_primary_bleed": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "current Codex goals checkout flow SQL Server Dapper",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_ARCHITECTURE_CURRENT",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS", "SELF_IMPROVEMENT"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "builder approval before code changes BookSeller inventory",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_TICKET_BOOK_001",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS", "SELF_IMPROVEMENT"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "self improvement memory spine current architecture BookSeller",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_ARCHITECTURE_CURRENT",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS", "SELF_IMPROVEMENT"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 4,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller project scoped test plan report Codex runner",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_TEST_PLAN_CURRENT",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS", "TEST_AGENT_SPEC"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 4,
+  "early_stop_on_failure": true
+}

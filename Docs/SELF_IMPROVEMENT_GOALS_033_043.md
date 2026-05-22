@@ -88,6 +88,8 @@ This should test behaviours, not exact assistant wording.
 
 ### 040: BookSeller Retrieval Chaos Batch
 
+Status: implemented in this branch.
+
 Create a BookSeller retrieval chaos batch with similar IronDev/BookSeller language, stale/current variants, and tempting wrong-project chunks.
 
 The proof must show project and authority ranking still protect the result.
