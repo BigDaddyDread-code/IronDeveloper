@@ -1,0 +1,38 @@
+{
+  "test_run_id": "test-irondev-agent-model-profiles-014",
+  "goal_id": "agent-model-profiles-014",
+  "description": "Prove IronDev has OpenAI-only model profiles, eight registered agent stubs, and one working TesterAgent path that can execute an existing Test Agent plan.",
+  "expected": {
+    "agent_count": 8,
+    "openai_profiles_only": true,
+    "tester_agent_profile": "cheap-runner",
+    "tester_agent_runs_plan": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_list",
+      "params": {
+        "expect_agent_count": 8
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_profiles",
+      "params": {
+        "expect_openai_only": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-codex-memory-search-cli-smoke.json",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI"
+      }
+    }
+  ],
+  "max_turns": 3,
+  "early_stop_on_failure": true
+}

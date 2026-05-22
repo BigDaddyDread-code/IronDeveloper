@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IronDev.Core.Agents;
 using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
@@ -8,6 +9,7 @@ using IronDev.Data;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
+using IronDev.Infrastructure.Services.Agents;
 using IronDev.Infrastructure.Services.SemanticMemory;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
@@ -20,8 +22,22 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory search <query> [...] | failure latest --for-codex [...]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory search <query> [...] | failure latest --for-codex [...]");
     return 2;
+}
+
+if (IsCommand(args, "agent", "list"))
+    return HandleAgentListCommand(args, options);
+
+if (IsCommand(args, "agent", "profiles"))
+    return HandleAgentProfilesCommand(args, options);
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "tester", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "run-plan", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentTesterRunPlanCommandAsync(args, options);
 }
 
 if (IsCommand(args, "chat", "send"))
@@ -180,6 +196,178 @@ static bool IsCommand(string[] args, string first, string second)
     => args.Length >= 2 &&
        string.Equals(args[0], first, StringComparison.OrdinalIgnoreCase) &&
        string.Equals(args[1], second, StringComparison.OrdinalIgnoreCase);
+
+static int HandleAgentListCommand(string[] args, JsonSerializerOptions options)
+{
+    var (_, registry, _) = CreateAgentRuntime();
+    var definitions = registry.ListDefinitions()
+        .Select(definition => new
+        {
+            name = definition.Name,
+            purpose = definition.Purpose,
+            defaultModelProfile = definition.DefaultModelProfile,
+            enabled = definition.Enabled,
+            allowedTools = definition.AllowedTools
+        })
+        .ToArray();
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent list",
+        agents = definitions
+    }, options));
+
+    return 0;
+}
+
+static int HandleAgentProfilesCommand(string[] args, JsonSerializerOptions options)
+{
+    var (modelResolver, _, _) = CreateAgentRuntime();
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent profiles",
+        providerBoundary = "014 supports OpenAI model profiles only.",
+        profiles = modelResolver.ListProfiles()
+    }, options));
+
+    return 0;
+}
+
+static async Task<int> HandleAgentTesterRunPlanCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var planPath = ReadOption(args, "--plan");
+    if (string.IsNullOrWhiteSpace(planPath))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent tester run-plan --plan <path> [--run-id id] [--json]");
+        return 2;
+    }
+
+    var runId = ReadOption(args, "--run-id") ?? $"TesterAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "TesterAgent",
+        GoalId = "agent-tester-run-plan-014",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["plan_path"] = planPath
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent tester run-plan",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        commandsRun = result.CommandsRun,
+        evidencePaths = result.EvidencePaths,
+        report = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
+static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime()
+{
+    var repoRoot = FindRepositoryRoot();
+    var modelResolver = new AgentModelResolver(LoadModelProfiles(repoRoot));
+    var definitions = AgentModelDefaults.CreateDefaultDefinitions();
+    var agents = definitions
+        .Select<AgentDefinition, IIronDevAgent>(definition =>
+            string.Equals(definition.Name, "TesterAgent", StringComparison.OrdinalIgnoreCase)
+                ? new TesterAgent(definition, modelResolver, repoRoot)
+                : new StaticIronDevAgent(definition, modelResolver))
+        .ToArray();
+    var registry = new AgentRegistry(agents, definitions);
+
+    return (modelResolver, registry, new AgentRunner(registry));
+}
+
+static IReadOnlyList<ModelProfile> LoadModelProfiles(string repoRoot)
+{
+    var configPaths = new[]
+    {
+        Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
+        Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+    };
+
+    foreach (var configPath in configPaths)
+    {
+        if (!File.Exists(configPath))
+            continue;
+
+        using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+        if (!document.RootElement.TryGetProperty("ModelProfiles", out var profilesElement) ||
+            profilesElement.ValueKind != JsonValueKind.Object)
+        {
+            continue;
+        }
+
+        var profiles = new List<ModelProfile>();
+        foreach (var profileProperty in profilesElement.EnumerateObject())
+        {
+            var profile = profileProperty.Value;
+            profiles.Add(new ModelProfile
+            {
+                Name = profileProperty.Name,
+                Provider = ReadString(profile, "Provider", "OpenAI"),
+                Model = ReadString(profile, "Model", string.Empty),
+                Temperature = ReadDouble(profile, "Temperature", 0.2),
+                MaxOutputTokens = ReadInt(profile, "MaxOutputTokens", 2000),
+                MaxCostPerRun = ReadDecimal(profile, "MaxCostPerRun")
+            });
+        }
+
+        if (profiles.Count > 0)
+            return profiles;
+    }
+
+    return AgentModelDefaults.CreateDefaultProfiles();
+}
+
+static JsonElement? TryParseJson(string json)
+{
+    if (string.IsNullOrWhiteSpace(json))
+        return null;
+
+    try
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+    catch (JsonException)
+    {
+        return null;
+    }
+}
+
+static string ReadString(JsonElement element, string propertyName, string fallback) =>
+    element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+        ? property.GetString() ?? fallback
+        : fallback;
+
+static double ReadDouble(JsonElement element, string propertyName, double fallback) =>
+    element.TryGetProperty(propertyName, out var property) && property.TryGetDouble(out var value)
+        ? value
+        : fallback;
+
+static int ReadInt(JsonElement element, string propertyName, int fallback) =>
+    element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value)
+        ? value
+        : fallback;
+
+static decimal? ReadDecimal(JsonElement element, string propertyName) =>
+    element.TryGetProperty(propertyName, out var property) && property.TryGetDecimal(out var value)
+        ? value
+        : null;
 
 static async Task<int> HandleChatSendCommandAsync(string[] args, JsonSerializerOptions options)
 {
