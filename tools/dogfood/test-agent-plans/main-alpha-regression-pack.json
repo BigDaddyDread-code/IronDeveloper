@@ -1,0 +1,116 @@
+{
+  "test_run_id": "MainAlphaRegressionPack",
+  "goal_id": "main-alpha-regression-pack-102",
+  "description": "Compact main-branch Alpha safety net after the Alpha Test Phase audit bundle.",
+  "expected": {
+    "checkpoint_memory_retrievable": true,
+    "agent_matrix_memory_retrievable": true,
+    "final_report_memory_retrievable": true,
+    "core_memory_search_passes": true,
+    "bookseller_project_smoke_passes": true,
+    "builder_preview_safety_passes": true,
+    "failure_handoff_passes": true,
+    "code_standards_passes": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "AGENT_CAPABILITY_MATRIX",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "AGENT_CAPABILITY_MATRIX",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "ALPHA_TEST_PHASE_REPORT",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "ALPHA_TEST_PHASE_REPORT",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 4,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-codex-memory-search-cli-smoke.json",
+        "expect_nested_goal_id": "codex-memory-search-cli-013",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 5,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
+        "expect_nested_goal_id": "bookseller-project-fixture-020",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 6,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-builder-proposal-safety-smoke.json",
+        "expect_nested_goal_id": "builder-proposal-safety-016",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 7,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
+        "expect_nested_goal_id": "failure-package-handoff-017",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 8,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+        "expect_nested_goal_id": "code-standards-alpha-009",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "max_turns": 8,
+  "early_stop_on_failure": true
+}
