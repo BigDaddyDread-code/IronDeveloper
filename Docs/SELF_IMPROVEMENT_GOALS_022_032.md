@@ -22,9 +22,13 @@ This branch is a batch branch for the next self-improvement proof set. It should
 
 ### 022: BookSeller Builder Preview Proof
 
+Status: implemented in this branch.
+
 Prove BookSeller builder preview is project-scoped, includes BookSeller source context, excludes IronDev/CODEX authority, and performs no file writes before approval.
 
 ### 023: BookSeller Test-After-Preview Proof
+
+Status: implemented in this branch.
 
 Prove the Test Agent can run a BookSeller-scoped validation plan after builder preview without applying code.
 
