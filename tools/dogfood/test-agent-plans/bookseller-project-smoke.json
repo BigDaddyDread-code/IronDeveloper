@@ -1,0 +1,62 @@
+﻿{
+  "test_run_id": "test-bookseller-project-smoke-020",
+  "goal_id": "bookseller-project-fixture-020",
+  "project_id": 5,
+  "description": "Prove BookSeller exists as a project-scoped dogfood fixture with accepted memory, a simple ticket fixture, and a CLI/Test Agent plan that reports project = BookSeller without IronDev memory bleed.",
+  "expected": {
+    "project_fixture": "BookSeller",
+    "accepted_docs_memory": true,
+    "simple_ticket_fixture": "BOOK-001",
+    "project_scoped_report": true,
+    "no_irondev_memory_bleed": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "current architecture SQL Server Dapper inventory",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_ARCHITECTURE_CURRENT",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BOOK-001 add book inventory ticket SQL stock",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_TICKET_BOOK_001",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller test plan project scoped report",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_TEST_PLAN_CURRENT",
+        "expect_no_match_title_contains": ["IRONDEV", "CODEX_GOALS"],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 3,
+  "early_stop_on_failure": true
+}

@@ -1060,6 +1060,7 @@ foreach ($step in $plan.steps) {
 
                 $expectedTitle = [string]$params.expect_top_title_contains
                 $expectedProject = [string]$params.expect_project
+                $mustNotContain = @($params.expect_no_match_title_contains)
                 $expectSourcePresent = Convert-ToBool $params.expect_source_present $true
                 $expectTracePresent = Convert-ToBool $params.expect_semantic_trace_id $true
                 $expectRawAndFinalRank = Convert-ToBool $params.expect_raw_and_final_rank $true
@@ -1083,6 +1084,17 @@ foreach ($step in $plan.steps) {
 
                 if ($expectRawAndFinalRank -and ($null -eq $top.rawWeaviateRank -or $null -eq $top.finalIronDevRank)) {
                     $failures.Add("Expected top memory match to include rawWeaviateRank and finalIronDevRank.") | Out-Null
+                }
+
+                foreach ($forbidden in $mustNotContain) {
+                    if ([string]::IsNullOrWhiteSpace([string]$forbidden)) {
+                        continue
+                    }
+
+                    $badMatch = $matches | Where-Object { Test-StringContains -Value ([string]$_.documentTitle) -Expected ([string]$forbidden) } | Select-Object -First 1
+                    if ($badMatch) {
+                        $failures.Add("Memory search results must not contain title '$forbidden', actual '$($badMatch.documentTitle)'.") | Out-Null
+                    }
                 }
 
                 if ($failures.Count -gt 0) {
