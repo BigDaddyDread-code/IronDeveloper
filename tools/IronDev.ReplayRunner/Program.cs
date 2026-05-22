@@ -41,6 +41,22 @@ if (args.Length >= 3 &&
     return await HandleAgentTesterRunPlanCommandAsync(args, options);
 }
 
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "retriever", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "search", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentRetrieverSearchCommandAsync(args, options);
+}
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "supervisor", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "run-goal", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentSupervisorRunGoalCommandAsync(args, options);
+}
+
 if (IsCommand(args, "chat", "send"))
     return await HandleChatSendCommandAsync(args, options);
 
@@ -58,6 +74,12 @@ if (IsCommand(args, "docs", "show"))
 
 if (IsCommand(args, "docs", "search"))
     return await HandleDocsSearchCommandAsync(args, options);
+
+if (IsCommand(args, "docs", "discussion-smoke"))
+    return await DocsDiscussionSmokeCommand.HandleAsync(args, options);
+
+if (IsCommand(args, "tickets", "document-to-tickets-smoke"))
+    return await TicketsDocumentToTicketsSmokeCommand.HandleAsync(args, options);
 
 if (IsCommand(args, "failure", "latest"))
     return await HandleFailureLatestCommandAsync(args, options);
@@ -279,6 +301,95 @@ static async Task<int> HandleAgentTesterRunPlanCommandAsync(string[] args, JsonS
     return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
 }
 
+static async Task<int> HandleAgentRetrieverSearchCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var query = ReadOption(args, "--query") ?? ReadPositionalText(args, 3);
+    var take = ReadOption(args, "--take") ?? "5";
+    if (string.IsNullOrWhiteSpace(query))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent retriever search --project <project> --query <query> [--take n] [--run-id id] [--json]");
+        return 2;
+    }
+
+    var runId = ReadOption(args, "--run-id") ?? $"RetrieverAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "RetrieverAgent",
+        GoalId = "agent-retriever-search-024",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["project"] = project,
+            ["query"] = query,
+            ["take"] = take
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent retriever search",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        commandsRun = result.CommandsRun,
+        contextPackage = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
+static async Task<int> HandleAgentSupervisorRunGoalCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var query = ReadOption(args, "--query");
+    var planPath = ReadOption(args, "--plan");
+    if (string.IsNullOrWhiteSpace(query) || string.IsNullOrWhiteSpace(planPath))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent supervisor run-goal --project <project> --query <query> --plan <path> [--run-id id] [--json]");
+        return 2;
+    }
+
+    var runId = ReadOption(args, "--run-id") ?? $"SupervisorAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "SupervisorAgent",
+        GoalId = "supervisor-codex-loop-proof-025",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["project"] = project,
+            ["query"] = query,
+            ["plan_path"] = planPath
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent supervisor run-goal",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        commandsRun = result.CommandsRun,
+        evidencePaths = result.EvidencePaths,
+        loopReport = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
 static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime()
 {
     var repoRoot = FindRepositoryRoot();
@@ -288,6 +399,10 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
         .Select<AgentDefinition, IIronDevAgent>(definition =>
             string.Equals(definition.Name, "TesterAgent", StringComparison.OrdinalIgnoreCase)
                 ? new TesterAgent(definition, modelResolver, repoRoot)
+                : string.Equals(definition.Name, "SupervisorAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new SupervisorAgent(definition, modelResolver, repoRoot)
+                : string.Equals(definition.Name, "RetrieverAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new RetrieverAgent(definition, modelResolver, repoRoot)
                 : new StaticIronDevAgent(definition, modelResolver))
         .ToArray();
     var registry = new AgentRegistry(agents, definitions);

@@ -1,0 +1,34 @@
+{
+  "test_run_id": "BookSeller029-TicketToBuilderContext",
+  "goal_id": "bookseller-ticket-to-builder-context-029",
+  "project_id": 5,
+  "description": "Prove a BookSeller ticket with SourceDocumentVersionId assembles builder context with the linked source document memory, without generating code or applying patches.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "builder_context_source_memory_smoke",
+      "params": {
+        "project": "BookSeller",
+        "expect_project": "BookSeller",
+        "expect_ticket_included": true,
+        "expect_source_document_included": true,
+        "expect_source_version_included": true,
+        "expect_source_markdown_included": true,
+        "expect_wrong_project_excluded": true,
+        "expect_missing_source_fails": true,
+        "expect_boundary_contains": "does not prove code generation"
+      }
+    }
+  ],
+  "expected": {
+    "bookSeller_ticket_loaded": true,
+    "builder_context_includes_source_document": true,
+    "builder_context_includes_source_document_version": true,
+    "builder_context_excludes_wrong_project_memory": true,
+    "missing_source_fails_cleanly": true,
+    "no_code_generation": true,
+    "no_patch_application": true
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "test_run_id": "BookSeller023-TestAfterPreview",
+  "goal_id": "bookseller-test-after-preview-023",
+  "project_id": 5,
+  "description": "Prove the Test Agent can run a BookSeller-scoped validation step after builder preview without applying code.",
+  "max_turns": 3,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "builder_proposal_safety_smoke",
+      "params": {
+        "project": "BookSeller",
+        "use_requested_project": true,
+        "expect_project": "BookSeller",
+        "expect_no_file_writes": true,
+        "expect_approval_blocked": true,
+        "expect_source_context_included": true,
+        "expect_context_not_contains": [
+          "CODEX_GOALS",
+          "IRONDEV_SELF_IMPROVEMENT_SYSTEM"
+        ]
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller test plan project scoped report",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER_TEST_PLAN_CURRENT",
+        "expect_no_match_title_contains": [
+          "IRONDEV",
+          "CODEX_GOALS"
+        ],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "dotnet_build",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    }
+  ],
+  "expected": {
+    "project": "BookSeller",
+    "builder_preview_generated": true,
+    "no_file_writes_before_approval": true,
+    "post_preview_validation_ran": true,
+    "bookSeller_test_plan_memory_retrieved": true,
+    "no_target_app_build": true
+  }
+}

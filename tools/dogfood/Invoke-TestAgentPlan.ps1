@@ -622,7 +622,45 @@ foreach ($step in $plan.steps) {
                         $status = "FAILED"
                         $summary = "Expected final intent $expectedIntent, actual $($lastParsed.intent)"
                     } else {
-                        $summary = "Conversation final intent=$($lastParsed.intent); turns=$($conversationLog.Count)"
+                        $validationFailures = [System.Collections.Generic.List[string]]::new()
+                        if ($params.expected_outcome.first_turn_intent -and $conversationLog.Count -gt 0) {
+                            $firstIntent = [string]$conversationLog[0].intent
+                            if ($firstIntent -ne [string]$params.expected_outcome.first_turn_intent) {
+                                $validationFailures.Add("Expected first turn intent $($params.expected_outcome.first_turn_intent), actual $firstIntent.") | Out-Null
+                            }
+                        }
+
+                        if ($null -ne $params.expected_outcome.requires_action) {
+                            $expectedRequiresAction = Convert-ToBool $params.expected_outcome.requires_action $false
+                            if ([bool]$lastParsed.requiresAction -ne $expectedRequiresAction) {
+                                $validationFailures.Add("Expected final requiresAction=$expectedRequiresAction, actual $($lastParsed.requiresAction).") | Out-Null
+                            }
+                        }
+
+                        if ($null -ne $params.expected_outcome.allows_prose_response) {
+                            $expectedAllowsProse = Convert-ToBool $params.expected_outcome.allows_prose_response $true
+                            if ([bool]$lastParsed.allowsProseResponse -ne $expectedAllowsProse) {
+                                $validationFailures.Add("Expected final allowsProseResponse=$expectedAllowsProse, actual $($lastParsed.allowsProseResponse).") | Out-Null
+                            }
+                        }
+
+                        if ($params.expected_outcome.min_discussion_documents) {
+                            $minDocuments = [int]$params.expected_outcome.min_discussion_documents
+                            if ([int]$lastParsed.simulatedDiscussionDocuments -lt $minDocuments) {
+                                $validationFailures.Add("Expected at least $minDocuments simulated discussion documents, actual $($lastParsed.simulatedDiscussionDocuments).") | Out-Null
+                            }
+                        }
+
+                        if ($params.expected_outcome.expect_no_file_writes -and [int]$lastParsed.simulatedFilesChanged -ne 0) {
+                            $validationFailures.Add("Expected no file writes, actual $($lastParsed.simulatedFilesChanged).") | Out-Null
+                        }
+
+                        if ($validationFailures.Count -gt 0) {
+                            $status = "FAILED"
+                            $summary = $validationFailures -join " "
+                        } else {
+                            $summary = "Conversation final intent=$($lastParsed.intent); turns=$($conversationLog.Count)"
+                        }
                     }
                 }
             }
@@ -865,17 +903,18 @@ foreach ($step in $plan.steps) {
             }
 
             "agent_tester_run_plan" {
-                $planPath = [string]$params.plan_path
+                $nestedPlanPath = [string]$params.plan_path
                 $testerRunId = "$RunId-agent-step-$stepNumber"
                 $expectedModelProfile = if ($params.expect_model_profile) { [string]$params.expect_model_profile } else { "cheap-runner" }
                 $expectedProvider = if ($params.expect_provider) { [string]$params.expect_provider } else { "OpenAI" }
                 $expectedNestedGoalId = [string]$params.expect_nested_goal_id
                 $expectedNestedStatus = [string]$params.expect_nested_status
                 $expectedNestedOverallResult = [string]$params.expect_nested_overall_result
+                $compactReport = [bool]$params.compact_report
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
                     "agent", "tester", "run-plan",
-                    "--plan", $planPath,
+                    "--plan", $nestedPlanPath,
                     "--run-id", $testerRunId,
                     "--json"
                 )
@@ -910,6 +949,31 @@ foreach ($step in $plan.steps) {
                     $summary = "Expected nested report overall_result $expectedNestedOverallResult, actual $($parsed.report.overall_result)."
                 } else {
                     $summary = "TesterAgent ran plan with profile=$($parsed.modelProfile); summary=$($parsed.summary)"
+                    if ($compactReport) {
+                        $nestedReport = $parsed.report
+                        $parsed = [ordered]@{
+                            command = $parsed.command
+                            agent = $parsed.agent
+                            status = $parsed.status
+                            summary = $parsed.summary
+                            modelProfile = $parsed.modelProfile
+                            provider = $parsed.provider
+                            model = $parsed.model
+                            exitCode = $parsed.exitCode
+                            nestedReport = [ordered]@{
+                                test_run_id = $nestedReport.test_run_id
+                                goal_id = $nestedReport.goal_id
+                                status = $nestedReport.status
+                                overall_result = $nestedReport.overall_result
+                                summary = $nestedReport.summary
+                                steps_passed = $nestedReport.actual.steps_passed
+                                steps_failed = $nestedReport.actual.steps_failed
+                                steps_skipped = $nestedReport.actual.steps_skipped
+                                evidence_count = @($nestedReport.evidence).Count
+                                full_log_location = $nestedReport.full_log_location
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1020,6 +1084,280 @@ foreach ($step in $plan.steps) {
                     $summary = $failures[0]
                 } else {
                     $summary = "docs_search top match '$($top.document.title)' score=$($top.score)"
+                }
+            }
+
+            "agent_retriever_search" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $query = [string]$params.query
+                if ([string]::IsNullOrWhiteSpace($query)) {
+                    throw "agent_retriever_search requires params.query."
+                }
+                $take = if ($params.take) { [string]$params.take } else { "5" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "retriever", "search",
+                    "--project", $project,
+                    "--query", [string]$query,
+                    "--take", $take,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "agent_retriever_search exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected RetrieverAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected RetrieverAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_provider -and [string]$parsed.provider -ne [string]$params.expect_provider) {
+                    $status = "FAILED"
+                    $summary = "Expected RetrieverAgent provider $($params.expect_provider), actual $($parsed.provider)."
+                } else {
+                    $matches = @($parsed.contextPackage.Matches)
+                    $top = $matches | Select-Object -First 1
+                    $summary = "RetrieverAgent top match '$($top.DocumentTitle)' finalRank=$($top.FinalIronDevRank)."
+
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.contextPackage.Project.Name -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected context package project '$($params.expect_project)', actual '$($parsed.contextPackage.Project.Name)'.") | Out-Null
+                    }
+
+                    if ($params.expect_top_title_contains -and (-not $top -or [string]$top.DocumentTitle -notlike "*$($params.expect_top_title_contains)*")) {
+                        $validationFailures.Add("Expected top context title to contain '$($params.expect_top_title_contains)', actual '$($top.DocumentTitle)'.") | Out-Null
+                    }
+
+                    if ($params.expect_source_present -and (-not $top.SourceLinks -or @($top.SourceLinks).Count -eq 0)) {
+                        $validationFailures.Add("Expected top context match to include source links.") | Out-Null
+                    }
+
+                    if ($params.expect_semantic_trace_id -and -not $parsed.contextPackage.SemanticTraceId) {
+                        $validationFailures.Add("Expected context package semantic trace id.") | Out-Null
+                    }
+
+                    if ($params.expect_raw_and_final_rank -and ($null -eq $top.RawWeaviateRank -or $null -eq $top.FinalIronDevRank)) {
+                        $validationFailures.Add("Expected top context match to include raw and final ranks.") | Out-Null
+                    }
+
+                    foreach ($term in @($params.expect_no_match_title_contains)) {
+                        foreach ($match in $matches) {
+                            if ($term -and [string]$match.DocumentTitle -like "*$term*") {
+                                $validationFailures.Add("Expected RetrieverAgent matches not to contain title '$term', actual '$($match.DocumentTitle)'.") | Out-Null
+                            }
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
+            "agent_supervisor_run_goal" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $query = [string]$params.query
+                $planPath = [string]$params.plan_path
+                if ([string]::IsNullOrWhiteSpace($query)) {
+                    throw "agent_supervisor_run_goal requires params.query."
+                }
+                if ([string]::IsNullOrWhiteSpace($planPath)) {
+                    throw "agent_supervisor_run_goal requires params.plan_path."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "supervisor", "run-goal",
+                    "--project", $project,
+                    "--query", $query,
+                    "--plan", $planPath,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "agent_supervisor_run_goal exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected SupervisorAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected SupervisorAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } else {
+                    $loopReport = $parsed.loopReport
+                    $summary = "SupervisorAgent decision '$($loopReport.supervisor.decision)' with tester summary '$($loopReport.tester.summary)'."
+
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$loopReport.project -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected supervisor project '$($params.expect_project)', actual '$($loopReport.project)'.") | Out-Null
+                    }
+
+                    if ($params.expect_top_title_contains -and [string]$loopReport.memory.topTitle -notlike "*$($params.expect_top_title_contains)*") {
+                        $validationFailures.Add("Expected supervisor memory top title to contain '$($params.expect_top_title_contains)', actual '$($loopReport.memory.topTitle)'.") | Out-Null
+                    }
+
+                    if ($params.expect_memory_succeeded -and -not [bool]$loopReport.memory.succeeded) {
+                        $validationFailures.Add("Expected supervisor memory step to succeed.") | Out-Null
+                    }
+
+                    if ($params.expect_tester_succeeded -and -not [bool]$loopReport.tester.succeeded) {
+                        $validationFailures.Add("Expected supervisor tester step to succeed.") | Out-Null
+                    }
+
+                    if ($params.expect_codex_handoff -and -not $loopReport.codexHandoff) {
+                        $validationFailures.Add("Expected supervisor loop report to include codexHandoff.") | Out-Null
+                    }
+
+                    if ($params.expect_boundary_contains -and [string]$loopReport.codexHandoff.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected handoff boundary to contain '$($params.expect_boundary_contains)', actual '$($loopReport.codexHandoff.boundary)'.") | Out-Null
+                    }
+
+                    if ($params.expect_tester_goal_id) {
+                        $actualGoalId = [string]$loopReport.tester.report.goal_id
+                        if ($actualGoalId -ne [string]$params.expect_tester_goal_id) {
+                            $validationFailures.Add("Expected nested tester goal '$($params.expect_tester_goal_id)', actual '$actualGoalId'.") | Out-Null
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
+            "discussion_document_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "docs", "discussion-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "discussion_document_smoke exited with code $exitCode"
+                } else {
+                    $summary = "Discussion document $($parsed.documentId) currentVersion=$($parsed.currentVersionId); trace=$($parsed.semanticTraceId)"
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.projectName -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+                    if ($params.expect_document_type -and [string]$parsed.documentType -ne [string]$params.expect_document_type) {
+                        $validationFailures.Add("Expected document type '$($params.expect_document_type)', actual '$($parsed.documentType)'.") | Out-Null
+                    }
+                    if ($params.expect_current_version_status -and [string]$parsed.currentVersionStatus -ne [string]$params.expect_current_version_status) {
+                        $validationFailures.Add("Expected current version status '$($params.expect_current_version_status)', actual '$($parsed.currentVersionStatus)'.") | Out-Null
+                    }
+                    if ($params.expect_source_link -and ([int]$parsed.currentSourceLinkCount -lt 1 -or [int]$parsed.draftSourceLinkCount -lt 1)) {
+                        $validationFailures.Add("Expected source links on draft and current discussion document versions.") | Out-Null
+                    }
+                    if ($params.expect_semantic_trace_id -and -not $parsed.semanticTraceId) {
+                        $validationFailures.Add("Expected semantic trace id.") | Out-Null
+                    }
+                    if ($params.expect_top_source_version_matches -and [string]$parsed.topSourceVersionId -ne [string]$parsed.currentVersionId) {
+                        $validationFailures.Add("Expected top source version '$($parsed.currentVersionId)', actual '$($parsed.topSourceVersionId)'.") | Out-Null
+                    }
+                    if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                    }
+                    if (-not [bool]$parsed.passed) {
+                        $validationFailures.Add("Discussion document smoke reported passed=false.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
+            "document_to_tickets_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "tickets", "document-to-tickets-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "document_to_tickets_smoke exited with code $exitCode"
+                } else {
+                    $summary = "Document $($parsed.sourceDocumentId) generated $(@($parsed.ticketIds).Count) tickets; links=$($parsed.generatedTicketLinkCount)."
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.projectName -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+                    if ($params.expect_ticket_count -and @($parsed.ticketIds).Count -ne [int]$params.expect_ticket_count) {
+                        $validationFailures.Add("Expected $($params.expect_ticket_count) generated tickets, actual $(@($parsed.ticketIds).Count).") | Out-Null
+                    }
+                    if ($params.expect_all_tickets_linked -and -not [bool]$parsed.allTicketsLinked) {
+                        $validationFailures.Add("Expected all generated tickets to preserve SourceDocumentVersionId and artifact source references.") | Out-Null
+                    }
+                    if ($params.expect_all_tickets_resolve -and -not [bool]$parsed.allTicketsResolve) {
+                        $validationFailures.Add("Expected all generated tickets to resolve the exact source document version.") | Out-Null
+                    }
+                    if ($params.expect_generated_ticket_links -and [int]$parsed.generatedTicketLinkCount -lt [int]$params.expect_generated_ticket_links) {
+                        $validationFailures.Add("Expected at least $($params.expect_generated_ticket_links) generated ticket document links, actual $($parsed.generatedTicketLinkCount).") | Out-Null
+                    }
+                    if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                    }
+                    if (-not [bool]$parsed.passed) {
+                        $validationFailures.Add("Document-to-tickets smoke reported passed=false.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
                 }
             }
 
@@ -1331,6 +1669,39 @@ foreach ($step in $plan.steps) {
                 } else {
                     $summary = "Builder context included ticket $($parsed.ticketId), source ProjectDocumentVersion $($parsed.sourceDocumentVersionId), wrongProjectExcluded=$($parsed.builderContext.wrongProjectMemoryExcluded)"
                 }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.projectName -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+                    if ($params.expect_ticket_included -and -not [bool]$parsed.builderContext.ticketIncluded) {
+                        $validationFailures.Add("Expected builder context to include ticket.") | Out-Null
+                    }
+                    if ($params.expect_source_document_included -and -not [bool]$parsed.builderContext.sourceDocumentIncluded) {
+                        $validationFailures.Add("Expected builder context to include source document.") | Out-Null
+                    }
+                    if ($params.expect_source_version_included -and -not [bool]$parsed.builderContext.sourceDocumentVersionIncluded) {
+                        $validationFailures.Add("Expected builder context to include source document version.") | Out-Null
+                    }
+                    if ($params.expect_source_markdown_included -and -not [bool]$parsed.builderContext.sourceMarkdownIncluded) {
+                        $validationFailures.Add("Expected builder context to include source markdown excerpt.") | Out-Null
+                    }
+                    if ($params.expect_wrong_project_excluded -and -not [bool]$parsed.builderContext.wrongProjectMemoryExcluded) {
+                        $validationFailures.Add("Expected wrong-project source memory to be excluded.") | Out-Null
+                    }
+                    if ($params.expect_missing_source_fails -and -not [bool]$parsed.negativeChecks.orphanTicketFailsCleanly) {
+                        $validationFailures.Add("Expected missing source document version to fail cleanly.") | Out-Null
+                    }
+                    if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
             }
 
             "builder_proposal_safety_smoke" {
@@ -1341,6 +1712,9 @@ foreach ($step in $plan.steps) {
                     "--project", $project,
                     "--dogfood-run-id", $RunId
                 )
+                if ($params.use_requested_project) {
+                    $arguments += @("--use-requested-project")
+                }
                 if ($params.connection_string) {
                     $arguments += @("--connection-string", [string]$params.connection_string)
                 }
@@ -1367,6 +1741,38 @@ foreach ($step in $plan.steps) {
                     $summary = "Builder proposal safety smoke returned Passed=false"
                 } else {
                     $summary = "Builder proposal safety passed; ticket=$($parsed.ticketId); proposedFiles=$($parsed.proposal.proposedFileCount); applyBlocked=$($parsed.safety.approvalGateBlockedApply)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    $expectedProject = if ($params.expect_project) { [string]$params.expect_project } else { $null }
+
+                    if ($expectedProject -and [string]$parsed.projectName -ne $expectedProject) {
+                        $validationFailures.Add("Expected project '$expectedProject', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+
+                    if ($params.expect_no_file_writes -and (-not [bool]$parsed.safety.fileUnchangedAfterPreview -or -not [bool]$parsed.safety.fileUnchangedAfterApplyAttempt -or -not [bool]$parsed.safety.fileUnchangedAfterDirectPatchAttempt)) {
+                        $validationFailures.Add("Expected no file writes during preview/apply-block checks.") | Out-Null
+                    }
+
+                    if ($params.expect_approval_blocked -and -not [bool]$parsed.safety.approvalGateBlockedApply) {
+                        $validationFailures.Add("Expected approval gate to block apply.") | Out-Null
+                    }
+
+                    if ($params.expect_source_context_included -and -not [bool]$parsed.safety.sourceContextIncluded) {
+                        $validationFailures.Add("Expected source context to be included.") | Out-Null
+                    }
+
+                    foreach ($term in @($params.expect_context_not_contains)) {
+                        if ($term -and [string]$parsed.evidence.contextSummary -like "*$term*") {
+                            $validationFailures.Add("Expected context summary not to contain '$term'.") | Out-Null
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
                 }
             }
 

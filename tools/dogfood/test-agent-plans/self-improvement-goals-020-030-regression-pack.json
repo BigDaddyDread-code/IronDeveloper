@@ -1,0 +1,126 @@
+{
+  "test_run_id": "SelfImprovement031-BatchRegressionPack",
+  "goal_id": "self-improvement-batch-regression-pack-031",
+  "description": "Run the key BookSeller and self-improvement proof plans through TesterAgent as one compact 020-030 regression pack.",
+  "expected": {
+    "batch_regression_pack_created": true,
+    "tester_agent_runs_nested_plans": true,
+    "bookseller_project_fixture_passes": true,
+    "goals_022_through_030_pass": true,
+    "compact_pass_fail_report": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
+        "expect_nested_goal_id": "bookseller-project-fixture-020",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-builder-preview-smoke.json",
+        "expect_nested_goal_id": "bookseller-builder-preview-022",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-test-after-preview-smoke.json",
+        "expect_nested_goal_id": "bookseller-test-after-preview-023",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 4,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-retriever-agent-memory-search-smoke.json",
+        "expect_nested_goal_id": "retriever-agent-real-path-024",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 5,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-codex-loop-smoke.json",
+        "expect_nested_goal_id": "supervisor-codex-loop-proof-025",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 6,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-vague-prompt-routing-smoke.json",
+        "expect_nested_goal_id": "bookseller-vague-prompt-routing-026",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 7,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-discussion-to-document-smoke.json",
+        "expect_nested_goal_id": "bookseller-discussion-to-document-027",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 8,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-document-to-tickets-smoke.json",
+        "expect_nested_goal_id": "bookseller-document-to-tickets-028",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 9,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-ticket-to-builder-context-smoke.json",
+        "expect_nested_goal_id": "bookseller-ticket-to-builder-context-029",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 10,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-failure-package-smoke.json",
+        "expect_nested_goal_id": "bookseller-failure-package-proof-030",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "max_turns": 10,
+  "early_stop_on_failure": true
+}
