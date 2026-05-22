@@ -1,0 +1,15 @@
+{
+  "patchProposalId": "bookseller-book-001-negative-stock",
+  "ticket": "BOOK-001",
+  "summary": "Add negative stock validation to the BookSeller inventory fixture from an external patch proposal file.",
+  "fileChanges": [
+    {
+      "filePath": "BookSeller\\InventoryService.cs",
+      "beforeSnippet": "        Quantity += quantity;",
+      "afterSnippet": "        if (quantity < 0)\n            throw new ArgumentOutOfRangeException(nameof(quantity), \"Quantity cannot be negative.\");\n\n        Quantity += quantity;"
+    }
+  ],
+  "expectedChangedFiles": [
+    "BookSeller\\InventoryService.cs"
+  ]
+}
