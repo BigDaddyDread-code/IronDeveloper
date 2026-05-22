@@ -64,6 +64,8 @@ Prove a BookSeller document can produce linked draft tickets with source documen
 
 ### 029: BookSeller Ticket-To-Builder Context Proof
 
+Status: implemented in this branch.
+
 Prove BookSeller tickets produce builder context packages with linked BookSeller source memory and without IronDev/CODEX bleed.
 
 ### 030: BookSeller Failure Package Proof

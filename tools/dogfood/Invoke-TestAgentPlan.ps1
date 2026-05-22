@@ -1643,6 +1643,39 @@ foreach ($step in $plan.steps) {
                 } else {
                     $summary = "Builder context included ticket $($parsed.ticketId), source ProjectDocumentVersion $($parsed.sourceDocumentVersionId), wrongProjectExcluded=$($parsed.builderContext.wrongProjectMemoryExcluded)"
                 }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.projectName -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+                    if ($params.expect_ticket_included -and -not [bool]$parsed.builderContext.ticketIncluded) {
+                        $validationFailures.Add("Expected builder context to include ticket.") | Out-Null
+                    }
+                    if ($params.expect_source_document_included -and -not [bool]$parsed.builderContext.sourceDocumentIncluded) {
+                        $validationFailures.Add("Expected builder context to include source document.") | Out-Null
+                    }
+                    if ($params.expect_source_version_included -and -not [bool]$parsed.builderContext.sourceDocumentVersionIncluded) {
+                        $validationFailures.Add("Expected builder context to include source document version.") | Out-Null
+                    }
+                    if ($params.expect_source_markdown_included -and -not [bool]$parsed.builderContext.sourceMarkdownIncluded) {
+                        $validationFailures.Add("Expected builder context to include source markdown excerpt.") | Out-Null
+                    }
+                    if ($params.expect_wrong_project_excluded -and -not [bool]$parsed.builderContext.wrongProjectMemoryExcluded) {
+                        $validationFailures.Add("Expected wrong-project source memory to be excluded.") | Out-Null
+                    }
+                    if ($params.expect_missing_source_fails -and -not [bool]$parsed.negativeChecks.orphanTicketFailsCleanly) {
+                        $validationFailures.Add("Expected missing source document version to fail cleanly.") | Out-Null
+                    }
+                    if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
             }
 
             "builder_proposal_safety_smoke" {
