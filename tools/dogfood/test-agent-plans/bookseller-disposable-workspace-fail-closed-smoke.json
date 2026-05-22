@@ -1,0 +1,39 @@
+{
+  "test_run_id": "bookseller-disposable-workspace-fail-closed-smoke",
+  "goal_id": "disposable-workspace-fail-closed-104-115",
+  "project": "BookSeller",
+  "description": "Prove disposable workspace patch apply fails closed when a patch proposal attempts to write outside the explicit disposable workspace.",
+  "steps": [
+    {
+      "step": 1,
+      "action": "disposable_workspace_apply_smoke",
+      "params": {
+        "project": "BookSeller",
+        "proposal_path": "tools/dogfood/patch-proposals/bookseller-unsafe-outside-workspace.json",
+        "expect_failure": true,
+        "expect_project": "BookSeller",
+        "expect_workspace_outside_repo": true,
+        "expect_real_repo_unchanged": true,
+        "expect_patch_not_applied": true,
+        "expect_patch_proposal_id": "bookseller-book-001-unsafe-outside-workspace",
+        "expect_proposal_source_file": true,
+        "expect_apply_failure_contains": [
+          "blocked_path_outside_workspace"
+        ],
+        "expect_failure_package_path": true,
+        "expect_human_gate_no_real_repo_write": true,
+        "expect_included_sources": [
+          "BOOKSELLER_ARCHITECTURE_CURRENT",
+          "BOOKSELLER_TICKET_BOOK_001_ADD_BOOK_INVENTORY",
+          "BOOKSELLER_TEST_PLAN_CURRENT"
+        ],
+        "expect_rejected_sources": [
+          "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
+          "CODEX_GOALS"
+        ]
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}
