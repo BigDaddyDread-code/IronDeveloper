@@ -80,6 +80,8 @@ The first version may be deterministic/template-backed, but it must produce vali
 
 ### 039: BookSeller Messy Prompt Batch
 
+Status: implemented in this branch.
+
 Create a batch of messy BookSeller prompts that tests route stability across vague, typo-heavy, shorthand, contradictory, and follow-up style user messages.
 
 This should test behaviours, not exact assistant wording.
