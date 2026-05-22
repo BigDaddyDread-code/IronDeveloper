@@ -1,0 +1,29 @@
+{
+  "test_run_id": "test-irondev-intentional-memory-search-failure-017",
+  "goal_id": "intentional-memory-search-failure-017",
+  "project_id": 2,
+  "description": "Intentionally fail a memory search assertion so the failure package handoff can prove Test Agent failures are packaged for Codex.",
+  "expected": {
+    "intentional_failure": true,
+    "failed_action": "memory_search",
+    "failure_reason_contains": "Expected top memory title"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "current Codex goals",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "THIS_DOC_SHOULD_NOT_EXIST_017",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true
+}
