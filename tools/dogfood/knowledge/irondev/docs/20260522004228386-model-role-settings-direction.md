@@ -1,12 +1,12 @@
 ---
-id: 20260521215528085-model-role-settings-direction
+id: 20260522004228386-model-role-settings-direction
 project: IronDev
 title: Model Role Settings Direction
 document_type: Discussion
 authority: WorkingDraft
 source: SeedBaseline
-dogfood_run_id:
-created_utc: 2026-05-21T21:55:28.0858398+00:00
+dogfood_run_id: 
+created_utc: 2026-05-22T00:42:28.3867795+00:00
 ---
 
 # Model Role Settings Direction

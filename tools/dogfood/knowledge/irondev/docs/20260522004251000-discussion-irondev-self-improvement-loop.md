@@ -1,12 +1,12 @@
 ---
-id: 20260521221802569-discussion-irondev-self-improvement-loop
+id: 20260522004251000-discussion-irondev-self-improvement-loop
 project: IronDev
 title: DISCUSSION_IRONDEV_SELF_IMPROVEMENT_LOOP
 document_type: Discussion
 authority: WorkingDraft
 source: C:\Users\bob\source\repos\AIDeveloper\Docs\DISCUSSION_IRONDEV_SELF_IMPROVEMENT_LOOP.md
-dogfood_run_id: CodexGoals-001
-created_utc: 2026-05-21T22:18:02.5872255+00:00
+dogfood_run_id: DogfoodDocsSeed-20260522-012
+created_utc: 2026-05-22T00:42:51.0132483+00:00
 ---
 
 # IronDev CLI, Test Agent, Retrieval, And Self-Improvement Loop

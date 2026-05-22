@@ -1,90 +1,222 @@
 [
   {
-    "Id": "20260521221802569-discussion-irondev-self-improvement-loop",
+    "Id": "20260522004257945-workflow-engine-design",
+    "Project": "IronDev",
+    "Title": "WORKFLOW_ENGINE_DESIGN",
+    "DocumentType": "Architecture",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\WORKFLOW_ENGINE_DESIGN.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004257945-workflow-engine-design.md",
+    "CreatedUtc": "2026-05-22T00:42:57.9600742+00:00"
+  },
+  {
+    "Id": "20260522004256981-weaviate-local-setup",
+    "Project": "IronDev",
+    "Title": "weaviate-local-setup",
+    "DocumentType": "Guide",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\weaviate-local-setup.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004256981-weaviate-local-setup.md",
+    "CreatedUtc": "2026-05-22T00:42:56.9955657+00:00"
+  },
+  {
+    "Id": "20260522004255966-testing",
+    "Project": "IronDev",
+    "Title": "TESTING",
+    "DocumentType": "Guide",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\TESTING.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004255966-testing.md",
+    "CreatedUtc": "2026-05-22T00:42:55.9816446+00:00"
+  },
+  {
+    "Id": "20260522004254795-test-agent-spec",
+    "Project": "IronDev",
+    "Title": "TEST_AGENT_SPEC",
+    "DocumentType": "Architecture",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\TEST_AGENT_SPEC.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004254795-test-agent-spec.md",
+    "CreatedUtc": "2026-05-22T00:42:54.8136699+00:00"
+  },
+  {
+    "Id": "20260522004253737-semantic-memory-design",
+    "Project": "IronDev",
+    "Title": "SEMANTIC_MEMORY_DESIGN",
+    "DocumentType": "Architecture",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\SEMANTIC_MEMORY_DESIGN.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004253737-semantic-memory-design.md",
+    "CreatedUtc": "2026-05-22T00:42:53.7501851+00:00"
+  },
+  {
+    "Id": "20260522004252810-roadmap",
+    "Project": "IronDev",
+    "Title": "ROADMAP",
+    "DocumentType": "Planning",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\ROADMAP.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004252810-roadmap.md",
+    "CreatedUtc": "2026-05-22T00:42:52.8234612+00:00"
+  },
+  {
+    "Id": "20260522004251923-local-development",
+    "Project": "IronDev",
+    "Title": "local-development",
+    "DocumentType": "Guide",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\local-development.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004251923-local-development.md",
+    "CreatedUtc": "2026-05-22T00:42:51.9359829+00:00"
+  },
+  {
+    "Id": "20260522004251000-discussion-irondev-self-improvement-loop",
     "Project": "IronDev",
     "Title": "DISCUSSION_IRONDEV_SELF_IMPROVEMENT_LOOP",
     "DocumentType": "Discussion",
     "Authority": "WorkingDraft",
     "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\DISCUSSION_IRONDEV_SELF_IMPROVEMENT_LOOP.md",
-    "DogfoodRunId": "CodexGoals-001",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521221802569-discussion-irondev-self-improvement-loop.md",
-    "CreatedUtc": "2026-05-21T22:18:02.5872255+00:00"
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004251000-discussion-irondev-self-improvement-loop.md",
+    "CreatedUtc": "2026-05-22T00:42:51.0132483+00:00"
   },
   {
-    "Id": "20260521221802568-codex-goals",
+    "Id": "20260522004250126-codex-goals",
     "Project": "IronDev",
     "Title": "CODEX_GOALS",
     "DocumentType": "Architecture",
-    "Authority": "WorkingDraft",
+    "Authority": "Accepted",
     "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CODEX_GOALS.md",
-    "DogfoodRunId": "CodexGoals-001",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521221802568-codex-goals.md",
-    "CreatedUtc": "2026-05-21T22:18:02.581757+00:00"
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004250126-codex-goals.md",
+    "CreatedUtc": "2026-05-22T00:42:50.1393109+00:00"
   },
   {
-    "Id": "20260521215546001-agent-model-settings",
+    "Id": "20260522004249192-code-standards",
+    "Project": "IronDev",
+    "Title": "CODE_STANDARDS",
+    "DocumentType": "Architecture",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CODE_STANDARDS.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004249192-code-standards.md",
+    "CreatedUtc": "2026-05-22T00:42:49.2068067+00:00"
+  },
+  {
+    "Id": "20260522004248184-chat-grounding-test-matrix",
+    "Project": "IronDev",
+    "Title": "chat-grounding-test-matrix",
+    "DocumentType": "Architecture",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\chat-grounding-test-matrix.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004248184-chat-grounding-test-matrix.md",
+    "CreatedUtc": "2026-05-22T00:42:48.1975687+00:00"
+  },
+  {
+    "Id": "20260522004247286-architecture",
+    "Project": "IronDev",
+    "Title": "ARCHITECTURE",
+    "DocumentType": "Architecture",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\ARCHITECTURE.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004247286-architecture.md",
+    "CreatedUtc": "2026-05-22T00:42:47.2992573+00:00"
+  },
+  {
+    "Id": "20260522004246342-alpha-0-1-manual-validation",
+    "Project": "IronDev",
+    "Title": "alpha-0.1-manual-validation",
+    "DocumentType": "Guide",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\alpha-0.1-manual-validation.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004246342-alpha-0-1-manual-validation.md",
+    "CreatedUtc": "2026-05-22T00:42:46.3553229+00:00"
+  },
+  {
+    "Id": "20260522004245466-alpha-0-1-charter",
+    "Project": "IronDev",
+    "Title": "alpha-0.1-charter",
+    "DocumentType": "Planning",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\alpha-0.1-charter.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004245466-alpha-0-1-charter.md",
+    "CreatedUtc": "2026-05-22T00:42:45.4789794+00:00"
+  },
+  {
+    "Id": "20260522004244585-alpha-0-1-build-order",
+    "Project": "IronDev",
+    "Title": "alpha-0.1-build-order",
+    "DocumentType": "Planning",
+    "Authority": "WorkingDraft",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\alpha-0.1-build-order.md",
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004244585-alpha-0-1-build-order.md",
+    "CreatedUtc": "2026-05-22T00:42:44.598008+00:00"
+  },
+  {
+    "Id": "20260522004243635-agent-model-settings",
     "Project": "IronDev",
     "Title": "AGENT_MODEL_SETTINGS",
     "DocumentType": "Architecture",
-    "Authority": "WorkingDraft",
+    "Authority": "Accepted",
     "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\AGENT_MODEL_SETTINGS.md",
-    "DogfoodRunId": "TestAgentConversationCheck",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215546001-agent-model-settings.md",
-    "CreatedUtc": "2026-05-21T21:55:46.0185723+00:00"
+    "DogfoodRunId": "DogfoodDocsSeed-20260522-012",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004243635-agent-model-settings.md",
+    "CreatedUtc": "2026-05-22T00:42:43.6489925+00:00"
   },
   {
-    "Id": "20260521215545985-test-agent-spec",
-    "Project": "IronDev",
-    "Title": "TEST_AGENT_SPEC",
-    "DocumentType": "Architecture",
-    "Authority": "WorkingDraft",
-    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\TEST_AGENT_SPEC.md",
-    "DogfoodRunId": "TestAgentConversationCheck",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215545985-test-agent-spec.md",
-    "CreatedUtc": "2026-05-21T21:55:46.0001244+00:00"
-  },
-  {
-    "Id": "20260521215528085-model-role-settings-direction",
+    "Id": "20260522004228386-model-role-settings-direction",
     "Project": "IronDev",
     "Title": "Model Role Settings Direction",
     "DocumentType": "Discussion",
     "Authority": "WorkingDraft",
     "Source": "SeedBaseline",
     "DogfoodRunId": "",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528085-model-role-settings-direction.md",
-    "CreatedUtc": "2026-05-21T21:55:28.0858398+00:00"
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004228386-model-role-settings-direction.md",
+    "CreatedUtc": "2026-05-22T00:42:28.3867795+00:00"
   },
   {
-    "Id": "20260521215528085-test-agent-contract",
+    "Id": "20260522004228386-test-agent-contract",
     "Project": "IronDev",
     "Title": "Test Agent Contract",
     "DocumentType": "Architecture",
     "Authority": "WorkingDraft",
     "Source": "SeedBaseline",
     "DogfoodRunId": "",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528085-test-agent-contract.md",
-    "CreatedUtc": "2026-05-21T21:55:28.0850753+00:00"
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004228386-test-agent-contract.md",
+    "CreatedUtc": "2026-05-22T00:42:28.3861479+00:00"
   },
   {
-    "Id": "20260521215528084-headless-dogfood-loop",
+    "Id": "20260522004228385-headless-dogfood-loop",
     "Project": "IronDev",
     "Title": "Headless Dogfood Loop",
     "DocumentType": "Discussion",
     "Authority": "WorkingDraft",
     "Source": "SeedBaseline",
     "DogfoodRunId": "",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528084-headless-dogfood-loop.md",
-    "CreatedUtc": "2026-05-21T21:55:28.0843294+00:00"
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004228385-headless-dogfood-loop.md",
+    "CreatedUtc": "2026-05-22T00:42:28.3851496+00:00"
   },
   {
-    "Id": "20260521215528072-irondev-alpha-stabilisation-principles",
+    "Id": "20260522004228375-irondev-alpha-stabilisation-principles",
     "Project": "IronDev",
     "Title": "IronDev Alpha Stabilisation Principles",
     "DocumentType": "Architecture",
     "Authority": "Accepted",
     "Source": "SeedBaseline",
     "DogfoodRunId": "",
-    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260521215528072-irondev-alpha-stabilisation-principles.md",
-    "CreatedUtc": "2026-05-21T21:55:28.0738589+00:00"
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522004228375-irondev-alpha-stabilisation-principles.md",
+    "CreatedUtc": "2026-05-22T00:42:28.3768738+00:00"
   }
 ]
