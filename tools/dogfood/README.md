@@ -286,6 +286,7 @@ The local executor currently supports:
 - `sql_document_version_smoke`
 - `weaviate_sql_document_version_smoke`
 - `cross_project_memory_smoke`
+- `ticket_source_link_smoke`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
 `coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
@@ -355,6 +356,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 This creates SQL-backed memory for IronDev and BookSeller, writes both to Weaviate, runs a real `nearVector` query that intentionally prefers the BookSeller chunk, and verifies IronDev context rejects the cross-project candidate before final ranking.
+
+Run the ticket source document-version integrity smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-ticket-source-link-smoke.json `
+  -RunId IronDevMemorySpine010-TicketSourceLink `
+  -Json
+```
+
+This creates a disposable SQL `ProjectDocument` and `ProjectDocumentVersion`, saves a real `ProjectTicket` through `TicketService`, persists `SourceDocumentVersionId`, records source references, and verifies the link resolves back to the exact SQL version. It also creates an intentional orphan control ticket and verifies that missing source links are reported as validation failure. It does not touch builder context.
 
 Conversation-mode sample:
 

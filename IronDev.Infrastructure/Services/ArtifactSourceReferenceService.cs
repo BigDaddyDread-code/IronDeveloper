@@ -179,6 +179,69 @@ public sealed class ArtifactSourceReferenceService : IArtifactSourceReferenceSer
                 CREATE INDEX IX_ArtifactSourceReferences_Source
                     ON dbo.ArtifactSourceReferences(TenantId, ProjectId, SourceType, SourceId);
             END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'SourcePath') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD SourcePath NVARCHAR(1000) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'SourceSymbol') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD SourceSymbol NVARCHAR(500) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'SourceSection') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD SourceSection NVARCHAR(500) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'SourceAnchor') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD SourceAnchor NVARCHAR(500) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'ReferenceType') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD ReferenceType NVARCHAR(100) NOT NULL
+                    CONSTRAINT DF_ArtifactSourceReferences_ReferenceType DEFAULT 'References';
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'RelationshipType') IS NOT NULL
+               AND NOT EXISTS
+               (
+                   SELECT 1
+                   FROM sys.default_constraints dc
+                   INNER JOIN sys.columns c
+                       ON c.object_id = dc.parent_object_id
+                      AND c.column_id = dc.parent_column_id
+                   WHERE dc.parent_object_id = OBJECT_ID('dbo.ArtifactSourceReferences')
+                     AND c.name = 'RelationshipType'
+               )
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD
+                    CONSTRAINT DF_ArtifactSourceReferences_RelationshipType DEFAULT 'References' FOR RelationshipType;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'Summary') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD Summary NVARCHAR(MAX) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'RelevanceScore') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD RelevanceScore DECIMAL(9,4) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'IsRequired') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD IsRequired BIT NOT NULL
+                    CONSTRAINT DF_ArtifactSourceReferences_IsRequired DEFAULT 0;
+            END
+
+            IF COL_LENGTH('dbo.ArtifactSourceReferences', 'CreatedBy') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ArtifactSourceReferences ADD CreatedBy NVARCHAR(200) NULL;
+            END
             """;
 
         await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: ct));
