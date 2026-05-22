@@ -9,6 +9,7 @@
     "core_memory_search_passes": true,
     "bookseller_project_smoke_passes": true,
     "builder_preview_safety_passes": true,
+    "disposable_workspace_apply_passes": true,
     "failure_handoff_passes": true,
     "code_standards_passes": true
   },
@@ -92,6 +93,17 @@
       "step": 7,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-disposable-workspace-apply-smoke.json",
+        "expect_nested_goal_id": "disposable-workspace-apply-proof-104-115",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 8,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -100,7 +112,7 @@
       }
     },
     {
-      "step": 8,
+      "step": 9,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -111,6 +123,6 @@
       }
     }
   ],
-  "max_turns": 8,
+  "max_turns": 9,
   "early_stop_on_failure": true
 }

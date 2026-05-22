@@ -413,6 +413,29 @@ Before and after every major PR in this phase, run the deterministic Alpha quali
 
 This is the KilljoyAgent baseline. It should remain boring and deterministic.
 
+## Implemented Smoke Proof
+
+The first disposable workspace apply proof is exposed through the ReplayRunner command:
+
+```text
+builder disposable-workspace-apply-smoke --project BookSeller --dogfood-run-id <run-id>
+```
+
+The matching Test Agent plan is:
+
+```text
+tools/dogfood/test-agent-plans/bookseller-disposable-workspace-apply-smoke.json
+```
+
+This proof uses a controlled BookSeller fixture, copies it to a temp disposable workspace, captures before hashes, applies a deterministic patch only inside that workspace, captures after hashes, runs build/test inside the workspace, compares changed files against the proposal scope, and writes a Codex-readable result package.
+
+Boundary:
+
+- It does not mutate the real repository.
+- It does not apply patches to the real BookSeller project.
+- It does not grant autonomous repair.
+- Human approval remains a review gate only, not permission to write to the real repo.
+
 ## Audit Notes
 
 This phase is aligned with the Alpha Test Phase Report.
