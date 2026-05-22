@@ -1,0 +1,53 @@
+{
+  "test_run_id": "IronDev024-RetrieverAgentMemorySearch",
+  "goal_id": "retriever-agent-real-path-024",
+  "project_id": 2,
+  "description": "Prove RetrieverAgent wraps the real memory search path and returns a project-scoped context package with source and ranking evidence.",
+  "max_turns": 2,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "IronDev",
+        "query": "IRONDEV_SELF_IMPROVEMENT_SYSTEM next build order 022 BookSeller builder preview proof",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "IRONDEV_SELF_IMPROVEMENT_SYSTEM",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BOOK-001 add book inventory ticket SQL stock",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "BOOKSELLER_TICKET_BOOK_001",
+        "expect_no_match_title_contains": [
+          "IRONDEV",
+          "CODEX_GOALS"
+        ],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "expected": {
+    "retriever_agent_is_real_path": true,
+    "uses_memory_search": true,
+    "project_scoped_context_package": true,
+    "source_links_present": true,
+    "raw_and_final_ranking_visible": true
+  }
+}

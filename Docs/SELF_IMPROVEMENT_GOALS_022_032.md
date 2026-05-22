@@ -34,6 +34,8 @@ Prove the Test Agent can run a BookSeller-scoped validation plan after builder p
 
 ### 024: RetrieverAgent Real Path
 
+Status: implemented in this branch.
+
 Make RetrieverAgent wrap the existing memory search path and return structured project-scoped context packages.
 
 ### 025: Supervisor/Codex Loop Proof

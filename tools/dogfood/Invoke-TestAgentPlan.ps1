@@ -1023,6 +1023,86 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "agent_retriever_search" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $query = [string]$params.query
+                if ([string]::IsNullOrWhiteSpace($query)) {
+                    throw "agent_retriever_search requires params.query."
+                }
+                $take = if ($params.take) { [string]$params.take } else { "5" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "retriever", "search",
+                    "--project", $project,
+                    "--query", [string]$query,
+                    "--take", $take,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "agent_retriever_search exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected RetrieverAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected RetrieverAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_provider -and [string]$parsed.provider -ne [string]$params.expect_provider) {
+                    $status = "FAILED"
+                    $summary = "Expected RetrieverAgent provider $($params.expect_provider), actual $($parsed.provider)."
+                } else {
+                    $matches = @($parsed.contextPackage.Matches)
+                    $top = $matches | Select-Object -First 1
+                    $summary = "RetrieverAgent top match '$($top.DocumentTitle)' finalRank=$($top.FinalIronDevRank)."
+
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.contextPackage.Project.Name -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected context package project '$($params.expect_project)', actual '$($parsed.contextPackage.Project.Name)'.") | Out-Null
+                    }
+
+                    if ($params.expect_top_title_contains -and (-not $top -or [string]$top.DocumentTitle -notlike "*$($params.expect_top_title_contains)*")) {
+                        $validationFailures.Add("Expected top context title to contain '$($params.expect_top_title_contains)', actual '$($top.DocumentTitle)'.") | Out-Null
+                    }
+
+                    if ($params.expect_source_present -and (-not $top.SourceLinks -or @($top.SourceLinks).Count -eq 0)) {
+                        $validationFailures.Add("Expected top context match to include source links.") | Out-Null
+                    }
+
+                    if ($params.expect_semantic_trace_id -and -not $parsed.contextPackage.SemanticTraceId) {
+                        $validationFailures.Add("Expected context package semantic trace id.") | Out-Null
+                    }
+
+                    if ($params.expect_raw_and_final_rank -and ($null -eq $top.RawWeaviateRank -or $null -eq $top.FinalIronDevRank)) {
+                        $validationFailures.Add("Expected top context match to include raw and final ranks.") | Out-Null
+                    }
+
+                    foreach ($term in @($params.expect_no_match_title_contains)) {
+                        foreach ($match in $matches) {
+                            if ($term -and [string]$match.DocumentTitle -like "*$term*") {
+                                $validationFailures.Add("Expected RetrieverAgent matches not to contain title '$term', actual '$($match.DocumentTitle)'.") | Out-Null
+                            }
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "memory_search" {
                 $query = [string]$params.query
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }
