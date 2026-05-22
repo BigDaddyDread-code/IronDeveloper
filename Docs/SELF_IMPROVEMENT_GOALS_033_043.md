@@ -32,6 +32,8 @@ Create the 033-043 goal pack, branch rules, and build order so the next self-imp
 
 ### 034: RetrieverAgent Context Bundle
 
+Status: implemented in this branch.
+
 Make RetrieverAgent return a richer context bundle instead of raw memory search shape only.
 
 The bundle should include project, query, accepted sources, rejected or demoted sources where available, raw rank, final rank, source document/version IDs, excerpts, match reasons, trace ID, and a short "use this / treat as historical / ignore this" guidance field.

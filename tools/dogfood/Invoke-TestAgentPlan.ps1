@@ -1152,6 +1152,32 @@ foreach ($step in $plan.steps) {
                         $validationFailures.Add("Expected top context match to include raw and final ranks.") | Out-Null
                     }
 
+                    if ($params.expect_context_bundle -and [string]$parsed.contextPackage.BundleKind -ne "RetrieverContextBundle") {
+                        $validationFailures.Add("Expected RetrieverAgent context package BundleKind=RetrieverContextBundle.") | Out-Null
+                    }
+
+                    if ($params.expect_guidance_fields) {
+                        if (-not $top.Guidance) {
+                            $validationFailures.Add("Expected top context match to include guidance.") | Out-Null
+                        }
+                        if (-not $parsed.contextPackage.UseGuidance) {
+                            $validationFailures.Add("Expected context package to include use guidance.") | Out-Null
+                        }
+                        if ($null -eq $parsed.contextPackage.AcceptedSources) {
+                            $validationFailures.Add("Expected context package to include accepted sources.") | Out-Null
+                        }
+                        if ($null -eq $parsed.contextPackage.DemotedSources) {
+                            $validationFailures.Add("Expected context package to include demoted sources.") | Out-Null
+                        }
+                        if ($null -eq $parsed.contextPackage.HistoricalSources) {
+                            $validationFailures.Add("Expected context package to include historical sources.") | Out-Null
+                        }
+                    }
+
+                    if ($params.expect_top_guidance -and [string]$top.Guidance -ne [string]$params.expect_top_guidance) {
+                        $validationFailures.Add("Expected top context guidance '$($params.expect_top_guidance)', actual '$($top.Guidance)'.") | Out-Null
+                    }
+
                     foreach ($term in @($params.expect_no_match_title_contains)) {
                         foreach ($match in $matches) {
                             if ($term -and [string]$match.DocumentTitle -like "*$term*") {
