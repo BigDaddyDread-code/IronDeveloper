@@ -1,0 +1,42 @@
+{
+  "test_run_id": "IronDev070-CodexMemoryTitlePromotion",
+  "goal_id": "codex-memory-title-promotion-070",
+  "description": "Prove named-memory queries promote the exact accepted document above broad umbrella architecture.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_054_073",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_054_073",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_044_053",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_044_053",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "expected": {
+    "exact_named_memory_promoted": true,
+    "raw_and_final_rank_visible": true,
+    "broad_architecture_doc_not_primary_for_exact_title": true
+  }
+}

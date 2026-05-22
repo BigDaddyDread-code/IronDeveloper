@@ -1,0 +1,25 @@
+{
+  "test_run_id": "IronDev060-FailureHandoffRegression",
+  "goal_id": "irondev-failure-handoff-regression-060",
+  "description": "Keep the IronDev failure package handoff path green.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "failure_package_smoke",
+      "params": {
+        "failure_plan_path": "tools/dogfood/test-agent-plans/irondev-intentional-memory-search-failure.json",
+        "expect_nested_goal_id": "intentional-memory-search-failure-017"
+      }
+    }
+  ],
+  "expected": {
+    "failure_package_json_created": true,
+    "failure_package_markdown_created": true,
+    "repro_command_present": true,
+    "validation_command_present": true,
+    "likely_areas_present": true,
+    "safety_rules_present": true
+  }
+}

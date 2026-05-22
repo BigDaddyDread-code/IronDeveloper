@@ -1,0 +1,29 @@
+{
+  "test_run_id": "IronDev056-PlannerMemoryFirstDraft",
+  "goal_id": "planner-agent-memory-first-056",
+  "description": "Prove PlannerAgent drafts an IronDev-scoped memory-first plan for the larger reliability loop.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_planner_draft_test_plan",
+      "params": {
+        "project": "IronDev",
+        "goal": "run a larger IronDev reliability batch without autonomous code writes",
+        "expect_model_profile": "standard-reasoner",
+        "expect_project": "IronDev",
+        "expect_min_steps": 2,
+        "expect_action_contains": "memory_search",
+        "expect_boundary_contains": "drafts Test Agent plan JSON only"
+      }
+    }
+  ],
+  "expected": {
+    "planner_agent_real_path": true,
+    "irondev_project_scoped": true,
+    "memory_first_step": true,
+    "no_plan_execution": true,
+    "no_code_patch": true
+  }
+}

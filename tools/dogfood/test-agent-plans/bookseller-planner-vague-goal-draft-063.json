@@ -1,0 +1,29 @@
+{
+  "test_run_id": "BookSeller063-PlannerVagueGoalDraft",
+  "goal_id": "bookseller-planner-vague-goal-draft-063",
+  "description": "Prove PlannerAgent drafts from vague BookSeller intent without executing or patching.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_planner_draft_test_plan",
+      "params": {
+        "project": "BookSeller",
+        "goal": "bookseller needs stock maybe locations maybe sales history but keep it safe",
+        "expect_model_profile": "standard-reasoner",
+        "expect_project": "BookSeller",
+        "expect_min_steps": 2,
+        "expect_action_contains": "memory_search",
+        "expect_boundary_contains": "drafts Test Agent plan JSON only"
+      }
+    }
+  ],
+  "expected": {
+    "planner_agent_real_path": true,
+    "bookseller_project_scoped": true,
+    "memory_first_step": true,
+    "no_plan_execution": true,
+    "no_builder_write": true
+  }
+}

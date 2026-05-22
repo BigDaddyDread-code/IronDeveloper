@@ -1,0 +1,48 @@
+{
+  "test_run_id": "SelfImprovement072-CrossBatchRegression",
+  "goal_id": "self-improvement-goals-033-070-cross-batch-regression-072",
+  "description": "Run prior PR gates plus the new 054-070 pack so Codex can see continuity across batches.",
+  "expected": {
+    "goals_033_043_still_pass": true,
+    "goals_044_053_still_pass": true,
+    "goals_054_070_pass": true,
+    "compact_cross_batch_report": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-033-043-pr-ready-quality-gate.json",
+        "expect_nested_goal_id": "self-improvement-goals-033-043-pr-ready-quality-gate",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-044-053-pr-ready-quality-gate.json",
+        "expect_nested_goal_id": "self-improvement-goals-044-053-pr-ready-quality-gate",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/self-improvement-goals-054-070-regression-pack.json",
+        "expect_nested_goal_id": "self-improvement-goals-054-070-regression-pack-071",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "max_turns": 3,
+  "early_stop_on_failure": true
+}
