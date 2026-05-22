@@ -1,12 +1,12 @@
 ---
-id: 20260521215546001-agent-model-settings
+id: 20260522004243635-agent-model-settings
 project: IronDev
 title: AGENT_MODEL_SETTINGS
 document_type: Architecture
-authority: WorkingDraft
+authority: Accepted
 source: C:\Users\bob\source\repos\AIDeveloper\Docs\AGENT_MODEL_SETTINGS.md
-dogfood_run_id: TestAgentConversationCheck
-created_utc: 2026-05-21T21:55:46.0185723+00:00
+dogfood_run_id: DogfoodDocsSeed-20260522-012
+created_utc: 2026-05-22T00:42:43.6489925+00:00
 ---
 
 # IronDev Agent Model Settings

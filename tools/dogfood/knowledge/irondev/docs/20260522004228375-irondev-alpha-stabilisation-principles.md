@@ -1,12 +1,12 @@
 ---
-id: 20260521215528072-irondev-alpha-stabilisation-principles
+id: 20260522004228375-irondev-alpha-stabilisation-principles
 project: IronDev
 title: IronDev Alpha Stabilisation Principles
 document_type: Architecture
 authority: Accepted
 source: SeedBaseline
-dogfood_run_id:
-created_utc: 2026-05-21T21:55:28.0738589+00:00
+dogfood_run_id: 
+created_utc: 2026-05-22T00:42:28.3768738+00:00
 ---
 
 # IronDev Alpha Stabilisation Principles

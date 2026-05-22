@@ -1,12 +1,12 @@
 ---
-id: 20260521215528084-headless-dogfood-loop
+id: 20260522004228385-headless-dogfood-loop
 project: IronDev
 title: Headless Dogfood Loop
 document_type: Discussion
 authority: WorkingDraft
 source: SeedBaseline
-dogfood_run_id:
-created_utc: 2026-05-21T21:55:28.0843294+00:00
+dogfood_run_id: 
+created_utc: 2026-05-22T00:42:28.3851496+00:00
 ---
 
 # Headless Dogfood Loop

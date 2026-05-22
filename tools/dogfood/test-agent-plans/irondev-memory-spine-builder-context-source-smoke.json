@@ -1,0 +1,36 @@
+{
+  "test_run_id": "irondev-memory-spine-011-builder-context-source",
+  "goal_id": "memory-spine-011-builder-context-source-memory",
+  "description": "Prove builder context assembly includes the ticket's linked SQL ProjectDocumentVersion without generating code or applying patches.",
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "name": "Build replay runner",
+      "action": "dotnet_build",
+      "params": {
+        "target": "tools/IronDev.ReplayRunner/IronDev.ReplayRunner.csproj"
+      }
+    },
+    {
+      "step": 2,
+      "name": "Run Memory Spine 011 builder-context source proof",
+      "action": "builder_context_source_memory_smoke",
+      "params": {
+        "project": "IronDev"
+      }
+    }
+  ],
+  "expected": {
+    "builder_context_source_memory_smoke": {
+      "intent": "ProveBuilderContextSourceMemory",
+      "requires_ticket_source_document_version": true,
+      "requires_source_document_resolution": true,
+      "requires_wrong_project_exclusion": true,
+      "requires_stale_memory_historical_marking": true,
+      "requires_negative_checks": true,
+      "allows_code_generation": false,
+      "allows_patch_application": false
+    }
+  }
+}

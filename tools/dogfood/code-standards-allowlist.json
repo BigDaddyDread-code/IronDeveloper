@@ -1,0 +1,51 @@
+{
+  "temporaryWarnings": [
+    {
+      "path": "tools/IronDev.ReplayRunner/Program.cs",
+      "rule": "LargeFile",
+      "reason": "Alpha smoke harness still contains 005-011 memory spine proof commands; extract once the proof chain stabilises.",
+      "expiresAfter": "Memory Spine 012 extraction pass"
+    },
+    {
+      "path": "tools/IronDev.ReplayRunner/Program.cs",
+      "rule": "LargeMethod",
+      "method": "HandleMemorySqlVersionSmokeCommandAsync",
+      "reason": "006 proof command is stable but not yet extracted into focused dogfood harness helpers.",
+      "expiresAfter": "Memory Spine 012 extraction pass"
+    },
+    {
+      "path": "tools/IronDev.ReplayRunner/Program.cs",
+      "rule": "LargeMethod",
+      "method": "HandleMemoryWeaviateSqlVersionSmokeCommandAsync",
+      "reason": "007 proof command is stable but not yet extracted into focused dogfood harness helpers.",
+      "expiresAfter": "Memory Spine 012 extraction pass"
+    },
+    {
+      "path": "tools/IronDev.ReplayRunner/Program.cs",
+      "rule": "LargeMethod",
+      "method": "HandleMemoryCrossProjectSmokeCommandAsync",
+      "reason": "008 proof command is stable but not yet extracted into focused dogfood harness helpers.",
+      "expiresAfter": "Memory Spine 012 extraction pass"
+    },
+    {
+      "path": "tools/IronDev.ReplayRunner/Program.cs",
+      "rule": "LargeMethod",
+      "method": "HandleMemoryTicketSourceLinkSmokeCommandAsync",
+      "reason": "010 proof command is stable but not yet extracted into focused dogfood harness helpers.",
+      "expiresAfter": "Memory Spine 012 extraction pass"
+    },
+    {
+      "path": "tools/IronDev.ReplayRunner/Program.cs",
+      "rule": "LargeMethod",
+      "method": "HandleMemoryBuilderContextSourceSmokeCommandAsync",
+      "reason": "011 proof command is intentionally preserved while 012 hardens the quality gate.",
+      "expiresAfter": "Memory Spine 012 extraction pass"
+    },
+    {
+      "path": "tools/dogfood/Invoke-TestAgentPlan.ps1",
+      "rule": "LargeFile",
+      "reason": "Test Agent local executor is intentionally centralised until CLI command surface stabilises.",
+      "expiresAfter": "Test Agent CLI extraction"
+    }
+  ]
+}

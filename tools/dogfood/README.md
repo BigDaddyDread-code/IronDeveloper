@@ -287,6 +287,7 @@ The local executor currently supports:
 - `weaviate_sql_document_version_smoke`
 - `cross_project_memory_smoke`
 - `ticket_source_link_smoke`
+- `builder_context_source_memory_smoke`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
 `coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
@@ -312,6 +313,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 The code standards gate is deterministic and non-repairing. It runs build/test/format/audit steps plus code-shape checks such as large file and large method warnings. Warnings are allowed in Alpha; the purpose is to give Codex a structured quality report before widening the branch.
+
+The hardening pass uses `Docs/CODE_STANDARDS.md` as the human-readable rule source and `tools/dogfood/code-standards-allowlist.json` for temporary Alpha exceptions. Findings include rule id, severity, file, optional method, recommendation, blocking status, and allowlist expiry notes. The default thresholds are intentionally loose but visible:
+
+- warning when a file is over 700 lines
+- warning when a method is over 120 lines
+- failure when a method is over 250 lines unless explicitly allowlisted
+- failure when required proof plans are missing
+- warning when proof-boundary documentation is missing
 
 Run the first Memory Spine smoke while Weaviate is running:
 
@@ -367,6 +376,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 This creates a disposable SQL `ProjectDocument` and `ProjectDocumentVersion`, saves a real `ProjectTicket` through `TicketService`, persists `SourceDocumentVersionId`, records source references, and verifies the link resolves back to the exact SQL version. It also creates an intentional orphan control ticket and verifies that missing source links are reported as validation failure. It does not touch builder context.
+
+Run the builder context source-memory smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-builder-context-source-smoke.json `
+  -RunId IronDevMemorySpine011-BuilderContextSource `
+  -Json
+```
+
+This creates a disposable SQL `ProjectDocument` and linked `ProjectTicket`, then assembles real builder context through `BuilderContextService`. It verifies the builder context includes the ticket, source document/version metadata, safe source markdown excerpt, and source link evidence. It also verifies missing source links, missing document versions, wrong-project sources, and historical sources are reported cleanly. It does not generate code or apply patches.
 
 Conversation-mode sample:
 
