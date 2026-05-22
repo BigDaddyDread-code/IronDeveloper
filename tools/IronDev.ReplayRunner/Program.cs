@@ -1300,21 +1300,6 @@ static string? TryReadConnectionString(string path, string name)
     return null;
 }
 
-static string? TryReadNestedString(string path, string sectionName, string propertyName)
-{
-    if (!File.Exists(path))
-        return null;
-
-    using var document = JsonDocument.Parse(File.ReadAllText(path));
-    if (document.RootElement.TryGetProperty(sectionName, out var section) &&
-        section.TryGetProperty(propertyName, out var value))
-    {
-        return value.GetString();
-    }
-
-    return null;
-}
-
 static string FindRepositoryRoot()
 {
     var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -1330,12 +1315,6 @@ static string FindRepositoryRoot()
     }
 
     return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-}
-
-static string ComputeSha256(string text)
-{
-    var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text));
-    return Convert.ToHexString(bytes);
 }
 
 static string ReadPositionalText(string[] args, int startIndex)

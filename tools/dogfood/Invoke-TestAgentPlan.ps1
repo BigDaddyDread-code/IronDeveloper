@@ -1235,6 +1235,7 @@ foreach ($step in $plan.steps) {
 
             "ticket_source_link_smoke" {
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $expectedProject = if ($params.expect_project) { [string]$params.expect_project } else { $project }
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",
                     "memory", "ticket-source-link-smoke",
@@ -1267,6 +1268,31 @@ foreach ($step in $plan.steps) {
                     $summary = "Ticket source-link smoke returned Passed=false"
                 } else {
                     $summary = "Ticket $($parsed.ticketId) resolved to ProjectDocumentVersion $($parsed.sourceDocumentVersionId); orphanReported=$($parsed.orphanReportedAsFailure)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+
+                    if ($expectedProject -and [string]$parsed.projectName -ne $expectedProject) {
+                        $validationFailures.Add("Expected project '$expectedProject', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+
+                    if ($params.expect_ticket_has_source_document_version_id -and -not $parsed.ticketSourceDocumentVersionId) {
+                        $validationFailures.Add("Expected ticketSourceDocumentVersionId to be present.") | Out-Null
+                    }
+
+                    if ($params.expect_source_document_version_resolves -and [string]$parsed.linkResolutionStatus -ne "resolved_exact_project_document_version") {
+                        $validationFailures.Add("Expected linkResolutionStatus resolved, actual '$($parsed.linkResolutionStatus)'.") | Out-Null
+                    }
+
+                    if ($params.expect_orphan_missing_source_is_reported_as_failure -and -not [bool]$parsed.orphanReportedAsFailure) {
+                        $validationFailures.Add("Expected orphan ticket to be reported as failure.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
                 }
             }
 
