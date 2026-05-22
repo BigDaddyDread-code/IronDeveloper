@@ -1,0 +1,42 @@
+# IronDev Code Standards
+
+## Purpose
+
+These standards keep IronDev dogfood work traceable, reviewable, and maintainable while the Alpha spine is still moving quickly.
+
+## Core Rules
+
+- Prefer small focused services/classes over large procedural command handlers.
+- Smoke commands may stay procedural while a proof is being discovered, but repeated setup/assertion logic must be extracted once the proof is stable.
+- Every Test Agent action must return structured JSON through the standard Test Agent report envelope.
+- Every proof plan must state what it proves and what it does not prove.
+- Every memory/retrieval proof must include source evidence, not only a pass/fail flag.
+- Raw retrieval ranking and final authority decisions must be visible whenever a proof exercises ranking.
+- Builder flow remains proposal-first and approval-first. No uncontrolled file writes.
+- Do not add broad refactors without a failing test, quality finding, or explicit stabilisation task.
+
+## Quality Gate Thresholds
+
+- Warning: file length above 700 lines.
+- Warning: method length above 120 lines.
+- Failure: method length above 250 lines unless explicitly allowlisted.
+- Failure: missing Test Agent plan for a new dogfood proof.
+- Failure: missing proof-boundary documentation for a new proof.
+- Failure: unsupported or fake Test Agent action behavior.
+
+## Allowlist Rules
+
+Temporary Alpha exceptions must live in `tools/dogfood/code-standards-allowlist.json`.
+
+Each exception must include:
+
+- `path`
+- `rule`
+- `reason`
+- `expiresAfter`
+
+Allowlists are not a hiding place. They are visible debt with an expiry note.
+
+## Current Alpha Boundary
+
+The ReplayRunner and Test Agent harness are allowed to be larger than the final desired shape while Memory Spine ribs are still being proven. Once the proof chain is stable, extraction should happen around repeated concerns such as project resolution, document seeding, Weaviate setup, semantic assertions, and report writing.

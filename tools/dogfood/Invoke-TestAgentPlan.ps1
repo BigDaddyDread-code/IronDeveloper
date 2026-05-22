@@ -148,6 +148,93 @@ function Test-StringContains {
         $Value.IndexOf($Expected, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
+function Convert-ToRepoRelativePath {
+    param([string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $root = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\') + '\'
+    if ($fullPath.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $fullPath.Substring($root.Length).Replace('\', '/')
+    }
+
+    return $fullPath.Replace('\', '/')
+}
+
+function Get-CodeStandardsAllowlist {
+    param($Params)
+
+    $allowlistPath = if ($Params.allowlist) {
+        Resolve-TargetPath $Params.allowlist
+    } else {
+        Join-Path $repoRoot "tools\dogfood\code-standards-allowlist.json"
+    }
+
+    if (-not (Test-Path -LiteralPath $allowlistPath)) {
+        return [ordered]@{
+            path = $allowlistPath
+            entries = @()
+        }
+    }
+
+    $json = Get-Content -LiteralPath $allowlistPath -Raw | ConvertFrom-Json
+    return [ordered]@{
+        path = $allowlistPath
+        entries = @($json.temporaryWarnings)
+    }
+}
+
+function Find-CodeStandardsAllowlistEntry {
+    param(
+        [object[]]$Entries,
+        [string]$RelativePath,
+        [string]$Rule,
+        [string]$Method
+    )
+
+    foreach ($entry in $Entries) {
+        if ([string]$entry.path -ne $RelativePath) { continue }
+        if ([string]$entry.rule -ne $Rule) { continue }
+        if (-not [string]::IsNullOrWhiteSpace($Method) -and
+            -not [string]::IsNullOrWhiteSpace([string]$entry.method) -and
+            [string]$entry.method -ne $Method) {
+            continue
+        }
+        return $entry
+    }
+
+    return $null
+}
+
+function New-CodeStandardsFinding {
+    param(
+        [string]$Severity,
+        [string]$Rule,
+        [string]$Path,
+        [string]$Message,
+        [string]$Recommendation,
+        [bool]$Blocking,
+        [object]$AllowlistEntry = $null,
+        [string]$Method = ""
+    )
+
+    $finding = [ordered]@{
+        severity = $Severity
+        rule = $Rule
+        rule_id = $Rule
+        file = $Path
+        area = $Path
+        method = $Method
+        message = $Message
+        recommendation = $Recommendation
+        blocking = $Blocking
+        allowlisted = $null -ne $AllowlistEntry
+        allowlist_reason = if ($AllowlistEntry) { [string]$AllowlistEntry.reason } else { $null }
+        expires_after = if ($AllowlistEntry) { [string]$AllowlistEntry.expiresAfter } else { $null }
+    }
+
+    return $finding
+}
+
 function Get-CSharpMethodMeasurements {
     param(
         [string]$Path
@@ -214,54 +301,66 @@ function Invoke-CodeStandardsCheck {
         $targetValues += "tools/IronDev.ReplayRunner/Program.cs"
     }
 
-    $maxFileLines = if ($Params.max_file_lines) { [int]$Params.max_file_lines } else { 1800 }
-    $maxMethodLines = if ($Params.max_method_lines) { [int]$Params.max_method_lines } else { 180 }
+    $maxFileLines = if ($Params.max_file_lines) { [int]$Params.max_file_lines } else { 700 }
+    $maxMethodLines = if ($Params.max_method_lines) { [int]$Params.max_method_lines } else { 120 }
+    $failMethodLines = if ($Params.fail_method_lines) { [int]$Params.fail_method_lines } else { 250 }
     $requireProofBoundaryDocs = Convert-ToBool $Params.require_proof_boundary_docs $true
+    $requirePlanFiles = Convert-ToBool $Params.require_plan_files $true
     $failOnWarnings = Convert-ToBool $Params.fail_on_warnings $false
+    $allowlist = Get-CodeStandardsAllowlist -Params $Params
+    $allowlistEntries = @($allowlist.entries)
 
     $findings = New-Object System.Collections.Generic.List[object]
     $metrics = New-Object System.Collections.Generic.List[object]
 
     foreach ($target in $targetValues) {
         $path = Resolve-TargetPath $target
+        $relativePath = Convert-ToRepoRelativePath $path
         if (-not (Test-Path -LiteralPath $path)) {
-            $findings.Add([ordered]@{
-                severity = "error"
-                area = $target
-                rule = "TargetExists"
-                message = "Code standards target does not exist."
-                recommendation = "Fix the test plan target path or add the expected file."
-            }) | Out-Null
+            $findings.Add((New-CodeStandardsFinding `
+                -Severity "error" `
+                -Rule "TargetExists" `
+                -Path $target `
+                -Message "Code standards target does not exist." `
+                -Recommendation "Fix the test plan target path or add the expected file." `
+                -Blocking $true)) | Out-Null
             continue
         }
 
         $lineCount = @(Get-Content -LiteralPath $path).Count
         $metrics.Add([ordered]@{
             path = $path
+            relative_path = $relativePath
             line_count = $lineCount
         }) | Out-Null
 
         if ($lineCount -gt $maxFileLines) {
-            $findings.Add([ordered]@{
-                severity = "warning"
-                area = $path
-                rule = "LargeFile"
-                message = "File has $lineCount lines; threshold is $maxFileLines."
-                recommendation = "Extract stable dogfood helpers after proof slices stabilise."
-            }) | Out-Null
+            $entry = Find-CodeStandardsAllowlistEntry -Entries $allowlistEntries -RelativePath $relativePath -Rule "LargeFile"
+            $findings.Add((New-CodeStandardsFinding `
+                -Severity "warning" `
+                -Rule "LargeFile" `
+                -Path $relativePath `
+                -Message "File has $lineCount lines; warning threshold is $maxFileLines." `
+                -Recommendation "Extract stable dogfood helpers after proof slices stabilise." `
+                -Blocking $false `
+                -AllowlistEntry $entry)) | Out-Null
         }
 
         if ([System.IO.Path]::GetExtension($path).Equals(".cs", [System.StringComparison]::OrdinalIgnoreCase)) {
             $methods = Get-CSharpMethodMeasurements -Path $path
             foreach ($method in $methods) {
                 if ([int]$method.line_count -gt $maxMethodLines) {
-                    $findings.Add([ordered]@{
-                        severity = "warning"
-                        area = $path
-                        rule = "LargeMethod"
-                        message = "Method $($method.method) has $($method.line_count) lines; threshold is $maxMethodLines."
-                        recommendation = "Extract focused services or command handlers once this smoke path is stable."
-                    }) | Out-Null
+                    $entry = Find-CodeStandardsAllowlistEntry -Entries $allowlistEntries -RelativePath $relativePath -Rule "LargeMethod" -Method ([string]$method.method)
+                    $isFailure = [int]$method.line_count -gt $failMethodLines -and $null -eq $entry
+                    $findings.Add((New-CodeStandardsFinding `
+                        -Severity $(if ($isFailure) { "error" } else { "warning" }) `
+                        -Rule "LargeMethod" `
+                        -Path $relativePath `
+                        -Method ([string]$method.method) `
+                        -Message "Method $($method.method) has $($method.line_count) lines; warning threshold is $maxMethodLines and failure threshold is $failMethodLines." `
+                        -Recommendation "Extract focused services or command handlers once this smoke path is stable." `
+                        -Blocking $isFailure `
+                        -AllowlistEntry $entry)) | Out-Null
                 }
             }
         }
@@ -269,6 +368,7 @@ function Invoke-CodeStandardsCheck {
 
     if ($requireProofBoundaryDocs) {
         $docsToCheck = @(
+            (Join-Path $repoRoot "Docs\CODE_STANDARDS.md"),
             (Join-Path $repoRoot "Docs\CODEX_GOALS.md"),
             (Join-Path $repoRoot "Docs\TEST_AGENT_SPEC.md"),
             (Join-Path $repoRoot "tools\dogfood\README.md")
@@ -278,13 +378,40 @@ function Invoke-CodeStandardsCheck {
             $text = if (Test-Path -LiteralPath $docPath) { Get-Content -LiteralPath $docPath -Raw } else { "" }
             $hasProofLanguage = $text -match '(?i)proves?|not yet|does not yet|still|boundary|evidence'
             if (-not $hasProofLanguage) {
-                $findings.Add([ordered]@{
-                    severity = "warning"
-                    area = $docPath
-                    rule = "ProofBoundaryDocumentation"
-                    message = "Document does not clearly state proof boundaries or evidence language."
-                    recommendation = "Add what this proves and what it does not prove before broadening the memory spine."
-                }) | Out-Null
+                $findings.Add((New-CodeStandardsFinding `
+                    -Severity "warning" `
+                    -Rule "ProofBoundaryDocumentation" `
+                    -Path (Convert-ToRepoRelativePath $docPath) `
+                    -Message "Document does not clearly state proof boundaries or evidence language." `
+                    -Recommendation "Add what this proves and what it does not prove before broadening the memory spine." `
+                    -Blocking $false)) | Out-Null
+            }
+        }
+    }
+
+    if ($requirePlanFiles) {
+        $planDir = Join-Path $repoRoot "tools\dogfood\test-agent-plans"
+        $requiredPlans = @(
+            "irondev-code-standards-alpha.json",
+            "irondev-memory-spine-smoke.json",
+            "irondev-memory-spine-sql-version-smoke.json",
+            "irondev-memory-spine-weaviate-sql-version-smoke.json",
+            "irondev-memory-spine-cross-project-smoke.json",
+            "irondev-memory-spine-ticket-source-link-smoke.json",
+            "irondev-memory-spine-builder-context-source-smoke.json",
+            "irondev-toolchain-smoke.json"
+        )
+
+        foreach ($requiredPlan in $requiredPlans) {
+            $requiredPlanPath = Join-Path $planDir $requiredPlan
+            if (-not (Test-Path -LiteralPath $requiredPlanPath)) {
+                $findings.Add((New-CodeStandardsFinding `
+                    -Severity "error" `
+                    -Rule "ProofPlanExists" `
+                    -Path (Convert-ToRepoRelativePath $requiredPlanPath) `
+                    -Message "Required proof plan is missing." `
+                    -Recommendation "Add the missing Test Agent plan or remove it from the required proof chain intentionally." `
+                    -Blocking $true)) | Out-Null
             }
         }
     }
@@ -305,6 +432,12 @@ function Invoke-CodeStandardsCheck {
         tests = "not_run_by_this_step"
         format = "not_run_by_this_step"
         package_audit = "not_run_by_this_step"
+        thresholds = [ordered]@{
+            warning_file_lines = $maxFileLines
+            warning_method_lines = $maxMethodLines
+            failure_method_lines = $failMethodLines
+        }
+        allowlist_path = $allowlist.path
         metrics = @($metrics.ToArray())
         findings = @($findings.ToArray())
         warning_count = $warnings.Count

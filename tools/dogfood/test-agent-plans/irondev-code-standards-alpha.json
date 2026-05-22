@@ -49,9 +49,12 @@
           "tools/IronDev.ReplayRunner/Program.cs",
           "tools/dogfood/Invoke-TestAgentPlan.ps1"
         ],
-        "max_file_lines": 1800,
-        "max_method_lines": 180,
+        "max_file_lines": 700,
+        "max_method_lines": 120,
+        "fail_method_lines": 250,
         "require_proof_boundary_docs": true,
+        "require_plan_files": true,
+        "allowlist": "tools/dogfood/code-standards-allowlist.json",
         "fail_on_warnings": false
       }
     }

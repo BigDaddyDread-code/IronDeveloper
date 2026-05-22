@@ -314,6 +314,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 
 The code standards gate is deterministic and non-repairing. It runs build/test/format/audit steps plus code-shape checks such as large file and large method warnings. Warnings are allowed in Alpha; the purpose is to give Codex a structured quality report before widening the branch.
 
+The hardening pass uses `Docs/CODE_STANDARDS.md` as the human-readable rule source and `tools/dogfood/code-standards-allowlist.json` for temporary Alpha exceptions. Findings include rule id, severity, file, optional method, recommendation, blocking status, and allowlist expiry notes. The default thresholds are intentionally loose but visible:
+
+- warning when a file is over 700 lines
+- warning when a method is over 120 lines
+- failure when a method is over 250 lines unless explicitly allowlisted
+- failure when required proof plans are missing
+- warning when proof-boundary documentation is missing
+
 Run the first Memory Spine smoke while Weaviate is running:
 
 ```powershell
