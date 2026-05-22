@@ -23,7 +23,7 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory search <query> [...] | failure latest --for-codex [...]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|reindex-freshness-smoke> [...] | failure latest --for-codex [...]");
     return 2;
 }
 
@@ -119,6 +119,9 @@ if (IsCommand(args, "memory", "weaviate-sql-version-smoke"))
 
 if (IsCommand(args, "memory", "cross-project-smoke"))
     return await MemoryCrossProjectSmokeCommand.HandleAsync(args, options);
+
+if (IsCommand(args, "memory", "reindex-freshness-smoke"))
+    return await MemoryReindexFreshnessSmokeCommand.HandleAsync(args, options);
 
 if (IsCommand(args, "memory", "ticket-source-link-smoke"))
     return await HandleMemoryTicketSourceLinkSmokeCommandAsync(args, options);
@@ -2685,6 +2688,76 @@ public sealed class CrossProjectMemoryDecision
     public string? SourceVersionId { get; init; }
     public double VectorSimilarity { get; init; }
     public string Decision { get; init; } = string.Empty;
+}
+
+public sealed class MemoryReindexFreshnessSmokeResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public string Project { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public string BleedProject { get; init; } = string.Empty;
+    public int BleedProjectId { get; init; }
+    public long DocumentId { get; init; }
+    public string DocumentTitle { get; init; } = string.Empty;
+    public long OldVersionId { get; init; }
+    public long NewVersionId { get; init; }
+    public string Query { get; init; } = string.Empty;
+    public string WeaviateEndpoint { get; init; } = string.Empty;
+    public string WeaviateCollection { get; init; } = string.Empty;
+    public Guid SemanticTraceId { get; init; }
+    public bool Passed { get; init; }
+    public ReindexRawRankEvidence RawRank { get; init; } = new();
+    public ReindexFinalRankEvidence FinalRank { get; init; } = new();
+    public ReindexStaleDemotionEvidence StaleDemotion { get; init; } = new();
+    public ReindexDuplicateEvidence Duplicates { get; init; } = new();
+    public ReindexWrongProjectRejectionEvidence WrongProjectRejection { get; init; } = new();
+    public ReindexExactTitlePromotionEvidence ExactTitlePromotion { get; init; } = new();
+    public IReadOnlyList<MemoryWeaviateSqlVersionSearchResult> Results { get; init; } = [];
+}
+
+public sealed class ReindexRawRankEvidence
+{
+    public int? OldVersionRawRank { get; init; }
+    public int? NewVersionRawRank { get; init; }
+    public int? WrongProjectRawRank { get; init; }
+}
+
+public sealed class ReindexFinalRankEvidence
+{
+    public int? OldVersionFinalRank { get; init; }
+    public int? NewVersionFinalRank { get; init; }
+}
+
+public sealed class ReindexStaleDemotionEvidence
+{
+    public bool OldVersionVisible { get; init; }
+    public bool OldVersionIsStale { get; init; }
+    public double OldVersionStalePenalty { get; init; }
+    public bool CurrentBeatsStale { get; init; }
+}
+
+public sealed class ReindexDuplicateEvidence
+{
+    public int DuplicateArtefactSourceRecords { get; init; }
+    public int DuplicateActiveChunks { get; init; }
+    public int DuplicateIndexedCandidates { get; init; }
+    public int ActiveChunkCount { get; init; }
+    public int IndexedCandidateCount { get; init; }
+    public int DuplicateCount { get; init; }
+}
+
+public sealed class ReindexWrongProjectRejectionEvidence
+{
+    public bool WrongProjectCandidateVisibleRaw { get; init; }
+    public string WrongProjectName { get; init; } = string.Empty;
+    public bool WrongProjectRejectedFromFinal { get; init; }
+}
+
+public sealed class ReindexExactTitlePromotionEvidence
+{
+    public string ExactTitleQuery { get; init; } = string.Empty;
+    public bool PromotedAcceptedCurrentVersion { get; init; }
+    public double DirectLinkBoost { get; init; }
 }
 
 public sealed class MemoryTicketSourceLinkSmokeResult

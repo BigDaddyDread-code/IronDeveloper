@@ -1,0 +1,42 @@
+{
+  "test_run_id": "irondev-memory-reindex-freshness-smoke",
+  "goal_id": "memory-reindex-freshness-116",
+  "project": "IronDev",
+  "description": "Prove memory reindexing keeps accepted IronDev project memory fresh, project-scoped, idempotent, and traceable before deeper disposable apply work.",
+  "expected": {
+    "current_version_beats_stale": true,
+    "stale_version_visible_as_demoted_evidence": true,
+    "no_duplicate_active_chunks_or_source_records": true,
+    "bookSeller_wrong_project_rejected": true,
+    "exact_accepted_title_promoted": true,
+    "semantic_trace_id_returned": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "weaviate_health",
+      "params": {
+        "endpoint": "http://localhost:8080"
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_reindex_freshness_smoke",
+      "params": {
+        "project": "IronDev",
+        "bleed_project": "BookSeller",
+        "query": "current reindex freshness rules",
+        "weaviate_endpoint": "http://localhost:8080",
+        "expect_project": "IronDev",
+        "expect_current_beats_stale": true,
+        "expect_stale_visible": true,
+        "expect_no_duplicates": true,
+        "expect_wrong_project_rejected": true,
+        "expect_exact_title_promoted": true,
+        "expect_semantic_trace_id": true
+      }
+    }
+  ],
+  "max_turns": 2,
+  "early_stop_on_failure": true
+}

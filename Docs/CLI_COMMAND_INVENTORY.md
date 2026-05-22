@@ -34,6 +34,7 @@ These are closest to the control surface Codex will use.
 - `memory sql-version-smoke`
 - `memory weaviate-sql-version-smoke`
 - `memory cross-project-smoke`
+- `memory reindex-freshness-smoke`
 - `memory ticket-source-link-smoke`
 - `memory builder-context-source-smoke`
 - `docs discussion-smoke`

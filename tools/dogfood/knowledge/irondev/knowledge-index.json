@@ -1,5 +1,27 @@
 ﻿[
     {
+        "Id":  "20260523093000000-memory-reindex-freshness-gate",
+        "Project":  "IronDev",
+        "Title":  "MEMORY_REINDEX_FRESHNESS_GATE",
+        "DocumentType":  "ArchitectureCheckpoint",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\MEMORY_REINDEX_FRESHNESS_GATE.md",
+        "DogfoodRunId":  "DogfoodDocsSeed-20260523-ReindexFreshness",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523093000000-memory-reindex-freshness-gate.md",
+        "CreatedUtc":  "2026-05-23T09:30:00.0000000+00:00"
+    },
+    {
+        "Id":  "20260523090000002-disposable-workspace-apply-completion-checkpoint",
+        "Project":  "IronDev",
+        "Title":  "DISPOSABLE_WORKSPACE_APPLY_COMPLETION_CHECKPOINT",
+        "DocumentType":  "ArchitectureCheckpoint",
+        "Authority":  "Draft",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\DISPOSABLE_WORKSPACE_APPLY_COMPLETION_CHECKPOINT.md",
+        "DogfoodRunId":  "DogfoodDocsSeed-20260523-DisposableApplyCompletion",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523090000002-disposable-workspace-apply-completion-checkpoint.md",
+        "CreatedUtc":  "2026-05-23T09:00:00.0000000+00:00"
+    },
+    {
         "Id":  "20260523103000000-disposable-workspace-phase-report",
         "Project":  "IronDev",
         "Title":  "DISPOSABLE_WORKSPACE_PHASE_REPORT",

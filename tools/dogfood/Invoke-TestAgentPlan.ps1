@@ -1813,6 +1813,83 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "memory_reindex_freshness_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $bleedProject = if ($params.bleed_project) { [string]$params.bleed_project } else { "BookSeller" }
+                $query = if ($params.query) { [string]$params.query } else { "current reindex freshness rules" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "memory", "reindex-freshness-smoke",
+                    "--project", $project,
+                    "--bleed-project", $bleedProject,
+                    "--query", $query,
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.connection_string) {
+                    $arguments += @("--connection-string", [string]$params.connection_string)
+                }
+                if ($params.weaviate_endpoint) {
+                    $arguments += @("--weaviate-endpoint", [string]$params.weaviate_endpoint)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed) {
+                        "Reindex freshness smoke failed; duplicateCount=$($parsed.duplicates.duplicateCount); trace=$($parsed.semanticTraceId)"
+                    } else {
+                        "memory_reindex_freshness_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "Reindex freshness smoke returned Passed=false"
+                } else {
+                    $summary = "Reindex freshness passed; current finalRank=$($parsed.finalRank.newVersionFinalRank); stale rawRank=$($parsed.rawRank.oldVersionRawRank); trace=$($parsed.semanticTraceId)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.project -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.project)'.") | Out-Null
+                    }
+                    if ($params.expect_current_beats_stale -and -not [bool]$parsed.staleDemotion.currentBeatsStale) {
+                        $validationFailures.Add("Expected current version to beat stale version after reindex.") | Out-Null
+                    }
+                    if ($params.expect_stale_visible -and -not [bool]$parsed.staleDemotion.oldVersionVisible) {
+                        $validationFailures.Add("Expected stale version to remain visible as demoted evidence.") | Out-Null
+                    }
+                    if ($params.expect_no_duplicates -and [int]$parsed.duplicates.duplicateCount -ne 0) {
+                        $validationFailures.Add("Expected no duplicate active chunks or artefact source records.") | Out-Null
+                    }
+                    if ($params.expect_no_duplicates -and [int]$parsed.duplicates.duplicateIndexedCandidates -ne 0) {
+                        $validationFailures.Add("Expected no duplicate indexed Weaviate candidates.") | Out-Null
+                    }
+                    if ($params.expect_wrong_project_rejected -and -not [bool]$parsed.wrongProjectRejection.wrongProjectRejectedFromFinal) {
+                        $validationFailures.Add("Expected wrong-project candidate to be rejected from final results.") | Out-Null
+                    }
+                    if ($params.expect_exact_title_promoted -and -not [bool]$parsed.exactTitlePromotion.promotedAcceptedCurrentVersion) {
+                        $validationFailures.Add("Expected exact accepted title query to promote current document.") | Out-Null
+                    }
+                    if ($params.expect_semantic_trace_id -and [string]::IsNullOrWhiteSpace([string]$parsed.semanticTraceId)) {
+                        $validationFailures.Add("Expected semantic trace id.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "ticket_source_link_smoke" {
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }
                 $expectedProject = if ($params.expect_project) { [string]$params.expect_project } else { $project }

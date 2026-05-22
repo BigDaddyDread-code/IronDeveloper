@@ -141,14 +141,27 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
             new { ArtefactId = artefactId },
             cancellationToken: ct));
 
-        const string insert = """
-            INSERT INTO dbo.SemanticChunks
-                (Id, ArtefactId, ProjectId, ChunkIndex, ChunkText, TokenEstimate, ContentHash, IsStale, CreatedUtc)
-            VALUES
-                (@Id, @ArtefactId, @ProjectId, @ChunkIndex, @ChunkText, @TokenEstimate, @ContentHash, 0, SYSUTCDATETIME());
+        const string upsert = """
+            MERGE dbo.SemanticChunks AS target
+            USING (SELECT @Id AS Id) AS source
+            ON target.Id = source.Id
+            WHEN MATCHED THEN
+                UPDATE SET
+                    ArtefactId = @ArtefactId,
+                    ProjectId = @ProjectId,
+                    ChunkIndex = @ChunkIndex,
+                    ChunkText = @ChunkText,
+                    TokenEstimate = @TokenEstimate,
+                    ContentHash = @ContentHash,
+                    IsStale = 0
+            WHEN NOT MATCHED THEN
+                INSERT
+                    (Id, ArtefactId, ProjectId, ChunkIndex, ChunkText, TokenEstimate, ContentHash, IsStale, CreatedUtc)
+                VALUES
+                    (@Id, @ArtefactId, @ProjectId, @ChunkIndex, @ChunkText, @TokenEstimate, @ContentHash, 0, SYSUTCDATETIME());
             """;
         foreach (var chunk in chunks)
-            await connection.ExecuteAsync(new CommandDefinition(insert, chunk, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition(upsert, chunk, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<SemanticChunk>> GetChunksAsync(Guid artefactId, bool includeStale = false, CancellationToken ct = default)
