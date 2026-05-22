@@ -17,6 +17,7 @@ public static class BuilderProposalSafetySmokeCommand
     {
         var requestedProjectName = ReadOption(args, "--project") ?? "IronDev";
         var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"builder-proposal-safety-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+        var useRequestedProject = HasFlag(args, "--use-requested-project");
         var repoRoot = FindRepositoryRoot();
         var fixture = await CreateFixtureAsync(repoRoot, dogfoodRunId);
         var connectionFactory = new CliConnectionFactory(ResolveIronDevConnectionString(args, repoRoot));
@@ -33,10 +34,26 @@ public static class BuilderProposalSafetySmokeCommand
         }
 
         var services = CreateSmokeServices(connectionFactory, baseProject.TenantId);
-        var project = await CreateDisposableProjectAsync(services.ProjectService, baseProject, dogfoodRunId, fixture.RunRoot);
-        var source = await CreateSourceDocumentAsync(services.DocumentService, project.ProjectId);
-        var ticketId = await CreateTicketAsync(services.TicketService, services.DocumentService, baseProject, project.ProjectId, source.Version.Id, fixture.TargetFileName);
-        var result = await RunSafetyChecksAsync(services.ContextService, project, source, ticketId, fixture, dogfoodRunId, baseProject.TenantId);
+        var project = useRequestedProject
+            ? new BuilderSafetyProject(baseProject.ProjectId, baseProject.ProjectName)
+            : await CreateDisposableProjectAsync(services.ProjectService, baseProject, dogfoodRunId, fixture.RunRoot);
+
+        var originalLocalPath = useRequestedProject
+            ? await SetProjectLocalPathAsync(connectionFactory, project.ProjectId, fixture.RunRoot)
+            : null;
+
+        BuilderProposalSafetySmokeResult result;
+        try
+        {
+            var source = await CreateSourceDocumentAsync(services.DocumentService, project.ProjectId, baseProject.ProjectName);
+            var ticketId = await CreateTicketAsync(services.TicketService, services.DocumentService, baseProject, project.ProjectId, source.Version.Id, fixture.TargetFileName);
+            result = await RunSafetyChecksAsync(services.ContextService, project, source, ticketId, fixture, dogfoodRunId, baseProject.TenantId);
+        }
+        finally
+        {
+            if (useRequestedProject)
+                await RestoreProjectLocalPathAsync(connectionFactory, project.ProjectId, originalLocalPath);
+        }
 
         Console.WriteLine(JsonSerializer.Serialize(result, options));
         return result.Passed ? 0 : 1;
@@ -102,7 +119,8 @@ public static class BuilderProposalSafetySmokeCommand
 
     private static async Task<BuilderSafetySourceDocument> CreateSourceDocumentAsync(
         ProjectDocumentService documentService,
-        int projectId)
+        int projectId,
+        string sourceProjectName)
     {
         var title = $"BUILDER_PROPOSAL_SAFETY_016_{Guid.NewGuid():N}";
         var document = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
@@ -113,10 +131,11 @@ public static class BuilderProposalSafetySmokeCommand
             ContentMarkdown = """
                 # Builder Proposal Safety
 
+                Source project: {{PROJECT_NAME}}.
                 Builder must generate reviewable proposals and stop before writes.
                 Dry-run validation may inspect target files, but proposal generation must not modify them.
                 Applying patches requires explicit approval and is outside this smoke.
-                """,
+                """.Replace("{{PROJECT_NAME}}", sourceProjectName, StringComparison.Ordinal),
             ChangeSummary = "Builder proposal safety source document",
             CreatedBy = "TestAgent",
             SourceEntityType = "Discussion",
@@ -347,6 +366,34 @@ public static class BuilderProposalSafetySmokeCommand
             await connection.ExecuteAsync(batch);
     }
 
+    private static async Task<string?> SetProjectLocalPathAsync(
+        IDbConnectionFactory connectionFactory,
+        int projectId,
+        string localPath)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        var originalPath = await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
+            "SELECT LocalPath FROM dbo.Projects WHERE Id = @ProjectId;",
+            new { ProjectId = projectId }));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Projects SET LocalPath = @LocalPath WHERE Id = @ProjectId;",
+            new { ProjectId = projectId, LocalPath = localPath }));
+
+        return originalPath;
+    }
+
+    private static async Task RestoreProjectLocalPathAsync(
+        IDbConnectionFactory connectionFactory,
+        int projectId,
+        string? originalPath)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Projects SET LocalPath = @LocalPath WHERE Id = @ProjectId;",
+            new { ProjectId = projectId, LocalPath = originalPath }));
+    }
+
     private static string ResolveIronDevConnectionString(string[] args, string repoRoot)
     {
         var explicitConnection = ReadOption(args, "--connection-string");
@@ -392,6 +439,11 @@ public static class BuilderProposalSafetySmokeCommand
         }
 
         return null;
+    }
+
+    private static bool HasFlag(string[] args, string name)
+    {
+        return args.Any(arg => string.Equals(arg, name, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string FindRepositoryRoot()

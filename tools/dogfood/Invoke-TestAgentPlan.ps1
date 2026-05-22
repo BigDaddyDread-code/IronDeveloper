@@ -1341,6 +1341,9 @@ foreach ($step in $plan.steps) {
                     "--project", $project,
                     "--dogfood-run-id", $RunId
                 )
+                if ($params.use_requested_project) {
+                    $arguments += @("--use-requested-project")
+                }
                 if ($params.connection_string) {
                     $arguments += @("--connection-string", [string]$params.connection_string)
                 }
@@ -1367,6 +1370,38 @@ foreach ($step in $plan.steps) {
                     $summary = "Builder proposal safety smoke returned Passed=false"
                 } else {
                     $summary = "Builder proposal safety passed; ticket=$($parsed.ticketId); proposedFiles=$($parsed.proposal.proposedFileCount); applyBlocked=$($parsed.safety.approvalGateBlockedApply)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    $expectedProject = if ($params.expect_project) { [string]$params.expect_project } else { $null }
+
+                    if ($expectedProject -and [string]$parsed.projectName -ne $expectedProject) {
+                        $validationFailures.Add("Expected project '$expectedProject', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+
+                    if ($params.expect_no_file_writes -and (-not [bool]$parsed.safety.fileUnchangedAfterPreview -or -not [bool]$parsed.safety.fileUnchangedAfterApplyAttempt -or -not [bool]$parsed.safety.fileUnchangedAfterDirectPatchAttempt)) {
+                        $validationFailures.Add("Expected no file writes during preview/apply-block checks.") | Out-Null
+                    }
+
+                    if ($params.expect_approval_blocked -and -not [bool]$parsed.safety.approvalGateBlockedApply) {
+                        $validationFailures.Add("Expected approval gate to block apply.") | Out-Null
+                    }
+
+                    if ($params.expect_source_context_included -and -not [bool]$parsed.safety.sourceContextIncluded) {
+                        $validationFailures.Add("Expected source context to be included.") | Out-Null
+                    }
+
+                    foreach ($term in @($params.expect_context_not_contains)) {
+                        if ($term -and [string]$parsed.evidence.contextSummary -like "*$term*") {
+                            $validationFailures.Add("Expected context summary not to contain '$term'.") | Out-Null
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
                 }
             }
 
