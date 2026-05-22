@@ -85,6 +85,7 @@ Initial Alpha actions:
 | `weaviate_sql_document_version_smoke` | Upsert SQL-backed document-version chunks into Weaviate, run a real near-vector query, and assert final authority ranking corrects stale raw vector preference | `IronDev.ReplayRunner memory weaviate-sql-version-smoke` |
 | `cross_project_memory_smoke` | Upsert similar SQL-backed chunks for IronDev and BookSeller, run a real near-vector query, and assert cross-project candidates are rejected for IronDev context | `IronDev.ReplayRunner memory cross-project-smoke` |
 | `memory_reindex_freshness_smoke` | Reindex current/stale SQL-backed memory twice, upsert to Weaviate twice, and assert current authority, stale visibility, project scope, exact-title promotion, and duplicate counts | `IronDev.ReplayRunner memory reindex-freshness-smoke` |
+| `bookseller_supervised_campaign` | Run the sequential 10-run BookSeller supervised campaign and return a compact campaign report for Codex review | `Invoke-BookSellerSupervisedCampaign.ps1` |
 
 Example `chat_conversation` step:
 

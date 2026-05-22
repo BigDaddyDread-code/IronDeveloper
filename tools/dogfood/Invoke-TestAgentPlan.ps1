@@ -2212,6 +2212,58 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "bookseller_supervised_campaign" {
+                $campaignRunId = if ([string]::IsNullOrWhiteSpace([string]$params.campaign_run_id)) {
+                    "$RunId-campaign"
+                } else {
+                    [string]$params.campaign_run_id
+                }
+
+                $arguments = @(
+                    "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", (Join-Path $PSScriptRoot "Invoke-BookSellerSupervisedCampaign.ps1"),
+                    "-RunId", $campaignRunId,
+                    "-Json"
+                )
+
+                $commandText = "powershell " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "powershell" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if (-not [string]::IsNullOrWhiteSpace($capture.output)) {
+                    $parsed = $capture.output | ConvertFrom-Json
+                }
+
+                $validationFailures = [System.Collections.Generic.List[string]]::new()
+                if ($exitCode -ne 0) {
+                    $validationFailures.Add("bookseller_supervised_campaign exited with code $exitCode") | Out-Null
+                }
+                if ($params.expect_runs -and [int]$parsed.runs -ne [int]$params.expect_runs) {
+                    $validationFailures.Add("Expected runs=$($params.expect_runs), actual $($parsed.runs).") | Out-Null
+                }
+                if ($null -ne $params.expect_real_repo_mutations -and [int]$parsed.realRepoMutations -ne [int]$params.expect_real_repo_mutations) {
+                    $validationFailures.Add("Expected realRepoMutations=$($params.expect_real_repo_mutations), actual $($parsed.realRepoMutations).") | Out-Null
+                }
+                if ($params.expect_blocked_unsafe_min -and [int]$parsed.blockedUnsafe -lt [int]$params.expect_blocked_unsafe_min) {
+                    $validationFailures.Add("Expected blockedUnsafe >= $($params.expect_blocked_unsafe_min), actual $($parsed.blockedUnsafe).") | Out-Null
+                }
+                if ($null -ne $params.expect_parallel_allowed) {
+                    $expectedParallel = Convert-ToBool $params.expect_parallel_allowed $false
+                    if ([bool]$parsed.parallelExecutionAllowed -ne $expectedParallel) {
+                        $validationFailures.Add("Expected parallelExecutionAllowed=$expectedParallel, actual $($parsed.parallelExecutionAllowed).") | Out-Null
+                    }
+                }
+                if ($params.expect_failure_min -and [int]$parsed.failed -lt [int]$params.expect_failure_min) {
+                    $validationFailures.Add("Expected failed >= $($params.expect_failure_min), actual $($parsed.failed).") | Out-Null
+                }
+
+                if ($validationFailures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $validationFailures -join " "
+                } else {
+                    $summary = "BookSeller supervised campaign complete; passed=$($parsed.passed); failed=$($parsed.failed); blockedUnsafe=$($parsed.blockedUnsafe); realRepoMutations=$($parsed.realRepoMutations)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

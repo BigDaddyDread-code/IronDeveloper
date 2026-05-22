@@ -1,5 +1,23 @@
 ﻿[
     {
+        "planFile":  "bookseller-supervised-10-run-campaign.json",
+        "goalId":  "bookseller-supervised-campaign-118",
+        "project":  "BookSeller",
+        "actions":  [
+                        "bookseller_supervised_campaign"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "Weaviate",
+                                 "DisposableWorkspace"
+                             ],
+        "regressionGroup":  "BookSellerSupervisedCampaign",
+        "safetyBoundary":  "Sequential campaign only; disposable workspace writes allowed; real repo writes blocked.",
+        "kind":  "campaign",
+        "description":  "Run a sequential 10-run supervised BookSeller campaign with messy prompts, project-scoped memory/context checks, disposable workspace apply, fail-closed unsafe patching, and a compact Codex-readable campaign report."
+    },
+    {
         "planFile":  "bookseller-architecture-memory-regression-061.json",
         "goalId":  "bookseller-architecture-memory-regression-061",
         "project":  "BookSeller",

@@ -1,5 +1,16 @@
 ﻿[
     {
+        "Id":  "20260522232000000-bookseller-supervised-iteration-campaign-118",
+        "Project":  "IronDev",
+        "Title":  "BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118",
+        "DocumentType":  "ArchitectureCheckpoint",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118.md",
+        "DogfoodRunId":  "BookSellerCampaign118",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522232000000-bookseller-supervised-iteration-campaign-118.md",
+        "CreatedUtc":  "2026-05-22T23:20:00.0000000+00:00"
+    },
+    {
         "Id":  "20260522225500000-bookseller-supervised-dogfood-review-117",
         "Project":  "IronDev",
         "Title":  "BOOKSELLER_SUPERVISED_DOGFOOD_REVIEW_117",
