@@ -102,6 +102,8 @@ Run a failing batch and prove the system produces a compact Codex handoff with f
 
 ### 042: Batch Regression Pack
 
+Status: implemented in this branch.
+
 Create a single batch plan that runs the key 033-041 proofs and returns a compact pass/fail report.
 
 ### 043: PR-Ready Quality Gate
