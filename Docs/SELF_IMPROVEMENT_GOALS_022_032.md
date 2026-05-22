@@ -52,6 +52,8 @@ Prove messy BookSeller prompts route to the right action instead of prose fallba
 
 ### 027: BookSeller Discussion-To-Document Proof
 
+Status: implemented in this branch.
+
 Prove a BookSeller discussion can become a project-scoped accepted or draft document with source trace.
 
 ### 028: BookSeller Document-To-Tickets Proof

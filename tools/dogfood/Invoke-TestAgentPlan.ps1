@@ -1224,6 +1224,63 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "discussion_document_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "docs", "discussion-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "discussion_document_smoke exited with code $exitCode"
+                } else {
+                    $summary = "Discussion document $($parsed.documentId) currentVersion=$($parsed.currentVersionId); trace=$($parsed.semanticTraceId)"
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.projectName -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.projectName)'.") | Out-Null
+                    }
+                    if ($params.expect_document_type -and [string]$parsed.documentType -ne [string]$params.expect_document_type) {
+                        $validationFailures.Add("Expected document type '$($params.expect_document_type)', actual '$($parsed.documentType)'.") | Out-Null
+                    }
+                    if ($params.expect_current_version_status -and [string]$parsed.currentVersionStatus -ne [string]$params.expect_current_version_status) {
+                        $validationFailures.Add("Expected current version status '$($params.expect_current_version_status)', actual '$($parsed.currentVersionStatus)'.") | Out-Null
+                    }
+                    if ($params.expect_source_link -and ([int]$parsed.currentSourceLinkCount -lt 1 -or [int]$parsed.draftSourceLinkCount -lt 1)) {
+                        $validationFailures.Add("Expected source links on draft and current discussion document versions.") | Out-Null
+                    }
+                    if ($params.expect_semantic_trace_id -and -not $parsed.semanticTraceId) {
+                        $validationFailures.Add("Expected semantic trace id.") | Out-Null
+                    }
+                    if ($params.expect_top_source_version_matches -and [string]$parsed.topSourceVersionId -ne [string]$parsed.currentVersionId) {
+                        $validationFailures.Add("Expected top source version '$($parsed.currentVersionId)', actual '$($parsed.topSourceVersionId)'.") | Out-Null
+                    }
+                    if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                    }
+                    if (-not [bool]$parsed.passed) {
+                        $validationFailures.Add("Discussion document smoke reported passed=false.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "memory_search" {
                 $query = [string]$params.query
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }

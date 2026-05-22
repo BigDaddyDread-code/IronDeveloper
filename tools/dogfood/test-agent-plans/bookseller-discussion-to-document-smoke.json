@@ -1,0 +1,33 @@
+{
+  "test_run_id": "BookSeller027-DiscussionToDocument",
+  "goal_id": "bookseller-discussion-to-document-027",
+  "project_id": 5,
+  "description": "Prove a BookSeller discussion can become a real SQL ProjectDocument with an exact source discussion link and semantic trace evidence.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "discussion_document_smoke",
+      "params": {
+        "project": "BookSeller",
+        "expect_project": "BookSeller",
+        "expect_document_type": "DiscussionSummary",
+        "expect_current_version_status": "Approved",
+        "expect_source_link": true,
+        "expect_semantic_trace_id": true,
+        "expect_top_source_version_matches": true,
+        "expect_boundary_contains": "discussion-to-document capture"
+      }
+    }
+  ],
+  "expected": {
+    "sql_project_document_created": true,
+    "sql_project_document_version_created": true,
+    "source_discussion_link_present": true,
+    "current_version_is_approved": true,
+    "semantic_trace_written": true,
+    "no_ticket_generation": true,
+    "no_builder_work": true
+  }
+}

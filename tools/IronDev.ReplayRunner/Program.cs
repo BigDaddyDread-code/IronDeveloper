@@ -75,6 +75,9 @@ if (IsCommand(args, "docs", "show"))
 if (IsCommand(args, "docs", "search"))
     return await HandleDocsSearchCommandAsync(args, options);
 
+if (IsCommand(args, "docs", "discussion-smoke"))
+    return await DocsDiscussionSmokeCommand.HandleAsync(args, options);
+
 if (IsCommand(args, "failure", "latest"))
     return await HandleFailureLatestCommandAsync(args, options);
 
