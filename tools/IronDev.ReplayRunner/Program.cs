@@ -53,6 +53,9 @@ if (IsCommand(args, "memory", "weaviate-sql-version-smoke"))
 if (IsCommand(args, "memory", "cross-project-smoke"))
     return await HandleMemoryCrossProjectSmokeCommandAsync(args, options);
 
+if (IsCommand(args, "memory", "ticket-source-link-smoke"))
+    return await HandleMemoryTicketSourceLinkSmokeCommandAsync(args, options);
+
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
 {
@@ -1209,6 +1212,210 @@ static async Task<int> HandleMemoryCrossProjectSmokeCommandAsync(string[] args, 
 
     Console.WriteLine(JsonSerializer.Serialize(result, options));
     return passed ? 0 : 1;
+}
+
+static async Task<int> HandleMemoryTicketSourceLinkSmokeCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var requestedProjectName = ReadOption(args, "--project") ?? "IronDev";
+    var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"memory-ticket-source-link-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var connectionString = ResolveIronDevConnectionString(args);
+    var repoRoot = FindRepositoryRoot();
+    var connectionFactory = new CliConnectionFactory(connectionString);
+
+    await ApplySqlScriptAsync(
+        connectionFactory,
+        Path.Combine(repoRoot, "Database", "migrate_project_documents.sql"));
+
+    var project = await ResolveProjectAsync(connectionFactory, requestedProjectName);
+    if (project is null)
+    {
+        Console.Error.WriteLine($"Project not found: {requestedProjectName}");
+        return 1;
+    }
+
+    var tenant = new CliTenantContext(project.TenantId);
+    var documentService = new ProjectDocumentService(connectionFactory, tenant);
+    var sourceReferenceService = new ArtifactSourceReferenceService(connectionFactory);
+    var ticketService = new TicketService(connectionFactory, tenant, sourceReferenceService);
+
+    var stamp = dogfoodRunId.Replace(':', '-').Replace('\\', '-').Replace('/', '-');
+    var titleSeed = $"TICKET_SOURCE_LINK_SPINE_{stamp}_{Guid.NewGuid():N}";
+    var title = titleSeed[..Math.Min(120, titleSeed.Length)];
+    var content = """
+        # Ticket Source Link Spine
+
+        Current rule: tickets generated from project documents must preserve the exact SQL ProjectDocumentVersion source.
+        The generated ticket should not become orphaned from this document version.
+        """;
+
+    var document = await documentService.CreateDocumentAsync(new CreateProjectDocumentRequest
+    {
+        ProjectId = project.ProjectId,
+        Title = title,
+        DocumentType = "Architecture",
+        ContentMarkdown = content,
+        ChangeSummary = "Ticket source-link dogfood source",
+        CreatedBy = "TestAgent",
+        SourceEntityType = "Discussion",
+        SourceEntityId = 9401
+    });
+
+    var sourceVersion = await documentService.GetCurrentVersionAsync(document.Id)
+        ?? throw new InvalidOperationException("Ticket source-link document version was not created.");
+
+    var ticket = new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Prove ticket source document version link integrity",
+        TicketType = "Test",
+        Priority = "High",
+        Summary = "Generated smoke ticket created from an exact SQL ProjectDocumentVersion.",
+        Problem = "Tickets without source document links become orphaned and cannot be trusted by Codex or builder context.",
+        AcceptanceCriteria = "- Ticket has SourceDocumentVersionId.\n- Source version resolves to the expected SQL ProjectDocumentVersion.\n- Source references identify the document version.",
+        Status = "Draft",
+        Content = "Memory Spine 010 smoke ticket.",
+        ContextSummary = $"Source ProjectDocumentVersion:{sourceVersion.Id}",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 010 smoke",
+        SourceDocumentVersionId = sourceVersion.Id
+    };
+
+    var ticketId = await ticketService.SaveTicketAsync(ticket);
+    await documentService.LinkVersionAsync(new LinkProjectDocumentVersionRequest
+    {
+        DocumentVersionId = sourceVersion.Id,
+        LinkedEntityType = "Ticket",
+        LinkedEntityId = ticketId,
+        LinkType = "GeneratedTicket",
+        CreatedBy = "TestAgent"
+    });
+
+    var savedTicket = await ticketService.GetTicketByIdAsync(ticketId)
+        ?? throw new InvalidOperationException("Saved smoke ticket could not be reloaded.");
+    var resolvedVersion = savedTicket.SourceDocumentVersionId is { } savedSourceVersionId
+        ? await documentService.GetVersionAsync(savedSourceVersionId)
+        : null;
+    var sourceReferences = await sourceReferenceService.GetForArtifactAsync(
+        project.TenantId,
+        project.ProjectId,
+        "Ticket",
+        ticketId);
+    var versionLinks = await documentService.GetLinksForVersionAsync(sourceVersion.Id);
+
+    var orphanTicket = new ProjectTicket
+    {
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        SessionId = Guid.NewGuid(),
+        Title = "Intentional orphan source-link control",
+        TicketType = "Test",
+        Priority = "Medium",
+        Summary = "Negative control for Memory Spine 010.",
+        AcceptanceCriteria = "- This ticket intentionally has no SourceDocumentVersionId.",
+        Status = "Draft",
+        Content = "This ticket should be reported as orphaned by the 010 validator.",
+        IsGenerated = true,
+        GenerationNote = "Memory Spine 010 orphan control"
+    };
+    var orphanTicketId = await ticketService.SaveTicketAsync(orphanTicket);
+    var orphanReloaded = await ticketService.GetTicketByIdAsync(orphanTicketId)
+        ?? throw new InvalidOperationException("Orphan control ticket could not be reloaded.");
+    var orphanFailure = BuildTicketSourceLinkValidation(orphanReloaded, expectedDocumentVersionId: sourceVersion.Id, resolvedVersion: null);
+
+    var positiveValidation = BuildTicketSourceLinkValidation(savedTicket, sourceVersion.Id, resolvedVersion);
+    var hasArtifactReference = sourceReferences.Any(reference =>
+        reference.SourceType == "ProjectDocumentVersion" &&
+        reference.SourceId == sourceVersion.Id &&
+        reference.ReferenceType == "CreatedFrom");
+    var hasDocumentLink = versionLinks.Any(link =>
+        link.LinkedEntityType == "Ticket" &&
+        link.LinkedEntityId == ticketId &&
+        link.LinkType == "GeneratedTicket");
+
+    var passed = positiveValidation.Passed &&
+                 hasArtifactReference &&
+                 hasDocumentLink &&
+                 !orphanFailure.Passed;
+
+    var result = new MemoryTicketSourceLinkSmokeResult
+    {
+        DogfoodRunId = dogfoodRunId,
+        TenantId = project.TenantId,
+        ProjectId = project.ProjectId,
+        ProjectName = project.ProjectName,
+        SourceDocumentId = document.Id,
+        SourceDocumentVersionId = sourceVersion.Id,
+        TicketId = ticketId,
+        TicketSourceDocumentVersionId = savedTicket.SourceDocumentVersionId,
+        LinkResolutionStatus = positiveValidation.Status,
+        ArtifactSourceReferenceFound = hasArtifactReference,
+        ProjectDocumentLinkFound = hasDocumentLink,
+        OrphanTicketId = orphanTicketId,
+        OrphanReportedAsFailure = !orphanFailure.Passed,
+        Passed = passed,
+        Expected = new MemoryTicketSourceLinkExpected
+        {
+            TicketSourceDocumentVersionId = sourceVersion.Id,
+            OrphanShouldFailValidation = true
+        },
+        Evidence = new MemoryTicketSourceLinkEvidence
+        {
+            ResolvedDocumentVersionId = resolvedVersion?.Id,
+            ResolvedDocumentId = resolvedVersion?.DocumentId,
+            SourceReferenceCount = sourceReferences.Count,
+            ProjectDocumentLinkCount = versionLinks.Count,
+            PositiveValidation = positiveValidation,
+            OrphanValidation = orphanFailure
+        }
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(result, options));
+    return passed ? 0 : 1;
+}
+
+static TicketSourceLinkValidation BuildTicketSourceLinkValidation(
+    ProjectTicket ticket,
+    long expectedDocumentVersionId,
+    ProjectDocumentVersion? resolvedVersion)
+{
+    if (ticket.SourceDocumentVersionId is null)
+    {
+        return new TicketSourceLinkValidation
+        {
+            Passed = false,
+            Status = "missing_source_document_version",
+            FailureReason = "Ticket does not have SourceDocumentVersionId."
+        };
+    }
+
+    if (ticket.SourceDocumentVersionId.Value != expectedDocumentVersionId)
+    {
+        return new TicketSourceLinkValidation
+        {
+            Passed = false,
+            Status = "wrong_source_document_version",
+            FailureReason = $"Ticket SourceDocumentVersionId {ticket.SourceDocumentVersionId.Value} did not match expected {expectedDocumentVersionId}."
+        };
+    }
+
+    if (resolvedVersion is null)
+    {
+        return new TicketSourceLinkValidation
+        {
+            Passed = false,
+            Status = "source_document_version_not_found",
+            FailureReason = $"ProjectDocumentVersion {ticket.SourceDocumentVersionId.Value} could not be resolved from SQL."
+        };
+    }
+
+    return new TicketSourceLinkValidation
+    {
+        Passed = true,
+        Status = "resolved_exact_project_document_version",
+        FailureReason = null
+    };
 }
 
 static ReplayFailure? FindLatestReplayFailure(string runsRoot, string? selectedRunId)
@@ -2887,6 +3094,49 @@ public sealed class CrossProjectMemoryDecision
     public string? SourceVersionId { get; init; }
     public double VectorSimilarity { get; init; }
     public string Decision { get; init; } = string.Empty;
+}
+
+public sealed class MemoryTicketSourceLinkSmokeResult
+{
+    public string DogfoodRunId { get; init; } = string.Empty;
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public string ProjectName { get; init; } = string.Empty;
+    public long SourceDocumentId { get; init; }
+    public long SourceDocumentVersionId { get; init; }
+    public long TicketId { get; init; }
+    public long? TicketSourceDocumentVersionId { get; init; }
+    public string LinkResolutionStatus { get; init; } = string.Empty;
+    public bool ArtifactSourceReferenceFound { get; init; }
+    public bool ProjectDocumentLinkFound { get; init; }
+    public long OrphanTicketId { get; init; }
+    public bool OrphanReportedAsFailure { get; init; }
+    public bool Passed { get; init; }
+    public MemoryTicketSourceLinkExpected Expected { get; init; } = new();
+    public MemoryTicketSourceLinkEvidence Evidence { get; init; } = new();
+}
+
+public sealed class MemoryTicketSourceLinkExpected
+{
+    public long TicketSourceDocumentVersionId { get; init; }
+    public bool OrphanShouldFailValidation { get; init; }
+}
+
+public sealed class MemoryTicketSourceLinkEvidence
+{
+    public long? ResolvedDocumentVersionId { get; init; }
+    public long? ResolvedDocumentId { get; init; }
+    public int SourceReferenceCount { get; init; }
+    public int ProjectDocumentLinkCount { get; init; }
+    public TicketSourceLinkValidation PositiveValidation { get; init; } = new();
+    public TicketSourceLinkValidation OrphanValidation { get; init; } = new();
+}
+
+public sealed class TicketSourceLinkValidation
+{
+    public bool Passed { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string? FailureReason { get; init; }
 }
 
 public sealed class CliProjectContext

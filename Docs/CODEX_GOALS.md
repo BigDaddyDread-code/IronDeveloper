@@ -61,6 +61,7 @@ Current smoke slices:
 - `irondev-memory-spine-sql-version-smoke.json` proves a SQL-backed project document version can be indexed into semantic memory tables, linked to source context, ranked above a stale version, and traced.
 - `irondev-memory-spine-weaviate-sql-version-smoke.json` proves SQL-backed chunks can be upserted into Weaviate and returned by a real vector query while final authority ranking still corrects stale raw vector preference.
 - `irondev-memory-spine-cross-project-smoke.json` proves raw Weaviate retrieval can prefer a similar BookSeller document while IronDev project context rejects it before final ranking.
+- `irondev-memory-spine-ticket-source-link-smoke.json` proves a real SQL `ProjectTicket` created from a project document preserves and resolves the exact `ProjectDocumentVersion` source link. It also proves missing source links are reported as orphan failures. It does not prove builder context yet.
 
 ## Goal 1B: Code Standards Alpha
 
