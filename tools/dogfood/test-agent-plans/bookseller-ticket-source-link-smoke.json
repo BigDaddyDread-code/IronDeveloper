@@ -1,0 +1,28 @@
+{
+  "test_run_id": "BookSeller021-TicketSourceLink",
+  "goal_id": "bookseller-ticket-source-link-021",
+  "project_id": 5,
+  "description": "Prove a BookSeller project ticket created from a SQL-backed project document preserves and resolves the exact ProjectDocumentVersion source link.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "ticket_source_link_smoke",
+      "params": {
+        "project": "BookSeller",
+        "expect_project": "BookSeller",
+        "expect_ticket_has_source_document_version_id": true,
+        "expect_source_document_version_resolves": true,
+        "expect_orphan_missing_source_is_reported_as_failure": true
+      }
+    }
+  ],
+  "expected": {
+    "project": "BookSeller",
+    "ticket_has_source_document_version_id": true,
+    "source_document_version_resolves": true,
+    "orphan_missing_source_is_reported_as_failure": true,
+    "no_irondev_source_authority": true
+  }
+}
