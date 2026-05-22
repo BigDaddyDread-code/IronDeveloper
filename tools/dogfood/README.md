@@ -423,6 +423,14 @@ Search local dogfood knowledge:
 dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- docs search "cheap model test agent" --project IronDev
 ```
 
+Search Codex-facing memory through the Weaviate-backed path:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- memory search "current Codex goals" --project IronDev --json
+```
+
+`memory search` returns compact JSON with the query, project identity, source document/version ids, raw Weaviate rank/vector score, final IronDev rank/authority score, source links, excerpt, match reason, and a semantic trace id. This is the 013 slice: it proves Codex can fetch grounded IronDev memory before editing, not that Codex automatically obeys that memory during code generation.
+
 The local store lives under:
 
 ```text
