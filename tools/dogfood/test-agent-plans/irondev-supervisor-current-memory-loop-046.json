@@ -1,0 +1,35 @@
+{
+  "test_run_id": "IronDev046-SupervisorCurrentMemoryLoop",
+  "goal_id": "supervisor-current-memory-loop-046",
+  "description": "Prove SupervisorAgent retrieves current IronDev batch memory and dispatches TesterAgent against a bounded memory smoke plan.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_supervisor_run_goal",
+      "params": {
+        "project": "IronDev",
+        "query": "SELF_IMPROVEMENT_GOALS_044_053",
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-self-improvement-goals-044-memory-smoke.json",
+        "expect_model_profile": "strong-reasoner",
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "SELF_IMPROVEMENT_GOALS_044_053",
+        "expect_memory_succeeded": true,
+        "expect_tester_succeeded": true,
+        "expect_tester_goal_id": "self-improvement-goals-044-memory-import",
+        "expect_codex_handoff": true,
+        "expect_supervisor_decision": "report_ready",
+        "expect_decision_evidence": true,
+        "expect_boundary_contains": "memory-to-test orchestration"
+      }
+    }
+  ],
+  "expected": {
+    "supervisor_agent_real_path": true,
+    "current_memory_retrieved": true,
+    "tester_agent_used": true,
+    "codex_handoff_report": true,
+    "no_builder_changes": true
+  }
+}

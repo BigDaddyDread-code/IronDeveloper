@@ -145,7 +145,7 @@ public static class MemorySearchCommand
         IReadOnlyList<SemanticSearchCandidate> candidates)
     {
         var boostedArtefactIds = documents.Values
-            .Where(item => HasTitleTermOverlap(item.Document.Title, query))
+            .Where(item => HasStrongTitleMatch(item.Document.Title, query))
             .Select(item => BuildKnowledgeArtefact(projectName, item.Document, item.Body).Id)
             .ToArray();
 
@@ -520,6 +520,29 @@ public static class MemorySearchCommand
         return terms.Any(term => title.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
+    private static bool HasStrongTitleMatch(string title, string query)
+    {
+        var normalizedTitle = NormalizeTitleForMatch(title);
+        var normalizedQuery = NormalizeTitleForMatch(query);
+        if (string.IsNullOrWhiteSpace(normalizedTitle) || string.IsNullOrWhiteSpace(normalizedQuery))
+            return false;
+
+        if (normalizedQuery.Contains(normalizedTitle, StringComparison.OrdinalIgnoreCase) ||
+            normalizedTitle.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var titleTerms = normalizedTitle
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(term => term.Length >= 4)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return titleTerms.Length > 0 &&
+               titleTerms.All(term => normalizedQuery.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static double GetTitleOverlapBoost(string title, string query)
     {
         var terms = query
@@ -530,6 +553,16 @@ public static class MemorySearchCommand
 
         var hits = terms.Count(term => title.Contains(term, StringComparison.OrdinalIgnoreCase));
         return Math.Min(0.60, hits * 0.25);
+    }
+
+    private static string NormalizeTitleForMatch(string value)
+    {
+        var chars = value
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : ' ')
+            .ToArray();
+
+        return string.Join(' ', new string(chars).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
     private static IReadOnlyList<double> BuildLexicalVector(string text, int dimensions = 32)

@@ -1,0 +1,30 @@
+{
+  "test_run_id": "IronDev045-PlannerMemoryFirstDraft",
+  "goal_id": "planner-agent-memory-first-045",
+  "description": "Prove PlannerAgent drafts an IronDev-scoped memory-first plan from a vague self-improvement goal.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_planner_draft_test_plan",
+      "params": {
+        "project": "IronDev",
+        "goal": "make the next IronDev dogfood loop more reliable without applying code automatically",
+        "expect_model_profile": "standard-reasoner",
+        "expect_project": "IronDev",
+        "expect_min_steps": 2,
+        "expect_action_contains": "memory_search",
+        "expect_boundary_contains": "drafts Test Agent plan JSON only"
+      }
+    }
+  ],
+  "expected": {
+    "planner_agent_real_path": true,
+    "irondev_project_scoped": true,
+    "memory_first_step": true,
+    "quality_gate_included": true,
+    "no_plan_execution": true,
+    "no_code_patch": true
+  }
+}

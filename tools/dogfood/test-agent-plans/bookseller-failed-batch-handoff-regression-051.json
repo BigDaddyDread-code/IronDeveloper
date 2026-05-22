@@ -1,0 +1,25 @@
+{
+  "test_run_id": "BookSeller051-FailedBatchHandoffRegression",
+  "goal_id": "bookseller-failed-batch-handoff-regression-051",
+  "description": "Keep the BookSeller failed-batch Codex handoff path green.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "failure_package_smoke",
+      "params": {
+        "failure_plan_path": "tools/dogfood/test-agent-plans/bookseller-intentional-batch-failure-041.json",
+        "expect_nested_goal_id": "bookseller-intentional-batch-failure-041"
+      }
+    }
+  ],
+  "expected": {
+    "failure_package_json_created": true,
+    "failure_package_markdown_created": true,
+    "repro_command_present": true,
+    "validation_command_present": true,
+    "likely_areas_present": true,
+    "safety_rules_present": true
+  }
+}
