@@ -1,0 +1,35 @@
+{
+  "test_run_id": "BookSeller048-SupervisorBuilderPreviewLoop",
+  "goal_id": "bookseller-supervisor-builder-preview-loop-048",
+  "description": "Prove SupervisorAgent can coordinate BookSeller memory retrieval plus BookSeller builder preview validation without writes.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_supervisor_run_goal",
+      "params": {
+        "project": "BookSeller",
+        "query": "BOOK-001 add book inventory ticket SQL stock builder preview",
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-builder-preview-smoke.json",
+        "expect_model_profile": "strong-reasoner",
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER",
+        "expect_memory_succeeded": true,
+        "expect_tester_succeeded": true,
+        "expect_tester_goal_id": "bookseller-builder-preview-022",
+        "expect_codex_handoff": true,
+        "expect_supervisor_decision": "report_ready",
+        "expect_decision_evidence": true,
+        "expect_boundary_contains": "memory-to-test orchestration"
+      }
+    }
+  ],
+  "expected": {
+    "supervisor_agent_real_path": true,
+    "bookseller_project_scoped": true,
+    "builder_preview_validated": true,
+    "no_file_writes": true,
+    "no_irondev_memory_bleed": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "test_run_id": "BookSeller050-CriticFailedBatchReview",
+  "goal_id": "bookseller-critic-failed-batch-review-050",
+  "description": "Prove CriticAgent can review a Codex-facing failure package generated from a failed BookSeller batch.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "critic_failure_package_review_smoke",
+      "params": {
+        "failure_plan_path": "tools/dogfood/test-agent-plans/bookseller-intentional-batch-failure-041.json",
+        "expect_nested_goal_id": "bookseller-intentional-batch-failure-041",
+        "expect_model_profile": "strong-reviewer",
+        "expect_actionable": true,
+        "expect_evidence_sufficient": true,
+        "expect_recommendation": "fix_with_smallest_evidence_backed_patch",
+        "expect_boundary_contains": "reviews failure-package evidence only"
+      }
+    }
+  ],
+  "expected": {
+    "critic_agent_real_path": true,
+    "failure_package_reviewed": true,
+    "evidence_sufficient": true,
+    "actionable_recommendation": true,
+    "no_code_patch": true
+  }
+}
