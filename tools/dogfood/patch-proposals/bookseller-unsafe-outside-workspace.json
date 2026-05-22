@@ -1,0 +1,15 @@
+{
+  "patchProposalId": "bookseller-book-001-unsafe-outside-workspace",
+  "ticket": "BOOK-001",
+  "summary": "Unsafe negative test proposal that attempts to write outside the disposable workspace. This must fail closed.",
+  "fileChanges": [
+    {
+      "filePath": "..\\..\\outside-disposable-workspace.txt",
+      "beforeSnippet": "",
+      "afterSnippet": "This file must never be written by the disposable workspace apply proof."
+    }
+  ],
+  "expectedChangedFiles": [
+    "..\\..\\outside-disposable-workspace.txt"
+  ]
+}
