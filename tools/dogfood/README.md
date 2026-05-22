@@ -287,6 +287,7 @@ The local executor currently supports:
 - `weaviate_sql_document_version_smoke`
 - `cross_project_memory_smoke`
 - `ticket_source_link_smoke`
+- `builder_context_source_memory_smoke`
 
 Unsupported future actions must be reported as unsupported. They must not be faked.
 `coverage_report` requires ReportGenerator as either a local dotnet tool or global command; when it is missing, the step fails with the attempted command and missing-tool evidence.
@@ -367,6 +368,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestA
 ```
 
 This creates a disposable SQL `ProjectDocument` and `ProjectDocumentVersion`, saves a real `ProjectTicket` through `TicketService`, persists `SourceDocumentVersionId`, records source references, and verifies the link resolves back to the exact SQL version. It also creates an intentional orphan control ticket and verifies that missing source links are reported as validation failure. It does not touch builder context.
+
+Run the builder context source-memory smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
+  -PlanPath .\tools\dogfood\test-agent-plans\irondev-memory-spine-builder-context-source-smoke.json `
+  -RunId IronDevMemorySpine011-BuilderContextSource `
+  -Json
+```
+
+This creates a disposable SQL `ProjectDocument` and linked `ProjectTicket`, then assembles real builder context through `BuilderContextService`. It verifies the builder context includes the ticket, source document/version metadata, safe source markdown excerpt, and source link evidence. It also verifies missing source links, missing document versions, wrong-project sources, and historical sources are reported cleanly. It does not generate code or apply patches.
 
 Conversation-mode sample:
 

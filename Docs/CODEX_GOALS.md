@@ -62,6 +62,7 @@ Current smoke slices:
 - `irondev-memory-spine-weaviate-sql-version-smoke.json` proves SQL-backed chunks can be upserted into Weaviate and returned by a real vector query while final authority ranking still corrects stale raw vector preference.
 - `irondev-memory-spine-cross-project-smoke.json` proves raw Weaviate retrieval can prefer a similar BookSeller document while IronDev project context rejects it before final ranking.
 - `irondev-memory-spine-ticket-source-link-smoke.json` proves a real SQL `ProjectTicket` created from a project document preserves and resolves the exact `ProjectDocumentVersion` source link. It also proves missing source links are reported as orphan failures. It does not prove builder context yet.
+- `irondev-memory-spine-builder-context-source-smoke.json` proves builder context assembly includes the ticket, the linked source `ProjectDocumentVersion`, source document metadata, safe source markdown excerpt, and source link evidence. It also proves orphan, missing-version, wrong-project, and historical-source controls fail or mark context cleanly. It does not prove code generation or patch application.
 
 ## Goal 1B: Code Standards Alpha
 

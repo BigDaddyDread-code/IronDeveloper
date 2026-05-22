@@ -26,17 +26,29 @@ public sealed class BuilderContextService : IBuilderContextService
     private readonly IProjectService        _projectService;
     private readonly IProjectMemoryService  _memoryService;
     private readonly IProjectProfileService _profileService;
+    private readonly IProjectDocumentService? _documentService;
 
     public BuilderContextService(
         ITicketService        ticketService,
         IProjectService       projectService,
         IProjectMemoryService memoryService,
         IProjectProfileService profileService)
+        : this(ticketService, projectService, memoryService, profileService, null)
+    {
+    }
+
+    public BuilderContextService(
+        ITicketService ticketService,
+        IProjectService projectService,
+        IProjectMemoryService memoryService,
+        IProjectProfileService profileService,
+        IProjectDocumentService? documentService)
     {
         _ticketService  = ticketService;
         _projectService = projectService;
         _memoryService  = memoryService;
         _profileService = profileService;
+        _documentService = documentService;
     }
 
     public async Task<TicketBuildContext> AssembleContextAsync(
@@ -111,6 +123,7 @@ public sealed class BuilderContextService : IBuilderContextService
 
         // ── 6. Resolve affected files ──────────────────────────────────────
         var affectedFiles = ResolveAffectedFiles(ticket, plan);
+        var sourceDocument = await ResolveSourceDocumentAsync(ticket, projectId, cancellationToken);
 
         // ── 7. Assemble ───────────────────────────────────────────────────────
         var ctx = new TicketBuildContext
@@ -139,6 +152,15 @@ public sealed class BuilderContextService : IBuilderContextService
             TicketTestPlan            = ticket.TechnicalNotes,
             TicketBackground          = ticket.Background,
             TicketProblem             = ticket.Problem,
+
+            SourceDocumentId               = sourceDocument.Document?.Id,
+            SourceDocumentVersionId        = sourceDocument.Version?.Id ?? ticket.SourceDocumentVersionId,
+            SourceDocumentTitle            = sourceDocument.Document?.Title,
+            SourceDocumentVersionLabel     = sourceDocument.Version?.VersionLabel,
+            SourceDocumentMarkdownExcerpt  = sourceDocument.MarkdownExcerpt,
+            SourceDocumentResolutionStatus = sourceDocument.Status,
+            SourceDocumentResolutionDetail = sourceDocument.Detail,
+            SourceLinkEvidence             = sourceDocument.Evidence,
 
             PlanTitle         = plan?.Title,
             PlanId            = plan?.Id,
@@ -172,6 +194,103 @@ public sealed class BuilderContextService : IBuilderContextService
     /// Splits on newline / comma / semicolon, trims, and deduplicates.
     /// Does not validate file existence.
     /// </summary>
+    private async Task<SourceDocumentResolution> ResolveSourceDocumentAsync(
+        IronDev.Data.Models.ProjectTicket ticket,
+        int projectId,
+        CancellationToken cancellationToken)
+    {
+        if (ticket.SourceDocumentVersionId is null)
+        {
+            return new SourceDocumentResolution
+            {
+                Status = "missing_source_document_version",
+                Detail = "Ticket does not have SourceDocumentVersionId."
+            };
+        }
+
+        if (_documentService is null)
+        {
+            return new SourceDocumentResolution
+            {
+                Status = "document_service_unavailable",
+                Detail = "Builder context service was created without IProjectDocumentService."
+            };
+        }
+
+        var version = await _documentService.GetVersionAsync(ticket.SourceDocumentVersionId.Value, cancellationToken);
+        if (version is null)
+        {
+            return new SourceDocumentResolution
+            {
+                Status = "source_document_version_not_found",
+                Detail = $"ProjectDocumentVersion {ticket.SourceDocumentVersionId.Value} could not be resolved."
+            };
+        }
+
+        var document = await _documentService.GetDocumentAsync(version.DocumentId, cancellationToken);
+        if (document is null)
+        {
+            return new SourceDocumentResolution
+            {
+                Version = version,
+                Status = "source_document_not_found",
+                Detail = $"ProjectDocument {version.DocumentId} could not be resolved."
+            };
+        }
+
+        if (document.ProjectId != projectId)
+        {
+            return new SourceDocumentResolution
+            {
+                Document = document,
+                Version = version,
+                Status = "source_document_wrong_project",
+                Detail = $"ProjectDocument {document.Id} belongs to project {document.ProjectId}, not {projectId}."
+            };
+        }
+
+        var links = await _documentService.GetLinksForVersionAsync(version.Id, cancellationToken);
+        var isHistorical = version.Status.Equals("Superseded", StringComparison.OrdinalIgnoreCase);
+
+        return new SourceDocumentResolution
+        {
+            Document = document,
+            Version = version,
+            MarkdownExcerpt = CreateSafeExcerpt(version.ContentMarkdown),
+            Status = isHistorical
+                ? "resolved_historical_source_document_version"
+                : "resolved_source_document_version",
+            Detail = isHistorical
+                ? "Source ProjectDocumentVersion resolved but is marked historical/superseded."
+                : "Source ProjectDocumentVersion resolved for builder context.",
+            Evidence = links
+                .Select(link => $"{link.LinkType}:{link.LinkedEntityType}:{link.LinkedEntityId}")
+                .ToArray()
+        };
+    }
+
+    private static string CreateSafeExcerpt(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+            return string.Empty;
+
+        const int maxLength = 1800;
+        var normalized = markdown.Trim();
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..maxLength] + "\n\n[Excerpt truncated for builder context smoke.]";
+    }
+
+    private sealed class SourceDocumentResolution
+    {
+        public IronDev.Data.Models.ProjectDocument? Document { get; init; }
+        public IronDev.Data.Models.ProjectDocumentVersion? Version { get; init; }
+        public string? MarkdownExcerpt { get; init; }
+        public string Status { get; init; } = "not_requested";
+        public string? Detail { get; init; }
+        public IReadOnlyList<string> Evidence { get; init; } = [];
+    }
+
     private static IReadOnlyList<string> ResolveAffectedFiles(
         IronDev.Data.Models.ProjectTicket           ticket,
         IronDev.Data.Models.ProjectImplementationPlan? plan)

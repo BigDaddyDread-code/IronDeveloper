@@ -34,6 +34,16 @@ public sealed class TicketBuildContext
     public string? TicketBackground          { get; set; }
     public string? TicketProblem             { get; set; }
 
+    // Source project document memory linked from the ticket.
+    public long?   SourceDocumentId                 { get; set; }
+    public long?   SourceDocumentVersionId          { get; set; }
+    public string? SourceDocumentTitle              { get; set; }
+    public string? SourceDocumentVersionLabel       { get; set; }
+    public string? SourceDocumentMarkdownExcerpt    { get; set; }
+    public string  SourceDocumentResolutionStatus   { get; set; } = "not_requested";
+    public string? SourceDocumentResolutionDetail   { get; set; }
+    public IReadOnlyList<string> SourceLinkEvidence { get; set; } = [];
+
     // Linked plan
     public string? PlanTitle         { get; set; }
     public string? PlanGoal          { get; set; }
