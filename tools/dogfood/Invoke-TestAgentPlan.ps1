@@ -1103,6 +1103,89 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "agent_supervisor_run_goal" {
+                $project = if ($params.project) { [string]$params.project } else { "IronDev" }
+                $query = [string]$params.query
+                $planPath = [string]$params.plan_path
+                if ([string]::IsNullOrWhiteSpace($query)) {
+                    throw "agent_supervisor_run_goal requires params.query."
+                }
+                if ([string]::IsNullOrWhiteSpace($planPath)) {
+                    throw "agent_supervisor_run_goal requires params.plan_path."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "supervisor", "run-goal",
+                    "--project", $project,
+                    "--query", $query,
+                    "--plan", $planPath,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "agent_supervisor_run_goal exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected SupervisorAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected SupervisorAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } else {
+                    $loopReport = $parsed.loopReport
+                    $summary = "SupervisorAgent decision '$($loopReport.supervisor.decision)' with tester summary '$($loopReport.tester.summary)'."
+
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$loopReport.project -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected supervisor project '$($params.expect_project)', actual '$($loopReport.project)'.") | Out-Null
+                    }
+
+                    if ($params.expect_top_title_contains -and [string]$loopReport.memory.topTitle -notlike "*$($params.expect_top_title_contains)*") {
+                        $validationFailures.Add("Expected supervisor memory top title to contain '$($params.expect_top_title_contains)', actual '$($loopReport.memory.topTitle)'.") | Out-Null
+                    }
+
+                    if ($params.expect_memory_succeeded -and -not [bool]$loopReport.memory.succeeded) {
+                        $validationFailures.Add("Expected supervisor memory step to succeed.") | Out-Null
+                    }
+
+                    if ($params.expect_tester_succeeded -and -not [bool]$loopReport.tester.succeeded) {
+                        $validationFailures.Add("Expected supervisor tester step to succeed.") | Out-Null
+                    }
+
+                    if ($params.expect_codex_handoff -and -not $loopReport.codexHandoff) {
+                        $validationFailures.Add("Expected supervisor loop report to include codexHandoff.") | Out-Null
+                    }
+
+                    if ($params.expect_boundary_contains -and [string]$loopReport.codexHandoff.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                        $validationFailures.Add("Expected handoff boundary to contain '$($params.expect_boundary_contains)', actual '$($loopReport.codexHandoff.boundary)'.") | Out-Null
+                    }
+
+                    if ($params.expect_tester_goal_id) {
+                        $actualGoalId = [string]$loopReport.tester.report.goal_id
+                        if ($actualGoalId -ne [string]$params.expect_tester_goal_id) {
+                            $validationFailures.Add("Expected nested tester goal '$($params.expect_tester_goal_id)', actual '$actualGoalId'.") | Out-Null
+                        }
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "memory_search" {
                 $query = [string]$params.query
                 $project = if ($params.project) { [string]$params.project } else { "IronDev" }

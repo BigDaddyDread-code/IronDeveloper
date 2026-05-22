@@ -40,6 +40,8 @@ Make RetrieverAgent wrap the existing memory search path and return structured p
 
 ### 025: Supervisor/Codex Loop Proof
 
+Status: implemented in this branch.
+
 Prove Codex/Supervisor can create a test plan, TesterAgent can execute it, and IronDev can return a repair-ready report.
 
 ### 026: BookSeller Vague Prompt Routing

@@ -1,0 +1,34 @@
+{
+  "test_run_id": "IronDev025-SupervisorCodexLoop",
+  "goal_id": "supervisor-codex-loop-proof-025",
+  "description": "Prove SupervisorAgent can gather project memory, dispatch TesterAgent, and return a compact Codex-facing handoff without changing builder behaviour.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_supervisor_run_goal",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller controlled fixture BOOK-001 project scoped test plan",
+        "plan_path": "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
+        "expect_model_profile": "strong-reasoner",
+        "expect_project": "BookSeller",
+        "expect_top_title_contains": "BOOKSELLER",
+        "expect_memory_succeeded": true,
+        "expect_tester_succeeded": true,
+        "expect_tester_goal_id": "bookseller-project-fixture-020",
+        "expect_codex_handoff": true,
+        "expect_boundary_contains": "memory-to-test orchestration"
+      }
+    }
+  ],
+  "expected": {
+    "supervisor_agent_real_path": true,
+    "retriever_agent_used": true,
+    "tester_agent_used": true,
+    "codex_handoff_report": true,
+    "no_builder_changes": true,
+    "no_file_writes": true
+  }
+}
