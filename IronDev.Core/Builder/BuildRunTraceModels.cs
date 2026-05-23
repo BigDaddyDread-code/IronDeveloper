@@ -152,6 +152,7 @@ public sealed class TestAttemptTrace
     public int Passed { get; init; }
     public int Failed { get; init; }
     public int Skipped { get; init; }
+    public string LogPath { get; init; } = string.Empty;
     public string FailureClassification { get; init; } = "Unknown";
     public List<string> FailedTests { get; init; } = [];
 }

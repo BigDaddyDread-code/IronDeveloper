@@ -1634,5 +1634,28 @@
         "regression_group":  "builder-trace",
         "safety_boundary":  "Synthetic trace only; no real repo writes, no disposable workspace creation, no app file generation.",
         "classification":  "core"
+    },
+    {
+        "plan_file":  "irondev-builder-repair-loop-141.json",
+        "goal_id":  "trace-backed-builderagent-repair-loop-141",
+        "project":  "IronDev",
+        "agent_path":  "TestAgent -> BuilderAgent repair loop",
+        "cli_command":  "agent builder repair-loop",
+        "required_services":  [
+                                  "ReplayRunner",
+                                  "dotnet SDK"
+                              ],
+        "expected_evidence":  [
+                                  "build run trace",
+                                  "intentional build failure",
+                                  "build repair attempt",
+                                  "intentional test failure",
+                                  "test repair attempt",
+                                  "final build/test pass",
+                                  "real repo mutation count zero"
+                              ],
+        "regression_group":  "builder-trace",
+        "safety_boundary":  "Disposable workspace writes only; no real repo writes, memory mutation, guardrail mutation, or self-approval.",
+        "classification":  "core"
     }
 ]

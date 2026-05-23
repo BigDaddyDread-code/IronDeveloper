@@ -1,0 +1,53 @@
+{
+  "test_run_id": "IronDev141-BuilderRepairLoop",
+  "goal_id": "trace-backed-builderagent-repair-loop-141",
+  "description": "Proves BuilderAgent can run a trace-backed disposable Solitaire repair loop with intentional build/test failures, bounded repairs, final pass, and zero real repo mutation.",
+  "steps": [
+    {
+      "action": "builder_repair_loop_smoke",
+      "description": "Run the real disposable repair loop and validate trace evidence.",
+      "params": {
+        "project": "Solitaire",
+        "expect_project": "Solitaire",
+        "expect_trace_path": true,
+        "expect_report_path": true,
+        "expect_markdown_path": true,
+        "expect_stages": [
+          "RetrieverAgent",
+          "ConscienceAgent",
+          "ThoughtLedger",
+          "BuilderAgent",
+          "TesterAgent",
+          "CriticAgent",
+          "QualityAgent",
+          "SupervisorAgent"
+        ],
+        "expect_build_failure": true,
+        "expect_test_failure": true,
+        "expect_final_build_success": true,
+        "expect_final_test_success": true,
+        "expect_build_failure_classifications": [
+          "MissingProjectReference"
+        ],
+        "expect_test_failure_classifications": [
+          "RuleBug"
+        ],
+        "expect_repair_attempts_min": 2,
+        "expect_real_repo_mutation_count": 0,
+        "expect_disposable_files_changed_min": 17,
+        "expect_recommendation": "PromoteLater"
+      }
+    }
+  ],
+  "expected": {
+    "builder_repair_loop_runs_inside_disposable_workspace": true,
+    "intentional_build_failure_recorded": true,
+    "build_repair_recorded": true,
+    "intentional_test_failure_recorded": true,
+    "test_repair_recorded": true,
+    "final_build_and_test_pass": true,
+    "real_repo_mutation_count_zero": true,
+    "trace_and_report_exist": true
+  },
+  "boundary": "BuilderAgent may repair only inside the explicit disposable workspace. No real repo writes, memory mutation, guardrail mutation, regression mutation, or self-approval."
+}

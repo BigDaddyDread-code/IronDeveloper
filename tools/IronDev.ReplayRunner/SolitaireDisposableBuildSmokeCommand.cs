@@ -138,7 +138,7 @@ public static class SolitaireDisposableBuildSmokeCommand
             Boundary = "Fail closed: disposable workspace safety contract was not satisfied."
         };
 
-    private static string ResolveWorkspaceRoot(string[] args, string dogfoodRunId)
+    internal static string ResolveWorkspaceRoot(string[] args, string dogfoodRunId)
     {
         var explicitRoot = ReadOption(args, "--workspace-root");
         if (!string.IsNullOrWhiteSpace(explicitRoot))
@@ -147,7 +147,7 @@ public static class SolitaireDisposableBuildSmokeCommand
         return Path.Combine(Path.GetTempPath(), "IronDevDisposableWorkspaces", dogfoodRunId);
     }
 
-    private static DisposableWorkspaceSafety ValidateWorkspaceSafety(string repoRoot, string workspaceRoot, string workspacePath)
+    internal static DisposableWorkspaceSafety ValidateWorkspaceSafety(string repoRoot, string workspaceRoot, string workspacePath)
     {
         var root = Normalize(workspaceRoot);
         var path = Normalize(workspacePath);
@@ -179,14 +179,14 @@ public static class SolitaireDisposableBuildSmokeCommand
         };
     }
 
-    private static void ResetWorkspace(string workspacePath)
+    internal static void ResetWorkspace(string workspacePath)
     {
         if (Directory.Exists(workspacePath))
             Directory.Delete(workspacePath, recursive: true);
         Directory.CreateDirectory(workspacePath);
     }
 
-    private static async Task<SolitaireBuilderEvidence> GenerateSolitaireAsync(string workspacePath)
+    internal static async Task<SolitaireBuilderEvidence> GenerateSolitaireAsync(string workspacePath)
     {
         var files = new Dictionary<string, string>
         {
@@ -226,7 +226,7 @@ public static class SolitaireDisposableBuildSmokeCommand
         };
     }
 
-    private static WeightedContextBundleEvidence BuildContextBundle(string repoRoot, string dogfoodRunId) =>
+    internal static WeightedContextBundleEvidence BuildContextBundle(string repoRoot, string dogfoodRunId) =>
         new()
         {
             Project = "Solitaire",
@@ -260,7 +260,7 @@ public static class SolitaireDisposableBuildSmokeCommand
             WhyIncluded = why
         };
 
-    private static ConscienceReviewEvidence BuildConscienceReview(string workspacePath) =>
+    internal static ConscienceReviewEvidence BuildConscienceReview(string workspacePath) =>
         new()
         {
             Decision = "Allow",
@@ -285,7 +285,7 @@ public static class SolitaireDisposableBuildSmokeCommand
             Boundary = "ConscienceAgent reviews only. It does not patch, create tickets, mutate memory, or approve itself."
         };
 
-    private static ThoughtLedgerEvidence BuildThoughtLedger(string decision) =>
+    internal static ThoughtLedgerEvidence BuildThoughtLedger(string decision) =>
         new()
         {
             CurrentBelief = $"Conscience decision is {decision}; Solitaire can be attempted only inside the disposable workspace.",
@@ -355,7 +355,7 @@ public static class SolitaireDisposableBuildSmokeCommand
             ]
         };
 
-    private static async Task<CommandRunEvidence> RunCommandAsync(string fileName, string arguments, string runRoot, string workingDirectory)
+    internal static async Task<CommandRunEvidence> RunCommandAsync(string fileName, string arguments, string runRoot, string workingDirectory)
     {
         var logPath = Path.Combine(runRoot, $"{SanitizeFileName(fileName)}-{Guid.NewGuid():N}.log");
         var psi = new ProcessStartInfo(fileName, arguments)
@@ -373,7 +373,7 @@ public static class SolitaireDisposableBuildSmokeCommand
         return new CommandRunEvidence { Command = $"{fileName} {arguments}", ExitCode = process.ExitCode, LogPath = logPath, Summary = process.ExitCode == 0 ? "passed" : "failed" };
     }
 
-    private static IReadOnlyDictionary<string, string> HashDirectory(string root)
+    internal static IReadOnlyDictionary<string, string> HashDirectory(string root)
     {
         if (!Directory.Exists(root))
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -612,7 +612,7 @@ public static class SolitaireDisposableBuildSmokeCommand
         return Convert.ToHexString(SHA256.HashData(stream));
     }
 
-    private static async Task<string> GetGitStatusAsync(string repoRoot)
+    internal static async Task<string> GetGitStatusAsync(string repoRoot)
     {
         var run = await RunProcessForTextAsync("git", "status --porcelain --untracked-files=no", repoRoot);
         return run.Trim();
@@ -647,7 +647,7 @@ public static class SolitaireDisposableBuildSmokeCommand
         return null;
     }
 
-    private static string FindRepositoryRoot()
+    internal static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
@@ -659,7 +659,7 @@ public static class SolitaireDisposableBuildSmokeCommand
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
     }
 
-    private static string Normalize(string path) => Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    internal static string Normalize(string path) => Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     private static string SanitizeFileName(string value) { foreach (var invalid in Path.GetInvalidFileNameChars()) value = value.Replace(invalid, '-'); return value; }
 }
 

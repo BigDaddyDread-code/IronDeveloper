@@ -32,6 +32,7 @@ The machine-readable inventory is stored at:
 - `agent conscience review`
 - `agent thought-ledger explain`
 - `agent builder trace-smoke`
+- `agent builder repair-loop`
 - `govern review`
 - `foundation break-test`
 - `failure latest`
@@ -52,6 +53,8 @@ These are closest to the control surface Codex will use.
 `agent supervisor run-goal` now performs governed autonomy: Tier 3 read/test/report loops and Tier 4 disposable-workspace apply loops. It still requires ConscienceAgent review, ThoughtLedger explanation, and TesterAgent execution, and real repository writes remain blocked.
 
 `agent builder trace-smoke` creates a synthetic BuildAgent trace/report for a future heavy-duty disposable build. It records stage status, build/test attempts, repair attempts, evidence artefacts, mutation counts, and recommendation. It does not create a disposable workspace, generate app files, apply patches, mutate memory, or approve writes.
+
+`agent builder repair-loop` runs the first real trace-backed disposable repair loop. It generates Solitaire inside an explicit disposable workspace, injects one build failure and one rule-test failure, repairs both inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
 
 ## Dogfood/Smoke Commands
 
@@ -90,4 +93,10 @@ The JSON inventory is a flat command array sorted by `category`, then `command`.
 - `agent builder trace-smoke --project Solitaire --dogfood-run-id <run> --json` creates a synthetic trace for the future heavy-duty disposable build path.
 - It writes `build-run-trace.json`, `build-run-report.json`, `build-run-report.md`, and evidence placeholders under `tools/dogfood/runs/{runId}`.
 - It is trace/report only. It does not create Solitaire app files or a real disposable workspace.
+
+## 141 Trace-Backed Builder Repair Loop Command
+
+- `agent builder repair-loop --project Solitaire --dogfood-run-id <run> --json` runs a real disposable repair loop.
+- It intentionally breaks the generated WPF project reference, records the build failure, repairs the project file, intentionally breaks the empty-tableau King rule, records the test failure, repairs `KlondikeRules`, and verifies final build/test pass.
+- It may write only inside the explicit temp disposable workspace. It must not mutate the real repo, memory, guardrails, or regression packs.
 
