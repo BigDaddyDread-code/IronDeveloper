@@ -55,6 +55,8 @@ These are closest to the control surface Codex will use.
 
 `govern review` combines ConscienceAgent and ThoughtLedger into one review package. It still does not execute the proposed action.
 
+`agent retriever search` now returns a weighted context bundle. It preserves the real memory search result while adding included sources, rejected or filtered-context notes, source risk notes, semantic trace id, and an agent-facing summary.
+
 ## Dogfood/Smoke Commands
 
 - `memory sql-version-smoke`

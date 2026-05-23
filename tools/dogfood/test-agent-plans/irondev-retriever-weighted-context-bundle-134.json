@@ -1,0 +1,67 @@
+{
+  "test_run_id": "IronDev134-RetrieverWeightedContextBundle",
+  "goal_id": "retriever-weighted-context-bundle-134",
+  "project_id": 2,
+  "description": "Prove RetrieverAgent emits an explicit WeightedContextBundle with included/rejected source evidence while preserving the real memory search path.",
+  "max_turns": 2,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "IronDev",
+        "query": "Retriever Weighted Context Bundle 134",
+        "take": 5,
+        "expect_project": "IronDev",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "Retriever Weighted Context Bundle 134",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true,
+        "expect_weighted_context_bundle": true,
+        "expect_weighted_reason_contains": [
+          "accepted project memory",
+          "current source"
+        ],
+        "expect_top_guidance": "use_this"
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "BookSeller",
+        "query": "BookSeller current architecture SQL inventory with IronDev governance",
+        "take": 5,
+        "expect_project": "BookSeller",
+        "expect_model_profile": "cheap-runner",
+        "expect_provider": "OpenAI",
+        "expect_top_title_contains": "BOOKSELLER",
+        "expect_no_match_title_contains": [
+          "CODEX_GOALS",
+          "IRONDEV_SELF_IMPROVEMENT_SYSTEM"
+        ],
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true,
+        "expect_weighted_context_bundle": true,
+        "expect_top_guidance": "use_this"
+      }
+    }
+  ],
+  "expected": {
+    "weighted_context_bundle": true,
+    "uses_memory_search": true,
+    "included_sources_have_reasons": true,
+    "rejected_sources_or_filtering_notes_visible": true,
+    "project_scoped_context_package": true,
+    "no_builder_changes": true,
+    "no_memory_mutation": true
+  }
+}

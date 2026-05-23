@@ -39,7 +39,7 @@
                           "requiresSql":  false,
                           "requiresWeaviate":  true,
                           "status":  "memory wrapper",
-                          "notes":  "Packages memory search result as context bundle."
+                          "notes":  "Packages memory search result as weighted context bundle with included/rejected source evidence."
                       },
                       {
                           "command":  "agent supervisor run-goal",
