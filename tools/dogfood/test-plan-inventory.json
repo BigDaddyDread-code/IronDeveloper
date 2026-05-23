@@ -1,5 +1,28 @@
 [
     {
+        "planFile":  "irondev-solitaire-product-spike-plan-138.json",
+        "goalId":  "solitaire-product-spike-plan-138",
+        "project":  "IronDev",
+        "description":  "Prove IDA can retrieve the Solitaire architecture and draft-ticket planning package after the 137 intake.",
+        "agentPath":  "MemorySearch + RetrieverAgent",
+        "command":  "memory search / agent retriever search",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "MemorySearch",
+                                 "RetrieverAgent",
+                                 "Weaviate"
+                             ],
+        "expectedEvidence":  [
+                                 "Exact 138 query returns 138 top",
+                                 "Natural next-step query returns 138 top",
+                                 "Retriever uses 138 as primary context",
+                                 "No build/apply/workspace action occurs"
+                             ],
+        "regressionGroup":  "ProductSpikePlanning",
+        "safetyBoundary":  "Planning package retrieval only; no Solitaire app files, disposable workspace, patch, or real repo writes.",
+        "kind":  "core"
+    },
+    {
         "planFile":  "irondev-solitaire-product-spike-intake-137.json",
         "goalId":  "solitaire-product-spike-intake-137",
         "project":  "IronDev",

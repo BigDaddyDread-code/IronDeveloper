@@ -1,0 +1,62 @@
+{
+  "test_run_id": "irondev-solitaire-product-spike-plan-138",
+  "goal_id": "solitaire-product-spike-plan-138",
+  "description": "Prove IDA can retrieve the Solitaire architecture and draft-ticket planning package after the 137 intake.",
+  "max_turns": 4,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SOLITAIRE_PRODUCT_SPIKE_ARCHITECTURE_AND_TICKETS_138",
+        "take": 5,
+        "expect_top_title_contains": "Solitaire Product Spike Architecture",
+        "expect_project": "IronDev",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "what comes after solitaire product spike intake",
+        "take": 5,
+        "expect_top_title_contains": "Solitaire Product Spike Architecture",
+        "expect_project": "IronDev",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "agent_retriever_search",
+      "params": {
+        "project": "IronDev",
+        "query": "should IDA jump straight from solitaire intake to build or create architecture tickets first",
+        "take": 5,
+        "expect_model_profile": "cheap-runner",
+        "expect_project": "IronDev",
+        "expect_top_title_contains": "Solitaire Product Spike Architecture",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true,
+        "expect_context_bundle": true,
+        "expect_guidance_fields": true
+      }
+    }
+  ],
+  "expected": {
+    "exact_138_query_returns_138": true,
+    "natural_next_step_query_returns_138": true,
+    "retriever_uses_138_as_primary_context": true,
+    "does_not_build_solitaire": true,
+    "does_not_create_workspace": true,
+    "does_not_apply_patches": true
+  }
+}

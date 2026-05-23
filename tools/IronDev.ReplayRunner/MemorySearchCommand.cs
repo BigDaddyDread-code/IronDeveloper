@@ -145,7 +145,9 @@ public static class MemorySearchCommand
         IReadOnlyList<SemanticSearchCandidate> candidates)
     {
         var boostedArtefactIds = documents.Values
-            .Where(item => HasStrongTitleMatch(item.Document.Title, query))
+            .Where(item => HasStrongTitleMatch(item.Document.Title, query) ||
+                           HasStrongDocumentIdentityMatch(item.Document, query) ||
+                           HasStrongContentPhraseMatch(item.Body, query))
             .Select(item => BuildKnowledgeArtefact(projectName, item.Document, item.Body).Id)
             .ToArray();
 
@@ -527,11 +529,8 @@ public static class MemorySearchCommand
         if (string.IsNullOrWhiteSpace(normalizedTitle) || string.IsNullOrWhiteSpace(normalizedQuery))
             return false;
 
-        if (normalizedQuery.Contains(normalizedTitle, StringComparison.OrdinalIgnoreCase) ||
-            normalizedTitle.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
-        {
+        if (string.Equals(normalizedTitle, normalizedQuery, StringComparison.OrdinalIgnoreCase))
             return true;
-        }
 
         var titleTerms = normalizedTitle
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -539,8 +538,63 @@ public static class MemorySearchCommand
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        if (titleTerms.Length >= 2 &&
+            (normalizedQuery.Contains(normalizedTitle, StringComparison.OrdinalIgnoreCase) ||
+             normalizedTitle.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
         return titleTerms.Length > 0 &&
+               titleTerms.Length >= 2 &&
                titleTerms.All(term => normalizedQuery.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasStrongDocumentIdentityMatch(KnowledgeDocument document, string query)
+    {
+        var normalizedQuery = NormalizeIdentifierForMatch(query);
+        if (string.IsNullOrWhiteSpace(normalizedQuery))
+            return false;
+
+        return new[]
+            {
+                document.Id,
+                Path.GetFileNameWithoutExtension(document.Path),
+                Path.GetFileNameWithoutExtension(document.Source)
+            }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(NormalizeIdentifierForMatch)
+            .Any(identity => HasStrongIdentityMatch(identity, normalizedQuery));
+    }
+
+    private static bool HasStrongIdentityMatch(string normalizedIdentity, string normalizedQuery)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedIdentity) || string.IsNullOrWhiteSpace(normalizedQuery))
+            return false;
+
+        if (string.Equals(normalizedIdentity, normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return normalizedIdentity.Length >= 16 &&
+               (normalizedQuery.Contains(normalizedIdentity, StringComparison.OrdinalIgnoreCase) ||
+                normalizedIdentity.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasStrongContentPhraseMatch(string body, string query)
+    {
+        var normalizedBody = NormalizeTitleForMatch(body);
+        var normalizedQuery = NormalizeTitleForMatch(query);
+        if (string.IsNullOrWhiteSpace(normalizedBody) || string.IsNullOrWhiteSpace(normalizedQuery))
+            return false;
+
+        var queryTerms = normalizedQuery
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(term => term.Length >= 3)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return queryTerms.Length >= 4 &&
+               normalizedBody.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase);
     }
 
     private static double GetTitleOverlapBoost(string title, string query)
@@ -563,6 +617,16 @@ public static class MemorySearchCommand
             .ToArray();
 
         return string.Join(' ', new string(chars).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private static string NormalizeIdentifierForMatch(string value)
+    {
+        var chars = value
+            .ToLowerInvariant()
+            .Where(char.IsLetterOrDigit)
+            .ToArray();
+
+        return new string(chars);
     }
 
     private static IReadOnlyList<double> BuildLexicalVector(string text, int dimensions = 32)
