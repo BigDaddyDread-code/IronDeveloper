@@ -23,7 +23,7 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan|conscience review|thought-ledger explain> [...] | govern review [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|triage|reindex-freshness-smoke> [...] | foundation break-test [...] | failure latest --for-codex [...]");
+    PrintUsage();
     return 2;
 }
 
@@ -184,6 +184,12 @@ if (IsCommand(args, "builder", "disposable-workspace-apply-smoke"))
 if (IsCommand(args, "builder", "solitaire-disposable-build-smoke"))
     return await SolitaireDisposableBuildSmokeCommand.HandleAsync(args, options);
 
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "builder", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "trace-smoke", StringComparison.OrdinalIgnoreCase))
+    return await BuildAgentTraceSmokeCommand.HandleAsync(args, options);
+
 if (IsCommand(args, "foundation", "break-test"))
     return await FoundationBreakTestCommand.HandleAsync(args, options);
 
@@ -304,6 +310,21 @@ static bool IsCommand(string[] args, string first, string second)
     => args.Length >= 2 &&
        string.Equals(args[0], first, StringComparison.OrdinalIgnoreCase) &&
        string.Equals(args[1], second, StringComparison.OrdinalIgnoreCase);
+
+static void PrintUsage()
+{
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | <command> [options]");
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("Agent: agent builder trace-smoke | agent conscience review | agent critic review-failure | agent list | agent planner draft-test-plan | agent planner intake-product-spike | agent profiles | agent quality run-gate | agent research package | agent retriever search | agent sentinel observe | agent supervisor run-goal | agent tester run-plan | agent thought-ledger explain");
+    Console.Error.WriteLine("Builder: builder disposable-workspace-apply-smoke | builder proposal-safety-smoke | builder solitaire-disposable-build-smoke");
+    Console.Error.WriteLine("Chat: chat send");
+    Console.Error.WriteLine("Docs: docs clean | docs discussion-smoke | docs import | docs list | docs search | docs show");
+    Console.Error.WriteLine("Failure: failure latest");
+    Console.Error.WriteLine("Foundation: foundation break-test");
+    Console.Error.WriteLine("Govern: govern review");
+    Console.Error.WriteLine("Memory: memory builder-context-source-smoke | memory cross-project-smoke | memory reindex-freshness-smoke | memory search | memory sql-version-smoke | memory ticket-source-link-smoke | memory triage | memory weaviate-sql-version-smoke");
+    Console.Error.WriteLine("Tickets: tickets document-to-tickets-smoke");
+}
 
 static int HandleAgentListCommand(string[] args, JsonSerializerOptions options)
 {

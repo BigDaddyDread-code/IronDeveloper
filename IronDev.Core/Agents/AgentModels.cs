@@ -32,6 +32,7 @@ public sealed class AgentRequest
     public required string AgentName { get; init; }
     public string GoalId { get; init; } = string.Empty;
     public string DogfoodRunId { get; init; } = string.Empty;
+    public IReadOnlyList<string> RequestedTools { get; init; } = [];
     public IReadOnlyDictionary<string, string> Inputs { get; init; } = new Dictionary<string, string>();
     public DateTimeOffset CreatedAtUtc { get; init; } = DateTimeOffset.UtcNow;
 }
@@ -40,15 +41,21 @@ public sealed class AgentResult
 {
     public required string AgentName { get; init; }
     public AgentRunStatus Status { get; init; }
+    public string GoalId { get; init; } = string.Empty;
+    public string DogfoodRunId { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
     public string ModelProfileName { get; init; } = string.Empty;
     public string Provider { get; init; } = string.Empty;
     public string Model { get; init; } = string.Empty;
     public int ExitCode { get; init; }
     public string OutputJson { get; init; } = string.Empty;
+    public IReadOnlyList<string> RequestedTools { get; init; } = [];
+    public IReadOnlyList<string> AllowedTools { get; init; } = [];
     public IReadOnlyList<string> CommandsRun { get; init; } = [];
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+    public DateTimeOffset StartedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset CompletedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+    public long DurationMs { get; init; }
 }
 
 public sealed class ThoughtLedgerEntry
