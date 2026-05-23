@@ -144,3 +144,25 @@ Recommended boundary:
 | Meaningful Context Agent stages | Explicit trace entries |
 
 Tracing should prefer visible pipeline boundaries over AOP-style interception. Good pipeline candidates include REST middleware and Context Agent stages. Where no useful pipeline exists, small DI decorators are acceptable for service-boundary timing, correlation, and error logging. Heavy runtime interception should be avoided. Good decorator candidates are `ILLMService`, `ICodeIndexService`, and `ITicketBuildOrchestrator`; `IContextAgentService` should keep explicit traces for meaningful AI decisions.
+
+---
+
+## Governed Autonomy Control Plane
+
+IronDev's agent layer is governed autonomy, not free autonomy.
+
+The current control-plane architecture is:
+
+```text
+Human / Codex request
+  -> RetrieverAgent weighted context
+  -> ConscienceAgent safety review
+  -> ThoughtLedger visible reasoning summary
+  -> bounded agent action
+  -> TesterAgent / QualityAgent validation
+  -> trace and evidence report
+```
+
+Model profiles are runtime-configurable and support `OpenAI`, `LocalOpenAI`, and `Ollama`. Provider configuration does not grant tool authority. Tool authority remains controlled by `AgentDefinition.AllowedTools`, ConscienceAgent, and the workflow boundary.
+
+BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.

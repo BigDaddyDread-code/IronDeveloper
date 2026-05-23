@@ -22,9 +22,12 @@ public sealed class ModelProfile
     public required string Name { get; init; }
     public string Provider { get; init; } = "OpenAI";
     public required string Model { get; init; }
+    public string? BaseUrl { get; init; }
+    public string? ApiKeyEnvironmentVariable { get; init; }
     public double Temperature { get; init; } = 0.2;
     public int MaxOutputTokens { get; init; } = 2000;
     public decimal? MaxCostPerRun { get; init; }
+    public int TimeoutSeconds { get; init; } = 60;
 }
 
 public sealed class AgentRequest

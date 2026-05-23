@@ -1,0 +1,25 @@
+{
+  "test_run_id": "IronDevSelfImprovementCampaign157",
+  "goal_id": "self-improvement-campaign-157",
+  "description": "Proves the governed autonomy control plane maturity campaign can validate agent model providers, ArchitectAgent review, and governance boundaries as one traceable smoke.",
+  "expected": {
+    "campaign_status_succeeded": true,
+    "openai_provider_supported": true,
+    "local_openai_provider_supported": true,
+    "ollama_provider_supported": true,
+    "architect_agent_review_available": true,
+    "conscience_still_required": true,
+    "thought_ledger_still_required": true,
+    "real_repo_writes_still_blocked": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "self_improvement_campaign_157",
+      "params": {}
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "boundary": "Campaign smoke only. It validates control-plane maturity evidence but does not call external LLMs, mutate memory, apply patches, or grant real repository write authority."
+}
