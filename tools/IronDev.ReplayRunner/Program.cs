@@ -27,6 +27,9 @@ if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
     return 2;
 }
 
+if (IsCommand(args, "inventory", "validate"))
+    return await InventoryValidateCommand.HandleAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
@@ -40,6 +43,9 @@ if (args.Length >= 3 &&
 {
     return await HandleAgentTesterRunPlanCommandAsync(args, options);
 }
+
+if (IsCommand(args, "test", "run-plan"))
+    return await HandleAgentTesterRunPlanCommandAsync(RebaseCommand(args, 2, "agent", "tester", "run-plan"), options);
 
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
@@ -160,20 +166,38 @@ if (IsCommand(args, "memory", "triage"))
 if (IsCommand(args, "memory", "sql-version-smoke"))
     return await MemorySqlVersionSmokeCommand.HandleAsync(args, options);
 
+if (IsCommand3(args, "dogfood", "memory", "sql-version-smoke"))
+    return await MemorySqlVersionSmokeCommand.HandleAsync(RebaseCommand(args, 3, "memory", "sql-version-smoke"), options);
+
 if (IsCommand(args, "memory", "weaviate-sql-version-smoke"))
     return await MemoryWeaviateSqlVersionSmokeCommand.HandleAsync(args, options);
+
+if (IsCommand3(args, "dogfood", "memory", "weaviate-sql-version-smoke"))
+    return await MemoryWeaviateSqlVersionSmokeCommand.HandleAsync(RebaseCommand(args, 3, "memory", "weaviate-sql-version-smoke"), options);
 
 if (IsCommand(args, "memory", "cross-project-smoke"))
     return await MemoryCrossProjectSmokeCommand.HandleAsync(args, options);
 
+if (IsCommand3(args, "dogfood", "memory", "cross-project-smoke"))
+    return await MemoryCrossProjectSmokeCommand.HandleAsync(RebaseCommand(args, 3, "memory", "cross-project-smoke"), options);
+
 if (IsCommand(args, "memory", "reindex-freshness-smoke"))
     return await MemoryReindexFreshnessSmokeCommand.HandleAsync(args, options);
+
+if (IsCommand3(args, "dogfood", "memory", "reindex-freshness-smoke"))
+    return await MemoryReindexFreshnessSmokeCommand.HandleAsync(RebaseCommand(args, 3, "memory", "reindex-freshness-smoke"), options);
 
 if (IsCommand(args, "memory", "ticket-source-link-smoke"))
     return await HandleMemoryTicketSourceLinkSmokeCommandAsync(args, options);
 
+if (IsCommand3(args, "dogfood", "memory", "ticket-source-link-smoke"))
+    return await HandleMemoryTicketSourceLinkSmokeCommandAsync(RebaseCommand(args, 3, "memory", "ticket-source-link-smoke"), options);
+
 if (IsCommand(args, "memory", "builder-context-source-smoke"))
     return await HandleMemoryBuilderContextSourceSmokeCommandAsync(args, options);
+
+if (IsCommand3(args, "dogfood", "memory", "builder-context-source-smoke"))
+    return await HandleMemoryBuilderContextSourceSmokeCommandAsync(RebaseCommand(args, 3, "memory", "builder-context-source-smoke"), options);
 
 if (IsCommand(args, "builder", "proposal-safety-smoke"))
     return await BuilderProposalSafetySmokeCommand.HandleAsync(args, options);
@@ -181,8 +205,14 @@ if (IsCommand(args, "builder", "proposal-safety-smoke"))
 if (IsCommand(args, "builder", "disposable-workspace-apply-smoke"))
     return await DisposableWorkspaceApplySmokeCommand.HandleAsync(args, options);
 
+if (IsCommand3(args, "dogfood", "build", "disposable-apply-smoke"))
+    return await DisposableWorkspaceApplySmokeCommand.HandleAsync(RebaseCommand(args, 3, "builder", "disposable-workspace-apply-smoke"), options);
+
 if (IsCommand(args, "builder", "solitaire-disposable-build-smoke"))
     return await SolitaireDisposableBuildSmokeCommand.HandleAsync(args, options);
+
+if (IsCommand3(args, "dogfood", "build", "solitaire-disposable-build-smoke"))
+    return await SolitaireDisposableBuildSmokeCommand.HandleAsync(RebaseCommand(args, 3, "builder", "solitaire-disposable-build-smoke"), options);
 
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
@@ -190,14 +220,26 @@ if (args.Length >= 3 &&
     string.Equals(args[2], "trace-smoke", StringComparison.OrdinalIgnoreCase))
     return await BuildAgentTraceSmokeCommand.HandleAsync(args, options);
 
+if (IsCommand(args, "trace", "build-smoke"))
+    return await BuildAgentTraceSmokeCommand.HandleAsync(RebaseCommand(args, 2, "agent", "builder", "trace-smoke"), options);
+
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
     string.Equals(args[1], "builder", StringComparison.OrdinalIgnoreCase) &&
     string.Equals(args[2], "repair-loop", StringComparison.OrdinalIgnoreCase))
     return await BuilderRepairLoopCommand.HandleAsync(args, options);
 
+if (IsCommand3(args, "build", "disposable", "repair"))
+    return await BuilderRepairLoopCommand.HandleAsync(RebaseCommand(args, 3, "agent", "builder", "repair-loop"), options);
+
+if (IsCommand3(args, "build", "disposable", "run"))
+    return await BuilderRepairLoopCommand.HandleAsync(RebaseCommand(args, 3, "agent", "builder", "repair-loop"), options);
+
 if (IsCommand(args, "foundation", "break-test"))
     return await FoundationBreakTestCommand.HandleAsync(args, options);
+
+if (IsCommand3(args, "dogfood", "foundation", "break-test"))
+    return await FoundationBreakTestCommand.HandleAsync(RebaseCommand(args, 3, "foundation", "break-test"), options);
 
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))
@@ -317,6 +359,15 @@ static bool IsCommand(string[] args, string first, string second)
        string.Equals(args[0], first, StringComparison.OrdinalIgnoreCase) &&
        string.Equals(args[1], second, StringComparison.OrdinalIgnoreCase);
 
+static bool IsCommand3(string[] args, string first, string second, string third)
+    => args.Length >= 3 &&
+       string.Equals(args[0], first, StringComparison.OrdinalIgnoreCase) &&
+       string.Equals(args[1], second, StringComparison.OrdinalIgnoreCase) &&
+       string.Equals(args[2], third, StringComparison.OrdinalIgnoreCase);
+
+static string[] RebaseCommand(string[] args, int consumed, params string[] replacement)
+    => replacement.Concat(args.Skip(consumed)).ToArray();
+
 static void PrintUsage()
 {
     Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | <command> [options]");
@@ -328,7 +379,9 @@ static void PrintUsage()
     Console.Error.WriteLine("Failure: failure latest");
     Console.Error.WriteLine("Foundation: foundation break-test");
     Console.Error.WriteLine("Govern: govern review");
+    Console.Error.WriteLine("Inventory: inventory validate");
     Console.Error.WriteLine("Memory: memory builder-context-source-smoke | memory cross-project-smoke | memory reindex-freshness-smoke | memory search | memory sql-version-smoke | memory ticket-source-link-smoke | memory triage | memory weaviate-sql-version-smoke");
+    Console.Error.WriteLine("Clean aliases: test run-plan | trace build-smoke | build disposable repair | build disposable run | dogfood build ... | dogfood memory ...");
     Console.Error.WriteLine("Tickets: tickets document-to-tickets-smoke");
 }
 

@@ -1,0 +1,29 @@
+{
+  "test_run_id": "IronDev142-CliCommandSurfaceCleanup",
+  "goal_id": "cli-command-surface-cleanup-142",
+  "project_id": 2,
+  "description": "Proves the clean IronDev CLI aliases route correctly and inventory validation can check the command/docs/test-plan surface.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "cli_command_surface_cleanup",
+      "params": {
+        "expect_inventory_validate": true,
+        "expect_trace_build_smoke_alias": true,
+        "expect_build_disposable_repair_alias": true,
+        "expect_test_run_plan_alias": true,
+        "expect_real_repo_mutation_count": 0
+      }
+    }
+  ],
+  "expected": {
+    "inventory_validate_passes": true,
+    "test_run_plan_alias_routes": true,
+    "trace_build_smoke_alias_routes": true,
+    "build_disposable_repair_alias_routes": true,
+    "real_repo_mutation_count_zero": true
+  },
+  "boundary": "CLI surface cleanup only. Existing command semantics remain unchanged; no retrieval, builder, governance, memory, or real repository write authority is expanded."
+}

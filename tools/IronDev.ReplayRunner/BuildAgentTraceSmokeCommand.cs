@@ -6,7 +6,9 @@ public static class BuildAgentTraceSmokeCommand
 {
     public static async Task<int> HandleAsync(string[] args, JsonSerializerOptions options)
     {
-        var runId = ReadOption(args, "--dogfood-run-id") ?? $"buildagent-trace-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+        var runId = ReadOption(args, "--run-id") ??
+                    ReadOption(args, "--dogfood-run-id") ??
+                    $"buildagent-trace-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
         var project = ReadOption(args, "--project") ?? "Solitaire";
         var repoRoot = FindRepositoryRoot();
         var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", runId);

@@ -7,7 +7,9 @@ public static class SolitaireDisposableBuildSmokeCommand
 {
     public static async Task<int> HandleAsync(string[] args, JsonSerializerOptions options)
     {
-        var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"solitaire-build-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+        var dogfoodRunId = ReadOption(args, "--run-id") ??
+                            ReadOption(args, "--dogfood-run-id") ??
+                            $"solitaire-build-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
         var repoRoot = FindRepositoryRoot();
         var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", dogfoodRunId);
         var workspaceRoot = ResolveWorkspaceRoot(args, dogfoodRunId);
