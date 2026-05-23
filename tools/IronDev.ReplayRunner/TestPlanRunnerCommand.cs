@@ -67,7 +67,8 @@ public sealed class TestPlanRunner
         "self_improvement_campaign_157",
         "live_governed_agent_execution_158",
         "live_critic_planner_agents_159",
-        "live_retriever_sentinel_agents_160"
+        "live_retriever_sentinel_agents_160",
+        "live_remaining_governed_agents_161"
     };
 
     private readonly string _repoRoot;
@@ -136,6 +137,7 @@ public sealed class TestPlanRunner
                     "live_governed_agent_execution_158" => await RunLiveGovernedAgentExecution158Async(runId, logPath),
                     "live_critic_planner_agents_159" => await RunLiveCriticPlannerAgents159Async(runId, logPath),
                     "live_retriever_sentinel_agents_160" => await RunLiveRetrieverSentinelAgents160Async(runId, logPath),
+                    "live_remaining_governed_agents_161" => await RunLiveRemainingGovernedAgents161Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -715,6 +717,43 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Live Retriever/Sentinel agent smoke passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunLiveRemainingGovernedAgents161Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "live-remaining-agents-161", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign live-remaining-agents-161 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected campaign status Succeeded, actual {ReadProperty(parsed, "status")}.");
+
+        var liveProviderHandling = ReadElement(parsed, "liveProviderHandling");
+        if (!ReadBoolProperty(liveProviderHandling, "researchAttempted"))
+            failures.Add("Expected ResearchAgent live provider handling to attempt a model call.");
+        if (!ReadBoolProperty(liveProviderHandling, "qualityAttempted"))
+            failures.Add("Expected QualityAgent live provider handling to attempt a model call.");
+        if (!ReadBoolProperty(liveProviderHandling, "supervisorAttempted"))
+            failures.Add("Expected SupervisorAgent live provider handling to attempt a model call.");
+
+        var governance = ReadElement(parsed, "governance");
+        if (!ReadBoolProperty(governance, "realRepoWritesBlocked"))
+            failures.Add("Expected real repo writes to remain blocked.");
+        if (!ReadBoolProperty(governance, "memoryMutationBlocked"))
+            failures.Add("Expected memory mutation to remain blocked.");
+        if (!ReadBoolProperty(governance, "ticketCreationBlocked"))
+            failures.Add("Expected ticket creation to remain blocked.");
+        if (!ReadBoolProperty(governance, "deterministicGatesRemainAuthoritative"))
+            failures.Add("Expected deterministic quality/governance gates to remain authoritative.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Live remaining governed agents smoke passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);

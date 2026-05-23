@@ -29,7 +29,8 @@
     "live_critic_planner_agents_159_passes": true,
     "live_retriever_sentinel_agents_160_passes": true,
     "failure_handoff_passes": true,
-    "code_standards_passes": true
+    "code_standards_passes": true,
+    "live_remaining_governed_agents_161_passes": true
   },
   "steps": [
     {
@@ -320,6 +321,17 @@
       "step": 26,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-live-remaining-governed-agents-161.json",
+        "expect_nested_goal_id": "live-remaining-governed-agents-161",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 27,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -328,7 +340,7 @@
       }
     },
     {
-      "step": 27,
+      "step": 28,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -339,6 +351,6 @@
       }
     }
   ],
-  "max_turns": 27,
+  "max_turns": 28,
   "early_stop_on_failure": true
 }

@@ -1,0 +1,35 @@
+{
+  "test_run_id": "LiveRemainingGovernedAgents161",
+  "goal_id": "live-remaining-governed-agents-161",
+  "description": "Proves ResearchAgent, QualityAgent, and SupervisorAgent have opt-in live governed evidence paths with deterministic fallback and no new authority.",
+  "early_stop_on_failure": true,
+  "max_turns": 1,
+  "preconditions": [
+    "ReplayRunner builds.",
+    "Model profiles include local-cheap-runner or deterministic fallback remains available."
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "action": "live_remaining_governed_agents_161",
+      "description": "Run the 161 campaign for ResearchAgent, QualityAgent, and SupervisorAgent.",
+      "expected": {
+        "campaign_status_succeeded": true,
+        "research_live_provider_attempt_recorded": true,
+        "quality_live_provider_attempt_recorded": true,
+        "supervisor_live_provider_attempt_recorded": true,
+        "deterministic_gates_remain_authoritative": true,
+        "real_repo_writes_still_blocked": true,
+        "memory_mutation_still_blocked": true,
+        "ticket_creation_still_blocked": true,
+        "patch_apply_still_blocked": true
+      }
+    }
+  ],
+  "reporting": {
+    "format": "json",
+    "include_evidence_paths": true,
+    "include_command_output_summary": true
+  },
+  "boundary": "161 proves opt-in live ResearchAgent, QualityAgent, and SupervisorAgent evidence paths. It does not grant writes, memory mutation, ticket creation, patch apply, quality override, self-approval, or ungated autonomy."
+}

@@ -12,16 +12,16 @@ Agents may reason, package evidence, run bounded plans, and write inside explici
 
 | Agent | Current maturity | Default profile | Authority |
 | --- | --- | --- | --- |
-| SupervisorAgent | Governed orchestration | strong-reasoner | Coordinates memory, ConscienceAgent, ThoughtLedger, and TesterAgent loops. Stops on missing evidence or blocked governance. |
+| SupervisorAgent | Opt-in live governed orchestration | strong-reasoner | Coordinates memory, ConscienceAgent, ThoughtLedger, and TesterAgent loops. May call a configured model only after deterministic orchestration state exists. Stops on missing evidence or blocked governance. |
 | PlannerAgent | Opt-in live governed planning path with deterministic fallback | standard-reasoner | Drafts plans and product-spike intake packages. May call a configured model only when explicitly enabled. Does not execute or write. |
 | ArchitectAgent | Opt-in live governed architecture review | strong-reasoner | Reviews proposals against weighted context and safety boundaries. May call a configured model only when explicitly enabled. Does not create accepted decisions or patch. |
 | BuilderAgent | Caged disposable repair loop | code-builder | May write only inside explicit disposable workspaces. Real repo writes remain blocked. |
 | TesterAgent | C# dogfood runner wrapper | cheap-runner | Executes plans and reports. Does not fix. |
-| QualityAgent / KilljoyAgent | Deterministic quality gate | cheap-runner | Runs build/test/format/package/code-standards checks and reports debt. Does not refactor. |
+| QualityAgent / KilljoyAgent | Opt-in live governed quality commentary | cheap-runner | Runs build/test/format/package/code-standards checks and reports debt. May call a configured model for advisory risk notes only. Does not refactor or override gates. |
 | RetrieverAgent | Opt-in live governed weighted context packer | cheap-runner | Packages accepted project memory, rankings, rejected context, and trace evidence. May call a configured model only when explicitly enabled. Does not decide implementation or override ranking. |
 | CriticAgent | Opt-in live governed failure/evidence reviewer | strong-reviewer | Reviews failure packages and risks. May call a configured model only when explicitly enabled. Does not patch. |
 | SentinelAgent | Opt-in live governed internal observation | cheap-runner | Emits advisory insight artefacts. May call a configured model only when explicitly enabled. Does not create tickets or mutate memory. |
-| ResearchAgent | External evidence packer | cheap-runner | Packages explicit external evidence only. Project memory remains authority. |
+| ResearchAgent | Opt-in live governed external evidence packer | cheap-runner | Packages explicit external evidence only. May call a configured model only when explicitly enabled. Project memory remains authority. |
 | ConscienceAgent | Governance gate | cheap-runner | Returns Allow, Block, or NeedsMoreEvidence. Does not execute. |
 | ThoughtLedger | Visible reasoning summary | cheap-runner | Explains evidence, uncertainty, blocked actions, and safer alternatives without exposing hidden chain-of-thought. |
 
@@ -66,3 +66,5 @@ IRONDEV-158 adds the first opt-in live governed agent execution path for Archite
 IRONDEV-159 extends the same opt-in live governed pattern to CriticAgent and PlannerAgent. Live model output is advisory evidence only; deterministic routing/review remains in force, and no writes, memory mutation, ticket creation, patch apply, or self-approval authority is granted.
 
 IRONDEV-160 extends the same opt-in live governed pattern to RetrieverAgent and SentinelAgent. Live model output cannot override memory ranking, project scoping, or insight classification; it remains advisory evidence only.
+
+IRONDEV-161 completes the current useful opt-in live agent pass for ResearchAgent, QualityAgent, and SupervisorAgent. TesterAgent, ConscienceAgent, and ThoughtLedger intentionally remain deterministic because they execute, gate, and explain rather than freely decide.

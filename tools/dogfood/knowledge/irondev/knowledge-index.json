@@ -1,5 +1,16 @@
 [
   {
+    "Id": "LIVE_REMAINING_GOVERNED_AGENTS_161",
+    "Project": "IronDev",
+    "Title": "Live Remaining Governed Agents 161",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\LIVE_REMAINING_GOVERNED_AGENTS_161.md",
+    "DogfoodRunId": "LiveRemainingGovernedAgents161",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524161000000-live-remaining-governed-agents-161.md",
+    "CreatedUtc": "2026-05-24T16:10:00+00:00"
+  },
+  {
     "Id": "LIVE_RETRIEVER_SENTINEL_AGENTS_160",
     "Project": "IronDev",
     "Title": "Live Retriever And Sentinel Agents 160",

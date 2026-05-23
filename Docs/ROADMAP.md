@@ -106,7 +106,7 @@ Goal: make IronDev actually act on a project — not just store memory.
 
 ## Self-Improvement Campaign 157
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: mature the governed autonomy control plane while preserving the safety boundary.
 
@@ -167,7 +167,7 @@ Still blocked:
 
 ## Live Retriever And Sentinel Agents 160
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: extend opt-in live model execution to RetrieverAgent and SentinelAgent while preserving deterministic memory ranking, project scope, insight classification, and hard governance boundaries.
 
@@ -185,4 +185,28 @@ Still blocked:
 - Memory mutation.
 - Ticket creation.
 - Patch application.
+- Agent self-approval.
+
+## Live Remaining Governed Agents 161
+
+**Status: Active**
+
+Goal: complete the current useful opt-in live governed agent pass for ResearchAgent, QualityAgent, and SupervisorAgent.
+
+Delivered in this slice:
+
+- `ResearchAgent` can attempt live model execution only after explicit external evidence is packaged.
+- `QualityAgent` can attempt live model execution only after deterministic quality evidence is produced.
+- `SupervisorAgent` can attempt live model execution only after deterministic orchestration state is known.
+- `campaign live-remaining-agents-161` records deterministic fallback, live-provider attempts, and blocked mutation/override authority.
+
+Still blocked:
+
+- Real repository writes.
+- Memory mutation.
+- Ticket creation.
+- Patch application.
+- Quality gate override.
+- ConscienceAgent bypass.
+- ThoughtLedger bypass.
 - Agent self-approval.

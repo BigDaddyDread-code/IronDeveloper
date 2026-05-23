@@ -148,6 +148,14 @@ The JSON inventory is a flat command array sorted by `category`, then `command`.
 - `campaign live-retriever-sentinel-160 --run-id <run> --json` validates RetrieverAgent and SentinelAgent fallback/live-attempt behaviour.
 - None of these commands can override ranking, cross project boundaries silently, create tickets, mutate memory, patch files, approve writes, or bypass ConscienceAgent/ThoughtLedger.
 
+## 161 Live Remaining Governed Agent Commands
+
+- `agent research package --project <project> --topic <topic> --live-llm --model-profile <profile> --json` records advisory live model evidence while keeping accepted project memory authoritative.
+- `agent quality run-gate --plan <plan> --live-llm --model-profile <profile> --json` records advisory live model evidence while keeping deterministic quality gates authoritative.
+- `agent supervisor run-goal --project <project> --query <query> --plan <plan> --live-llm --model-profile <profile> --json` records advisory live model evidence while keeping Conscience, ThoughtLedger, and deterministic stop conditions authoritative.
+- `campaign live-remaining-agents-161 --run-id <run> --json` validates ResearchAgent, QualityAgent, and SupervisorAgent fallback/live-attempt behaviour.
+- None of these commands can override accepted memory, override deterministic gates, bypass governance, create tickets, mutate memory, patch files, approve writes, or self-approve.
+
 ## 140 BuildAgent Trace Smoke Command
 
 - `agent builder trace-smoke --project Solitaire --dogfood-run-id <run> --json` creates a synthetic trace for the future heavy-duty disposable build path.
