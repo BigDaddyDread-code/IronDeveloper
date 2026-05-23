@@ -273,13 +273,36 @@ tools/dogfood/test-agent-plans/bookseller-storage-vague.json
 Run the sample plan locally:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
-  -PlanPath .\tools\dogfood\test-agent-plans\bookseller-storage-vague.json `
-  -RunId TestAgentSmoke-001 `
-  -Json
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  test run-plan `
+  --plan .\tools\dogfood\test-agent-plans\bookseller-storage-vague.json `
+  --run-id TestAgentSmoke-001 `
+  --json
 ```
 
-The local executor currently supports:
+As of 143, the primary executor is the C# ReplayRunner `TestPlanRunner`. `Invoke-TestAgentPlan.ps1` remains available, but it is now a thin compatibility wrapper around `test run-plan`. `Invoke-TestAgentPlan.Legacy.ps1` keeps the old PowerShell implementation for explicit fallback while older actions are ported.
+
+The C# runner writes standard run evidence under:
+
+```text
+tools/dogfood/runs/{runId}/report.json
+tools/dogfood/runs/{runId}/test-agent-report.json
+tools/dogfood/runs/{runId}/trace.json
+tools/dogfood/runs/{runId}/report.md
+tools/dogfood/runs/{runId}/evidence/
+tools/dogfood/runs/{runId}/logs/
+```
+
+The current native C# runner supports:
+
+- `memory_search`
+- `agent_tester_run_plan`
+- `buildagent_trace_smoke`
+- `builder_repair_loop_smoke`
+- `cli_command_surface_cleanup`
+- `csharp_dogfood_runner_smoke`
+
+Older compatibility actions remain available through the legacy fallback:
 
 - `chat_send`
 - `chat_conversation`
@@ -306,10 +329,11 @@ Unsupported future actions must be reported as unsupported. They must not be fak
 Run the deterministic toolchain smoke:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
-  -PlanPath .\tools\dogfood\test-agent-plans\irondev-toolchain-smoke.json `
-  -RunId TestAgentToolchain-001 `
-  -Json
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  test run-plan `
+  --plan .\tools\dogfood\test-agent-plans\irondev-toolchain-smoke.json `
+  --run-id TestAgentToolchain-001 `
+  --json
 ```
 
 Every report includes a `trace` envelope, per-step trace data, command list, evidence paths, and `report_schema_valid`.
@@ -317,10 +341,11 @@ Every report includes a `trace` envelope, per-step trace data, command list, evi
 Run the Alpha code standards gate:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\dogfood\Invoke-TestAgentPlan.ps1 `
-  -PlanPath .\tools\dogfood\test-agent-plans\irondev-code-standards-alpha.json `
-  -RunId IronDevCodeStandardsAlpha-009 `
-  -Json
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  test run-plan `
+  --plan .\tools\dogfood\test-agent-plans\irondev-code-standards-alpha.json `
+  --run-id IronDevCodeStandardsAlpha-009 `
+  --json
 ```
 
 The code standards gate is deterministic and non-repairing. It runs build/test/format/audit steps plus code-shape checks such as large file and large method warnings. Warnings are allowed in Alpha; the purpose is to give Codex a structured quality report before widening the branch.

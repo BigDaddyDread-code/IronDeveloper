@@ -1,5 +1,29 @@
 [
     {
+        "planFile":  "irondev-csharp-dogfood-runner-143.json",
+        "goalId":  "csharp-dogfood-runner-143",
+        "project":  "IronDev",
+        "description":  "Prove C# ReplayRunner owns the primary dogfood/test plan execution path while PowerShell remains a compatibility wrapper.",
+        "agentPath":  "TestAgent + C# TestPlanRunner",
+        "command":  "test run-plan / dogfood run-plan / agent tester run-plan / Invoke-TestAgentPlan.ps1 wrapper",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestPlanRunnerCommand",
+                                 "BuildAgentTraceSmokeCommand",
+                                 "BuilderRepairLoopCommand"
+                             ],
+        "expectedEvidence":  [
+                                 "test run-plan routes through C#",
+                                 "dogfood run-plan routes through C#",
+                                 "agent tester run-plan routes through C#",
+                                 "PowerShell wrapper delegates to C#",
+                                 "builder repair loop still passes"
+                             ],
+        "regressionGroup":  "CliCommandSurface",
+        "safetyBoundary":  "Dogfood execution layer migration only; no retrieval, builder, governance, memory, or real repository write authority is expanded.",
+        "kind":  "smoke"
+    },
+    {
         "planFile":  "irondev-cli-command-surface-cleanup-142.json",
         "goalId":  "cli-command-surface-cleanup-142",
         "project":  "IronDev",

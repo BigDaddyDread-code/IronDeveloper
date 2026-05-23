@@ -1,5 +1,16 @@
 [
   {
+    "Id": "CSHARP_DOGFOOD_RUNNER_143",
+    "Project": "IronDev",
+    "Title": "C# Dogfood Runner 143",
+    "DocumentType": "ArchitectureProof",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CSHARP_DOGFOOD_RUNNER_143.md",
+    "DogfoodRunId": "CSharpDogfoodRunner143",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523214300000-csharp-dogfood-runner-143.md",
+    "CreatedUtc": "2026-05-23T21:43:00+00:00"
+  },
+  {
     "Id": "CLI_COMMAND_SURFACE_CLEANUP_142",
     "Project": "IronDev",
     "Title": "CLI Command Surface Cleanup 142",

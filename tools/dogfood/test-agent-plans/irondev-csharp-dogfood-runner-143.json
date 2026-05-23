@@ -1,0 +1,40 @@
+{
+  "test_run_id": "IronDev143-CSharpDogfoodRunner",
+  "goal_id": "csharp-dogfood-runner-143",
+  "project_id": 2,
+  "description": "Proves C# ReplayRunner owns the primary dogfood/test plan execution path while the PowerShell script remains a compatibility wrapper.",
+  "max_turns": 2,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "csharp_dogfood_runner_smoke",
+      "params": {
+        "expect_test_run_plan_routes": true,
+        "expect_dogfood_run_plan_routes": true,
+        "expect_agent_tester_run_plan_routes": true,
+        "expect_powershell_wrapper_routes": true,
+        "expect_native_compatibility_mode": false
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-builder-repair-loop-141.json",
+        "expect_nested_goal_id": "trace-backed-builderagent-repair-loop-141",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    }
+  ],
+  "expected": {
+    "test_run_plan_routes_through_csharp": true,
+    "dogfood_run_plan_routes_through_csharp": true,
+    "agent_tester_run_plan_routes_through_csharp": true,
+    "powershell_wrapper_routes_to_csharp": true,
+    "builder_repair_loop_still_passes": true
+  },
+  "boundary": "Dogfood execution layer migration only. Existing plan semantics remain unchanged; no retrieval, builder, governance, memory, or real repository write authority is expanded."
+}

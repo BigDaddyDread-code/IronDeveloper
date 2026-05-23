@@ -14,7 +14,7 @@ The machine-readable inventory is stored at:
 - Build commands: 2
 - Chat commands: 1
 - Docs commands: 6
-- Dogfood commands: 9
+- Dogfood commands: 10
 - Ticket commands: 1
 - Failure commands: 1
 - Govern commands: 1
@@ -70,6 +70,8 @@ These are closest to the control surface Codex will use.
 
 `test run-plan` is the product-shaped alias for `agent tester run-plan`. TesterAgent remains an execution/reporting wrapper only.
 
+As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` execute through the C# `TestPlanRunner`. `Invoke-TestAgentPlan.ps1` remains as a compatibility wrapper that delegates to `test run-plan`.
+
 `trace build-smoke` is the product-shaped alias for `agent builder trace-smoke`.
 
 `inventory validate` checks the CLI inventory, CLI documentation, and dogfood test-plan inventory. It is read-only and does not execute the listed commands.
@@ -93,6 +95,7 @@ These are closest to the control surface Codex will use.
 - `dogfood build disposable-apply-smoke`
 - `dogfood build solitaire-disposable-build-smoke`
 - `dogfood foundation break-test`
+- `dogfood run-plan`
 
 These prove slices of the spine but are not product commands.
 
@@ -141,4 +144,23 @@ The JSON inventory is a flat command array sorted by `category`, then `command`.
 - `dogfood memory ...` aliases keep memory-spine proof commands visibly dogfood-only.
 
 Existing command names remain compatible. This cleanup changes the command surface shape; it does not change retrieval, builder, or governance semantics.
+
+## 143 C# Dogfood Runner
+
+- `test run-plan --plan <path> --run-id <run> --json` is now the primary C# Test Agent plan runner.
+- `dogfood run-plan --plan <path> --run-id <run> --json` is the dogfood-shaped alias for the same C# runner.
+- `agent tester run-plan --plan <path> --run-id <run> --json` remains compatible and uses the same C# runner.
+- `Invoke-TestAgentPlan.ps1` is now a thin compatibility wrapper around `test run-plan`.
+- `Invoke-TestAgentPlan.Legacy.ps1` preserves the previous PowerShell implementation for explicit fallback while older actions are ported.
+
+The C# runner writes standard reports under `tools/dogfood/runs/{runId}`:
+
+- `report.json`
+- `test-agent-report.json`
+- `trace.json`
+- `report.md`
+- `evidence/`
+- `logs/`
+
+If an unported action falls back to the legacy script, the report marks `compatibility_mode: true`.
 
