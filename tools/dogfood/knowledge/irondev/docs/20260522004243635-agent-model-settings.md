@@ -43,6 +43,8 @@ IronDev chooses models by agent role, not by one global chat setting.
 | `QualityAgent` | `cheap-runner` | Run deterministic build/test/format/package checks |
 | `RetrieverAgent` | `cheap-runner` | Select project memory with metadata-aware filtering |
 | `CriticAgent` | `strong-reviewer` | Challenge assumptions and review deeper risks |
+| `SentinelAgent` | `cheap-runner` | Observe campaign/failure/test evidence and emit insight artefacts |
+| `ResearchAgent` | `cheap-runner` | Package explicit external evidence as read-only research |
 
 ## Settings Shape
 
@@ -93,7 +95,7 @@ IronDev chooses models by agent role, not by one global chat setting.
 - `IAgentRegistry`
 - `IAgentModelResolver`
 - `IAgentRunner`
-- eight registered agent stubs
+- core agent stubs plus lite observer agents
 - one working `TesterAgent` path that executes an existing Test Agent plan
 
 The other seven agents are registered but intentionally not intelligent yet. They return skipped/static results until their proof slices exist.

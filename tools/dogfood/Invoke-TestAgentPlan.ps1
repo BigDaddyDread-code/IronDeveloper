@@ -1033,6 +1033,134 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "agent_sentinel_observe" {
+                $observedProject = if ($params.observed_project) { [string]$params.observed_project } else { "BookSeller" }
+                $affectedProject = if ($params.affected_project) { [string]$params.affected_project } else { $observedProject }
+                $findingType = if ($params.finding_type) { [string]$params.finding_type } else { "Observation" }
+                $evidenceText = [string]$params.evidence
+                if ([string]::IsNullOrWhiteSpace($evidenceText)) {
+                    throw "agent_sentinel_observe requires params.evidence."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "sentinel", "observe",
+                    "--observed-project", $observedProject,
+                    "--affected-project", $affectedProject,
+                    "--finding-type", $findingType,
+                    "--evidence", $evidenceText,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "SentinelAgent observe exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected SentinelAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected SentinelAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_observed_project -and [string]$parsed.insight.observedProject -ne [string]$params.expect_observed_project) {
+                    $status = "FAILED"
+                    $summary = "Expected observedProject '$($params.expect_observed_project)', actual '$($parsed.insight.observedProject)'."
+                } elseif ($params.expect_affected_project -and [string]$parsed.insight.affectedProject -ne [string]$params.expect_affected_project) {
+                    $status = "FAILED"
+                    $summary = "Expected affectedProject '$($params.expect_affected_project)', actual '$($parsed.insight.affectedProject)'."
+                } elseif ($params.expect_insight_type -and [string]$parsed.insight.insightType -ne [string]$params.expect_insight_type) {
+                    $status = "FAILED"
+                    $summary = "Expected insightType '$($params.expect_insight_type)', actual '$($parsed.insight.insightType)'."
+                } elseif ($params.expect_severity -and [string]$parsed.insight.severity -ne [string]$params.expect_severity) {
+                    $status = "FAILED"
+                    $summary = "Expected severity '$($params.expect_severity)', actual '$($parsed.insight.severity)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.insight.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected SentinelAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.insight.boundary)'."
+                } else {
+                    foreach ($disposition in @($params.expect_recommended_dispositions)) {
+                        if ($disposition -and @($parsed.insight.recommendedDispositions | Where-Object { [string]$_ -eq [string]$disposition }).Count -eq 0) {
+                            $status = "FAILED"
+                            $summary = "Expected SentinelAgent recommended disposition '$disposition'."
+                            break
+                        }
+                    }
+                    if ($status -eq "SUCCESS") {
+                        $summary = "SentinelAgent observed $($parsed.insight.insightType); observed=$($parsed.insight.observedProject); affected=$($parsed.insight.affectedProject)."
+                    }
+                }
+            }
+
+            "agent_research_package" {
+                $project = if ($params.project) { [string]$params.project } else { "BookSeller" }
+                $topic = [string]$params.topic
+                if ([string]::IsNullOrWhiteSpace($topic)) {
+                    throw "agent_research_package requires params.topic."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "research", "package",
+                    "--project", $project,
+                    "--topic", $topic,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+                if ($params.source_url) { $arguments += @("--source-url", [string]$params.source_url) }
+                if ($params.source_title) { $arguments += @("--source-title", [string]$params.source_title) }
+                if ($params.source_type) { $arguments += @("--source-type", [string]$params.source_type) }
+                if ($params.snippet) { $arguments += @("--snippet", [string]$params.snippet) }
+                if ($params.published_date) { $arguments += @("--published-date", [string]$params.published_date) }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "ResearchAgent package exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected ResearchAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected ResearchAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_project -and [string]$parsed.researchPackage.project -ne [string]$params.expect_project) {
+                    $status = "FAILED"
+                    $summary = "Expected research project '$($params.expect_project)', actual '$($parsed.researchPackage.project)'."
+                } elseif ($params.expect_type -and [string]$parsed.researchPackage.type -ne [string]$params.expect_type) {
+                    $status = "FAILED"
+                    $summary = "Expected research package type '$($params.expect_type)', actual '$($parsed.researchPackage.type)'."
+                } elseif ($params.expect_authority_warning_contains -and [string]$parsed.researchPackage.authorityWarning -notlike "*$($params.expect_authority_warning_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected authority warning to contain '$($params.expect_authority_warning_contains)', actual '$($parsed.researchPackage.authorityWarning)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.researchPackage.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected ResearchAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.researchPackage.boundary)'."
+                } elseif ($params.expect_source_url -and @($parsed.researchPackage.sources | Where-Object { [string]$_.url -eq [string]$params.expect_source_url }).Count -eq 0) {
+                    $status = "FAILED"
+                    $summary = "Expected research source '$($params.expect_source_url)'."
+                } else {
+                    $summary = "ResearchAgent packaged topic='$($parsed.researchPackage.topic)' sources=$(@($parsed.researchPackage.sources).Count); confidence=$($parsed.researchPackage.confidenceScore)."
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",

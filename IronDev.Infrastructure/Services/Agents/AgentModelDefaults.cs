@@ -105,6 +105,20 @@ public static class AgentModelDefaults
             Purpose = "Challenge assumptions, detect drift, and review deeper risks.",
             DefaultModelProfile = "strong-reviewer",
             AllowedTools = ["memory.search", "trace.read", "repo.read"]
+        },
+        new()
+        {
+            Name = "SentinelAgent",
+            Purpose = "Observe traces, campaigns, failures, and quality signals and raise evidence-backed insight artefacts.",
+            DefaultModelProfile = "cheap-runner",
+            AllowedTools = ["trace.read", "failure.read", "test.report.read", "insight.emit"]
+        },
+        new()
+        {
+            Name = "ResearchAgent",
+            Purpose = "Package explicitly requested external evidence as read-only research without overriding project memory.",
+            DefaultModelProfile = "cheap-runner",
+            AllowedTools = ["external.evidence.read", "research.package"]
         }
     ];
 }
