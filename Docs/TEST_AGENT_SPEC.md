@@ -93,7 +93,7 @@ Initial Alpha actions:
 | `thought_ledger_explain` | Ask ThoughtLedger to produce a visible reasoning summary without exposing raw hidden chain-of-thought | `IronDev.ReplayRunner agent thought-ledger explain` |
 | `govern_review` | Run the governed action review package: ConscienceAgent decision plus ThoughtLedger explanation | `IronDev.ReplayRunner govern review` |
 | `agent_retriever_search` | Ask RetrieverAgent to package project memory as a weighted context bundle with included/rejected source evidence | `IronDev.ReplayRunner agent retriever search` |
-| `agent_supervisor_run_goal` | Ask SupervisorAgent to run a governed bounded read/test/report loop through RetrieverAgent, ConscienceAgent, ThoughtLedger, and TesterAgent | `IronDev.ReplayRunner agent supervisor run-goal` |
+| `agent_supervisor_run_goal` | Ask SupervisorAgent to run a governed bounded read/test/report or disposable-workspace apply loop through RetrieverAgent, ConscienceAgent, ThoughtLedger, and TesterAgent | `IronDev.ReplayRunner agent supervisor run-goal` |
 | `foundation_break_test` | Run one foundation break-test scenario from the 121-130 hardening phase | `IronDev.ReplayRunner foundation break-test` |
 
 Example `chat_conversation` step:

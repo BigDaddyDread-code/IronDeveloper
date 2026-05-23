@@ -1832,6 +1832,24 @@ foreach ($step in $plan.steps) {
                         }
                     }
 
+                    if ($params.expect_autonomy_tier -and [string]$loopReport.governedAutonomy.tier -ne [string]$params.expect_autonomy_tier) {
+                        $validationFailures.Add("Expected autonomy tier '$($params.expect_autonomy_tier)', actual '$($loopReport.governedAutonomy.tier)'.") | Out-Null
+                    }
+
+                    if ($null -ne $params.expect_real_repo_mutation_allowed) {
+                        $expectedRealRepoMutation = Convert-ToBool $params.expect_real_repo_mutation_allowed $false
+                        if ([bool]$loopReport.governedAutonomy.realRepoMutationAllowed -ne $expectedRealRepoMutation) {
+                            $validationFailures.Add("Expected realRepoMutationAllowed=$expectedRealRepoMutation, actual $($loopReport.governedAutonomy.realRepoMutationAllowed).") | Out-Null
+                        }
+                    }
+
+                    if ($null -ne $params.expect_disposable_workspace_mutation_allowed) {
+                        $expectedDisposableMutation = Convert-ToBool $params.expect_disposable_workspace_mutation_allowed $false
+                        if ([bool]$loopReport.governedAutonomy.disposableWorkspaceMutationAllowed -ne $expectedDisposableMutation) {
+                            $validationFailures.Add("Expected disposableWorkspaceMutationAllowed=$expectedDisposableMutation, actual $($loopReport.governedAutonomy.disposableWorkspaceMutationAllowed).") | Out-Null
+                        }
+                    }
+
                     if ($params.expect_boundary_contains -and [string]$loopReport.codexHandoff.boundary -notlike "*$($params.expect_boundary_contains)*") {
                         $validationFailures.Add("Expected handoff boundary to contain '$($params.expect_boundary_contains)', actual '$($loopReport.codexHandoff.boundary)'.") | Out-Null
                     }

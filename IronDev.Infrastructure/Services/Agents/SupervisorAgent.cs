@@ -26,6 +26,14 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         var runId = string.IsNullOrWhiteSpace(request.DogfoodRunId)
             ? $"SupervisorAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
+        var autonomyTier = DetermineAutonomyTier(planPath);
+        var isDisposableApply = string.Equals(autonomyTier, "Tier4DisposableWorkspaceApply", StringComparison.OrdinalIgnoreCase);
+        var actionType = isDisposableApply
+            ? "execute disposable workspace apply validation plan"
+            : "execute bounded autonomous validation plan";
+        var safetyBoundaryRefs = isDisposableApply
+            ? "disposable workspace|outside real repo|before hash|after hash|no real repository writes|TesterAgent executes only"
+            : "No real repository writes|TesterAgent executes only|bounded read/test/report autonomy|no patch apply";
 
         var memory = await RunDotnetAsync([
             "run",
@@ -64,7 +72,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 "conscience",
                 "review",
                 "--action-type",
-                "execute bounded autonomous validation plan",
+                actionType,
                 "--observed-project",
                 project,
                 "--affected-project",
@@ -81,7 +89,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 "--memory-authority-refs",
                 string.IsNullOrWhiteSpace(topMemoryTitle) ? "WeightedContextBundle" : topMemoryTitle,
                 "--safety-boundary-refs",
-                "No real repository writes|TesterAgent executes only|bounded read/test/report autonomy|no patch apply",
+                safetyBoundaryRefs,
                 "--run-id",
                 $"{runId}-conscience",
                 "--json"
@@ -116,11 +124,15 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 string.IsNullOrWhiteSpace(weightedSummary) ? "weighted summary missing" : weightedSummary
             ]),
             "--known-boundaries",
-            "No real repository writes|TesterAgent executes only|no patch apply|bounded autonomy",
+            isDisposableApply
+                ? "No real repository writes|TesterAgent executes only|patch apply only inside explicit disposable workspace|bounded autonomy"
+                : "No real repository writes|TesterAgent executes only|no patch apply|bounded autonomy",
             "--uncertainties",
             memorySucceeded ? "" : "retrieval failed",
             "--candidate-actions",
-            "run TesterAgent plan|request more evidence|stop before writes",
+            isDisposableApply
+                ? "run disposable workspace Test Agent plan|request more evidence|stop before real repo writes"
+                : "run TesterAgent plan|request more evidence|stop before writes",
             "--json"
         ], ct);
 
@@ -212,14 +224,18 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             },
             governedAutonomy = new
             {
-                tier = "Tier3ReadTestReport",
+                tier = autonomyTier,
                 autonomousExecutionAllowed = memorySucceeded && conscienceAllows,
                 mutationAllowed = false,
+                realRepoMutationAllowed = false,
+                disposableWorkspaceMutationAllowed = isDisposableApply && memorySucceeded && conscienceAllows && testsSucceeded,
                 executedTesterAgent = tests.ExitCode == 0,
                 stopReason = status == AgentRunStatus.Succeeded
                     ? ""
                     : decisionReason,
-                boundary = "SupervisorAgent may autonomously run safe read/test/report loops only when ConscienceAgent allows them. It must stop before writes, ticket creation, memory mutation, builder apply, or real repository changes."
+                boundary = isDisposableApply
+                    ? "SupervisorAgent may autonomously run disposable workspace apply/build/test plans only when ConscienceAgent allows them and the cage evidence is explicit. Real repository writes, ticket creation, memory mutation, and self-approval remain blocked."
+                    : "SupervisorAgent may autonomously run safe read/test/report loops only when ConscienceAgent allows them. It must stop before writes, ticket creation, memory mutation, builder apply, or real repository changes."
             },
             codexHandoff = new
             {
@@ -234,7 +250,9 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 recommendedNextAction = status == AgentRunStatus.Succeeded
                     ? "Codex may inspect the compact handoff and choose the next scoped improvement."
                     : "Generate a failure package from the failed Test Agent run before patching.",
-                boundary = "135 proves a governed autonomous read/test/report supervisor loop while preserving the tiny memory-to-test supervisor decision loop and memory-to-test orchestration boundary. It does not write files, mutate memory, create tickets, change builder behaviour, or apply code patches."
+                boundary = isDisposableApply
+                    ? "136 proves a governed autonomous disposable workspace apply loop. It may mutate only the explicit disposable workspace and must not write the real repo, mutate memory, create tickets, approve itself, or apply patches outside the cage."
+                    : "135 proves a governed autonomous read/test/report supervisor loop while preserving the tiny memory-to-test supervisor decision loop and memory-to-test orchestration boundary. It does not write files, mutate memory, create tickets, change builder behaviour, or apply code patches."
             }
         };
 
@@ -263,6 +281,11 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
     private string RunnerProjectPath() =>
         Path.Combine(_repoRoot, "tools", "IronDev.ReplayRunner", "IronDev.ReplayRunner.csproj");
+
+    private static string DetermineAutonomyTier(string planPath) =>
+        planPath.Contains("disposable-workspace-apply", StringComparison.OrdinalIgnoreCase)
+            ? "Tier4DisposableWorkspaceApply"
+            : "Tier3ReadTestReport";
 
     private static string SelectDecision(bool memorySucceeded, bool conscienceAllows, bool testsSucceeded, string conscienceDecision)
     {
