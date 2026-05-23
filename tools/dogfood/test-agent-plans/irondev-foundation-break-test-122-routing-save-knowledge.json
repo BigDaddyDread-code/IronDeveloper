@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest122-RoutingSaveKnowledge",
+  "goal_id": "foundation-break-test-122",
+  "project": "IronDev",
+  "description": "Prove BookSeller project-knowledge save vocabulary routes to SaveDiscussionDocument and questions stay GeneralChat.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "routing-save-knowledge",
+        "expect_scenario": "routing-save-knowledge",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

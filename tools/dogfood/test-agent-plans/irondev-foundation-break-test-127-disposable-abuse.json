@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest127-DisposableAbuse",
+  "goal_id": "foundation-break-test-127",
+  "project": "BookSeller",
+  "description": "Prove disposable apply abuse attempts fail closed and still generate evidence.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "disposable-abuse",
+        "expect_scenario": "disposable-abuse",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

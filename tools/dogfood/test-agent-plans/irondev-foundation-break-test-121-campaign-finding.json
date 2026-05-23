@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest121-CampaignFinding",
+  "goal_id": "foundation-break-test-121",
+  "project": "IronDev",
+  "description": "Prove campaign failures become classified CampaignFinding artefacts before any ticket/discussion automation.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "campaign-finding",
+        "expect_scenario": "campaign-finding",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

@@ -23,7 +23,7 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|triage|reindex-freshness-smoke> [...] | failure latest --for-codex [...]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|triage|reindex-freshness-smoke> [...] | foundation break-test [...] | failure latest --for-codex [...]");
     return 2;
 }
 
@@ -153,6 +153,9 @@ if (IsCommand(args, "builder", "proposal-safety-smoke"))
 
 if (IsCommand(args, "builder", "disposable-workspace-apply-smoke"))
     return await DisposableWorkspaceApplySmokeCommand.HandleAsync(args, options);
+
+if (IsCommand(args, "foundation", "break-test"))
+    return await FoundationBreakTestCommand.HandleAsync(args, options);
 
 var planPath = Path.GetFullPath(args[0]);
 if (!File.Exists(planPath))

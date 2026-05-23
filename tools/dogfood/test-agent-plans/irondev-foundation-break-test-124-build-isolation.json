@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest124-BuildIsolation",
+  "goal_id": "foundation-break-test-124",
+  "project": "IronDev",
+  "description": "Prove campaign/build isolation policy blocks parallel trampling unless isolated outputs exist.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "build-isolation",
+        "expect_scenario": "build-isolation",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

@@ -1,1243 +1,1457 @@
 ﻿[
     {
-        "planFile":  "irondev-memory-triage-smoke.json",
-        "goalId":  "memory-triage-119",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_triage"
-                    ],
-        "requiredServices":  [
-                                 "ReplayRunner",
-                                 "TestAgent"
-                             ],
-        "regressionGroup":  "MemoryTriage",
-        "safetyBoundary":  "Classification only; no document persistence, ticket creation, code writes, or autonomous fixes.",
-        "kind":  "smoke",
-        "description":  "Prove IDA can classify user feedback/context into global or project memory candidates, findings, tickets, discussions, decisions, and no-save memory queries."
+        "value":  [
+                      {
+                          "planFile":  "irondev-memory-triage-smoke.json",
+                          "goalId":  "memory-triage-119",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_triage"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent"
+                                               ],
+                          "regressionGroup":  "MemoryTriage",
+                          "safetyBoundary":  "Classification only; no document persistence, ticket creation, code writes, or autonomous fixes.",
+                          "kind":  "smoke",
+                          "description":  "Prove IDA can classify user feedback/context into global or project memory candidates, findings, tickets, discussions, decisions, and no-save memory queries."
+                      },
+                      {
+                          "planFile":  "irondev-sentinel-agent-lite-smoke.json",
+                          "goalId":  "sentinel-agent-lite-120",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_sentinel_observe"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent",
+                                                   "AgentRegistry"
+                                               ],
+                          "regressionGroup":  "SentinelAgent",
+                          "safetyBoundary":  "Observational only; no document persistence, ticket creation, code writes, build blocking, or autonomous fixes.",
+                          "kind":  "smoke",
+                          "description":  "Prove SentinelAgent Lite emits project-aware insight artefacts from campaign evidence, preserving observedProject and affectedProject."
+                      },
+                      {
+                          "planFile":  "irondev-research-agent-lite-smoke.json",
+                          "goalId":  "research-agent-lite-121",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_research_package"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent",
+                                                   "AgentRegistry"
+                                               ],
+                          "regressionGroup":  "ResearchAgent",
+                          "safetyBoundary":  "Read-only explicit evidence packaging; no architecture decisions, project memory writes, tickets, patches, or automatic builder context injection.",
+                          "kind":  "smoke",
+                          "description":  "Prove ResearchAgent Lite emits a ResearchPackage from explicit external evidence and warns that accepted project memory remains authoritative."
+                      },
+                      {
+                          "planFile":  "bookseller-supervised-10-run-campaign.json",
+                          "goalId":  "bookseller-supervised-campaign-118",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "bookseller_supervised_campaign"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent",
+                                                   "Weaviate",
+                                                   "DisposableWorkspace"
+                                               ],
+                          "regressionGroup":  "BookSellerSupervisedCampaign",
+                          "safetyBoundary":  "Sequential campaign only; disposable workspace writes allowed; real repo writes blocked.",
+                          "kind":  "campaign",
+                          "description":  "Run a sequential 10-run supervised BookSeller campaign with messy prompts, project-scoped memory/context checks, disposable workspace apply, fail-closed unsafe patching, and a compact Codex-readable campaign report."
+                      },
+                      {
+                          "planFile":  "bookseller-architecture-memory-regression-061.json",
+                          "goalId":  "bookseller-architecture-memory-regression-061",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep BookSeller architecture memory retrieval green and project-scoped."
+                      },
+                      {
+                          "planFile":  "bookseller-architecture-memory-regression-081.json",
+                          "goalId":  "bookseller-architecture-memory-regression-081",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep BookSeller architecture memory retrieval green and project-scoped."
+                      },
+                      {
+                          "planFile":  "bookseller-builder-preview-smoke.json",
+                          "goalId":  "bookseller-builder-preview-022",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "builder_proposal_safety_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove BookSeller builder preview is project-scoped, includes BookSeller source context, and performs no file writes before approval."
+                      },
+                      {
+                          "planFile":  "bookseller-conversation-storage.json",
+                          "goalId":  "",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "chat_conversation",
+                                          "replay_run"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Start with a vague persistence request, let IronDev ask for detail, then answer with storage facts and require a saved discussion document route."
+                      },
+                      {
+                          "planFile":  "bookseller-disposable-workspace-apply-smoke.json",
+                          "goalId":  "disposable-workspace-apply-proof-104-115",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "disposable_workspace_apply_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove BookSeller patch application is restricted to an explicit disposable workspace with hashes, build/test evidence, comparison review, and no real repo writes."
+                      },
+                      {
+                          "planFile":  "bookseller-disposable-workspace-fail-closed-smoke.json",
+                          "goalId":  "disposable-workspace-fail-closed-104-115",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "disposable_workspace_apply_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove BookSeller disposable workspace apply fails closed when a proposal attempts to write outside the explicit disposable workspace."
+                      },
+                      {
+                          "planFile":  "bookseller-critic-failed-batch-review-050.json",
+                          "goalId":  "bookseller-critic-failed-batch-review-050",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "critic_failure_package_review_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove CriticAgent can review a Codex-facing failure package generated from a failed BookSeller batch."
+                      },
+                      {
+                          "planFile":  "bookseller-critic-failed-review-067.json",
+                          "goalId":  "bookseller-critic-failed-review-067",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "critic_failure_package_review_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep CriticAgent review of BookSeller failure evidence green."
+                      },
+                      {
+                          "planFile":  "bookseller-critic-failed-review-087.json",
+                          "goalId":  "bookseller-critic-failed-review-087",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "critic_failure_package_review_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep CriticAgent review of BookSeller failure evidence green."
+                      },
+                      {
+                          "planFile":  "bookseller-discussion-to-document-smoke.json",
+                          "goalId":  "bookseller-discussion-to-document-027",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "discussion_document_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a BookSeller discussion can become a real SQL ProjectDocument with an exact source discussion link and semantic trace evidence."
+                      },
+                      {
+                          "planFile":  "bookseller-document-to-tickets-smoke.json",
+                          "goalId":  "bookseller-document-to-tickets-028",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "document_to_tickets_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a BookSeller project document can generate multiple SQL ProjectTickets and each ticket preserves the exact ProjectDocumentVersion source link."
+                      },
+                      {
+                          "planFile":  "bookseller-failed-batch-codex-handoff-smoke.json",
+                          "goalId":  "bookseller-failed-batch-codex-handoff-041",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a failed BookSeller batch produces a compact Codex-readable failure package with evidence paths, repro command, validation command, and recommended next action."
+                      },
+                      {
+                          "planFile":  "bookseller-failed-batch-handoff-regression-051.json",
+                          "goalId":  "bookseller-failed-batch-handoff-regression-051",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the BookSeller failed-batch Codex handoff path green."
+                      },
+                      {
+                          "planFile":  "bookseller-failed-handoff-regression-066.json",
+                          "goalId":  "bookseller-failed-handoff-regression-066",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep BookSeller failed batch handoff green."
+                      },
+                      {
+                          "planFile":  "bookseller-failed-handoff-regression-086.json",
+                          "goalId":  "bookseller-failed-handoff-regression-086",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep BookSeller failed batch handoff green."
+                      },
+                      {
+                          "planFile":  "bookseller-failure-package-smoke.json",
+                          "goalId":  "bookseller-failure-package-proof-030",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a failed BookSeller Test Agent run is packaged into Codex-readable JSON and Markdown evidence."
+                      },
+                      {
+                          "planFile":  "bookseller-intentional-batch-failure-041.json",
+                          "goalId":  "bookseller-intentional-batch-failure-041",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Intentionally fail a BookSeller batch after one passing memory search so Codex handoff can prove evidence from a real multi-step failed batch."
+                      },
+                      {
+                          "planFile":  "bookseller-intentional-memory-search-failure.json",
+                          "goalId":  "bookseller-intentional-memory-search-failure-030",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Intentionally fail a BookSeller memory search assertion so the Codex failure package can prove BookSeller-scoped evidence handoff."
+                      },
+                      {
+                          "planFile":  "bookseller-messy-prompt-batch-smoke.json",
+                          "goalId":  "bookseller-messy-prompt-batch-039",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "chat_conversation"
+                                      ],
+                          "stepCount":  4,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove messy BookSeller prompts route by behaviour, not exact wording, across vague storage, typo-heavy ticket creation, shorthand discussion saving, and build-preview safety."
+                      },
+                      {
+                          "planFile":  "bookseller-messy-prompt-regression-068.json",
+                          "goalId":  "bookseller-messy-prompt-regression-068",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the BookSeller messy prompt batch green through TesterAgent."
+                      },
+                      {
+                          "planFile":  "bookseller-messy-prompt-regression-088.json",
+                          "goalId":  "bookseller-messy-prompt-regression-088",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the BookSeller messy prompt batch green through TesterAgent."
+                      },
+                      {
+                          "planFile":  "bookseller-planner-vague-goal-draft-049.json",
+                          "goalId":  "bookseller-planner-vague-goal-draft-049",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent can draft a BookSeller-scoped plan from a vague goal without executing or patching."
+                      },
+                      {
+                          "planFile":  "bookseller-planner-vague-goal-draft-063.json",
+                          "goalId":  "bookseller-planner-vague-goal-draft-063",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent drafts from vague BookSeller intent without executing or patching."
+                      },
+                      {
+                          "planFile":  "bookseller-planner-vague-goal-draft-083.json",
+                          "goalId":  "bookseller-planner-vague-goal-draft-083",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent drafts from vague BookSeller intent without executing or patching."
+                      },
+                      {
+                          "planFile":  "bookseller-project-smoke.json",
+                          "goalId":  "bookseller-project-fixture-020",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  3,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove BookSeller exists as a project-scoped dogfood fixture with accepted memory, a simple ticket fixture, and a CLI/Test Agent plan that reports project = BookSeller without IronDev memory bleed."
+                      },
+                      {
+                          "planFile":  "bookseller-retrieval-chaos-batch-smoke.json",
+                          "goalId":  "bookseller-retrieval-chaos-batch-040",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  4,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove BookSeller memory search remains project-scoped and authority-ranked when queries contain tempting IronDev/Codex/self-improvement language."
+                      },
+                      {
+                          "planFile":  "bookseller-retrieval-chaos-regression-069.json",
+                          "goalId":  "bookseller-retrieval-chaos-regression-069",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the BookSeller retrieval chaos batch green through TesterAgent."
+                      },
+                      {
+                          "planFile":  "bookseller-retrieval-chaos-regression-089.json",
+                          "goalId":  "bookseller-retrieval-chaos-regression-089",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the BookSeller retrieval chaos batch green through TesterAgent."
+                      },
+                      {
+                          "planFile":  "bookseller-retriever-context-062.json",
+                          "goalId":  "bookseller-retriever-context-062",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent can package BookSeller accepted memory without IronDev bleed."
+                      },
+                      {
+                          "planFile":  "bookseller-retriever-context-082.json",
+                          "goalId":  "bookseller-retriever-context-082",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent packages BookSeller accepted memory without IronDev bleed."
+                      },
+                      {
+                          "planFile":  "bookseller-storage-vague.json",
+                          "goalId":  "",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "chat_send",
+                                          "replay_run"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Exercise a vague BookSeller storage request, answer IronDev\u0027s clarification, then verify replay stays green."
+                      },
+                      {
+                          "planFile":  "bookseller-supervisor-builder-preview-065.json",
+                          "goalId":  "bookseller-supervisor-builder-preview-065",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent can coordinate BookSeller memory plus builder preview while preserving no-write boundaries."
+                      },
+                      {
+                          "planFile":  "bookseller-supervisor-builder-preview-085.json",
+                          "goalId":  "bookseller-supervisor-builder-preview-085",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent coordinates BookSeller memory plus builder preview while preserving no-write boundaries."
+                      },
+                      {
+                          "planFile":  "bookseller-supervisor-builder-preview-loop-048.json",
+                          "goalId":  "bookseller-supervisor-builder-preview-loop-048",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent can coordinate BookSeller memory retrieval plus BookSeller builder preview validation without writes."
+                      },
+                      {
+                          "planFile":  "bookseller-supervisor-project-smoke-064.json",
+                          "goalId":  "bookseller-supervisor-project-smoke-064",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent can coordinate BookSeller memory plus the BookSeller project smoke."
+                      },
+                      {
+                          "planFile":  "bookseller-supervisor-project-smoke-084.json",
+                          "goalId":  "bookseller-supervisor-project-smoke-084",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent coordinates BookSeller memory plus the BookSeller project smoke."
+                      },
+                      {
+                          "planFile":  "bookseller-test-after-preview-smoke.json",
+                          "goalId":  "bookseller-test-after-preview-023",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "builder_proposal_safety_smoke",
+                                          "dotnet_build",
+                                          "memory_search"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  3,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove the Test Agent can run a BookSeller-scoped validation step after builder preview without applying code."
+                      },
+                      {
+                          "planFile":  "bookseller-tester-agent-project-smoke.json",
+                          "goalId":  "bookseller-tester-agent-project-fixture-020",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove TesterAgent can run the BookSeller project-scoped fixture plan and return a structured report for project = BookSeller."
+                      },
+                      {
+                          "planFile":  "bookseller-ticket-source-link-smoke.json",
+                          "goalId":  "bookseller-ticket-source-link-021",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "ticket_source_link_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a BookSeller project ticket created from a SQL-backed project document preserves and resolves the exact ProjectDocumentVersion source link."
+                      },
+                      {
+                          "planFile":  "bookseller-ticket-to-builder-context-smoke.json",
+                          "goalId":  "bookseller-ticket-to-builder-context-029",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "builder_context_source_memory_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a BookSeller ticket with SourceDocumentVersionId assembles builder context with the linked source document memory, without generating code or applying patches."
+                      },
+                      {
+                          "planFile":  "bookseller-vague-prompt-routing-smoke.json",
+                          "goalId":  "bookseller-vague-prompt-routing-026",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "chat_conversation",
+                                          "replay_run"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a vague BookSeller persistence prompt asks for more detail first, then routes the clarified answer into a dry-run discussion document action."
+                      },
+                      {
+                          "planFile":  "irondev-agent-model-profiles-smoke.json",
+                          "goalId":  "agent-model-profiles-014",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_list",
+                                          "agent_profiles",
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  3,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove IronDev has OpenAI-only model profiles, eight registered agent stubs, and one working TesterAgent path that can execute an existing Test Agent plan."
+                      },
+                      {
+                          "planFile":  "irondev-builder-proposal-safety-smoke.json",
+                          "goalId":  "builder-proposal-safety-016",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "builder_proposal_safety_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove builder proposal generation remains proposal-first and does not write files before approval."
+                      },
+                      {
+                          "planFile":  "irondev-code-standards-alpha.json",
+                          "goalId":  "code-standards-alpha-009",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "code_standards_check",
+                                          "dotnet_build",
+                                          "dotnet_test",
+                                          "format_check",
+                                          "package_audit"
+                                      ],
+                          "stepCount":  5,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the deterministic Alpha code standards gate so Codex can see build/test/format/audit status plus code-shape warnings before adding more memory-spine ribs."
+                      },
+                      {
+                          "planFile":  "irondev-codex-memory-search-cli-smoke.json",
+                          "goalId":  "codex-memory-search-cli-013",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  4,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove Codex can query IronDev dogfood project memory through a Weaviate-backed CLI search and receive compact source-linked JSON before editing."
+                      },
+                      {
+                          "planFile":  "irondev-codex-memory-title-promotion-070.json",
+                          "goalId":  "codex-memory-title-promotion-070",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove named-memory queries promote the exact accepted document above broad umbrella architecture."
+                      },
+                      {
+                          "planFile":  "irondev-codex-memory-title-promotion-090.json",
+                          "goalId":  "codex-memory-title-promotion-090",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove named-memory queries promote exact accepted batch documents across current and previous batches."
+                      },
+                      {
+                          "planFile":  "irondev-critic-failure-package-review-smoke.json",
+                          "goalId":  "critic-failure-package-review-036",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "critic_failure_package_review_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove CriticAgent can review a Codex-facing failure package and return an actionable evidence review."
+                      },
+                      {
+                          "planFile":  "irondev-critic-failure-review-059.json",
+                          "goalId":  "critic-irondev-failure-review-059",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "critic_failure_package_review_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove CriticAgent can review an IronDev failure package and return an actionable evidence-backed recommendation."
+                      },
+                      {
+                          "planFile":  "irondev-critic-failure-review-079.json",
+                          "goalId":  "critic-irondev-failure-review-079",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "critic_failure_package_review_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep CriticAgent review of IronDev failure evidence green."
+                      },
+                      {
+                          "planFile":  "irondev-failure-handoff-regression-060.json",
+                          "goalId":  "irondev-failure-handoff-regression-060",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the IronDev failure package handoff path green."
+                      },
+                      {
+                          "planFile":  "irondev-failure-handoff-regression-080.json",
+                          "goalId":  "irondev-failure-handoff-regression-080",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the IronDev failure package handoff path green."
+                      },
+                      {
+                          "planFile":  "irondev-failure-package-handoff-smoke.json",
+                          "goalId":  "failure-package-handoff-017",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "failure_package_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove failed Test Agent reports can be packaged into Codex-readable JSON and Markdown with expected/actual evidence, likely areas, repro commands, validation commands, and safety rules."
+                      },
+                      {
+                          "planFile":  "irondev-intentional-memory-search-failure.json",
+                          "goalId":  "intentional-memory-search-failure-017",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Intentionally fail a memory search assertion so the failure package handoff can prove Test Agent failures are packaged for Codex."
+                      },
+                      {
+                          "planFile":  "irondev-memory-spine-builder-context-source-smoke.json",
+                          "goalId":  "memory-spine-011-builder-context-source-memory",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "builder_context_source_memory_smoke",
+                                          "dotnet_build"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  null,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove builder context assembly includes the ticket\u0027s linked SQL ProjectDocumentVersion without generating code or applying patches."
+                      },
+                      {
+                          "planFile":  "irondev-memory-spine-cross-project-smoke.json",
+                          "goalId":  "retrieval-correctness-008",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "cross_project_memory_smoke",
+                                          "weaviate_health"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove real Weaviate retrieval can surface a stronger cross-project candidate while IronDev project filtering rejects it and accepts the active IronDev project memory as primary authority."
+                      },
+                      {
+                          "planFile":  "irondev-memory-spine-smoke.json",
+                          "goalId":  "retrieval-correctness-001",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "docs_search",
+                                          "weaviate_health"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove the first slice of IronDev\u0027s memory spine: Weaviate health plus current IronDev dogfood knowledge retrieval with authority-aware expectations."
+                      },
+                      {
+                          "planFile":  "irondev-memory-spine-sql-version-smoke.json",
+                          "goalId":  "retrieval-correctness-006",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "sql_document_version_smoke",
+                                          "weaviate_health"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove a SQL-backed ProjectDocumentVersion can be indexed into semantic memory tables and retrieved as the current authoritative version over an older stale version."
+                      },
+                      {
+                          "planFile":  "irondev-memory-spine-ticket-source-link-smoke.json",
+                          "goalId":  "memory-spine-010-ticket-source-link",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "ticket_source_link_smoke"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove tickets created from SQL-backed project documents preserve and resolve the exact ProjectDocumentVersion source link."
+                      },
+                      {
+                          "planFile":  "irondev-memory-reindex-freshness-smoke.json",
+                          "goalId":  "memory-reindex-freshness-116",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "weaviate_health",
+                                          "memory_reindex_freshness_smoke"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove repeated memory reindexing keeps current accepted IronDev memory fresh, stale evidence visible, duplicate counts zero, and BookSeller wrong-project candidates rejected."
+                      },
+                      {
+                          "planFile":  "irondev-memory-spine-weaviate-sql-version-smoke.json",
+                          "goalId":  "retrieval-correctness-007",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "weaviate_health",
+                                          "weaviate_sql_document_version_smoke"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SQL-backed ProjectDocumentVersion chunks can be written to Weaviate, returned by a real nearVector query, and corrected by authority/current/stale ranking when raw vector retrieval prefers the stale version."
+                      },
+                      {
+                          "planFile":  "irondev-planner-agent-test-plan-draft-smoke.json",
+                          "goalId":  "planner-agent-test-plan-draft-038",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent turns a bounded vague goal into valid draft Test Agent plan JSON without executing or patching code."
+                      },
+                      {
+                          "planFile":  "irondev-planner-memory-first-045.json",
+                          "goalId":  "planner-agent-memory-first-045",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent drafts an IronDev-scoped memory-first plan from a vague self-improvement goal."
+                      },
+                      {
+                          "planFile":  "irondev-planner-memory-first-056.json",
+                          "goalId":  "planner-agent-memory-first-056",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent drafts an IronDev-scoped memory-first plan for the larger reliability loop."
+                      },
+                      {
+                          "planFile":  "irondev-planner-memory-first-076.json",
+                          "goalId":  "planner-agent-memory-first-076",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_planner_draft_test_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove PlannerAgent drafts an IronDev-scoped memory-first plan for the 074-093 reliability loop."
+                      },
+                      {
+                          "planFile":  "irondev-quality-agent-gate-regression-058.json",
+                          "goalId":  "quality-agent-gate-regression-058",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_quality_run_gate"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep QualityAgent deterministic quality gate green inside the 054-073 batch."
+                      },
+                      {
+                          "planFile":  "irondev-quality-agent-gate-regression-078.json",
+                          "goalId":  "quality-agent-gate-regression-078",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Keep the QualityAgent deterministic gate green inside the 074-093 batch."
+                      },
+                      {
+                          "planFile":  "irondev-quality-agent-real-path-smoke.json",
+                          "goalId":  "quality-agent-real-path-037",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_quality_run_gate"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove QualityAgent wraps the deterministic code standards/toolchain gate and returns a structured quality report."
+                      },
+                      {
+                          "planFile":  "irondev-retriever-agent-context-bundle-smoke.json",
+                          "goalId":  "retriever-agent-context-bundle-034",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent returns a richer context bundle with source guidance while preserving the real memory search path."
+                      },
+                      {
+                          "planFile":  "irondev-retriever-agent-memory-search-smoke.json",
+                          "goalId":  "retriever-agent-real-path-024",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent wraps the real memory search path and returns a project-scoped context package with source and ranking evidence."
+                      },
+                      {
+                          "planFile":  "irondev-retriever-current-batch-context-047.json",
+                          "goalId":  "retriever-current-batch-context-047",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent returns the accepted 044-053 batch goal pack as current IronDev context with guidance and trace evidence."
+                      },
+                      {
+                          "planFile":  "irondev-retriever-current-batch-context-055.json",
+                          "goalId":  "retriever-current-batch-context-055",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent returns the accepted 054-073 batch goal pack as current IronDev context."
+                      },
+                      {
+                          "planFile":  "irondev-retriever-current-batch-context-075.json",
+                          "goalId":  "retriever-current-batch-context-075",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_retriever_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove RetrieverAgent returns the accepted 074-093 batch goal pack as current IronDev context."
+                      },
+                      {
+                          "planFile":  "irondev-self-improvement-current-memory-smoke.json",
+                          "goalId":  "self-improvement-current-memory-022-docs",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  3,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove the accepted IronDev self-improvement system memory retrieves as the current source for operating rules and next build order."
+                      },
+                      {
+                          "planFile":  "irondev-self-improvement-goals-044-memory-smoke.json",
+                          "goalId":  "self-improvement-goals-044-memory-import",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove the 044-053 goal pack is available through Codex-facing IronDev memory search."
+                      },
+                      {
+                          "planFile":  "irondev-self-improvement-goals-054-memory-smoke.json",
+                          "goalId":  "self-improvement-goals-054-memory-import",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove the 054-073 goal pack is available through Codex-facing IronDev memory search."
+                      },
+                      {
+                          "planFile":  "irondev-self-improvement-goals-074-memory-smoke.json",
+                          "goalId":  "self-improvement-goals-074-memory-import",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "memory_search"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove the 074-093 self-improvement goal pack is accepted IronDev memory."
+                      },
+                      {
+                          "planFile":  "irondev-supervisor-codex-loop-smoke.json",
+                          "goalId":  "supervisor-codex-loop-proof-025",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent can gather project memory, dispatch TesterAgent, and return a compact Codex-facing handoff without changing builder behaviour."
+                      },
+                      {
+                          "planFile":  "irondev-supervisor-current-batch-loop-057.json",
+                          "goalId":  "supervisor-current-batch-loop-057",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent retrieves current 054-073 memory and dispatches TesterAgent against a bounded memory smoke."
+                      },
+                      {
+                          "planFile":  "irondev-supervisor-current-batch-loop-077.json",
+                          "goalId":  "supervisor-current-batch-loop-077",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent retrieves current 074-093 memory and dispatches TesterAgent against a bounded memory smoke."
+                      },
+                      {
+                          "planFile":  "irondev-supervisor-current-memory-loop-046.json",
+                          "goalId":  "supervisor-current-memory-loop-046",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent retrieves current IronDev batch memory and dispatches TesterAgent against a bounded memory smoke plan."
+                      },
+                      {
+                          "planFile":  "irondev-supervisor-tiny-decision-loop-smoke.json",
+                          "goalId":  "supervisor-tiny-decision-loop-035",
+                          "project":  "BookSeller",
+                          "actions":  [
+                                          "agent_supervisor_run_goal"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove SupervisorAgent selects from a tiny allowed decision set after RetrieverAgent and TesterAgent complete."
+                      },
+                      {
+                          "planFile":  "irondev-tester-agent-cross-project-memory-smoke.json",
+                          "goalId":  "tester-agent-cross-project-memory-015",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  1,
+                          "maxTurns":  1,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Prove TesterAgent can execute the real cross-project Weaviate memory smoke and return a structured report showing IronDev rejects BookSeller memory as primary authority."
+                      },
+                      {
+                          "planFile":  "irondev-toolchain-smoke.json",
+                          "goalId":  "toolchain-smoke-001",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "dotnet_build",
+                                          "dotnet_test",
+                                          "format_check",
+                                          "package_audit",
+                                          "replay_run"
+                                      ],
+                          "stepCount":  5,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Exercise real deterministic Test Agent tools for build, focused tests, formatting, audit, and report schema shape."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-020-030-regression-pack.json",
+                          "goalId":  "self-improvement-batch-regression-pack-031",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  10,
+                          "maxTurns":  10,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the key BookSeller and self-improvement proof plans through TesterAgent as one compact 020-030 regression pack."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-022-032-pr-ready-quality-gate.json",
+                          "goalId":  "self-improvement-pr-ready-quality-gate-032",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the branch-level PR-ready quality gate for the 022-032 self-improvement batch."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-033-041-regression-pack.json",
+                          "goalId":  "self-improvement-goals-033-041-regression-pack-042",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  8,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the key 034-041 operational self-improvement proofs through TesterAgent as one compact regression pack. Goal 033 is the branch goal document boundary."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-033-043-pr-ready-quality-gate.json",
+                          "goalId":  "self-improvement-goals-033-043-pr-ready-quality-gate",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the branch-level PR-ready quality gate for the 033-043 self-improvement batch."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-033-070-cross-batch-regression.json",
+                          "goalId":  "self-improvement-goals-033-070-cross-batch-regression-072",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  3,
+                          "maxTurns":  3,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run prior PR gates plus the new 054-070 pack so Codex can see continuity across batches."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-033-090-cross-batch-regression.json",
+                          "goalId":  "self-improvement-goals-033-090-cross-batch-regression-092",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  4,
+                          "maxTurns":  4,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the 033-043, 044-053, 054-073, and 074-090 proof packs as a compact cross-batch confidence gate."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-044-051-regression-pack.json",
+                          "goalId":  "self-improvement-goals-044-051-regression-pack-052",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  8,
+                          "maxTurns":  8,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the key 044-051 agent dogfood proofs through TesterAgent as one compact regression pack."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-044-053-pr-ready-quality-gate.json",
+                          "goalId":  "self-improvement-goals-044-053-pr-ready-quality-gate",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the branch-level PR-ready quality gate for the 044-053 self-improvement batch."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-054-070-regression-pack.json",
+                          "goalId":  "self-improvement-goals-054-070-regression-pack-071",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  17,
+                          "maxTurns":  17,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the key 054-070 self-improvement proofs through TesterAgent as one compact regression pack."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-054-073-pr-ready-quality-gate.json",
+                          "goalId":  "self-improvement-goals-054-073-pr-ready-quality-gate",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the branch-level PR-ready quality gate for the 054-073 self-improvement batch."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-074-090-regression-pack.json",
+                          "goalId":  "self-improvement-goals-074-090-regression-pack-091",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  17,
+                          "maxTurns":  17,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the key 074-090 self-improvement proofs through TesterAgent as one compact regression pack."
+                      },
+                      {
+                          "planFile":  "self-improvement-goals-074-093-pr-ready-quality-gate.json",
+                          "goalId":  "self-improvement-goals-074-093-pr-ready-quality-gate",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "agent_tester_run_plan"
+                                      ],
+                          "stepCount":  2,
+                          "maxTurns":  2,
+                          "earlyStopOnFailure":  true,
+                          "description":  "Run the branch-level PR-ready quality gate for the 074-093 self-improvement batch."
+                      }
+                  ],
+        "Count":  100
     },
     {
-        "planFile":  "irondev-sentinel-agent-lite-smoke.json",
-        "goalId":  "sentinel-agent-lite-120",
+        "plan_file":  "irondev-foundation-break-test-121-campaign-finding.json",
+        "goal_id":  "foundation-break-test-121",
         "project":  "IronDev",
-        "actions":  [
-                        "agent_sentinel_observe"
-                    ],
-        "requiredServices":  [
-                                 "ReplayRunner",
-                                 "TestAgent",
-                                 "AgentRegistry"
-                             ],
-        "regressionGroup":  "SentinelAgent",
-        "safetyBoundary":  "Observational only; no document persistence, ticket creation, code writes, build blocking, or autonomous fixes.",
-        "kind":  "smoke",
-        "description":  "Prove SentinelAgent Lite emits project-aware insight artefacts from campaign evidence, preserving observedProject and affectedProject."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "irondev-research-agent-lite-smoke.json",
-        "goalId":  "research-agent-lite-121",
+        "plan_file":  "irondev-foundation-break-test-122-routing-save-knowledge.json",
+        "goal_id":  "foundation-break-test-122",
         "project":  "IronDev",
-        "actions":  [
-                        "agent_research_package"
-                    ],
-        "requiredServices":  [
-                                 "ReplayRunner",
-                                 "TestAgent",
-                                 "AgentRegistry"
-                             ],
-        "regressionGroup":  "ResearchAgent",
-        "safetyBoundary":  "Read-only explicit evidence packaging; no architecture decisions, project memory writes, tickets, patches, or automatic builder context injection.",
-        "kind":  "smoke",
-        "description":  "Prove ResearchAgent Lite emits a ResearchPackage from explicit external evidence and warns that accepted project memory remains authoritative."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "bookseller-supervised-10-run-campaign.json",
-        "goalId":  "bookseller-supervised-campaign-118",
+        "plan_file":  "irondev-foundation-break-test-123-campaign-reset.json",
+        "goal_id":  "foundation-break-test-123",
+        "project":  "IronDev",
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
+    },
+    {
+        "plan_file":  "irondev-foundation-break-test-124-build-isolation.json",
+        "goal_id":  "foundation-break-test-124",
+        "project":  "IronDev",
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
+    },
+    {
+        "plan_file":  "irondev-foundation-break-test-125-campaign-rerun.json",
+        "goal_id":  "foundation-break-test-125",
         "project":  "BookSeller",
-        "actions":  [
-                        "bookseller_supervised_campaign"
-                    ],
-        "requiredServices":  [
-                                 "ReplayRunner",
-                                 "TestAgent",
-                                 "Weaviate",
-                                 "DisposableWorkspace"
-                             ],
-        "regressionGroup":  "BookSellerSupervisedCampaign",
-        "safetyBoundary":  "Sequential campaign only; disposable workspace writes allowed; real repo writes blocked.",
-        "kind":  "campaign",
-        "description":  "Run a sequential 10-run supervised BookSeller campaign with messy prompts, project-scoped memory/context checks, disposable workspace apply, fail-closed unsafe patching, and a compact Codex-readable campaign report."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "bookseller-architecture-memory-regression-061.json",
-        "goalId":  "bookseller-architecture-memory-regression-061",
+        "plan_file":  "irondev-foundation-break-test-126-project-bleed-chaos.json",
+        "goal_id":  "foundation-break-test-126",
         "project":  "BookSeller",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep BookSeller architecture memory retrieval green and project-scoped."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "bookseller-architecture-memory-regression-081.json",
-        "goalId":  "bookseller-architecture-memory-regression-081",
+        "plan_file":  "irondev-foundation-break-test-127-disposable-abuse.json",
+        "goal_id":  "foundation-break-test-127",
         "project":  "BookSeller",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep BookSeller architecture memory retrieval green and project-scoped."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "bookseller-builder-preview-smoke.json",
-        "goalId":  "bookseller-builder-preview-022",
-        "project":  "BookSeller",
-        "actions":  [
-                        "builder_proposal_safety_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove BookSeller builder preview is project-scoped, includes BookSeller source context, and performs no file writes before approval."
-    },
-    {
-        "planFile":  "bookseller-conversation-storage.json",
-        "goalId":  "",
-        "project":  "BookSeller",
-        "actions":  [
-                        "chat_conversation",
-                        "replay_run"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Start with a vague persistence request, let IronDev ask for detail, then answer with storage facts and require a saved discussion document route."
-    },
-    {
-        "planFile":  "bookseller-disposable-workspace-apply-smoke.json",
-        "goalId":  "disposable-workspace-apply-proof-104-115",
-        "project":  "BookSeller",
-        "actions":  [
-                        "disposable_workspace_apply_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove BookSeller patch application is restricted to an explicit disposable workspace with hashes, build/test evidence, comparison review, and no real repo writes."
-    },
-    {
-        "planFile":  "bookseller-disposable-workspace-fail-closed-smoke.json",
-        "goalId":  "disposable-workspace-fail-closed-104-115",
-        "project":  "BookSeller",
-        "actions":  [
-                        "disposable_workspace_apply_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove BookSeller disposable workspace apply fails closed when a proposal attempts to write outside the explicit disposable workspace."
-    },
-    {
-        "planFile":  "bookseller-critic-failed-batch-review-050.json",
-        "goalId":  "bookseller-critic-failed-batch-review-050",
-        "project":  "BookSeller",
-        "actions":  [
-                        "critic_failure_package_review_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove CriticAgent can review a Codex-facing failure package generated from a failed BookSeller batch."
-    },
-    {
-        "planFile":  "bookseller-critic-failed-review-067.json",
-        "goalId":  "bookseller-critic-failed-review-067",
-        "project":  "BookSeller",
-        "actions":  [
-                        "critic_failure_package_review_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep CriticAgent review of BookSeller failure evidence green."
-    },
-    {
-        "planFile":  "bookseller-critic-failed-review-087.json",
-        "goalId":  "bookseller-critic-failed-review-087",
-        "project":  "BookSeller",
-        "actions":  [
-                        "critic_failure_package_review_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep CriticAgent review of BookSeller failure evidence green."
-    },
-    {
-        "planFile":  "bookseller-discussion-to-document-smoke.json",
-        "goalId":  "bookseller-discussion-to-document-027",
-        "project":  "BookSeller",
-        "actions":  [
-                        "discussion_document_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a BookSeller discussion can become a real SQL ProjectDocument with an exact source discussion link and semantic trace evidence."
-    },
-    {
-        "planFile":  "bookseller-document-to-tickets-smoke.json",
-        "goalId":  "bookseller-document-to-tickets-028",
-        "project":  "BookSeller",
-        "actions":  [
-                        "document_to_tickets_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a BookSeller project document can generate multiple SQL ProjectTickets and each ticket preserves the exact ProjectDocumentVersion source link."
-    },
-    {
-        "planFile":  "bookseller-failed-batch-codex-handoff-smoke.json",
-        "goalId":  "bookseller-failed-batch-codex-handoff-041",
-        "project":  "BookSeller",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a failed BookSeller batch produces a compact Codex-readable failure package with evidence paths, repro command, validation command, and recommended next action."
-    },
-    {
-        "planFile":  "bookseller-failed-batch-handoff-regression-051.json",
-        "goalId":  "bookseller-failed-batch-handoff-regression-051",
-        "project":  "BookSeller",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the BookSeller failed-batch Codex handoff path green."
-    },
-    {
-        "planFile":  "bookseller-failed-handoff-regression-066.json",
-        "goalId":  "bookseller-failed-handoff-regression-066",
-        "project":  "BookSeller",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep BookSeller failed batch handoff green."
-    },
-    {
-        "planFile":  "bookseller-failed-handoff-regression-086.json",
-        "goalId":  "bookseller-failed-handoff-regression-086",
-        "project":  "BookSeller",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep BookSeller failed batch handoff green."
-    },
-    {
-        "planFile":  "bookseller-failure-package-smoke.json",
-        "goalId":  "bookseller-failure-package-proof-030",
-        "project":  "BookSeller",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a failed BookSeller Test Agent run is packaged into Codex-readable JSON and Markdown evidence."
-    },
-    {
-        "planFile":  "bookseller-intentional-batch-failure-041.json",
-        "goalId":  "bookseller-intentional-batch-failure-041",
-        "project":  "BookSeller",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Intentionally fail a BookSeller batch after one passing memory search so Codex handoff can prove evidence from a real multi-step failed batch."
-    },
-    {
-        "planFile":  "bookseller-intentional-memory-search-failure.json",
-        "goalId":  "bookseller-intentional-memory-search-failure-030",
-        "project":  "BookSeller",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Intentionally fail a BookSeller memory search assertion so the Codex failure package can prove BookSeller-scoped evidence handoff."
-    },
-    {
-        "planFile":  "bookseller-messy-prompt-batch-smoke.json",
-        "goalId":  "bookseller-messy-prompt-batch-039",
-        "project":  "BookSeller",
-        "actions":  [
-                        "chat_conversation"
-                    ],
-        "stepCount":  4,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove messy BookSeller prompts route by behaviour, not exact wording, across vague storage, typo-heavy ticket creation, shorthand discussion saving, and build-preview safety."
-    },
-    {
-        "planFile":  "bookseller-messy-prompt-regression-068.json",
-        "goalId":  "bookseller-messy-prompt-regression-068",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the BookSeller messy prompt batch green through TesterAgent."
-    },
-    {
-        "planFile":  "bookseller-messy-prompt-regression-088.json",
-        "goalId":  "bookseller-messy-prompt-regression-088",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the BookSeller messy prompt batch green through TesterAgent."
-    },
-    {
-        "planFile":  "bookseller-planner-vague-goal-draft-049.json",
-        "goalId":  "bookseller-planner-vague-goal-draft-049",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent can draft a BookSeller-scoped plan from a vague goal without executing or patching."
-    },
-    {
-        "planFile":  "bookseller-planner-vague-goal-draft-063.json",
-        "goalId":  "bookseller-planner-vague-goal-draft-063",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent drafts from vague BookSeller intent without executing or patching."
-    },
-    {
-        "planFile":  "bookseller-planner-vague-goal-draft-083.json",
-        "goalId":  "bookseller-planner-vague-goal-draft-083",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent drafts from vague BookSeller intent without executing or patching."
-    },
-    {
-        "planFile":  "bookseller-project-smoke.json",
-        "goalId":  "bookseller-project-fixture-020",
-        "project":  "BookSeller",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  3,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove BookSeller exists as a project-scoped dogfood fixture with accepted memory, a simple ticket fixture, and a CLI/Test Agent plan that reports project = BookSeller without IronDev memory bleed."
-    },
-    {
-        "planFile":  "bookseller-retrieval-chaos-batch-smoke.json",
-        "goalId":  "bookseller-retrieval-chaos-batch-040",
-        "project":  "BookSeller",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  4,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove BookSeller memory search remains project-scoped and authority-ranked when queries contain tempting IronDev/Codex/self-improvement language."
-    },
-    {
-        "planFile":  "bookseller-retrieval-chaos-regression-069.json",
-        "goalId":  "bookseller-retrieval-chaos-regression-069",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the BookSeller retrieval chaos batch green through TesterAgent."
-    },
-    {
-        "planFile":  "bookseller-retrieval-chaos-regression-089.json",
-        "goalId":  "bookseller-retrieval-chaos-regression-089",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the BookSeller retrieval chaos batch green through TesterAgent."
-    },
-    {
-        "planFile":  "bookseller-retriever-context-062.json",
-        "goalId":  "bookseller-retriever-context-062",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent can package BookSeller accepted memory without IronDev bleed."
-    },
-    {
-        "planFile":  "bookseller-retriever-context-082.json",
-        "goalId":  "bookseller-retriever-context-082",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent packages BookSeller accepted memory without IronDev bleed."
-    },
-    {
-        "planFile":  "bookseller-storage-vague.json",
-        "goalId":  "",
-        "project":  "BookSeller",
-        "actions":  [
-                        "chat_send",
-                        "replay_run"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Exercise a vague BookSeller storage request, answer IronDev\u0027s clarification, then verify replay stays green."
-    },
-    {
-        "planFile":  "bookseller-supervisor-builder-preview-065.json",
-        "goalId":  "bookseller-supervisor-builder-preview-065",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent can coordinate BookSeller memory plus builder preview while preserving no-write boundaries."
-    },
-    {
-        "planFile":  "bookseller-supervisor-builder-preview-085.json",
-        "goalId":  "bookseller-supervisor-builder-preview-085",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent coordinates BookSeller memory plus builder preview while preserving no-write boundaries."
-    },
-    {
-        "planFile":  "bookseller-supervisor-builder-preview-loop-048.json",
-        "goalId":  "bookseller-supervisor-builder-preview-loop-048",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent can coordinate BookSeller memory retrieval plus BookSeller builder preview validation without writes."
-    },
-    {
-        "planFile":  "bookseller-supervisor-project-smoke-064.json",
-        "goalId":  "bookseller-supervisor-project-smoke-064",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent can coordinate BookSeller memory plus the BookSeller project smoke."
-    },
-    {
-        "planFile":  "bookseller-supervisor-project-smoke-084.json",
-        "goalId":  "bookseller-supervisor-project-smoke-084",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent coordinates BookSeller memory plus the BookSeller project smoke."
-    },
-    {
-        "planFile":  "bookseller-test-after-preview-smoke.json",
-        "goalId":  "bookseller-test-after-preview-023",
-        "project":  "BookSeller",
-        "actions":  [
-                        "builder_proposal_safety_smoke",
-                        "dotnet_build",
-                        "memory_search"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  3,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove the Test Agent can run a BookSeller-scoped validation step after builder preview without applying code."
-    },
-    {
-        "planFile":  "bookseller-tester-agent-project-smoke.json",
-        "goalId":  "bookseller-tester-agent-project-fixture-020",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove TesterAgent can run the BookSeller project-scoped fixture plan and return a structured report for project = BookSeller."
-    },
-    {
-        "planFile":  "bookseller-ticket-source-link-smoke.json",
-        "goalId":  "bookseller-ticket-source-link-021",
-        "project":  "BookSeller",
-        "actions":  [
-                        "ticket_source_link_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a BookSeller project ticket created from a SQL-backed project document preserves and resolves the exact ProjectDocumentVersion source link."
-    },
-    {
-        "planFile":  "bookseller-ticket-to-builder-context-smoke.json",
-        "goalId":  "bookseller-ticket-to-builder-context-029",
-        "project":  "BookSeller",
-        "actions":  [
-                        "builder_context_source_memory_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a BookSeller ticket with SourceDocumentVersionId assembles builder context with the linked source document memory, without generating code or applying patches."
-    },
-    {
-        "planFile":  "bookseller-vague-prompt-routing-smoke.json",
-        "goalId":  "bookseller-vague-prompt-routing-026",
-        "project":  "BookSeller",
-        "actions":  [
-                        "chat_conversation",
-                        "replay_run"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a vague BookSeller persistence prompt asks for more detail first, then routes the clarified answer into a dry-run discussion document action."
-    },
-    {
-        "planFile":  "irondev-agent-model-profiles-smoke.json",
-        "goalId":  "agent-model-profiles-014",
+        "plan_file":  "irondev-foundation-break-test-128-code-comparison-hardening.json",
+        "goal_id":  "foundation-break-test-128",
         "project":  "IronDev",
-        "actions":  [
-                        "agent_list",
-                        "agent_profiles",
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  3,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove IronDev has OpenAI-only model profiles, eight registered agent stubs, and one working TesterAgent path that can execute an existing Test Agent plan."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "irondev-builder-proposal-safety-smoke.json",
-        "goalId":  "builder-proposal-safety-016",
+        "plan_file":  "irondev-foundation-break-test-129-sentinel-insight-pack.json",
+        "goal_id":  "foundation-break-test-129",
         "project":  "IronDev",
-        "actions":  [
-                        "builder_proposal_safety_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove builder proposal generation remains proposal-first and does not write files before approval."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "irondev-code-standards-alpha.json",
-        "goalId":  "code-standards-alpha-009",
+        "plan_file":  "irondev-foundation-break-test-130-phase-report.json",
+        "goal_id":  "foundation-break-test-130",
         "project":  "IronDev",
-        "actions":  [
-                        "code_standards_check",
-                        "dotnet_build",
-                        "dotnet_test",
-                        "format_check",
-                        "package_audit"
-                    ],
-        "stepCount":  5,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the deterministic Alpha code standards gate so Codex can see build/test/format/audit status plus code-shape warnings before adding more memory-spine ribs."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "core"
     },
     {
-        "planFile":  "irondev-codex-memory-search-cli-smoke.json",
-        "goalId":  "codex-memory-search-cli-013",
+        "plan_file":  "irondev-foundation-break-test-121-130-pack.json",
+        "goal_id":  "foundation-break-test-121-130",
         "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  4,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove Codex can query IronDev dogfood project memory through a Weaviate-backed CLI search and receive compact source-linked JSON before editing."
-    },
-    {
-        "planFile":  "irondev-codex-memory-title-promotion-070.json",
-        "goalId":  "codex-memory-title-promotion-070",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove named-memory queries promote the exact accepted document above broad umbrella architecture."
-    },
-    {
-        "planFile":  "irondev-codex-memory-title-promotion-090.json",
-        "goalId":  "codex-memory-title-promotion-090",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove named-memory queries promote exact accepted batch documents across current and previous batches."
-    },
-    {
-        "planFile":  "irondev-critic-failure-package-review-smoke.json",
-        "goalId":  "critic-failure-package-review-036",
-        "project":  "IronDev",
-        "actions":  [
-                        "critic_failure_package_review_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove CriticAgent can review a Codex-facing failure package and return an actionable evidence review."
-    },
-    {
-        "planFile":  "irondev-critic-failure-review-059.json",
-        "goalId":  "critic-irondev-failure-review-059",
-        "project":  "IronDev",
-        "actions":  [
-                        "critic_failure_package_review_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove CriticAgent can review an IronDev failure package and return an actionable evidence-backed recommendation."
-    },
-    {
-        "planFile":  "irondev-critic-failure-review-079.json",
-        "goalId":  "critic-irondev-failure-review-079",
-        "project":  "IronDev",
-        "actions":  [
-                        "critic_failure_package_review_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep CriticAgent review of IronDev failure evidence green."
-    },
-    {
-        "planFile":  "irondev-failure-handoff-regression-060.json",
-        "goalId":  "irondev-failure-handoff-regression-060",
-        "project":  "IronDev",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the IronDev failure package handoff path green."
-    },
-    {
-        "planFile":  "irondev-failure-handoff-regression-080.json",
-        "goalId":  "irondev-failure-handoff-regression-080",
-        "project":  "IronDev",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the IronDev failure package handoff path green."
-    },
-    {
-        "planFile":  "irondev-failure-package-handoff-smoke.json",
-        "goalId":  "failure-package-handoff-017",
-        "project":  "IronDev",
-        "actions":  [
-                        "failure_package_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove failed Test Agent reports can be packaged into Codex-readable JSON and Markdown with expected/actual evidence, likely areas, repro commands, validation commands, and safety rules."
-    },
-    {
-        "planFile":  "irondev-intentional-memory-search-failure.json",
-        "goalId":  "intentional-memory-search-failure-017",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Intentionally fail a memory search assertion so the failure package handoff can prove Test Agent failures are packaged for Codex."
-    },
-    {
-        "planFile":  "irondev-memory-spine-builder-context-source-smoke.json",
-        "goalId":  "memory-spine-011-builder-context-source-memory",
-        "project":  "IronDev",
-        "actions":  [
-                        "builder_context_source_memory_smoke",
-                        "dotnet_build"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  null,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove builder context assembly includes the ticket\u0027s linked SQL ProjectDocumentVersion without generating code or applying patches."
-    },
-    {
-        "planFile":  "irondev-memory-spine-cross-project-smoke.json",
-        "goalId":  "retrieval-correctness-008",
-        "project":  "IronDev",
-        "actions":  [
-                        "cross_project_memory_smoke",
-                        "weaviate_health"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove real Weaviate retrieval can surface a stronger cross-project candidate while IronDev project filtering rejects it and accepts the active IronDev project memory as primary authority."
-    },
-    {
-        "planFile":  "irondev-memory-spine-smoke.json",
-        "goalId":  "retrieval-correctness-001",
-        "project":  "IronDev",
-        "actions":  [
-                        "docs_search",
-                        "weaviate_health"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove the first slice of IronDev\u0027s memory spine: Weaviate health plus current IronDev dogfood knowledge retrieval with authority-aware expectations."
-    },
-    {
-        "planFile":  "irondev-memory-spine-sql-version-smoke.json",
-        "goalId":  "retrieval-correctness-006",
-        "project":  "IronDev",
-        "actions":  [
-                        "sql_document_version_smoke",
-                        "weaviate_health"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove a SQL-backed ProjectDocumentVersion can be indexed into semantic memory tables and retrieved as the current authoritative version over an older stale version."
-    },
-    {
-        "planFile":  "irondev-memory-spine-ticket-source-link-smoke.json",
-        "goalId":  "memory-spine-010-ticket-source-link",
-        "project":  "IronDev",
-        "actions":  [
-                        "ticket_source_link_smoke"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove tickets created from SQL-backed project documents preserve and resolve the exact ProjectDocumentVersion source link."
-    },
-    {
-        "planFile":  "irondev-memory-reindex-freshness-smoke.json",
-        "goalId":  "memory-reindex-freshness-116",
-        "project":  "IronDev",
-        "actions":  [
-                        "weaviate_health",
-                        "memory_reindex_freshness_smoke"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove repeated memory reindexing keeps current accepted IronDev memory fresh, stale evidence visible, duplicate counts zero, and BookSeller wrong-project candidates rejected."
-    },
-    {
-        "planFile":  "irondev-memory-spine-weaviate-sql-version-smoke.json",
-        "goalId":  "retrieval-correctness-007",
-        "project":  "IronDev",
-        "actions":  [
-                        "weaviate_health",
-                        "weaviate_sql_document_version_smoke"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SQL-backed ProjectDocumentVersion chunks can be written to Weaviate, returned by a real nearVector query, and corrected by authority/current/stale ranking when raw vector retrieval prefers the stale version."
-    },
-    {
-        "planFile":  "irondev-planner-agent-test-plan-draft-smoke.json",
-        "goalId":  "planner-agent-test-plan-draft-038",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent turns a bounded vague goal into valid draft Test Agent plan JSON without executing or patching code."
-    },
-    {
-        "planFile":  "irondev-planner-memory-first-045.json",
-        "goalId":  "planner-agent-memory-first-045",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent drafts an IronDev-scoped memory-first plan from a vague self-improvement goal."
-    },
-    {
-        "planFile":  "irondev-planner-memory-first-056.json",
-        "goalId":  "planner-agent-memory-first-056",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent drafts an IronDev-scoped memory-first plan for the larger reliability loop."
-    },
-    {
-        "planFile":  "irondev-planner-memory-first-076.json",
-        "goalId":  "planner-agent-memory-first-076",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_planner_draft_test_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove PlannerAgent drafts an IronDev-scoped memory-first plan for the 074-093 reliability loop."
-    },
-    {
-        "planFile":  "irondev-quality-agent-gate-regression-058.json",
-        "goalId":  "quality-agent-gate-regression-058",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_quality_run_gate"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep QualityAgent deterministic quality gate green inside the 054-073 batch."
-    },
-    {
-        "planFile":  "irondev-quality-agent-gate-regression-078.json",
-        "goalId":  "quality-agent-gate-regression-078",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Keep the QualityAgent deterministic gate green inside the 074-093 batch."
-    },
-    {
-        "planFile":  "irondev-quality-agent-real-path-smoke.json",
-        "goalId":  "quality-agent-real-path-037",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_quality_run_gate"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove QualityAgent wraps the deterministic code standards/toolchain gate and returns a structured quality report."
-    },
-    {
-        "planFile":  "irondev-retriever-agent-context-bundle-smoke.json",
-        "goalId":  "retriever-agent-context-bundle-034",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent returns a richer context bundle with source guidance while preserving the real memory search path."
-    },
-    {
-        "planFile":  "irondev-retriever-agent-memory-search-smoke.json",
-        "goalId":  "retriever-agent-real-path-024",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent wraps the real memory search path and returns a project-scoped context package with source and ranking evidence."
-    },
-    {
-        "planFile":  "irondev-retriever-current-batch-context-047.json",
-        "goalId":  "retriever-current-batch-context-047",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent returns the accepted 044-053 batch goal pack as current IronDev context with guidance and trace evidence."
-    },
-    {
-        "planFile":  "irondev-retriever-current-batch-context-055.json",
-        "goalId":  "retriever-current-batch-context-055",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent returns the accepted 054-073 batch goal pack as current IronDev context."
-    },
-    {
-        "planFile":  "irondev-retriever-current-batch-context-075.json",
-        "goalId":  "retriever-current-batch-context-075",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_retriever_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove RetrieverAgent returns the accepted 074-093 batch goal pack as current IronDev context."
-    },
-    {
-        "planFile":  "irondev-self-improvement-current-memory-smoke.json",
-        "goalId":  "self-improvement-current-memory-022-docs",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  3,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove the accepted IronDev self-improvement system memory retrieves as the current source for operating rules and next build order."
-    },
-    {
-        "planFile":  "irondev-self-improvement-goals-044-memory-smoke.json",
-        "goalId":  "self-improvement-goals-044-memory-import",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove the 044-053 goal pack is available through Codex-facing IronDev memory search."
-    },
-    {
-        "planFile":  "irondev-self-improvement-goals-054-memory-smoke.json",
-        "goalId":  "self-improvement-goals-054-memory-import",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove the 054-073 goal pack is available through Codex-facing IronDev memory search."
-    },
-    {
-        "planFile":  "irondev-self-improvement-goals-074-memory-smoke.json",
-        "goalId":  "self-improvement-goals-074-memory-import",
-        "project":  "IronDev",
-        "actions":  [
-                        "memory_search"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove the 074-093 self-improvement goal pack is accepted IronDev memory."
-    },
-    {
-        "planFile":  "irondev-supervisor-codex-loop-smoke.json",
-        "goalId":  "supervisor-codex-loop-proof-025",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent can gather project memory, dispatch TesterAgent, and return a compact Codex-facing handoff without changing builder behaviour."
-    },
-    {
-        "planFile":  "irondev-supervisor-current-batch-loop-057.json",
-        "goalId":  "supervisor-current-batch-loop-057",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent retrieves current 054-073 memory and dispatches TesterAgent against a bounded memory smoke."
-    },
-    {
-        "planFile":  "irondev-supervisor-current-batch-loop-077.json",
-        "goalId":  "supervisor-current-batch-loop-077",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent retrieves current 074-093 memory and dispatches TesterAgent against a bounded memory smoke."
-    },
-    {
-        "planFile":  "irondev-supervisor-current-memory-loop-046.json",
-        "goalId":  "supervisor-current-memory-loop-046",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent retrieves current IronDev batch memory and dispatches TesterAgent against a bounded memory smoke plan."
-    },
-    {
-        "planFile":  "irondev-supervisor-tiny-decision-loop-smoke.json",
-        "goalId":  "supervisor-tiny-decision-loop-035",
-        "project":  "BookSeller",
-        "actions":  [
-                        "agent_supervisor_run_goal"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove SupervisorAgent selects from a tiny allowed decision set after RetrieverAgent and TesterAgent complete."
-    },
-    {
-        "planFile":  "irondev-tester-agent-cross-project-memory-smoke.json",
-        "goalId":  "tester-agent-cross-project-memory-015",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  1,
-        "maxTurns":  1,
-        "earlyStopOnFailure":  true,
-        "description":  "Prove TesterAgent can execute the real cross-project Weaviate memory smoke and return a structured report showing IronDev rejects BookSeller memory as primary authority."
-    },
-    {
-        "planFile":  "irondev-toolchain-smoke.json",
-        "goalId":  "toolchain-smoke-001",
-        "project":  "IronDev",
-        "actions":  [
-                        "dotnet_build",
-                        "dotnet_test",
-                        "format_check",
-                        "package_audit",
-                        "replay_run"
-                    ],
-        "stepCount":  5,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Exercise real deterministic Test Agent tools for build, focused tests, formatting, audit, and report schema shape."
-    },
-    {
-        "planFile":  "self-improvement-goals-020-030-regression-pack.json",
-        "goalId":  "self-improvement-batch-regression-pack-031",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  10,
-        "maxTurns":  10,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the key BookSeller and self-improvement proof plans through TesterAgent as one compact 020-030 regression pack."
-    },
-    {
-        "planFile":  "self-improvement-goals-022-032-pr-ready-quality-gate.json",
-        "goalId":  "self-improvement-pr-ready-quality-gate-032",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the branch-level PR-ready quality gate for the 022-032 self-improvement batch."
-    },
-    {
-        "planFile":  "self-improvement-goals-033-041-regression-pack.json",
-        "goalId":  "self-improvement-goals-033-041-regression-pack-042",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  8,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the key 034-041 operational self-improvement proofs through TesterAgent as one compact regression pack. Goal 033 is the branch goal document boundary."
-    },
-    {
-        "planFile":  "self-improvement-goals-033-043-pr-ready-quality-gate.json",
-        "goalId":  "self-improvement-goals-033-043-pr-ready-quality-gate",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the branch-level PR-ready quality gate for the 033-043 self-improvement batch."
-    },
-    {
-        "planFile":  "self-improvement-goals-033-070-cross-batch-regression.json",
-        "goalId":  "self-improvement-goals-033-070-cross-batch-regression-072",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  3,
-        "maxTurns":  3,
-        "earlyStopOnFailure":  true,
-        "description":  "Run prior PR gates plus the new 054-070 pack so Codex can see continuity across batches."
-    },
-    {
-        "planFile":  "self-improvement-goals-033-090-cross-batch-regression.json",
-        "goalId":  "self-improvement-goals-033-090-cross-batch-regression-092",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  4,
-        "maxTurns":  4,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the 033-043, 044-053, 054-073, and 074-090 proof packs as a compact cross-batch confidence gate."
-    },
-    {
-        "planFile":  "self-improvement-goals-044-051-regression-pack.json",
-        "goalId":  "self-improvement-goals-044-051-regression-pack-052",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  8,
-        "maxTurns":  8,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the key 044-051 agent dogfood proofs through TesterAgent as one compact regression pack."
-    },
-    {
-        "planFile":  "self-improvement-goals-044-053-pr-ready-quality-gate.json",
-        "goalId":  "self-improvement-goals-044-053-pr-ready-quality-gate",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the branch-level PR-ready quality gate for the 044-053 self-improvement batch."
-    },
-    {
-        "planFile":  "self-improvement-goals-054-070-regression-pack.json",
-        "goalId":  "self-improvement-goals-054-070-regression-pack-071",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  17,
-        "maxTurns":  17,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the key 054-070 self-improvement proofs through TesterAgent as one compact regression pack."
-    },
-    {
-        "planFile":  "self-improvement-goals-054-073-pr-ready-quality-gate.json",
-        "goalId":  "self-improvement-goals-054-073-pr-ready-quality-gate",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the branch-level PR-ready quality gate for the 054-073 self-improvement batch."
-    },
-    {
-        "planFile":  "self-improvement-goals-074-090-regression-pack.json",
-        "goalId":  "self-improvement-goals-074-090-regression-pack-091",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  17,
-        "maxTurns":  17,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the key 074-090 self-improvement proofs through TesterAgent as one compact regression pack."
-    },
-    {
-        "planFile":  "self-improvement-goals-074-093-pr-ready-quality-gate.json",
-        "goalId":  "self-improvement-goals-074-093-pr-ready-quality-gate",
-        "project":  "IronDev",
-        "actions":  [
-                        "agent_tester_run_plan"
-                    ],
-        "stepCount":  2,
-        "maxTurns":  2,
-        "earlyStopOnFailure":  true,
-        "description":  "Run the branch-level PR-ready quality gate for the 074-093 self-improvement batch."
+        "agent_path":  "TestAgent -\u003e foundation_break_test",
+        "cli_command":  "foundation break-test",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "scenario",
+                                  "boundary",
+                                  "structured evidence",
+                                  "passed flag"
+                              ],
+        "regression_group":  "foundation-break-test",
+        "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
+        "classification":  "regression-pack"
     }
 ]

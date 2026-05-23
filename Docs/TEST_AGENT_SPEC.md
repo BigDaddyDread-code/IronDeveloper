@@ -89,6 +89,7 @@ Initial Alpha actions:
 | `memory_triage` | Classify whether feedback/context should become global or project memory, a finding, ticket, discussion, decision, or no saved memory | `IronDev.ReplayRunner memory triage` |
 | `agent_sentinel_observe` | Ask SentinelAgent Lite to emit an observational insight artefact from campaign/failure/test evidence | `IronDev.ReplayRunner agent sentinel observe` |
 | `agent_research_package` | Ask ResearchAgent Lite to package explicit external evidence as a read-only ResearchPackage | `IronDev.ReplayRunner agent research package` |
+| `foundation_break_test` | Run one foundation break-test scenario from the 121-130 hardening phase | `IronDev.ReplayRunner foundation break-test` |
 
 Example `chat_conversation` step:
 

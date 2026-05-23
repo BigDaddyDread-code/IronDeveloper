@@ -1,0 +1,20 @@
+{
+  "test_run_id": "FoundationBreakTest121-130-Pack",
+  "goal_id": "foundation-break-test-121-130",
+  "project": "IronDev",
+  "description": "Run the compact foundation break-test phase pack covering campaign findings, routing, reset, isolation, abuse, comparison, sentinel insight, and phase reporting.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    { "step": 1, "action": "foundation_break_test", "params": { "scenario": "campaign-finding", "expect_scenario": "campaign-finding", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 2, "action": "foundation_break_test", "params": { "scenario": "routing-save-knowledge", "expect_scenario": "routing-save-knowledge", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 3, "action": "foundation_break_test", "params": { "scenario": "campaign-reset", "expect_scenario": "campaign-reset", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 4, "action": "foundation_break_test", "params": { "scenario": "build-isolation", "expect_scenario": "build-isolation", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 5, "action": "foundation_break_test", "params": { "scenario": "campaign-rerun", "expect_scenario": "campaign-rerun", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 6, "action": "foundation_break_test", "params": { "scenario": "project-bleed-chaos", "expect_scenario": "project-bleed-chaos", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 7, "action": "foundation_break_test", "params": { "scenario": "disposable-abuse", "expect_scenario": "disposable-abuse", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 8, "action": "foundation_break_test", "params": { "scenario": "code-comparison-hardening", "expect_scenario": "code-comparison-hardening", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 9, "action": "foundation_break_test", "params": { "scenario": "sentinel-insight-pack", "expect_scenario": "sentinel-insight-pack", "expect_boundary_contains": "No real repository writes" } },
+    { "step": 10, "action": "foundation_break_test", "params": { "scenario": "phase-report", "expect_scenario": "phase-report", "expect_boundary_contains": "No real repository writes" } }
+  ]
+}
