@@ -2455,6 +2455,49 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "foundation_break_test" {
+                $scenario = [string]$params.scenario
+                if ([string]::IsNullOrWhiteSpace($scenario)) {
+                    throw "foundation_break_test requires params.scenario."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "foundation", "break-test",
+                    "--scenario", $scenario,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if (-not [string]::IsNullOrWhiteSpace($capture.output)) {
+                    $parsed = $capture.output | ConvertFrom-Json
+                }
+
+                $validationFailures = [System.Collections.Generic.List[string]]::new()
+                if ($exitCode -ne 0) {
+                    $validationFailures.Add("foundation_break_test exited with code $exitCode") | Out-Null
+                }
+                if (-not [bool]$parsed.passed) {
+                    $validationFailures.Add("Foundation break-test scenario '$scenario' returned passed=false.") | Out-Null
+                }
+                if ($params.expect_scenario -and [string]$parsed.scenario -ne [string]$params.expect_scenario) {
+                    $validationFailures.Add("Expected scenario '$($params.expect_scenario)', actual '$($parsed.scenario)'.") | Out-Null
+                }
+                if ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $validationFailures.Add("Expected boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'.") | Out-Null
+                }
+
+                if ($validationFailures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $validationFailures -join " "
+                } else {
+                    $summary = "Foundation break-test '$($parsed.scenario)' passed: $($parsed.summary)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")

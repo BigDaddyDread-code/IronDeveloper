@@ -28,6 +28,7 @@ The machine-readable inventory is stored at:
 - Failure commands: 1
 - Memory commands: 6
 - Builder commands: 1
+- Foundation commands: 1
 - Replay scenario entrypoint: 1
 
 ## Product-Ish Commands
@@ -38,10 +39,13 @@ The machine-readable inventory is stored at:
 - `agent retriever search`
 - `agent sentinel observe`
 - `agent research package`
+- `foundation break-test`
 - `failure latest`
 - `builder proposal-safety-smoke`
 
 These are closest to the control surface Codex will use.
+
+`foundation break-test` is a dogfood control command for the 121-130 hardening phase. It is evidence/report oriented and must not mutate the real repository.
 
 ## Dogfood/Smoke Commands
 

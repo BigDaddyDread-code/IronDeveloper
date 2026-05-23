@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest129-SentinelInsightPack",
+  "goal_id": "foundation-break-test-129",
+  "project": "IronDev",
+  "description": "Prove SentinelAgent Lite campaign insights stay advisory and project-labelled.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "sentinel-insight-pack",
+        "expect_scenario": "sentinel-insight-pack",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

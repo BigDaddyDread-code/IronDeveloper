@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest126-ProjectBleedChaos",
+  "goal_id": "foundation-break-test-126",
+  "project": "BookSeller",
+  "description": "Prove project bleed chaos keeps IronDev/CODEX memory rejected or clearly labelled for BookSeller prompts.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "project-bleed-chaos",
+        "expect_scenario": "project-bleed-chaos",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

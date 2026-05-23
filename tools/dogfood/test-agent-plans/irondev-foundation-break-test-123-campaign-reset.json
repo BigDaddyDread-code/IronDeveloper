@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest123-CampaignReset",
+  "goal_id": "foundation-break-test-123",
+  "project": "IronDev",
+  "description": "Prove campaign reset is DogfoodRunId-scoped and may hard-delete only disposable dogfood artefacts.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "campaign-reset",
+        "expect_scenario": "campaign-reset",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

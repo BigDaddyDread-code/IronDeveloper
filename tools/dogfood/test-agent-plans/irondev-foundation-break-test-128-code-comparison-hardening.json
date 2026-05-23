@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest128-CodeComparisonHardening",
+  "goal_id": "foundation-break-test-128",
+  "project": "IronDev",
+  "description": "Prove IDA comparison classifies imperfect patches without approving real repo writes.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "code-comparison-hardening",
+        "expect_scenario": "code-comparison-hardening",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

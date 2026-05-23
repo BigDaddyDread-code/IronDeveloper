@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest130-PhaseReport",
+  "goal_id": "foundation-break-test-130",
+  "project": "IronDev",
+  "description": "Produce the foundation break-test phase report and preserve the no-UI/no-real-repo-write boundary.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "phase-report",
+        "expect_scenario": "phase-report",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

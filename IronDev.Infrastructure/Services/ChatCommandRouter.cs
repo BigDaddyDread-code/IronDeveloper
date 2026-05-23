@@ -235,7 +235,8 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "save this as project knowledge",
             "save that as project knowledge",
             "as project knowledge",
-            "project knowledge then make tickets");
+            "project knowledge then make tickets") ||
+           IsProjectKnowledgeSaveCommand(lower);
 
     private static bool IsBuildTicketCommand(string lower)
         => ContainsAny(lower,
@@ -350,6 +351,34 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             trimmed.StartsWith("save that as ", StringComparison.Ordinal) ||
             trimmed.StartsWith("turn this into ", StringComparison.Ordinal) ||
             trimmed.StartsWith("turn that into ", StringComparison.Ordinal);
+    }
+
+    private static bool IsProjectKnowledgeSaveCommand(string lower)
+    {
+        var hasProjectKnowledgeTarget =
+            ContainsAny(lower, "project knowledge", "project memory", "architecture") &&
+            ContainsAny(lower, "bookseller", "book seller", "bookstore", "irondev", "ida", "project");
+
+        var rememberForProject =
+            ContainsAny(lower, "remember this for", "remember that for", "save this for", "save that for") &&
+            ContainsAny(lower, "bookseller", "book seller", "bookstore", "irondev", "ida");
+
+        if (!hasProjectKnowledgeTarget && !rememberForProject)
+            return false;
+
+        return ContainsAny(lower,
+            "save this as",
+            "save that as",
+            "save this to",
+            "save that to",
+            "remember this for",
+            "remember that for",
+            "store this as",
+            "store that as",
+            "add this to",
+            "add that to",
+            "make this architecture",
+            "make that architecture");
     }
 
     private static bool IsNonActionQuestion(string lower)

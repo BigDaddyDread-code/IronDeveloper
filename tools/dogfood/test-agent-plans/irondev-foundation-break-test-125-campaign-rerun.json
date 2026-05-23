@@ -1,0 +1,19 @@
+{
+  "test_run_id": "FoundationBreakTest125-CampaignRerun",
+  "goal_id": "foundation-break-test-125",
+  "project": "BookSeller",
+  "description": "Prove the known BookSeller campaign project-knowledge routing failure is fixed before rerunning bigger campaigns.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "foundation_break_test",
+      "params": {
+        "scenario": "campaign-rerun",
+        "expect_scenario": "campaign-rerun",
+        "expect_boundary_contains": "No real repository writes"
+      }
+    }
+  ]
+}

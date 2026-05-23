@@ -1540,6 +1540,61 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("ChatCommandRouter handles project-named save-memory vocabulary without falling back to chat.")]
+    public async Task ChatCommandRouter_ProjectKnowledgeVocabulary_IsActionFirst()
+    {
+        var router = new ChatCommandRouter();
+        var positives = new[]
+        {
+            "Save this as BookSeller project knowledge.",
+            "Remember this for BookSeller.",
+            "Store this as BookSeller architecture.",
+            "BookSeller should use SQL Server and Dapper. Save this as BookSeller project knowledge.",
+            "Add this to BookSeller project memory: stock cannot go negative."
+        };
+
+        foreach (var message in positives)
+        {
+            var route = await router.RouteAsync(new ChatTurnInput
+            {
+                ProjectId = 5,
+                ChatSessionId = 10,
+                UserMessage = message
+            });
+
+            Assert.AreEqual(ChatRouteIntent.SaveDiscussionDocument, route.Intent, message);
+            Assert.IsTrue(route.RequiresAction, message);
+            Assert.IsFalse(route.AllowsProseResponse, message);
+        }
+    }
+
+    [TestMethod]
+    [Description("ChatCommandRouter does not save when the user asks about existing project knowledge.")]
+    public async Task ChatCommandRouter_ProjectKnowledgeQuestions_AllowProse()
+    {
+        var router = new ChatCommandRouter();
+        var negatives = new[]
+        {
+            "Tell me about BookSeller project knowledge.",
+            "What project knowledge do we have for BookSeller?"
+        };
+
+        foreach (var message in negatives)
+        {
+            var route = await router.RouteAsync(new ChatTurnInput
+            {
+                ProjectId = 5,
+                ChatSessionId = 10,
+                UserMessage = message
+            });
+
+            Assert.AreEqual(ChatRouteIntent.GeneralChat, route.Intent, message);
+            Assert.IsFalse(route.RequiresAction, message);
+            Assert.IsTrue(route.AllowsProseResponse, message);
+        }
+    }
+
+    [TestMethod]
     [Description("ChatCommandRouter treats typoed save-discussion commands as document actions.")]
     public async Task ChatCommandRouter_SaveDiscussionTypo_IsActionFirst()
     {
