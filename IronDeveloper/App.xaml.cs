@@ -189,6 +189,7 @@ public partial class App : Application
                     () => sp.GetRequiredService<LlmConsoleViewModel>(),
                     () => sp.GetRequiredService<TestingCompanionViewModel>(),
                     () => sp.GetRequiredService<PromptPlaygroundViewModel>()));
+                services.AddSingleton<RunReportsViewModel>();
 
 
                 // Shell
@@ -228,6 +229,9 @@ public partial class App : Application
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IBuilderReadinessService,
                     global::IronDev.Infrastructure.Builder.BuilderReadinessService>();
+                services.AddSingleton<global::IronDev.Core.RunReports.IRunReportService, global::IronDev.Infrastructure.Services.RunReports.FileRunReportService>();
+                services.AddSingleton<global::IronDev.Core.RunReports.IRunEvidenceService>(sp =>
+                    (global::IronDev.Core.RunReports.IRunEvidenceService)sp.GetRequiredService<global::IronDev.Core.RunReports.IRunReportService>());
 
                 services.AddTransient<
                     global::IronDev.Core.Interfaces.IProjectProfileService,

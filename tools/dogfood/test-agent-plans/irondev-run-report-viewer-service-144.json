@@ -1,0 +1,37 @@
+{
+  "test_run_id": "IronDev144-RunReportViewerService",
+  "goal_id": "run-report-viewer-service-144",
+  "project_id": 2,
+  "description": "Proves the Run Reports viewer service can read file-backed trace/report evidence without shelling out to the CLI from WPF.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "run_report_viewer_service_smoke",
+      "params": {
+        "expect_valid_report_loads": true,
+        "expect_builder_stage": true,
+        "expect_tester_stage": true,
+        "expect_build_attempt": true,
+        "expect_test_attempt": true,
+        "expect_repair_attempts": true,
+        "expect_real_repo_mutation_count": 0,
+        "expect_missing_evidence_warning": true,
+        "expect_malformed_json_safe_state": true,
+        "expect_no_cli_process_from_service": true
+      }
+    }
+  ],
+  "expected": {
+    "valid_report_loads": true,
+    "stage_mapping_works": true,
+    "attempt_mapping_works": true,
+    "repair_mapping_works": true,
+    "evidence_exposed": true,
+    "missing_evidence_does_not_crash": true,
+    "malformed_json_returns_invalid_state": true,
+    "wpf_service_does_not_shell_out_to_cli": true
+  },
+  "boundary": "Read/report service smoke only. No BuilderAgent execution, patch apply, memory mutation, CLI shell-out from WPF, or real repository write authority is expanded."
+}

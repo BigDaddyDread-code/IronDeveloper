@@ -223,6 +223,11 @@
                                                       CommandParameter="DevTools"
                                                       ToolTip="Dev Tools"
                                                       IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=DevTools}"/>
+                                <controls:NavRailItem IconData="{StaticResource Icon.Nav.Code}"
+                                                      Command="{Binding DataContext.NavigateWorkspaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="RunReports"
+                                                      ToolTip="Run Reports"
+                                                      IsActive="{Binding DataContext.CurrentWorkspace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WorkspaceActiveConverter}, ConverterParameter=RunReports}"/>
                             </x:Array>
                         </controls:AppNavRail.ItemsSource>
 

@@ -1,5 +1,31 @@
 [
     {
+        "planFile":  "irondev-run-report-viewer-service-144.json",
+        "goalId":  "run-report-viewer-service-144",
+        "project":  "IronDev",
+        "description":  "Prove the Run Reports viewer service can read file-backed trace/report evidence without shelling out from WPF to CLI.",
+        "agentPath":  "TestAgent + ReplayRunner + FileRunReportService",
+        "command":  "run-report viewer-smoke",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "IRunReportService",
+                                 "IRunEvidenceService",
+                                 "FileRunReportService"
+                             ],
+        "expectedEvidence":  [
+                                 "valid report loads",
+                                 "stage mapping works",
+                                 "build/test attempt mapping works",
+                                 "repair mapping works",
+                                 "missing evidence returns warning",
+                                 "malformed JSON returns invalid state",
+                                 "no WPF-to-CLI shell-out is introduced"
+                             ],
+        "regressionGroup":  "RunReports",
+        "safetyBoundary":  "Read/report service smoke only; no BuilderAgent execution, patch apply, memory mutation, CLI shell-out from WPF, or real repository write authority is expanded.",
+        "kind":  "smoke"
+    },
+    {
         "planFile":  "irondev-csharp-dogfood-runner-143.json",
         "goalId":  "csharp-dogfood-runner-143",
         "project":  "IronDev",
