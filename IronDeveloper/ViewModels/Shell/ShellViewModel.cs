@@ -33,6 +33,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly DocumentsWorkspaceViewModel _documentsVm;
     private readonly ImplementationPlansWorkspaceViewModel _plansVm;
     private readonly DevToolsWorkspaceViewModel _devToolsVm;
+    private readonly RunReportsViewModel _runReportsVm;
     private readonly SettingsWorkspaceViewModel  _settingsVm;
     private readonly BuilderWorkspaceViewModel   _builderVm;
     private readonly ProjectProfileViewModel     _profileVm;
@@ -101,6 +102,7 @@ public sealed partial class ShellViewModel : ObservableObject
         KnowledgeCompilerViewModel knowledgeCompiler => knowledgeCompiler.SelectedDiscussion?.Title ?? "Knowledge Compiler",
         TestingCompanionViewModel => "Testing session",
         BuilderWorkspaceViewModel => "Build workflow",
+        RunReportsViewModel runReports => runReports.SelectedRun?.RunId ?? "No run selected",
         DevToolsWorkspaceViewModel => "Diagnostics workspace",
         _ => CurrentWorkspaceDisplayName
     };
@@ -126,6 +128,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public string LatestTraceContextText => CurrentWorkspace switch
     {
         ProjectWorkspace.DevTools => "Trace tools are open in this workspace.",
+        ProjectWorkspace.RunReports => "Run reports show trace, evidence, mutation, and repair summaries.",
         ProjectWorkspace.Discovery => "Apply selected proposals to create project memory.",
         _ => "Open Dev Tools for LLM and route traces."
     };
@@ -145,6 +148,7 @@ public sealed partial class ShellViewModel : ObservableObject
         DocumentsWorkspaceViewModel          documentsVm,
         ImplementationPlansWorkspaceViewModel plansVm,
         DevToolsWorkspaceViewModel           devToolsVm,
+        RunReportsViewModel                  runReportsVm,
         SettingsWorkspaceViewModel  settingsVm,
         BuilderWorkspaceViewModel   builderVm,
         ProjectProfileViewModel     profileVm,
@@ -162,6 +166,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _documentsVm = documentsVm;
         _plansVm     = plansVm;
         _devToolsVm  = devToolsVm;
+        _runReportsVm = runReportsVm;
         _settingsVm  = settingsVm;
         _builderVm   = builderVm;
         _profileVm   = profileVm;
@@ -364,6 +369,7 @@ public sealed partial class ShellViewModel : ObservableObject
             ProjectWorkspace.Decisions      => _decisionsVm,
             ProjectWorkspace.Documents      => _documentsVm,
             ProjectWorkspace.DevTools       => _devToolsVm,
+            ProjectWorkspace.RunReports     => _runReportsVm,
             ProjectWorkspace.Settings       => _settingsVm,
             ProjectWorkspace.Builder        => _builderVm,
             ProjectWorkspace.ProjectProfile => _profileVm,
@@ -562,6 +568,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 _decisionsVm.LoadAsync(project),
                 _documentsVm.LoadAsync(project),
                 _plansVm.LoadAsync(project),
+                _runReportsVm.LoadAsync(),
                 _profileVm.LoadAsync(project)
             );
 

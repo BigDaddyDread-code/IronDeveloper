@@ -358,6 +358,18 @@ The hardening pass uses `Docs/CODE_STANDARDS.md` as the human-readable rule sour
 - failure when required proof plans are missing
 - warning when proof-boundary documentation is missing
 
+Run the Run Reports service smoke:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  test run-plan `
+  --plan .\tools\dogfood\test-agent-plans\irondev-run-report-viewer-service-144.json `
+  --run-id RunReportViewerService144 `
+  --json
+```
+
+The WPF Run Reports workspace reads `tools/dogfood/runs/{runId}` through shared C# services. It must not shell out to `IronDev.ReplayRunner` or parse stdout.
+
 Run the first Memory Spine smoke while Weaviate is running:
 
 ```powershell

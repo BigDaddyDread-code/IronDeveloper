@@ -23,6 +23,7 @@
     "solitaire_product_spike_plan_passes": true,
     "cli_command_surface_cleanup_passes": true,
     "csharp_dogfood_runner_passes": true,
+    "run_report_viewer_service_passes": true,
     "failure_handoff_passes": true,
     "code_standards_passes": true
   },
@@ -260,6 +261,17 @@
       "step": 21,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-run-report-viewer-service-144.json",
+        "expect_nested_goal_id": "run-report-viewer-service-144",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 22,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -268,7 +280,7 @@
       }
     },
     {
-      "step": 22,
+      "step": 23,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -279,6 +291,6 @@
       }
     }
   ],
-  "max_turns": 22,
+  "max_turns": 23,
   "early_stop_on_failure": true
 }

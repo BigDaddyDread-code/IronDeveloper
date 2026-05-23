@@ -22,6 +22,7 @@ The machine-readable inventory is stored at:
 - Memory commands: 8
 - Builder commands: 3
 - Foundation commands: 1
+- Run report commands: 1
 - Test commands: 1
 - Trace commands: 1
 - Replay scenario entrypoint: 1
@@ -49,6 +50,7 @@ The machine-readable inventory is stored at:
 - `builder disposable-workspace-apply-smoke`
 - `builder proposal-safety-smoke`
 - `builder solitaire-disposable-build-smoke`
+- `run-report viewer-smoke`
 
 These are closest to the control surface Codex will use.
 
@@ -75,6 +77,8 @@ As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` exec
 `trace build-smoke` is the product-shaped alias for `agent builder trace-smoke`.
 
 `inventory validate` checks the CLI inventory, CLI documentation, and dogfood test-plan inventory. It is read-only and does not execute the listed commands.
+
+`run-report viewer-smoke` proves the Run Reports viewer service can read file-backed run evidence through shared C# services. It does not execute BuilderAgent, apply patches, mutate memory, or prove WPF-to-CLI execution.
 
 ## Dogfood/Smoke Commands
 
@@ -163,4 +167,12 @@ The C# runner writes standard reports under `tools/dogfood/runs/{runId}`:
 - `logs/`
 
 If an unported action falls back to the legacy script, the report marks `compatibility_mode: true`.
+
+## 144 Run Report Viewer Service
+
+- `run-report viewer-smoke --run-id <run> --json` creates small file-backed run report fixtures and proves the shared `IRunReportService` / `IRunEvidenceService` path can read them.
+- WPF uses the same shared services through `RunReportsViewModel`; it does not shell out to ReplayRunner or parse CLI stdout.
+- The first UI surface is the `RunReports` workspace inside the existing `ProjectWorkspaceFrame`.
+
+This is read/report infrastructure only. It does not change CLI command semantics, builder behavior, agent authority, retrieval, memory, or real repository write boundaries.
 

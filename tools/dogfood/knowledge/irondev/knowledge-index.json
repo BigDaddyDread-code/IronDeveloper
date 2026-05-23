@@ -1,5 +1,16 @@
 [
   {
+    "Id": "RUN_REPORT_VIEWER_SERVICE_144",
+    "Project": "IronDev",
+    "Title": "Run Report Viewer Service 144",
+    "DocumentType": "ArchitectureProof",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\RUN_REPORT_VIEWER_SERVICE_144.md",
+    "DogfoodRunId": "RunReportViewerService144",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523214400000-run-report-viewer-service-144.md",
+    "CreatedUtc": "2026-05-23T21:44:00+00:00"
+  },
+  {
     "Id": "CSHARP_DOGFOOD_RUNNER_143",
     "Project": "IronDev",
     "Title": "C# Dogfood Runner 143",

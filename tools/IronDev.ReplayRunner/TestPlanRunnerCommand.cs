@@ -62,7 +62,8 @@ public sealed class TestPlanRunner
         "builder_repair_loop_smoke",
         "csharp_dogfood_runner_smoke",
         "cli_command_surface_cleanup",
-        "memory_search"
+        "memory_search",
+        "run_report_viewer_service_smoke"
     };
 
     private readonly string _repoRoot;
@@ -126,6 +127,7 @@ public sealed class TestPlanRunner
                     "csharp_dogfood_runner_smoke" => await RunCSharpDogfoodRunnerSmokeAsync(runId, logPath),
                     "cli_command_surface_cleanup" => await RunCliCommandSurfaceCleanupAsync(runId, logPath),
                     "memory_search" => await RunMemorySearchAsync(step, runId, logPath),
+                    "run_report_viewer_service_smoke" => await RunReportViewerServiceSmokeAsync(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -543,6 +545,25 @@ public sealed class TestPlanRunner
             failures.Add("Expected semantic trace id.");
 
         return new NativeActionResult(failures.Count == 0, failures.Count == 0 ? $"memory_search top match '{(matches.Count > 0 ? ReadProperty(matches[0], "documentTitle") : "")}'" : string.Join(" ", failures), "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)), run.ExitCode, parsed);
+    }
+
+    private async Task<NativeActionResult> RunReportViewerServiceSmokeAsync(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "run-report", "viewer-smoke", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"run-report viewer-smoke exited with code {run.ExitCode}.");
+        if (!ReadBoolProperty(parsed, "Passed"))
+            failures.Add("Run report viewer service smoke returned Passed=false.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Run report viewer service smoke passed; trace={ReadProperty(parsed, "TraceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
     }
 
     private List<string> ValidateBuildTraceLike(TestPlanStep step, JsonElement parsed, string finalBuildKey, string finalTestKey)

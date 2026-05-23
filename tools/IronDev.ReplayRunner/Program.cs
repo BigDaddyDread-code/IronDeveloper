@@ -50,6 +50,9 @@ if (IsCommand(args, "test", "run-plan"))
 if (IsCommand(args, "dogfood", "run-plan"))
     return await TestPlanRunnerCommand.HandleAsync(args, options, "dogfood run-plan");
 
+if (IsCommand(args, "run-report", "viewer-smoke"))
+    return await RunReportViewerSmokeCommand.HandleAsync(args, options);
+
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
     string.Equals(args[1], "retriever", StringComparison.OrdinalIgnoreCase) &&

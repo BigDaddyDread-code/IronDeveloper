@@ -500,6 +500,16 @@
         "notes":  "Runs chat route replay scenario files."
     },
     {
+        "command":  "run-report viewer-smoke",
+        "category":  "run-report",
+        "scope":  "smoke",
+        "implementation":  "RunReportViewerSmokeCommand.cs + FileRunReportService",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "service-backed run report viewer proof",
+        "notes":  "Dogfood smoke proving run report files are read through shared C# services. WPF must not shell out to CLI."
+    },
+    {
         "command":  "test run-plan",
         "category":  "test",
         "scope":  "dogfood/control",
