@@ -33,6 +33,23 @@
         "description":  "Prove SentinelAgent Lite emits project-aware insight artefacts from campaign evidence, preserving observedProject and affectedProject."
     },
     {
+        "planFile":  "irondev-research-agent-lite-smoke.json",
+        "goalId":  "research-agent-lite-121",
+        "project":  "IronDev",
+        "actions":  [
+                        "agent_research_package"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "AgentRegistry"
+                             ],
+        "regressionGroup":  "ResearchAgent",
+        "safetyBoundary":  "Read-only explicit evidence packaging; no architecture decisions, project memory writes, tickets, patches, or automatic builder context injection.",
+        "kind":  "smoke",
+        "description":  "Prove ResearchAgent Lite emits a ResearchPackage from explicit external evidence and warns that accepted project memory remains authoritative."
+    },
+    {
         "planFile":  "bookseller-supervised-10-run-campaign.json",
         "goalId":  "bookseller-supervised-campaign-118",
         "project":  "BookSeller",
