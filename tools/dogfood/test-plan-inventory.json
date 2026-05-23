@@ -1,5 +1,25 @@
 [
     {
+        "planFile":  "irondev-supervisor-governed-autonomous-loop-135.json",
+        "goalId":  "supervisor-governed-autonomous-loop-135",
+        "project":  "IronDev",
+        "actions":  [
+                        "agent_supervisor_run_goal"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "SupervisorAgent",
+                                 "RetrieverAgent",
+                                 "ConscienceAgent",
+                                 "ThoughtLedgerService"
+                             ],
+        "regressionGroup":  "GovernedAutonomy",
+        "safetyBoundary":  "Tier 3 read/test/report autonomy only; no writes, tickets, memory mutation, builder apply, or real repository changes.",
+        "kind":  "smoke",
+        "description":  "Prove SupervisorAgent autonomously runs a bounded validation loop only after ConscienceAgent allows it."
+    },
+    {
         "planFile":  "irondev-retriever-weighted-context-bundle-134.json",
         "goalId":  "retriever-weighted-context-bundle-134",
         "project":  "IronDev",

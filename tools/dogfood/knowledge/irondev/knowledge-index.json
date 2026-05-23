@@ -1,5 +1,16 @@
 [
     {
+        "Id":  "20260523135000000-supervisor-governed-autonomous-loop-135",
+        "Project":  "IronDev",
+        "Title":  "SUPERVISOR_GOVERNED_AUTONOMOUS_LOOP_135",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\SUPERVISOR_GOVERNED_AUTONOMOUS_LOOP_135.md",
+        "DogfoodRunId":  "SupervisorGovernedAutonomy135",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523135000000-supervisor-governed-autonomous-loop-135.md",
+        "CreatedUtc":  "2026-05-23T13:50:00.0000000+00:00"
+    },
+    {
         "Id":  "20260523134000000-retriever-weighted-context-bundle-134",
         "Project":  "IronDev",
         "Title":  "RETRIEVER_WEIGHTED_CONTEXT_BUNDLE_134",

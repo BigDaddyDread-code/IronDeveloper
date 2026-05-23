@@ -29,7 +29,7 @@ Primary retrieval question: which IronDev agents are real vs stubbed?
 
 | Agent | Current class | Current capability | Trust boundary |
 | --- | --- | --- | --- |
-| SupervisorAgent | Deterministic wrapper | Retrieves memory and dispatches TesterAgent for bounded plans. | Coordination only; no autonomous decisions beyond current narrow path. |
+| SupervisorAgent | Governed autonomous wrapper | Retrieves weighted memory, asks ConscienceAgent to review, asks ThoughtLedger to explain, and dispatches TesterAgent for bounded plans only when allowed. | Tier 3 read/test/report autonomy only; no writes, tickets, memory mutation, builder apply, or real repository changes. |
 | PlannerAgent | Deterministic wrapper | Drafts Test Agent plan JSON from a goal. | Draft only; does not execute or patch. |
 | ArchitectAgent | Stub | Registered as part of the eight-agent skeleton. | Do not trust for architecture decisions yet. |
 | BuilderAgent | Stub/control-plane future | Builder path exists as preview safety smoke, not autonomous BuilderAgent execution. | No patch apply. |

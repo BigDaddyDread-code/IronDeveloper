@@ -46,6 +46,8 @@ These are closest to the control surface Codex will use.
 
 `agent retriever search` now returns a weighted context bundle. It preserves the real memory search result while adding included sources, rejected or filtered-context notes, source risk notes, semantic trace id, and an agent-facing summary.
 
+`agent supervisor run-goal` now performs governed Tier 3 autonomy: weighted retrieval, ConscienceAgent review, ThoughtLedger explanation, and TesterAgent execution only when allowed. It still stops before writes, tickets, memory mutation, builder apply, or real repository changes.
+
 ## Dogfood/Smoke Commands
 
 - `memory sql-version-smoke`
