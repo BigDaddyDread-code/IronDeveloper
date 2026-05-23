@@ -45,7 +45,10 @@ if (args.Length >= 3 &&
 }
 
 if (IsCommand(args, "test", "run-plan"))
-    return await HandleAgentTesterRunPlanCommandAsync(RebaseCommand(args, 2, "agent", "tester", "run-plan"), options);
+    return await TestPlanRunnerCommand.HandleAsync(args, options, "test run-plan");
+
+if (IsCommand(args, "dogfood", "run-plan"))
+    return await TestPlanRunnerCommand.HandleAsync(args, options, "dogfood run-plan");
 
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
@@ -381,7 +384,7 @@ static void PrintUsage()
     Console.Error.WriteLine("Govern: govern review");
     Console.Error.WriteLine("Inventory: inventory validate");
     Console.Error.WriteLine("Memory: memory builder-context-source-smoke | memory cross-project-smoke | memory reindex-freshness-smoke | memory search | memory sql-version-smoke | memory ticket-source-link-smoke | memory triage | memory weaviate-sql-version-smoke");
-    Console.Error.WriteLine("Clean aliases: test run-plan | trace build-smoke | build disposable repair | build disposable run | dogfood build ... | dogfood memory ...");
+    Console.Error.WriteLine("Clean aliases: test run-plan | dogfood run-plan | trace build-smoke | build disposable repair | build disposable run | dogfood build ... | dogfood memory ...");
     Console.Error.WriteLine("Tickets: tickets document-to-tickets-smoke");
 }
 
@@ -432,35 +435,28 @@ static async Task<int> HandleAgentTesterRunPlanCommandAsync(string[] args, JsonS
     }
 
     var runId = ReadOption(args, "--run-id") ?? $"TesterAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
-    var (_, _, runner) = CreateAgentRuntime();
-    var result = await runner.RunAsync(new AgentRequest
-    {
-        AgentName = "TesterAgent",
-        GoalId = "agent-tester-run-plan-014",
-        DogfoodRunId = runId,
-        Inputs = new Dictionary<string, string>
-        {
-            ["plan_path"] = planPath
-        }
-    });
+    var repoRoot = FindRepositoryRoot();
+    var fullPlanPath = Path.GetFullPath(Path.IsPathRooted(planPath) ? planPath : Path.Combine(repoRoot, planPath));
+    var report = await new TestPlanRunner(repoRoot, options).RunAsync(fullPlanPath, runId, "agent tester run-plan");
+    var succeeded = string.Equals(report.Status, "passed", StringComparison.OrdinalIgnoreCase);
 
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         command = "agent tester run-plan",
-        agent = result.AgentName,
-        status = result.Status.ToString(),
-        summary = result.Summary,
-        modelProfile = result.ModelProfileName,
-        provider = result.Provider,
-        model = result.Model,
-        exitCode = result.ExitCode,
-        commandsRun = result.CommandsRun,
-        evidencePaths = result.EvidencePaths,
-        report = TryParseJson(result.OutputJson),
-        completedAtUtc = result.CompletedAtUtc
+        agent = "TesterAgent",
+        status = succeeded ? "Succeeded" : "Failed",
+        summary = report.Summary,
+        modelProfile = "cheap-runner",
+        provider = "OpenAI",
+        model = "gpt-4o-mini",
+        exitCode = succeeded ? 0 : 1,
+        commandsRun = report.CommandsRun,
+        evidencePaths = report.Evidence.Select(evidence => evidence.Path).ToArray(),
+        report,
+        completedAtUtc = DateTimeOffset.UtcNow
     }, options));
 
-    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+    return succeeded ? 0 : 1;
 }
 
 static async Task<int> HandleAgentRetrieverSearchCommandAsync(string[] args, JsonSerializerOptions options)

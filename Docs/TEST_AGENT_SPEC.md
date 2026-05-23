@@ -10,6 +10,18 @@ This keeps expensive model time focused on diagnosis and repair while the Test A
 
 The Test Agent receives a JSON test plan and returns a JSON report.
 
+Primary local execution command:
+
+```powershell
+dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj -- `
+  test run-plan `
+  --plan .\tools\dogfood\test-agent-plans\<plan>.json `
+  --run-id <run> `
+  --json
+```
+
+`agent tester run-plan` and `dogfood run-plan` use the same C# `TestPlanRunner`. `Invoke-TestAgentPlan.ps1` is now a compatibility wrapper around `test run-plan`; the legacy PowerShell runner is retained only for explicit fallback while older actions are ported.
+
 It must:
 
 - execute steps in order
@@ -95,6 +107,7 @@ Initial Alpha actions:
 | `agent_retriever_search` | Ask RetrieverAgent to package project memory as a weighted context bundle with included/rejected source evidence | `IronDev.ReplayRunner agent retriever search` |
 | `agent_supervisor_run_goal` | Ask SupervisorAgent to run a governed bounded read/test/report or disposable-workspace apply loop through RetrieverAgent, ConscienceAgent, ThoughtLedger, and TesterAgent | `IronDev.ReplayRunner agent supervisor run-goal` |
 | `foundation_break_test` | Run one foundation break-test scenario from the 121-130 hardening phase | `IronDev.ReplayRunner foundation break-test` |
+| `csharp_dogfood_runner_smoke` | Prove `test run-plan`, `dogfood run-plan`, `agent tester run-plan`, and the PowerShell wrapper all route through C# for native plans | `IronDev.ReplayRunner test run-plan` |
 
 Example `chat_conversation` step:
 

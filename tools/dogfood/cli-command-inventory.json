@@ -133,11 +133,11 @@
         "command":  "agent tester run-plan",
         "category":  "agent",
         "scope":  "dogfood/control",
-        "implementation":  "Program.cs + TesterAgent",
+        "implementation":  "Program.cs + TestPlanRunnerCommand.cs",
         "requiresSql":  false,
         "requiresWeaviate":  "depends on plan",
-        "status":  "real wrapper over Test Agent plan runner",
-        "notes":  "First real execution agent path."
+        "status":  "C# TestPlanRunner wrapper",
+        "notes":  "TesterAgent entrypoint now runs through the C# TestPlanRunner; PowerShell is compatibility fallback only for unported actions."
     },
     {
         "command":  "agent thought-ledger explain",
@@ -360,6 +360,16 @@
         "notes":  "Dogfood-only raw-vs-authority proof alias; existing memory command remains compatible."
     },
     {
+        "command":  "dogfood run-plan",
+        "category":  "dogfood",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs -\u003e TestPlanRunnerCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  "depends on plan",
+        "status":  "C# dogfood plan execution",
+        "notes":  "Dogfood-shaped alias for test run-plan. Writes standard report/trace/evidence files under tools/dogfood/runs/{runId}."
+    },
+    {
         "command":  "failure latest",
         "category":  "failure",
         "scope":  "dogfood/control",
@@ -493,11 +503,11 @@
         "command":  "test run-plan",
         "category":  "test",
         "scope":  "dogfood/control",
-        "implementation":  "Program.cs alias -\u003e agent tester run-plan",
+        "implementation":  "Program.cs -\u003e TestPlanRunnerCommand.cs",
         "requiresSql":  false,
         "requiresWeaviate":  "depends on plan",
-        "status":  "clean alias for TesterAgent plan execution",
-        "notes":  "Product-shaped alias for agent tester run-plan; TesterAgent still only executes plans and reports evidence."
+        "status":  "primary C# Test Agent plan runner",
+        "notes":  "Primary product-shaped dogfood/test execution surface. PowerShell compatibility remains available through Invoke-TestAgentPlan.ps1 wrapper."
     },
     {
         "command":  "tickets document-to-tickets-smoke",
