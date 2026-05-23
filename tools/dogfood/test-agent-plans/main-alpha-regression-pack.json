@@ -20,6 +20,7 @@
     "supervisor_governed_autonomy_passes": true,
     "supervisor_disposable_workspace_autonomy_passes": true,
     "solitaire_product_spike_intake_passes": true,
+    "solitaire_product_spike_plan_passes": true,
     "failure_handoff_passes": true,
     "code_standards_passes": true
   },
@@ -224,6 +225,17 @@
       "step": 18,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-solitaire-product-spike-plan-138.json",
+        "expect_nested_goal_id": "solitaire-product-spike-plan-138",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 19,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -232,7 +244,7 @@
       }
     },
     {
-      "step": 19,
+      "step": 20,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -243,6 +255,6 @@
       }
     }
   ],
-  "max_turns": 19,
+  "max_turns": 20,
   "early_stop_on_failure": true
 }

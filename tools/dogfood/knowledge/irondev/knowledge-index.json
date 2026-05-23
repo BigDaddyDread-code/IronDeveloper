@@ -1,5 +1,16 @@
 [
     {
+        "Id":  "20260523138000000-solitaire-product-spike-architecture-and-tickets-138",
+        "Project":  "IronDev",
+        "Title":  "Solitaire Product Spike Architecture And Associated Tickets 138",
+        "DocumentType":  "ArchitecturePlan",
+        "Authority":  "Proposed",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\SOLITAIRE_PRODUCT_SPIKE_ARCHITECTURE_AND_TICKETS_138.md",
+        "DogfoodRunId":  "SolitaireProductSpikePlan138",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523138000000-solitaire-product-spike-architecture-and-tickets-138.md",
+        "CreatedUtc":  "2026-05-23T14:20:00.0000000+00:00"
+    },
+    {
         "Id":  "20260523137000000-solitaire-product-spike-intake-137",
         "Title":  "Solitaire Product Spike Intake 137",
         "DocumentType":  "ArchitectureProof",
