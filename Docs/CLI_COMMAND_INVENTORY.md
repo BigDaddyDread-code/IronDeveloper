@@ -10,7 +10,7 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 15
+- Agent commands: 16
 - Build commands: 2
 - Chat commands: 1
 - Docs commands: 6
@@ -39,6 +39,7 @@ The machine-readable inventory is stored at:
 - `agent thought-ledger explain`
 - `agent builder trace-smoke`
 - `agent builder repair-loop`
+- `agent loop plan-review`
 - `build disposable repair`
 - `build disposable run`
 - `govern review`
@@ -55,6 +56,7 @@ The machine-readable inventory is stored at:
 - `campaign live-governed-agent-158`
 - `campaign live-critic-planner-159`
 - `campaign live-retriever-sentinel-160`
+- `campaign governed-tool-loop-162-167`
 - `agent architect review`
 
 These are closest to the control surface Codex will use.
@@ -88,6 +90,10 @@ As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` exec
 `campaign live-critic-planner-159` proves CriticAgent and PlannerAgent can attempt opt-in live model calls through configured profiles while deterministic fallback and no-write governance remain in force.
 
 `campaign live-retriever-sentinel-160` proves RetrieverAgent and SentinelAgent can attempt opt-in live model calls through configured profiles while deterministic memory ranking, project scoping, insight classification, and no-write governance remain in force.
+
+`agent loop plan-review` runs the 162-167 governed Planner/Critic tool loop. PlannerAgent requests named capabilities, the tool registry executes safe read/test/report tools, CriticAgent reviews evidence, PlannerAgent revises the plan, and a human escalation gate records review requirements. It does not grant writes, memory mutation, ticket creation, patch application, or raw command execution by agents.
+
+`campaign governed-tool-loop-162-167` is the dogfood regression command for the same loop. It also proves the tool registry, trace report, evidence validation layer, human escalation gate, and `.NET`/Node/Python runtime profile contracts.
 
 ## Dogfood/Smoke Commands
 

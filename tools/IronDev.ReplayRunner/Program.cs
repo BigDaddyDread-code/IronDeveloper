@@ -45,11 +45,22 @@ if (IsCommand(args, "campaign", "live-retriever-sentinel-160"))
 if (IsCommand(args, "campaign", "live-remaining-agents-161"))
     return await LiveRemainingGovernedAgents161Command.HandleAsync(args, options);
 
+if (IsCommand(args, "campaign", "governed-tool-loop-162-167"))
+    return await GovernedToolLoop162167Command.HandleCampaignAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
 if (IsCommand(args, "agent", "profiles"))
     return HandleAgentProfilesCommand(args, options);
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "loop", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "plan-review", StringComparison.OrdinalIgnoreCase))
+{
+    return await GovernedToolLoop162167Command.HandlePlanReviewAsync(args, options);
+}
 
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
@@ -401,7 +412,7 @@ static void PrintUsage()
 {
     Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | <command> [options]");
     Console.Error.WriteLine();
-    Console.Error.WriteLine("Agent: agent builder repair-loop | agent builder trace-smoke | agent conscience review | agent critic review-failure | agent list | agent planner draft-test-plan | agent planner intake-product-spike | agent profiles | agent quality run-gate | agent research package | agent retriever search | agent sentinel observe | agent supervisor run-goal | agent tester run-plan | agent thought-ledger explain");
+    Console.Error.WriteLine("Agent: agent builder repair-loop | agent builder trace-smoke | agent conscience review | agent critic review-failure | agent list | agent loop plan-review | agent planner draft-test-plan | agent planner intake-product-spike | agent profiles | agent quality run-gate | agent research package | agent retriever search | agent sentinel observe | agent supervisor run-goal | agent tester run-plan | agent thought-ledger explain");
     Console.Error.WriteLine("Builder: builder disposable-workspace-apply-smoke | builder proposal-safety-smoke | builder solitaire-disposable-build-smoke");
     Console.Error.WriteLine("Chat: chat send");
     Console.Error.WriteLine("Docs: docs clean | docs discussion-smoke | docs import | docs list | docs search | docs show");
