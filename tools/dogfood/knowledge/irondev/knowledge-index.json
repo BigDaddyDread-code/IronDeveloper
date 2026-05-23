@@ -1,5 +1,60 @@
 ﻿[
     {
+        "Id":  "20260523120000000-memory-triage-agent-119",
+        "Project":  "IronDev",
+        "Title":  "MEMORY_TRIAGE_AGENT_119",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\MEMORY_TRIAGE_AGENT_119.md",
+        "DogfoodRunId":  "MemoryTriage119",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523120000000-memory-triage-agent-119.md",
+        "CreatedUtc":  "2026-05-23T12:00:00+00:00"
+    },
+    {
+        "Id":  "20260523122000000-sentinel-agent-lite-120",
+        "Project":  "IronDev",
+        "Title":  "SENTINEL_AGENT_LITE_120",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\SENTINEL_AGENT_LITE_120.md",
+        "DogfoodRunId":  "SentinelAgentLite120",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523122000000-sentinel-agent-lite-120.md",
+        "CreatedUtc":  "2026-05-23T12:20:00+00:00"
+    },
+    {
+        "Id":  "20260523124000000-research-agent-lite-121",
+        "Project":  "IronDev",
+        "Title":  "RESEARCH_AGENT_LITE_121",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\RESEARCH_AGENT_LITE_121.md",
+        "DogfoodRunId":  "ResearchAgentLite121",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523124000000-research-agent-lite-121.md",
+        "CreatedUtc":  "2026-05-23T12:40:00+00:00"
+    },
+    {
+        "Id":  "20260522232000000-bookseller-supervised-iteration-campaign-118",
+        "Project":  "IronDev",
+        "Title":  "BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118",
+        "DocumentType":  "ArchitectureCheckpoint",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118.md",
+        "DogfoodRunId":  "BookSellerCampaign118",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522232000000-bookseller-supervised-iteration-campaign-118.md",
+        "CreatedUtc":  "2026-05-22T23:20:00.0000000+00:00"
+    },
+    {
+        "Id":  "20260522225500000-bookseller-supervised-dogfood-review-117",
+        "Project":  "IronDev",
+        "Title":  "BOOKSELLER_SUPERVISED_DOGFOOD_REVIEW_117",
+        "DocumentType":  "ArchitectureCheckpoint",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\BOOKSELLER_SUPERVISED_DOGFOOD_REVIEW_117.md",
+        "DogfoodRunId":  "Review117-BookSellerSupervisedDogfood",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260522225500000-bookseller-supervised-dogfood-review-117.md",
+        "CreatedUtc":  "2026-05-22T22:55:00.0000000+00:00"
+    },
+    {
         "Id":  "20260523093000000-memory-reindex-freshness-gate",
         "Project":  "IronDev",
         "Title":  "MEMORY_REINDEX_FRESHNESS_GATE",

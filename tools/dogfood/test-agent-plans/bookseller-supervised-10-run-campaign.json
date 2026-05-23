@@ -1,0 +1,32 @@
+{
+  "test_run_id": "BookSeller118-Supervised10RunCampaign",
+  "goal_id": "bookseller-supervised-campaign-118",
+  "project": "BookSeller",
+  "description": "Run a sequential 10-run supervised BookSeller campaign with messy prompts, project-scoped memory/context checks, disposable workspace apply, fail-closed unsafe patching, and a compact Codex-readable campaign report.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "expected": {
+    "campaign": "BookSeller-10-run-supervised",
+    "runs": 10,
+    "sequential_execution": true,
+    "parallel_execution_allowed": false,
+    "real_repo_mutations": 0,
+    "blocked_unsafe_min": 1,
+    "failure_min": 1,
+    "codex_review_summary_present": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "bookseller_supervised_campaign",
+      "params": {
+        "campaign_run_id": "BookSellerCampaign118",
+        "expect_runs": 10,
+        "expect_real_repo_mutations": 0,
+        "expect_blocked_unsafe_min": 1,
+        "expect_parallel_allowed": false,
+        "expect_failure_min": 1
+      }
+    }
+  ]
+}

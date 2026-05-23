@@ -1,0 +1,31 @@
+{
+  "test_run_id": "IronDevResearchAgentLite121",
+  "goal_id": "research-agent-lite-121",
+  "description": "Prove ResearchAgent Lite can package explicit external evidence as read-only ResearchPackage output without overriding accepted project memory.",
+  "expected": {
+    "research_is_explicit_only": true,
+    "research_is_read_only": true,
+    "project_memory_remains_authoritative": true,
+    "package_contains_sources_findings_confidence_and_warning": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_research_package",
+      "params": {
+        "project": "BookSeller",
+        "topic": "Simple .NET inventory management patterns for a small BookSeller app",
+        "source_url": "https://learn.microsoft.com/dotnet/architecture/",
+        "source_title": ".NET architecture guidance",
+        "source_type": "ExternalTechnicalDocumentation",
+        "snippet": "Separate catalogue identity from stock quantity. Prevent negative stock in domain logic. Use stock movement records when audit/history matters.",
+        "expect_model_profile": "cheap-runner",
+        "expect_project": "BookSeller",
+        "expect_type": "ResearchPackage",
+        "expect_source_url": "https://learn.microsoft.com/dotnet/architecture/",
+        "expect_authority_warning_contains": "Accepted BookSeller memory remains authoritative",
+        "expect_boundary_contains": "read-only"
+      }
+    }
+  ]
+}

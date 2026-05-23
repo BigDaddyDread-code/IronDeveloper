@@ -1,5 +1,73 @@
 ﻿[
     {
+        "planFile":  "irondev-memory-triage-smoke.json",
+        "goalId":  "memory-triage-119",
+        "project":  "IronDev",
+        "actions":  [
+                        "memory_triage"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent"
+                             ],
+        "regressionGroup":  "MemoryTriage",
+        "safetyBoundary":  "Classification only; no document persistence, ticket creation, code writes, or autonomous fixes.",
+        "kind":  "smoke",
+        "description":  "Prove IDA can classify user feedback/context into global or project memory candidates, findings, tickets, discussions, decisions, and no-save memory queries."
+    },
+    {
+        "planFile":  "irondev-sentinel-agent-lite-smoke.json",
+        "goalId":  "sentinel-agent-lite-120",
+        "project":  "IronDev",
+        "actions":  [
+                        "agent_sentinel_observe"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "AgentRegistry"
+                             ],
+        "regressionGroup":  "SentinelAgent",
+        "safetyBoundary":  "Observational only; no document persistence, ticket creation, code writes, build blocking, or autonomous fixes.",
+        "kind":  "smoke",
+        "description":  "Prove SentinelAgent Lite emits project-aware insight artefacts from campaign evidence, preserving observedProject and affectedProject."
+    },
+    {
+        "planFile":  "irondev-research-agent-lite-smoke.json",
+        "goalId":  "research-agent-lite-121",
+        "project":  "IronDev",
+        "actions":  [
+                        "agent_research_package"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "AgentRegistry"
+                             ],
+        "regressionGroup":  "ResearchAgent",
+        "safetyBoundary":  "Read-only explicit evidence packaging; no architecture decisions, project memory writes, tickets, patches, or automatic builder context injection.",
+        "kind":  "smoke",
+        "description":  "Prove ResearchAgent Lite emits a ResearchPackage from explicit external evidence and warns that accepted project memory remains authoritative."
+    },
+    {
+        "planFile":  "bookseller-supervised-10-run-campaign.json",
+        "goalId":  "bookseller-supervised-campaign-118",
+        "project":  "BookSeller",
+        "actions":  [
+                        "bookseller_supervised_campaign"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "Weaviate",
+                                 "DisposableWorkspace"
+                             ],
+        "regressionGroup":  "BookSellerSupervisedCampaign",
+        "safetyBoundary":  "Sequential campaign only; disposable workspace writes allowed; real repo writes blocked.",
+        "kind":  "campaign",
+        "description":  "Run a sequential 10-run supervised BookSeller campaign with messy prompts, project-scoped memory/context checks, disposable workspace apply, fail-closed unsafe patching, and a compact Codex-readable campaign report."
+    },
+    {
         "planFile":  "bookseller-architecture-memory-regression-061.json",
         "goalId":  "bookseller-architecture-memory-regression-061",
         "project":  "BookSeller",

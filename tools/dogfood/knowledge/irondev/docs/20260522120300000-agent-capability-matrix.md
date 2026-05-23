@@ -37,6 +37,8 @@ Primary retrieval question: which IronDev agents are real vs stubbed?
 | QualityAgent | Deterministic wrapper | Runs code standards/tooling gate through existing plan machinery. | Reports quality; does not refactor. |
 | RetrieverAgent | Memory wrapper | Runs memory search and packages context bundle with source guidance. | Uses dogfood memory search; not a full retrieval planner yet. |
 | CriticAgent | Deterministic wrapper | Reviews failure packages and returns evidence-backed recommendation. | Reviews only; no code changes. |
+| SentinelAgent | Deterministic wrapper | Observes campaign/failure/test evidence and emits insight artefacts. | Observational only; no tickets, memory writes, patches, or approvals. |
+| ResearchAgent | Deterministic wrapper | Packages explicit external evidence as a ResearchPackage. | Read-only; does not decide architecture, write memory, create tickets, patch code, or override project memory. |
 
 ## Blunt Assessment
 
