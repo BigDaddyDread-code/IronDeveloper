@@ -165,6 +165,6 @@ Human / Codex request
 
 Model profiles are runtime-configurable and support `OpenAI`, `LocalOpenAI`, and `Ollama`. Provider configuration does not grant tool authority. Tool authority remains controlled by `AgentDefinition.AllowedTools`, ConscienceAgent, and the workflow boundary.
 
-IRONDEV-158 adds opt-in live model execution for the governed ArchitectAgent path. IRONDEV-159 extends the same pattern to CriticAgent failure review and PlannerAgent planning/intake. Live provider calls are traced through the agent output and fall back to deterministic review or planning when unavailable. This does not grant write authority, memory mutation, ticket creation, patch apply, or self-approval.
+IRONDEV-158 adds opt-in live model execution for the governed ArchitectAgent path. IRONDEV-159 extends the same pattern to CriticAgent failure review and PlannerAgent planning/intake. IRONDEV-160 extends it to RetrieverAgent context packaging and SentinelAgent insight observation. Live provider calls are traced through the agent output and fall back to deterministic behaviour when unavailable. This does not grant write authority, memory mutation, ticket creation, patch apply, ranking override, or self-approval.
 
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.

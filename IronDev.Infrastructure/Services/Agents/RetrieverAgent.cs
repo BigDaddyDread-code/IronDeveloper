@@ -10,12 +10,14 @@ public sealed class RetrieverAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
+    private readonly IAgentLlmClient? _llmClient;
 
-    public RetrieverAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot)
+    public RetrieverAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
+        _llmClient = llmClient;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -29,6 +31,7 @@ public sealed class RetrieverAgent : StaticIronDevAgent
         var runId = string.IsNullOrWhiteSpace(request.DogfoodRunId)
             ? $"RetrieverAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
 
         var runnerProject = Path.Combine(_repoRoot, "tools", "IronDev.ReplayRunner", "IronDev.ReplayRunner.csproj");
         var arguments = new[]
@@ -74,8 +77,10 @@ public sealed class RetrieverAgent : StaticIronDevAgent
         var output = string.IsNullOrWhiteSpace(stderr)
             ? stdout
             : stdout + Environment.NewLine + stderr;
+        var prompt = BuildPrompt(project, query, stdout);
+        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
         var contextBundle = process.ExitCode == 0
-            ? BuildContextBundle(stdout)
+            ? BuildContextBundle(stdout, profile, prompt, liveLlmRequested, llmResult)
             : output;
 
         return new AgentResult
@@ -132,7 +137,56 @@ public sealed class RetrieverAgent : StaticIronDevAgent
             : stdout.Trim().Split(Environment.NewLine).FirstOrDefault() ?? "RetrieverAgent completed.";
     }
 
-    private static string BuildContextBundle(string stdout)
+    private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentRequest request,
+        CancellationToken ct)
+    {
+        if (request.Inputs.TryGetValue("llm_response", out var providedResponse) &&
+            !string.IsNullOrWhiteSpace(providedResponse))
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "provided_llm_response",
+                ResponseText = providedResponse
+            };
+        }
+
+        if (!liveLlmRequested)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "llm_ready_deterministic_fallback",
+                ResponseText = "No live model response supplied; deterministic weighted context packaging was used for this governed smoke."
+            };
+        }
+
+        if (_llmClient is null)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = false,
+                InvocationMode = "live_model_requested_without_client_fallback",
+                ErrorMessage = "No governed agent LLM client was configured."
+            };
+        }
+
+        return await _llmClient.CompleteAsync(profile, prompt, ct);
+    }
+
+    private static string BuildContextBundle(
+        string stdout,
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentLlmCallResult llmResult)
     {
         try
         {
@@ -192,6 +246,7 @@ public sealed class RetrieverAgent : StaticIronDevAgent
             root["HistoricalSources"] = historicalSources;
             root["UseGuidance"] = BuildUseGuidance(matches);
             root["WeightedContextBundle"] = BuildWeightedContextBundle(root, matches);
+            root["LlmIntelligence"] = BuildLlmEvidence(profile, prompt, liveLlmRequested, llmResult);
 
             return root.ToJsonString();
         }
@@ -199,6 +254,47 @@ public sealed class RetrieverAgent : StaticIronDevAgent
         {
             return stdout;
         }
+    }
+
+    private static JsonObject BuildLlmEvidence(ModelProfile profile, string prompt, bool liveLlmRequested, AgentLlmCallResult result) => new()
+    {
+        ["modelProfile"] = profile.Name,
+        ["profileProvider"] = profile.Provider,
+        ["profileModel"] = profile.Model,
+        ["prompt"] = prompt,
+        ["invocationMode"] = result.InvocationMode,
+        ["liveLlmRequested"] = liveLlmRequested,
+        ["wasAttempted"] = result.WasAttempted,
+        ["wasSuccessful"] = result.WasSuccessful,
+        ["durationMs"] = result.DurationMs,
+        ["modelSummary"] = BuildModelSummary(result),
+        ["error"] = result.WasSuccessful ? string.Empty : result.ErrorMessage,
+        ["boundary"] = "Live RetrieverAgent output is advisory evidence only. Deterministic memory search, project filtering, and authority ranking remain authoritative."
+    };
+
+    private static string BuildPrompt(string project, string query, string memorySearchJson) =>
+        $"""
+        You are RetrieverAgent for IronDev/IDA.
+        Review this project-scoped memory search evidence for project '{project}' and query '{query}'.
+        Return concise JSON with context risks, included-source notes, rejected-source notes, and questions for the next agent.
+        Do not change ranking, override accepted memory, cross project boundaries, create tickets, mutate memory, patch files, or approve writes.
+        Memory search JSON:
+        {memorySearchJson}
+        """;
+
+    private static bool ReadBoolInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) &&
+        bool.TryParse(value, out var parsed) &&
+        parsed;
+
+    private static string BuildModelSummary(AgentLlmCallResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.ResponseText))
+            return result.ResponseText;
+
+        return result.WasAttempted
+            ? "Live model call did not return usable content; deterministic weighted context packaging remained in force."
+            : "No live model response supplied; deterministic weighted context packaging was used for this governed smoke.";
     }
 
     private static string BuildGuidance(JsonObject match)

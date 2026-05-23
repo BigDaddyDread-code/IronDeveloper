@@ -1,5 +1,35 @@
 [
     {
+        "planFile":  "irondev-live-retriever-sentinel-agents-160.json",
+        "goalId":  "live-retriever-sentinel-agents-160",
+        "project":  "IronDev",
+        "description":  "Validate opt-in live governed RetrieverAgent and SentinelAgent execution, deterministic fallback, unavailable-provider handling, and hard safety boundaries.",
+        "agentPath":  "TestAgent + ReplayRunner + LiveRetrieverSentinelAgents160Command + RetrieverAgent + SentinelAgent",
+        "command":  "campaign live-retriever-sentinel-160",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "AgentModelResolver",
+                                 "AgentLlmClient",
+                                 "RetrieverAgent",
+                                 "SentinelAgent",
+                                 "Weaviate"
+                             ],
+        "expectedEvidence":  [
+                                 "retriever fallback context available",
+                                 "sentinel fallback insight available",
+                                 "retriever live provider attempt recorded",
+                                 "sentinel live provider attempt recorded",
+                                 "ranking override remains blocked",
+                                 "real repo writes remain blocked",
+                                 "memory mutation remains blocked",
+                                 "ticket creation remains blocked",
+                                 "patch apply remains blocked"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Campaign smoke only; opt-in live model execution with safe fallback, no ranking override, no memory mutation, no ticket creation, no patch apply, no self-approval, and no real repository writes.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-live-critic-planner-agents-159.json",
         "goalId":  "live-critic-planner-agents-159",
         "project":  "IronDev",

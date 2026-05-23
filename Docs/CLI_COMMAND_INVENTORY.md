@@ -54,6 +54,7 @@ The machine-readable inventory is stored at:
 - `campaign self-improvement-157`
 - `campaign live-governed-agent-158`
 - `campaign live-critic-planner-159`
+- `campaign live-retriever-sentinel-160`
 - `agent architect review`
 
 These are closest to the control surface Codex will use.
@@ -85,6 +86,8 @@ As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` exec
 `run-report viewer-smoke` proves the Run Reports viewer service can read file-backed run evidence through shared C# services. It does not execute BuilderAgent, apply patches, mutate memory, or prove WPF-to-CLI execution.
 
 `campaign live-critic-planner-159` proves CriticAgent and PlannerAgent can attempt opt-in live model calls through configured profiles while deterministic fallback and no-write governance remain in force.
+
+`campaign live-retriever-sentinel-160` proves RetrieverAgent and SentinelAgent can attempt opt-in live model calls through configured profiles while deterministic memory ranking, project scoping, insight classification, and no-write governance remain in force.
 
 ## Dogfood/Smoke Commands
 
@@ -137,6 +140,13 @@ The JSON inventory is a flat command array sorted by `category`, then `command`.
 - `agent planner draft-test-plan --goal <goal> --project <project> --live-llm --model-profile <profile> --json` records advisory live model evidence while drafting plan JSON only.
 - `campaign live-critic-planner-159 --run-id <run> --json` validates CriticAgent and PlannerAgent fallback/live-attempt behaviour.
 - None of these commands can patch files, create tickets, mutate memory, apply patches, approve writes, or bypass ConscienceAgent/ThoughtLedger.
+
+## 160 Live Retriever And Sentinel Commands
+
+- `agent retriever search --project <project> --query <query> --live-llm --model-profile <profile> --json` records advisory live model evidence while keeping real memory search, project filtering, and authority ranking in force.
+- `agent sentinel observe --observed-project <project> --affected-project <project> --evidence <text> --live-llm --model-profile <profile> --json` records advisory live model evidence while keeping deterministic insight classification in force.
+- `campaign live-retriever-sentinel-160 --run-id <run> --json` validates RetrieverAgent and SentinelAgent fallback/live-attempt behaviour.
+- None of these commands can override ranking, cross project boundaries silently, create tickets, mutate memory, patch files, approve writes, or bypass ConscienceAgent/ThoughtLedger.
 
 ## 140 BuildAgent Trace Smoke Command
 
