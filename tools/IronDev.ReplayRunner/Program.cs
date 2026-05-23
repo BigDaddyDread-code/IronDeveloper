@@ -23,7 +23,7 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|reindex-freshness-smoke> [...] | failure latest --for-codex [...]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|triage|reindex-freshness-smoke> [...] | failure latest --for-codex [...]");
     return 2;
 }
 
@@ -110,6 +110,9 @@ if (IsCommand(args, "failure", "latest"))
 
 if (IsCommand(args, "memory", "search"))
     return await MemorySearchCommand.HandleAsync(args, options);
+
+if (IsCommand(args, "memory", "triage"))
+    return MemoryTriageCommand.Handle(args, options);
 
 if (IsCommand(args, "memory", "sql-version-smoke"))
     return await MemorySqlVersionSmokeCommand.HandleAsync(args, options);

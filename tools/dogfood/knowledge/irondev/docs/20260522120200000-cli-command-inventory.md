@@ -33,6 +33,7 @@ The machine-readable inventory is stored at:
 ## Product-Ish Commands
 
 - `memory search`
+- `memory triage`
 - `agent tester run-plan`
 - `agent retriever search`
 - `failure latest`

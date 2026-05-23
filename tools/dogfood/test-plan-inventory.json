@@ -1,5 +1,21 @@
 ﻿[
     {
+        "planFile":  "irondev-memory-triage-smoke.json",
+        "goalId":  "memory-triage-119",
+        "project":  "IronDev",
+        "actions":  [
+                        "memory_triage"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent"
+                             ],
+        "regressionGroup":  "MemoryTriage",
+        "safetyBoundary":  "Classification only; no document persistence, ticket creation, code writes, or autonomous fixes.",
+        "kind":  "smoke",
+        "description":  "Prove IDA can classify user feedback/context into global or project memory candidates, findings, tickets, discussions, decisions, and no-save memory queries."
+    },
+    {
         "planFile":  "bookseller-supervised-10-run-campaign.json",
         "goalId":  "bookseller-supervised-campaign-118",
         "project":  "BookSeller",

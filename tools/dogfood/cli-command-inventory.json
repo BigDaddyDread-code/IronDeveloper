@@ -180,6 +180,16 @@
         "notes":  "Codex-facing memory search with raw/final rank."
     },
     {
+        "command":  "memory triage",
+        "category":  "memory",
+        "scope":  "dogfood/control",
+        "implementation":  "MemoryTriageCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic memory classification proof",
+        "notes":  "Classifies whether feedback/context should become memory; does not persist artefacts."
+    },
+    {
         "command":  "memory sql-version-smoke",
         "category":  "memory",
         "scope":  "smoke",

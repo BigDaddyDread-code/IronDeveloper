@@ -2264,6 +2264,69 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "memory_triage" {
+                $message = [string]$params.message
+                if ([string]::IsNullOrWhiteSpace($message)) {
+                    $message = [string]$params.prompt
+                }
+                $project = if ([string]::IsNullOrWhiteSpace([string]$params.project)) { "IronDev" } else { [string]$params.project }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "memory", "triage", $message,
+                    "--project", $project,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+                if (-not [string]::IsNullOrWhiteSpace($capture.output)) {
+                    $parsed = $capture.output | ConvertFrom-Json
+                }
+
+                $validationFailures = [System.Collections.Generic.List[string]]::new()
+                if ($exitCode -ne 0) {
+                    $validationFailures.Add("memory_triage exited with code $exitCode") | Out-Null
+                }
+                if ($null -ne $params.expect_should_save) {
+                    $expectedShouldSave = Convert-ToBool $params.expect_should_save $false
+                    if ([bool]$parsed.shouldSave -ne $expectedShouldSave) {
+                        $validationFailures.Add("Expected shouldSave=$expectedShouldSave, actual $($parsed.shouldSave).") | Out-Null
+                    }
+                }
+                if ($params.expect_scope -and [string]$parsed.scope -ne [string]$params.expect_scope) {
+                    $validationFailures.Add("Expected scope '$($params.expect_scope)', actual '$($parsed.scope)'.") | Out-Null
+                }
+                if ($params.expect_project -and [string]$parsed.project -ne [string]$params.expect_project) {
+                    $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.project)'.") | Out-Null
+                }
+                if ($params.expect_memory_type -and [string]$parsed.memoryType -ne [string]$params.expect_memory_type) {
+                    $validationFailures.Add("Expected memoryType '$($params.expect_memory_type)', actual '$($parsed.memoryType)'.") | Out-Null
+                }
+                if ($params.expect_authority -and [string]$parsed.authority -ne [string]$params.expect_authority) {
+                    $validationFailures.Add("Expected authority '$($params.expect_authority)', actual '$($parsed.authority)'.") | Out-Null
+                }
+                foreach ($artifact in @($params.expect_recommended_artifacts)) {
+                    if ($artifact -and @($parsed.recommendedArtifacts | Where-Object { [string]$_ -eq [string]$artifact }).Count -eq 0) {
+                        $validationFailures.Add("Expected recommended artifact '$artifact'.") | Out-Null
+                    }
+                }
+                foreach ($signal in @($params.expect_evidence)) {
+                    if ($signal -and @($parsed.evidence | Where-Object { [string]$_ -eq [string]$signal }).Count -eq 0) {
+                        $validationFailures.Add("Expected evidence signal '$signal'.") | Out-Null
+                    }
+                }
+
+                if ($validationFailures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $validationFailures -join " "
+                } else {
+                    $summary = "memory_triage classified scope=$($parsed.scope); type=$($parsed.memoryType); shouldSave=$($parsed.shouldSave); project=$($parsed.project)"
+                }
+            }
+
             "dotnet_build" {
                 $target = Resolve-TargetPath $params.target
                 $arguments = @("build", $target, "-p:UseSharedCompilation=false", "-nr:false")
