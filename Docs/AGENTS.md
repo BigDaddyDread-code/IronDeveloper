@@ -13,13 +13,13 @@ Agents may reason, package evidence, run bounded plans, and write inside explici
 | Agent | Current maturity | Default profile | Authority |
 | --- | --- | --- | --- |
 | SupervisorAgent | Governed orchestration | strong-reasoner | Coordinates memory, ConscienceAgent, ThoughtLedger, and TesterAgent loops. Stops on missing evidence or blocked governance. |
-| PlannerAgent | LLM-ready planning path with deterministic fallback | standard-reasoner | Drafts plans and product-spike intake packages. Does not execute or write. |
+| PlannerAgent | Opt-in live governed planning path with deterministic fallback | standard-reasoner | Drafts plans and product-spike intake packages. May call a configured model only when explicitly enabled. Does not execute or write. |
 | ArchitectAgent | Opt-in live governed architecture review | strong-reasoner | Reviews proposals against weighted context and safety boundaries. May call a configured model only when explicitly enabled. Does not create accepted decisions or patch. |
 | BuilderAgent | Caged disposable repair loop | code-builder | May write only inside explicit disposable workspaces. Real repo writes remain blocked. |
 | TesterAgent | C# dogfood runner wrapper | cheap-runner | Executes plans and reports. Does not fix. |
 | QualityAgent / KilljoyAgent | Deterministic quality gate | cheap-runner | Runs build/test/format/package/code-standards checks and reports debt. Does not refactor. |
 | RetrieverAgent | Weighted context packer | cheap-runner | Packages accepted project memory, rankings, rejected context, and trace evidence. Does not decide implementation. |
-| CriticAgent | Failure/evidence reviewer | strong-reviewer | Reviews failure packages and risks. Does not patch. |
+| CriticAgent | Opt-in live governed failure/evidence reviewer | strong-reviewer | Reviews failure packages and risks. May call a configured model only when explicitly enabled. Does not patch. |
 | SentinelAgent | Internal observation | cheap-runner | Emits advisory insight artefacts. Does not create tickets or mutate memory. |
 | ResearchAgent | External evidence packer | cheap-runner | Packages explicit external evidence only. Project memory remains authority. |
 | ConscienceAgent | Governance gate | cheap-runner | Returns Allow, Block, or NeedsMoreEvidence. Does not execute. |
@@ -62,3 +62,5 @@ IRONDEV-157 matures the control plane by:
 - preserving Run Reports as the trace/evidence viewer foundation.
 
 IRONDEV-158 adds the first opt-in live governed agent execution path for ArchitectAgent while preserving deterministic fallback and all no-write boundaries.
+
+IRONDEV-159 extends the same opt-in live governed pattern to CriticAgent and PlannerAgent. Live model output is advisory evidence only; deterministic routing/review remains in force, and no writes, memory mutation, ticket creation, patch apply, or self-approval authority is granted.

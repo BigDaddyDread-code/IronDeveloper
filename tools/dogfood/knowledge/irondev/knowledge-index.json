@@ -1,5 +1,16 @@
 [
   {
+    "Id": "LIVE_CRITIC_PLANNER_AGENTS_159",
+    "Project": "IronDev",
+    "Title": "Live Critic And Planner Agents 159",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\LIVE_CRITIC_PLANNER_AGENTS_159.md",
+    "DogfoodRunId": "LiveCriticPlanner159",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524159000000-live-critic-planner-agents-159.md",
+    "CreatedUtc": "2026-05-24T15:59:00+00:00"
+  },
+  {
     "Id": "LIVE_GOVERNED_AGENT_EXECUTION_158",
     "Project": "IronDev",
     "Title": "Live Governed Agent Execution 158",

@@ -7,20 +7,22 @@ namespace IronDev.Infrastructure.Services.Agents;
 public sealed class PlannerAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
+    private readonly IAgentLlmClient? _llmClient;
 
-    public PlannerAgent(AgentDefinition definition, IAgentModelResolver modelResolver)
+    public PlannerAgent(AgentDefinition definition, IAgentModelResolver modelResolver, IAgentLlmClient? llmClient = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
+        _llmClient = llmClient;
     }
 
-    public override Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
+    public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
     {
         var profile = _modelResolver.ResolveForAgent(Definition);
         if (request.Inputs.TryGetValue("mode", out var mode) &&
             string.Equals(mode, "product_spike_intake", StringComparison.OrdinalIgnoreCase))
         {
-            return Task.FromResult(BuildProductSpikeIntakeResult(request, profile));
+            return await BuildProductSpikeIntakeResultAsync(request, profile, ct);
         }
 
         var goal = RequireInput(request, "goal");
@@ -31,6 +33,9 @@ public sealed class PlannerAgent : StaticIronDevAgent
             ? $"PlannerAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
         var safeId = Slug(goal);
+        var prompt = BuildDraftPlanPrompt(project, goal);
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
+        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
         var plan = new
         {
             test_run_id = $"{runId}-draft",
@@ -92,12 +97,13 @@ public sealed class PlannerAgent : StaticIronDevAgent
                     "Stop if project-scoped memory cannot be retrieved.",
                     "Stop if the deterministic quality gate fails.",
                     "Stop before any builder apply/write action."
-                }
+                },
+                llmIntelligence = BuildLlmEvidence(profile, prompt, liveLlmRequested, llmResult)
             }
         };
 
         var outputJson = JsonSerializer.Serialize(plan, new JsonSerializerOptions { WriteIndented = true });
-        return Task.FromResult(new AgentResult
+        return new AgentResult
         {
             AgentName = AgentName,
             Status = AgentRunStatus.Succeeded,
@@ -110,10 +116,10 @@ public sealed class PlannerAgent : StaticIronDevAgent
             CommandsRun = [$"planner draft-test-plan --project {project} --goal \"{goal}\""],
             EvidencePaths = [],
             CompletedAtUtc = DateTimeOffset.UtcNow
-        });
+        };
     }
 
-    private AgentResult BuildProductSpikeIntakeResult(AgentRequest request, ModelProfile profile)
+    private async Task<AgentResult> BuildProductSpikeIntakeResultAsync(AgentRequest request, ModelProfile profile, CancellationToken ct)
     {
         var prompt = RequireInput(request, "prompt");
         var projectInput = request.Inputs.TryGetValue("project", out var projectValue)
@@ -127,6 +133,9 @@ public sealed class PlannerAgent : StaticIronDevAgent
             ? $"PlannerIntake-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
         var likelyTypo = prompt.Contains("solitare", StringComparison.OrdinalIgnoreCase);
+        var llmPrompt = BuildProductSpikePrompt(prompt, detectedProject, normalizedPrompt);
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
+        var llmResult = await ResolveLlmResultAsync(profile, llmPrompt, liveLlmRequested, request, ct);
 
         var intake = new
         {
@@ -175,7 +184,8 @@ public sealed class PlannerAgent : StaticIronDevAgent
                 modelProfile = profile.Name,
                 provider = profile.Provider,
                 model = profile.Model,
-                boundary = "137A product spike intake drafts structured next steps only; it does not create project memory, tickets, disposable workspaces, patches, or real repository writes."
+                boundary = "137A product spike intake drafts structured next steps only; it does not create project memory, tickets, disposable workspaces, patches, or real repository writes.",
+                llmIntelligence = BuildLlmEvidence(profile, llmPrompt, liveLlmRequested, llmResult)
             }
         };
 
@@ -194,6 +204,99 @@ public sealed class PlannerAgent : StaticIronDevAgent
             EvidencePaths = [],
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentRequest request,
+        CancellationToken ct)
+    {
+        if (request.Inputs.TryGetValue("llm_response", out var providedResponse) &&
+            !string.IsNullOrWhiteSpace(providedResponse))
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "provided_llm_response",
+                ResponseText = providedResponse
+            };
+        }
+
+        if (!liveLlmRequested)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "llm_ready_deterministic_fallback",
+                ResponseText = "No live model response supplied; deterministic planning output was used for this governed smoke."
+            };
+        }
+
+        if (_llmClient is null)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = false,
+                InvocationMode = "live_model_requested_without_client_fallback",
+                ErrorMessage = "No governed agent LLM client was configured."
+            };
+        }
+
+        return await _llmClient.CompleteAsync(profile, prompt, ct);
+    }
+
+    private static object BuildLlmEvidence(ModelProfile profile, string prompt, bool liveLlmRequested, AgentLlmCallResult result) => new
+    {
+        modelProfile = profile.Name,
+        profileProvider = profile.Provider,
+        profileModel = profile.Model,
+        prompt,
+        invocationMode = result.InvocationMode,
+        liveLlmRequested,
+        wasAttempted = result.WasAttempted,
+        wasSuccessful = result.WasSuccessful,
+        durationMs = result.DurationMs,
+        modelSummary = BuildModelSummary(result),
+        error = result.WasSuccessful ? string.Empty : result.ErrorMessage
+    };
+
+    private static string BuildDraftPlanPrompt(string project, string goal) =>
+        $"""
+        You are PlannerAgent for IronDev/IDA.
+        Draft a bounded Test Agent plan for project '{project}' and goal '{goal}'.
+        Return concise JSON with planned steps, missing evidence, and stop conditions.
+        Do not execute tests, create tickets, mutate memory, patch files, or approve writes.
+        """;
+
+    private static string BuildProductSpikePrompt(string prompt, string detectedProject, string normalizedPrompt) =>
+        $"""
+        You are PlannerAgent for IronDev/IDA.
+        Classify this product-spike intake safely.
+        Original prompt: {prompt}
+        Normalized prompt: {normalizedPrompt}
+        Detected project: {detectedProject}
+        Return concise JSON with assumptions, clarifying questions, blocked actions, and next safe steps.
+        Do not create project memory, create tickets, create a disposable workspace, patch files, or approve writes.
+        """;
+
+    private static bool ReadBoolInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) &&
+        bool.TryParse(value, out var parsed) &&
+        parsed;
+
+    private static string BuildModelSummary(AgentLlmCallResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.ResponseText))
+            return result.ResponseText;
+
+        return result.WasAttempted
+            ? "Live model call did not return usable content; deterministic planning output remained in force."
+            : "No live model response supplied; deterministic planning output was used for this governed smoke.";
     }
 
     private static string RequireInput(AgentRequest request, string key)
