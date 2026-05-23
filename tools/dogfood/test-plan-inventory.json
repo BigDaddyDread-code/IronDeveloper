@@ -1,5 +1,30 @@
 [
     {
+        "planFile":  "irondev-self-improvement-campaign-157.json",
+        "goalId":  "self-improvement-campaign-157",
+        "project":  "IronDev",
+        "description":  "Validate the governed autonomy control-plane maturity campaign across model profiles, ArchitectAgent review, and hard safety boundaries.",
+        "agentPath":  "TestAgent + ReplayRunner + SelfImprovementCampaign157Command",
+        "command":  "campaign self-improvement-157",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "AgentModelResolver",
+                                 "ArchitectAgent"
+                             ],
+        "expectedEvidence":  [
+                                 "OpenAI provider supported",
+                                 "LocalOpenAI provider supported",
+                                 "Ollama provider supported",
+                                 "ArchitectAgent review produced",
+                                 "ConscienceAgent remains required",
+                                 "ThoughtLedger remains required",
+                                 "real repo writes remain blocked"
+                             ],
+        "regressionGroup":  "SelfImprovementCampaign",
+        "safetyBoundary":  "Campaign smoke only; no external LLM calls, memory mutation, patch apply, self-approval, or real repository writes.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-run-report-viewer-service-144.json",
         "goalId":  "run-report-viewer-service-144",
         "project":  "IronDev",

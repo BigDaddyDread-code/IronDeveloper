@@ -30,6 +30,9 @@ if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 if (IsCommand(args, "inventory", "validate"))
     return await InventoryValidateCommand.HandleAsync(args, options);
 
+if (IsCommand(args, "campaign", "self-improvement-157"))
+    return await SelfImprovementCampaign157Command.HandleAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
@@ -99,6 +102,14 @@ if (args.Length >= 3 &&
     string.Equals(args[2], "draft-test-plan", StringComparison.OrdinalIgnoreCase))
 {
     return await HandleAgentPlannerDraftTestPlanCommandAsync(args, options);
+}
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "architect", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "review", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentArchitectReviewCommandAsync(args, options);
 }
 
 if (args.Length >= 3 &&
@@ -421,7 +432,7 @@ static int HandleAgentProfilesCommand(string[] args, JsonSerializerOptions optio
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         command = "agent profiles",
-        providerBoundary = "014 supports OpenAI model profiles only.",
+        providerBoundary = "157 supports runtime-configurable OpenAI, LocalOpenAI, and Ollama model profiles. Profile selection does not grant tool authority or bypass governance.",
         profiles = modelResolver.ListProfiles()
     }, options));
 
@@ -711,6 +722,54 @@ static async Task<int> HandleAgentPlannerIntakeProductSpikeCommandAsync(string[]
     return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
 }
 
+static async Task<int> HandleAgentArchitectReviewCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var project = ReadOption(args, "--project") ?? "IronDev";
+    var proposal = ReadOption(args, "--proposal") ?? ReadPositionalText(args, 3);
+    if (string.IsNullOrWhiteSpace(proposal))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent architect review --project <project> --proposal <proposal> [--weighted-context text] [--safety-boundary text] [--run-id id] [--json]");
+        return 2;
+    }
+
+    var runId = ReadOption(args, "--run-id") ?? $"ArchitectAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var inputs = new Dictionary<string, string>
+    {
+        ["project"] = project,
+        ["proposal"] = proposal,
+        ["weighted_context"] = ReadOption(args, "--weighted-context") ?? string.Empty,
+        ["safety_boundary"] = ReadOption(args, "--safety-boundary") ?? "No real repository writes; disposable workspace only for apply."
+    };
+    var llmResponse = ReadOption(args, "--llm-response");
+    if (!string.IsNullOrWhiteSpace(llmResponse))
+        inputs["llm_response"] = llmResponse;
+
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "ArchitectAgent",
+        GoalId = "architect-agent-full-145",
+        DogfoodRunId = runId,
+        Inputs = inputs
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent architect review",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        architectureReview = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
 static async Task<int> HandleAgentSentinelObserveCommandAsync(string[] args, JsonSerializerOptions options)
 {
     var observedProject = ReadOption(args, "--observed-project") ?? "BookSeller";
@@ -895,6 +954,8 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                     ? new QualityAgent(definition, modelResolver, repoRoot)
                 : string.Equals(definition.Name, "PlannerAgent", StringComparison.OrdinalIgnoreCase)
                     ? new PlannerAgent(definition, modelResolver)
+                : string.Equals(definition.Name, "ArchitectAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new ArchitectAgent(definition, modelResolver)
                 : string.Equals(definition.Name, "SentinelAgent", StringComparison.OrdinalIgnoreCase)
                     ? new SentinelAgent(definition, modelResolver)
                 : string.Equals(definition.Name, "ResearchAgent", StringComparison.OrdinalIgnoreCase)
@@ -937,9 +998,12 @@ static IReadOnlyList<ModelProfile> LoadModelProfiles(string repoRoot)
                 Name = profileProperty.Name,
                 Provider = ReadString(profile, "Provider", "OpenAI"),
                 Model = ReadString(profile, "Model", string.Empty),
+                BaseUrl = ReadNullableString(profile, "BaseUrl"),
+                ApiKeyEnvironmentVariable = ReadNullableString(profile, "ApiKeyEnvironmentVariable"),
                 Temperature = ReadDouble(profile, "Temperature", 0.2),
                 MaxOutputTokens = ReadInt(profile, "MaxOutputTokens", 2000),
-                MaxCostPerRun = ReadDecimal(profile, "MaxCostPerRun")
+                MaxCostPerRun = ReadDecimal(profile, "MaxCostPerRun"),
+                TimeoutSeconds = ReadInt(profile, "TimeoutSeconds", 60)
             });
         }
 
@@ -970,6 +1034,11 @@ static string ReadString(JsonElement element, string propertyName, string fallba
     element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
         ? property.GetString() ?? fallback
         : fallback;
+
+static string? ReadNullableString(JsonElement element, string propertyName) =>
+    element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+        ? property.GetString()
+        : null;
 
 static double ReadDouble(JsonElement element, string propertyName, double fallback) =>
     element.TryGetProperty(propertyName, out var property) && property.TryGetDouble(out var value)

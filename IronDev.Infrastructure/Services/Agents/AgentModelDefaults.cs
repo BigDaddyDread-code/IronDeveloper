@@ -45,6 +45,26 @@ public static class AgentModelDefaults
             Model = "gpt-5.5",
             Temperature = 0.1,
             MaxOutputTokens = 4000
+        },
+        new()
+        {
+            Name = "local-cheap-runner",
+            Provider = "Ollama",
+            Model = "llama3.1",
+            BaseUrl = "http://localhost:11434",
+            Temperature = 0.1,
+            MaxOutputTokens = 1200,
+            TimeoutSeconds = 90
+        },
+        new()
+        {
+            Name = "local-standard-reasoner",
+            Provider = "LocalOpenAI",
+            Model = "local-reasoner",
+            BaseUrl = "http://localhost:1234/v1",
+            Temperature = 0.2,
+            MaxOutputTokens = 3000,
+            TimeoutSeconds = 90
         }
     ];
 

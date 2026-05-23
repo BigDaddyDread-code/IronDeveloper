@@ -28,8 +28,15 @@ public sealed class AgentModelResolver : IAgentModelResolver
 
     private static ModelProfile ValidateProfile(ModelProfile profile)
     {
-        if (!string.Equals(profile.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"014 supports OpenAI model profiles only. Profile '{profile.Name}' uses '{profile.Provider}'.");
+        var supportedProviders = new[] { "OpenAI", "LocalOpenAI", "Ollama" };
+        if (!supportedProviders.Contains(profile.Provider, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported agent model provider '{profile.Provider}' for profile '{profile.Name}'. Supported providers: {string.Join(", ", supportedProviders)}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Model))
+            throw new InvalidOperationException($"Agent model profile '{profile.Name}' must specify a model.");
 
         return profile;
     }

@@ -103,3 +103,24 @@ Goal: make IronDev actually act on a project — not just store memory.
 2. Every new endpoint gets one success test, one auth test, one tenant test.
 3. WPF stays working at all times — no breaking the client to serve backend work.
 4. Secrets stay out of source. Always.
+
+## Self-Improvement Campaign 157
+
+**Status: Active**
+
+Goal: mature the governed autonomy control plane while preserving the safety boundary.
+
+Delivered in this campaign:
+
+- `Docs/AGENTS.md` as the current agent-layer source of truth.
+- Runtime-configurable agent profiles for OpenAI, LocalOpenAI, and Ollama.
+- Governed ArchitectAgent review path.
+- Campaign smoke that reports child-ticket maturity evidence for IRONDEV-144 through IRONDEV-156.
+
+Still blocked:
+
+- Real repository writes.
+- Ungated autonomy.
+- Agent self-approval.
+- ResearchAgent overriding accepted project memory.
+- SentinelAgent creating tickets or patches.

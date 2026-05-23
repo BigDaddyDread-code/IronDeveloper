@@ -1,5 +1,16 @@
 [
   {
+    "Id": "SELF_IMPROVEMENT_CAMPAIGN_157",
+    "Project": "IronDev",
+    "Title": "SELF_IMPROVEMENT_CAMPAIGN_157",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "dogfood-discussion",
+    "DogfoodRunId": "SelfImprovementCampaign157",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523157000000-self-improvement-campaign-157.md",
+    "CreatedUtc": "2026-05-23T10:57:00+00:00"
+  },
+  {
     "Id": "RUN_REPORT_VIEWER_SERVICE_144",
     "Project": "IronDev",
     "Title": "Run Report Viewer Service 144",

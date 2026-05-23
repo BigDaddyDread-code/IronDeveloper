@@ -20,6 +20,16 @@
         "notes":  "Creates trace/report evidence for future disposable build work; no workspace creation or repo writes."
     },
     {
+        "command":  "agent architect review",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + ArchitectAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed architecture reviewer",
+        "notes":  "Reviews proposals against weighted context and safety boundaries; does not patch, mutate memory, create decisions, or approve writes."
+    },
+    {
         "command":  "agent conscience review",
         "category":  "agent",
         "scope":  "dogfood/control",
@@ -77,7 +87,7 @@
         "requiresSql":  false,
         "requiresWeaviate":  false,
         "status":  "real deterministic profile listing",
-        "notes":  "Lists OpenAI model profiles."
+        "notes":  "Lists runtime-configurable OpenAI, LocalOpenAI, and Ollama model profiles."
     },
     {
         "command":  "agent quality run-gate",
@@ -498,6 +508,16 @@
         "requiresWeaviate":  false,
         "status":  "deterministic replay runner",
         "notes":  "Runs chat route replay scenario files."
+    },
+    {
+        "command":  "campaign self-improvement-157",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "SelfImprovementCampaign157Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed autonomy maturity campaign smoke",
+        "notes":  "Reports control-plane maturity evidence for IRONDEV-144 through IRONDEV-156 without real repo writes or external LLM calls."
     },
     {
         "command":  "run-report viewer-smoke",

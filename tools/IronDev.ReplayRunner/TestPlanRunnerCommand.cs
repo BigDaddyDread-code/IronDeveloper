@@ -63,7 +63,8 @@ public sealed class TestPlanRunner
         "csharp_dogfood_runner_smoke",
         "cli_command_surface_cleanup",
         "memory_search",
-        "run_report_viewer_service_smoke"
+        "run_report_viewer_service_smoke",
+        "self_improvement_campaign_157"
     };
 
     private readonly string _repoRoot;
@@ -128,6 +129,7 @@ public sealed class TestPlanRunner
                     "cli_command_surface_cleanup" => await RunCliCommandSurfaceCleanupAsync(runId, logPath),
                     "memory_search" => await RunMemorySearchAsync(step, runId, logPath),
                     "run_report_viewer_service_smoke" => await RunReportViewerServiceSmokeAsync(runId, logPath),
+                    "self_improvement_campaign_157" => await RunSelfImprovementCampaign157Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -561,6 +563,41 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Run report viewer service smoke passed; trace={ReadProperty(parsed, "TraceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunSelfImprovementCampaign157Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "self-improvement-157", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign self-improvement-157 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected campaign status Succeeded, actual {ReadProperty(parsed, "status")}.");
+
+        var providerSupport = ReadElement(parsed, "providerSupport");
+        if (!ReadBoolProperty(providerSupport, "openAi"))
+            failures.Add("Expected OpenAI provider support.");
+        if (!ReadBoolProperty(providerSupport, "localOpenAi"))
+            failures.Add("Expected LocalOpenAI provider support.");
+        if (!ReadBoolProperty(providerSupport, "ollama"))
+            failures.Add("Expected Ollama provider support.");
+
+        var governance = ReadElement(parsed, "governance");
+        if (!ReadBoolProperty(governance, "conscienceRequired"))
+            failures.Add("Expected ConscienceAgent to remain required.");
+        if (!ReadBoolProperty(governance, "thoughtLedgerRequired"))
+            failures.Add("Expected ThoughtLedger to remain required.");
+        if (!ReadBoolProperty(governance, "realRepoWritesBlocked"))
+            failures.Add("Expected real repo writes to remain blocked.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Self-improvement campaign 157 smoke passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);
