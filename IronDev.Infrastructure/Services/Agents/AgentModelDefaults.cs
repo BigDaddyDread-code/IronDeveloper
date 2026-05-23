@@ -74,9 +74,9 @@ public static class AgentModelDefaults
         new()
         {
             Name = "BuilderAgent",
-            Purpose = "Create implementation proposals from grounded context.",
+            Purpose = "Create traceable implementation proposals and disposable-workspace build attempts from grounded context.",
             DefaultModelProfile = "code-builder",
-            AllowedTools = ["repo.read", "repo.patch", "test.run"]
+            AllowedTools = ["repo.read", "disposable.workspace.write", "build.run", "test.run", "trace.write"]
         },
         new()
         {

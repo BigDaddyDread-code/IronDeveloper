@@ -21,7 +21,7 @@ Primary retrieval question: which IronDev agents are real vs stubbed?
 | SupervisorAgent | Governed autonomous wrapper | Retrieves weighted memory, asks ConscienceAgent to review, asks ThoughtLedger to explain, and dispatches TesterAgent for bounded plans only when allowed. | Tier 3 read/test/report and Tier 4 disposable-workspace apply autonomy only; real repo writes, tickets, memory mutation, and self-approval remain blocked. |
 | PlannerAgent | Deterministic wrapper | Drafts Test Agent plan JSON from a goal. | Draft only; does not execute or patch. |
 | ArchitectAgent | Stub | Registered as part of the eight-agent skeleton. | Do not trust for architecture decisions yet. |
-| BuilderAgent | Stub/control-plane future | Builder path exists as preview safety smoke, not autonomous BuilderAgent execution. | No patch apply. |
+| BuilderAgent | Traceable internal execution skeleton | Builder path has preview/disposable smoke coverage plus a traceable internal spine for build brief, architecture plan, file manifest, workspace mutation, build/test attempts, repair attempts, retry budget, and evidence packaging. | Trace smoke only for 140; real writes remain limited to explicit disposable workspaces. No real repo writes. |
 | TesterAgent | Real execution wrapper | Runs Test Agent plans through CLI/PowerShell and returns structured report. | Executes plans; does not interpret or fix failures. |
 | QualityAgent | Deterministic wrapper | Runs code standards/tooling gate through existing plan machinery. | Reports quality; does not refactor. |
 | RetrieverAgent | Memory wrapper | Runs memory search and packages a weighted context bundle with included/rejected sources, ranking evidence, risk notes, and source guidance. | Uses dogfood memory search; not a full retrieval planner yet. |
@@ -47,3 +47,9 @@ No agent currently has permission to mutate project source files autonomously.
 ## 137 PlannerAgent Product Spike Intake
 
 PlannerAgent can now classify a vague new product build prompt into a bounded ProductSpikeCandidate intake. This is deterministic structured planning support only; it does not create memory, tickets, disposable workspaces, patches, or real repository writes.
+
+## 140 BuilderAgent Trace Spine
+
+BuilderAgent now has a deterministic traceable disposable-build spine for future heavy-duty work. Internally, the spine separates build brief compilation, architecture planning, file manifest planning, patch writing, workspace mutation tracking, build/test attempt recording, failure classification, repair planning, retry budget control, and evidence packaging.
+
+This does not make BuilderAgent a mature autonomous engineer. It gives future disposable build runs somewhere structured to record every important move before the real 141 repair-loop build path grows.

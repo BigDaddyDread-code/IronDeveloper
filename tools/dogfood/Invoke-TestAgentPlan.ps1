@@ -2663,6 +2663,90 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "buildagent_trace_smoke" {
+                $project = if ($params.project) { [string]$params.project } else { "Solitaire" }
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "builder", "trace-smoke",
+                    "--project", $project,
+                    "--dogfood-run-id", $RunId
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed) {
+                        "BuildAgent trace smoke failed; passed=$($parsed.passed); trace=$($parsed.traceId)"
+                    } else {
+                        "buildagent_trace_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "BuildAgent trace smoke returned Passed=false"
+                } else {
+                    $summary = "BuildAgent trace smoke passed; trace=$($parsed.traceId); recommendation=$($parsed.report.recommendation)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.project -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.project)'.") | Out-Null
+                    }
+                    if ($params.expect_trace_path -and -not (Test-Path ([string]$parsed.tracePath))) {
+                        $validationFailures.Add("Expected trace path to exist.") | Out-Null
+                    }
+                    if ($params.expect_report_path -and -not (Test-Path ([string]$parsed.reportPath))) {
+                        $validationFailures.Add("Expected report path to exist.") | Out-Null
+                    }
+                    if ($params.expect_markdown_path -and -not (Test-Path ([string]$parsed.markdownPath))) {
+                        $validationFailures.Add("Expected markdown report path to exist.") | Out-Null
+                    }
+                    foreach ($stage in @($params.expect_stages)) {
+                        if ($stage -and @($parsed.trace.stages | Where-Object { [string]$_.agentName -eq [string]$stage -or [string]$_.stageName -eq [string]$stage }).Count -eq 0) {
+                            $validationFailures.Add("Expected trace stage '$stage'.") | Out-Null
+                        }
+                    }
+                    if ($params.expect_build_failure -and @($parsed.trace.buildAttempts | Where-Object { [string]$_.status -eq "Failed" }).Count -eq 0) {
+                        $validationFailures.Add("Expected at least one failed build attempt.") | Out-Null
+                    }
+                    if ($params.expect_test_failure -and @($parsed.trace.testAttempts | Where-Object { [string]$_.status -eq "Failed" }).Count -eq 0) {
+                        $validationFailures.Add("Expected at least one failed test attempt.") | Out-Null
+                    }
+                    if ($params.expect_build_success -and @($parsed.trace.buildAttempts | Where-Object { [string]$_.status -eq "Succeeded" }).Count -eq 0) {
+                        $validationFailures.Add("Expected at least one successful build attempt.") | Out-Null
+                    }
+                    if ($params.expect_test_success -and @($parsed.trace.testAttempts | Where-Object { [string]$_.status -eq "Succeeded" }).Count -eq 0) {
+                        $validationFailures.Add("Expected at least one successful test attempt.") | Out-Null
+                    }
+                    if ($params.expect_repair_attempts_min -and @($parsed.trace.repairAttempts).Count -lt [int]$params.expect_repair_attempts_min) {
+                        $validationFailures.Add("Expected at least $($params.expect_repair_attempts_min) repair attempts.") | Out-Null
+                    }
+                    if ($null -ne $params.expect_real_repo_mutation_count -and [int]$parsed.trace.realRepoMutationCount -ne [int]$params.expect_real_repo_mutation_count) {
+                        $validationFailures.Add("Expected realRepoMutationCount=$($params.expect_real_repo_mutation_count), actual $($parsed.trace.realRepoMutationCount).") | Out-Null
+                    }
+                    if ($params.expect_disposable_files_changed_min -and [int]$parsed.trace.disposableFilesChanged -lt [int]$params.expect_disposable_files_changed_min) {
+                        $validationFailures.Add("Expected disposableFilesChanged >= $($params.expect_disposable_files_changed_min), actual $($parsed.trace.disposableFilesChanged).") | Out-Null
+                    }
+                    if ($params.expect_recommendation -and [string]$parsed.report.recommendation -ne [string]$params.expect_recommendation) {
+                        $validationFailures.Add("Expected recommendation '$($params.expect_recommendation)', actual '$($parsed.report.recommendation)'.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "solitaire_disposable_build_smoke" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",

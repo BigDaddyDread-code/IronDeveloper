@@ -1613,5 +1613,26 @@
         "regression_group":  "foundation-break-test",
         "safety_boundary":  "No real repo writes; no UI work; disposable workspace only where apply is involved.",
         "classification":  "regression-pack"
+    },
+    {
+        "plan_file":  "irondev-buildagent-traceable-disposable-build-spine-140.json",
+        "goal_id":  "buildagent-traceable-disposable-build-spine-140",
+        "project":  "IronDev",
+        "agent_path":  "TestAgent -> BuildAgent trace smoke",
+        "cli_command":  "agent builder trace-smoke",
+        "required_services":  [
+                                  "ReplayRunner"
+                              ],
+        "expected_evidence":  [
+                                  "build run trace",
+                                  "agent stage traces",
+                                  "build/test attempts",
+                                  "repair attempts",
+                                  "evidence artefacts",
+                                  "final report"
+                              ],
+        "regression_group":  "builder-trace",
+        "safety_boundary":  "Synthetic trace only; no real repo writes, no disposable workspace creation, no app file generation.",
+        "classification":  "core"
     }
 ]

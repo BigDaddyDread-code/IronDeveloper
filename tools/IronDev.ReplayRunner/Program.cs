@@ -184,6 +184,12 @@ if (IsCommand(args, "builder", "disposable-workspace-apply-smoke"))
 if (IsCommand(args, "builder", "solitaire-disposable-build-smoke"))
     return await SolitaireDisposableBuildSmokeCommand.HandleAsync(args, options);
 
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "builder", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "trace-smoke", StringComparison.OrdinalIgnoreCase))
+    return await BuildAgentTraceSmokeCommand.HandleAsync(args, options);
+
 if (IsCommand(args, "foundation", "break-test"))
     return await FoundationBreakTestCommand.HandleAsync(args, options);
 

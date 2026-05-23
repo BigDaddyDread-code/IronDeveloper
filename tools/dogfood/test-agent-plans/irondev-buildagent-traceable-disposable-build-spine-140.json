@@ -1,0 +1,51 @@
+{
+  "test_run_id": "IronDev140-BuildAgentTraceSpine",
+  "goal_id": "buildagent-traceable-disposable-build-spine-140",
+  "project_id": 2,
+  "description": "Proves the heavy-duty BuilderAgent trace spine can represent a governed disposable build run with context, safety, visible reasoning, build/test attempts, repairs, evidence artefacts, mutation counts, and a final recommendation without creating a real workspace or app files.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "buildagent_trace_smoke",
+      "params": {
+        "project": "Solitaire",
+        "expect_project": "Solitaire",
+        "expect_trace_path": true,
+        "expect_report_path": true,
+        "expect_markdown_path": true,
+        "expect_stages": [
+          "RetrieverAgent",
+          "ConscienceAgent",
+          "ThoughtLedger",
+          "BuilderAgent",
+          "TesterAgent",
+          "CriticAgent",
+          "QualityAgent",
+          "SupervisorAgent"
+        ],
+        "expect_build_failure": true,
+        "expect_test_failure": true,
+        "expect_build_success": true,
+        "expect_test_success": true,
+        "expect_repair_attempts_min": 2,
+        "expect_real_repo_mutation_count": 0,
+        "expect_disposable_files_changed_min": 3,
+        "expect_recommendation": "PromoteLater"
+      }
+    }
+  ],
+  "expected": {
+    "build_run_trace_created": true,
+    "stage_traces_created": true,
+    "build_attempt_failure_recorded": true,
+    "test_attempt_failure_recorded": true,
+    "repair_attempts_recorded": true,
+    "final_success_recorded": true,
+    "real_repo_mutation_count_zero": true,
+    "report_json_created": true,
+    "report_markdown_created": true
+  },
+  "boundary": "Trace smoke only. This does not create a disposable workspace, generate Solitaire app files, apply patches, mutate memory, or approve real repo writes."
+}
