@@ -1,5 +1,16 @@
 [
   {
+    "Id": "LIVE_GOVERNED_AGENT_EXECUTION_158",
+    "Project": "IronDev",
+    "Title": "Live Governed Agent Execution 158",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\LIVE_GOVERNED_AGENT_EXECUTION_158.md",
+    "DogfoodRunId": "LiveGovernedAgentExecution158",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523158000000-live-governed-agent-execution-158.md",
+    "CreatedUtc": "2026-05-23T11:58:00+00:00"
+  },
+  {
     "Id": "SELF_IMPROVEMENT_CAMPAIGN_157",
     "Project": "IronDev",
     "Title": "SELF_IMPROVEMENT_CAMPAIGN_157",

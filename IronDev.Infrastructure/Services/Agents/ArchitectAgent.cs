@@ -7,20 +7,25 @@ namespace IronDev.Infrastructure.Services.Agents;
 public sealed class ArchitectAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
+    private readonly IAgentLlmClient? _llmClient;
 
-    public ArchitectAgent(AgentDefinition definition, IAgentModelResolver modelResolver)
+    public ArchitectAgent(AgentDefinition definition, IAgentModelResolver modelResolver, IAgentLlmClient? llmClient = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
+        _llmClient = llmClient;
     }
 
-    public override Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
+    public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
     {
         var profile = _modelResolver.ResolveForAgent(Definition);
         var project = ReadInput(request, "project", "IronDev");
         var proposal = RequireInput(request, "proposal");
         var weightedContext = ReadInput(request, "weighted_context", string.Empty);
         var safetyBoundary = ReadInput(request, "safety_boundary", "No real repository writes; disposable workspace only for apply.");
+        var prompt = BuildPrompt(project, proposal, weightedContext, safetyBoundary);
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
+        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
         var architectureDecision = BuildDecision(proposal, weightedContext, safetyBoundary);
         var review = new
         {
@@ -37,16 +42,19 @@ public sealed class ArchitectAgent : StaticIronDevAgent
                 modelProfile = profile.Name,
                 profileProvider = profile.Provider,
                 profileModel = profile.Model,
-                prompt = BuildPrompt(project, proposal, weightedContext, safetyBoundary),
-                invocationMode = request.Inputs.ContainsKey("llm_response")
-                    ? "provided_llm_response"
-                    : "llm_ready_deterministic_fallback",
-                modelSummary = ReadInput(request, "llm_response", "No live model response supplied; deterministic architecture review was used for this governed smoke.")
+                prompt,
+                invocationMode = llmResult.InvocationMode,
+                liveLlmRequested,
+                wasAttempted = llmResult.WasAttempted,
+                wasSuccessful = llmResult.WasSuccessful,
+                durationMs = llmResult.DurationMs,
+                modelSummary = BuildModelSummary(llmResult),
+                error = llmResult.WasSuccessful ? string.Empty : llmResult.ErrorMessage
             },
             boundary = "ArchitectAgent reviews architecture and produces recommendations only. It does not patch, create accepted decisions, mutate memory, or approve real repo writes."
         };
 
-        return Task.FromResult(new AgentResult
+        return new AgentResult
         {
             AgentName = AgentName,
             Status = AgentRunStatus.Succeeded,
@@ -59,7 +67,51 @@ public sealed class ArchitectAgent : StaticIronDevAgent
             CommandsRun = [$"architect review --project {QuoteIfNeeded(project)}"],
             EvidencePaths = [],
             CompletedAtUtc = DateTimeOffset.UtcNow
-        });
+        };
+    }
+
+    private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentRequest request,
+        CancellationToken ct)
+    {
+        if (request.Inputs.TryGetValue("llm_response", out var providedResponse) &&
+            !string.IsNullOrWhiteSpace(providedResponse))
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "provided_llm_response",
+                ResponseText = providedResponse
+            };
+        }
+
+        if (!liveLlmRequested)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "llm_ready_deterministic_fallback",
+                ResponseText = "No live model response supplied; deterministic architecture review was used for this governed smoke."
+            };
+        }
+
+        if (_llmClient is null)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = false,
+                InvocationMode = "live_model_requested_without_client_fallback",
+                ErrorMessage = "No governed agent LLM client was configured."
+            };
+        }
+
+        return await _llmClient.CompleteAsync(profile, prompt, ct);
     }
 
     private static ArchitectureDecision BuildDecision(string proposal, string weightedContext, string safetyBoundary)
@@ -119,6 +171,21 @@ public sealed class ArchitectAgent : StaticIronDevAgent
         request.Inputs.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
             : defaultValue;
+
+    private static bool ReadBoolInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) &&
+        bool.TryParse(value, out var parsed) &&
+        parsed;
+
+    private static string BuildModelSummary(AgentLlmCallResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.ResponseText))
+            return result.ResponseText;
+
+        return result.WasAttempted
+            ? "Live model call did not return usable content; deterministic architecture review remained in force."
+            : "No live model response supplied; deterministic architecture review was used for this governed smoke.";
+    }
 
     private static string QuoteIfNeeded(string value) =>
         value.Contains(' ', StringComparison.Ordinal) ? $"\"{value}\"" : value;

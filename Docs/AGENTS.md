@@ -14,7 +14,7 @@ Agents may reason, package evidence, run bounded plans, and write inside explici
 | --- | --- | --- | --- |
 | SupervisorAgent | Governed orchestration | strong-reasoner | Coordinates memory, ConscienceAgent, ThoughtLedger, and TesterAgent loops. Stops on missing evidence or blocked governance. |
 | PlannerAgent | LLM-ready planning path with deterministic fallback | standard-reasoner | Drafts plans and product-spike intake packages. Does not execute or write. |
-| ArchitectAgent | Governed architecture review | strong-reasoner | Reviews proposals against weighted context and safety boundaries. Does not create accepted decisions or patch. |
+| ArchitectAgent | Opt-in live governed architecture review | strong-reasoner | Reviews proposals against weighted context and safety boundaries. May call a configured model only when explicitly enabled. Does not create accepted decisions or patch. |
 | BuilderAgent | Caged disposable repair loop | code-builder | May write only inside explicit disposable workspaces. Real repo writes remain blocked. |
 | TesterAgent | C# dogfood runner wrapper | cheap-runner | Executes plans and reports. Does not fix. |
 | QualityAgent / KilljoyAgent | Deterministic quality gate | cheap-runner | Runs build/test/format/package/code-standards checks and reports debt. Does not refactor. |
@@ -35,7 +35,9 @@ Supported providers:
 - `LocalOpenAI`
 - `Ollama`
 
-Local profiles are configuration support only. A configured local profile does not grant authority, bypass ConscienceAgent, or make a network call during deterministic dogfood smokes.
+Local profiles are configuration support only. A configured local profile does not grant authority or bypass ConscienceAgent.
+
+Live model calls are opt-in per governed command. If the provider is unavailable, the agent records the attempt and keeps deterministic fallback behaviour in force.
 
 ## Governance Rules
 
@@ -58,3 +60,5 @@ IRONDEV-157 matures the control plane by:
 - keeping SupervisorAgent bounded by ConscienceAgent and ThoughtLedger,
 - preserving C# dogfood execution as the primary plan runner,
 - preserving Run Reports as the trace/evidence viewer foundation.
+
+IRONDEV-158 adds the first opt-in live governed agent execution path for ArchitectAgent while preserving deterministic fallback and all no-write boundaries.
