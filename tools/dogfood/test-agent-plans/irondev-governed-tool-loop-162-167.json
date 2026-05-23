@@ -1,0 +1,38 @@
+{
+  "test_run_id": "GovernedToolLoop162167",
+  "goal_id": "governed-tool-loop-162-167",
+  "description": "Proves the Planner/Critic governed tool loop, tool registry, trace visualization, human escalation gate, evidence validation layer, and multi-language runtime profiles.",
+  "early_stop_on_failure": true,
+  "max_turns": 1,
+  "preconditions": [
+    "ReplayRunner builds.",
+    "Code standards gate exists.",
+    "Dogfood memory index exists for IronDev."
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "action": "governed_tool_loop_162_167",
+      "description": "Run the governed Planner/Critic tool loop campaign.",
+      "expected": {
+        "tool_contract_created": true,
+        "tool_registry_contains_safe_capabilities": true,
+        "trace_visualization_available": true,
+        "human_escalation_gate_present": true,
+        "evidence_validation_passes": true,
+        "dotnet_node_python_profiles_present": true,
+        "agent_raw_command_execution_blocked": true,
+        "real_repo_writes_still_blocked": true,
+        "memory_mutation_still_blocked": true,
+        "ticket_creation_still_blocked": true,
+        "patch_apply_still_blocked": true
+      }
+    }
+  ],
+  "reporting": {
+    "format": "json",
+    "include_evidence_paths": true,
+    "include_command_output_summary": true
+  },
+  "boundary": "162-167 proves governed tool-using reasoning, trace output, human escalation, evidence validation, and runtime profiles. It does not grant writes, memory mutation, ticket creation, patch apply, raw command execution by agents, or self-approval."
+}

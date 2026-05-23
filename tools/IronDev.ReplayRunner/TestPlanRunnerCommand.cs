@@ -68,7 +68,8 @@ public sealed class TestPlanRunner
         "live_governed_agent_execution_158",
         "live_critic_planner_agents_159",
         "live_retriever_sentinel_agents_160",
-        "live_remaining_governed_agents_161"
+        "live_remaining_governed_agents_161",
+        "governed_tool_loop_162_167"
     };
 
     private readonly string _repoRoot;
@@ -138,6 +139,7 @@ public sealed class TestPlanRunner
                     "live_critic_planner_agents_159" => await RunLiveCriticPlannerAgents159Async(runId, logPath),
                     "live_retriever_sentinel_agents_160" => await RunLiveRetrieverSentinelAgents160Async(runId, logPath),
                     "live_remaining_governed_agents_161" => await RunLiveRemainingGovernedAgents161Async(runId, logPath),
+                    "governed_tool_loop_162_167" => await RunGovernedToolLoop162167Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -754,6 +756,52 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Live remaining governed agents smoke passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunGovernedToolLoop162167Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "governed-tool-loop-162-167", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign governed-tool-loop-162-167 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected campaign status Succeeded, actual {ReadProperty(parsed, "status")}.");
+
+        var data = ReadElement(parsed, "data");
+        if (!ReadBoolProperty(data, "toolContractCreated"))
+            failures.Add("Expected tool contract to be created.");
+        var capabilities = ReadStringArray(data, "registryCapabilities");
+        foreach (var capability in new[] { "memory.search", "code.search", "trace.read", "failure.latest", "test.run-plan", "quality.run-gate", "project.build" })
+        {
+            if (!capabilities.Contains(capability, StringComparer.OrdinalIgnoreCase))
+                failures.Add($"Expected registry capability {capability}.");
+        }
+
+        if (!ReadBoolProperty(data, "traceVisualizationAvailable"))
+            failures.Add("Expected trace visualization/report markdown to be available.");
+        if (!StringPropertyEquals(data, "evidenceValidationStatus", "Passed"))
+            failures.Add($"Expected evidence validation Passed, actual {ReadProperty(data, "evidenceValidationStatus")}.");
+        if (!StringPropertyEquals(data, "humanEscalationDecision", "HumanReviewRequired"))
+            failures.Add($"Expected human escalation gate HumanReviewRequired, actual {ReadProperty(data, "humanEscalationDecision")}.");
+        if (!ReadBoolProperty(data, "dotnetProfilePresent") || !ReadBoolProperty(data, "nodeProfilePresent") || !ReadBoolProperty(data, "pythonProfilePresent"))
+            failures.Add("Expected dotnet, node, and python runtime profiles.");
+        if (!ReadBoolProperty(data, "realRepoWritesBlocked") ||
+            !ReadBoolProperty(data, "memoryMutationBlocked") ||
+            !ReadBoolProperty(data, "ticketCreationBlocked") ||
+            !ReadBoolProperty(data, "patchApplyBlocked") ||
+            !ReadBoolProperty(data, "rawCommandExecutionBlockedForAgents"))
+        {
+            failures.Add("Expected hard governance boundaries to remain blocked.");
+        }
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Governed tool loop 162-167 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);

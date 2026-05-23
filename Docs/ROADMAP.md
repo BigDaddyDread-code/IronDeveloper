@@ -189,7 +189,7 @@ Still blocked:
 
 ## Live Remaining Governed Agents 161
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: complete the current useful opt-in live governed agent pass for ResearchAgent, QualityAgent, and SupervisorAgent.
 
@@ -207,6 +207,32 @@ Still blocked:
 - Ticket creation.
 - Patch application.
 - Quality gate override.
+- ConscienceAgent bypass.
+- ThoughtLedger bypass.
+- Agent self-approval.
+
+## Governed Planner/Critic Tool Loop 162-167
+
+**Status: Active**
+
+Goal: make agents evidence-seeking instead of single-response helpers by adding a native governed tool contract, trace output, human escalation, evidence validation, and language-agnostic runtime profiles.
+
+Delivered in this slice:
+
+- `AgentToolCapability`, `AgentToolRequest`, `AgentToolResult`, `AgentLoopTrace`, `EvidenceValidationResult`, `HumanEscalationGate`, and `PlannerCriticLoopResult` contracts.
+- `GovernedToolRegistry` with safe read/test/report capabilities.
+- `GovernedPlannerCriticLoopService` for Planner -> tools -> Critic -> revised plan.
+- `agent loop plan-review` product command.
+- `campaign governed-tool-loop-162-167` regression command.
+- Runtime profile contracts for `.NET`, Node, and Python.
+
+Still blocked:
+
+- Raw command execution directly by agents.
+- Real repository writes.
+- Memory mutation.
+- Ticket creation without review.
+- Patch application.
 - ConscienceAgent bypass.
 - ThoughtLedger bypass.
 - Agent self-approval.

@@ -68,3 +68,5 @@ IRONDEV-159 extends the same opt-in live governed pattern to CriticAgent and Pla
 IRONDEV-160 extends the same opt-in live governed pattern to RetrieverAgent and SentinelAgent. Live model output cannot override memory ranking, project scoping, or insight classification; it remains advisory evidence only.
 
 IRONDEV-161 completes the current useful opt-in live agent pass for ResearchAgent, QualityAgent, and SupervisorAgent. TesterAgent, ConscienceAgent, and ThoughtLedger intentionally remain deterministic because they execute, gate, and explain rather than freely decide.
+
+IRONDEV-162 through IRONDEV-167 add the first governed Planner/Critic tool-using reasoning loop. Agents now request named capabilities such as `memory.search`, `code.search`, `quality.run-gate`, and `project.build`; the registry validates the request, the runner records evidence, CriticAgent reviews sufficiency, PlannerAgent revises the plan, and a human escalation gate decides whether more evidence or review is required. Tool requests remain read/test/report-only in this slice.

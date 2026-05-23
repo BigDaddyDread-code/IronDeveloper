@@ -1,5 +1,16 @@
 [
   {
+    "Id": "GOVERNED_TOOL_LOOP_162_167",
+    "Project": "IronDev",
+    "Title": "Governed Planner/Critic Tool Loop 162-167",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\GOVERNED_TOOL_LOOP_162_167.md",
+    "DogfoodRunId": "GovernedToolLoop162167",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524162000000-governed-tool-loop-162-167.md",
+    "CreatedUtc": "2026-05-24T16:20:00+00:00"
+  },
+  {
     "Id": "LIVE_REMAINING_GOVERNED_AGENTS_161",
     "Project": "IronDev",
     "Title": "Live Remaining Governed Agents 161",

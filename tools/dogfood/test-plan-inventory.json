@@ -1,5 +1,33 @@
 ﻿[
     {
+        "planFile":  "irondev-governed-tool-loop-162-167.json",
+        "goalId":  "governed-tool-loop-162-167",
+        "project":  "IronDev",
+        "description":  "Validate the governed Planner/Critic tool loop, tool registry, trace visualization, evidence validation, human escalation, and dotnet/node/python runtime profiles.",
+        "agentPath":  "TestAgent + ReplayRunner + GovernedToolLoop162167Command + GovernedPlannerCriticLoopService + GovernedToolRegistry",
+        "command":  "campaign governed-tool-loop-162-167",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "GovernedToolRegistry",
+                                 "GovernedPlannerCriticLoopService",
+                                 "EvidenceValidationService",
+                                 "Code Standards Alpha"
+                             ],
+        "expectedEvidence":  [
+                                 "tool contract exists",
+                                 "safe capabilities registered",
+                                 "trace report markdown exists",
+                                 "evidence validation passes",
+                                 "human escalation gate is present",
+                                 "dotnet node python runtime profiles exist",
+                                 "raw command execution by agents remains blocked",
+                                 "real repo writes remain blocked"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Read/test/report-only loop; no raw command execution by agents, no real repo writes, no memory mutation, no ticket creation, no patch apply, and no self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-live-remaining-governed-agents-161.json",
         "goalId":  "live-remaining-governed-agents-161",
         "project":  "IronDev",

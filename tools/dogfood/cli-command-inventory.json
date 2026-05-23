@@ -1,5 +1,25 @@
 ﻿[
     {
+        "command":  "agent loop plan-review",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "GovernedToolLoop162167Command.cs + GovernedPlannerCriticLoopService",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed Planner/Critic tool loop",
+        "notes":  "Runs a read/test/report-only Planner -> tool registry -> Critic -> revised plan loop with trace output, evidence validation, human escalation, and dotnet/node/python runtime profile contracts."
+    },
+    {
+        "command":  "campaign governed-tool-loop-162-167",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "GovernedToolLoop162167Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed tool loop smoke",
+        "notes":  "Proves the tool contract, registry, trace report, evidence validation layer, human escalation gate, runtime profiles, and hard no-write/no-memory-mutation/no-ticket/no-patch boundaries."
+    },
+    {
         "command":  "campaign live-remaining-agents-161",
         "category":  "campaign",
         "scope":  "dogfood/control",
