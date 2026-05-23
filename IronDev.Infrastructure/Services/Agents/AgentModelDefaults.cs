@@ -119,6 +119,13 @@ public static class AgentModelDefaults
             Purpose = "Package explicitly requested external evidence as read-only research without overriding project memory.",
             DefaultModelProfile = "cheap-runner",
             AllowedTools = ["external.evidence.read", "research.package"]
+        },
+        new()
+        {
+            Name = "ConscienceAgent",
+            Purpose = "Review proposed IronDev/IDA actions against evidence and safety boundaries.",
+            DefaultModelProfile = "cheap-runner",
+            AllowedTools = ["action.review", "boundary.check", "evidence.check"]
         }
     ];
 }

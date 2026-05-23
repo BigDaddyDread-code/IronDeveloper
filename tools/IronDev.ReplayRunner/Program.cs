@@ -23,7 +23,7 @@ var options = new JsonSerializerOptions
 
 if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
 {
-    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan> [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|triage|reindex-freshness-smoke> [...] | foundation break-test [...] | failure latest --for-codex [...]");
+    Console.Error.WriteLine("Usage: IronDev.ReplayRunner <replay-plan.json> | agent <list|profiles|tester run-plan|conscience review|thought-ledger explain> [...] | govern review [...] | chat send <message> [...] | docs <clean|import|list|show|search> [...] | memory <search|triage|reindex-freshness-smoke> [...] | foundation break-test [...] | failure latest --for-codex [...]");
     return 2;
 }
 
@@ -97,8 +97,27 @@ if (args.Length >= 3 &&
     return await HandleAgentResearchPackageCommandAsync(args, options);
 }
 
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "conscience", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "review", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentConscienceReviewCommandAsync(args, options);
+}
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "thought-ledger", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "explain", StringComparison.OrdinalIgnoreCase))
+{
+    return HandleAgentThoughtLedgerExplainCommand(args, options);
+}
+
 if (IsCommand(args, "chat", "send"))
     return await HandleChatSendCommandAsync(args, options);
+
+if (IsCommand(args, "govern", "review"))
+    return await GovernedActionReviewCommand.HandleAsync(args, options);
 
 if (IsCommand(args, "docs", "clean"))
     return await HandleDocsCleanCommandAsync(args, options);
@@ -650,6 +669,80 @@ static async Task<int> HandleAgentResearchPackageCommandAsync(string[] args, Jso
     return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
 }
 
+static async Task<int> HandleAgentConscienceReviewCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var actionType = ReadOption(args, "--action-type") ?? ReadPositionalText(args, 3);
+    if (string.IsNullOrWhiteSpace(actionType))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent conscience review --action-type <action> --observed-project <project> --affected-project <project> --evidence <text> [--requested-tools tools] [--memory-authority-refs refs] [--safety-boundary-refs refs] [--run-id id] [--json]");
+        return 2;
+    }
+
+    var runId = ReadOption(args, "--run-id") ?? $"ConscienceAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "ConscienceAgent",
+        GoalId = "conscience-agent-lite-131",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["action_type"] = actionType,
+            ["observed_project"] = ReadOption(args, "--observed-project") ?? string.Empty,
+            ["affected_project"] = ReadOption(args, "--affected-project") ?? string.Empty,
+            ["evidence"] = ReadOption(args, "--evidence") ?? string.Empty,
+            ["requested_tools"] = ReadOption(args, "--requested-tools") ?? string.Empty,
+            ["memory_authority_refs"] = ReadOption(args, "--memory-authority-refs") ?? string.Empty,
+            ["safety_boundary_refs"] = ReadOption(args, "--safety-boundary-refs") ?? string.Empty
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent conscience review",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        review = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
+static int HandleAgentThoughtLedgerExplainCommand(string[] args, JsonSerializerOptions options)
+{
+    var subject = ReadOption(args, "--subject") ?? ReadPositionalText(args, 3);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent thought-ledger explain --subject <subject> [--decision Allow|Block|NeedsMoreEvidence] [--observed-project project] [--affected-project project] [--evidence text] [--known-boundaries text] [--uncertainties text] [--candidate-actions text] [--json]");
+        return 2;
+    }
+
+    var service = new ThoughtLedgerService();
+    var result = service.Explain(
+        subject,
+        ReadOption(args, "--observed-project") ?? "IronDev",
+        ReadOption(args, "--affected-project") ?? ReadOption(args, "--observed-project") ?? "IronDev",
+        ReadOption(args, "--decision"),
+        SplitCliList(ReadOption(args, "--evidence")),
+        SplitCliList(ReadOption(args, "--known-boundaries")),
+        SplitCliList(ReadOption(args, "--uncertainties")),
+        SplitCliList(ReadOption(args, "--candidate-actions")));
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent thought-ledger explain",
+        thoughtLedger = result
+    }, options));
+
+    return 0;
+}
+
 static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime()
 {
     var repoRoot = FindRepositoryRoot();
@@ -673,6 +766,8 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                     ? new SentinelAgent(definition, modelResolver)
                 : string.Equals(definition.Name, "ResearchAgent", StringComparison.OrdinalIgnoreCase)
                     ? new ResearchAgent(definition, modelResolver)
+                : string.Equals(definition.Name, "ConscienceAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new ConscienceAgent(definition, modelResolver)
                 : new StaticIronDevAgent(definition, modelResolver))
         .ToArray();
     var registry = new AgentRegistry(agents, definitions);
@@ -1731,6 +1826,11 @@ static string? ReadOption(string[] args, string optionName)
 
     return null;
 }
+
+static IReadOnlyList<string> SplitCliList(string? value) =>
+    string.IsNullOrWhiteSpace(value)
+        ? []
+        : value.Split(['|', ';'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
 static bool HasFlag(string[] args, string optionName)
     => args.Any(arg => string.Equals(arg, optionName, StringComparison.OrdinalIgnoreCase));

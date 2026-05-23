@@ -30,3 +30,16 @@ public interface IAgentRunner
 {
     Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default);
 }
+
+public interface IThoughtLedgerService
+{
+    ThoughtLedgerResult Explain(
+        string subject,
+        string observedProject,
+        string affectedProject,
+        string? conscienceDecision,
+        IReadOnlyList<string> evidence,
+        IReadOnlyList<string> knownBoundaries,
+        IReadOnlyList<string> uncertainties,
+        IReadOnlyList<string> candidateActions);
+}

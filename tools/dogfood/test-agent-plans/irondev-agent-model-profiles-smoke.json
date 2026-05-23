@@ -1,9 +1,9 @@
 {
   "test_run_id": "test-irondev-agent-model-profiles-014",
   "goal_id": "agent-model-profiles-014",
-  "description": "Prove IronDev has OpenAI-only model profiles, core agents plus lite observer agents, and one working TesterAgent path that can execute an existing Test Agent plan.",
+  "description": "Prove IronDev has OpenAI-only model profiles, core agents plus lite observer/control-plane agents, and one working TesterAgent path that can execute an existing Test Agent plan.",
   "expected": {
-    "agent_count": 10,
+    "agent_count": 11,
     "openai_profiles_only": true,
     "tester_agent_profile": "cheap-runner",
     "tester_agent_runs_plan": true
@@ -13,7 +13,7 @@
       "step": 1,
       "action": "agent_list",
       "params": {
-        "expect_agent_count": 10
+        "expect_agent_count": 11
       }
     },
     {

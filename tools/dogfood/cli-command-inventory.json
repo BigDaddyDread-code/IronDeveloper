@@ -102,6 +102,36 @@
                           "notes":  "Packages explicit external evidence as read-only ResearchPackage output."
                       },
                       {
+                          "command":  "agent thought-ledger explain",
+                          "category":  "agent",
+                          "scope":  "dogfood/control",
+                          "implementation":  "Program.cs + ThoughtLedgerService",
+                          "requiresSql":  false,
+                          "requiresWeaviate":  false,
+                          "status":  "deterministic visible reasoning summary",
+                          "notes":  "Explains evidence, uncertainty, blocked actions, and safer alternatives without hidden chain-of-thought."
+                      },
+                      {
+                          "command":  "agent conscience review",
+                          "category":  "agent",
+                          "scope":  "dogfood/control",
+                          "implementation":  "Program.cs + ConscienceAgent",
+                          "requiresSql":  false,
+                          "requiresWeaviate":  false,
+                          "status":  "deterministic safety reviewer",
+                          "notes":  "Reviews proposed actions and returns Allow, Block, or NeedsMoreEvidence; no mutation."
+                      },
+                      {
+                          "command":  "govern review",
+                          "category":  "govern",
+                          "scope":  "dogfood/control",
+                          "implementation":  "GovernedActionReviewCommand.cs + ConscienceAgent + ThoughtLedgerService",
+                          "requiresSql":  false,
+                          "requiresWeaviate":  false,
+                          "status":  "deterministic governed action review",
+                          "notes":  "Combines action review and visible reasoning; never executes the proposed action."
+                      },
+                      {
                           "command":  "chat send",
                           "category":  "chat",
                           "scope":  "dogfood/control",

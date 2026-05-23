@@ -10,11 +10,12 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 10
+- Agent commands: 12
 - Chat commands: 1
 - Docs commands: 6
 - Ticket commands: 1
 - Failure commands: 1
+- Govern commands: 1
 - Memory commands: 6
 - Builder commands: 1
 - Foundation commands: 1
@@ -28,6 +29,9 @@ The machine-readable inventory is stored at:
 - `agent retriever search`
 - `agent sentinel observe`
 - `agent research package`
+- `agent conscience review`
+- `agent thought-ledger explain`
+- `govern review`
 - `foundation break-test`
 - `failure latest`
 - `builder proposal-safety-smoke`
@@ -35,6 +39,10 @@ The machine-readable inventory is stored at:
 These are closest to the control surface Codex will use.
 
 `foundation break-test` is a dogfood control command for the 121-130 hardening phase. It is evidence/report oriented and must not mutate the real repository.
+
+`agent conscience review` and `agent thought-ledger explain` are governed-autonomy control-plane commands. They review and explain proposed actions only; they do not execute, mutate memory, create tickets, or patch files.
+
+`govern review` combines ConscienceAgent and ThoughtLedger into one review package. It still does not execute the proposed action.
 
 ## Dogfood/Smoke Commands
 

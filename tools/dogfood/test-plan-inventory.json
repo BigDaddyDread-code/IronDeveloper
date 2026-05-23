@@ -2,6 +2,58 @@
     {
         "value":  [
                       {
+                          "planFile":  "irondev-governed-action-review-133.json",
+                          "goalId":  "governed-action-review-133",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "govern_review"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent",
+                                                   "ConscienceAgent",
+                                                   "ThoughtLedgerService"
+                                               ],
+                          "regressionGroup":  "GovernedAutonomy",
+                          "safetyBoundary":  "Review and explanation only; no execution, patching, ticket creation, or memory mutation.",
+                          "kind":  "smoke",
+                          "description":  "Prove govern review combines ConscienceAgent and ThoughtLedger into one non-mutating control-plane review."
+                      },
+                      {
+                          "planFile":  "irondev-conscience-agent-lite-131.json",
+                          "goalId":  "conscience-agent-lite-131",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "conscience_review"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent",
+                                                   "AgentRegistry"
+                                               ],
+                          "regressionGroup":  "GovernedAutonomy",
+                          "safetyBoundary":  "Review only; no patching, ticket creation, memory mutation, or self-approval.",
+                          "kind":  "smoke",
+                          "description":  "Prove ConscienceAgent Lite returns Allow, Block, or NeedsMoreEvidence for proposed actions."
+                      },
+                      {
+                          "planFile":  "irondev-thought-ledger-132.json",
+                          "goalId":  "thought-ledger-132",
+                          "project":  "IronDev",
+                          "actions":  [
+                                          "thought_ledger_explain"
+                                      ],
+                          "requiredServices":  [
+                                                   "ReplayRunner",
+                                                   "TestAgent",
+                                                   "ThoughtLedgerService"
+                                               ],
+                          "regressionGroup":  "GovernedAutonomy",
+                          "safetyBoundary":  "Visible reasoning summary only; no hidden chain-of-thought, writes, patches, tickets, or memory mutation.",
+                          "kind":  "smoke",
+                          "description":  "Prove ThoughtLedger explains evidence, uncertainty, blocked actions, and safer alternatives without executing actions."
+                      },
+                      {
                           "planFile":  "irondev-memory-triage-smoke.json",
                           "goalId":  "memory-triage-119",
                           "project":  "IronDev",

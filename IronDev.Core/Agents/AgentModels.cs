@@ -50,3 +50,26 @@ public sealed class AgentResult
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
     public DateTimeOffset CompletedAtUtc { get; init; } = DateTimeOffset.UtcNow;
 }
+
+public sealed class ThoughtLedgerEntry
+{
+    public required string Category { get; init; }
+    public required string Text { get; init; }
+    public string? Project { get; init; }
+}
+
+public sealed class ThoughtLedgerResult
+{
+    public string Subject { get; init; } = string.Empty;
+    public string CurrentBelief { get; init; } = string.Empty;
+    public IReadOnlyList<ThoughtLedgerEntry> Evidence { get; init; } = [];
+    public IReadOnlyList<ThoughtLedgerEntry> Uncertainties { get; init; } = [];
+    public IReadOnlyList<ThoughtLedgerEntry> Assumptions { get; init; } = [];
+    public IReadOnlyList<ThoughtLedgerEntry> TemptingActions { get; init; } = [];
+    public IReadOnlyList<ThoughtLedgerEntry> BlockedActions { get; init; } = [];
+    public IReadOnlyList<ThoughtLedgerEntry> SaferAlternatives { get; init; } = [];
+    public string RecommendedNextMove { get; init; } = string.Empty;
+    public string ObservedProject { get; init; } = string.Empty;
+    public string AffectedProject { get; init; } = string.Empty;
+    public string Boundary { get; init; } = "Visible reasoning summary only. No raw hidden chain-of-thought. No writes, patches, tickets, or memory mutation.";
+}
