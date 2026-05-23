@@ -1806,6 +1806,50 @@ foreach ($step in $plan.steps) {
                         $validationFailures.Add("Expected supervisor decision evidence.") | Out-Null
                     }
 
+                    if ($params.expect_conscience_decision -and [string]$loopReport.conscience.decision -ne [string]$params.expect_conscience_decision) {
+                        $validationFailures.Add("Expected supervisor conscience decision '$($params.expect_conscience_decision)', actual '$($loopReport.conscience.decision)'.") | Out-Null
+                    }
+
+                    if ($params.expect_thought_ledger -and -not $loopReport.thoughtLedger.explanation) {
+                        $validationFailures.Add("Expected supervisor loop report to include ThoughtLedger explanation.") | Out-Null
+                    }
+
+                    if ($params.expect_weighted_context_bundle -and -not $loopReport.memory.weightedContextBundle) {
+                        $validationFailures.Add("Expected supervisor memory report to include weightedContextBundle.") | Out-Null
+                    }
+
+                    if ($null -ne $params.expect_autonomous_execution_allowed) {
+                        $expectedAutonomous = Convert-ToBool $params.expect_autonomous_execution_allowed $false
+                        if ([bool]$loopReport.governedAutonomy.autonomousExecutionAllowed -ne $expectedAutonomous) {
+                            $validationFailures.Add("Expected autonomousExecutionAllowed=$expectedAutonomous, actual $($loopReport.governedAutonomy.autonomousExecutionAllowed).") | Out-Null
+                        }
+                    }
+
+                    if ($null -ne $params.expect_mutation_allowed) {
+                        $expectedMutation = Convert-ToBool $params.expect_mutation_allowed $false
+                        if ([bool]$loopReport.governedAutonomy.mutationAllowed -ne $expectedMutation) {
+                            $validationFailures.Add("Expected mutationAllowed=$expectedMutation, actual $($loopReport.governedAutonomy.mutationAllowed).") | Out-Null
+                        }
+                    }
+
+                    if ($params.expect_autonomy_tier -and [string]$loopReport.governedAutonomy.tier -ne [string]$params.expect_autonomy_tier) {
+                        $validationFailures.Add("Expected autonomy tier '$($params.expect_autonomy_tier)', actual '$($loopReport.governedAutonomy.tier)'.") | Out-Null
+                    }
+
+                    if ($null -ne $params.expect_real_repo_mutation_allowed) {
+                        $expectedRealRepoMutation = Convert-ToBool $params.expect_real_repo_mutation_allowed $false
+                        if ([bool]$loopReport.governedAutonomy.realRepoMutationAllowed -ne $expectedRealRepoMutation) {
+                            $validationFailures.Add("Expected realRepoMutationAllowed=$expectedRealRepoMutation, actual $($loopReport.governedAutonomy.realRepoMutationAllowed).") | Out-Null
+                        }
+                    }
+
+                    if ($null -ne $params.expect_disposable_workspace_mutation_allowed) {
+                        $expectedDisposableMutation = Convert-ToBool $params.expect_disposable_workspace_mutation_allowed $false
+                        if ([bool]$loopReport.governedAutonomy.disposableWorkspaceMutationAllowed -ne $expectedDisposableMutation) {
+                            $validationFailures.Add("Expected disposableWorkspaceMutationAllowed=$expectedDisposableMutation, actual $($loopReport.governedAutonomy.disposableWorkspaceMutationAllowed).") | Out-Null
+                        }
+                    }
+
                     if ($params.expect_boundary_contains -and [string]$loopReport.codexHandoff.boundary -notlike "*$($params.expect_boundary_contains)*") {
                         $validationFailures.Add("Expected handoff boundary to contain '$($params.expect_boundary_contains)', actual '$($loopReport.codexHandoff.boundary)'.") | Out-Null
                     }

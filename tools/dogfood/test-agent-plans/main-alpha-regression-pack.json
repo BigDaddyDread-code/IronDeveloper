@@ -17,6 +17,8 @@
     "thought_ledger_passes": true,
     "governed_action_review_passes": true,
     "retriever_weighted_context_passes": true,
+    "supervisor_governed_autonomy_passes": true,
+    "supervisor_disposable_workspace_autonomy_passes": true,
     "failure_handoff_passes": true,
     "code_standards_passes": true
   },
@@ -188,6 +190,28 @@
       "step": 15,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-governed-autonomous-loop-135.json",
+        "expect_nested_goal_id": "supervisor-governed-autonomous-loop-135",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 16,
+      "action": "agent_tester_run_plan",
+      "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-disposable-workspace-autonomy-136.json",
+        "expect_nested_goal_id": "supervisor-disposable-workspace-autonomy-136",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 17,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -196,7 +220,7 @@
       }
     },
     {
-      "step": 16,
+      "step": 18,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -207,6 +231,6 @@
       }
     }
   ],
-  "max_turns": 16,
+  "max_turns": 18,
   "early_stop_on_failure": true
 }

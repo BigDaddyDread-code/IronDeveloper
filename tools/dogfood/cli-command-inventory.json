@@ -48,8 +48,8 @@
                           "implementation":  "Program.cs + SupervisorAgent",
                           "requiresSql":  false,
                           "requiresWeaviate":  "depends on query",
-                          "status":  "deterministic coordinator",
-                          "notes":  "Runs memory lookup then nested TesterAgent plan."
+                          "status":  "governed autonomous wrapper",
+                          "notes":  "Runs weighted retrieval, ConscienceAgent review, ThoughtLedger explanation, then nested TesterAgent plan only when allowed. Supports Tier 3 read/test/report and Tier 4 disposable-workspace apply loops."
                       },
                       {
                           "command":  "agent critic review-failure",

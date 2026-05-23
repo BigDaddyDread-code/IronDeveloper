@@ -1,0 +1,46 @@
+{
+  "test_run_id": "IronDev135-SupervisorGovernedAutonomousLoop",
+  "goal_id": "supervisor-governed-autonomous-loop-135",
+  "project_id": 2,
+  "description": "Prove SupervisorAgent can autonomously run a bounded read/test/report loop only after ConscienceAgent allows it, while ThoughtLedger explains the decision.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_supervisor_run_goal",
+      "params": {
+        "project": "IronDev",
+        "query": "Supervisor Governed Autonomous Loop 135",
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-retriever-weighted-context-bundle-134.json",
+        "expect_project": "IronDev",
+        "expect_model_profile": "strong-reasoner",
+        "expect_top_title_contains": "Supervisor Governed Autonomous Loop 135",
+        "expect_memory_succeeded": true,
+        "expect_tester_succeeded": true,
+        "expect_codex_handoff": true,
+        "expect_supervisor_decision": "report_ready",
+        "expect_conscience_decision": "Allow",
+        "expect_thought_ledger": true,
+        "expect_weighted_context_bundle": true,
+        "expect_autonomous_execution_allowed": true,
+        "expect_mutation_allowed": false,
+        "expect_decision_evidence": true,
+        "expect_tester_goal_id": "retriever-weighted-context-bundle-134",
+        "expect_boundary_contains": "governed autonomous read/test/report"
+      }
+    }
+  ],
+  "expected": {
+    "supervisor_governed_autonomy": true,
+    "retriever_weighted_context_first": true,
+    "conscience_allows_before_tester": true,
+    "thought_ledger_explains": true,
+    "tester_executes_allowed_plan": true,
+    "mutation_allowed": false,
+    "no_real_repo_writes": true,
+    "no_memory_mutation": true,
+    "no_ticket_creation": true,
+    "no_patch_apply": true
+  }
+}
