@@ -1,5 +1,15 @@
 ﻿[
     {
+        "command":  "agent builder repair-loop",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "BuilderRepairLoopCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "trace-backed disposable repair loop",
+        "notes":  "Runs a real caged Solitaire repair loop with intentional build/test failures, bounded repairs, final pass, and zero real repo mutation."
+    },
+    {
         "command":  "agent builder trace-smoke",
         "category":  "agent",
         "scope":  "smoke",

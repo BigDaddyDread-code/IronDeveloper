@@ -198,6 +198,17 @@
     "CreatedUtc": "2026-05-23T09:00:00+00:00"
   },
   {
+    "Id": "20260523083659547-builder-repair-loop-141",
+    "Project": "IronDev",
+    "Title": "BUILDER_REPAIR_LOOP_141",
+    "DocumentType": "ArchitectureProof",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\BUILDER_REPAIR_LOOP_141.md",
+    "DogfoodRunId": "BuilderRepairLoop141Docs",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523083659547-builder-repair-loop-141.md",
+    "CreatedUtc": "2026-05-23T08:36:59.5609055+00:00"
+  },
+  {
     "Id": "20260523070832553-buildagent-traceable-disposable-build-spine-140",
     "Project": "IronDev",
     "Title": "BUILDAGENT_TRACEABLE_DISPOSABLE_BUILD_SPINE_140",
