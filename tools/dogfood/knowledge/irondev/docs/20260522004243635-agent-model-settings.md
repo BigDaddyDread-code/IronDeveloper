@@ -45,6 +45,7 @@ IronDev chooses models by agent role, not by one global chat setting.
 | `CriticAgent` | `strong-reviewer` | Challenge assumptions and review deeper risks |
 | `SentinelAgent` | `cheap-runner` | Observe campaign/failure/test evidence and emit insight artefacts |
 | `ResearchAgent` | `cheap-runner` | Package explicit external evidence as read-only research |
+| `ConscienceAgent` | `cheap-runner` | Review proposed actions against evidence and safety boundaries |
 
 ## Settings Shape
 

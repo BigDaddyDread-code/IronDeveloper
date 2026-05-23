@@ -1,0 +1,109 @@
+{
+  "test_run_id": "IronDevThoughtLedger132",
+  "goal_id": "thought-ledger-132",
+  "description": "Prove ThoughtLedger returns visible reasoning summaries without exposing raw hidden chain-of-thought or executing actions.",
+  "steps": [
+    {
+      "step": 1,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "UI implementation request",
+        "decision": "Block",
+        "observed_project": "IronDev",
+        "affected_project": "IronDev",
+        "evidence": "Foundation break-test phase says UI work is blocked.",
+        "known_boundaries": "UI implementation remains blocked until foundation gates pass.",
+        "candidate_actions": "start UI implementation|write foundation report",
+        "expect_blocked_action_min": 1,
+        "expect_boundary_contains": "No raw hidden chain-of-thought"
+      }
+    },
+    {
+      "step": 2,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "Real repo write request",
+        "decision": "Block",
+        "observed_project": "BookSeller",
+        "affected_project": "IronDev",
+        "evidence": "ConscienceAgent blocked real repository write.",
+        "known_boundaries": "No real repository writes.",
+        "candidate_actions": "patch real repo|apply inside disposable workspace",
+        "expect_blocked_action_min": 1,
+        "expect_observed_project": "BookSeller",
+        "expect_affected_project": "IronDev"
+      }
+    },
+    {
+      "step": 3,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "Disposable workspace alternative",
+        "decision": "Block",
+        "observed_project": "BookSeller",
+        "affected_project": "BookSeller",
+        "evidence": "Real repo write is blocked.",
+        "known_boundaries": "Patch apply only inside explicit disposable workspaces.",
+        "candidate_actions": "patch real repo|use disposable workspace proof",
+        "expect_recommended_next_move_contains": "safer alternative"
+      }
+    },
+    {
+      "step": 4,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "Missing evidence review",
+        "decision": "NeedsMoreEvidence",
+        "observed_project": "IronDev",
+        "affected_project": "IronDev",
+        "uncertainties": "No trace id supplied|No source ticket supplied",
+        "candidate_actions": "continue review",
+        "expect_uncertainty_min": 2,
+        "expect_recommended_next_move_contains": "Gather missing evidence"
+      }
+    },
+    {
+      "step": 5,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "BookSeller campaign found IronDev routing weakness",
+        "decision": "Allow",
+        "observed_project": "BookSeller",
+        "affected_project": "IronDev",
+        "evidence": "BookSeller run 3 expected SaveDiscussionDocument but got GeneralChat.",
+        "candidate_actions": "record visible review",
+        "expect_observed_project": "BookSeller",
+        "expect_affected_project": "IronDev"
+      }
+    },
+    {
+      "step": 6,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "Consume ConscienceAgent output",
+        "decision": "Block",
+        "observed_project": "BookSeller",
+        "affected_project": "IronDev",
+        "evidence": "ConscienceAgent decision=Block because NoRealRepositoryWrites was violated.",
+        "known_boundaries": "No real repository writes.",
+        "candidate_actions": "apply patch to real repo",
+        "expect_blocked_action_min": 1
+      }
+    },
+    {
+      "step": 7,
+      "action": "thought_ledger_explain",
+      "params": {
+        "subject": "No mutation authority",
+        "decision": "Allow",
+        "observed_project": "IronDev",
+        "affected_project": "IronDev",
+        "evidence": "ThoughtLedger explains only.",
+        "candidate_actions": "explain review",
+        "expect_boundary_contains": "No writes, patches, tickets, or memory mutation"
+      }
+    }
+  ],
+  "max_turns": 7,
+  "early_stop_on_failure": true
+}

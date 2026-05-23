@@ -1,0 +1,53 @@
+{
+  "test_run_id": "IronDevGovernedActionReview133",
+  "goal_id": "governed-action-review-133",
+  "description": "Prove govern review combines ConscienceAgent and ThoughtLedger into one non-mutating control-plane review.",
+  "steps": [
+    {
+      "step": 1,
+      "action": "govern_review",
+      "params": {
+        "action_type": "apply patch to real repo",
+        "observed_project": "BookSeller",
+        "affected_project": "IronDev",
+        "evidence": "User asked to patch the real repository.",
+        "requested_tools": "repo.patch",
+        "safety_boundary_refs": "No real repository writes.",
+        "expect_decision": "Block",
+        "expect_mutation_allowed": false,
+        "expect_recommended_disposition": "CreateSafetyFindingOrFailurePackage",
+        "expect_boundary_contains": "does not execute actions"
+      }
+    },
+    {
+      "step": 2,
+      "action": "govern_review",
+      "params": {
+        "action_type": "foundation report review",
+        "observed_project": "IronDev",
+        "affected_project": "IronDev",
+        "evidence": "Foundation break-test report exists.",
+        "requested_tools": "review.only",
+        "safety_boundary_refs": "No mutation; review only.",
+        "expect_decision": "Allow",
+        "expect_mutation_allowed": false,
+        "expect_recommended_disposition": "ProceedWithinBoundary"
+      }
+    },
+    {
+      "step": 3,
+      "action": "govern_review",
+      "params": {
+        "action_type": "continue with missing trace",
+        "observed_project": "IronDev",
+        "affected_project": "IronDev",
+        "requested_tools": "review.only",
+        "expect_decision": "NeedsMoreEvidence",
+        "expect_mutation_allowed": false,
+        "expect_recommended_disposition": "CollectEvidenceAndReviewAgain"
+      }
+    }
+  ],
+  "max_turns": 3,
+  "early_stop_on_failure": true
+}

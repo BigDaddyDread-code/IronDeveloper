@@ -1161,6 +1161,171 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "conscience_review" {
+                $actionType = [string]$params.action_type
+                if ([string]::IsNullOrWhiteSpace($actionType)) {
+                    throw "conscience_review requires params.action_type."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "conscience", "review",
+                    "--action-type", $actionType,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+                if ($params.observed_project) { $arguments += @("--observed-project", [string]$params.observed_project) }
+                if ($params.affected_project) { $arguments += @("--affected-project", [string]$params.affected_project) }
+                if ($params.evidence) { $arguments += @("--evidence", [string]$params.evidence) }
+                if ($params.requested_tools) { $arguments += @("--requested-tools", [string]$params.requested_tools) }
+                if ($params.memory_authority_refs) { $arguments += @("--memory-authority-refs", [string]$params.memory_authority_refs) }
+                if ($params.safety_boundary_refs) { $arguments += @("--safety-boundary-refs", [string]$params.safety_boundary_refs) }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "ConscienceAgent review exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected ConscienceAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected ConscienceAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_decision -and [string]$parsed.review.decision -ne [string]$params.expect_decision) {
+                    $status = "FAILED"
+                    $summary = "Expected ConscienceAgent decision '$($params.expect_decision)', actual '$($parsed.review.decision)'."
+                } elseif ($params.expect_observed_project -and [string]$parsed.review.observedProject -ne [string]$params.expect_observed_project) {
+                    $status = "FAILED"
+                    $summary = "Expected observedProject '$($params.expect_observed_project)', actual '$($parsed.review.observedProject)'."
+                } elseif ($params.expect_affected_project -and [string]$parsed.review.affectedProject -ne [string]$params.expect_affected_project) {
+                    $status = "FAILED"
+                    $summary = "Expected affectedProject '$($params.expect_affected_project)', actual '$($parsed.review.affectedProject)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.review.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected ConscienceAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.review.boundary)'."
+                } elseif ($params.expect_violated_boundary -and @($parsed.review.violatedBoundaries | Where-Object { [string]$_ -eq [string]$params.expect_violated_boundary }).Count -eq 0) {
+                    $status = "FAILED"
+                    $summary = "Expected violated boundary '$($params.expect_violated_boundary)'."
+                } else {
+                    $summary = "ConscienceAgent decision=$($parsed.review.decision); observed=$($parsed.review.observedProject); affected=$($parsed.review.affectedProject)."
+                }
+            }
+
+            "thought_ledger_explain" {
+                $subject = [string]$params.subject
+                if ([string]::IsNullOrWhiteSpace($subject)) {
+                    throw "thought_ledger_explain requires params.subject."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "thought-ledger", "explain",
+                    "--subject", $subject,
+                    "--json"
+                )
+                if ($params.decision) { $arguments += @("--decision", [string]$params.decision) }
+                if ($params.observed_project) { $arguments += @("--observed-project", [string]$params.observed_project) }
+                if ($params.affected_project) { $arguments += @("--affected-project", [string]$params.affected_project) }
+                if ($params.evidence) { $arguments += @("--evidence", [string]$params.evidence) }
+                if ($params.known_boundaries) { $arguments += @("--known-boundaries", [string]$params.known_boundaries) }
+                if ($params.uncertainties) { $arguments += @("--uncertainties", [string]$params.uncertainties) }
+                if ($params.candidate_actions) { $arguments += @("--candidate-actions", [string]$params.candidate_actions) }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "ThoughtLedger explain exited with code $exitCode"
+                } elseif ($params.expect_observed_project -and [string]$parsed.thoughtLedger.ObservedProject -ne [string]$params.expect_observed_project) {
+                    $status = "FAILED"
+                    $summary = "Expected observedProject '$($params.expect_observed_project)', actual '$($parsed.thoughtLedger.ObservedProject)'."
+                } elseif ($params.expect_affected_project -and [string]$parsed.thoughtLedger.AffectedProject -ne [string]$params.expect_affected_project) {
+                    $status = "FAILED"
+                    $summary = "Expected affectedProject '$($params.expect_affected_project)', actual '$($parsed.thoughtLedger.AffectedProject)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.thoughtLedger.Boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected ThoughtLedger boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.thoughtLedger.Boundary)'."
+                } elseif ($params.expect_blocked_action_min -and @($parsed.thoughtLedger.BlockedActions).Count -lt [int]$params.expect_blocked_action_min) {
+                    $status = "FAILED"
+                    $summary = "Expected at least $($params.expect_blocked_action_min) blocked actions."
+                } elseif ($params.expect_uncertainty_min -and @($parsed.thoughtLedger.Uncertainties).Count -lt [int]$params.expect_uncertainty_min) {
+                    $status = "FAILED"
+                    $summary = "Expected at least $($params.expect_uncertainty_min) uncertainties."
+                } elseif ($params.expect_recommended_next_move_contains -and [string]$parsed.thoughtLedger.RecommendedNextMove -notlike "*$($params.expect_recommended_next_move_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected recommended next move to contain '$($params.expect_recommended_next_move_contains)', actual '$($parsed.thoughtLedger.RecommendedNextMove)'."
+                } else {
+                    $summary = "ThoughtLedger explained subject='$($parsed.thoughtLedger.Subject)'; blocked=$(@($parsed.thoughtLedger.BlockedActions).Count); uncertainties=$(@($parsed.thoughtLedger.Uncertainties).Count)."
+                }
+            }
+
+            "govern_review" {
+                $actionType = [string]$params.action_type
+                if ([string]::IsNullOrWhiteSpace($actionType)) {
+                    throw "govern_review requires params.action_type."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "govern", "review",
+                    "--action-type", $actionType,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+                if ($params.observed_project) { $arguments += @("--observed-project", [string]$params.observed_project) }
+                if ($params.affected_project) { $arguments += @("--affected-project", [string]$params.affected_project) }
+                if ($params.evidence) { $arguments += @("--evidence", [string]$params.evidence) }
+                if ($params.requested_tools) { $arguments += @("--requested-tools", [string]$params.requested_tools) }
+                if ($params.memory_authority_refs) { $arguments += @("--memory-authority-refs", [string]$params.memory_authority_refs) }
+                if ($params.safety_boundary_refs) { $arguments += @("--safety-boundary-refs", [string]$params.safety_boundary_refs) }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "Governed action review exited with code $exitCode"
+                } elseif ($params.expect_decision -and [string]$parsed.decision -ne [string]$params.expect_decision) {
+                    $status = "FAILED"
+                    $summary = "Expected governed decision '$($params.expect_decision)', actual '$($parsed.decision)'."
+                } elseif ($params.expect_mutation_allowed -ne $null -and [bool]$parsed.mutationAllowed -ne (Convert-ToBool $params.expect_mutation_allowed $false)) {
+                    $status = "FAILED"
+                    $summary = "Expected mutationAllowed=$($params.expect_mutation_allowed), actual $($parsed.mutationAllowed)."
+                } elseif ($params.expect_recommended_disposition -and [string]$parsed.recommendedDisposition -ne [string]$params.expect_recommended_disposition) {
+                    $status = "FAILED"
+                    $summary = "Expected recommendedDisposition '$($params.expect_recommended_disposition)', actual '$($parsed.recommendedDisposition)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected governed boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.boundary)'."
+                } else {
+                    $summary = "Governed action review decision=$($parsed.decision); disposition=$($parsed.recommendedDisposition); mutationAllowed=$($parsed.mutationAllowed)."
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",

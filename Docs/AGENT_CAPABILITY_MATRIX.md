@@ -28,6 +28,9 @@ Primary retrieval question: which IronDev agents are real vs stubbed?
 | CriticAgent | Deterministic wrapper | Reviews failure packages and returns evidence-backed recommendation. | Reviews only; no code changes. |
 | SentinelAgent | Deterministic wrapper | Observes campaign/failure/test evidence and emits insight artefacts. | Observational only; no tickets, memory writes, patches, or approvals. |
 | ResearchAgent | Deterministic wrapper | Packages explicit external evidence as a ResearchPackage. | Read-only; does not decide architecture, write memory, create tickets, patch code, or override project memory. |
+| ConscienceAgent | Deterministic safety reviewer | Reviews proposed actions and returns Allow, Block, or NeedsMoreEvidence. | Reviews only; no patching, ticket creation, memory mutation, or self-approval. |
+| ThoughtLedger | Deterministic visible reasoning service | Explains visible reasoning summaries, uncertainty, blocked actions, and safer alternatives. | Explanation only; no hidden chain-of-thought, writes, patches, tickets, or memory mutation. |
+| GovernedActionReview | Deterministic control-plane package | Combines ConscienceAgent and ThoughtLedger into one review package. | Reviews and explains only; does not execute the proposed action. |
 
 ## Blunt Assessment
 
