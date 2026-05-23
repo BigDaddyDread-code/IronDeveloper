@@ -181,6 +181,9 @@ if (IsCommand(args, "builder", "proposal-safety-smoke"))
 if (IsCommand(args, "builder", "disposable-workspace-apply-smoke"))
     return await DisposableWorkspaceApplySmokeCommand.HandleAsync(args, options);
 
+if (IsCommand(args, "builder", "solitaire-disposable-build-smoke"))
+    return await SolitaireDisposableBuildSmokeCommand.HandleAsync(args, options);
+
 if (IsCommand(args, "foundation", "break-test"))
     return await FoundationBreakTestCommand.HandleAsync(args, options);
 

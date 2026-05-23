@@ -2663,6 +2663,89 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "solitaire_disposable_build_smoke" {
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "builder", "solitaire-disposable-build-smoke",
+                    "--dogfood-run-id", $RunId
+                )
+                if ($params.workspace_root) {
+                    $arguments += @("--workspace-root", [string]$params.workspace_root)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0) {
+                    $status = "FAILED"
+                    $summary = if ($parsed) {
+                        "Solitaire disposable build failed; passed=$($parsed.passed); build=$($parsed.build.summary); test=$($parsed.test.summary); workspace=$($parsed.workspace.workspacePath)"
+                    } else {
+                        "solitaire_disposable_build_smoke exited with code $exitCode"
+                    }
+                } elseif ($parsed -and -not [bool]$parsed.passed) {
+                    $status = "FAILED"
+                    $summary = "Solitaire disposable build returned Passed=false"
+                } else {
+                    $summary = "Solitaire disposable build passed; changedFiles=$(@($parsed.changedFiles).Count); recommendation=$($parsed.recommendation)"
+                }
+
+                if ($status -eq "SUCCESS" -and $parsed) {
+                    $validationFailures = [System.Collections.Generic.List[string]]::new()
+                    if ($params.expect_project -and [string]$parsed.project -ne [string]$params.expect_project) {
+                        $validationFailures.Add("Expected project '$($params.expect_project)', actual '$($parsed.project)'.") | Out-Null
+                    }
+                    if ($params.expect_workspace_outside_repo -and -not [bool]$parsed.workspace.isOutsideRealRepo) {
+                        $validationFailures.Add("Expected Solitaire workspace outside real repo.") | Out-Null
+                    }
+                    if ($params.expect_real_repo_unchanged -and -not [bool]$parsed.workspace.realRepoUnchanged) {
+                        $validationFailures.Add("Expected real IronDev repo unchanged.") | Out-Null
+                    }
+                    if ($params.expect_conscience_decision -and [string]$parsed.conscience.decision -ne [string]$params.expect_conscience_decision) {
+                        $validationFailures.Add("Expected Conscience decision '$($params.expect_conscience_decision)', actual '$($parsed.conscience.decision)'.") | Out-Null
+                    }
+                    if ($params.expect_build_success -and [int]$parsed.build.exitCode -ne 0) {
+                        $validationFailures.Add("Expected Solitaire WPF build success.") | Out-Null
+                    }
+                    if ($params.expect_test_success -and [int]$parsed.test.exitCode -ne 0) {
+                        $validationFailures.Add("Expected Solitaire core tests success.") | Out-Null
+                    }
+                    if ($params.expect_scope_match -and -not [bool]$parsed.comparison.scopeMatch) {
+                        $validationFailures.Add("Expected generated files to match Solitaire scope.") | Out-Null
+                    }
+                    if ($params.expect_no_unsafe_changes -and [bool]$parsed.comparison.unsafeChangesFound) {
+                        $validationFailures.Add("Expected no unsafe changes.") | Out-Null
+                    }
+                    if ($params.expect_core_project -and @($parsed.changedFiles | Where-Object { ([string]$_).Replace('\', '/').StartsWith("Solitaire.Core/") }).Count -eq 0) {
+                        $validationFailures.Add("Expected generated Solitaire.Core files.") | Out-Null
+                    }
+                    if ($params.expect_wpf_project -and @($parsed.changedFiles | Where-Object { ([string]$_).Replace('\', '/').StartsWith("Solitaire.Wpf/") }).Count -eq 0) {
+                        $validationFailures.Add("Expected generated Solitaire.Wpf files.") | Out-Null
+                    }
+                    if ($params.expect_test_project -and @($parsed.changedFiles | Where-Object { ([string]$_).Replace('\', '/').StartsWith("Solitaire.Core.Tests/") }).Count -eq 0) {
+                        $validationFailures.Add("Expected generated Solitaire.Core.Tests files.") | Out-Null
+                    }
+                    if ($params.expect_evidence_package_path -and -not (Test-Path ([string]$parsed.evidencePackage.resultPath))) {
+                        $validationFailures.Add("Expected Solitaire evidence package result path to exist.") | Out-Null
+                    }
+                    if ($params.expect_recommendation -and [string]$parsed.recommendation -ne [string]$params.expect_recommendation) {
+                        $validationFailures.Add("Expected recommendation '$($params.expect_recommendation)', actual '$($parsed.recommendation)'.") | Out-Null
+                    }
+
+                    if ($validationFailures.Count -gt 0) {
+                        $status = "FAILED"
+                        $summary = $validationFailures -join " "
+                    }
+                }
+            }
+
             "bookseller_supervised_campaign" {
                 $campaignRunId = if ([string]::IsNullOrWhiteSpace([string]$params.campaign_run_id)) {
                     "$RunId-campaign"
