@@ -1595,6 +1595,27 @@ public sealed class ContextAgentTests
     }
 
     [TestMethod]
+    [Description("ChatCommandRouter treats vague new product build prompts as planning intake, not direct build. ")]
+    public async Task ChatCommandRouter_VagueNewProductBuild_IsPlanningIntake()
+    {
+        var router = new ChatCommandRouter();
+
+        var route = await router.RouteAsync(new ChatTurnInput
+        {
+            ProjectId = 0,
+            ChatSessionId = 10,
+            UserMessage = "i want build solitare"
+        });
+
+        Assert.AreEqual(ChatRouteIntent.ProjectPlanningDiscussion, route.Intent);
+        Assert.IsFalse(route.RequiresAction);
+        Assert.IsTrue(route.AllowsProseResponse);
+        Assert.AreEqual(ContextReferenceKind.CurrentMessage, route.ContextReference);
+        CollectionAssert.Contains(route.MatchedSignals.ToArray(), "needs-planner-intake");
+        CollectionAssert.Contains(route.MatchedSignals.ToArray(), "no-build-without-disposable-workspace");
+    }
+
+    [TestMethod]
     [Description("ChatCommandRouter treats typoed save-discussion commands as document actions.")]
     public async Task ChatCommandRouter_SaveDiscussionTypo_IsActionFirst()
     {

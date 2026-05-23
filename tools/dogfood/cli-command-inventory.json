@@ -1,4 +1,14 @@
-﻿[
+[
+    {
+        "command":  "agent planner intake-product-spike",
+        "category":  "agent",
+        "implementation":  "Program.cs + PlannerAgent",
+        "status":  "deterministic product-spike intake",
+        "requires":  [
+                         "ReplayRunner"
+                     ],
+        "notes":  "Classifies vague new product prompts into safe intake evidence. Does not create memory, tickets, disposable workspaces, patches, or real repo writes."
+    },
     {
         "value":  [
                       {

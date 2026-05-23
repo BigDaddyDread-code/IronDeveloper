@@ -1,5 +1,15 @@
 [
     {
+        "Id":  "20260523137000000-solitaire-product-spike-intake-137",
+        "Title":  "Solitaire Product Spike Intake 137",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\SOLITAIRE_PRODUCT_SPIKE_INTAKE_137.md",
+        "DogfoodRunId":  "SolitaireProductSpikeIntake137",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523137000000-solitaire-product-spike-intake-137.md",
+        "CreatedUtc":  "2026-05-23T14:10:00.0000000+00:00"
+    },
+    {
         "Id":  "20260523136000000-supervisor-disposable-workspace-autonomy-136",
         "Project":  "IronDev",
         "Title":  "SUPERVISOR_DISPOSABLE_WORKSPACE_AUTONOMY_136",

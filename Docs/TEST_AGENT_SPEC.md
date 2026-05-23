@@ -223,3 +223,7 @@ dotnet run --project .\tools\IronDev.ReplayRunner\IronDev.ReplayRunner.csproj --
 ```
 
 `docs clean` archives local dogfood docs and seeds a fresh baseline. It does not delete SQL project data.
+
+## 137 Product Spike Intake Action
+
+The Test Agent supports gent_planner_product_spike_intake, which calls gent planner intake-product-spike and validates that vague product prompts become structured intake evidence instead of direct build/apply actions.

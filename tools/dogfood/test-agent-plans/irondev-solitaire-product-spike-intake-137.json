@@ -1,0 +1,57 @@
+{
+  "test_run_id": "irondev-solitaire-product-spike-intake-137",
+  "goal_id": "solitaire-product-spike-intake-137",
+  "description": "Prove IDA handles 'i want build solitare' as a vague new product spike intake, not a direct build.",
+  "max_turns": 3,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "chat_send",
+      "params": {
+        "message": "i want build solitare",
+        "expect_intent": "ProjectPlanningDiscussion",
+        "expect_allows_prose_response": true,
+        "expect_requires_action": false,
+        "expect_no_files_changed": true,
+        "expect_response_contains": "new product spike intake"
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_planner_product_spike_intake",
+      "params": {
+        "prompt": "i want build solitare",
+        "expect_model_profile": "standard-reasoner",
+        "expect_intake_kind": "ProductSpikeCandidate",
+        "expect_detected_project": "Solitaire",
+        "expect_normalized_contains": "Solitaire",
+        "expect_min_questions": 4,
+        "expect_recommended_next_step": "CreateProductSpikeDocumentDraft",
+        "expect_blocked_action": "DoNotApplyToRealRepo",
+        "expect_boundary_contains": "does not create project memory"
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "SOLITAIRE_PRODUCT_SPIKE_INTAKE_137",
+        "take": 3,
+        "expect_top_title": "Solitaire Product Spike Intake 137",
+        "expect_project": "IronDev",
+        "expect_source_present": true,
+        "expect_semantic_trace_id": true,
+        "expect_raw_and_final_rank": true
+      }
+    }
+  ],
+  "expected": {
+    "vague_prompt_routes_to_product_planning_discussion": true,
+    "planner_agent_creates_intake_package": true,
+    "no_direct_build": true,
+    "no_real_repo_write": true,
+    "memory_doc_retrievable": true
+  }
+}
