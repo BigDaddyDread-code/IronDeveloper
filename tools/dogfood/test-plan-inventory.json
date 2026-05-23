@@ -1,5 +1,33 @@
 [
     {
+        "planFile":  "irondev-live-critic-planner-agents-159.json",
+        "goalId":  "live-critic-planner-agents-159",
+        "project":  "IronDev",
+        "description":  "Validate opt-in live governed CriticAgent and PlannerAgent execution, deterministic fallback, unavailable-provider handling, and hard safety boundaries.",
+        "agentPath":  "TestAgent + ReplayRunner + LiveCriticPlannerAgents159Command + CriticAgent + PlannerAgent",
+        "command":  "campaign live-critic-planner-159",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "AgentModelResolver",
+                                 "AgentLlmClient",
+                                 "CriticAgent",
+                                 "PlannerAgent"
+                             ],
+        "expectedEvidence":  [
+                                 "critic fallback review available",
+                                 "planner fallback intake available",
+                                 "critic live provider attempt recorded",
+                                 "planner live provider attempt recorded",
+                                 "real repo writes remain blocked",
+                                 "memory mutation remains blocked",
+                                 "ticket creation remains blocked",
+                                 "patch apply remains blocked"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Campaign smoke only; opt-in live model execution with safe fallback, no memory mutation, no ticket creation, no patch apply, no self-approval, and no real repository writes.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-live-governed-agent-execution-158.json",
         "goalId":  "live-governed-agent-execution-158",
         "project":  "IronDev",

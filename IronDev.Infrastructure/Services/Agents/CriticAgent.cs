@@ -7,11 +7,13 @@ namespace IronDev.Infrastructure.Services.Agents;
 public sealed class CriticAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
+    private readonly IAgentLlmClient? _llmClient;
 
-    public CriticAgent(AgentDefinition definition, IAgentModelResolver modelResolver)
+    public CriticAgent(AgentDefinition definition, IAgentModelResolver modelResolver, IAgentLlmClient? llmClient = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
+        _llmClient = llmClient;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -34,6 +36,9 @@ public sealed class CriticAgent : StaticIronDevAgent
         var evidencePaths = ReadStringArray(package, "EvidencePaths");
         var likelyAreas = ReadStringArray(package, "LikelyAreas");
         var safetyRules = ReadStringArray(package, "SafetyRules");
+        var prompt = BuildPrompt(failureReason, expectedJson, actualJson, reproCommand, validationCommand, likelyAreas, safetyRules);
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
+        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
         var evidenceSufficient =
             !string.IsNullOrWhiteSpace(failureReason) &&
             !string.IsNullOrWhiteSpace(expectedJson) &&
@@ -63,8 +68,22 @@ public sealed class CriticAgent : StaticIronDevAgent
             likelyAreas,
             evidencePaths,
             safetyRules,
+            llmIntelligence = new
+            {
+                modelProfile = profile.Name,
+                profileProvider = profile.Provider,
+                profileModel = profile.Model,
+                prompt,
+                invocationMode = llmResult.InvocationMode,
+                liveLlmRequested,
+                wasAttempted = llmResult.WasAttempted,
+                wasSuccessful = llmResult.WasSuccessful,
+                durationMs = llmResult.DurationMs,
+                modelSummary = BuildModelSummary(llmResult),
+                error = llmResult.WasSuccessful ? string.Empty : llmResult.ErrorMessage
+            },
             risks = BuildRisks(package, evidenceSufficient, actionable),
-            boundary = "036 reviews failure-package evidence only; it does not patch code, run tests, or change routing."
+            boundary = "CriticAgent reviews failure-package evidence only. Live LLM output is advisory evidence and does not patch code, run tests, create tickets, mutate memory, or approve writes."
         };
 
         return new AgentResult
@@ -83,6 +102,86 @@ public sealed class CriticAgent : StaticIronDevAgent
             EvidencePaths = evidencePaths,
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentRequest request,
+        CancellationToken ct)
+    {
+        if (request.Inputs.TryGetValue("llm_response", out var providedResponse) &&
+            !string.IsNullOrWhiteSpace(providedResponse))
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "provided_llm_response",
+                ResponseText = providedResponse
+            };
+        }
+
+        if (!liveLlmRequested)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "llm_ready_deterministic_fallback",
+                ResponseText = "No live model response supplied; deterministic failure-package review was used for this governed smoke."
+            };
+        }
+
+        if (_llmClient is null)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = false,
+                InvocationMode = "live_model_requested_without_client_fallback",
+                ErrorMessage = "No governed agent LLM client was configured."
+            };
+        }
+
+        return await _llmClient.CompleteAsync(profile, prompt, ct);
+    }
+
+    private static string BuildPrompt(
+        string failureReason,
+        string expectedJson,
+        string actualJson,
+        string reproCommand,
+        string validationCommand,
+        IReadOnlyList<string> likelyAreas,
+        IReadOnlyList<string> safetyRules) =>
+        $"""
+        You are CriticAgent for IronDev/IDA.
+        Review this failure package and return concise JSON with evidence gaps, likely risk areas, and next safe investigation steps.
+        Failure reason: {failureReason}
+        Expected JSON: {expectedJson}
+        Actual JSON: {actualJson}
+        Repro command: {reproCommand}
+        Validation command: {validationCommand}
+        Likely areas: {string.Join("; ", likelyAreas)}
+        Safety rules: {string.Join("; ", safetyRules)}
+        Do not suggest weakening assertions. Do not patch code, create tickets, mutate memory, or approve writes.
+        """;
+
+    private static bool ReadBoolInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) &&
+        bool.TryParse(value, out var parsed) &&
+        parsed;
+
+    private static string BuildModelSummary(AgentLlmCallResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.ResponseText))
+            return result.ResponseText;
+
+        return result.WasAttempted
+            ? "Live model call did not return usable content; deterministic failure-package review remained in force."
+            : "No live model response supplied; deterministic failure-package review was used for this governed smoke.";
     }
 
     private static string RequireInput(AgentRequest request, string key)

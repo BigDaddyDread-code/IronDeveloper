@@ -1,0 +1,26 @@
+{
+  "test_run_id": "IronDevLiveCriticPlannerAgents159",
+  "goal_id": "live-critic-planner-agents-159",
+  "description": "Proves CriticAgent and PlannerAgent can attempt opt-in live model execution through configured profiles while preserving deterministic fallback and hard governance boundaries.",
+  "expected": {
+    "campaign_status_succeeded": true,
+    "critic_fallback_review_available": true,
+    "planner_fallback_intake_available": true,
+    "critic_live_provider_attempt_recorded": true,
+    "planner_live_provider_attempt_recorded": true,
+    "real_repo_writes_still_blocked": true,
+    "memory_mutation_still_blocked": true,
+    "ticket_creation_still_blocked": true,
+    "patch_apply_still_blocked": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "live_critic_planner_agents_159",
+      "params": {}
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "boundary": "Campaign smoke only. Live model execution is opt-in, traced, and falls back safely; no writes, memory mutation, ticket creation, patch apply, self-approval, or ungated autonomy are granted."
+}
