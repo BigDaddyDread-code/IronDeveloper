@@ -1,4 +1,15 @@
-﻿[
+[
+    {
+        "Id":  "20260523134000000-retriever-weighted-context-bundle-134",
+        "Project":  "IronDev",
+        "Title":  "RETRIEVER_WEIGHTED_CONTEXT_BUNDLE_134",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\RETRIEVER_WEIGHTED_CONTEXT_BUNDLE_134.md",
+        "DogfoodRunId":  "RetrieverWeightedContext134",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523134000000-retriever-weighted-context-bundle-134.md",
+        "CreatedUtc":  "2026-05-23T13:40:00.0000000+00:00"
+    },
     {
         "Id":  "20260523133000000-ida-governed-autonomy-control-plane-133",
         "Project":  "IronDev",

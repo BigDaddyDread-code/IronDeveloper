@@ -1666,6 +1666,45 @@ foreach ($step in $plan.steps) {
                         }
                     }
 
+                    if ($params.expect_weighted_context_bundle) {
+                        $weighted = $parsed.contextPackage.WeightedContextBundle
+                        if (-not $weighted) {
+                            $validationFailures.Add("Expected context package to include WeightedContextBundle.") | Out-Null
+                        } else {
+                            if ([string]$weighted.bundleKind -ne "WeightedContextBundle") {
+                                $validationFailures.Add("Expected WeightedContextBundle.bundleKind=WeightedContextBundle, actual '$($weighted.bundleKind)'.") | Out-Null
+                            }
+                            if (-not $weighted.semanticTraceId) {
+                                $validationFailures.Add("Expected WeightedContextBundle semantic trace id.") | Out-Null
+                            }
+                            if (-not $weighted.summaryForAgent) {
+                                $validationFailures.Add("Expected WeightedContextBundle summaryForAgent.") | Out-Null
+                            }
+                            if ($params.expect_project -and [string]$weighted.project.Name -ne [string]$params.expect_project) {
+                                $validationFailures.Add("Expected WeightedContextBundle project '$($params.expect_project)', actual '$($weighted.project.Name)'.") | Out-Null
+                            }
+                            if (@($weighted.includedSources).Count -lt 1) {
+                                $validationFailures.Add("Expected WeightedContextBundle to include at least one source.") | Out-Null
+                            }
+                        }
+                    }
+
+                    if ($params.expect_weighted_rejected_sources) {
+                        $weighted = $parsed.contextPackage.WeightedContextBundle
+                        if (-not $weighted -or @($weighted.rejectedSources).Count -lt 1) {
+                            $validationFailures.Add("Expected WeightedContextBundle rejectedSources to include at least one source or filtering note.") | Out-Null
+                        }
+                    }
+
+                    if ($params.expect_weighted_reason_contains) {
+                        $weightedJson = ($parsed.contextPackage.WeightedContextBundle | ConvertTo-Json -Depth 20)
+                        foreach ($term in @($params.expect_weighted_reason_contains)) {
+                            if ($term -and $weightedJson -notlike "*$term*") {
+                                $validationFailures.Add("Expected WeightedContextBundle reasons to contain '$term'.") | Out-Null
+                            }
+                        }
+                    }
+
                     if ($params.expect_top_guidance -and [string]$top.Guidance -ne [string]$params.expect_top_guidance) {
                         $validationFailures.Add("Expected top context guidance '$($params.expect_top_guidance)', actual '$($top.Guidance)'.") | Out-Null
                     }

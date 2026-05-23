@@ -16,6 +16,7 @@
     "conscience_agent_lite_passes": true,
     "thought_ledger_passes": true,
     "governed_action_review_passes": true,
+    "retriever_weighted_context_passes": true,
     "failure_handoff_passes": true,
     "code_standards_passes": true
   },
@@ -176,6 +177,17 @@
       "step": 14,
       "action": "agent_tester_run_plan",
       "params": {
+        "plan_path": "tools/dogfood/test-agent-plans/irondev-retriever-weighted-context-bundle-134.json",
+        "expect_nested_goal_id": "retriever-weighted-context-bundle-134",
+        "expect_nested_status": "passed",
+        "expect_nested_overall_result": "SUCCESS",
+        "compact_report": true
+      }
+    },
+    {
+      "step": 15,
+      "action": "agent_tester_run_plan",
+      "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
         "expect_nested_goal_id": "failure-package-handoff-017",
         "expect_nested_status": "passed",
@@ -184,7 +196,7 @@
       }
     },
     {
-      "step": 15,
+      "step": 16,
       "action": "agent_tester_run_plan",
       "params": {
         "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -195,6 +207,6 @@
       }
     }
   ],
-  "max_turns": 15,
+  "max_turns": 16,
   "early_stop_on_failure": true
 }

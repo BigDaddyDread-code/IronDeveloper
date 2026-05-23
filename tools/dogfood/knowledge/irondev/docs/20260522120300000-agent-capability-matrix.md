@@ -35,7 +35,7 @@ Primary retrieval question: which IronDev agents are real vs stubbed?
 | BuilderAgent | Stub/control-plane future | Builder path exists as preview safety smoke, not autonomous BuilderAgent execution. | No patch apply. |
 | TesterAgent | Real execution wrapper | Runs Test Agent plans through CLI/PowerShell and returns structured report. | Executes plans; does not interpret or fix failures. |
 | QualityAgent | Deterministic wrapper | Runs code standards/tooling gate through existing plan machinery. | Reports quality; does not refactor. |
-| RetrieverAgent | Memory wrapper | Runs memory search and packages context bundle with source guidance. | Uses dogfood memory search; not a full retrieval planner yet. |
+| RetrieverAgent | Memory wrapper | Runs memory search and packages a weighted context bundle with included/rejected sources, ranking evidence, risk notes, and source guidance. | Uses dogfood memory search; not a full retrieval planner yet. |
 | CriticAgent | Deterministic wrapper | Reviews failure packages and returns evidence-backed recommendation. | Reviews only; no code changes. |
 | SentinelAgent | Deterministic wrapper | Observes campaign/failure/test evidence and emits insight artefacts. | Observational only; no tickets, memory writes, patches, or approvals. |
 | ResearchAgent | Deterministic wrapper | Packages explicit external evidence as a ResearchPackage. | Read-only; does not decide architecture, write memory, create tickets, patch code, or override project memory. |

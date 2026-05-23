@@ -1,4 +1,22 @@
-﻿[
+[
+    {
+        "planFile":  "irondev-retriever-weighted-context-bundle-134.json",
+        "goalId":  "retriever-weighted-context-bundle-134",
+        "project":  "IronDev",
+        "actions":  [
+                        "agent_retriever_search"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "RetrieverAgent",
+                                 "Weaviate"
+                             ],
+        "regressionGroup":  "AgentContext",
+        "safetyBoundary":  "Context packaging only; no implementation decisions, tickets, memory mutation, patching, or file writes.",
+        "kind":  "smoke",
+        "description":  "Prove RetrieverAgent emits a WeightedContextBundle with included/rejected source evidence while preserving the real memory search path."
+    },
     {
         "value":  [
                       {
