@@ -74,6 +74,9 @@ public sealed class ChatCommandRouter : IChatCommandRouter
         if (IsBuildTicketCommand(lower))
             return BuildActionRoute(ChatRouteIntent.BuildTicket, 0.86, "deterministic-build-ticket-command", input, actionText, contextReference);
 
+        if (IsVagueNewProductBuildCommand(lower))
+            return BuildPlanningDiscussionRoute(input);
+
         if (IsMultiStepWorkflowCommand(lower))
             return BuildActionRoute(ChatRouteIntent.CreateImplementationPlan, 0.78, "deterministic-multi-step-workflow-command", input, actionText, contextReference);
 
@@ -109,6 +112,31 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             MatchedSignals = signals
         };
     }
+
+    private static ChatRouteResult BuildPlanningDiscussionRoute(ChatTurnInput input)
+        => new()
+        {
+            Intent = ChatRouteIntent.ProjectPlanningDiscussion,
+            Confidence = 0.64,
+            IsAction = false,
+            RequiresAction = false,
+            AllowsProseResponse = true,
+            ContextReference = ContextReferenceKind.CurrentMessage,
+            DraftCountMode = DraftCountMode.None,
+            ActionText = input.UserMessage,
+            ActionTitle = BuildActionTitle(input.UserMessage, input.UserMessage, ChatRouteIntent.ProjectPlanningDiscussion),
+            MatchedSignals =
+            [
+                "deterministic-new-product-intake-candidate",
+                "needs-planner-intake",
+                "no-build-without-disposable-workspace"
+            ],
+            Warnings =
+            [
+                "Vague product build request needs project/app scope before docs, tickets, or disposable apply.",
+                "Direct build/apply remains blocked until ConscienceAgent sees explicit disposable workspace evidence."
+            ]
+        };
 
     private static ContextReferenceKind ResolveContextReference(CreateTicketIntent ticketIntent, ChatTurnInput input)
     {
@@ -168,6 +196,7 @@ public sealed class ChatCommandRouter : IChatCommandRouter
         var prefix = intent switch
         {
             ChatRouteIntent.SaveDecision => "Decision",
+            ChatRouteIntent.ProjectPlanningDiscussion => "Product spike intake",
             ChatRouteIntent.CreateImplementationPlan => "Implementation plan",
             ChatRouteIntent.SaveDiscussionDocument => "Discussion document",
             ChatRouteIntent.BuildTicket => "Build ticket",
@@ -254,6 +283,35 @@ public sealed class ChatCommandRouter : IChatCommandRouter
             "make a plan and proposed patch",
             "proposed patch for ticket",
             "approval gate only");
+
+    private static bool IsVagueNewProductBuildCommand(string lower)
+    {
+        var wantsBuild =
+            ContainsAny(lower,
+                " i want build ",
+                " i want to build ",
+                " i wanna build ",
+                " i need build ",
+                " i need to build ",
+                " build me ",
+                " make me ",
+                " create me ") ||
+            lower.TrimStart().StartsWith("build a ", StringComparison.Ordinal) ||
+            lower.TrimStart().StartsWith("build an ", StringComparison.Ordinal) ||
+            lower.TrimStart().StartsWith("make a ", StringComparison.Ordinal) ||
+            lower.TrimStart().StartsWith("make an ", StringComparison.Ordinal);
+
+        if (!wantsBuild)
+            return false;
+
+        return !ContainsAny(lower,
+            " ticket ",
+            " book-",
+            " selected ticket",
+            " build agent",
+            " approval gate",
+            " proposed patch");
+    }
 
     private static bool IsVagueContextActionCommand(string lower)
         => ContainsAny(lower,

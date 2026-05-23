@@ -540,6 +540,18 @@ foreach ($step in $plan.steps) {
                 if ($params.expect_intent -and $parsed.intent -ne [string]$params.expect_intent) {
                     $status = "FAILED"
                     $summary = "Expected intent $($params.expect_intent), actual $($parsed.intent)"
+                } elseif ($null -ne $params.expect_allows_prose_response -and [bool]$parsed.allowsProseResponse -ne [bool]$params.expect_allows_prose_response) {
+                    $status = "FAILED"
+                    $summary = "Expected allowsProseResponse=$($params.expect_allows_prose_response), actual $($parsed.allowsProseResponse)."
+                } elseif ($null -ne $params.expect_requires_action -and [bool]$parsed.requiresAction -ne [bool]$params.expect_requires_action) {
+                    $status = "FAILED"
+                    $summary = "Expected requiresAction=$($params.expect_requires_action), actual $($parsed.requiresAction)."
+                } elseif ($params.expect_no_files_changed -and [int]$parsed.simulatedFilesChanged -ne 0) {
+                    $status = "FAILED"
+                    $summary = "Expected no simulated files changed, actual $($parsed.simulatedFilesChanged)."
+                } elseif ($params.expect_response_contains -and [string]$parsed.assistantResponse -notlike "*$($params.expect_response_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected assistant response to contain '$($params.expect_response_contains)', actual '$($parsed.assistantResponse)'."
                 }
             }
 
@@ -1030,6 +1042,69 @@ foreach ($step in $plan.steps) {
                     $summary = "Expected PlannerAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.draftPlan.planner.boundary)'."
                 } else {
                     $summary = "PlannerAgent drafted plan goal=$($parsed.draftPlan.goal_id); steps=$(@($parsed.draftPlan.steps).Count)."
+                }
+            }
+
+            "agent_planner_product_spike_intake" {
+                $prompt = [string]$params.prompt
+                if ([string]::IsNullOrWhiteSpace($prompt)) {
+                    throw "agent_planner_product_spike_intake requires params.prompt."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "planner", "intake-product-spike",
+                    "--prompt", $prompt,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                if ($params.project) {
+                    $arguments += @("--project", [string]$params.project)
+                }
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "PlannerAgent product spike intake exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_intake_kind -and [string]$parsed.intake.intakeKind -ne [string]$params.expect_intake_kind) {
+                    $status = "FAILED"
+                    $summary = "Expected intake kind '$($params.expect_intake_kind)', actual '$($parsed.intake.intakeKind)'."
+                } elseif ($params.expect_detected_project -and [string]$parsed.intake.detectedProject -ne [string]$params.expect_detected_project) {
+                    $status = "FAILED"
+                    $summary = "Expected detected project '$($params.expect_detected_project)', actual '$($parsed.intake.detectedProject)'."
+                } elseif ($params.expect_normalized_contains -and [string]$parsed.intake.normalizedPrompt -notlike "*$($params.expect_normalized_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected normalized prompt to contain '$($params.expect_normalized_contains)', actual '$($parsed.intake.normalizedPrompt)'."
+                } elseif ($params.expect_min_questions -and @($parsed.intake.clarifyingQuestions).Count -lt [int]$params.expect_min_questions) {
+                    $status = "FAILED"
+                    $summary = "Expected at least $($params.expect_min_questions) clarifying questions."
+                } elseif ($params.expect_recommended_next_step -and -not (@($parsed.intake.recommendedNextSteps) -contains [string]$params.expect_recommended_next_step)) {
+                    $status = "FAILED"
+                    $summary = "Expected recommended next step '$($params.expect_recommended_next_step)'."
+                } elseif ($params.expect_blocked_action -and -not (@($parsed.intake.blockedActions) -contains [string]$params.expect_blocked_action)) {
+                    $status = "FAILED"
+                    $summary = "Expected blocked action '$($params.expect_blocked_action)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.intake.planner.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected PlannerAgent intake boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.intake.planner.boundary)'."
+                } else {
+                    $summary = "PlannerAgent intake detected project=$($parsed.intake.detectedProject); questions=$(@($parsed.intake.clarifyingQuestions).Count)."
                 }
             }
 

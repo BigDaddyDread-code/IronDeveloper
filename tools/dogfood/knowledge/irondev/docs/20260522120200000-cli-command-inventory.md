@@ -81,3 +81,10 @@ Some commands still live in `Program.cs`, including ticket source-link and build
 This is an inventory and help audit. It does not change command semantics.
 
 
+
+## 137 Product Spike Intake Command
+
+- gent planner intake-product-spike classifies vague new product prompts such as i want build solitare into a structured product-spike intake package.
+- It returns detected project, assumptions, clarifying questions, recommended next steps, blocked unsafe actions, and a boundary statement.
+- It does not create project memory, tickets, disposable workspaces, patches, or real repository writes.
+

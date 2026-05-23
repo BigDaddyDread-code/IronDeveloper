@@ -76,6 +76,14 @@ if (args.Length >= 3 &&
 if (args.Length >= 3 &&
     string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
     string.Equals(args[1], "planner", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "intake-product-spike", StringComparison.OrdinalIgnoreCase))
+{
+    return await HandleAgentPlannerIntakeProductSpikeCommandAsync(args, options);
+}
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "planner", StringComparison.OrdinalIgnoreCase) &&
     string.Equals(args[2], "draft-test-plan", StringComparison.OrdinalIgnoreCase))
 {
     return await HandleAgentPlannerDraftTestPlanCommandAsync(args, options);
@@ -572,6 +580,49 @@ static async Task<int> HandleAgentPlannerDraftTestPlanCommandAsync(string[] args
         exitCode = result.ExitCode,
         commandsRun = result.CommandsRun,
         draftPlan = TryParseJson(result.OutputJson),
+        completedAtUtc = result.CompletedAtUtc
+    }, options));
+
+    return result.Status == AgentRunStatus.Succeeded ? 0 : 1;
+}
+
+static async Task<int> HandleAgentPlannerIntakeProductSpikeCommandAsync(string[] args, JsonSerializerOptions options)
+{
+    var prompt = ReadOption(args, "--prompt") ?? ReadPositionalText(args, 3);
+    if (string.IsNullOrWhiteSpace(prompt))
+    {
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent planner intake-product-spike --prompt <prompt> [--project project] [--run-id id] [--json]");
+        return 2;
+    }
+
+    var project = ReadOption(args, "--project") ?? string.Empty;
+    var runId = ReadOption(args, "--run-id") ?? $"PlannerIntake-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var (_, _, runner) = CreateAgentRuntime();
+    var result = await runner.RunAsync(new AgentRequest
+    {
+        AgentName = "PlannerAgent",
+        GoalId = "planner-product-spike-intake-137",
+        DogfoodRunId = runId,
+        Inputs = new Dictionary<string, string>
+        {
+            ["mode"] = "product_spike_intake",
+            ["prompt"] = prompt,
+            ["project"] = project
+        }
+    });
+
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        command = "agent planner intake-product-spike",
+        agent = result.AgentName,
+        status = result.Status.ToString(),
+        summary = result.Summary,
+        modelProfile = result.ModelProfileName,
+        provider = result.Provider,
+        model = result.Model,
+        exitCode = result.ExitCode,
+        commandsRun = result.CommandsRun,
+        intake = TryParseJson(result.OutputJson),
         completedAtUtc = result.CompletedAtUtc
     }, options));
 
@@ -2377,6 +2428,9 @@ static string GenerateAssistantResponse(ReplayExpected expected, ChatRouteResult
 
     if (actionResult.ImplementationPlans.Count > 0)
         return "I prepared an implementation plan and stopped for review before any code changes.";
+
+    if (route.Intent == ChatRouteIntent.ProjectPlanningDiscussion)
+        return "This sounds like a new product spike intake, not a build command yet. I need to clarify the project, platform, smallest playable scope, and whether you want a reviewed ProductSpike document and disposable-workspace plan. No files will be changed.";
 
     if (expected.RequiresClarificationWhenNoContext || expected.MustIdentifyProjectAmbiguity)
         return "What exactly should I save or act on, and which project/context should it belong to?";

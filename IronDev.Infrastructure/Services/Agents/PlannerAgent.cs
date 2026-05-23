@@ -17,6 +17,12 @@ public sealed class PlannerAgent : StaticIronDevAgent
     public override Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
     {
         var profile = _modelResolver.ResolveForAgent(Definition);
+        if (request.Inputs.TryGetValue("mode", out var mode) &&
+            string.Equals(mode, "product_spike_intake", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult(BuildProductSpikeIntakeResult(request, profile));
+        }
+
         var goal = RequireInput(request, "goal");
         var project = request.Inputs.TryGetValue("project", out var projectValue) && !string.IsNullOrWhiteSpace(projectValue)
             ? projectValue
@@ -107,6 +113,89 @@ public sealed class PlannerAgent : StaticIronDevAgent
         });
     }
 
+    private AgentResult BuildProductSpikeIntakeResult(AgentRequest request, ModelProfile profile)
+    {
+        var prompt = RequireInput(request, "prompt");
+        var projectInput = request.Inputs.TryGetValue("project", out var projectValue)
+            ? projectValue
+            : string.Empty;
+        var detectedProject = string.IsNullOrWhiteSpace(projectInput)
+            ? DetectProjectName(prompt)
+            : projectInput.Trim();
+        var normalizedPrompt = NormalizePrompt(prompt);
+        var runId = string.IsNullOrWhiteSpace(request.DogfoodRunId)
+            ? $"PlannerIntake-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
+            : request.DogfoodRunId;
+        var likelyTypo = prompt.Contains("solitare", StringComparison.OrdinalIgnoreCase);
+
+        var intake = new
+        {
+            intakeKind = "ProductSpikeCandidate",
+            originalPrompt = prompt,
+            normalizedPrompt,
+            detectedProject,
+            projectKnown = false,
+            confidence = 0.62,
+            assumptions = likelyTypo
+                ? new[] { "The prompt says 'solitare'; treating 'Solitaire' as a tentative spelling correction only." }
+                : new[] { "The prompt looks like a new product/app spike request, not an instruction to write immediately." },
+            clarifyingQuestions = new[]
+            {
+                "Should this become a new dogfood project fixture?",
+                "What platform should the first spike target: WPF, web, console, or another UI?",
+                "What is the smallest playable scope that would count as success?",
+                "Should IDA create a ProductSpike document and draft ticket before any disposable workspace apply?"
+            },
+            recommendedNextSteps = new[]
+            {
+                "CreateProductSpikeDocumentDraft",
+                "CreateSpikeTicketDraft",
+                "RunRetrieverForProjectMemory",
+                "AskConscienceBeforeDisposableApply",
+                "UseDisposableWorkspaceOnly"
+            },
+            blockedActions = new[]
+            {
+                "DoNotApplyToRealRepo",
+                "DoNotCreateFinalTicketsWithoutReview",
+                "DoNotMutateProjectMemoryWithoutReviewedArtefact",
+                "DoNotStartBuilderApplyWithoutExplicitDisposableWorkspace"
+            },
+            candidatePlan = new
+            {
+                project = detectedProject,
+                firstSafePlan = "product-spike-intake-only",
+                laterPlan = "disposable-workspace-spike-after-human-approval",
+                requiresHumanApproval = true,
+                realRepoMutationAllowed = false
+            },
+            planner = new
+            {
+                agent = AgentName,
+                modelProfile = profile.Name,
+                provider = profile.Provider,
+                model = profile.Model,
+                boundary = "137A product spike intake drafts structured next steps only; it does not create project memory, tickets, disposable workspaces, patches, or real repository writes."
+            }
+        };
+
+        var outputJson = JsonSerializer.Serialize(intake, new JsonSerializerOptions { WriteIndented = true });
+        return new AgentResult
+        {
+            AgentName = AgentName,
+            Status = AgentRunStatus.Succeeded,
+            Summary = $"PlannerAgent classified '{prompt}' as a {detectedProject} product spike intake candidate.",
+            ModelProfileName = profile.Name,
+            Provider = profile.Provider,
+            Model = profile.Model,
+            ExitCode = 0,
+            OutputJson = outputJson,
+            CommandsRun = [$"planner intake-product-spike --prompt \"{prompt}\""],
+            EvidencePaths = [],
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
+
     private static string RequireInput(AgentRequest request, string key)
     {
         if (request.Inputs.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
@@ -126,4 +215,18 @@ public sealed class PlannerAgent : StaticIronDevAgent
 
         return slug.Length > 48 ? slug[..48].Trim('-') : slug;
     }
+
+    private static string DetectProjectName(string prompt)
+    {
+        if (prompt.Contains("solitare", StringComparison.OrdinalIgnoreCase) ||
+            prompt.Contains("solitaire", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Solitaire";
+        }
+
+        return "UnspecifiedProductSpike";
+    }
+
+    private static string NormalizePrompt(string prompt)
+        => prompt.Replace("solitare", "Solitaire", StringComparison.OrdinalIgnoreCase).Trim();
 }

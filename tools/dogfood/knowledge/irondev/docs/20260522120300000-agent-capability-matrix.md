@@ -56,3 +56,8 @@ The safest real path today is:
 No agent currently has permission to mutate project source files autonomously.
 
 
+
+## 137 PlannerAgent Product Spike Intake
+
+PlannerAgent can now classify a vague new product build prompt into a bounded ProductSpikeCandidate intake. This is deterministic structured planning support only; it does not create memory, tickets, disposable workspaces, patches, or real repository writes.
+

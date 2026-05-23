@@ -1,5 +1,31 @@
 [
     {
+        "planFile":  "irondev-solitaire-product-spike-intake-137.json",
+        "goalId":  "solitaire-product-spike-intake-137",
+        "project":  "IronDev",
+        "description":  "Prove the dumb-human prompt i want build solitare routes to product spike intake and PlannerAgent returns structured safe next steps.",
+        "agentPath":  "ChatCommandRouter + PlannerAgent",
+        "command":  "chat send / agent planner intake-product-spike",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "ChatCommandRouter",
+                                 "PlannerAgent",
+                                 "TestAgent",
+                                 "MemorySearch"
+                             ],
+        "expectedEvidence":  [
+                                 "ProjectPlanningDiscussion route",
+                                 "ProductSpikeCandidate intake",
+                                 "Solitaire detected project",
+                                 "clarifying questions",
+                                 "blocked real repo action",
+                                 "retrievable accepted memory doc"
+                             ],
+        "regressionGroup":  "ProductSpikeIntake",
+        "safetyBoundary":  "No project memory, tickets, disposable workspace, patches, or real repo writes are created.",
+        "kind":  "core"
+    },
+    {
         "planFile":  "irondev-supervisor-disposable-workspace-autonomy-136.json",
         "goalId":  "supervisor-disposable-workspace-autonomy-136",
         "project":  "BookSeller",

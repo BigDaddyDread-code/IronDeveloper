@@ -24,7 +24,7 @@
       "action": "dotnet_test",
       "params": {
         "target": "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj",
-        "filter": "ChatCommandRouter_CreateTickets_IsActionFirst|ChatCommandRouter_SaveDecision_IsActionFirst|ChatCommandRouter_CreatePlan_IsActionFirst|ChatCommandRouter_BuildTicketQuestion_AllowsProse|ChatCommandRouter_ProjectKnowledgeVocabulary_IsActionFirst|ChatCommandRouter_ProjectKnowledgeQuestions_AllowProse"
+        "filter": "ChatCommandRouter_CreateTickets_IsActionFirst|ChatCommandRouter_SaveDecision_IsActionFirst|ChatCommandRouter_CreatePlan_IsActionFirst|ChatCommandRouter_BuildTicketQuestion_AllowsProse|ChatCommandRouter_ProjectKnowledgeVocabulary_IsActionFirst|ChatCommandRouter_ProjectKnowledgeQuestions_AllowProse|ChatCommandRouter_VagueNewProductBuild_IsPlanningIntake"
       }
     },
     {
