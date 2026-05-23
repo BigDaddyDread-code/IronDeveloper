@@ -1,5 +1,16 @@
 ﻿[
     {
+        "Id":  "20260523120000000-memory-triage-agent-119",
+        "Project":  "IronDev",
+        "Title":  "MEMORY_TRIAGE_AGENT_119",
+        "DocumentType":  "ArchitectureProof",
+        "Authority":  "Accepted",
+        "Source":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\MEMORY_TRIAGE_AGENT_119.md",
+        "DogfoodRunId":  "MemoryTriage119",
+        "Path":  "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523120000000-memory-triage-agent-119.md",
+        "CreatedUtc":  "2026-05-23T12:00:00+00:00"
+    },
+    {
         "Id":  "20260522232000000-bookseller-supervised-iteration-campaign-118",
         "Project":  "IronDev",
         "Title":  "BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118",

@@ -1,0 +1,88 @@
+{
+  "test_run_id": "IronDevMemoryTriage119",
+  "goal_id": "memory-triage-119",
+  "description": "Prove IDA can classify which feedback/context should become memory, ticket, discussion, decision, or no saved memory.",
+  "expected": {
+    "routing_findings_become_global_memory": true,
+    "project_requirements_become_project_memory": true,
+    "project_knowledge_save_phrases_become_document_capture_candidates": true,
+    "memory_questions_do_not_save": true,
+    "safety_rules_become_global_decision_candidates": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_triage",
+      "params": {
+        "project": "BookSeller",
+        "message": "The ticket went wrong route in the BookSeller campaign. Expected SaveDiscussionDocument, actual GeneralChat.",
+        "expect_should_save": true,
+        "expect_scope": "Global",
+        "expect_project": "IronDev",
+        "expect_memory_type": "RoutingFinding",
+        "expect_authority": "Proposed",
+        "expect_recommended_artifacts": [ "CampaignFinding", "BugTicket", "DiscussionDocument" ],
+        "expect_evidence": [ "routing_failure_language" ]
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_triage",
+      "params": {
+        "project": "BookSeller",
+        "message": "BookSeller stock cannot go negative.",
+        "expect_should_save": true,
+        "expect_scope": "Project",
+        "expect_project": "BookSeller",
+        "expect_memory_type": "ProjectRequirement",
+        "expect_authority": "Proposed",
+        "expect_recommended_artifacts": [ "ProjectDocument", "Requirement" ],
+        "expect_evidence": [ "project_requirement_language" ]
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_triage",
+      "params": {
+        "project": "BookSeller",
+        "message": "Save this as BookSeller project knowledge: use SQL Server and Dapper for books, stock, and storage locations.",
+        "expect_should_save": true,
+        "expect_scope": "Project",
+        "expect_project": "BookSeller",
+        "expect_memory_type": "ProjectKnowledgeInstruction",
+        "expect_authority": "Proposed",
+        "expect_recommended_artifacts": [ "ProjectDocument", "DiscussionDocument", "DecisionCandidate" ],
+        "expect_evidence": [ "memory_save_language" ]
+      }
+    },
+    {
+      "step": 4,
+      "action": "memory_triage",
+      "params": {
+        "project": "BookSeller",
+        "message": "Tell me about BookSeller project knowledge.",
+        "expect_should_save": false,
+        "expect_scope": "None",
+        "expect_project": "BookSeller",
+        "expect_memory_type": "MemoryQuery",
+        "expect_authority": "None",
+        "expect_evidence": [ "question_about_existing_memory" ]
+      }
+    },
+    {
+      "step": 5,
+      "action": "memory_triage",
+      "params": {
+        "project": "IronDev",
+        "message": "No real repo writes outside disposable workspace.",
+        "expect_should_save": true,
+        "expect_scope": "Global",
+        "expect_project": "IronDev",
+        "expect_memory_type": "SafetyDecisionCandidate",
+        "expect_authority": "Proposed",
+        "expect_recommended_artifacts": [ "DecisionCandidate", "CodeStandardsRule" ],
+        "expect_evidence": [ "safety_boundary_language" ]
+      }
+    }
+  ]
+}

@@ -86,6 +86,7 @@ Initial Alpha actions:
 | `cross_project_memory_smoke` | Upsert similar SQL-backed chunks for IronDev and BookSeller, run a real near-vector query, and assert cross-project candidates are rejected for IronDev context | `IronDev.ReplayRunner memory cross-project-smoke` |
 | `memory_reindex_freshness_smoke` | Reindex current/stale SQL-backed memory twice, upsert to Weaviate twice, and assert current authority, stale visibility, project scope, exact-title promotion, and duplicate counts | `IronDev.ReplayRunner memory reindex-freshness-smoke` |
 | `bookseller_supervised_campaign` | Run the sequential 10-run BookSeller supervised campaign and return a compact campaign report for Codex review | `Invoke-BookSellerSupervisedCampaign.ps1` |
+| `memory_triage` | Classify whether feedback/context should become global or project memory, a finding, ticket, discussion, decision, or no saved memory | `IronDev.ReplayRunner memory triage` |
 
 Example `chat_conversation` step:
 
