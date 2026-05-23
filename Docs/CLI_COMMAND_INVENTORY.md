@@ -10,7 +10,7 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 8
+- Agent commands: 9
 - Chat commands: 1
 - Docs commands: 6
 - Ticket commands: 1
@@ -25,6 +25,7 @@ The machine-readable inventory is stored at:
 - `memory triage`
 - `agent tester run-plan`
 - `agent retriever search`
+- `agent sentinel observe`
 - `failure latest`
 - `builder proposal-safety-smoke`
 

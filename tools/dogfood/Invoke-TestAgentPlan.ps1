@@ -1033,6 +1033,74 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "agent_sentinel_observe" {
+                $observedProject = if ($params.observed_project) { [string]$params.observed_project } else { "BookSeller" }
+                $affectedProject = if ($params.affected_project) { [string]$params.affected_project } else { $observedProject }
+                $findingType = if ($params.finding_type) { [string]$params.finding_type } else { "Observation" }
+                $evidenceText = [string]$params.evidence
+                if ([string]::IsNullOrWhiteSpace($evidenceText)) {
+                    throw "agent_sentinel_observe requires params.evidence."
+                }
+
+                $arguments = @(
+                    "run", "--no-build", "--project", $runnerProject, "--",
+                    "agent", "sentinel", "observe",
+                    "--observed-project", $observedProject,
+                    "--affected-project", $affectedProject,
+                    "--finding-type", $findingType,
+                    "--evidence", $evidenceText,
+                    "--run-id", $RunId,
+                    "--json"
+                )
+
+                $commandText = "dotnet " + ($arguments -join " ")
+                $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $arguments -StepLogPath $stepLogPath
+                $exitCode = $capture.exit_code
+
+                try {
+                    $parsed = $capture.output | ConvertFrom-Json
+                } catch {
+                    $parsed = $null
+                }
+
+                if ($exitCode -ne 0 -or -not $parsed) {
+                    $status = "FAILED"
+                    $summary = "SentinelAgent observe exited with code $exitCode"
+                } elseif ([string]$parsed.status -ne "Succeeded") {
+                    $status = "FAILED"
+                    $summary = "Expected SentinelAgent status Succeeded, actual $($parsed.status)."
+                } elseif ($params.expect_model_profile -and [string]$parsed.modelProfile -ne [string]$params.expect_model_profile) {
+                    $status = "FAILED"
+                    $summary = "Expected SentinelAgent model profile $($params.expect_model_profile), actual $($parsed.modelProfile)."
+                } elseif ($params.expect_observed_project -and [string]$parsed.insight.observedProject -ne [string]$params.expect_observed_project) {
+                    $status = "FAILED"
+                    $summary = "Expected observedProject '$($params.expect_observed_project)', actual '$($parsed.insight.observedProject)'."
+                } elseif ($params.expect_affected_project -and [string]$parsed.insight.affectedProject -ne [string]$params.expect_affected_project) {
+                    $status = "FAILED"
+                    $summary = "Expected affectedProject '$($params.expect_affected_project)', actual '$($parsed.insight.affectedProject)'."
+                } elseif ($params.expect_insight_type -and [string]$parsed.insight.insightType -ne [string]$params.expect_insight_type) {
+                    $status = "FAILED"
+                    $summary = "Expected insightType '$($params.expect_insight_type)', actual '$($parsed.insight.insightType)'."
+                } elseif ($params.expect_severity -and [string]$parsed.insight.severity -ne [string]$params.expect_severity) {
+                    $status = "FAILED"
+                    $summary = "Expected severity '$($params.expect_severity)', actual '$($parsed.insight.severity)'."
+                } elseif ($params.expect_boundary_contains -and [string]$parsed.insight.boundary -notlike "*$($params.expect_boundary_contains)*") {
+                    $status = "FAILED"
+                    $summary = "Expected SentinelAgent boundary to contain '$($params.expect_boundary_contains)', actual '$($parsed.insight.boundary)'."
+                } else {
+                    foreach ($disposition in @($params.expect_recommended_dispositions)) {
+                        if ($disposition -and @($parsed.insight.recommendedDispositions | Where-Object { [string]$_ -eq [string]$disposition }).Count -eq 0) {
+                            $status = "FAILED"
+                            $summary = "Expected SentinelAgent recommended disposition '$disposition'."
+                            break
+                        }
+                    }
+                    if ($status -eq "SUCCESS") {
+                        $summary = "SentinelAgent observed $($parsed.insight.insightType); observed=$($parsed.insight.observedProject); affected=$($parsed.insight.affectedProject)."
+                    }
+                }
+            }
+
             "agent_list" {
                 $arguments = @(
                     "run", "--no-build", "--project", $runnerProject, "--",

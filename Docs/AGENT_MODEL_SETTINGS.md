@@ -43,6 +43,7 @@ IronDev chooses models by agent role, not by one global chat setting.
 | `QualityAgent` | `cheap-runner` | Run deterministic build/test/format/package checks |
 | `RetrieverAgent` | `cheap-runner` | Select project memory with metadata-aware filtering |
 | `CriticAgent` | `strong-reviewer` | Challenge assumptions and review deeper risks |
+| `SentinelAgent` | `cheap-runner` | Observe campaign/failure/test evidence and emit insight artefacts |
 
 ## Settings Shape
 

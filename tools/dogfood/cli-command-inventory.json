@@ -80,6 +80,16 @@
         "notes":  "Drafts plan JSON only; does not execute."
     },
     {
+        "command":  "agent sentinel observe",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + SentinelAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic insight observer",
+        "notes":  "Emits project-aware insight artefacts from evidence; no mutation."
+    },
+    {
         "command":  "chat send",
         "category":  "chat",
         "scope":  "dogfood/control",

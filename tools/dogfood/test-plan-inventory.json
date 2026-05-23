@@ -16,6 +16,23 @@
         "description":  "Prove IDA can classify user feedback/context into global or project memory candidates, findings, tickets, discussions, decisions, and no-save memory queries."
     },
     {
+        "planFile":  "irondev-sentinel-agent-lite-smoke.json",
+        "goalId":  "sentinel-agent-lite-120",
+        "project":  "IronDev",
+        "actions":  [
+                        "agent_sentinel_observe"
+                    ],
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "AgentRegistry"
+                             ],
+        "regressionGroup":  "SentinelAgent",
+        "safetyBoundary":  "Observational only; no document persistence, ticket creation, code writes, build blocking, or autonomous fixes.",
+        "kind":  "smoke",
+        "description":  "Prove SentinelAgent Lite emits project-aware insight artefacts from campaign evidence, preserving observedProject and affectedProject."
+    },
+    {
         "planFile":  "bookseller-supervised-10-run-campaign.json",
         "goalId":  "bookseller-supervised-campaign-118",
         "project":  "BookSeller",

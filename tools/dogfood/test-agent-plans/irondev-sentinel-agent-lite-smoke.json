@@ -1,0 +1,47 @@
+{
+  "test_run_id": "IronDevSentinelAgentLite120",
+  "goal_id": "sentinel-agent-lite-120",
+  "description": "Prove SentinelAgent Lite can observe campaign evidence across projects and emit an advisory insight artefact without mutating code, memory, tickets, or approvals.",
+  "expected": {
+    "sentinel_is_observational": true,
+    "observed_project_is_preserved": true,
+    "affected_project_can_differ": true,
+    "routing_weakness_recommends_ticket_discussion_and_finding": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "agent_sentinel_observe",
+      "params": {
+        "observed_project": "BookSeller",
+        "affected_project": "IronDev",
+        "finding_type": "RoutingWeakness",
+        "evidence": "BookSellerCampaign118 run 3: Expected SaveDiscussionDocument, Actual GeneralChat for 'Save this as BookSeller project knowledge'.",
+        "expect_model_profile": "cheap-runner",
+        "expect_observed_project": "BookSeller",
+        "expect_affected_project": "IronDev",
+        "expect_insight_type": "RoutingWeakness",
+        "expect_severity": "Concern",
+        "expect_recommended_dispositions": [ "CreateTicket", "CreateDiscussion", "CreateCampaignFinding" ],
+        "expect_boundary_contains": "observational only"
+      }
+    },
+    {
+      "step": 2,
+      "action": "agent_sentinel_observe",
+      "params": {
+        "observed_project": "BookSeller",
+        "affected_project": "BookSeller",
+        "finding_type": "DomainRuleSignal",
+        "evidence": "BookSeller prompts repeatedly mention negative stock and inventory validation.",
+        "expect_model_profile": "cheap-runner",
+        "expect_observed_project": "BookSeller",
+        "expect_affected_project": "BookSeller",
+        "expect_insight_type": "DomainRuleSignal",
+        "expect_severity": "Info",
+        "expect_recommended_dispositions": [ "CreateObservation", "ReviewProjectTicket" ],
+        "expect_boundary_contains": "observational only"
+      }
+    }
+  ]
+}
