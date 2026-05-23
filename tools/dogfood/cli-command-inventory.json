@@ -20,6 +20,26 @@
         "notes":  "Proves the tool contract, registry, trace report, evidence validation layer, human escalation gate, runtime profiles, and hard no-write/no-memory-mutation/no-ticket/no-patch boundaries."
     },
     {
+        "command":  "campaign loop-gated-disposable-build-168",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LoopGatedDisposableBuild168Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "loop-gated disposable build smoke",
+        "notes":  "Runs messy prompt to run-scoped docs, governed Planner/Critic loop, caged Solitaire BuilderAgent repair loop, QualityAgent gate, and final evidence report with real repo mutation count zero."
+    },
+    {
+        "command":  "campaign promotion-package-169",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "PromotionPackage169Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "promotion package smoke",
+        "notes":  "Runs a 168 source build, creates a ProposedChange and PromotionPackage, classifies promotable/blocked files through the language runtime profile, and keeps approval at NeedsHumanReview."
+    },
+    {
         "command":  "campaign live-remaining-agents-161",
         "category":  "campaign",
         "scope":  "dogfood/control",
@@ -233,11 +253,11 @@
         "command":  "build disposable run",
         "category":  "build",
         "scope":  "dogfood/control",
-        "implementation":  "Program.cs alias -\u003e BuilderRepairLoopCommand.cs",
+        "implementation":  "LoopGatedDisposableBuild168Command.cs",
         "requiresSql":  false,
         "requiresWeaviate":  false,
-        "status":  "clean alias for disposable build/repair run",
-        "notes":  "Product-shaped alpha alias for the caged BuilderAgent repair loop; real repo writes remain blocked."
+        "status":  "loop-gated disposable build run",
+        "notes":  "Product-shaped entrypoint for messy prompt to run-scoped docs, governed Planner/Critic evidence, caged BuilderAgent repair loop, QualityAgent gate, and final report; real repo writes remain blocked."
     },
     {
         "command":  "builder disposable-workspace-apply-smoke",
@@ -478,6 +498,16 @@
         "requiresWeaviate":  false,
         "status":  "deterministic command/test-plan inventory validator",
         "notes":  "Validates command inventory, command docs, and test plan inventory without executing commands or mutating project state."
+    },
+    {
+        "command":  "promotion package create",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "PromotionPackage169Command.cs + LanguageRuntimeRegistry",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "promotion package creator",
+        "notes":  "Creates ProposedChange and PromotionPackage review evidence from a successful disposable source run. It does not apply files, create branches, mutate memory, accept tickets, or approve writes."
     },
     {
         "command":  "memory builder-context-source-smoke",

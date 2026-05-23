@@ -169,4 +169,8 @@ IRONDEV-158 adds opt-in live model execution for the governed ArchitectAgent pat
 
 IRONDEV-162 through IRONDEV-167 add a native governed tool loop. PlannerAgent requests named capabilities, the tool registry checks capability boundaries and runtime profiles, safe tools collect evidence, CriticAgent reviews the evidence, PlannerAgent revises the plan, and a human escalation gate records whether review or more evidence is required. .NET is the first runtime adapter, but Node and Python profiles are represented through the same capability contract.
 
+IRONDEV-168 connects the governed loop to the product-shaped disposable build path. `build disposable run` can now take a messy goal such as `I want build solitaire`, create run-scoped intake/build/ticket artefacts, run Planner/Critic evidence collection, execute the caged BuilderAgent repair loop, run QualityAgent/Killjoy, and return a single evidence report. The generated app remains inside the disposable workspace and run-scoped docs do not become accepted memory.
+
+IRONDEV-169 adds the promotion bridge. `ProposedChange` is the review case file; `PromotionPackage` is the evidence package. Promotion package creation classifies disposable workspace files through `ILanguageRuntimeRegistry`, attaches build/test/quality evidence, blocks generated outputs such as `bin/` and `obj/`, and keeps approval at `NeedsHumanReview`. The `csharp-dotnet` runtime profile is executable; Java, TypeScript, and Python profiles are contract-only until reviewed runtime executors are added.
+
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.

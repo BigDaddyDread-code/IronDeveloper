@@ -28,6 +28,63 @@
         "kind":  "campaign-smoke"
     },
     {
+        "planFile":  "irondev-loop-gated-disposable-build-168.json",
+        "goalId":  "loop-gated-disposable-build-168",
+        "project":  "IronDev",
+        "description":  "Validate messy prompt to run-scoped docs to governed Planner/Critic evidence to caged Solitaire build/repair to QualityAgent report.",
+        "agentPath":  "TestAgent + ReplayRunner + LoopGatedDisposableBuild168Command + GovernedPlannerCriticLoopService + BuilderRepairLoopCommand + QualityAgent",
+        "command":  "campaign loop-gated-disposable-build-168",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "GovernedPlannerCriticLoopService",
+                                 "GovernedToolRegistry",
+                                 "BuilderRepairLoopCommand",
+                                 "QualityAgent",
+                                 "Code Standards Alpha"
+                             ],
+        "expectedEvidence":  [
+                                 "messy prompt preserved",
+                                 "run-scoped docs created",
+                                 "Planner/Critic evidence validation passes",
+                                 "BuilderAgent caged repair loop passes",
+                                 "QualityAgent gate passes",
+                                 "real repo mutation count zero",
+                                 "generated Solitaire app files stay disposable"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Loop-gated disposable build only; run-scoped docs are evidence, generated app files stay in the disposable workspace, and accepted memory mutation, ticket acceptance, real repo writes, and self-approval remain blocked.",
+        "kind":  "campaign-smoke"
+    },
+    {
+        "planFile":  "irondev-promotion-package-169.json",
+        "goalId":  "promotion-package-language-runtime-169",
+        "project":  "IronDev",
+        "description":  "Validate ProposedChange, PromotionPackage, language runtime profile, promotable/blocked file classification, evidence, and NeedsHumanReview approval state.",
+        "agentPath":  "TestAgent + ReplayRunner + PromotionPackage169Command + LanguageRuntimeRegistry",
+        "command":  "campaign promotion-package-169",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "LoopGatedDisposableBuild168Command",
+                                 "PromotionPackage169Command",
+                                 "LanguageRuntimeRegistry",
+                                 "BuilderRepairLoopCommand",
+                                 "QualityAgent"
+                             ],
+        "expectedEvidence":  [
+                                 "ProposedChange id created",
+                                 "PromotionPackage id created",
+                                 "csharp-dotnet runtime executable",
+                                 "future runtime profiles present but non-executable",
+                                 "generated source files promotable",
+                                 "bin obj outputs blocked",
+                                 "real repo mutation count zero",
+                                 "approval state NeedsHumanReview"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Promotion package review only; no apply, branch creation, accepted memory mutation, ticket acceptance, real repo writes, or self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-live-remaining-governed-agents-161.json",
         "goalId":  "live-remaining-governed-agents-161",
         "project":  "IronDev",

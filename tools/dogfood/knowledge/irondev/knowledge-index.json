@@ -1,5 +1,27 @@
 [
   {
+    "Id": "PROMOTION_PACKAGE_LANGUAGE_RUNTIME_169",
+    "Project": "IronDev",
+    "Title": "Promotion Package And Language Runtime Spine 169",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\PROMOTION_PACKAGE_LANGUAGE_RUNTIME_169.md",
+    "DogfoodRunId": "PromotionPackage169",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524169000000-promotion-package-language-runtime-169.md",
+    "CreatedUtc": "2026-05-24T16:09:00+00:00"
+  },
+  {
+    "Id": "LOOP_GATED_DISPOSABLE_BUILD_168",
+    "Project": "IronDev",
+    "Title": "Loop-Gated Disposable Build 168",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\LOOP_GATED_DISPOSABLE_BUILD_168.md",
+    "DogfoodRunId": "LoopGatedDisposableBuild168",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524168000000-loop-gated-disposable-build-168.md",
+    "CreatedUtc": "2026-05-24T16:08:00+00:00"
+  },
+  {
     "Id": "GOVERNED_TOOL_LOOP_162_167",
     "Project": "IronDev",
     "Title": "Governed Planner/Critic Tool Loop 162-167",
