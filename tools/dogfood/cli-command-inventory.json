@@ -1,347 +1,372 @@
-[
+﻿[
+    {
+        "command":  "agent builder trace-smoke",
+        "category":  "agent",
+        "scope":  "smoke",
+        "implementation":  "BuildAgentTraceSmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "synthetic build-agent trace proof",
+        "notes":  "Creates trace/report evidence for future disposable build work; no workspace creation or repo writes."
+    },
+    {
+        "command":  "agent conscience review",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + ConscienceAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic safety reviewer",
+        "notes":  "Reviews proposed actions and returns Allow, Block, or NeedsMoreEvidence; no mutation."
+    },
+    {
+        "command":  "agent critic review-failure",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + CriticAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic failure reviewer",
+        "notes":  "Reviews generated failure packages; no code changes."
+    },
+    {
+        "command":  "agent list",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "real deterministic registry listing",
+        "notes":  "Lists registered agent definitions."
+    },
+    {
+        "command":  "agent planner draft-test-plan",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + PlannerAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic draft generator",
+        "notes":  "Drafts plan JSON only; does not execute."
+    },
     {
         "command":  "agent planner intake-product-spike",
         "category":  "agent",
+        "scope":  "dogfood/control",
         "implementation":  "Program.cs + PlannerAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
         "status":  "deterministic product-spike intake",
-        "requires":  [
-                         "ReplayRunner"
-                     ],
         "notes":  "Classifies vague new product prompts into safe intake evidence. Does not create memory, tickets, disposable workspaces, patches, or real repo writes."
     },
     {
-        "value":  [
-                      {
-                          "command":  "agent list",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "real deterministic registry listing",
-                          "notes":  "Lists registered agent definitions."
-                      },
-                      {
-                          "command":  "agent profiles",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "real deterministic profile listing",
-                          "notes":  "Lists OpenAI model profiles."
-                      },
-                      {
-                          "command":  "agent tester run-plan",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + TesterAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  "depends on plan",
-                          "status":  "real wrapper over Test Agent plan runner",
-                          "notes":  "First real execution agent path."
-                      },
-                      {
-                          "command":  "agent retriever search",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + RetrieverAgent + memory search",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  true,
-                          "status":  "memory wrapper",
-                          "notes":  "Packages memory search result as weighted context bundle with included/rejected source evidence."
-                      },
-                      {
-                          "command":  "agent supervisor run-goal",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + SupervisorAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  "depends on query",
-                          "status":  "governed autonomous wrapper",
-                          "notes":  "Runs weighted retrieval, ConscienceAgent review, ThoughtLedger explanation, then nested TesterAgent plan only when allowed. Supports Tier 3 read/test/report and Tier 4 disposable-workspace apply loops."
-                      },
-                      {
-                          "command":  "agent critic review-failure",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + CriticAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic failure reviewer",
-                          "notes":  "Reviews generated failure packages; no code changes."
-                      },
-                      {
-                          "command":  "agent quality run-gate",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + QualityAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic tool gate",
-                          "notes":  "Runs build/format/package/code standards checks via plan machinery."
-                      },
-                      {
-                          "command":  "agent planner draft-test-plan",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + PlannerAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic draft generator",
-                          "notes":  "Drafts plan JSON only; does not execute."
-                      },
-                      {
-                          "command":  "agent sentinel observe",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + SentinelAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic insight observer",
-                          "notes":  "Emits project-aware insight artefacts from evidence; no mutation."
-                      },
-                      {
-                          "command":  "agent research package",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + ResearchAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic external evidence packager",
-                          "notes":  "Packages explicit external evidence as read-only ResearchPackage output."
-                      },
-                      {
-                          "command":  "agent thought-ledger explain",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + ThoughtLedgerService",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic visible reasoning summary",
-                          "notes":  "Explains evidence, uncertainty, blocked actions, and safer alternatives without hidden chain-of-thought."
-                      },
-                      {
-                          "command":  "agent conscience review",
-                          "category":  "agent",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + ConscienceAgent",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic safety reviewer",
-                          "notes":  "Reviews proposed actions and returns Allow, Block, or NeedsMoreEvidence; no mutation."
-                      },
-                      {
-                          "command":  "govern review",
-                          "category":  "govern",
-                          "scope":  "dogfood/control",
-                          "implementation":  "GovernedActionReviewCommand.cs + ConscienceAgent + ThoughtLedgerService",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic governed action review",
-                          "notes":  "Combines action review and visible reasoning; never executes the proposed action."
-                      },
-                      {
-                          "command":  "chat send",
-                          "category":  "chat",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic routing harness",
-                          "notes":  "Exercises command router, not full provider LLM path."
-                      },
-                      {
-                          "command":  "docs clean",
-                          "category":  "docs",
-                          "scope":  "dogfood/data",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "dogfood local store command",
-                          "notes":  "Local dogfood docs cleanup."
-                      },
-                      {
-                          "command":  "docs import",
-                          "category":  "docs",
-                          "scope":  "dogfood/data",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "dogfood local store command",
-                          "notes":  "Imports docs to dogfood knowledge."
-                      },
-                      {
-                          "command":  "docs list",
-                          "category":  "docs",
-                          "scope":  "dogfood/data",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "dogfood local store command",
-                          "notes":  "Lists dogfood docs."
-                      },
-                      {
-                          "command":  "docs show",
-                          "category":  "docs",
-                          "scope":  "dogfood/data",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "dogfood local store command",
-                          "notes":  "Shows dogfood doc."
-                      },
-                      {
-                          "command":  "docs search",
-                          "category":  "docs",
-                          "scope":  "dogfood/data",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "local lexical search",
-                          "notes":  "Local docs search; not Weaviate."
-                      },
-                      {
-                          "command":  "docs discussion-smoke",
-                          "category":  "docs",
-                          "scope":  "smoke",
-                          "implementation":  "DocsDiscussionSmokeCommand.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "smoke proof",
-                          "notes":  "Discussion document smoke."
-                      },
-                      {
-                          "command":  "tickets document-to-tickets-smoke",
-                          "category":  "tickets",
-                          "scope":  "smoke",
-                          "implementation":  "TicketsDocumentToTicketsSmokeCommand.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "smoke proof",
-                          "notes":  "Document to ticket smoke."
-                      },
-                      {
-                          "command":  "failure latest",
-                          "category":  "failure",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs + FailurePackageService.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "real failure package generator",
-                          "notes":  "Produces Codex-facing failure evidence."
-                      },
-                      {
-                          "command":  "memory search",
-                          "category":  "memory",
-                          "scope":  "dogfood/control",
-                          "implementation":  "MemorySearchCommand.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  true,
-                          "status":  "real Weaviate-backed dogfood memory search",
-                          "notes":  "Codex-facing memory search with raw/final rank."
-                      },
-                      {
-                          "command":  "memory triage",
-                          "category":  "memory",
-                          "scope":  "dogfood/control",
-                          "implementation":  "MemoryTriageCommand.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic memory classification proof",
-                          "notes":  "Classifies whether feedback/context should become memory; does not persist artefacts."
-                      },
-                      {
-                          "command":  "memory sql-version-smoke",
-                          "category":  "memory",
-                          "scope":  "smoke",
-                          "implementation":  "MemorySqlVersionSmokeCommand.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  false,
-                          "status":  "SQL-backed smoke proof",
-                          "notes":  "Version/current authority proof."
-                      },
-                      {
-                          "command":  "memory weaviate-sql-version-smoke",
-                          "category":  "memory",
-                          "scope":  "smoke",
-                          "implementation":  "MemoryWeaviateSqlVersionSmokeCommand.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  true,
-                          "status":  "SQL + Weaviate smoke proof",
-                          "notes":  "Raw vector vs authority rerank proof."
-                      },
-                      {
-                          "command":  "memory cross-project-smoke",
-                          "category":  "memory",
-                          "scope":  "smoke",
-                          "implementation":  "MemoryCrossProjectSmokeCommand.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  true,
-                          "status":  "SQL + Weaviate smoke proof",
-                          "notes":  "Cross-project bleed rejection proof."
-                      },
-                      {
-                          "command":  "memory reindex-freshness-smoke",
-                          "category":  "memory",
-                          "scope":  "smoke",
-                          "implementation":  "MemoryReindexFreshnessSmokeCommand.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  true,
-                          "status":  "SQL + Weaviate reindex smoke proof",
-                          "notes":  "Freshness, stale visibility, project scope, exact title promotion, and idempotency proof."
-                      },
-                      {
-                          "command":  "memory ticket-source-link-smoke",
-                          "category":  "memory",
-                          "scope":  "smoke",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  false,
-                          "status":  "SQL source-link smoke proof",
-                          "notes":  "Still in Program.cs."
-                      },
-                      {
-                          "command":  "memory builder-context-source-smoke",
-                          "category":  "memory",
-                          "scope":  "smoke",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  false,
-                          "status":  "SQL builder context smoke proof",
-                          "notes":  "Still in Program.cs."
-                      },
-                      {
-                          "command":  "builder proposal-safety-smoke",
-                          "category":  "builder",
-                          "scope":  "smoke",
-                          "implementation":  "BuilderProposalSafetySmokeCommand.cs",
-                          "requiresSql":  true,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic builder safety proof",
-                          "notes":  "Preview only; no writes."
-                      },
-                      {
-                          "command":  "\u003creplay-plan.json\u003e",
-                          "category":  "replay",
-                          "scope":  "dogfood/control",
-                          "implementation":  "Program.cs",
-                          "requiresSql":  false,
-                          "requiresWeaviate":  false,
-                          "status":  "deterministic replay runner",
-                          "notes":  "Runs chat route replay scenario files."
-                      }
-                  ],
-        "Count":  29
+        "command":  "agent profiles",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "real deterministic profile listing",
+        "notes":  "Lists OpenAI model profiles."
+    },
+    {
+        "command":  "agent quality run-gate",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + QualityAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic tool gate",
+        "notes":  "Runs build/format/package/code standards checks via plan machinery."
+    },
+    {
+        "command":  "agent research package",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + ResearchAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic external evidence packager",
+        "notes":  "Packages explicit external evidence as read-only ResearchPackage output."
+    },
+    {
+        "command":  "agent retriever search",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + RetrieverAgent + memory search",
+        "requiresSql":  false,
+        "requiresWeaviate":  true,
+        "status":  "memory wrapper",
+        "notes":  "Packages memory search result as weighted context bundle with included/rejected source evidence."
+    },
+    {
+        "command":  "agent sentinel observe",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + SentinelAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic insight observer",
+        "notes":  "Emits project-aware insight artefacts from evidence; no mutation."
+    },
+    {
+        "command":  "agent supervisor run-goal",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + SupervisorAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  "depends on query",
+        "status":  "governed autonomous wrapper",
+        "notes":  "Runs weighted retrieval, ConscienceAgent review, ThoughtLedger explanation, then nested TesterAgent plan only when allowed."
+    },
+    {
+        "command":  "agent tester run-plan",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + TesterAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  "depends on plan",
+        "status":  "real wrapper over Test Agent plan runner",
+        "notes":  "First real execution agent path."
+    },
+    {
+        "command":  "agent thought-ledger explain",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + ThoughtLedgerService",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic visible reasoning summary",
+        "notes":  "Explains evidence, uncertainty, blocked actions, and safer alternatives without hidden chain-of-thought."
+    },
+    {
+        "command":  "builder disposable-workspace-apply-smoke",
+        "category":  "builder",
+        "scope":  "smoke",
+        "implementation":  "DisposableWorkspaceApplySmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "disposable workspace apply proof",
+        "notes":  "Evidence/report command for Tier 4 disposable workspace apply behavior; real repo writes remain blocked."
+    },
+    {
+        "command":  "builder proposal-safety-smoke",
+        "category":  "builder",
+        "scope":  "smoke",
+        "implementation":  "BuilderProposalSafetySmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "deterministic builder safety proof",
+        "notes":  "Preview only; no writes."
+    },
+    {
+        "command":  "builder solitaire-disposable-build-smoke",
+        "category":  "builder",
+        "scope":  "smoke",
+        "implementation":  "SolitaireDisposableBuildSmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "synthetic Solitaire disposable build proof",
+        "notes":  "Builds trace evidence for the Solitaire product spike without mutating the real repo."
+    },
+    {
+        "command":  "chat send",
+        "category":  "chat",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic routing harness",
+        "notes":  "Exercises command router, not full provider LLM path."
+    },
+    {
+        "command":  "docs clean",
+        "category":  "docs",
+        "scope":  "dogfood/data",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood local store command",
+        "notes":  "Local dogfood docs cleanup."
+    },
+    {
+        "command":  "docs discussion-smoke",
+        "category":  "docs",
+        "scope":  "smoke",
+        "implementation":  "DocsDiscussionSmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "smoke proof",
+        "notes":  "Discussion document smoke."
+    },
+    {
+        "command":  "docs import",
+        "category":  "docs",
+        "scope":  "dogfood/data",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood local store command",
+        "notes":  "Imports docs to dogfood knowledge."
+    },
+    {
+        "command":  "docs list",
+        "category":  "docs",
+        "scope":  "dogfood/data",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood local store command",
+        "notes":  "Lists dogfood docs."
+    },
+    {
+        "command":  "docs search",
+        "category":  "docs",
+        "scope":  "dogfood/data",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "local lexical search",
+        "notes":  "Local docs search; not Weaviate."
+    },
+    {
+        "command":  "docs show",
+        "category":  "docs",
+        "scope":  "dogfood/data",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood local store command",
+        "notes":  "Shows dogfood doc."
+    },
+    {
+        "command":  "failure latest",
+        "category":  "failure",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs + FailurePackageService.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "real failure package generator",
+        "notes":  "Produces Codex-facing failure evidence."
     },
     {
         "command":  "foundation break-test",
-        "group":  "foundation",
-        "kind":  "dogfood-control",
-        "requires":  [
-                         "ReplayRunner"
-                     ],
-        "description":  "Run one foundation break-test scenario from the 121-130 hardening phase.",
-        "boundary":  "Evidence/report command only. No real repo writes and no UI work."
+        "category":  "foundation",
+        "scope":  "dogfood/control",
+        "implementation":  "FoundationBreakTestCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "foundation hardening proof",
+        "notes":  "Runs one foundation break-test scenario from the 121-130 hardening phase; no real repo writes and no UI work."
+    },
+    {
+        "command":  "govern review",
+        "category":  "govern",
+        "scope":  "dogfood/control",
+        "implementation":  "GovernedActionReviewCommand.cs + ConscienceAgent + ThoughtLedgerService",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic governed action review",
+        "notes":  "Combines action review and visible reasoning; never executes the proposed action."
+    },
+    {
+        "command":  "memory builder-context-source-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "Program.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "SQL builder context smoke proof",
+        "notes":  "Still in Program.cs."
+    },
+    {
+        "command":  "memory cross-project-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "MemoryCrossProjectSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "SQL + Weaviate smoke proof",
+        "notes":  "Cross-project bleed rejection proof."
+    },
+    {
+        "command":  "memory reindex-freshness-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "MemoryReindexFreshnessSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "SQL + Weaviate reindex smoke proof",
+        "notes":  "Freshness, stale visibility, project scope, exact title promotion, and idempotency proof."
+    },
+    {
+        "command":  "memory search",
+        "category":  "memory",
+        "scope":  "dogfood/control",
+        "implementation":  "MemorySearchCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  true,
+        "status":  "real Weaviate-backed dogfood memory search",
+        "notes":  "Codex-facing memory search with raw/final rank."
+    },
+    {
+        "command":  "memory sql-version-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "MemorySqlVersionSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "SQL-backed smoke proof",
+        "notes":  "Version/current authority proof."
+    },
+    {
+        "command":  "memory ticket-source-link-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "Program.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "SQL source-link smoke proof",
+        "notes":  "Still in Program.cs."
+    },
+    {
+        "command":  "memory triage",
+        "category":  "memory",
+        "scope":  "dogfood/control",
+        "implementation":  "MemoryTriageCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic memory classification proof",
+        "notes":  "Classifies whether feedback/context should become memory; does not persist artefacts."
+    },
+    {
+        "command":  "memory weaviate-sql-version-smoke",
+        "category":  "memory",
+        "scope":  "smoke",
+        "implementation":  "MemoryWeaviateSqlVersionSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "SQL + Weaviate smoke proof",
+        "notes":  "Raw vector vs authority rerank proof."
+    },
+    {
+        "command":  "\u003creplay-plan.json\u003e",
+        "category":  "replay",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic replay runner",
+        "notes":  "Runs chat route replay scenario files."
+    },
+    {
+        "command":  "tickets document-to-tickets-smoke",
+        "category":  "tickets",
+        "scope":  "smoke",
+        "implementation":  "TicketsDocumentToTicketsSmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "smoke proof",
+        "notes":  "Document to ticket smoke."
     }
 ]

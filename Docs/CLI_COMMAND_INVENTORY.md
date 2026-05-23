@@ -10,14 +10,14 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 13
+- Agent commands: 14
 - Chat commands: 1
 - Docs commands: 6
 - Ticket commands: 1
 - Failure commands: 1
 - Govern commands: 1
-- Memory commands: 6
-- Builder commands: 1
+- Memory commands: 8
+- Builder commands: 3
 - Foundation commands: 1
 - Replay scenario entrypoint: 1
 
@@ -35,7 +35,9 @@ The machine-readable inventory is stored at:
 - `govern review`
 - `foundation break-test`
 - `failure latest`
+- `builder disposable-workspace-apply-smoke`
 - `builder proposal-safety-smoke`
+- `builder solitaire-disposable-build-smoke`
 
 These are closest to the control surface Codex will use.
 
@@ -73,9 +75,13 @@ Some commands still live in `Program.cs`, including ticket source-link and build
 This is an inventory and help audit. It does not change command semantics.
 
 
+## Inventory Order
+
+The JSON inventory is a flat command array sorted by `category`, then `command`. Keep new commands in that order so Codex and dogfood tooling can diff the surface cleanly.
+
 ## 137 Product Spike Intake Command
 
-- gent planner intake-product-spike classifies vague new product prompts such as i want build solitare into a structured product-spike intake package.
+- `agent planner intake-product-spike` classifies vague new product prompts such as `i want build solitare` into a structured product-spike intake package.
 - It returns detected project, assumptions, clarifying questions, recommended next steps, blocked unsafe actions, and a boundary statement.
 - It does not create project memory, tickets, disposable workspaces, patches, or real repository writes.
 
