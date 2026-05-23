@@ -42,6 +42,9 @@ if (IsCommand(args, "campaign", "live-critic-planner-159"))
 if (IsCommand(args, "campaign", "live-retriever-sentinel-160"))
     return await LiveRetrieverSentinelAgents160Command.HandleAsync(args, options);
 
+if (IsCommand(args, "campaign", "live-remaining-agents-161"))
+    return await LiveRemainingGovernedAgents161Command.HandleAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
@@ -541,23 +544,31 @@ static async Task<int> HandleAgentSupervisorRunGoalCommandAsync(string[] args, J
     var planPath = ReadOption(args, "--plan");
     if (string.IsNullOrWhiteSpace(query) || string.IsNullOrWhiteSpace(planPath))
     {
-        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent supervisor run-goal --project <project> --query <query> --plan <path> [--run-id id] [--json]");
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent supervisor run-goal --project <project> --query <query> --plan <path> [--run-id id] [--live-llm] [--model-profile profile] [--json]");
         return 2;
     }
 
     var runId = ReadOption(args, "--run-id") ?? $"SupervisorAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
-    var (_, _, runner) = CreateAgentRuntime();
+    var liveLlm = HasFlag(args, "--live-llm");
+    var modelProfile = ReadOption(args, "--model-profile");
+    var inputs = new Dictionary<string, string>
+    {
+        ["project"] = project,
+        ["query"] = query,
+        ["plan_path"] = planPath,
+        ["live_llm"] = liveLlm.ToString()
+    };
+    var llmResponse = ReadOption(args, "--llm-response");
+    if (!string.IsNullOrWhiteSpace(llmResponse))
+        inputs["llm_response"] = llmResponse;
+
+    var (_, _, runner) = CreateAgentRuntime(enableLiveLlm: liveLlm, supervisorModelProfile: modelProfile);
     var result = await runner.RunAsync(new AgentRequest
     {
         AgentName = "SupervisorAgent",
         GoalId = "supervisor-codex-loop-proof-025",
         DogfoodRunId = runId,
-        Inputs = new Dictionary<string, string>
-        {
-            ["project"] = project,
-            ["query"] = query,
-            ["plan_path"] = planPath
-        }
+        Inputs = inputs
     });
 
     Console.WriteLine(JsonSerializer.Serialize(new
@@ -631,16 +642,24 @@ static async Task<int> HandleAgentQualityRunGateCommandAsync(string[] args, Json
 {
     var planPath = ReadOption(args, "--plan") ?? "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json";
     var runId = ReadOption(args, "--run-id") ?? $"QualityAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
-    var (_, _, runner) = CreateAgentRuntime();
+    var liveLlm = HasFlag(args, "--live-llm");
+    var modelProfile = ReadOption(args, "--model-profile");
+    var inputs = new Dictionary<string, string>
+    {
+        ["plan_path"] = planPath,
+        ["live_llm"] = liveLlm.ToString()
+    };
+    var llmResponse = ReadOption(args, "--llm-response");
+    if (!string.IsNullOrWhiteSpace(llmResponse))
+        inputs["llm_response"] = llmResponse;
+
+    var (_, _, runner) = CreateAgentRuntime(enableLiveLlm: liveLlm, qualityModelProfile: modelProfile);
     var result = await runner.RunAsync(new AgentRequest
     {
         AgentName = "QualityAgent",
         GoalId = "quality-agent-real-path-037",
         DogfoodRunId = runId,
-        Inputs = new Dictionary<string, string>
-        {
-            ["plan_path"] = planPath
-        }
+        Inputs = inputs
     });
 
     Console.WriteLine(JsonSerializer.Serialize(new
@@ -873,27 +892,35 @@ static async Task<int> HandleAgentResearchPackageCommandAsync(string[] args, Jso
     var topic = ReadOption(args, "--topic") ?? ReadPositionalText(args, 3);
     if (string.IsNullOrWhiteSpace(topic))
     {
-        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent research package --project <project> --topic <topic> [--source-url url] [--source-title title] [--source-type type] [--snippet text] [--run-id id] [--json]");
+        Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent research package --project <project> --topic <topic> [--source-url url] [--source-title title] [--source-type type] [--snippet text] [--run-id id] [--live-llm] [--model-profile profile] [--json]");
         return 2;
     }
 
     var runId = ReadOption(args, "--run-id") ?? $"ResearchAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
-    var (_, _, runner) = CreateAgentRuntime();
+    var liveLlm = HasFlag(args, "--live-llm");
+    var modelProfile = ReadOption(args, "--model-profile");
+    var inputs = new Dictionary<string, string>
+    {
+        ["project"] = project,
+        ["topic"] = topic,
+        ["source_url"] = ReadOption(args, "--source-url") ?? string.Empty,
+        ["source_title"] = ReadOption(args, "--source-title") ?? string.Empty,
+        ["source_type"] = ReadOption(args, "--source-type") ?? string.Empty,
+        ["snippet"] = ReadOption(args, "--snippet") ?? string.Empty,
+        ["published_date"] = ReadOption(args, "--published-date") ?? string.Empty,
+        ["live_llm"] = liveLlm.ToString()
+    };
+    var llmResponse = ReadOption(args, "--llm-response");
+    if (!string.IsNullOrWhiteSpace(llmResponse))
+        inputs["llm_response"] = llmResponse;
+
+    var (_, _, runner) = CreateAgentRuntime(enableLiveLlm: liveLlm, researchModelProfile: modelProfile);
     var result = await runner.RunAsync(new AgentRequest
     {
         AgentName = "ResearchAgent",
         GoalId = "research-agent-lite-121",
         DogfoodRunId = runId,
-        Inputs = new Dictionary<string, string>
-        {
-            ["project"] = project,
-            ["topic"] = topic,
-            ["source_url"] = ReadOption(args, "--source-url") ?? string.Empty,
-            ["source_title"] = ReadOption(args, "--source-title") ?? string.Empty,
-            ["source_type"] = ReadOption(args, "--source-type") ?? string.Empty,
-            ["snippet"] = ReadOption(args, "--snippet") ?? string.Empty,
-            ["published_date"] = ReadOption(args, "--published-date") ?? string.Empty
-        }
+        Inputs = inputs
     });
 
     Console.WriteLine(JsonSerializer.Serialize(new
@@ -993,7 +1020,10 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
     string? criticModelProfile = null,
     string? plannerModelProfile = null,
     string? retrieverModelProfile = null,
-    string? sentinelModelProfile = null)
+    string? sentinelModelProfile = null,
+    string? supervisorModelProfile = null,
+    string? qualityModelProfile = null,
+    string? researchModelProfile = null)
 {
     var repoRoot = FindRepositoryRoot();
     var modelResolver = new AgentModelResolver(LoadModelProfiles(repoRoot));
@@ -1007,6 +1037,9 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                 "PlannerAgent" => plannerModelProfile,
                 "RetrieverAgent" => retrieverModelProfile,
                 "SentinelAgent" => sentinelModelProfile,
+                "SupervisorAgent" => supervisorModelProfile,
+                "QualityAgent" => qualityModelProfile,
+                "ResearchAgent" => researchModelProfile,
                 _ => null
             };
 
@@ -1028,13 +1061,13 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
             string.Equals(definition.Name, "TesterAgent", StringComparison.OrdinalIgnoreCase)
                 ? new TesterAgent(definition, modelResolver, repoRoot)
                 : string.Equals(definition.Name, "SupervisorAgent", StringComparison.OrdinalIgnoreCase)
-                    ? new SupervisorAgent(definition, modelResolver, repoRoot)
+                    ? new SupervisorAgent(definition, modelResolver, repoRoot, agentLlmClient)
                 : string.Equals(definition.Name, "RetrieverAgent", StringComparison.OrdinalIgnoreCase)
                     ? new RetrieverAgent(definition, modelResolver, repoRoot, agentLlmClient)
                 : string.Equals(definition.Name, "CriticAgent", StringComparison.OrdinalIgnoreCase)
                     ? new CriticAgent(definition, modelResolver, agentLlmClient)
                 : string.Equals(definition.Name, "QualityAgent", StringComparison.OrdinalIgnoreCase)
-                    ? new QualityAgent(definition, modelResolver, repoRoot)
+                    ? new QualityAgent(definition, modelResolver, repoRoot, agentLlmClient)
                 : string.Equals(definition.Name, "PlannerAgent", StringComparison.OrdinalIgnoreCase)
                     ? new PlannerAgent(definition, modelResolver, agentLlmClient)
                 : string.Equals(definition.Name, "ArchitectAgent", StringComparison.OrdinalIgnoreCase)
@@ -1042,7 +1075,7 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                 : string.Equals(definition.Name, "SentinelAgent", StringComparison.OrdinalIgnoreCase)
                     ? new SentinelAgent(definition, modelResolver, agentLlmClient)
                 : string.Equals(definition.Name, "ResearchAgent", StringComparison.OrdinalIgnoreCase)
-                    ? new ResearchAgent(definition, modelResolver)
+                    ? new ResearchAgent(definition, modelResolver, agentLlmClient)
                 : string.Equals(definition.Name, "ConscienceAgent", StringComparison.OrdinalIgnoreCase)
                     ? new ConscienceAgent(definition, modelResolver)
                 : new StaticIronDevAgent(definition, modelResolver))

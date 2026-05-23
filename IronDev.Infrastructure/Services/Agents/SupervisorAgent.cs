@@ -9,12 +9,14 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
+    private readonly IAgentLlmClient? _llmClient;
 
-    public SupervisorAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot)
+    public SupervisorAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
+        _llmClient = llmClient;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -27,6 +29,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             ? $"SupervisorAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
         var autonomyTier = DetermineAutonomyTier(planPath);
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
         var isDisposableApply = string.Equals(autonomyTier, "Tier4DisposableWorkspaceApply", StringComparison.OrdinalIgnoreCase);
         var actionType = isDisposableApply
             ? "execute disposable workspace apply validation plan"
@@ -162,6 +165,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         var testSummary = ReadString(testJson, "summary");
         var decision = SelectDecision(memorySucceeded, conscienceAllows, testsSucceeded, conscienceDecision);
         var decisionReason = BuildDecisionReason(decision, memorySucceeded, conscienceAllows, testsSucceeded, conscienceDecision);
+        var prompt = BuildPrompt(project, query, planPath, autonomyTier, decision, decisionReason, memorySucceeded, conscienceAllows, testsSucceeded);
+        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
 
         var handoff = new
         {
@@ -187,6 +192,21 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 },
                 decision,
                 decisionReason,
+                llmIntelligence = new
+                {
+                    modelProfile = profile.Name,
+                    profileProvider = profile.Provider,
+                    profileModel = profile.Model,
+                    prompt,
+                    invocationMode = llmResult.InvocationMode,
+                    liveLlmRequested,
+                    wasAttempted = llmResult.WasAttempted,
+                    wasSuccessful = llmResult.WasSuccessful,
+                    durationMs = llmResult.DurationMs,
+                    modelSummary = BuildModelSummary(llmResult),
+                    error = llmResult.WasSuccessful ? string.Empty : llmResult.ErrorMessage,
+                    boundary = "Live SupervisorAgent output is advisory orchestration commentary only. Conscience, ThoughtLedger, and deterministic stop conditions remain authoritative."
+                },
                 decisionEvidence = new[]
                 {
                     $"memorySucceeded={memorySucceeded}",
@@ -279,6 +299,50 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         };
     }
 
+    private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentRequest request,
+        CancellationToken ct)
+    {
+        if (request.Inputs.TryGetValue("llm_response", out var providedResponse) &&
+            !string.IsNullOrWhiteSpace(providedResponse))
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "provided_llm_response",
+                ResponseText = providedResponse
+            };
+        }
+
+        if (!liveLlmRequested)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "llm_ready_deterministic_fallback",
+                ResponseText = "No live model response supplied; deterministic SupervisorAgent orchestration remained in force."
+            };
+        }
+
+        if (_llmClient is null)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = false,
+                InvocationMode = "live_model_requested_without_client_fallback",
+                ErrorMessage = "No governed agent LLM client was configured."
+            };
+        }
+
+        return await _llmClient.CompleteAsync(profile, prompt, ct);
+    }
+
     private string RunnerProjectPath() =>
         Path.Combine(_repoRoot, "tools", "IronDev.ReplayRunner", "IronDev.ReplayRunner.csproj");
 
@@ -318,6 +382,46 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             "report_ready" => "RetrieverAgent returned project memory, ConscienceAgent allowed bounded execution, and TesterAgent returned a passing report.",
             _ => $"Supervisor selected {decision}; memorySucceeded={memorySucceeded}; conscienceAllows={conscienceAllows}; testsSucceeded={testsSucceeded}."
         };
+
+    private static string BuildPrompt(
+        string project,
+        string query,
+        string planPath,
+        string autonomyTier,
+        string decision,
+        string decisionReason,
+        bool memorySucceeded,
+        bool conscienceAllows,
+        bool testsSucceeded) =>
+        $"""
+        You are SupervisorAgent for IronDev/IDA.
+        Review this governed orchestration state and return concise JSON with orchestration risks, stop/continue notes, and questions for Codex/human review.
+        Do not bypass ConscienceAgent, override ThoughtLedger, create tickets, mutate memory, patch files, approve writes, or rerun actions.
+        Project: {project}
+        Query: {query}
+        PlanPath: {planPath}
+        AutonomyTier: {autonomyTier}
+        Decision: {decision}
+        DecisionReason: {decisionReason}
+        MemorySucceeded: {memorySucceeded}
+        ConscienceAllows: {conscienceAllows}
+        TestsSucceeded: {testsSucceeded}
+        """;
+
+    private static bool ReadBoolInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) &&
+        bool.TryParse(value, out var parsed) &&
+        parsed;
+
+    private static string BuildModelSummary(AgentLlmCallResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.ResponseText))
+            return result.ResponseText;
+
+        return result.WasAttempted
+            ? "Live model call did not return usable content; deterministic SupervisorAgent orchestration remained in force."
+            : "No live model response supplied; deterministic SupervisorAgent orchestration remained in force.";
+    }
 
     private async Task<CommandRun> RunDotnetAsync(string[] arguments, CancellationToken ct)
     {

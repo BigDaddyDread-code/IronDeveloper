@@ -1,4 +1,34 @@
-[
+﻿[
+    {
+        "planFile":  "irondev-live-remaining-governed-agents-161.json",
+        "goalId":  "live-remaining-governed-agents-161",
+        "project":  "IronDev",
+        "description":  "Validate opt-in live governed ResearchAgent, QualityAgent, and SupervisorAgent execution, deterministic fallback, unavailable-provider handling, and hard safety boundaries.",
+        "agentPath":  "TestAgent + ReplayRunner + LiveRemainingGovernedAgents161Command + ResearchAgent + QualityAgent + SupervisorAgent",
+        "command":  "campaign live-remaining-agents-161",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "AgentModelResolver",
+                                 "AgentLlmClient",
+                                 "ResearchAgent",
+                                 "QualityAgent",
+                                 "SupervisorAgent",
+                                 "Weaviate"
+                             ],
+        "expectedEvidence":  [
+                                 "research live provider attempt recorded",
+                                 "quality live provider attempt recorded",
+                                 "supervisor live provider attempt recorded",
+                                 "deterministic gates remain authoritative",
+                                 "real repo writes remain blocked",
+                                 "memory mutation remains blocked",
+                                 "ticket creation remains blocked",
+                                 "patch apply remains blocked"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Campaign smoke only; opt-in live model execution with safe fallback, no accepted-memory override, no quality override, no memory mutation, no ticket creation, no patch apply, no self-approval, and no real repository writes.",
+        "kind":  "campaign-smoke"
+    },
     {
         "planFile":  "irondev-live-retriever-sentinel-agents-160.json",
         "goalId":  "live-retriever-sentinel-agents-160",
@@ -1801,7 +1831,7 @@
         "plan_file":  "irondev-buildagent-traceable-disposable-build-spine-140.json",
         "goal_id":  "buildagent-traceable-disposable-build-spine-140",
         "project":  "IronDev",
-        "agent_path":  "TestAgent -> BuildAgent trace smoke",
+        "agent_path":  "TestAgent -\u003e BuildAgent trace smoke",
         "cli_command":  "agent builder trace-smoke",
         "required_services":  [
                                   "ReplayRunner"
@@ -1822,7 +1852,7 @@
         "plan_file":  "irondev-builder-repair-loop-141.json",
         "goal_id":  "trace-backed-builderagent-repair-loop-141",
         "project":  "IronDev",
-        "agent_path":  "TestAgent -> BuilderAgent repair loop",
+        "agent_path":  "TestAgent -\u003e BuilderAgent repair loop",
         "cli_command":  "agent builder repair-loop",
         "required_services":  [
                                   "ReplayRunner",

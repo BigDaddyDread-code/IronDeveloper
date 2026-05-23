@@ -11,12 +11,14 @@ public sealed class QualityAgent : StaticIronDevAgent
 
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
+    private readonly IAgentLlmClient? _llmClient;
 
-    public QualityAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot)
+    public QualityAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
+        _llmClient = llmClient;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -29,6 +31,7 @@ public sealed class QualityAgent : StaticIronDevAgent
         var runId = string.IsNullOrWhiteSpace(request.DogfoodRunId)
             ? $"QualityAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
+        var liveLlmRequested = ReadBoolInput(request, "live_llm");
 
         var scriptPath = Path.Combine(_repoRoot, "tools", "dogfood", "Invoke-TestAgentPlan.ps1");
         var fullPlanPath = Path.GetFullPath(Path.Combine(_repoRoot, planPath));
@@ -68,6 +71,12 @@ public sealed class QualityAgent : StaticIronDevAgent
         await process.WaitForExitAsync(ct);
 
         var report = BuildQualityReport(stdout, stderr, planPath, runId, process.ExitCode);
+        var prompt = BuildPrompt(report);
+        report.LlmIntelligence = BuildLlmEvidence(
+            profile,
+            prompt,
+            liveLlmRequested,
+            await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct));
         var reportJson = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
 
         return new AgentResult
@@ -84,6 +93,50 @@ public sealed class QualityAgent : StaticIronDevAgent
             EvidencePaths = report.EvidencePaths,
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
+        ModelProfile profile,
+        string prompt,
+        bool liveLlmRequested,
+        AgentRequest request,
+        CancellationToken ct)
+    {
+        if (request.Inputs.TryGetValue("llm_response", out var providedResponse) &&
+            !string.IsNullOrWhiteSpace(providedResponse))
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "provided_llm_response",
+                ResponseText = providedResponse
+            };
+        }
+
+        if (!liveLlmRequested)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = true,
+                InvocationMode = "llm_ready_deterministic_fallback",
+                ResponseText = "No live model response supplied; deterministic quality gate evidence remained authoritative."
+            };
+        }
+
+        if (_llmClient is null)
+        {
+            return new AgentLlmCallResult
+            {
+                WasAttempted = false,
+                WasSuccessful = false,
+                InvocationMode = "live_model_requested_without_client_fallback",
+                ErrorMessage = "No governed agent LLM client was configured."
+            };
+        }
+
+        return await _llmClient.CompleteAsync(profile, prompt, ct);
     }
 
     private static QualityReport BuildQualityReport(string stdout, string stderr, string planPath, string runId, int exitCode)
@@ -171,6 +224,47 @@ public sealed class QualityAgent : StaticIronDevAgent
             ? property.GetString() ?? string.Empty
             : string.Empty;
 
+    private static bool ReadBoolInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) &&
+        bool.TryParse(value, out var parsed) &&
+        parsed;
+
+    private static string BuildPrompt(QualityReport report) =>
+        $"""
+        You are QualityAgent / KilljoyAgent for IronDev/IDA.
+        Review this deterministic quality gate evidence and return concise JSON with risk notes, debt notes, and recommended follow-up questions.
+        Do not refactor code, hide warnings, weaken standards, patch files, approve writes, or override deterministic gate results.
+        Status: {report.Status}
+        Summary: {report.Summary}
+        Warnings: {report.WarningCount}
+        Errors: {report.ErrorCount}
+        BuildSucceeded: {report.BuildSucceeded}
+        FocusedTestsSucceeded: {report.FocusedTestsSucceeded}
+        FormatSucceeded: {report.FormatSucceeded}
+        PackageAuditSucceeded: {report.PackageAuditSucceeded}
+        CodeStandardsSucceeded: {report.CodeStandardsSucceeded}
+        """;
+
+    private static object BuildLlmEvidence(ModelProfile profile, string prompt, bool liveLlmRequested, AgentLlmCallResult result) => new
+    {
+        modelProfile = profile.Name,
+        profileProvider = profile.Provider,
+        profileModel = profile.Model,
+        prompt,
+        invocationMode = result.InvocationMode,
+        liveLlmRequested,
+        wasAttempted = result.WasAttempted,
+        wasSuccessful = result.WasSuccessful,
+        durationMs = result.DurationMs,
+        modelSummary = string.IsNullOrWhiteSpace(result.ResponseText)
+            ? result.WasAttempted
+                ? "Live model call did not return usable content; deterministic quality gate evidence remained authoritative."
+                : "No live model response supplied; deterministic quality gate evidence remained authoritative."
+            : result.ResponseText,
+        error = result.WasSuccessful ? string.Empty : result.ErrorMessage,
+        boundary = "Live QualityAgent output is advisory debt/risk commentary only. Deterministic quality gates remain authoritative."
+    };
+
     private static string QuoteIfNeeded(string value) =>
         value.Contains(' ', StringComparison.Ordinal) ? $"\"{value}\"" : value;
 
@@ -190,5 +284,6 @@ public sealed class QualityAgent : StaticIronDevAgent
         public string GateStatus { get; init; } = string.Empty;
         public IReadOnlyList<string> EvidencePaths { get; init; } = [];
         public string Boundary { get; init; } = string.Empty;
+        public object? LlmIntelligence { get; set; }
     }
 }
