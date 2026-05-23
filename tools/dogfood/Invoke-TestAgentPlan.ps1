@@ -2747,6 +2747,90 @@ foreach ($step in $plan.steps) {
                 }
             }
 
+            "cli_command_surface_cleanup" {
+                $validationFailures = [System.Collections.Generic.List[string]]::new()
+                $checks = @(
+                    @{
+                        name = "inventory validate"
+                        args = @("run", "--no-build", "--project", $runnerProject, "--", "inventory", "validate", "--run-id", "$RunId-inventory", "--json")
+                        validate = {
+                            param($parsed)
+                            if (-not $parsed -or [string]$parsed.Status -ne "Succeeded") {
+                                return "inventory validate did not succeed."
+                            }
+                            return $null
+                        }
+                    },
+                    @{
+                        name = "trace build-smoke"
+                        args = @("run", "--no-build", "--project", $runnerProject, "--", "trace", "build-smoke", "--project", "Solitaire", "--run-id", "$RunId-trace", "--json")
+                        validate = {
+                            param($parsed)
+                            if (-not $parsed -or -not [bool]$parsed.passed) {
+                                return "trace build-smoke did not pass."
+                            }
+                            if ([int]$parsed.trace.realRepoMutationCount -ne 0) {
+                                return "trace build-smoke reported real repo mutation count $($parsed.trace.realRepoMutationCount)."
+                            }
+                            return $null
+                        }
+                    },
+                    @{
+                        name = "build disposable repair"
+                        args = @("run", "--no-build", "--project", $runnerProject, "--", "build", "disposable", "repair", "--project", "Solitaire", "--run-id", "$RunId-repair", "--json")
+                        validate = {
+                            param($parsed)
+                            if (-not $parsed -or -not [bool]$parsed.passed) {
+                                return "build disposable repair did not pass."
+                            }
+                            if ([int]$parsed.trace.realRepoMutationCount -ne 0) {
+                                return "build disposable repair reported real repo mutation count $($parsed.trace.realRepoMutationCount)."
+                            }
+                            return $null
+                        }
+                    },
+                    @{
+                        name = "test run-plan"
+                        args = @("run", "--no-build", "--project", $runnerProject, "--", "test", "run-plan", "--plan", ".\tools\dogfood\test-agent-plans\irondev-buildagent-traceable-disposable-build-spine-140.json", "--run-id", "$RunId-test-alias", "--json")
+                        validate = {
+                            param($parsed)
+                            if (-not $parsed -or [string]$parsed.status -ne "Succeeded" -or [string]$parsed.report.status -ne "passed") {
+                                return "test run-plan alias did not pass."
+                            }
+                            return $null
+                        }
+                    }
+                )
+
+                foreach ($check in $checks) {
+                    $commandText = "dotnet " + ($check.args -join " ")
+                    $capture = Invoke-CommandCapture -FilePath "dotnet" -Arguments $check.args -StepLogPath ($stepLogPath + "-" + ($check.name -replace "[^A-Za-z0-9]+", "-"))
+                    if ($capture.exit_code -ne 0) {
+                        $validationFailures.Add("$($check.name) exited with code $($capture.exit_code).") | Out-Null
+                        continue
+                    }
+
+                    try {
+                        $parsed = $capture.output | ConvertFrom-Json
+                    } catch {
+                        $validationFailures.Add("$($check.name) did not return JSON.") | Out-Null
+                        continue
+                    }
+
+                    $failure = & $check.validate $parsed
+                    if ($failure) {
+                        $validationFailures.Add($failure) | Out-Null
+                    }
+                }
+
+                if ($validationFailures.Count -gt 0) {
+                    $status = "FAILED"
+                    $summary = $validationFailures -join " "
+                } else {
+                    $summary = "CLI command surface cleanup aliases and inventory validation passed."
+                }
+            }
+
             "builder_repair_loop_smoke" {
                 $project = if ($params.project) { [string]$params.project } else { "Solitaire" }
                 $arguments = @(

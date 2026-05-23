@@ -8,7 +8,9 @@ public static class DisposableWorkspaceApplySmokeCommand
 {
     public static async Task<int> HandleAsync(string[] args, JsonSerializerOptions options)
     {
-        var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"disposable-apply-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+        var dogfoodRunId = ReadOption(args, "--run-id") ??
+                            ReadOption(args, "--dogfood-run-id") ??
+                            $"disposable-apply-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
         var projectName = ReadOption(args, "--project") ?? "BookSeller";
         var repoRoot = FindRepositoryRoot();
         var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", dogfoodRunId);

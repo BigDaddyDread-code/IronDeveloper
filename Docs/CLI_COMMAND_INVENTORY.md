@@ -10,15 +10,20 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 14
+- Agent commands: 15
+- Build commands: 2
 - Chat commands: 1
 - Docs commands: 6
+- Dogfood commands: 9
 - Ticket commands: 1
 - Failure commands: 1
 - Govern commands: 1
+- Inventory commands: 1
 - Memory commands: 8
 - Builder commands: 3
 - Foundation commands: 1
+- Test commands: 1
+- Trace commands: 1
 - Replay scenario entrypoint: 1
 
 ## Product-Ish Commands
@@ -33,9 +38,14 @@ The machine-readable inventory is stored at:
 - `agent thought-ledger explain`
 - `agent builder trace-smoke`
 - `agent builder repair-loop`
+- `build disposable repair`
+- `build disposable run`
 - `govern review`
 - `foundation break-test`
 - `failure latest`
+- `inventory validate`
+- `test run-plan`
+- `trace build-smoke`
 - `builder disposable-workspace-apply-smoke`
 - `builder proposal-safety-smoke`
 - `builder solitaire-disposable-build-smoke`
@@ -56,6 +66,14 @@ These are closest to the control surface Codex will use.
 
 `agent builder repair-loop` runs the first real trace-backed disposable repair loop. It generates Solitaire inside an explicit disposable workspace, injects one build failure and one rule-test failure, repairs both inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
 
+`build disposable repair` and `build disposable run` are clean product-shaped aliases for the same trace-backed disposable repair loop. They accept `--run-id`; `--dogfood-run-id` remains a compatibility alias.
+
+`test run-plan` is the product-shaped alias for `agent tester run-plan`. TesterAgent remains an execution/reporting wrapper only.
+
+`trace build-smoke` is the product-shaped alias for `agent builder trace-smoke`.
+
+`inventory validate` checks the CLI inventory, CLI documentation, and dogfood test-plan inventory. It is read-only and does not execute the listed commands.
+
 ## Dogfood/Smoke Commands
 
 - `memory sql-version-smoke`
@@ -66,8 +84,19 @@ These are closest to the control surface Codex will use.
 - `memory builder-context-source-smoke`
 - `docs discussion-smoke`
 - `tickets document-to-tickets-smoke`
+- `dogfood memory sql-version-smoke`
+- `dogfood memory weaviate-sql-version-smoke`
+- `dogfood memory cross-project-smoke`
+- `dogfood memory reindex-freshness-smoke`
+- `dogfood memory ticket-source-link-smoke`
+- `dogfood memory builder-context-source-smoke`
+- `dogfood build disposable-apply-smoke`
+- `dogfood build solitaire-disposable-build-smoke`
+- `dogfood foundation break-test`
 
 These prove slices of the spine but are not product commands.
+
+The `dogfood ...` aliases make smoke/proof commands explicit while preserving the older command names for existing regression plans.
 
 ## Remaining Program.cs Surface
 
@@ -99,4 +128,17 @@ The JSON inventory is a flat command array sorted by `category`, then `command`.
 - `agent builder repair-loop --project Solitaire --dogfood-run-id <run> --json` runs a real disposable repair loop.
 - It intentionally breaks the generated WPF project reference, records the build failure, repairs the project file, intentionally breaks the empty-tableau King rule, records the test failure, repairs `KlondikeRules`, and verifies final build/test pass.
 - It may write only inside the explicit temp disposable workspace. It must not mutate the real repo, memory, guardrails, or regression packs.
+
+## 142 CLI Command Surface Cleanup
+
+- `inventory validate --run-id <run> --json` validates command/docs/test-plan inventory consistency.
+- `test run-plan --plan <path> --run-id <run> --json` aliases the TesterAgent execution surface.
+- `trace build-smoke --project Solitaire --run-id <run> --json` aliases the BuildAgent trace smoke.
+- `build disposable repair --project Solitaire --run-id <run> --json` aliases the trace-backed disposable repair loop.
+- `build disposable run --project Solitaire --run-id <run> --json` is an alpha product-shaped entrypoint for the same caged repair loop.
+- `dogfood build solitaire-disposable-build-smoke --run-id <run> --json` and `dogfood build disposable-apply-smoke --run-id <run> --json` keep dogfood build proofs visibly separate from product commands.
+- `dogfood foundation break-test --scenario <scenario> --run-id <run> --json` keeps foundation break-test scenarios under dogfood naming.
+- `dogfood memory ...` aliases keep memory-spine proof commands visibly dogfood-only.
+
+Existing command names remain compatible. This cleanup changes the command surface shape; it does not change retrieval, builder, or governance semantics.
 

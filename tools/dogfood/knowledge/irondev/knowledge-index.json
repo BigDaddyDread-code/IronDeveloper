@@ -1,5 +1,16 @@
 [
   {
+    "Id": "CLI_COMMAND_SURFACE_CLEANUP_142",
+    "Project": "IronDev",
+    "Title": "CLI Command Surface Cleanup 142",
+    "DocumentType": "ArchitectureProof",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CLI_COMMAND_SURFACE_CLEANUP_142.md",
+    "DogfoodRunId": "CliCommandSurfaceCleanup142",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260523214200000-cli-command-surface-cleanup-142.md",
+    "CreatedUtc": "2026-05-23T21:42:00+00:00"
+  },
+  {
     "Id": "IDA_GOVERNED_AUTONOMY_CONTROL_PLANE_133",
     "Project": "IronDev",
     "Title": "IDA Governed Autonomy Control Plane 133",

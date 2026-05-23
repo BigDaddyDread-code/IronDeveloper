@@ -150,6 +150,26 @@
         "notes":  "Explains evidence, uncertainty, blocked actions, and safer alternatives without hidden chain-of-thought."
     },
     {
+        "command":  "build disposable repair",
+        "category":  "build",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs alias -\u003e BuilderRepairLoopCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "clean alias for trace-backed disposable repair loop",
+        "notes":  "Product-shaped alias for agent builder repair-loop; writes only inside explicit disposable workspace and reports mutation evidence."
+    },
+    {
+        "command":  "build disposable run",
+        "category":  "build",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs alias -\u003e BuilderRepairLoopCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "clean alias for disposable build/repair run",
+        "notes":  "Product-shaped alpha alias for the caged BuilderAgent repair loop; real repo writes remain blocked."
+    },
+    {
         "command":  "builder disposable-workspace-apply-smoke",
         "category":  "builder",
         "scope":  "smoke",
@@ -250,6 +270,96 @@
         "notes":  "Shows dogfood doc."
     },
     {
+        "command":  "dogfood build disposable-apply-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e DisposableWorkspaceApplySmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood alias for disposable apply smoke",
+        "notes":  "Moves disposable apply smoke under explicit dogfood naming while preserving old builder command."
+    },
+    {
+        "command":  "dogfood build solitaire-disposable-build-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e SolitaireDisposableBuildSmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood alias for Solitaire disposable build smoke",
+        "notes":  "Keeps the Solitaire crash-test build visibly dogfood-only; generated app files stay inside disposable workspace."
+    },
+    {
+        "command":  "dogfood foundation break-test",
+        "category":  "dogfood",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs alias -\u003e FoundationBreakTestCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "dogfood alias for foundation break-test scenarios",
+        "notes":  "Keeps foundation break-test scenarios out of product command vocabulary; no real repo writes."
+    },
+    {
+        "command":  "dogfood memory builder-context-source-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e memory builder-context-source-smoke",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "dogfood alias for builder context source smoke",
+        "notes":  "Dogfood-only Memory Spine 011 proof alias; existing memory command remains compatible."
+    },
+    {
+        "command":  "dogfood memory cross-project-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e MemoryCrossProjectSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "dogfood alias for cross-project memory smoke",
+        "notes":  "Dogfood-only wrong-project rejection proof alias; existing memory command remains compatible."
+    },
+    {
+        "command":  "dogfood memory reindex-freshness-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e MemoryReindexFreshnessSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "dogfood alias for reindex freshness smoke",
+        "notes":  "Dogfood-only freshness/idempotency proof alias; existing memory command remains compatible."
+    },
+    {
+        "command":  "dogfood memory sql-version-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e MemorySqlVersionSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "dogfood alias for SQL version smoke",
+        "notes":  "Dogfood-only SQL version authority proof alias; existing memory command remains compatible."
+    },
+    {
+        "command":  "dogfood memory ticket-source-link-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e memory ticket-source-link-smoke",
+        "requiresSql":  true,
+        "requiresWeaviate":  false,
+        "status":  "dogfood alias for ticket source link smoke",
+        "notes":  "Dogfood-only Memory Spine 010 proof alias; existing memory command remains compatible."
+    },
+    {
+        "command":  "dogfood memory weaviate-sql-version-smoke",
+        "category":  "dogfood",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e MemoryWeaviateSqlVersionSmokeCommand.cs",
+        "requiresSql":  true,
+        "requiresWeaviate":  true,
+        "status":  "dogfood alias for Weaviate SQL version smoke",
+        "notes":  "Dogfood-only raw-vs-authority proof alias; existing memory command remains compatible."
+    },
+    {
         "command":  "failure latest",
         "category":  "failure",
         "scope":  "dogfood/control",
@@ -278,6 +388,16 @@
         "requiresWeaviate":  false,
         "status":  "deterministic governed action review",
         "notes":  "Combines action review and visible reasoning; never executes the proposed action."
+    },
+    {
+        "command":  "inventory validate",
+        "category":  "inventory",
+        "scope":  "dogfood/control",
+        "implementation":  "InventoryValidateCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "deterministic command/test-plan inventory validator",
+        "notes":  "Validates command inventory, command docs, and test plan inventory without executing commands or mutating project state."
     },
     {
         "command":  "memory builder-context-source-smoke",
@@ -370,6 +490,16 @@
         "notes":  "Runs chat route replay scenario files."
     },
     {
+        "command":  "test run-plan",
+        "category":  "test",
+        "scope":  "dogfood/control",
+        "implementation":  "Program.cs alias -\u003e agent tester run-plan",
+        "requiresSql":  false,
+        "requiresWeaviate":  "depends on plan",
+        "status":  "clean alias for TesterAgent plan execution",
+        "notes":  "Product-shaped alias for agent tester run-plan; TesterAgent still only executes plans and reports evidence."
+    },
+    {
         "command":  "tickets document-to-tickets-smoke",
         "category":  "tickets",
         "scope":  "smoke",
@@ -378,5 +508,15 @@
         "requiresWeaviate":  false,
         "status":  "smoke proof",
         "notes":  "Document to ticket smoke."
+    },
+    {
+        "command":  "trace build-smoke",
+        "category":  "trace",
+        "scope":  "smoke",
+        "implementation":  "Program.cs alias -\u003e BuildAgentTraceSmokeCommand.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "clean alias for BuildAgent trace smoke",
+        "notes":  "Product-shaped trace command for synthetic build-run trace/report evidence; no workspace creation or app files."
     }
 ]

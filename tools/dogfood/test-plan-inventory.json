@@ -1,5 +1,30 @@
 [
     {
+        "planFile":  "irondev-cli-command-surface-cleanup-142.json",
+        "goalId":  "cli-command-surface-cleanup-142",
+        "project":  "IronDev",
+        "description":  "Prove the clean CLI aliases route correctly and inventory validation checks command, docs, and test-plan inventory consistency.",
+        "agentPath":  "TestAgent + ReplayRunner",
+        "command":  "inventory validate / test run-plan / trace build-smoke / build disposable repair",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "TestAgent",
+                                 "InventoryValidateCommand",
+                                 "BuildAgentTraceSmokeCommand",
+                                 "BuilderRepairLoopCommand"
+                             ],
+        "expectedEvidence":  [
+                                 "inventory validate passes",
+                                 "test run-plan alias routes",
+                                 "trace build-smoke alias routes",
+                                 "build disposable repair alias routes",
+                                 "real repo mutation count remains zero"
+                             ],
+        "regressionGroup":  "CliCommandSurface",
+        "safetyBoundary":  "CLI surface cleanup only; no retrieval, builder, governance, memory, or real repository write authority is expanded.",
+        "kind":  "smoke"
+    },
+    {
         "planFile":  "irondev-solitaire-product-spike-plan-138.json",
         "goalId":  "solitaire-product-spike-plan-138",
         "project":  "IronDev",

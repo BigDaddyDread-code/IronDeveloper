@@ -7,7 +7,9 @@ public static class BuilderRepairLoopCommand
 {
     public static async Task<int> HandleAsync(string[] args, JsonSerializerOptions options)
     {
-        var dogfoodRunId = ReadOption(args, "--dogfood-run-id") ?? $"builder-repair-loop-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+        var dogfoodRunId = ReadOption(args, "--run-id") ??
+                            ReadOption(args, "--dogfood-run-id") ??
+                            $"builder-repair-loop-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
         var project = ReadOption(args, "--project") ?? "Solitaire";
         var repoRoot = SolitaireDisposableBuildSmokeCommand.FindRepositoryRoot();
         var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", dogfoodRunId);
@@ -251,23 +253,18 @@ public static class BuilderRepairLoopCommand
     private static async Task BreakProjectReferenceAsync(string path)
     {
         var content = await File.ReadAllTextAsync(path);
-        content = content.Replace("""
-          <ItemGroup>
-            <ProjectReference Include="..\Solitaire.Core\Solitaire.Core.csproj" />
-          </ItemGroup>
-        """, string.Empty);
+        content = content.Replace(
+            """<ProjectReference Include="..\Solitaire.Core\Solitaire.Core.csproj" />""",
+            """<ProjectReference Include="..\Missing.Core\Missing.Core.csproj" />""");
         await File.WriteAllTextAsync(path, content, Encoding.UTF8);
     }
 
     private static async Task<RepairAttemptTrace> RepairProjectReferenceAsync(string traceId, string path)
     {
         var content = await File.ReadAllTextAsync(path);
-        content = content.Replace("</Project>", """
-          <ItemGroup>
-            <ProjectReference Include="..\Solitaire.Core\Solitaire.Core.csproj" />
-          </ItemGroup>
-        </Project>
-        """);
+        content = content.Replace(
+            """<ProjectReference Include="..\Missing.Core\Missing.Core.csproj" />""",
+            """<ProjectReference Include="..\Solitaire.Core\Solitaire.Core.csproj" />""");
         await File.WriteAllTextAsync(path, content, Encoding.UTF8);
         return new RepairAttemptTrace
         {
