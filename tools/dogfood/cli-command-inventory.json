@@ -1,5 +1,15 @@
 ﻿[
     {
+        "command":  "campaign live-governed-agent-158",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LiveGovernedAgentExecution158Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "live governed agent execution smoke",
+        "notes":  "Runs ArchitectAgent deterministic fallback, opt-in live local model attempt, and missing-evidence review while preserving no-write governance boundaries."
+    },
+    {
         "command":  "agent builder repair-loop",
         "category":  "agent",
         "scope":  "dogfood/control",

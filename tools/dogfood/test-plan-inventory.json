@@ -1,5 +1,30 @@
 [
     {
+        "planFile":  "irondev-live-governed-agent-execution-158.json",
+        "goalId":  "live-governed-agent-execution-158",
+        "project":  "IronDev",
+        "description":  "Validate opt-in live governed ArchitectAgent execution, deterministic fallback, unavailable-provider handling, and hard safety boundaries.",
+        "agentPath":  "TestAgent + ReplayRunner + LiveGovernedAgentExecution158Command + ArchitectAgent",
+        "command":  "campaign live-governed-agent-158",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "AgentModelResolver",
+                                 "AgentLlmClient",
+                                 "ArchitectAgent"
+                             ],
+        "expectedEvidence":  [
+                                 "fallback review available",
+                                 "live provider attempt recorded",
+                                 "missing evidence returns NeedsMoreEvidence",
+                                 "real repo writes remain blocked",
+                                 "memory mutation remains blocked",
+                                 "ticket creation remains blocked"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Campaign smoke only; opt-in live model execution with safe fallback, no memory mutation, no ticket creation, no patch apply, no self-approval, and no real repository writes.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-self-improvement-campaign-157.json",
         "goalId":  "self-improvement-campaign-157",
         "project":  "IronDev",

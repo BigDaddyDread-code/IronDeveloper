@@ -33,6 +33,9 @@ if (IsCommand(args, "inventory", "validate"))
 if (IsCommand(args, "campaign", "self-improvement-157"))
     return await SelfImprovementCampaign157Command.HandleAsync(args, options);
 
+if (IsCommand(args, "campaign", "live-governed-agent-158"))
+    return await LiveGovernedAgentExecution158Command.HandleAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
@@ -733,18 +736,21 @@ static async Task<int> HandleAgentArchitectReviewCommandAsync(string[] args, Jso
     }
 
     var runId = ReadOption(args, "--run-id") ?? $"ArchitectAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+    var liveLlm = HasFlag(args, "--live-llm");
+    var modelProfile = ReadOption(args, "--model-profile");
     var inputs = new Dictionary<string, string>
     {
         ["project"] = project,
         ["proposal"] = proposal,
         ["weighted_context"] = ReadOption(args, "--weighted-context") ?? string.Empty,
-        ["safety_boundary"] = ReadOption(args, "--safety-boundary") ?? "No real repository writes; disposable workspace only for apply."
+        ["safety_boundary"] = ReadOption(args, "--safety-boundary") ?? "No real repository writes; disposable workspace only for apply.",
+        ["live_llm"] = liveLlm.ToString()
     };
     var llmResponse = ReadOption(args, "--llm-response");
     if (!string.IsNullOrWhiteSpace(llmResponse))
         inputs["llm_response"] = llmResponse;
 
-    var (_, _, runner) = CreateAgentRuntime();
+    var (_, _, runner) = CreateAgentRuntime(liveLlm, modelProfile);
     var result = await runner.RunAsync(new AgentRequest
     {
         AgentName = "ArchitectAgent",
@@ -935,11 +941,27 @@ static int HandleAgentThoughtLedgerExplainCommand(string[] args, JsonSerializerO
     return 0;
 }
 
-static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime()
+static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Runner) CreateAgentRuntime(
+    bool enableLiveLlm = false,
+    string? architectModelProfile = null)
 {
     var repoRoot = FindRepositoryRoot();
     var modelResolver = new AgentModelResolver(LoadModelProfiles(repoRoot));
-    var definitions = AgentModelDefaults.CreateDefaultDefinitions();
+    var definitions = AgentModelDefaults.CreateDefaultDefinitions()
+        .Select(definition =>
+            string.Equals(definition.Name, "ArchitectAgent", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(architectModelProfile)
+                ? new AgentDefinition
+                {
+                    Name = definition.Name,
+                    Purpose = definition.Purpose,
+                    DefaultModelProfile = architectModelProfile,
+                    Enabled = definition.Enabled,
+                    AllowedTools = definition.AllowedTools
+                }
+                : definition)
+        .ToArray();
+    var agentLlmClient = enableLiveLlm ? new AgentLlmClient() : null;
     var agents = definitions
         .Select<AgentDefinition, IIronDevAgent>(definition =>
             string.Equals(definition.Name, "TesterAgent", StringComparison.OrdinalIgnoreCase)
@@ -955,7 +977,7 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                 : string.Equals(definition.Name, "PlannerAgent", StringComparison.OrdinalIgnoreCase)
                     ? new PlannerAgent(definition, modelResolver)
                 : string.Equals(definition.Name, "ArchitectAgent", StringComparison.OrdinalIgnoreCase)
-                    ? new ArchitectAgent(definition, modelResolver)
+                    ? new ArchitectAgent(definition, modelResolver, agentLlmClient)
                 : string.Equals(definition.Name, "SentinelAgent", StringComparison.OrdinalIgnoreCase)
                     ? new SentinelAgent(definition, modelResolver)
                 : string.Equals(definition.Name, "ResearchAgent", StringComparison.OrdinalIgnoreCase)

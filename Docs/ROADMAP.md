@@ -124,3 +124,23 @@ Still blocked:
 - Agent self-approval.
 - ResearchAgent overriding accepted project memory.
 - SentinelAgent creating tickets or patches.
+
+## Live Governed Agent Execution 158
+
+**Status: Active**
+
+Goal: prove one agent can make an opt-in live model call through configured profiles while preserving deterministic fallback and hard governance boundaries.
+
+Delivered in this slice:
+
+- `ArchitectAgent` can attempt live model execution only when explicitly enabled.
+- `AgentLlmClient` maps configured profiles to OpenAI, LocalOpenAI, and Ollama services.
+- `campaign live-governed-agent-158` records fallback, live attempt, and missing-evidence behaviour.
+
+Still blocked:
+
+- Real repository writes.
+- Memory mutation.
+- Ticket creation.
+- Patch application.
+- Agent self-approval.

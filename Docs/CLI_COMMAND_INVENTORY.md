@@ -52,6 +52,7 @@ The machine-readable inventory is stored at:
 - `builder solitaire-disposable-build-smoke`
 - `run-report viewer-smoke`
 - `campaign self-improvement-157`
+- `campaign live-governed-agent-158`
 - `agent architect review`
 
 These are closest to the control surface Codex will use.

@@ -1,0 +1,24 @@
+{
+  "test_run_id": "IronDevLiveGovernedAgentExecution158",
+  "goal_id": "live-governed-agent-execution-158",
+  "description": "Proves ArchitectAgent can attempt opt-in live model execution through configured profiles while preserving deterministic fallback and hard governance boundaries.",
+  "expected": {
+    "campaign_status_succeeded": true,
+    "architect_fallback_review_available": true,
+    "live_provider_attempt_recorded": true,
+    "missing_evidence_still_blocks": true,
+    "real_repo_writes_still_blocked": true,
+    "memory_mutation_still_blocked": true,
+    "ticket_creation_still_blocked": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "live_governed_agent_execution_158",
+      "params": {}
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "boundary": "Campaign smoke only. Live model execution is opt-in, traced, and falls back safely; no writes, memory mutation, ticket creation, self-approval, or ungated autonomy are granted."
+}

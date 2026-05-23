@@ -61,6 +61,21 @@ public sealed class AgentResult
     public long DurationMs { get; init; }
 }
 
+public sealed class AgentLlmCallResult
+{
+    public bool WasAttempted { get; init; }
+    public bool WasSuccessful { get; init; }
+    public string InvocationMode { get; init; } = "disabled";
+    public string ResponseText { get; init; } = string.Empty;
+    public string ErrorMessage { get; init; } = string.Empty;
+    public long DurationMs { get; init; }
+}
+
+public interface IAgentLlmClient
+{
+    Task<AgentLlmCallResult> CompleteAsync(ModelProfile profile, string prompt, CancellationToken ct = default);
+}
+
 public sealed class ThoughtLedgerEntry
 {
     public required string Category { get; init; }
