@@ -1,5 +1,15 @@
 ﻿[
     {
+        "command":  "campaign live-retriever-sentinel-160",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LiveRetrieverSentinelAgents160Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  true,
+        "status":  "live governed RetrieverAgent and SentinelAgent smoke",
+        "notes":  "Runs RetrieverAgent and SentinelAgent deterministic fallback plus opt-in live local model attempts while preserving no-write and no-ranking-override governance boundaries."
+    },
+    {
         "command":  "campaign live-critic-planner-159",
         "category":  "campaign",
         "scope":  "dogfood/control",

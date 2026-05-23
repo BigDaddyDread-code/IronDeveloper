@@ -147,7 +147,7 @@ Still blocked:
 
 ## Live Critic And Planner Agents 159
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: extend opt-in live model execution to CriticAgent and PlannerAgent while preserving deterministic fallback and hard governance boundaries.
 
@@ -159,6 +159,28 @@ Delivered in this slice:
 
 Still blocked:
 
+- Real repository writes.
+- Memory mutation.
+- Ticket creation.
+- Patch application.
+- Agent self-approval.
+
+## Live Retriever And Sentinel Agents 160
+
+**Status: Active**
+
+Goal: extend opt-in live model execution to RetrieverAgent and SentinelAgent while preserving deterministic memory ranking, project scope, insight classification, and hard governance boundaries.
+
+Delivered in this slice:
+
+- `RetrieverAgent` can attempt live model execution only when explicitly enabled after deterministic memory search and weighted context packaging.
+- `SentinelAgent` can attempt live model execution only when explicitly enabled after deterministic insight classification.
+- `campaign live-retriever-sentinel-160` records deterministic fallback, live-provider attempts, and blocked mutation/ranking authority.
+
+Still blocked:
+
+- Memory ranking override.
+- Cross-project context mixing.
 - Real repository writes.
 - Memory mutation.
 - Ticket creation.
