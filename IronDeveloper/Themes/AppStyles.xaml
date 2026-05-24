@@ -1,7 +1,11 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- App-specific style overrides intentionally empty.
-         Shared controls and visual primitives live in IronDeveloper.Controls. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="IronDevVisualTokens.xaml"/>
+        <ResourceDictionary Source="IronDevComponentStyles.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- App-specific visual foundation lives here; reusable controls remain in IronDeveloper.Controls. -->
 
 </ResourceDictionary>
