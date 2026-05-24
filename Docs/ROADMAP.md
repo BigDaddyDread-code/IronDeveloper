@@ -291,7 +291,7 @@ Still blocked:
 
 ## Isolated Promotion Apply Proof 170
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: consume a `PromotionPackage` and prove it can become an isolated candidate workspace without writing main.
 
@@ -317,4 +317,142 @@ Still blocked:
 - Accepted memory mutation.
 - Ticket acceptance.
 - Promotion approval.
+- Agent self-approval.
+
+## Promotion Review Cockpit 171
+
+**Status: Active**
+
+Goal: make promotion package and isolated apply evidence inspectable in the WPF Run Reports workspace before any real write-path design.
+
+Delivered in this slice:
+
+- promotion review fields in `RunReportDetail`.
+- promotable and blocked file lists.
+- approval state and recommendation display.
+- runtime profile, target language, and target stack display.
+- configurable review policy visibility.
+- hard safety invariant visibility.
+- service parsing for `promotion-package.json` and `isolated-promotion-apply-report.json`.
+- Run Reports view sections for promotion review and policy.
+
+Still blocked:
+
+- Promotion approval.
+- Real repository writes.
+- Main branch writes.
+- Pull request creation.
+- Auto-merge.
+- Accepted memory mutation.
+- Agent self-approval.
+
+## Controlled Real Repo Write Path Design 172
+
+**Status: Active**
+
+Goal: define the locked door from promotion review into a future isolated branch/worktree apply path before any real repository write command exists.
+
+Delivered in this slice:
+
+- `Docs/CONTROLLED_REAL_REPO_WRITE_PATH_DESIGN_172.md`.
+- dogfood memory mirror and retrieval smoke plan.
+- settings-first policy shape for runtime adapters, command templates, branch naming, worktree roots, reviewer roles, evidence rules, and retention.
+- hard invariant list that cannot be configured away.
+- scoped human approval meaning for a future branch/worktree apply.
+- future evidence requirements for branch/worktree apply and PR package creation.
+
+Still blocked:
+
+- Real repository writes.
+- Main branch writes.
+- Active developer working tree writes.
+- Branch/worktree apply command.
+- PR package command.
+- Promotion approval execution.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Auto-merge.
+- Agent self-approval.
+
+## Controlled Write Policy Settings 173
+
+**Status: Delivered**
+
+Goal: resolve configurable controlled-write settings into a run-scoped effective policy while keeping hard invariants non-configurable.
+
+Delivered in this slice:
+
+- `ControlledWritePolicySettings` model.
+- `HardSafetyInvariant` model.
+- `ControlledWriteEffectivePolicy` model.
+- `promotion policy effective --project IronDev --run-id <run> --json`.
+- `campaign controlled-write-policy-173 --run-id <run> --json`.
+- evidence files under `tools/dogfood/runs/{runId}`.
+- ignored unsafe invariant override evidence.
+
+Still blocked:
+
+- Real repository writes.
+- Main branch writes.
+- Active developer working tree writes.
+- Branch/worktree apply.
+- PR creation.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Agent self-approval.
+
+## Controlled Write Approval Record 174
+
+**Status: Delivered**
+
+Goal: define a scoped approval record for one promotion package and controlled worktree dry-run only.
+
+Delivered in this slice:
+
+- `ControlledWriteApprovalRecord` model.
+- `promotion approval create --package-run-id <run> --run-id <approval-run> --json`.
+- `campaign controlled-write-approval-174 --run-id <run> --json`.
+- approval evidence bound to package id, proposed change id, source run id, and source trace id.
+- dry-run-only approval state.
+- explicit blocked actions for main write, active worktree write, PR creation, auto-merge, accepted memory mutation, ticket acceptance, and self-approval.
+
+Still blocked:
+
+- Real repository writes.
+- Branch/worktree apply.
+- PR creation.
+- Auto-merge.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Approval reuse for future packages.
+- Agent self-approval.
+
+## Controlled Worktree Dry-Run 175
+
+**Status: Delivered**
+
+Goal: validate the future controlled worktree apply path without creating a worktree or copying files.
+
+Delivered in this slice:
+
+- `ControlledWorktreeDryRunReport` model.
+- `promotion apply worktree-dry-run --package-run-id <package-run> --approval-run-id <approval-run> --target-worktree <path> --run-id <run> --json`.
+- `campaign controlled-worktree-dry-run-175 --run-id <run> --json`.
+- target path explicit proof.
+- target outside active repository proof.
+- non-main branch proof.
+- package/approval/policy matching.
+- promotable file list and blocked file rejection.
+- active repo mutation count zero.
+- dry-run target not created.
+
+Still blocked:
+
+- Worktree creation.
+- File copy.
+- Real repository writes.
+- PR creation.
+- Auto-merge.
+- Accepted memory mutation.
+- Ticket acceptance.
 - Agent self-approval.

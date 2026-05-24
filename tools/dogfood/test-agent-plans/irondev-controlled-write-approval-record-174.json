@@ -1,0 +1,32 @@
+{
+  "test_run_id": "IronDev174-ControlledWriteApprovalRecord",
+  "goal_id": "controlled-write-approval-record-174",
+  "description": "Proves a scoped approval record can approve one promotion package for controlled worktree dry-run only.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "controlled_write_approval_174",
+      "params": {
+        "expect_approval_state": "ApprovedForControlledWorktreeDryRun",
+        "expect_scope": "ControlledWorktreeDryRunOnly",
+        "expect_real_repo_write_valid": false,
+        "expect_allowed_action": "ControlledWorktreeDryRun",
+        "expect_blocked_actions": [
+          "WriteMain",
+          "AutoMerge",
+          "SelfApprove"
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "approval_record_created": true,
+    "approval_scoped_to_one_package": true,
+    "valid_for_controlled_worktree_dry_run": true,
+    "invalid_for_real_repo_write": true,
+    "blocked_actions_remain_blocked": true
+  },
+  "boundary": "Approval evidence only. No files are written outside run evidence, no PR is created, no real repository write is allowed, and no agent self-approval exists."
+}

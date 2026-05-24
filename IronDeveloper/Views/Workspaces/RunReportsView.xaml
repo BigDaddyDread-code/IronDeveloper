@@ -99,6 +99,71 @@
                     </Border>
                 </Grid>
 
+                <TextBlock Text="PROMOTION REVIEW" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Padding="12" Margin="0,0,8,0" Background="{StaticResource Background/Panel}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Text="PACKAGE" Style="{StaticResource Typography.Eyebrow}"/>
+                            <TextBlock Text="{Binding PromotionPackageId}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding ProposedChangeId}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Padding="12" Margin="0,0,8,0" Background="{StaticResource Background/Panel}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Text="APPROVAL" Style="{StaticResource Typography.Eyebrow}"/>
+                            <TextBlock Text="{Binding ApprovalState}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding Recommendation}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Padding="12" Background="{StaticResource Background/Panel}" BorderBrush="{StaticResource Border/Subtle}" BorderThickness="1" CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Text="RUNTIME" Style="{StaticResource Typography.Eyebrow}"/>
+                            <TextBlock Text="{Binding RuntimeProfile}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding TargetLanguage}" Foreground="{StaticResource Accent/Primary}" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="PROMOTABLE FILES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding PromotableFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="90"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding RelativePath}" Foreground="{StaticResource Text/Primary}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Role}" Foreground="{StaticResource Text/Muted}" FontSize="11" HorizontalAlignment="Right"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                        <TextBlock Text="BLOCKED FILES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding BlockedFileCount, StringFormat={}{0} blocked/generated files rejected}" Foreground="{StaticResource Text/Muted}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding PromotionChecklist}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource Text/Muted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+
                 <TextBlock Text="STAGES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                 <ItemsControl ItemsSource="{Binding Stages}" Margin="0,0,0,20">
                     <ItemsControl.ItemTemplate>
@@ -159,6 +224,33 @@
 
                 <TextBlock Text="BOUNDARY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                 <TextBlock Text="{Binding Boundary}" Foreground="{StaticResource Text/Muted}" TextWrapping="Wrap"/>
+
+                <Grid Margin="0,20,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="CONFIGURABLE POLICY" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding ConfigurablePolicy}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource Text/Muted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                        <TextBlock Text="HARD INVARIANTS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding HardInvariants}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource Text/Muted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
             </StackPanel>
         </ScrollViewer>
 

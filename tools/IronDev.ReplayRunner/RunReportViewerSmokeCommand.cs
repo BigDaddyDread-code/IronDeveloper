@@ -15,15 +15,18 @@ public static class RunReportViewerSmokeCommand
         var validRunId = $"{runId}-valid";
         var missingEvidenceRunId = $"{runId}-missing-evidence";
         var malformedRunId = $"{runId}-malformed";
+        var promotionRunId = $"{runId}-promotion-review";
 
         await WriteValidFixtureAsync(Path.Combine(runsRoot, validRunId));
         await WriteMissingEvidenceFixtureAsync(Path.Combine(runsRoot, missingEvidenceRunId));
         await WriteMalformedFixtureAsync(Path.Combine(runsRoot, malformedRunId));
+        await WritePromotionReviewFixtureAsync(Path.Combine(runsRoot, promotionRunId));
 
         var service = new FileRunReportService(runsRoot);
         var valid = await service.GetRunAsync(validRunId);
         var missingEvidence = await service.GetRunAsync(missingEvidenceRunId);
         var malformed = await service.GetRunAsync(malformedRunId);
+        var promotion = await service.GetRunAsync(promotionRunId);
         var recent = await service.GetRecentRunsAsync("Solitaire");
 
         var failures = new List<string>();
@@ -55,6 +58,23 @@ public static class RunReportViewerSmokeCommand
             failures.Add("Missing evidence fixture should load with a warning.");
         if (malformed is null || malformed.Status != "Invalid")
             failures.Add("Malformed JSON fixture should load as Invalid.");
+        if (promotion?.PromotionReview is null)
+            failures.Add("Promotion review fixture should expose promotion review details.");
+        else
+        {
+            if (promotion.PromotionReview.ApprovalState != "NeedsHumanReview")
+                failures.Add($"Expected NeedsHumanReview approval state, actual {promotion.PromotionReview.ApprovalState}.");
+            if (promotion.PromotionReview.RuntimeProfileId != "csharp-dotnet")
+                failures.Add($"Expected csharp-dotnet runtime, actual {promotion.PromotionReview.RuntimeProfileId}.");
+            if (promotion.PromotionReview.PromotableFileCount != 2)
+                failures.Add($"Expected two promotable files, actual {promotion.PromotionReview.PromotableFileCount}.");
+            if (promotion.PromotionReview.BlockedFileCount != 1)
+                failures.Add($"Expected one blocked file, actual {promotion.PromotionReview.BlockedFileCount}.");
+            if (promotion.Policy.ConfigurableSettings.Count == 0)
+                failures.Add("Expected configurable policy settings.");
+            if (promotion.Policy.HardInvariants.All(item => !item.Contains("real repo writes", StringComparison.OrdinalIgnoreCase)))
+                failures.Add("Expected hard invariant for real repo writes.");
+        }
         if (recent.All(run => run.RunId != validRunId))
             failures.Add("Recent Solitaire runs did not include valid fixture.");
 
@@ -74,13 +94,15 @@ public static class RunReportViewerSmokeCommand
                 validRun = valid,
                 missingEvidenceRun = missingEvidence,
                 malformedRun = malformed,
+                promotionRun = promotion,
                 recentSolitaireCount = recent.Count
             },
             Evidence = new[]
             {
                 new { Type = "RunReportFixture", Path = Path.Combine(runsRoot, validRunId), Summary = "Valid trace-backed repair-loop fixture." },
                 new { Type = "RunReportFixture", Path = Path.Combine(runsRoot, missingEvidenceRunId), Summary = "Missing evidence fixture." },
-                new { Type = "RunReportFixture", Path = Path.Combine(runsRoot, malformedRunId), Summary = "Malformed JSON fixture." }
+                new { Type = "RunReportFixture", Path = Path.Combine(runsRoot, malformedRunId), Summary = "Malformed JSON fixture." },
+                new { Type = "RunReportFixture", Path = Path.Combine(runsRoot, promotionRunId), Summary = "Promotion review fixture." }
             },
             Boundary = "Read/report service smoke only. No CLI process is started by the service, no builder runs execute, and no real repository writes are granted.",
             ReproCommand = $"dotnet run --project .\\tools\\IronDev.ReplayRunner\\IronDev.ReplayRunner.csproj -- run-report viewer-smoke --run-id {runId} --json"
@@ -147,6 +169,69 @@ public static class RunReportViewerSmokeCommand
     {
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, "builder-repair-loop-report.json"), "{ this is not json");
+    }
+
+    private static async Task WritePromotionReviewFixtureAsync(string directory)
+    {
+        Directory.CreateDirectory(Path.Combine(directory, "logs"));
+        await File.WriteAllTextAsync(Path.Combine(directory, "logs", "isolated-build.log"), "build passed");
+        await File.WriteAllTextAsync(Path.Combine(directory, "logs", "isolated-test.log"), "tests passed");
+        await File.WriteAllTextAsync(Path.Combine(directory, "isolated-promotion-apply-report.json"), """
+        {
+          "Command": "promotion apply isolated",
+          "Status": "Succeeded",
+          "RunId": "promotion-review-fixture",
+          "TraceId": "trace-promotion-review-fixture",
+          "Project": "Solitaire",
+          "PackageId": "PP-fixture",
+          "ProposedChangeId": "PC-fixture",
+          "IsolatedWorkspacePath": "C:\\Temp\\IronDev-IsolatedPromotionApply\\fixture",
+          "IsolatedBranchName": "isolated/fixture",
+          "RuntimeProfile": {
+            "RuntimeProfileId": "csharp-dotnet",
+            "TargetLanguage": "CSharp",
+            "TargetStack": ".NET"
+          },
+          "AppliedFiles": [
+            {
+              "RelativePath": "Solitaire.Core/Card.cs",
+              "Language": "CSharp",
+              "FileRole": "Source",
+              "HashMatchesPackage": true
+            },
+            {
+              "RelativePath": "Solitaire.Core.Tests/Program.cs",
+              "Language": "CSharp",
+              "FileRole": "Test",
+              "HashMatchesPackage": true
+            }
+          ],
+          "RejectedBlockedFiles": [
+            {
+              "RelativePath": "Solitaire.Core/bin/Debug/net10.0/Solitaire.Core.dll",
+              "Reason": "Forbidden runtime path segment: bin/"
+            }
+          ],
+          "Build": {
+            "Command": "dotnet build Solitaire.Wpf",
+            "ExitCode": 0,
+            "Status": "Succeeded"
+          },
+          "Test": {
+            "Command": "dotnet test Solitaire.Core.Tests",
+            "ExitCode": 0,
+            "Status": "Succeeded"
+          },
+          "Mutation": {
+            "ActiveRepoMutationCount": 0,
+            "IsolatedFilesChanged": 2,
+            "IsolatedWorkspacePath": "C:\\Temp\\IronDev-IsolatedPromotionApply\\fixture"
+          },
+          "ApprovalState": "NeedsHumanReview",
+          "Recommendation": "ReviewIsolatedCandidate",
+          "Boundary": "Fixture only. Does not approve real repo promotion."
+        }
+        """);
     }
 
     private static string? ReadOption(string[] args, string name)

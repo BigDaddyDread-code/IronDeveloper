@@ -94,8 +94,8 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
                 Status = ReadString(root, "Status") ?? ReadString(root, "status") ?? "Unknown",
                 Summary = ReadString(root, "Summary") ?? ReadString(root, "summary") ?? "",
                 Recommendation = ReadString(root, "Recommendation") ?? ReadString(root, "recommendation") ?? "",
-                RealRepoMutationCount = ReadInt(root, "RealRepoMutationCount", "realRepoMutationCount"),
-                DisposableFilesChanged = ReadInt(root, "DisposableFilesChanged", "disposableFilesChanged"),
+                RealRepoMutationCount = ReadMutationCount(root),
+                DisposableFilesChanged = ReadDisposableFilesChanged(root),
                 Stages = ReadStages(root),
                 Attempts = ReadAttempts(root),
                 Repairs = ReadRepairs(root),
@@ -103,7 +103,8 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
                 Boundary = ReadString(root, "Boundary") ?? ReadString(root, "boundary") ?? "",
                 WorkspacePath = ReadWorkspacePath(root),
                 Warnings = evidence.Count == 0 ? ["No evidence files were found for this run."] : [],
-                ReportPath = reportPath
+                ReportPath = reportPath,
+                PromotionReview = ReadPromotionReview(root)
             };
         }
         catch (JsonException ex)
@@ -188,6 +189,8 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
     {
         var candidates = new[]
         {
+            "isolated-promotion-apply-report.json",
+            "promotion-package.json",
             "builder-repair-loop-report.json",
             "build-run-report.json",
             "report.json",
@@ -215,8 +218,9 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
             .Select(attempt => MapAttempt(attempt, "Build"));
         var testAttempts = ReadArray(root, "TestAttempts", "testAttempts")
             .Select(attempt => MapAttempt(attempt, "Test"));
+        var commandAttempts = ReadCommandAttempts(root);
 
-        return buildAttempts.Concat(testAttempts)
+        return buildAttempts.Concat(testAttempts).Concat(commandAttempts)
             .OrderBy(attempt => attempt.AttemptNumber)
             .ThenBy(attempt => attempt.Type)
             .ToArray();
@@ -244,6 +248,27 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
             })
             .ToArray();
     }
+
+    private static IReadOnlyList<RunAttemptSummary> ReadCommandAttempts(JsonElement root)
+    {
+        var attempts = new List<RunAttemptSummary>();
+        var build = ReadElement(root, "Build", "build");
+        if (build.ValueKind == JsonValueKind.Object)
+            attempts.Add(MapCommandAttempt(build, "Build", 1));
+        var test = ReadElement(root, "Test", "test");
+        if (test.ValueKind == JsonValueKind.Object)
+            attempts.Add(MapCommandAttempt(test, "Test", 2));
+        return attempts;
+    }
+
+    private static RunAttemptSummary MapCommandAttempt(JsonElement attempt, string type, int attemptNumber) => new()
+    {
+        AttemptNumber = attemptNumber,
+        Type = type,
+        Status = ReadString(attempt, "Status", "status") ?? "",
+        FailureClassification = ReadString(attempt, "FailureClassification", "failureClassification") ?? "",
+        Summary = BuildAttemptSummary(attempt, type)
+    };
 
     private static IReadOnlyList<RunEvidenceItem> ReadEvidenceRefs(JsonElement root)
     {
@@ -277,10 +302,97 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
     private static string ReadWorkspacePath(JsonElement root)
     {
         var mutation = ReadElement(root, "WorkspaceMutation", "workspaceMutation", "mutation");
-        return ReadString(mutation, "WorkspacePath") ??
+        return ReadString(root, "IsolatedWorkspacePath", "isolatedWorkspacePath") ??
+               ReadString(mutation, "WorkspacePath") ??
                ReadString(mutation, "workspacePath") ??
                ReadString(mutation, "disposableWorkspacePath") ??
+               ReadString(mutation, "IsolatedWorkspacePath", "isolatedWorkspacePath") ??
                "";
+    }
+
+    private static int ReadMutationCount(JsonElement root)
+    {
+        var mutation = ReadElement(root, "Mutation", "mutation", "WorkspaceMutation", "workspaceMutation");
+        var evidenceSummary = ReadElement(root, "EvidenceSummary", "evidenceSummary");
+        return ReadInt(root, "RealRepoMutationCount", "realRepoMutationCount") is var direct && direct != 0
+            ? direct
+            : ReadInt(mutation, "ActiveRepoMutationCount", "activeRepoMutationCount", "RealRepoMutationCount", "realRepoMutationCount") is var nested && nested != 0
+                ? nested
+                : ReadInt(evidenceSummary, "RealRepoMutationCount", "realRepoMutationCount");
+    }
+
+    private static int ReadDisposableFilesChanged(JsonElement root)
+    {
+        var mutation = ReadElement(root, "Mutation", "mutation", "WorkspaceMutation", "workspaceMutation");
+        var evidenceSummary = ReadElement(root, "EvidenceSummary", "evidenceSummary");
+        var direct = ReadInt(root, "DisposableFilesChanged", "disposableFilesChanged");
+        if (direct != 0)
+            return direct;
+        var isolated = ReadInt(mutation, "IsolatedFilesChanged", "isolatedFilesChanged", "DisposableFilesChanged", "disposableFilesChanged");
+        return isolated != 0 ? isolated : ReadInt(evidenceSummary, "PromotableFileCount", "promotableFileCount");
+    }
+
+    private static RunPromotionReview? ReadPromotionReview(JsonElement root)
+    {
+        var package = ReadElement(root, "PromotionPackage", "promotionPackage");
+        if (package.ValueKind != JsonValueKind.Object)
+            package = root;
+
+        var packageId = ReadString(package, "PackageId", "packageId") ?? ReadString(root, "PackageId", "packageId") ?? "";
+        var proposedChangeId = ReadString(package, "ProposedChangeId", "proposedChangeId") ?? ReadString(root, "ProposedChangeId", "proposedChangeId") ?? "";
+        if (string.IsNullOrWhiteSpace(packageId) && string.IsNullOrWhiteSpace(proposedChangeId))
+            return null;
+
+        var runtime = ReadElement(package, "RuntimeProfile", "runtimeProfile");
+        var promotable = ReadArray(package, "FilesToPromote", "filesToPromote", "AppliedFiles", "appliedFiles")
+            .Select(item => new RunPromotionFile
+            {
+                RelativePath = ReadString(item, "RelativePath", "relativePath") ?? "",
+                Role = ReadString(item, "FileRole", "fileRole", "Role", "role") ?? "",
+                Language = ReadString(item, "Language", "language") ?? "",
+                Reason = ReadString(item, "Rationale", "rationale") ?? "",
+                HashMatchesPackage = ReadBool(item, "HashMatchesPackage", "hashMatchesPackage")
+            })
+            .ToArray();
+        var blocked = ReadArray(package, "FilesBlocked", "filesBlocked", "RejectedBlockedFiles", "rejectedBlockedFiles")
+            .Select(item => new RunPromotionFile
+            {
+                RelativePath = ReadString(item, "RelativePath", "relativePath") ?? "",
+                Role = "Blocked",
+                Language = "",
+                Reason = ReadString(item, "Reason", "reason") ?? "",
+                HashMatchesPackage = false
+            })
+            .ToArray();
+        var risks = ReadArray(package, "Risks", "risks")
+            .Select(item => new RunPromotionRisk
+            {
+                Severity = ReadString(item, "Severity", "severity") ?? "",
+                Category = ReadString(item, "Category", "category") ?? "",
+                Message = ReadString(item, "Message", "message") ?? "",
+                Mitigation = ReadString(item, "Mitigation", "mitigation") ?? ""
+            })
+            .ToArray();
+        var checklist = ReadElement(package, "Checklist", "checklist");
+
+        return new RunPromotionReview
+        {
+            PackageId = packageId,
+            ProposedChangeId = proposedChangeId,
+            ApprovalState = ReadString(package, "ApprovalState", "approvalState") ?? ReadString(root, "ApprovalState", "approvalState") ?? "",
+            Recommendation = ReadString(package, "Recommendation", "recommendation") ?? ReadString(root, "Recommendation", "recommendation") ?? "",
+            RuntimeProfileId = ReadString(runtime, "RuntimeProfileId", "runtimeProfileId") ?? "",
+            TargetLanguage = ReadString(runtime, "TargetLanguage", "targetLanguage") ?? "",
+            TargetStack = ReadString(runtime, "TargetStack", "targetStack") ?? "",
+            PromotableFileCount = promotable.Length,
+            BlockedFileCount = blocked.Length,
+            PromotableFiles = promotable,
+            BlockedFiles = blocked,
+            Risks = risks,
+            RequiredChecks = ReadStringArray(checklist, "RequiredChecks", "requiredChecks"),
+            ExplicitApprovalsNeeded = ReadStringArray(checklist, "ExplicitApprovalsNeeded", "explicitApprovalsNeeded"),
+            BlockedActions = ReadStringArray(checklist, "BlockedActions", "blockedActions")
+        };
     }
 
     private static bool IsEvidenceLike(string runDirectory, string path)
@@ -346,6 +458,26 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
     {
         var element = ReadElement(root, names);
         return element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var value) ? value : 0;
+    }
+
+    private static bool ReadBool(JsonElement root, params string[] names)
+    {
+        var element = ReadElement(root, names);
+        return element.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => bool.TryParse(element.GetString(), out var value) && value,
+            _ => false
+        };
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonElement root, params string[] names)
+    {
+        var element = ReadElement(root, names);
+        return element.ValueKind == JsonValueKind.Array
+            ? element.EnumerateArray().Select(item => item.ToString()).Where(item => !string.IsNullOrWhiteSpace(item)).ToArray()
+            : [];
     }
 
     private static string FindRepositoryRoot()

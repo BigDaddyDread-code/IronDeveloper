@@ -72,7 +72,10 @@ public sealed class TestPlanRunner
         "governed_tool_loop_162_167",
         "loop_gated_disposable_build_168",
         "promotion_package_169",
-        "isolated_promotion_apply_170"
+        "isolated_promotion_apply_170",
+        "controlled_write_policy_173",
+        "controlled_write_approval_174",
+        "controlled_worktree_dry_run_175"
     };
 
     private readonly string _repoRoot;
@@ -146,6 +149,9 @@ public sealed class TestPlanRunner
                     "loop_gated_disposable_build_168" => await RunLoopGatedDisposableBuild168Async(runId, logPath),
                     "promotion_package_169" => await RunPromotionPackage169Async(runId, logPath),
                     "isolated_promotion_apply_170" => await RunIsolatedPromotionApply170Async(runId, logPath),
+                    "controlled_write_policy_173" => await RunControlledWritePolicy173Async(runId, logPath),
+                    "controlled_write_approval_174" => await RunControlledWriteApproval174Async(runId, logPath),
+                    "controlled_worktree_dry_run_175" => await RunControlledWorktreeDryRun175Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -968,6 +974,114 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Isolated promotion apply 170 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunControlledWritePolicy173Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "controlled-write-policy-173", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign controlled-write-policy-173 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected policy status Succeeded, actual {ReadProperty(parsed, "status")}.");
+
+        var effective = ReadElement(parsed, "effectiveSettings");
+        if (!ReadBoolProperty(effective, "writePathEnabled"))
+            failures.Add("Expected write path enabled by explicit handoff key setting.");
+        if (!ReadArray(effective, "permittedPromotionModes").Any(mode => string.Equals(mode.ToString(), "ControlledWorktreeDryRun", StringComparison.OrdinalIgnoreCase)))
+            failures.Add("Expected ControlledWorktreeDryRun permitted by effective policy.");
+        if (ReadArray(parsed, "hardInvariants").Count < 6)
+            failures.Add("Expected hard invariants.");
+        if (ReadArray(parsed, "hardInvariants").Any(invariant => ReadBoolProperty(invariant, "configurable")))
+            failures.Add("Hard invariants must not be configurable.");
+        if (ReadArray(parsed, "ignoredInvariantOverrides").Count < 2)
+            failures.Add("Expected attempted invariant overrides to be ignored.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Controlled write policy 173 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunControlledWriteApproval174Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "controlled-write-approval-174", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign controlled-write-approval-174 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "approvalState", "ApprovedForControlledWorktreeDryRun"))
+            failures.Add($"Expected approval state ApprovedForControlledWorktreeDryRun, actual {ReadProperty(parsed, "approvalState")}.");
+        if (!StringPropertyEquals(parsed, "approvalScope", "ControlledWorktreeDryRunOnly"))
+            failures.Add($"Expected approval scope ControlledWorktreeDryRunOnly, actual {ReadProperty(parsed, "approvalScope")}.");
+        if (!ReadBoolProperty(parsed, "validForControlledWorktreeDryRun"))
+            failures.Add("Expected approval valid for controlled worktree dry-run.");
+        if (ReadBoolProperty(parsed, "validForRealRepoWrite"))
+            failures.Add("Approval must not be valid for real repo write.");
+        if (!ReadArray(parsed, "allowedActions").Any(action => string.Equals(action.ToString(), "ControlledWorktreeDryRun", StringComparison.OrdinalIgnoreCase)))
+            failures.Add("Expected ControlledWorktreeDryRun allowed action.");
+        foreach (var blocked in new[] { "WriteMain", "AutoMerge", "SelfApprove" })
+        {
+            if (!ReadArray(parsed, "blockedActions").Any(action => string.Equals(action.ToString(), blocked, StringComparison.OrdinalIgnoreCase)))
+                failures.Add($"Expected blocked action {blocked}.");
+        }
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Controlled write approval 174 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunControlledWorktreeDryRun175Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "controlled-worktree-dry-run-175", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign controlled-worktree-dry-run-175 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected dry-run status Succeeded, actual {ReadProperty(parsed, "status")}.");
+        if (!ReadBoolProperty(parsed, "targetPathExplicit"))
+            failures.Add("Expected explicit target path.");
+        if (!ReadBoolProperty(parsed, "targetOutsideActiveRepo"))
+            failures.Add("Expected target outside active repo.");
+        if (!ReadBoolProperty(parsed, "targetBranchIsNotMain"))
+            failures.Add("Expected target branch not main/master.");
+        if (!ReadBoolProperty(parsed, "wouldCreateWorktree"))
+            failures.Add("Expected dry-run to say it would create a worktree.");
+        if (ReadBoolProperty(parsed, "wouldCopyFiles"))
+            failures.Add("Dry-run must not copy files.");
+        if (ReadArray(parsed, "filesThatWouldApply").Count < 10)
+            failures.Add("Expected at least 10 files that would apply.");
+        if (ReadArray(parsed, "blockedFilesRejected").Count == 0)
+            failures.Add("Expected blocked files to remain rejected.");
+
+        var approval = ReadElement(parsed, "approvalRecord");
+        if (!ReadBoolProperty(approval, "validForControlledWorktreeDryRun") || ReadBoolProperty(approval, "validForRealRepoWrite"))
+            failures.Add("Expected scoped approval valid only for dry-run.");
+        var mutation = ReadElement(parsed, "mutation");
+        if (ReadIntProperty(mutation, "activeRepoMutationCount") != 0)
+            failures.Add($"Expected active repo mutation count zero, actual {ReadIntProperty(mutation, "activeRepoMutationCount")}.");
+        if (ReadIntProperty(mutation, "isolatedFilesChanged") != 0)
+            failures.Add("Expected dry-run isolated files changed count zero.");
+        var target = ReadProperty(parsed, "targetWorktreePath") ?? "";
+        if (!string.IsNullOrWhiteSpace(target) && Directory.Exists(target))
+            failures.Add("Dry-run target worktree should not be created.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Controlled worktree dry-run 175 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);

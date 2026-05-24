@@ -1,0 +1,37 @@
+{
+  "test_run_id": "IronDev171-PromotionReviewCockpit",
+  "goal_id": "promotion-review-cockpit-171",
+  "project_id": 2,
+  "description": "Proves the Run Reports viewer service can expose promotion package/apply review evidence, configurable policy, and hard safety invariants without shelling out from WPF.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "run_report_viewer_service_smoke",
+      "params": {
+        "expect_promotion_review": true,
+        "expect_package_id": true,
+        "expect_proposed_change_id": true,
+        "expect_approval_state_needs_human_review": true,
+        "expect_runtime_profile": "csharp-dotnet",
+        "expect_promotable_files": true,
+        "expect_blocked_files": true,
+        "expect_configurable_policy": true,
+        "expect_hard_invariants": true,
+        "expect_no_cli_process_from_service": true
+      }
+    }
+  ],
+  "expected": {
+    "promotion_review_exposed": true,
+    "approval_state_visible": true,
+    "runtime_profile_visible": true,
+    "promotable_files_visible": true,
+    "blocked_files_visible": true,
+    "configurable_policy_visible": true,
+    "hard_invariants_visible": true,
+    "wpf_service_does_not_shell_out_to_cli": true
+  },
+  "boundary": "Read/report promotion review smoke only. No promotion approval, real repo writes, memory mutation, BuilderAgent execution, or agent authority expansion."
+}

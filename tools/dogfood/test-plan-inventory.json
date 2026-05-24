@@ -1,5 +1,125 @@
 ﻿[
     {
+        "planFile":  "irondev-controlled-worktree-dry-run-175.json",
+        "goalId":  "controlled-worktree-dry-run-175",
+        "project":  "IronDev",
+        "description":  "Validate a future controlled worktree apply as a dry-run without creating the worktree, copying files, or mutating the active repository.",
+        "agentPath":  "TestAgent + ReplayRunner + ControlledWritePath173175Command",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-controlled-worktree-dry-run-175.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "ControlledWritePath173175Command"
+                             ],
+        "expectedEvidence":  [
+                                 "target path explicit",
+                                 "target outside active repo",
+                                 "target branch not main/master",
+                                 "scoped approval valid only for dry-run",
+                                 "promotable files identified",
+                                 "blocked files rejected",
+                                 "active repo mutation count zero",
+                                 "dry-run target not created"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Dry-run only; no worktree creation, file copy, real repository write, PR creation, accepted memory mutation, ticket acceptance, or self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
+        "planFile":  "irondev-controlled-write-approval-record-174.json",
+        "goalId":  "controlled-write-approval-record-174",
+        "project":  "IronDev",
+        "description":  "Validate scoped human approval records for one promotion package and ControlledWorktreeDryRun only.",
+        "agentPath":  "TestAgent + ReplayRunner + ControlledWritePath173175Command",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-controlled-write-approval-record-174.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "ControlledWritePath173175Command"
+                             ],
+        "expectedEvidence":  [
+                                 "approval record created",
+                                 "package id preserved",
+                                 "proposed change id preserved",
+                                 "approval valid for ControlledWorktreeDryRun",
+                                 "approval invalid for real repo write",
+                                 "blocked actions remain blocked"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Approval evidence only; no file apply, branch creation, PR creation, accepted memory mutation, ticket acceptance, or self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
+        "planFile":  "irondev-controlled-write-policy-settings-173.json",
+        "goalId":  "controlled-write-policy-settings-173",
+        "project":  "IronDev",
+        "description":  "Validate controlled write policy settings resolution and non-configurable hard invariants.",
+        "agentPath":  "TestAgent + ReplayRunner + ControlledWritePath173175Command",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-controlled-write-policy-settings-173.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "ControlledWritePath173175Command"
+                             ],
+        "expectedEvidence":  [
+                                 "effective policy created",
+                                 "write path enabled only by explicit handoff",
+                                 "ControlledWorktreeDryRun permitted",
+                                 "hard invariants non-configurable",
+                                 "unsafe invariant overrides ignored"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Policy evidence only; no branch apply, real repository write, accepted memory mutation, ticket acceptance, or self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
+        "planFile":  "irondev-controlled-real-repo-write-path-design-172.json",
+        "goalId":  "controlled-real-repo-write-path-design-172",
+        "project":  "IronDev",
+        "description":  "Validate the controlled real-repo write path design is retrievable as accepted memory and preserves the design-only boundary before branch/worktree apply exists.",
+        "agentPath":  "TestAgent + memory search",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-controlled-real-repo-write-path-design-172.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "memory search"
+                             ],
+        "expectedEvidence":  [
+                                 "controlled write path design memory is retrievable",
+                                 "settings versus hard invariants are retrievable",
+                                 "scoped human approval boundary is retrievable",
+                                 "no branch apply command is implemented",
+                                 "no real repo write authority is granted"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Design and memory retrieval only; no branch apply command, PR creation, promotion approval execution, accepted memory mutation, real repository write, or agent authority expansion.",
+        "kind":  "memory-smoke"
+    },
+    {
+        "planFile":  "irondev-promotion-review-cockpit-171.json",
+        "goalId":  "promotion-review-cockpit-171",
+        "project":  "IronDev",
+        "description":  "Validate the Run Reports viewer service exposes promotion package/apply review evidence, configurable policy settings, and hard safety invariants.",
+        "agentPath":  "TestAgent + ReplayRunner + FileRunReportService + RunReportsViewModel",
+        "command":  "run-report viewer-smoke",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "FileRunReportService",
+                                 "IRunReportService",
+                                 "IRunEvidenceService"
+                             ],
+        "expectedEvidence":  [
+                                 "promotion package id visible",
+                                 "proposed change id visible",
+                                 "approval state NeedsHumanReview visible",
+                                 "runtime profile visible",
+                                 "promotable files visible",
+                                 "blocked files visible",
+                                 "configurable policy visible",
+                                 "hard invariants visible",
+                                 "no WPF CLI shell-out"
+                             ],
+        "regressionGroup":  "RunReports",
+        "safetyBoundary":  "Read/report only; no promotion approval, real repo writes, memory mutation, BuilderAgent execution, or agent authority expansion.",
+        "kind":  "service-smoke"
+    },
+    {
         "planFile":  "irondev-isolated-promotion-apply-170.json",
         "goalId":  "isolated-promotion-apply-170",
         "project":  "IronDev",

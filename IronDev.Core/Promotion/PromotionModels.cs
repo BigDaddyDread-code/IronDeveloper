@@ -184,3 +184,112 @@ public sealed record PromotionMutationReport
 }
 
 public sealed record PromotionEvidenceRef(string Type, string Path, string Summary);
+
+public sealed record ControlledWritePolicySettings
+{
+    public required string PolicyId { get; init; }
+    public required string Scope { get; init; }
+    public bool WritePathEnabled { get; init; }
+    public IReadOnlyList<string> PermittedPromotionModes { get; init; } = [];
+    public string RuntimeProfileId { get; init; } = "csharp-dotnet";
+    public string LanguageAdapter { get; init; } = "csharp-dotnet";
+    public string BuildCommand { get; init; } = "dotnet build";
+    public string TestCommand { get; init; } = "dotnet test";
+    public string QualityCommand { get; init; } = "test run-plan --plan tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json";
+    public IReadOnlyList<string> AllowedSourceFileExtensions { get; init; } = [".cs", ".xaml", ".csproj", ".sln"];
+    public IReadOnlyList<string> BlockedPathSegments { get; init; } = ["bin/", "obj/", ".git/", ".vs/", "TestResults/"];
+    public int MaxFilesChanged { get; init; } = 50;
+    public int MaxLinesChanged { get; init; } = 5000;
+    public IReadOnlyList<string> RequiredReviewerRoles { get; init; } = ["HumanOwner"];
+    public IReadOnlyList<string> RequiredEvidenceTypes { get; init; } = ["PromotionPackage", "ProposedChange", "BuildLog", "TestLog", "QualityGate", "ConscienceDecision", "ThoughtLedgerSummary"];
+    public string RequiredApprovalPhrase { get; init; } = "Approve this specific promotion package for isolated branch/worktree validation only.";
+    public string BranchNameTemplate { get; init; } = "ida/{project}/{runId}";
+    public string WorktreeRoot { get; init; } = "";
+    public TimeSpan PromotionPackageExpiry { get; init; } = TimeSpan.FromDays(7);
+    public int BuildTestRetryCount { get; init; } = 0;
+}
+
+public sealed record HardSafetyInvariant
+{
+    public required string Id { get; init; }
+    public required string Description { get; init; }
+    public required string Enforcement { get; init; }
+    public bool Configurable { get; init; }
+}
+
+public sealed record ControlledWriteEffectivePolicy
+{
+    public required string Command { get; init; }
+    public required string Status { get; init; }
+    public required string RunId { get; init; }
+    public required string TraceId { get; init; }
+    public required string Project { get; init; }
+    public required ControlledWritePolicySettings GlobalDefaults { get; init; }
+    public required ControlledWritePolicySettings ProjectSettings { get; init; }
+    public required ControlledWritePolicySettings RunSettings { get; init; }
+    public required ControlledWritePolicySettings ExplicitHumanOverride { get; init; }
+    public required ControlledWritePolicySettings EffectiveSettings { get; init; }
+    public IReadOnlyList<HardSafetyInvariant> HardInvariants { get; init; } = [];
+    public IReadOnlyList<string> AttemptedInvariantOverrides { get; init; } = [];
+    public IReadOnlyList<string> IgnoredInvariantOverrides { get; init; } = [];
+    public IReadOnlyList<PromotionEvidenceRef> Evidence { get; init; } = [];
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public IReadOnlyList<string> Errors { get; init; } = [];
+    public required string Boundary { get; init; }
+    public required string ReproCommand { get; init; }
+}
+
+public sealed record ControlledWriteApprovalRecord
+{
+    public required string ApprovalId { get; init; }
+    public required string RunId { get; init; }
+    public required string TraceId { get; init; }
+    public required string Project { get; init; }
+    public required string PackageId { get; init; }
+    public required string ProposedChangeId { get; init; }
+    public required string SourceRunId { get; init; }
+    public required string SourceTraceId { get; init; }
+    public required string ApprovedBy { get; init; }
+    public required string ApprovalRole { get; init; }
+    public required string ApprovalScope { get; init; }
+    public required string ApprovalState { get; init; }
+    public required string ApprovalPhrase { get; init; }
+    public DateTimeOffset CreatedUtc { get; init; }
+    public DateTimeOffset ExpiresUtc { get; init; }
+    public required bool ValidForControlledWorktreeDryRun { get; init; }
+    public required bool ValidForRealRepoWrite { get; init; }
+    public IReadOnlyList<string> RequiredEvidenceRefs { get; init; } = [];
+    public IReadOnlyList<string> AllowedActions { get; init; } = [];
+    public IReadOnlyList<string> BlockedActions { get; init; } = [];
+    public required string Boundary { get; init; }
+}
+
+public sealed record ControlledWorktreeDryRunReport
+{
+    public required string Command { get; init; }
+    public required string Status { get; init; }
+    public required string RunId { get; init; }
+    public required string TraceId { get; init; }
+    public required string Project { get; init; }
+    public required string PackageId { get; init; }
+    public required string ProposedChangeId { get; init; }
+    public required string ApprovalId { get; init; }
+    public required string TargetWorktreePath { get; init; }
+    public required string TargetBranchName { get; init; }
+    public required bool TargetPathExplicit { get; init; }
+    public required bool TargetOutsideActiveRepo { get; init; }
+    public required bool TargetBranchIsNotMain { get; init; }
+    public required bool WouldCreateWorktree { get; init; }
+    public required bool WouldCopyFiles { get; init; }
+    public IReadOnlyList<PromotableFile> FilesThatWouldApply { get; init; } = [];
+    public IReadOnlyList<BlockedFile> BlockedFilesRejected { get; init; } = [];
+    public required ControlledWriteEffectivePolicy PolicySnapshot { get; init; }
+    public required ControlledWriteApprovalRecord ApprovalRecord { get; init; }
+    public required PromotionMutationReport Mutation { get; init; }
+    public IReadOnlyList<PromotionEvidenceRef> Evidence { get; init; } = [];
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public IReadOnlyList<string> Errors { get; init; } = [];
+    public required string Recommendation { get; init; }
+    public required string Boundary { get; init; }
+    public required string ReproCommand { get; init; }
+}

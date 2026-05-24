@@ -50,6 +50,36 @@
         "notes":  "Runs 169 to create a PromotionPackage, then applies only promotable files into an isolated candidate workspace outside the active repo, runs build/test, rejects blocked files, and preserves active repo mutation count zero."
     },
     {
+        "command":  "campaign controlled-write-policy-173",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write policy smoke",
+        "notes":  "Resolves layered settings into an effective controlled write policy and proves hard invariants cannot be configured away."
+    },
+    {
+        "command":  "campaign controlled-write-approval-174",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write approval smoke",
+        "notes":  "Creates a deterministic promotion package fixture and a scoped approval record valid only for ControlledWorktreeDryRun. The real disposable-output package path remains covered by campaign promotion-package-169."
+    },
+    {
+        "command":  "campaign controlled-worktree-dry-run-175",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled worktree dry-run smoke",
+        "notes":  "Creates deterministic package and approval fixtures, then validates a future worktree apply without creating the worktree or copying files. The real package path remains covered by campaign promotion-package-169."
+    },
+    {
         "command":  "campaign live-remaining-agents-161",
         "category":  "campaign",
         "scope":  "dogfood/control",
@@ -520,6 +550,26 @@
         "notes":  "Consumes a PromotionPackage and copies only FilesToPromote into an isolated candidate workspace outside the active repo. It runs runtime build/test and does not write main, mutate memory, accept tickets, auto-merge, or self-approve."
     },
     {
+        "command":  "promotion apply worktree-dry-run",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs + PromotionPackage",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled worktree dry-run gate",
+        "notes":  "Validates package, scoped approval, effective policy, target path, non-main branch, promotable files, blocked file rejection, and active repo mutation count without creating a worktree or copying files."
+    },
+    {
+        "command":  "promotion approval create",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs + PromotionPackage",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write approval record creator",
+        "notes":  "Creates a scoped approval record valid only for ControlledWorktreeDryRun and explicitly invalid for real repo writes, PR creation, auto-merge, memory mutation, ticket acceptance, and self-approval."
+    },
+    {
         "command":  "promotion package create",
         "category":  "promotion",
         "scope":  "dogfood/control",
@@ -528,6 +578,16 @@
         "requiresWeaviate":  false,
         "status":  "promotion package creator",
         "notes":  "Creates ProposedChange and PromotionPackage review evidence from a successful disposable source run. It does not apply files, create branches, mutate memory, accept tickets, or approve writes."
+    },
+    {
+        "command":  "promotion policy effective",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write effective policy snapshot",
+        "notes":  "Resolves global/project/run/human override settings into an effective policy while keeping hard invariants non-configurable."
     },
     {
         "command":  "memory builder-context-source-smoke",
