@@ -1,0 +1,12 @@
+{
+  "title": "Make IronDev tickets the source of truth for project work",
+  "ticketType": "Architecture / Dogfooding",
+  "priority": "Critical",
+  "status": "Draft",
+  "summary": "IronDev project work should be tracked as IronDev tickets inside IDA/IronDev, not primarily as GitHub issues.",
+  "problem": "Planning and implementation tickets are still being created as GitHub issues while IronDev is meant to manage project memory, tickets, build workflows, and traceability. This creates split-brain project state and bypasses the dogfood loop.",
+  "background": "GitHub issues may remain external references for PR discussion, but implementation work, build order, evidence, decisions, and workflow state should live in IronDev.",
+  "acceptanceCriteria": "- IronDev can create tickets from a discussion or design prompt.\n- Tickets are stored in IronDev's own ticket model/database.\n- Tickets can link to GitHub issues/PRs as external references, but GitHub is not the source of truth.\n- The API exposes a clear create-ticket endpoint.\n- The UI can create, review, and import generated tickets.\n- Codex prompts output IronDev ticket payloads where possible.\n- Existing GitHub planning issues can be backfilled or linked into IronDev.\n- Future work items are created in IronDev first.",
+  "technicalNotes": "Use IronDev.Api as the write boundary and IronDev.Client or CLI HTTP calls from clients. Do not create a new ticket system. Do not make GitHub canonical project memory. Preserve provenance such as created from chat, document, design review, or GitHub issue.",
+  "generationNote": "Provenance: created from design discussion. External references can be linked separately; GitHub is not canonical."
+}
