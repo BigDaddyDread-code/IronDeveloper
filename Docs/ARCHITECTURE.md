@@ -4,53 +4,70 @@
 
 IronDev is structured as a **multi-tenant client-server system**.
 
-The WPF desktop client currently communicates directly with local SQL services (Sprint 1 foundation). The REST API backend is being built in parallel and will eventually own all data-access paths. The WPF client will migrate to HTTP calls in Sprint 3.
+The product boundary is the REST API. The desktop UI is a cockpit, not the owner of persistence, tenancy, memory, tickets, or AI workflow state.
+
+The previous WPF-local mode, where `IronDeveloper` called `IronDev.Infrastructure` services directly, is now classified as **critical migration debt**. It is not an endorsed architecture and must not be expanded. New UI work must route through `IronDev.Client` and `IronDev.Api` unless there is an explicit, documented local-only exception.
+
+The immediate migration goal is to remove the WPF client's direct dependency on `IronDev.Infrastructure`. The first boundary project is `IronDev.Client`, which provides typed HTTP access to `IronDev.Api`.
 
 ---
 
 ## Layer Map
 
+```text
+IronDeveloper WPF client
+  -> IronDev.Client typed HTTP client
+  -> IronDev.Api REST backend
+  -> IronDev.Infrastructure services/repositories/providers
+  -> SQL Server / Weaviate / OpenAI / file/build adapters
 ```
-┌─────────────────────────────────────────────────┐
-│  IronDeveloper (WPF client)                     │
-│  · Project panel, chat, tickets, workbench      │
-│  · Currently uses Infrastructure services       │
-│    directly (local mode)                        │
-│  · Will migrate to HTTP client in Sprint 3      │
-└──────────────┬──────────────────────────────────┘
-               │ (future: HTTP)
-┌──────────────▼──────────────────────────────────┐
-│  IronDev.Api (ASP.NET Core REST backend)        │
-│  · Auth: POST /api/auth/login                   │
-│  · Tenant selection: POST /api/tenants/select   │
-│  · Domain APIs: projects, tickets, chat, memory │
-│  · JWT authentication + request-scoped tenancy  │
-└──────────────┬──────────────────────────────────┘
-               │
-┌──────────────▼──────────────────────────────────┐
-│  IronDev.Infrastructure                         │
-│  · Dapper SQL repositories                      │
-│  · UserService, ProjectService, TicketService   │
-│  · ChatHistoryService, ProjectMemoryService     │
-│  · CodeIndexService, PromptContextBuilder       │
-│  · DevelopmentTenantContext (local/WPF fallback)│
-│  · WorkbenchGeneratorService                    │
-└──────────────┬──────────────────────────────────┘
-               │
-┌──────────────▼──────────────────────────────────┐
-│  IronDev.Core                                   │
-│  · Domain models (Project, Ticket, ChatMessage) │
-│  · ICurrentTenantContext                        │
-│  · Auth DTOs (LoginRequest, LoginResponse, etc) │
-│  · ILLMService interface                        │
-└──────────────┬──────────────────────────────────┘
-               │
-┌──────────────▼──────────────────────────────────┐
-│  SQL Server                                     │
-│  · IronDeveloper (production)                   │
-│  · IronDeveloper_Test (integration tests)       │
-└─────────────────────────────────────────────────┘
-```
+
+`IronDeveloper` owns view composition, view model state, selection, dirty editor state, keyboard shortcuts, local path selection, local preview state, and calls to `IronDev.Client`.
+
+`IronDeveloper` must not directly own SQL, Dapper repositories, Weaviate, OpenAI/provider calls, tenant enforcement, prompt context assembly, persistent ticket/document/memory mutations, or build workflow state mutation.
+
+---
+
+## Boundary Rules
+
+### Hard rule
+
+`IronDeveloper` must not add new direct calls to `IronDev.Infrastructure`.
+
+The existing direct Infrastructure reference is a migration seam only. Every screen migrated behind the API client must remove the corresponding direct service dependency.
+
+### Allowed UI responsibilities
+
+- View composition
+- ViewModel state
+- Selection and filtering state
+- Local editor dirty state
+- Keyboard shortcuts
+- Local filesystem path selection
+- Local-only preview state
+- Calling `IronDev.Client`
+
+### Forbidden UI responsibilities
+
+- Direct SQL access
+- Direct Dapper repository access
+- Direct Weaviate access
+- Direct OpenAI/provider calls
+- Direct ticket/document/memory persistence
+- Direct tenant enforcement
+- Direct prompt context assembly
+- Direct build workflow mutation without an API/workflow boundary
+
+### Local-only exceptions
+
+Some operations may still execute on the local machine because they need local filesystem/process access:
+
+- Selecting a local repository path
+- Reading local files for preview
+- Local build/test process execution
+- Local disposable workspace operations
+
+These exceptions still need a product boundary. Results that become persistent product state must be sent through `IronDev.Api`.
 
 ---
 
@@ -77,39 +94,46 @@ The tenancy abstraction is interface-based and scoped per request/operation.
 
 | Context | Used in | Returns |
 |---|---|---|
-| `DevelopmentTenantContext` | WPF client (local dev) | Always `TenantId = 1` |
 | `JwtTenantContext` | ASP.NET Core API | Reads `tenant_id` claim from JWT |
-| `TestTenantContext` | Integration tests | Mutable — tests switch tenants to verify isolation |
+| `TestTenantContext` | Integration tests | Mutable; tests switch tenants to verify isolation |
+| `DevelopmentTenantContext` | Legacy local migration seam only | Always `TenantId = 1`; remove from WPF paths as they migrate to API |
 
 ---
 
-## Auth Flow (Sprint 2)
+## Auth Flow
 
-```
-1. POST /api/auth/login  →  base JWT (userId, email — no tenant claim)
-2. GET  /api/tenants     →  list of tenants user is a member of
-3. POST /api/tenants/select  →  new JWT with tenant_id claim embedded
-4. All subsequent API calls use the tenant-bearing JWT
+```text
+1. POST /api/auth/login        -> base JWT (userId, email, no tenant claim)
+2. GET  /api/tenants           -> tenants the user can access
+3. POST /api/tenants/select    -> tenant-bearing JWT with tenant_id claim
+4. Subsequent API calls use the tenant-bearing JWT
 ```
 
-Services resolve `ICurrentTenantContext` from the JWT claim per-request.
+Services resolve `ICurrentTenantContext` from the JWT claim per request.
 
 ---
 
 ## Local vs Backend Responsibilities
 
-### Stays local (client-side)
-- Local file system access
-- Code indexing of local repository paths
-- Workbench sandbox preview (temp drafts, not persisted)
-- Future: local build/test execution loop
+### Stays local client-side
+
+- Local filesystem picker and path validation
+- Local code/workspace preview where no persistent state is mutated
+- Local process execution where the OS requires it
+- Temporary disposable workspace files
 
 ### Belongs to the backend
+
 - Authentication and session management
 - Tenant resolution and enforcement
 - All persistent data: projects, tickets, chat, memory, decisions, summaries
-- Code index storage (indexed content stored in SQL)
+- Code index storage
 - Prompt context assembly
+- Ticket generation state
+- Document version state
+- Trace and evidence persistence
+- Approval state
+- Build/test run records
 
 ---
 
@@ -117,10 +141,13 @@ Services resolve `ICurrentTenantContext` from the JWT claim per-request.
 
 | Decision | Detail |
 |---|---|
+| API as product boundary | UI shells are replaceable; backend owns product behaviour |
+| `IronDev.Client` first | Minimal client abstraction before any UI framework change |
+| No second UI stack until boundary is sealed | WPF stays until the direct Infrastructure dependency is removed or explicitly caged |
 | Dapper over EF Core | SQL-native, explicit queries, no migration complexity |
 | BCrypt for password hashing | Industry standard, no extra ASP.NET dependency |
 | JWT re-issue on tenant select | Tenant identity embedded in token, not a client-controlled header |
-| Sequential integration tests | Tests share a real SQL Server DB — Workers=1 is required in runsettings to avoid FK/data conflicts |
+| Sequential integration tests | Tests share a real SQL Server DB; Workers=1 is required in runsettings |
 | No ASP.NET Core Identity | Too heavy for current phase; plain `UserService` + Dapper is sufficient |
 | Keyword-first context | Prompt builder prioritizes technical keywords extracted from user prompts |
 
@@ -140,10 +167,10 @@ Recommended boundary:
 |---|---|
 | AI workflow evidence | `ILlmTraceService` |
 | Runtime health and failures | Serilog |
-| Service-boundary timing/errors | Explicit pipeline tracing where available; DI decorators where no pipeline boundary exists |
+| Service-boundary timing/errors | REST middleware, explicit pipeline tracing, or small DI decorators |
 | Meaningful Context Agent stages | Explicit trace entries |
 
-Tracing should prefer visible pipeline boundaries over AOP-style interception. Good pipeline candidates include REST middleware and Context Agent stages. Where no useful pipeline exists, small DI decorators are acceptable for service-boundary timing, correlation, and error logging. Heavy runtime interception should be avoided. Good decorator candidates are `ILLMService`, `ICodeIndexService`, and `ITicketBuildOrchestrator`; `IContextAgentService` should keep explicit traces for meaningful AI decisions.
+Tracing should prefer visible pipeline boundaries over AOP-style interception. Good pipeline candidates include REST middleware and Context Agent stages. Where no useful pipeline exists, small DI decorators are acceptable for service-boundary timing, correlation, and error logging. Heavy runtime interception should be avoided.
 
 ---
 
@@ -165,20 +192,8 @@ Human / Codex request
 
 Model profiles are runtime-configurable and support `OpenAI`, `LocalOpenAI`, and `Ollama`. Provider configuration does not grant tool authority. Tool authority remains controlled by `AgentDefinition.AllowedTools`, ConscienceAgent, and the workflow boundary.
 
-IRONDEV-158 adds opt-in live model execution for the governed ArchitectAgent path. IRONDEV-159 extends the same pattern to CriticAgent failure review and PlannerAgent planning/intake. IRONDEV-160 extends it to RetrieverAgent context packaging and SentinelAgent insight observation. IRONDEV-161 completes the current useful live-agent pass for ResearchAgent, QualityAgent, and SupervisorAgent while keeping TesterAgent, ConscienceAgent, and ThoughtLedger deterministic. Live provider calls are traced through the agent output and fall back to deterministic behaviour when unavailable. This does not grant write authority, memory mutation, ticket creation, patch apply, ranking override, quality override, governance bypass, or self-approval.
+Live provider calls are traced through the agent output and fall back to deterministic behaviour when unavailable. This does not grant write authority, memory mutation, ticket creation, patch apply, ranking override, quality override, governance bypass, or self-approval.
 
-IRONDEV-162 through IRONDEV-167 add a native governed tool loop. PlannerAgent requests named capabilities, the tool registry checks capability boundaries and runtime profiles, safe tools collect evidence, CriticAgent reviews the evidence, PlannerAgent revises the plan, and a human escalation gate records whether review or more evidence is required. .NET is the first runtime adapter, but Node and Python profiles are represented through the same capability contract.
+The governed tool loop allows PlannerAgent to request named capabilities, the tool registry to check capability boundaries and runtime profiles, safe tools to collect evidence, CriticAgent to review evidence, PlannerAgent to revise the plan, and a human escalation gate to record whether review or more evidence is required.
 
-IRONDEV-168 connects the governed loop to the product-shaped disposable build path. `build disposable run` can now take a messy goal such as `I want build solitaire`, create run-scoped intake/build/ticket artefacts, run Planner/Critic evidence collection, execute the caged BuilderAgent repair loop, run QualityAgent/Killjoy, and return a single evidence report. The generated app remains inside the disposable workspace and run-scoped docs do not become accepted memory.
-
-IRONDEV-169 adds the promotion bridge. `ProposedChange` is the review case file; `PromotionPackage` is the evidence package. Promotion package creation classifies disposable workspace files through `ILanguageRuntimeRegistry`, attaches build/test/quality evidence, blocks generated outputs such as `bin/` and `obj/`, and keeps approval at `NeedsHumanReview`. The `csharp-dotnet` runtime profile is executable; Java, TypeScript, and Python profiles are contract-only until reviewed runtime executors are added.
-
-IRONDEV-170 proves isolated promotion apply. `promotion apply isolated` consumes a `PromotionPackage`, creates an isolated candidate workspace outside the active repo, copies only `FilesToPromote`, rejects `FilesBlocked`, runs runtime build/test, and writes an isolated apply report. This proves the promotion bridge can become reviewable candidate code without writing main or granting self-approval.
-
-IRONDEV-171 turns the Run Reports viewer into the promotion review cockpit. `FileRunReportService` can read promotion package and isolated apply reports as structured review data, including approval state, runtime profile, promotable files, blocked files, policy settings, and hard invariants. WPF still calls shared C# services directly rather than shelling out to ReplayRunner.
-
-IRONDEV-172 designs the future controlled real-repository write path without implementing it. The write path is settings-first for runtime adapters, command templates, branch names, worktree roots, reviewer roles, evidence rules, and retention policy, while hard invariants remain non-configurable. Future writes must target an explicit isolated branch or worktree, never `main` or the active developer working tree, and must carry trace, promotion package, proposed change, approval, build/test/quality, ConscienceAgent, and ThoughtLedger evidence.
-
-IRONDEV-173 through IRONDEV-175 turn that design into three non-writing control gates. `promotion policy effective` resolves layered settings into an evidence snapshot while hard invariants still win. `promotion approval create` creates a scoped approval record valid only for one promotion package and controlled worktree dry-run. `promotion apply worktree-dry-run` validates package, approval, policy, explicit target path, non-main branch name, promotable files, blocked file rejection, and active repo mutation count without creating a worktree or copying files.
-
-BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.
+BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked unless the reviewed promotion path supplies trace, promotion package, proposed change, approval, build/test/quality, ConscienceAgent, and ThoughtLedger evidence.
