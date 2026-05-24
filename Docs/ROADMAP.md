@@ -345,3 +345,31 @@ Still blocked:
 - Auto-merge.
 - Accepted memory mutation.
 - Agent self-approval.
+
+## Controlled Real Repo Write Path Design 172
+
+**Status: Active**
+
+Goal: define the locked door from promotion review into a future isolated branch/worktree apply path before any real repository write command exists.
+
+Delivered in this slice:
+
+- `Docs/CONTROLLED_REAL_REPO_WRITE_PATH_DESIGN_172.md`.
+- dogfood memory mirror and retrieval smoke plan.
+- settings-first policy shape for runtime adapters, command templates, branch naming, worktree roots, reviewer roles, evidence rules, and retention.
+- hard invariant list that cannot be configured away.
+- scoped human approval meaning for a future branch/worktree apply.
+- future evidence requirements for branch/worktree apply and PR package creation.
+
+Still blocked:
+
+- Real repository writes.
+- Main branch writes.
+- Active developer working tree writes.
+- Branch/worktree apply command.
+- PR package command.
+- Promotion approval execution.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Auto-merge.
+- Agent self-approval.

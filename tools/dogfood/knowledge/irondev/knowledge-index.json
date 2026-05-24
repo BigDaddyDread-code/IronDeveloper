@@ -1,5 +1,16 @@
 [
   {
+    "Id": "CONTROLLED_REAL_REPO_WRITE_PATH_DESIGN_172",
+    "Project": "IronDev",
+    "Title": "Controlled Real Repo Write Path Design 172",
+    "DocumentType": "ArchitectureDesign",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CONTROLLED_REAL_REPO_WRITE_PATH_DESIGN_172.md",
+    "DogfoodRunId": "ControlledWritePathDesign172",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524173000000-controlled-real-repo-write-path-design-172.md",
+    "CreatedUtc": "2026-05-24T17:30:00+00:00"
+  },
+  {
     "Id": "PROMOTION_REVIEW_COCKPIT_171",
     "Project": "IronDev",
     "Title": "Promotion Review Cockpit 171",

@@ -177,4 +177,6 @@ IRONDEV-170 proves isolated promotion apply. `promotion apply isolated` consumes
 
 IRONDEV-171 turns the Run Reports viewer into the promotion review cockpit. `FileRunReportService` can read promotion package and isolated apply reports as structured review data, including approval state, runtime profile, promotable files, blocked files, policy settings, and hard invariants. WPF still calls shared C# services directly rather than shelling out to ReplayRunner.
 
+IRONDEV-172 designs the future controlled real-repository write path without implementing it. The write path is settings-first for runtime adapters, command templates, branch names, worktree roots, reviewer roles, evidence rules, and retention policy, while hard invariants remain non-configurable. Future writes must target an explicit isolated branch or worktree, never `main` or the active developer working tree, and must carry trace, promotion package, proposed change, approval, build/test/quality, ConscienceAgent, and ThoughtLedger evidence.
+
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.

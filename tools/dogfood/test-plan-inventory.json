@@ -1,5 +1,27 @@
 ﻿[
     {
+        "planFile":  "irondev-controlled-real-repo-write-path-design-172.json",
+        "goalId":  "controlled-real-repo-write-path-design-172",
+        "project":  "IronDev",
+        "description":  "Validate the controlled real-repo write path design is retrievable as accepted memory and preserves the design-only boundary before branch/worktree apply exists.",
+        "agentPath":  "TestAgent + memory search",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-controlled-real-repo-write-path-design-172.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "memory search"
+                             ],
+        "expectedEvidence":  [
+                                 "controlled write path design memory is retrievable",
+                                 "settings versus hard invariants are retrievable",
+                                 "scoped human approval boundary is retrievable",
+                                 "no branch apply command is implemented",
+                                 "no real repo write authority is granted"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Design and memory retrieval only; no branch apply command, PR creation, promotion approval execution, accepted memory mutation, real repository write, or agent authority expansion.",
+        "kind":  "memory-smoke"
+    },
+    {
         "planFile":  "irondev-promotion-review-cockpit-171.json",
         "goalId":  "promotion-review-cockpit-171",
         "project":  "IronDev",

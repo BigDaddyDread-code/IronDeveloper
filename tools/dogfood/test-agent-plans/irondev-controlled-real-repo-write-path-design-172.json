@@ -1,0 +1,50 @@
+{
+  "test_run_id": "IronDev172-ControlledRealRepoWritePathDesign",
+  "goal_id": "controlled-real-repo-write-path-design-172",
+  "description": "Proves the controlled real-repo write path design is retrievable as accepted IronDev memory and preserves the design-only boundary before any branch/apply command exists.",
+  "max_turns": 3,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "CONTROLLED_REAL_REPO_WRITE_PATH_DESIGN_172",
+        "take": 5,
+        "expect_top_title_contains": "Controlled Real Repo Write Path Design 172",
+        "expect_semantic_trace_id": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "Controlled Real Repo Write Path Design 172 settings hard invariants cannot be disabled",
+        "take": 5,
+        "expect_top_title_contains": "Controlled Real Repo Write Path Design 172",
+        "expect_semantic_trace_id": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "memory_search",
+      "params": {
+        "project": "IronDev",
+        "query": "Controlled Real Repo Write Path Design 172 human approval isolated branch worktree not main",
+        "take": 5,
+        "expect_top_title_contains": "Controlled Real Repo Write Path Design 172",
+        "expect_semantic_trace_id": true
+      }
+    }
+  ],
+  "expected": {
+    "controlled_write_design_memory_retrievable": true,
+    "settings_and_hard_invariants_retrievable": true,
+    "scoped_approval_boundary_retrievable": true,
+    "no_branch_apply_command_implemented": true,
+    "no_real_repo_write_authority_granted": true
+  },
+  "boundary": "Design and memory retrieval only. No branch apply command, PR creation, promotion approval execution, accepted memory mutation, real repository write, or agent authority expansion."
+}
