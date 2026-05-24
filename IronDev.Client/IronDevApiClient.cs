@@ -1,0 +1,74 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using IronDev.Core.Auth;
+
+namespace IronDev.Client;
+
+public sealed class IronDevApiClient : IIronDevApiClient
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly HttpClient _httpClient;
+
+    public IronDevApiClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+
+    public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
+        return response.IsSuccessStatusCode;
+    }
+
+    public Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+        => PostAsync<LoginRequest, LoginResponse>("api/auth/login", request, cancellationToken);
+
+    public Task<UserProfileDto> GetCurrentUserAsync(CancellationToken cancellationToken = default)
+        => GetAsync<UserProfileDto>("api/auth/me", cancellationToken);
+
+    public Task<IReadOnlyList<TenantDto>> GetTenantsAsync(CancellationToken cancellationToken = default)
+        => GetAsync<IReadOnlyList<TenantDto>>("api/tenants", cancellationToken);
+
+    public Task<LoginResponse> SelectTenantAsync(SelectTenantRequest request, CancellationToken cancellationToken = default)
+        => PostAsync<SelectTenantRequest, LoginResponse>("api/tenants/select", request, cancellationToken);
+
+    public Task LogoutAsync(CancellationToken cancellationToken = default)
+        => PostAsync<object, object>("api/auth/logout", new { }, cancellationToken);
+
+    private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        return await ReadRequiredAsync<T>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(path, request, JsonOptions, cancellationToken).ConfigureAwait(false);
+        return await ReadRequiredAsync<TResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<T> ReadRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var body = response.Content is null
+            ? null
+            : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = string.IsNullOrWhiteSpace(body)
+                ? $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}."
+                : $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}";
+
+            throw new IronDevApiException(response.StatusCode, message, body);
+        }
+
+        if (typeof(T) == typeof(object))
+            return (T)new object();
+
+        if (string.IsNullOrWhiteSpace(body))
+            throw new IronDevApiException(response.StatusCode, "IronDev API returned an empty response body.");
+
+        var result = JsonSerializer.Deserialize<T>(body, JsonOptions);
+        return result ?? throw new IronDevApiException(response.StatusCode, "IronDev API returned a null or invalid response body.", body);
+    }
+}
