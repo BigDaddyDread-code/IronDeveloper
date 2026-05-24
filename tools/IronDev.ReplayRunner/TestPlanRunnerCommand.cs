@@ -69,7 +69,9 @@ public sealed class TestPlanRunner
         "live_critic_planner_agents_159",
         "live_retriever_sentinel_agents_160",
         "live_remaining_governed_agents_161",
-        "governed_tool_loop_162_167"
+        "governed_tool_loop_162_167",
+        "loop_gated_disposable_build_168",
+        "promotion_package_169"
     };
 
     private readonly string _repoRoot;
@@ -140,6 +142,8 @@ public sealed class TestPlanRunner
                     "live_retriever_sentinel_agents_160" => await RunLiveRetrieverSentinelAgents160Async(runId, logPath),
                     "live_remaining_governed_agents_161" => await RunLiveRemainingGovernedAgents161Async(runId, logPath),
                     "governed_tool_loop_162_167" => await RunGovernedToolLoop162167Async(runId, logPath),
+                    "loop_gated_disposable_build_168" => await RunLoopGatedDisposableBuild168Async(runId, logPath),
+                    "promotion_package_169" => await RunPromotionPackage169Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -802,6 +806,109 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Governed tool loop 162-167 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunLoopGatedDisposableBuild168Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "loop-gated-disposable-build-168", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign loop-gated-disposable-build-168 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected campaign status Succeeded, actual {ReadProperty(parsed, "status")}.");
+        if (!StringPropertyEquals(parsed, "project", "Solitaire"))
+            failures.Add($"Expected project Solitaire, actual {ReadProperty(parsed, "project")}.");
+        if (!StringPropertyEquals(parsed, "goal", "I want build solitaire"))
+            failures.Add($"Expected messy goal to be preserved, actual {ReadProperty(parsed, "goal")}.");
+        if (!StringPropertyEquals(parsed, "recommendation", "PromoteLater"))
+            failures.Add($"Expected recommendation PromoteLater, actual {ReadProperty(parsed, "recommendation")}.");
+
+        var data = ReadElement(parsed, "data");
+        if (!ReadBoolProperty(data, "productSpikeCandidate"))
+            failures.Add("Expected productSpikeCandidate=true.");
+        if (!ReadBoolProperty(data, "generatedSolitaireAppContained"))
+            failures.Add("Expected generatedSolitaireAppContained=true.");
+        if (!ReadBoolProperty(data, "docsAreRunScoped"))
+            failures.Add("Expected docsAreRunScoped=true.");
+        if (!ReadBoolProperty(data, "memoryMutationBlocked") || !ReadBoolProperty(data, "ticketAcceptanceBlocked"))
+            failures.Add("Expected memory mutation and ticket acceptance to remain blocked.");
+
+        var mutation = ReadElement(parsed, "mutation");
+        if (ReadIntProperty(mutation, "realRepoMutationCount") != 0)
+            failures.Add($"Expected real repo mutation count zero, actual {ReadIntProperty(mutation, "realRepoMutationCount")}.");
+        if (ReadIntProperty(mutation, "disposableFilesChanged") < 17)
+            failures.Add($"Expected disposableFilesChanged >= 17, actual {ReadIntProperty(mutation, "disposableFilesChanged")}.");
+
+        var evidence = ReadArray(parsed, "evidence");
+        foreach (var expected in new[] { "RunScopedDocument", "PlannerCriticTrace", "BuilderTrace", "BuilderReport", "QualityCommandLog" })
+        {
+            if (!evidence.Any(item => string.Equals(ReadProperty(item, "type"), expected, StringComparison.OrdinalIgnoreCase)))
+                failures.Add($"Expected evidence type {expected}.");
+        }
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Loop-gated disposable build 168 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunPromotionPackage169Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "promotion-package-169", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign promotion-package-169 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected campaign status Succeeded, actual {ReadProperty(parsed, "status")}.");
+        if (!StringPropertyEquals(parsed, "project", "Solitaire"))
+            failures.Add($"Expected project Solitaire, actual {ReadProperty(parsed, "project")}.");
+
+        var proposedChange = ReadElement(parsed, "proposedChange");
+        if (string.IsNullOrWhiteSpace(ReadProperty(proposedChange, "proposedChangeId")))
+            failures.Add("Expected ProposedChange id.");
+        if (!StringPropertyEquals(proposedChange, "currentStage", "PromotionPackageCreated"))
+            failures.Add($"Expected ProposedChange currentStage PromotionPackageCreated, actual {ReadProperty(proposedChange, "currentStage")}.");
+        if (!StringPropertyEquals(proposedChange, "approvalState", "NeedsHumanReview"))
+            failures.Add($"Expected ProposedChange approvalState NeedsHumanReview, actual {ReadProperty(proposedChange, "approvalState")}.");
+
+        var package = ReadElement(parsed, "promotionPackage");
+        var runtime = ReadElement(package, "runtimeProfile");
+        if (!StringPropertyEquals(runtime, "runtimeProfileId", "csharp-dotnet"))
+            failures.Add($"Expected csharp-dotnet runtime, actual {ReadProperty(runtime, "runtimeProfileId")}.");
+        if (!StringPropertyEquals(runtime, "availability", "Executable"))
+            failures.Add($"Expected executable runtime profile, actual {ReadProperty(runtime, "availability")}.");
+        if (ReadArray(package, "filesToPromote").Count < 10)
+            failures.Add("Expected at least 10 promotable files.");
+        if (ReadArray(package, "filesBlocked").Count == 0)
+            failures.Add("Expected build output files to be blocked from promotion.");
+        if (!StringPropertyEquals(package, "approvalState", "NeedsHumanReview"))
+            failures.Add($"Expected package approvalState NeedsHumanReview, actual {ReadProperty(package, "approvalState")}.");
+
+        var summary = ReadElement(package, "evidenceSummary");
+        if (ReadIntProperty(summary, "realRepoMutationCount") != 0)
+            failures.Add($"Expected real repo mutation count zero, actual {ReadIntProperty(summary, "realRepoMutationCount")}.");
+        if (ReadIntProperty(summary, "promotableFileCount") < 10)
+            failures.Add("Expected evidence summary promotable file count >= 10.");
+
+        var profiles = ReadArray(parsed, "runtimeProfiles");
+        foreach (var expected in new[] { "csharp-dotnet", "java-maven", "typescript-node", "python-pytest" })
+        {
+            if (!profiles.Any(profile => string.Equals(ReadProperty(profile, "runtimeProfileId"), expected, StringComparison.OrdinalIgnoreCase)))
+                failures.Add($"Expected runtime profile {expected}.");
+        }
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Promotion package 169 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);

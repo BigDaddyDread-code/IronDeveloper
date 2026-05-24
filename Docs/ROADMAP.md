@@ -213,7 +213,7 @@ Still blocked:
 
 ## Governed Planner/Critic Tool Loop 162-167
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: make agents evidence-seeking instead of single-response helpers by adding a native governed tool contract, trace output, human escalation, evidence validation, and language-agnostic runtime profiles.
 
@@ -235,4 +235,56 @@ Still blocked:
 - Patch application.
 - ConscienceAgent bypass.
 - ThoughtLedger bypass.
+- Agent self-approval.
+
+## Loop-Gated Disposable Build 168
+
+**Status: Delivered**
+
+Goal: make `build disposable run` earn its living by turning a messy product prompt into run-scoped docs, governed Planner/Critic evidence, a caged BuilderAgent repair build, QualityAgent evidence, and one final report.
+
+Delivered in this slice:
+
+- `build disposable run --project Solitaire --goal "I want build solitaire"` product-shaped command.
+- `campaign loop-gated-disposable-build-168` dogfood regression command.
+- Run-scoped intake, build brief, and ticket draft documents.
+- Governed Planner/Critic tool loop before build execution.
+- Trace-backed BuilderAgent repair loop inside the disposable workspace.
+- QualityAgent/Killjoy gate after the caged build.
+- Final evidence envelope with real repo mutation count, disposable file count, evidence refs, and recommendation.
+
+Still blocked:
+
+- Real repository writes.
+- Accepted memory mutation from the command.
+- Ticket acceptance.
+- Promotion approval.
+- ConscienceAgent or ThoughtLedger bypass.
+- BuilderAgent self-approval.
+
+## Promotion Package And Language Runtime Spine 169
+
+**Status: Active**
+
+Goal: create the bridge from a successful disposable build to reviewed promotable work without applying anything.
+
+Delivered in this slice:
+
+- `ProposedChange` case-file model.
+- `PromotionPackage` review evidence model.
+- `ILanguageRuntimeRegistry` and `LanguageRuntimeProfile`.
+- executable `csharp-dotnet` runtime profile.
+- contract-only `java-maven`, `typescript-node`, and `python-pytest` profiles marked `NotExecutableYet`.
+- `promotion package create` command.
+- `campaign promotion-package-169` dogfood regression command.
+- promotable/blocked file classification for disposable Solitaire output.
+
+Still blocked:
+
+- Real repository writes.
+- Branch/worktree apply.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Promotion approval.
+- Non-C# runtime execution.
 - Agent self-approval.

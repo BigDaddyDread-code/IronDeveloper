@@ -1,0 +1,39 @@
+{
+  "test_run_id": "IronDev169-PromotionPackage",
+  "goal_id": "promotion-package-language-runtime-169",
+  "description": "Proves a successful disposable Solitaire build can become a ProposedChange and PromotionPackage with a real C# runtime profile, blocked generated outputs, evidence, and NeedsHumanReview approval state.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "promotion_package_169",
+      "params": {
+        "project": "Solitaire",
+        "expect_proposed_change": true,
+        "expect_package": true,
+        "expect_runtime_profile": "csharp-dotnet",
+        "expect_future_runtime_profiles": [
+          "java-maven",
+          "typescript-node",
+          "python-pytest"
+        ],
+        "expect_promotable_files_min": 10,
+        "expect_blocked_files_min": 1,
+        "expect_real_repo_mutation_count": 0,
+        "expect_approval_state": "NeedsHumanReview"
+      }
+    }
+  ],
+  "expected": {
+    "proposed_change_created": true,
+    "promotion_package_created": true,
+    "csharp_runtime_executable": true,
+    "future_runtime_profiles_contract_only": true,
+    "generated_source_files_promotable": true,
+    "bin_obj_outputs_blocked": true,
+    "real_repo_mutation_count_zero": true,
+    "approval_state_needs_human_review": true
+  },
+  "boundary": "Promotion package review only. No apply, branch creation, accepted memory mutation, ticket acceptance, real repo writes, or self-approval."
+}

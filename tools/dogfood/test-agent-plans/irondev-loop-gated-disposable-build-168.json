@@ -1,0 +1,36 @@
+{
+  "test_run_id": "IronDev168-LoopGatedDisposableBuild",
+  "goal_id": "loop-gated-disposable-build-168",
+  "description": "Proves a messy Solitaire build prompt can create run-scoped docs, pass through the governed Planner/Critic loop, run the caged BuilderAgent repair build, run QualityAgent, and return compact evidence with zero real repo mutation.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "loop_gated_disposable_build_168",
+      "params": {
+        "project": "Solitaire",
+        "goal": "I want build solitaire",
+        "expect_route": "ProjectPlanningDiscussion",
+        "expect_product_spike_candidate": true,
+        "expect_run_scoped_docs": true,
+        "expect_planner_critic_loop": true,
+        "expect_builder_repair_loop": true,
+        "expect_quality_gate": true,
+        "expect_real_repo_mutation_count": 0,
+        "expect_disposable_files_changed_min": 17,
+        "expect_recommendation": "PromoteLater"
+      }
+    }
+  ],
+  "expected": {
+    "messy_prompt_preserved": true,
+    "run_scoped_docs_created": true,
+    "planner_critic_evidence_passes": true,
+    "caged_builder_repair_loop_passes": true,
+    "quality_gate_passes": true,
+    "real_repo_mutation_count_zero": true,
+    "generated_solitaire_app_contained": true
+  },
+  "boundary": "Loop-gated disposable build only. Generated app files must stay in the disposable workspace; run-scoped docs are evidence only; no accepted memory mutation, ticket acceptance, real repo writes, or self-approval."
+}

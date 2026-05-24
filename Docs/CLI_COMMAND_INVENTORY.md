@@ -20,6 +20,7 @@ The machine-readable inventory is stored at:
 - Govern commands: 1
 - Inventory commands: 1
 - Memory commands: 8
+- Promotion commands: 1
 - Builder commands: 3
 - Foundation commands: 1
 - Run report commands: 1
@@ -57,6 +58,9 @@ The machine-readable inventory is stored at:
 - `campaign live-critic-planner-159`
 - `campaign live-retriever-sentinel-160`
 - `campaign governed-tool-loop-162-167`
+- `campaign loop-gated-disposable-build-168`
+- `campaign promotion-package-169`
+- `promotion package create`
 - `agent architect review`
 
 These are closest to the control surface Codex will use.
@@ -75,7 +79,9 @@ These are closest to the control surface Codex will use.
 
 `agent builder repair-loop` runs the first real trace-backed disposable repair loop. It generates Solitaire inside an explicit disposable workspace, injects one build failure and one rule-test failure, repairs both inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
 
-`build disposable repair` and `build disposable run` are clean product-shaped aliases for the same trace-backed disposable repair loop. They accept `--run-id`; `--dogfood-run-id` remains a compatibility alias.
+`build disposable repair` is the clean product-shaped alias for the direct trace-backed disposable repair loop. It accepts `--run-id`; `--dogfood-run-id` remains a compatibility alias.
+
+`build disposable run` is now the fuller product-shaped entrypoint for the 168 workflow. It takes a goal such as `I want build solitaire`, creates run-scoped docs, runs the governed Planner/Critic loop, runs the caged BuilderAgent repair build, runs QualityAgent/Killjoy evidence, and returns one compact report. It still writes generated app files only inside the disposable workspace.
 
 `test run-plan` is the product-shaped alias for `agent tester run-plan`. TesterAgent remains an execution/reporting wrapper only.
 
@@ -94,6 +100,12 @@ As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` exec
 `agent loop plan-review` runs the 162-167 governed Planner/Critic tool loop. PlannerAgent requests named capabilities, the tool registry executes safe read/test/report tools, CriticAgent reviews evidence, PlannerAgent revises the plan, and a human escalation gate records review requirements. It does not grant writes, memory mutation, ticket creation, patch application, or raw command execution by agents.
 
 `campaign governed-tool-loop-162-167` is the dogfood regression command for the same loop. It also proves the tool registry, trace report, evidence validation layer, human escalation gate, and `.NET`/Node/Python runtime profile contracts.
+
+`campaign loop-gated-disposable-build-168` is the dogfood regression command for messy prompt -> run-scoped docs -> governed Planner/Critic loop -> caged Solitaire build/repair -> QualityAgent evidence -> final report. It must keep real repo mutation count at zero.
+
+`promotion package create` creates a `ProposedChange` and `PromotionPackage` from a successful disposable source run. It classifies files through the language runtime profile, keeps generated build outputs blocked, and leaves approval at `NeedsHumanReview`.
+
+`campaign promotion-package-169` runs the 168 source build and then packages it, proving the bridge from disposable output to review evidence. It does not apply files or create a branch.
 
 ## Dogfood/Smoke Commands
 
@@ -180,7 +192,7 @@ The JSON inventory is a flat command array sorted by `category`, then `command`.
 - `test run-plan --plan <path> --run-id <run> --json` aliases the TesterAgent execution surface.
 - `trace build-smoke --project Solitaire --run-id <run> --json` aliases the BuildAgent trace smoke.
 - `build disposable repair --project Solitaire --run-id <run> --json` aliases the trace-backed disposable repair loop.
-- `build disposable run --project Solitaire --run-id <run> --json` is an alpha product-shaped entrypoint for the same caged repair loop.
+- `build disposable run --project Solitaire --run-id <run> --json` was introduced as an alpha product-shaped entrypoint for the caged repair loop. As of 168 it points at the fuller loop-gated workflow; use `build disposable repair` for the direct repair-loop command.
 - `dogfood build solitaire-disposable-build-smoke --run-id <run> --json` and `dogfood build disposable-apply-smoke --run-id <run> --json` keep dogfood build proofs visibly separate from product commands.
 - `dogfood foundation break-test --scenario <scenario> --run-id <run> --json` keeps foundation break-test scenarios under dogfood naming.
 - `dogfood memory ...` aliases keep memory-spine proof commands visibly dogfood-only.
@@ -213,4 +225,18 @@ If an unported action falls back to the legacy script, the report marks `compati
 - The first UI surface is the `RunReports` workspace inside the existing `ProjectWorkspaceFrame`.
 
 This is read/report infrastructure only. It does not change CLI command semantics, builder behavior, agent authority, retrieval, memory, or real repository write boundaries.
+
+## 168 Loop-Gated Disposable Build
+
+- `build disposable run --project Solitaire --goal "I want build solitaire" --run-id <run> --json` turns a messy product prompt into run-scoped docs, Planner/Critic evidence, caged BuilderAgent repair-build evidence, QualityAgent evidence, and a final report.
+- `campaign loop-gated-disposable-build-168 --run-id <run> --json` validates the same workflow through the Test Agent native C# runner.
+- The command writes run evidence under `tools/dogfood/runs/{runId}` and generated Solitaire app files under the explicit temp disposable workspace.
+- It does not mutate accepted memory, accept tickets, approve promotion, or write generated app files into the real repository.
+
+## 169 Promotion Package And Language Runtime Spine
+
+- `promotion package create --source-run-id <run> --project Solitaire --run-id <package-run> --json` creates a ProposedChange case file and PromotionPackage review package from a successful disposable source run.
+- `campaign promotion-package-169 --run-id <run> --json` runs the 168 source build first, then packages its output.
+- The package includes the `csharp-dotnet` executable runtime profile, contract-only `java-maven`, `typescript-node`, and `python-pytest` profiles, promotable files, blocked files, test evidence, risks, checklist, and `NeedsHumanReview` approval state.
+- It does not apply files, create branches, mutate accepted memory, accept tickets, or approve writes.
 
