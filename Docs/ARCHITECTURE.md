@@ -110,6 +110,14 @@ powershell -ExecutionPolicy Bypass -File ./Scripts/Assert-WpfApiBoundary.ps1
 
 The guard fails if `IronDeveloper` reintroduces forbidden WPF coupling such as `IronDev.Infrastructure`, `IronDev.Services`, or the old direct service interface names.
 
+## UI Testability Gate
+
+Future UI shell work must be testable by contract before it becomes serious product surface.
+
+No serious new UI shell work starts until the Playwright harness exists, the `data-testid` convention exists, JSON and markdown reports exist, and at least one journey can run or is explicitly marked pending against a missing shell. Future UI PRs must add or update journey coverage for changed workflows.
+
+The UI testing contract lives in `Docs/UI_TESTING_CONTRACT.md`. The Codex-readable result schema lives in `Docs/UI_TEST_RESULT_SCHEMA.md`.
+
 ## Tenancy Model
 
 Every domain entity carries a `TenantId` foreign key. All service reads filter by `TenantId`. All service writes validate project ownership before insert.

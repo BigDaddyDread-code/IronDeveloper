@@ -1,0 +1,31 @@
+{
+  "config": {
+    "rootDir": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\ui-tests\\tests"
+  },
+  "suites": [
+    {
+      "title": "login-smoke.spec.ts",
+      "specs": [
+        {
+          "title": "user can log in and reach tenant-aware shell",
+          "ok": false,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "skipped",
+              "results": [
+                {
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "attachments": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

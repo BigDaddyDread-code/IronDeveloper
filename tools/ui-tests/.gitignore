@@ -1,0 +1,5 @@
+node_modules/
+test-results/
+reports/html/
+reports/playwright-report.json
+reports/latest-ui-test-report.md

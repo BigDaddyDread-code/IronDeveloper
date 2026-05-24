@@ -1,0 +1,21 @@
+{
+  "name": "irondev-ui-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ui-test:install": "playwright install",
+    "ui-test:login-smoke": "playwright test tests/login-smoke.spec.ts",
+    "ui-test:project-open-smoke": "playwright test tests/project-open-smoke.spec.ts",
+    "ui-test:ticket-review-smoke": "playwright test tests/ticket-review-smoke.spec.ts",
+    "ui-test:document-to-ticket": "playwright test tests/document-to-ticket-journey.spec.ts",
+    "ui-test:build-run-review-smoke": "playwright test tests/build-run-review-smoke.spec.ts",
+    "ui-test:all": "playwright test",
+    "ui-test:report": "node scripts/generate-report.mjs --input reports/playwright-report.json --fallback reports/sample-playwright-report.json --output reports/latest-ui-test-report.md"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@playwright/test": "^1.44.0",
+    "typescript": "^5.4.0"
+  }
+}
