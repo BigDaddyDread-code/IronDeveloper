@@ -15,6 +15,12 @@ public sealed partial class RunReportsViewModel : ObservableObject
     public ObservableCollection<RunAttemptSummary> Attempts { get; } = [];
     public ObservableCollection<RunRepairSummary> Repairs { get; } = [];
     public ObservableCollection<RunEvidenceItem> Evidence { get; } = [];
+    public ObservableCollection<RunPromotionFile> PromotableFiles { get; } = [];
+    public ObservableCollection<RunPromotionFile> BlockedFiles { get; } = [];
+    public ObservableCollection<RunPromotionRisk> PromotionRisks { get; } = [];
+    public ObservableCollection<string> PromotionChecklist { get; } = [];
+    public ObservableCollection<string> HardInvariants { get; } = [];
+    public ObservableCollection<string> ConfigurablePolicy { get; } = [];
 
     [ObservableProperty]
     private RunReportSummary? _selectedRun;
@@ -43,6 +49,14 @@ public sealed partial class RunReportsViewModel : ObservableObject
     public int RealRepoMutationCount => SelectedRunDetail?.RealRepoMutationCount ?? 0;
     public int DisposableFilesChanged => SelectedRunDetail?.DisposableFilesChanged ?? 0;
     public string WorkspacePath => SelectedRunDetail?.WorkspacePath ?? "";
+    public string PromotionPackageId => SelectedRunDetail?.PromotionReview?.PackageId ?? "";
+    public string ProposedChangeId => SelectedRunDetail?.PromotionReview?.ProposedChangeId ?? "";
+    public string ApprovalState => SelectedRunDetail?.PromotionReview?.ApprovalState ?? "";
+    public string RuntimeProfile => SelectedRunDetail?.PromotionReview?.RuntimeProfileId ?? "";
+    public string TargetLanguage => SelectedRunDetail?.PromotionReview?.TargetLanguage ?? "";
+    public string TargetStack => SelectedRunDetail?.PromotionReview?.TargetStack ?? "";
+    public int BlockedFileCount => SelectedRunDetail?.PromotionReview?.BlockedFileCount ?? 0;
+    public bool HasPromotionReview => SelectedRunDetail?.PromotionReview is not null;
 
     public RunReportsViewModel(IRunReportService runReportService, IRunEvidenceService runEvidenceService)
     {
@@ -103,6 +117,12 @@ public sealed partial class RunReportsViewModel : ObservableObject
         Attempts.Clear();
         Repairs.Clear();
         Evidence.Clear();
+        PromotableFiles.Clear();
+        BlockedFiles.Clear();
+        PromotionRisks.Clear();
+        PromotionChecklist.Clear();
+        HardInvariants.Clear();
+        ConfigurablePolicy.Clear();
         SelectedEvidenceText = string.Empty;
         SelectedRunDetail = null;
 
@@ -129,6 +149,21 @@ public sealed partial class RunReportsViewModel : ObservableObject
                 Repairs.Add(repair);
             foreach (var evidence in detail.Evidence)
                 Evidence.Add(evidence);
+            if (detail.PromotionReview is not null)
+            {
+                foreach (var file in detail.PromotionReview.PromotableFiles.Take(40))
+                    PromotableFiles.Add(file);
+                foreach (var file in detail.PromotionReview.BlockedFiles.Take(40))
+                    BlockedFiles.Add(file);
+                foreach (var risk in detail.PromotionReview.Risks)
+                    PromotionRisks.Add(risk);
+                foreach (var item in detail.PromotionReview.RequiredChecks.Concat(detail.PromotionReview.ExplicitApprovalsNeeded))
+                    PromotionChecklist.Add(item);
+            }
+            foreach (var invariant in detail.Policy.HardInvariants)
+                HardInvariants.Add(invariant);
+            foreach (var setting in detail.Policy.ConfigurableSettings)
+                ConfigurablePolicy.Add(setting);
 
             StatusMessage = detail.Warnings.Count > 0
                 ? string.Join(" ", detail.Warnings)
@@ -174,5 +209,13 @@ public sealed partial class RunReportsViewModel : ObservableObject
         OnPropertyChanged(nameof(RealRepoMutationCount));
         OnPropertyChanged(nameof(DisposableFilesChanged));
         OnPropertyChanged(nameof(WorkspacePath));
+        OnPropertyChanged(nameof(PromotionPackageId));
+        OnPropertyChanged(nameof(ProposedChangeId));
+        OnPropertyChanged(nameof(ApprovalState));
+        OnPropertyChanged(nameof(RuntimeProfile));
+        OnPropertyChanged(nameof(TargetLanguage));
+        OnPropertyChanged(nameof(TargetStack));
+        OnPropertyChanged(nameof(BlockedFileCount));
+        OnPropertyChanged(nameof(HasPromotionReview));
     }
 }

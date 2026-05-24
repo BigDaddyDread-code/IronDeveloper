@@ -1,5 +1,33 @@
 ﻿[
     {
+        "planFile":  "irondev-promotion-review-cockpit-171.json",
+        "goalId":  "promotion-review-cockpit-171",
+        "project":  "IronDev",
+        "description":  "Validate the Run Reports viewer service exposes promotion package/apply review evidence, configurable policy settings, and hard safety invariants.",
+        "agentPath":  "TestAgent + ReplayRunner + FileRunReportService + RunReportsViewModel",
+        "command":  "run-report viewer-smoke",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "FileRunReportService",
+                                 "IRunReportService",
+                                 "IRunEvidenceService"
+                             ],
+        "expectedEvidence":  [
+                                 "promotion package id visible",
+                                 "proposed change id visible",
+                                 "approval state NeedsHumanReview visible",
+                                 "runtime profile visible",
+                                 "promotable files visible",
+                                 "blocked files visible",
+                                 "configurable policy visible",
+                                 "hard invariants visible",
+                                 "no WPF CLI shell-out"
+                             ],
+        "regressionGroup":  "RunReports",
+        "safetyBoundary":  "Read/report only; no promotion approval, real repo writes, memory mutation, BuilderAgent execution, or agent authority expansion.",
+        "kind":  "service-smoke"
+    },
+    {
         "planFile":  "irondev-isolated-promotion-apply-170.json",
         "goalId":  "isolated-promotion-apply-170",
         "project":  "IronDev",

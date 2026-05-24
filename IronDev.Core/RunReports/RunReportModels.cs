@@ -33,6 +33,8 @@ public sealed record RunReportDetail
     public string WorkspacePath { get; init; } = string.Empty;
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public string? ReportPath { get; init; }
+    public RunPromotionReview? PromotionReview { get; init; }
+    public RunReviewPolicySnapshot Policy { get; init; } = RunReviewPolicySnapshot.Default;
 }
 
 public sealed record RunStageStatus
@@ -66,4 +68,69 @@ public sealed record RunEvidenceItem
     public string Type { get; init; } = string.Empty;
     public string Path { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
+}
+
+public sealed record RunPromotionReview
+{
+    public string PackageId { get; init; } = string.Empty;
+    public string ProposedChangeId { get; init; } = string.Empty;
+    public string ApprovalState { get; init; } = string.Empty;
+    public string Recommendation { get; init; } = string.Empty;
+    public string RuntimeProfileId { get; init; } = string.Empty;
+    public string TargetLanguage { get; init; } = string.Empty;
+    public string TargetStack { get; init; } = string.Empty;
+    public int PromotableFileCount { get; init; }
+    public int BlockedFileCount { get; init; }
+    public IReadOnlyList<RunPromotionFile> PromotableFiles { get; init; } = [];
+    public IReadOnlyList<RunPromotionFile> BlockedFiles { get; init; } = [];
+    public IReadOnlyList<RunPromotionRisk> Risks { get; init; } = [];
+    public IReadOnlyList<string> RequiredChecks { get; init; } = [];
+    public IReadOnlyList<string> ExplicitApprovalsNeeded { get; init; } = [];
+    public IReadOnlyList<string> BlockedActions { get; init; } = [];
+}
+
+public sealed record RunPromotionFile
+{
+    public string RelativePath { get; init; } = string.Empty;
+    public string Role { get; init; } = string.Empty;
+    public string Language { get; init; } = string.Empty;
+    public string Reason { get; init; } = string.Empty;
+    public bool HashMatchesPackage { get; init; }
+}
+
+public sealed record RunPromotionRisk
+{
+    public string Severity { get; init; } = string.Empty;
+    public string Category { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public string Mitigation { get; init; } = string.Empty;
+}
+
+public sealed record RunReviewPolicySnapshot
+{
+    public static RunReviewPolicySnapshot Default { get; } = new()
+    {
+        PolicyId = "irondev-default-promotion-review",
+        ConfigurableSettings = [
+            "runtime profile selection",
+            "build command per runtime profile",
+            "test command per runtime profile",
+            "promotable source extensions",
+            "blocked generated path segments",
+            "human review checklist",
+            "risk visibility thresholds"
+        ],
+        HardInvariants = [
+            "real repo writes require explicit reviewed approval",
+            "agents cannot approve their own changes",
+            "ConscienceAgent and ThoughtLedger cannot be bypassed for governed apply",
+            "mutation requires trace and evidence",
+            "project scope must be explicit",
+            "blocked files must not be promoted silently"
+        ]
+    };
+
+    public string PolicyId { get; init; } = string.Empty;
+    public IReadOnlyList<string> ConfigurableSettings { get; init; } = [];
+    public IReadOnlyList<string> HardInvariants { get; init; } = [];
 }

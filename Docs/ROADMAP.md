@@ -291,7 +291,7 @@ Still blocked:
 
 ## Isolated Promotion Apply Proof 170
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: consume a `PromotionPackage` and prove it can become an isolated candidate workspace without writing main.
 
@@ -317,4 +317,31 @@ Still blocked:
 - Accepted memory mutation.
 - Ticket acceptance.
 - Promotion approval.
+- Agent self-approval.
+
+## Promotion Review Cockpit 171
+
+**Status: Active**
+
+Goal: make promotion package and isolated apply evidence inspectable in the WPF Run Reports workspace before any real write-path design.
+
+Delivered in this slice:
+
+- promotion review fields in `RunReportDetail`.
+- promotable and blocked file lists.
+- approval state and recommendation display.
+- runtime profile, target language, and target stack display.
+- configurable review policy visibility.
+- hard safety invariant visibility.
+- service parsing for `promotion-package.json` and `isolated-promotion-apply-report.json`.
+- Run Reports view sections for promotion review and policy.
+
+Still blocked:
+
+- Promotion approval.
+- Real repository writes.
+- Main branch writes.
+- Pull request creation.
+- Auto-merge.
+- Accepted memory mutation.
 - Agent self-approval.

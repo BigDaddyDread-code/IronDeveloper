@@ -229,6 +229,7 @@ If an unported action falls back to the legacy script, the report marks `compati
 - `run-report viewer-smoke --run-id <run> --json` creates small file-backed run report fixtures and proves the shared `IRunReportService` / `IRunEvidenceService` path can read them.
 - WPF uses the same shared services through `RunReportsViewModel`; it does not shell out to ReplayRunner or parse CLI stdout.
 - The first UI surface is the `RunReports` workspace inside the existing `ProjectWorkspaceFrame`.
+- Slice 171 extends the same viewer/service path with promotion review data: package id, proposed change id, approval state, runtime profile, promotable files, blocked files, configurable policy, and hard safety invariants.
 
 This is read/report infrastructure only. It does not change CLI command semantics, builder behavior, agent authority, retrieval, memory, or real repository write boundaries.
 

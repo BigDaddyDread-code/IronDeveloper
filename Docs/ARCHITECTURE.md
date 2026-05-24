@@ -175,4 +175,6 @@ IRONDEV-169 adds the promotion bridge. `ProposedChange` is the review case file;
 
 IRONDEV-170 proves isolated promotion apply. `promotion apply isolated` consumes a `PromotionPackage`, creates an isolated candidate workspace outside the active repo, copies only `FilesToPromote`, rejects `FilesBlocked`, runs runtime build/test, and writes an isolated apply report. This proves the promotion bridge can become reviewable candidate code without writing main or granting self-approval.
 
+IRONDEV-171 turns the Run Reports viewer into the promotion review cockpit. `FileRunReportService` can read promotion package and isolated apply reports as structured review data, including approval state, runtime profile, promotable files, blocked files, policy settings, and hard invariants. WPF still calls shared C# services directly rather than shelling out to ReplayRunner.
+
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.

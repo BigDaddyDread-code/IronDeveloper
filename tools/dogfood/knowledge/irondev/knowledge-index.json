@@ -1,5 +1,15 @@
 [
   {
+    "Id": "PROMOTION_REVIEW_COCKPIT_171",
+    "Project": "IronDev",
+    "Title": "Promotion Review Cockpit 171",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\PROMOTION_REVIEW_COCKPIT_171.md",
+    "DogfoodRunId": "PromotionReviewCockpit171",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524171000000-promotion-review-cockpit-171.md",
+    "CreatedUtc": "2026-05-24T17:10:00+00:00"
+  },{
     "Id": "ISOLATED_PROMOTION_APPLY_170",
     "Project": "IronDev",
     "Title": "Isolated Promotion Apply Proof 170",
