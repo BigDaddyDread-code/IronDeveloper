@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="IronDev.Core/IronDev.Core.csproj" />
   <Project Path="IronDev.Infrastructure/IronDev.Infrastructure.csproj" />
+  <Project Path="IronDev.Client/IronDev.Client.csproj" />
   <Project Path="IronDeveloper/IronDev.Agent.csproj" />
   <Project Path="IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj" />
   <Project Path="IronDev.IntegrationTests/IronDev.IntegrationTests.csproj" />
