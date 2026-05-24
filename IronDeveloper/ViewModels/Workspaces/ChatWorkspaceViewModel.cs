@@ -1,3 +1,10 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Prompting;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,10 +18,8 @@ using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
 using IronDev.Agent.Services.Interfaces;
 
-using IronDev.AI;
 using IronDev.Core;
 using IronDev.Data.Models;
-using IronDev.Services;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using System.Threading.Tasks;
@@ -23,13 +28,13 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class ChatWorkspaceViewModel : ObservableObject
 {
-    private readonly IChatHistoryService    _chatHistoryService;
+    private readonly IChatApiClient    _chatHistoryService;
     private readonly IPromptContextBuilder  _promptContextBuilder;
     private readonly ILLMService            _llmService;
-    private readonly IProjectMemoryService  _memoryService;
-    private readonly ITicketService         _ticketService;
-    private readonly IChatFeedbackService   _feedbackService;
-    private readonly ILlmTraceService       _llmTraceService;
+    private readonly IMemoryApiClient  _memoryService;
+    private readonly ITicketsApiClient         _ticketService;
+    private readonly IChatApiClient   _feedbackService;
+    private readonly ITraceApiClient       _llmTraceService;
     private readonly IContextAgentService?  _contextAgentService;
     private readonly IChatCommandRouter     _chatCommandRouter;
 
@@ -81,13 +86,13 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     public Action? OnNavigateToDecision { get; set; }
 
     public ChatWorkspaceViewModel(
-        IChatHistoryService   chatHistoryService,
+        IChatApiClient   chatHistoryService,
         IPromptContextBuilder promptContextBuilder,
         ILLMService           llmService,
-        IProjectMemoryService memoryService,
-        ITicketService        ticketService,
-        IChatFeedbackService  feedbackService,
-        ILlmTraceService      llmTraceService,
+        IMemoryApiClient memoryService,
+        ITicketsApiClient        ticketService,
+        IChatApiClient  feedbackService,
+        ITraceApiClient      llmTraceService,
         IContextAgentService? contextAgentService = null,
         IChatCommandRouter?   chatCommandRouter = null)
     {
@@ -99,12 +104,35 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         _feedbackService      = feedbackService;
         _llmTraceService      = llmTraceService;
         _contextAgentService  = contextAgentService;
-        _chatCommandRouter    = chatCommandRouter ?? new IronDev.Infrastructure.Services.ChatCommandRouter();
+        _chatCommandRouter    = chatCommandRouter ?? new BoundaryChatCommandRouter();
 
         // Wire grouped view for history pane
         var cv = CollectionViewSource.GetDefaultView(_sessions);
         cv.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ProjectChatSession.DateGroup)));
         GroupedSessions = cv;
+    }
+
+    public ChatWorkspaceViewModel(
+        object chatHistoryService,
+        object promptContextBuilder,
+        ILLMService llmService,
+        object memoryService,
+        object ticketService,
+        object feedbackService,
+        object llmTraceService,
+        IContextAgentService? contextAgentService = null,
+        IChatCommandRouter? chatCommandRouter = null)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Chat(chatHistoryService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Prompt(promptContextBuilder),
+            llmService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Chat(feedbackService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Trace(llmTraceService),
+            contextAgentService,
+            chatCommandRouter)
+    {
     }
 
     public async Task LoadAsync(global::IronDev.Data.Models.Project project)
@@ -276,7 +304,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                 ActiveWorkspace = "Chat"
             });
 
-            if (commandRoute.RequiresAction && !commandRoute.AllowsProseResponse)
+            if (!UseContextAgent && commandRoute.RequiresAction && !commandRoute.AllowsProseResponse)
             {
                 if (commandRoute.Intent == ChatRouteIntent.SaveDecision)
                 {
@@ -407,7 +435,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
                     System.Diagnostics.Trace.WriteLine($"[Chat][Warning] Conflict artefact retrieval failed: {ex.Message}");
                 }
 
-                var createTicketIntent = IronDev.Infrastructure.Services.ChatIntentParser.ParseCreateTicket(text, previousMessage);
+                var createTicketIntent = ParseCreateTicketIntent(text, previousMessage);
 
                 if (createTicketIntent != null)
                 {
@@ -1315,10 +1343,10 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
     // ── Context summary builder ───────────────────────────────────────────────
 
     /// <summary>
-    /// Builds a compact, human-readable context summary from a <see cref="IronDev.AI.ChatContextPacket"/>
+    /// Builds a compact, human-readable context summary from a <see cref="IronDev.Client.Prompting.ChatContextPacket"/>
     /// for display in the LLM Console trace detail panel and exported trace files.
     /// </summary>
-    public static string BuildContextSummary(IronDev.AI.ChatContextPacket packet)
+    public static string BuildContextSummary(ChatContextPacket packet)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"Intent:            {packet.Intent}");
@@ -1338,5 +1366,145 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    public static string BuildContextSummary(object packet)
+    {
+        if (packet is ChatContextPacket typed)
+            return BuildContextSummary(typed);
+
+        var mapped = new ChatContextPacket
+        {
+            FormattedPrompt = ReadPacketValue<string>(packet, nameof(ChatContextPacket.FormattedPrompt)) ?? string.Empty,
+            IsProjectNotIndexed = ReadPacketValue<bool>(packet, nameof(ChatContextPacket.IsProjectNotIndexed)),
+            IncludedMemoryCount = ReadPacketValue<int>(packet, nameof(ChatContextPacket.IncludedMemoryCount)),
+            FilteredMemoryCount = ReadPacketValue<int>(packet, nameof(ChatContextPacket.FilteredMemoryCount)),
+            IncludedStandardsCount = ReadPacketValue<int>(packet, nameof(ChatContextPacket.IncludedStandardsCount)),
+            FilteredStandardsCount = ReadPacketValue<int>(packet, nameof(ChatContextPacket.FilteredStandardsCount)),
+            RulesLoadWarning = ReadPacketValue<string>(packet, nameof(ChatContextPacket.RulesLoadWarning))
+        };
+
+        if (Enum.TryParse(ReadPacketValue<object>(packet, nameof(ChatContextPacket.Intent))?.ToString(), out ChatIntent intent))
+            mapped.Intent = intent;
+
+        foreach (var path in ReadPacketList(packet, nameof(ChatContextPacket.MatchedFilePaths)))
+            mapped.MatchedFilePaths.Add(path);
+
+        return BuildContextSummary(mapped);
+    }
+
+    private static T? ReadPacketValue<T>(object packet, string propertyName)
+    {
+        var raw = packet.GetType().GetProperty(propertyName)?.GetValue(packet);
+        return raw is T typed ? typed : default;
+    }
+
+    private static IEnumerable<string> ReadPacketList(object packet, string propertyName)
+    {
+        var raw = packet.GetType().GetProperty(propertyName)?.GetValue(packet);
+        if (raw is not System.Collections.IEnumerable values)
+            yield break;
+
+        foreach (var value in values)
+        {
+            if (value is string text)
+                yield return text;
+        }
+    }
+
+    private static CreateTicketIntent? ParseCreateTicketIntent(string text, string? previousMessage)
+    {
+        if (!text.Contains("ticket", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var workText = ExtractTicketWorkText(text);
+        var splitHints = ExtractSplitHints(text);
+        var count = splitHints.Count > 0 ? splitHints.Count : 1;
+        var requiresClarification = string.IsNullOrWhiteSpace(workText)
+            || string.Equals(workText, "ticket", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(workText, "a ticket", StringComparison.OrdinalIgnoreCase);
+
+        return new CreateTicketIntent
+        {
+            Intent = "CreateTicket",
+            Confidence = 0.75,
+            CommandText = text,
+            WorkText = string.IsNullOrWhiteSpace(workText) ? (previousMessage ?? text) : workText,
+            TicketCount = count,
+            SplitHints = splitHints,
+            RequiresClarification = requiresClarification,
+            ClarificationQuestions = requiresClarification
+                ? ["What should the ticket cover?"]
+                : []
+        };
+    }
+
+    private static string ExtractTicketWorkText(string text)
+    {
+        var trimmed = text.Trim().TrimEnd('.', '!', '?');
+        var lower = trimmed.ToLowerInvariant();
+
+        foreach (var prefix in new[]
+        {
+            "create a ticket to ",
+            "create ticket to ",
+            "create a ticket for ",
+            "create ticket for ",
+            "make a ticket to ",
+            "make a ticket for ",
+            "add a ticket to ",
+            "add a ticket for "
+        })
+        {
+            if (lower.StartsWith(prefix, StringComparison.Ordinal))
+                return trimmed[prefix.Length..].Trim();
+        }
+
+        var colon = trimmed.IndexOf(':');
+        if (colon >= 0 && lower[..colon].Contains("ticket", StringComparison.Ordinal))
+            return trimmed[(colon + 1)..].Trim();
+
+        return trimmed;
+    }
+
+    private static IReadOnlyList<string> ExtractSplitHints(string text)
+    {
+        if (!text.Contains("split", StringComparison.OrdinalIgnoreCase)
+            || !text.Contains("ticket", StringComparison.OrdinalIgnoreCase))
+            return [];
+
+        var workText = ExtractTicketWorkText(text);
+        if (string.IsNullOrWhiteSpace(workText))
+            return [];
+
+        return workText
+            .Split([",", " and "], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static part => !string.IsNullOrWhiteSpace(part))
+            .Take(5)
+            .ToList();
+    }
+
+    private sealed class BoundaryChatCommandRouter : IChatCommandRouter
+    {
+        public Task<ChatRouteResult> RouteAsync(ChatTurnInput input, CancellationToken cancellationToken = default)
+        {
+            var ticketIntent = ParseCreateTicketIntent(input.UserMessage, input.PreviousAssistantMessage);
+            if (ticketIntent is null)
+                return Task.FromResult(ChatRouteResult.GeneralChat());
+
+            return Task.FromResult(new ChatRouteResult
+            {
+                Intent = ChatRouteIntent.CreateSingleDraftTicket,
+                Confidence = ticketIntent.Confidence,
+                IsAction = true,
+                RequiresAction = true,
+                AllowsProseResponse = false,
+                ContextReference = ContextReferenceKind.PreviousAssistantMessage,
+                DraftCountMode = DraftCountMode.Single,
+                CreateTicketIntent = ticketIntent,
+                ActionText = ticketIntent.WorkText,
+                ActionTitle = "Create ticket"
+            });
+        }
     }
 }

@@ -1,10 +1,16 @@
 using System.Text;
 using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
+using IronDev.Core;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
+using IronDev.Core.RunReports;
 using IronDev.Data;
+using IronDev.Infrastructure.Builder;
+using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Infrastructure.Services;
+using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -38,6 +44,8 @@ builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 
 // Infrastructure
@@ -45,13 +53,51 @@ builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
+builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
 builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
+builder.Services.AddScoped<IProjectProfileService, ProjectProfileService>();
+builder.Services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
+builder.Services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<SqlCodeIndexService>();
 builder.Services.AddScoped<ICodeIndexService, TracingCodeIndexServiceDecorator>();
 builder.Services.AddScoped<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
+builder.Services.AddSingleton<ILlmTraceService, LlmTraceService>();
+builder.Services.AddSingleton<IMarkdownRenderService, MarkdownRenderService>();
+builder.Services.AddCodeIntelligenceServices();
+builder.Services.AddScoped<IBuilderContextService, BuilderContextService>();
+builder.Services.AddScoped<ICodeChangeProposalService, CodeChangeProposalService>();
+builder.Services.AddScoped<ICodePatchService, CodePatchService>();
+builder.Services.AddScoped<TicketBuildOrchestrator>();
+builder.Services.AddScoped<ITicketBuildOrchestrator, TracingTicketBuildOrchestratorDecorator>();
+builder.Services.AddScoped<IDraftTicketService, DraftTicketService>();
+builder.Services.AddScoped<IBuilderProposalService, BuilderProposalService>();
+builder.Services.AddScoped<ICodebaseTicketGeneratorService, CodebaseTicketGeneratorService>();
+builder.Services.AddScoped<IBuildErrorClassifierService, BuildErrorClassifierService>();
+builder.Services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
+builder.Services.AddScoped<IDotNetBuildService, DotNetRunnerService>();
+builder.Services.AddScoped<IDotNetTestService, DotNetRunnerService>();
+builder.Services.AddSingleton<IRunReportService, FileRunReportService>();
+builder.Services.AddSingleton<IRunEvidenceService>(sp => (IRunEvidenceService)sp.GetRequiredService<IRunReportService>());
+
+var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
+if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
+    aiOptions.ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+builder.Services.AddScoped<ILLMService>(_ =>
+{
+    var provider = aiOptions.Provider?.ToLowerInvariant() ?? "openai";
+    return provider switch
+    {
+        "openai" => new OpenAiLlmService(aiOptions),
+        "localopenai" => new LocalOpenAiCompatibleLlmService(aiOptions),
+        "ollama" => new OllamaLlmService(aiOptions),
+        "custom" => new LocalOpenAiCompatibleLlmService(aiOptions),
+        _ => new FakeLlmService()
+    };
+});
 
 // Tenant context — request-scoped, reads tenant_id from JWT claim.
 builder.Services.AddScoped<ICurrentTenantContext, JwtTenantContext>();
@@ -87,8 +133,16 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
+{
     app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "IronDev API v1");
+        options.RoutePrefix = "swagger";
+    });
+}
 
 app.UseMiddleware<RequestTracingMiddleware>();
 app.UseHttpsRedirection();

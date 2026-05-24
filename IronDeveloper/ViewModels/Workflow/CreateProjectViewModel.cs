@@ -5,15 +5,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Core.Interfaces;
+using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workflow;
 
 public sealed partial class CreateProjectViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.IProjectService _projectService;
-    private readonly global::IronDev.Core.Interfaces.IProjectProfileService _profileService;
-    private readonly global::IronDev.Core.Interfaces.IProjectProfileDetectionService _profileDetectionService;
-    private readonly global::IronDev.Services.IProjectMemoryService? _memoryService;
+    private readonly IProjectsApiClient _projectService;
+    private readonly IProjectProfileService _profileService;
+    private readonly IProjectProfileDetectionService _profileDetectionService;
+    private readonly IMemoryApiClient? _memoryService;
 
     [ObservableProperty] private string _projectName = string.Empty;
     [ObservableProperty] private string _projectPath = string.Empty;
@@ -71,19 +75,32 @@ public sealed partial class CreateProjectViewModel : ObservableObject
     public bool CanGoBack => WizardStep > 1;
     public string PrimaryActionText => WizardStep < 3 ? "Next" : (IsNewProjectMode ? "Create Project" : "Import Project");
 
-    internal Action<global::IronDev.Data.Models.Project>? OnProjectCreated { get; set; }
+    internal Action<Project>? OnProjectCreated { get; set; }
     internal Action?                                    OnCancel         { get; set; }
 
     public CreateProjectViewModel(
-        global::IronDev.Services.IProjectService projectService,
-        global::IronDev.Core.Interfaces.IProjectProfileService profileService,
-        global::IronDev.Core.Interfaces.IProjectProfileDetectionService profileDetectionService,
-        global::IronDev.Services.IProjectMemoryService? memoryService = null)
+        IProjectsApiClient projectService,
+        IProjectProfileService profileService,
+        IProjectProfileDetectionService profileDetectionService,
+        IMemoryApiClient? memoryService = null)
     {
         _projectService = projectService;
         _profileService = profileService;
         _profileDetectionService = profileDetectionService;
         _memoryService = memoryService;
+    }
+
+    public CreateProjectViewModel(
+        object projectService,
+        IProjectProfileService profileService,
+        IProjectProfileDetectionService profileDetectionService,
+        object? memoryService = null)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Projects(projectService),
+            profileService,
+            profileDetectionService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService))
+    {
     }
 
     [RelayCommand]
@@ -171,7 +188,7 @@ public sealed partial class CreateProjectViewModel : ObservableObject
             return;
         }
 
-        var newProject = new global::IronDev.Data.Models.Project
+        var newProject = new Project
         {
             Name = ProjectName.Trim(),
             LocalPath = projectPath,
@@ -203,7 +220,7 @@ public sealed partial class CreateProjectViewModel : ObservableObject
         }
     }
 
-    private async Task SeedDetectedProfileAsync(global::IronDev.Data.Models.Project project)
+    private async Task SeedDetectedProfileAsync(Project project)
     {
         var detected = await _profileDetectionService.DetectAsync(project.LocalPath ?? string.Empty, project.Id);
         detected.Profile.ApplicationType = SelectedApplicationType;
@@ -369,7 +386,7 @@ public sealed partial class CreateProjectViewModel : ObservableObject
         DetectionSummary = "New project profile will be seeded from wizard selections.";
     }
 
-    private void ApplyDetectedProfile(global::IronDev.Data.Models.ProjectProfileDetectionResult detected)
+    private void ApplyDetectedProfile(ProjectProfileDetectionResult detected)
     {
         SelectedApplicationType = string.IsNullOrWhiteSpace(detected.Profile.ApplicationType) ? SelectedApplicationType : detected.Profile.ApplicationType;
         SelectedFramework = string.IsNullOrWhiteSpace(detected.Profile.Framework) ? SelectedFramework : detected.Profile.Framework;
@@ -386,17 +403,17 @@ public sealed partial class CreateProjectViewModel : ObservableObject
             : string.Join(" ", detected.DetectedFacts.DefaultIfEmpty("Profile detected. Review before importing."));
     }
 
-    private async Task SeedInitialContextAsync(global::IronDev.Data.Models.Project project)
+    private async Task SeedInitialContextAsync(Project project)
     {
         if (_memoryService == null) return;
 
-        await _memoryService.SaveSummaryAsync(new global::IronDev.Data.Models.ProjectSummary
+        await _memoryService.SaveSummaryAsync(new ProjectSummary
         {
             ProjectId = project.Id,
             Summary = $"{project.Name} was onboarded through the IronDev project wizard as a {SelectedApplicationType} project using {SelectedFramework}."
         });
 
-        await _memoryService.SaveContextDocumentAsync(new global::IronDev.Data.Models.ProjectContextDocument
+        await _memoryService.SaveContextDocumentAsync(new ProjectContextDocument
         {
             ProjectId = project.Id,
             DocumentType = "ArchitectureDecision",
@@ -407,7 +424,7 @@ public sealed partial class CreateProjectViewModel : ObservableObject
             Source = "Project Wizard"
         });
 
-        await _memoryService.SaveContextDocumentAsync(new global::IronDev.Data.Models.ProjectContextDocument
+        await _memoryService.SaveContextDocumentAsync(new ProjectContextDocument
         {
             ProjectId = project.Id,
             DocumentType = "ProjectStandard",

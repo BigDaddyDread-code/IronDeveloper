@@ -8,12 +8,14 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using global::IronDev.Agent.Models;
+using IronDev.Client.Auth;
+using IronDev.Core.Auth;
 
 namespace IronDev.Agent.ViewModels.Workflow;
 
 public sealed partial class LoginViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.IUserService _userService;
+    private readonly IAuthApiClient _authApiClient;
 
     [ObservableProperty] private string _email = string.Empty;
     [ObservableProperty] private string _emailError = string.Empty;
@@ -21,8 +23,8 @@ public sealed partial class LoginViewModel : ObservableObject
     [ObservableProperty] private bool   _hasAttemptedSignIn;
     [ObservableProperty] private bool   _isBusy;
 
-    [ObservableProperty] private ObservableCollection<global::IronDev.Core.Auth.TenantDto> _availableTenants = new();
-    [ObservableProperty] private global::IronDev.Core.Auth.TenantDto? _selectedTenant;
+    [ObservableProperty] private ObservableCollection<TenantDto> _availableTenants = new();
+    [ObservableProperty] private TenantDto? _selectedTenant;
     
     [ObservableProperty] private ObservableCollection<string> _availableAuthMethods = new() { "Direct Email/Password" };
     [ObservableProperty] private string _selectedAuthMethod = "Direct Email/Password";
@@ -35,15 +37,20 @@ public sealed partial class LoginViewModel : ObservableObject
     public bool IsResolvingVisible => CurrentStage == LoginStage.Resolving;
     public bool IsTenantSelectorVisible => CurrentStage == LoginStage.TenantSelection;
 
-    private global::IronDev.Services.User? _authenticatedUser;
+    private UserProfileDto? _authenticatedUser;
 
     /// <summary>Shell sets this callback; fired when sign-in succeeds with a user and tenant.</summary>
-    public Action<global::IronDev.Core.Auth.UserProfileDto, global::IronDev.Core.Auth.TenantDto>? OnSignIn { get; set; }
+    public Action<UserProfileDto, TenantDto>? OnSignIn { get; set; }
 
-    public LoginViewModel(global::IronDev.Services.IUserService userService)
+    public LoginViewModel(IAuthApiClient authApiClient)
     {
-        _userService = userService;
+        _authApiClient = authApiClient;
         Email = LoadLastEmail();
+    }
+
+    public LoginViewModel(object authService)
+        : this(global::IronDev.Agent.Services.BoundaryCompatibility.Auth(authService))
+    {
     }
 
     private static string LoadLastEmail()
@@ -89,20 +96,13 @@ public sealed partial class LoginViewModel : ObservableObject
             // 1. Transition to "Resolving" state early
             CurrentStage = LoginStage.Resolving;
 
-            // 2. Authenticate User
-            _authenticatedUser = await _userService.ValidateCredentialsAsync(Email, password!);
+            var login = await _authApiClient.LoginAsync(new LoginRequest(Email, password!));
+            _authenticatedUser = await _authApiClient.GetCurrentUserAsync();
             
-            if (_authenticatedUser == null)
-            {
-                EmailError = "Invalid email or password.";
-                CurrentStage = LoginStage.Credentials;
-                return;
-            }
-
             await Task.Delay(400); // UI feedback for "Loading your workspace..."
 
             // 3. Resolve Tenants for this user
-            var tenants = await _userService.GetUserTenantsAsync(_authenticatedUser.Id);
+            var tenants = await _authApiClient.GetTenantsAsync();
             AvailableTenants.Clear();
             foreach (var t in tenants) AvailableTenants.Add(t);
 
@@ -127,7 +127,9 @@ public sealed partial class LoginViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            EmailError = $"Connection error: {ex.Message}";
+            EmailError = ex.Message.Contains("Invalid credentials", StringComparison.OrdinalIgnoreCase)
+                ? "Invalid email or password."
+                : $"Connection error: {ex.Message}";
             CurrentStage = LoginStage.Credentials;
         }
         finally { IsBusy = false; }
@@ -140,16 +142,17 @@ public sealed partial class LoginViewModel : ObservableObject
         CompleteSignIn(SelectedTenant);
     }
 
-    private void CompleteSignIn(global::IronDev.Core.Auth.TenantDto tenant)
+    private async void CompleteSignIn(TenantDto tenant)
     {
         if (_authenticatedUser == null) return;
 
-        SaveLastEmail(_authenticatedUser.Email);
+        var response = await _authApiClient.SelectTenantAsync(new SelectTenantRequest(tenant.Id));
 
-        var profile = new global::IronDev.Core.Auth.UserProfileDto(
-            _authenticatedUser.Id, 
-            _authenticatedUser.Email, 
-            _authenticatedUser.DisplayName, 
+        SaveLastEmail(_authenticatedUser.Email);
+        var profile = new UserProfileDto(
+            response.UserId,
+            _authenticatedUser.Email,
+            response.DisplayName,
             tenant.Id);
 
         OnSignIn?.Invoke(profile, tenant);

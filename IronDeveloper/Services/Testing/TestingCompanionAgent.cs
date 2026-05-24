@@ -1,3 +1,9 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -17,13 +23,13 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         "TestRuns");
 
     private readonly IScreenshotCaptureService _screenshotCaptureService;
-    private readonly ILlmTraceService _llmTraceService;
+    private readonly ITraceApiClient _llmTraceService;
     private readonly List<TestMoment> _moments = [];
     private TestRun? _currentRun;
 
     public TestingCompanionAgent(
         IScreenshotCaptureService screenshotCaptureService,
-        ILlmTraceService llmTraceService)
+        ITraceApiClient llmTraceService)
     {
         _screenshotCaptureService = screenshotCaptureService;
         _llmTraceService = llmTraceService;

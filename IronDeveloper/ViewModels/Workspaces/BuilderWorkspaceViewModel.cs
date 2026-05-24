@@ -1,3 +1,9 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -8,7 +14,6 @@ using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Services;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
-using IronDev.Services;
 using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -16,12 +21,12 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 public partial class BuilderWorkspaceViewModel : ObservableObject
 {
     private readonly IBuilderProposalService _proposalService;
-    private readonly ILlmTraceService _traceService;
+    private readonly ITraceApiClient _traceService;
     private readonly IProjectProfileService _profileService;
-    private readonly IProjectMemoryService _memoryService;
+    private readonly IMemoryApiClient _memoryService;
     private readonly IBuilderReadinessService _readinessService;
-    private readonly IProjectService _projectService;
-    private readonly ITicketService _ticketService;
+    private readonly IProjectsApiClient _projectService;
+    private readonly ITicketsApiClient _ticketService;
     private readonly IAppSettingsService? _settingsService;
 
     internal Action<string>? OnProjectIndexStatusChanged { get; set; }
@@ -64,12 +69,12 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
 
     public BuilderWorkspaceViewModel(
         IBuilderProposalService proposalService,
-        ILlmTraceService traceService,
+        ITraceApiClient traceService,
         IProjectProfileService profileService,
-        IProjectMemoryService memoryService,
+        IMemoryApiClient memoryService,
         IBuilderReadinessService readinessService,
-        IProjectService projectService,
-        ITicketService ticketService,
+        IProjectsApiClient projectService,
+        ITicketsApiClient ticketService,
         IAppSettingsService? settingsService = null)
     {
         _proposalService = proposalService;
@@ -80,6 +85,27 @@ public partial class BuilderWorkspaceViewModel : ObservableObject
         _projectService = projectService;
         _ticketService = ticketService;
         _settingsService = settingsService;
+    }
+
+    public BuilderWorkspaceViewModel(
+        IBuilderProposalService proposalService,
+        object traceService,
+        IProjectProfileService profileService,
+        object memoryService,
+        IBuilderReadinessService readinessService,
+        object projectService,
+        object ticketService,
+        IAppSettingsService? settingsService = null)
+        : this(
+            proposalService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Trace(traceService),
+            profileService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            readinessService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Projects(projectService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService),
+            settingsService)
+    {
     }
 
     [RelayCommand]

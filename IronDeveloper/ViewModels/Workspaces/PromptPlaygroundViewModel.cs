@@ -1,3 +1,10 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Prompting;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -7,12 +14,10 @@ using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using IronDev.AI;
 using IronDev.Core;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
-using IronDev.Services;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
 
@@ -87,11 +92,11 @@ public sealed class GroundingTestCase
 public sealed partial class PromptPlaygroundViewModel : ObservableObject
 {
     private readonly IPromptContextBuilder  _builder;
-    private readonly IProjectService         _projectService;
+    private readonly IProjectsApiClient         _projectService;
     private readonly ILLMService             _llmService;
-    private readonly ICodeIndexService       _codeIndexService;
+    private readonly ICodeIndexApiClient       _codeIndexService;
     private readonly ICurrentTenantContext   _tenantContext;
-    private readonly ILlmTraceService        _llmTraceService;
+    private readonly ITraceApiClient        _llmTraceService;
 
     // ── Observable Properties ─────────────────────────────────────────────
 
@@ -168,11 +173,11 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 
     public PromptPlaygroundViewModel(
         IPromptContextBuilder  builder,
-        IProjectService        projectService,
+        IProjectsApiClient        projectService,
         ILLMService            llmService,
-        ICodeIndexService      codeIndexService,
+        ICodeIndexApiClient      codeIndexService,
         ICurrentTenantContext  tenantContext,
-        ILlmTraceService       llmTraceService)
+        ITraceApiClient       llmTraceService)
     {
         _builder          = builder;
         _projectService   = projectService;
@@ -183,6 +188,23 @@ public sealed partial class PromptPlaygroundViewModel : ObservableObject
 
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRetrievedItems));
         RetrievedItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ContextRetrievalStatus));
+    }
+
+    public PromptPlaygroundViewModel(
+        object builder,
+        object projectService,
+        ILLMService llmService,
+        ICodeIndexApiClient codeIndexService,
+        ICurrentTenantContext tenantContext,
+        object llmTraceService)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Prompt(builder),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Projects(projectService),
+            llmService,
+            codeIndexService,
+            tenantContext,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Trace(llmTraceService))
+    {
     }
 
     // ── Commands ──────────────────────────────────────────────────────────

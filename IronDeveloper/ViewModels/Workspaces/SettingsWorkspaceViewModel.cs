@@ -1,3 +1,9 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using IronDev.Agent.Services;
@@ -8,7 +14,7 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class SettingsWorkspaceViewModel : ObservableObject
 {
-    private readonly ILlmTraceService _traceService;
+    private readonly ITraceApiClient _traceService;
     private readonly IAppSettingsService? _settingsService;
     private bool _isLoadingSettings;
 
@@ -26,12 +32,12 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     [ObservableProperty] private bool _useContextAgent = false;
 
     // ── Trace LLM Calls ───────────────────────────────────────────────────
-    // Wraps ILlmTraceService.IsTracingEnabled so the Settings page can toggle
+    // Wraps ITraceApiClient.IsTracingEnabled so the Settings page can toggle
     // it. No persistence layer yet — the service defaults to true on startup.
 
     /// <summary>
     /// Master on/off for LLM tracing. Reads and writes through to
-    /// <see cref="ILlmTraceService.IsTracingEnabled"/>.
+    /// <see cref="ITraceApiClient.IsTracingEnabled"/>.
     /// </summary>
     public bool IsLlmTracingEnabled
     {
@@ -65,11 +71,16 @@ public sealed partial class SettingsWorkspaceViewModel : ObservableObject
     public string AlphaTesterPrompt =>
         "Point IronDev at a small repo, create one build-ready ticket from chat, generate a proposal, review the diff, and inspect the trace.";
 
-    public SettingsWorkspaceViewModel(ILlmTraceService traceService, IAppSettingsService? settingsService = null)
+    public SettingsWorkspaceViewModel(ITraceApiClient traceService, IAppSettingsService? settingsService = null)
     {
         _traceService = traceService;
         _settingsService = settingsService;
         LoadPersistedSettings();
+    }
+
+    public SettingsWorkspaceViewModel(object traceService, IAppSettingsService? settingsService = null)
+        : this(global::IronDev.Agent.Services.BoundaryCompatibility.Trace(traceService), settingsService)
+    {
     }
 
     private void LoadPersistedSettings()
