@@ -77,7 +77,8 @@ public sealed class TestPlanRunner
         "controlled_write_approval_174",
         "controlled_worktree_dry_run_175",
         "adversarial_memory_agents_183",
-        "minesweeper_disposable_build_184"
+        "minesweeper_disposable_build_184",
+        "tiny_rest_api_disposable_build_185"
     };
 
     private readonly string _repoRoot;
@@ -156,6 +157,7 @@ public sealed class TestPlanRunner
                     "controlled_worktree_dry_run_175" => await RunControlledWorktreeDryRun175Async(runId, logPath),
                     "adversarial_memory_agents_183" => await RunAdversarialMemoryAgents183Async(runId, logPath),
                     "minesweeper_disposable_build_184" => await RunMinesweeperDisposableBuild184Async(runId, logPath),
+                    "tiny_rest_api_disposable_build_185" => await RunTinyRestApiDisposableBuild185Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -936,6 +938,85 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Minesweeper disposable build 184 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunTinyRestApiDisposableBuild185Async(string runId, string logPath)
+    {
+        const string project = "TinyRestApi";
+        const string goal = "i want build tiny rest api";
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "build", "disposable", "run", "--project", project, "--goal", goal, "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"build disposable run for TinyRestApi exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected status Succeeded, actual {ReadProperty(parsed, "status")}.");
+        if (!StringPropertyEquals(parsed, "project", project))
+            failures.Add($"Expected project TinyRestApi, actual {ReadProperty(parsed, "project")}.");
+        if (!StringPropertyEquals(parsed, "goal", goal))
+            failures.Add($"Expected messy goal to be preserved, actual {ReadProperty(parsed, "goal")}.");
+        if (!StringPropertyEquals(parsed, "recommendation", "PromoteLater"))
+            failures.Add($"Expected recommendation PromoteLater, actual {ReadProperty(parsed, "recommendation")}.");
+
+        var data = ReadElement(parsed, "data");
+        if (!ReadBoolProperty(data, "productSpikeCandidate"))
+            failures.Add("Expected productSpikeCandidate=true.");
+        if (!StringPropertyEquals(data, "normalizedProductName", project))
+            failures.Add($"Expected normalizedProductName TinyRestApi, actual {ReadProperty(data, "normalizedProductName")}.");
+        if (!ReadBoolProperty(data, "generatedAppContained"))
+            failures.Add("Expected generatedAppContained=true.");
+        if (ReadBoolProperty(data, "generatedSolitaireAppContained"))
+            failures.Add("Expected generatedSolitaireAppContained=false for TinyRestApi.");
+        if (!ReadBoolProperty(data, "docsAreRunScoped"))
+            failures.Add("Expected docsAreRunScoped=true.");
+        if (!ReadBoolProperty(data, "memoryMutationBlocked") || !ReadBoolProperty(data, "ticketAcceptanceBlocked"))
+            failures.Add("Expected memory mutation and ticket acceptance to remain blocked.");
+
+        var docs = ReadElement(data, "docsCreated");
+        var docIds = string.Join(
+            '\n',
+            ReadProperty(docs, "intakeId") ?? "",
+            ReadProperty(docs, "buildBriefId") ?? "",
+            ReadProperty(docs, "ticketId") ?? "");
+        foreach (var expected in new[] { "TINYRESTAPI_PRODUCT_SPIKE_INTAKE_168", "TINYRESTAPI_DISPOSABLE_BUILD_BRIEF_168", "TINYRESTAPI_DISPOSABLE_BUILD_TICKET_168" })
+        {
+            if (!docIds.Contains(expected, StringComparison.OrdinalIgnoreCase))
+                failures.Add($"Expected run-scoped doc id {expected}.");
+        }
+
+        var mutation = ReadElement(parsed, "mutation");
+        if (ReadIntProperty(mutation, "realRepoMutationCount") != 0)
+            failures.Add($"Expected real repo mutation count zero, actual {ReadIntProperty(mutation, "realRepoMutationCount")}.");
+        if (ReadIntProperty(mutation, "disposableFilesChanged") < 7)
+            failures.Add($"Expected disposableFilesChanged >= 7, actual {ReadIntProperty(mutation, "disposableFilesChanged")}.");
+        if (!(ReadProperty(mutation, "disposableWorkspacePath") ?? "").Contains(project, StringComparison.OrdinalIgnoreCase))
+            failures.Add("Expected disposable workspace path to contain TinyRestApi.");
+
+        var evidence = ReadArray(parsed, "evidence");
+        foreach (var expected in new[] { "RunScopedDocument", "PlannerCriticTrace", "BuilderTrace", "BuilderReport", "QualityCommandLog" })
+        {
+            if (!evidence.Any(item => string.Equals(ReadProperty(item, "type"), expected, StringComparison.OrdinalIgnoreCase)))
+                failures.Add($"Expected evidence type {expected}.");
+        }
+
+        var evidenceText = string.Join('\n', evidence.Select(item => ReadProperty(item, "path")));
+        if (evidenceText.Contains("SOLITAIRE_", StringComparison.OrdinalIgnoreCase) ||
+            evidenceText.Contains("MINESWEEPER_", StringComparison.OrdinalIgnoreCase))
+            failures.Add("TinyRestApi run-scoped evidence should not use game-specific document ids.");
+
+        var parsedText = run.Output;
+        if (parsedText.Contains("TinyRestApi.Wpf", StringComparison.OrdinalIgnoreCase) ||
+            parsedText.Contains("Solitaire.Wpf", StringComparison.OrdinalIgnoreCase) ||
+            parsedText.Contains("Minesweeper.Wpf", StringComparison.OrdinalIgnoreCase))
+            failures.Add("TinyRestApi disposable build output should not reference game/WPF project output.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Tiny REST API disposable build 185 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);

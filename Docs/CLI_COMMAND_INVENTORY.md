@@ -92,7 +92,7 @@ These are closest to the control surface Codex will use.
 
 `agent builder trace-smoke` creates a synthetic BuildAgent trace/report for a future heavy-duty disposable build. It records stage status, build/test attempts, repair attempts, evidence artefacts, mutation counts, and recommendation. It does not create a disposable workspace, generate app files, apply patches, mutate memory, or approve writes.
 
-`agent builder repair-loop` runs a real trace-backed disposable repair loop. It supports the original Solitaire proof and the Minesweeper 184 proof. The command generates product files inside an explicit disposable workspace, injects build/test failures, repairs inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
+`agent builder repair-loop` runs a real trace-backed disposable repair loop. It supports the original Solitaire proof, the Minesweeper 184 proof, and the Tiny REST API 185 proof. The command generates product files inside an explicit disposable workspace, injects build/test failures, repairs inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
 
 `build disposable repair` is the clean product-shaped alias for the direct trace-backed disposable repair loop. It accepts `--run-id`; `--dogfood-run-id` remains a compatibility alias.
 
@@ -262,8 +262,10 @@ This is read/report infrastructure only. It does not change CLI command semantic
 
 - `build disposable run --project Solitaire --goal "I want build solitaire" --run-id <run> --json` turns a messy product prompt into run-scoped docs, Planner/Critic evidence, caged BuilderAgent repair-build evidence, QualityAgent evidence, and a final report.
 - `build disposable run --project Minesweeper --goal "i want build minesweeper" --run-id <run> --json` validates the same path against a second product so the command cannot hide behind Solitaire-specific assumptions.
+- `build disposable run --project TinyRestApi --goal "i want build tiny rest api" --run-id <run> --json` validates the same path against a non-WPF ASP.NET Core REST API with endpoints, DTOs, and validation tests.
 - `campaign loop-gated-disposable-build-168 --run-id <run> --json` validates the same workflow through the Test Agent native C# runner.
 - `test run-plan --plan tools/dogfood/test-agent-plans/irondev-minesweeper-disposable-build-184.json --run-id <run> --json` validates the Minesweeper 184 path through the Test Agent native C# runner.
+- `test run-plan --plan tools/dogfood/test-agent-plans/irondev-tiny-rest-api-disposable-build-185.json --run-id <run> --json` validates the Tiny REST API 185 path through the Test Agent native C# runner.
 - The command writes run evidence under `tools/dogfood/runs/{runId}` and generated app files under the explicit temp disposable workspace.
 - It does not mutate accepted memory, accept tickets, approve promotion, or write generated app files into the real repository.
 
