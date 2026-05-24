@@ -91,20 +91,24 @@ public static class LoopGatedDisposableBuild168Command
     {
         var docsRoot = Path.Combine(runRoot, "docs");
         Directory.CreateDirectory(docsRoot);
-        var intakePath = Path.Combine(docsRoot, "SOLITAIRE_PRODUCT_SPIKE_INTAKE_168.md");
-        var briefPath = Path.Combine(docsRoot, "SOLITAIRE_DISPOSABLE_BUILD_BRIEF_168.md");
-        var ticketPath = Path.Combine(docsRoot, "SOLITAIRE_DISPOSABLE_BUILD_TICKET_168.md");
+        var token = ToDocumentToken(project);
+        var intakeId = $"{token}_PRODUCT_SPIKE_INTAKE_168";
+        var briefId = $"{token}_DISPOSABLE_BUILD_BRIEF_168";
+        var ticketId = $"{token}_DISPOSABLE_BUILD_TICKET_168";
+        var intakePath = Path.Combine(docsRoot, $"{intakeId}.md");
+        var briefPath = Path.Combine(docsRoot, $"{briefId}.md");
+        var ticketPath = Path.Combine(docsRoot, $"{ticketId}.md");
 
-        await File.WriteAllTextAsync(intakePath, BuildIntakeDoc(project, goal), Encoding.UTF8);
-        await File.WriteAllTextAsync(briefPath, BuildBriefDoc(project, goal), Encoding.UTF8);
-        await File.WriteAllTextAsync(ticketPath, BuildTicketDoc(project), Encoding.UTF8);
+        await File.WriteAllTextAsync(intakePath, BuildIntakeDoc(intakeId, project, goal), Encoding.UTF8);
+        await File.WriteAllTextAsync(briefPath, BuildBriefDoc(briefId, project, goal), Encoding.UTF8);
+        await File.WriteAllTextAsync(ticketPath, BuildTicketDoc(ticketId, project), Encoding.UTF8);
 
         return new RunScopedDocs(
-            "SOLITAIRE_PRODUCT_SPIKE_INTAKE_168",
+            intakeId,
             intakePath,
-            "SOLITAIRE_DISPOSABLE_BUILD_BRIEF_168",
+            briefId,
             briefPath,
-            "SOLITAIRE_DISPOSABLE_BUILD_TICKET_168",
+            ticketId,
             ticketPath);
     }
 
@@ -142,13 +146,14 @@ public static class LoopGatedDisposableBuild168Command
             Project = project,
             Goal = goal,
             Summary = status == "Succeeded"
-                ? "Messy prompt produced run-scoped docs, governed plan evidence, caged Solitaire repair build, quality evidence, and zero real repo mutation."
+                ? $"Messy prompt produced run-scoped docs, governed plan evidence, caged {project} repair build, quality evidence, and zero real repo mutation."
                 : "Loop-gated disposable build did not complete all gates.",
             Data = new
             {
                 route = "ProjectPlanningDiscussion",
                 productSpikeCandidate = true,
                 normalizedProductName = project,
+                targetProduct = project,
                 docsCreated = docs,
                 plannerCriticLoop = plan,
                 builderRun = new
@@ -166,7 +171,8 @@ public static class LoopGatedDisposableBuild168Command
                     status = ReadString(qualityRoot, "status"),
                     summary = ReadString(qualityRoot, "summary")
                 },
-                generatedSolitaireAppContained = disposableFilesChanged > 0 && realRepoMutationCount == 0,
+                generatedAppContained = disposableFilesChanged > 0 && realRepoMutationCount == 0,
+                generatedSolitaireAppContained = string.Equals(project, "Solitaire", StringComparison.OrdinalIgnoreCase) && disposableFilesChanged > 0 && realRepoMutationCount == 0,
                 docsAreRunScoped = true,
                 memoryMutationBlocked = true,
                 ticketAcceptanceBlocked = true
@@ -233,17 +239,17 @@ public static class LoopGatedDisposableBuild168Command
         await File.WriteAllTextAsync(Path.Combine(runRoot, "loop-gated-disposable-build-168-report.md"), ToMarkdown(result), Encoding.UTF8);
     }
 
-    private static string BuildIntakeDoc(string project, string goal) =>
+    private static string BuildIntakeDoc(string id, string project, string goal) =>
         $"""
         ---
-        id: SOLITAIRE_PRODUCT_SPIKE_INTAKE_168
+        id: {id}
         project: {project}
         document_type: RunScopedIntake
         authority: Draft
         status: Current
         ---
 
-        # Solitaire Product Spike Intake 168
+        # {project} Product Spike Intake 168
 
         User goal:
 
@@ -256,38 +262,38 @@ public static class LoopGatedDisposableBuild168Command
         Boundary: run-scoped artefact only. This does not mutate accepted project memory.
         """;
 
-    private static string BuildBriefDoc(string project, string goal) =>
+    private static string BuildBriefDoc(string id, string project, string goal) =>
         $"""
         ---
-        id: SOLITAIRE_DISPOSABLE_BUILD_BRIEF_168
+        id: {id}
         project: {project}
         document_type: RunScopedBuildBrief
         authority: Draft
         status: Current
         ---
 
-        # Solitaire Disposable Build Brief 168
+        # {project} Disposable Build Brief 168
 
-        Build a caged Solitaire vertical slice from the messy prompt `{goal}`.
+        Build a caged {project} vertical slice from the messy prompt `{goal}`.
 
-        The build must use existing accepted Solitaire 138 memory, pass through the governed Planner/Critic loop, and write generated app files only inside the explicit disposable workspace.
+        The build must pass through the governed Planner/Critic loop and write generated app files only inside the explicit disposable workspace.
         """;
 
-    private static string BuildTicketDoc(string project) =>
+    private static string BuildTicketDoc(string id, string project) =>
         $"""
         ---
-        id: SOLITAIRE_DISPOSABLE_BUILD_TICKET_168
+        id: {id}
         project: {project}
         document_type: RunScopedTicketDraft
         authority: Draft
         status: Current
         ---
 
-        # Solitaire Disposable Build Ticket 168
+        # {project} Disposable Build Ticket 168
 
         Acceptance criteria:
 
-        - Create generated Solitaire files only inside the disposable workspace.
+        - Create generated {project} files only inside the disposable workspace.
         - Run the trace-backed builder repair loop.
         - Run deterministic quality evidence.
         - Report real repo mutation count zero.
@@ -453,6 +459,20 @@ public static class LoopGatedDisposableBuild168Command
 
     private static string QuoteIfNeeded(string value) =>
         value.Contains(' ') ? $"\"{value}\"" : value;
+
+    private static string ToDocumentToken(string project)
+    {
+        var builder = new StringBuilder();
+        foreach (var character in project.ToUpperInvariant())
+        {
+            if (char.IsLetterOrDigit(character))
+                builder.Append(character);
+            else if (builder.Length > 0 && builder[^1] != '_')
+                builder.Append('_');
+        }
+
+        return builder.Length == 0 ? "PROJECT" : builder.ToString().Trim('_');
+    }
 
     private sealed record RunScopedDocs(
         string IntakeId,

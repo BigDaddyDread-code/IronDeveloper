@@ -1,0 +1,37 @@
+{
+  "test_run_id": "IronDev184-MinesweeperDisposableBuild",
+  "goal_id": "minesweeper-disposable-build-184",
+  "description": "Proves the governed disposable build path can handle a second messy product request by building Minesweeper, not a renamed Solitaire run, inside the cage.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "minesweeper_disposable_build_184",
+      "params": {
+        "project": "Minesweeper",
+        "goal": "i want build minesweeper",
+        "expect_route": "ProjectPlanningDiscussion",
+        "expect_product_spike_candidate": true,
+        "expect_run_scoped_docs": true,
+        "expect_planner_critic_loop": true,
+        "expect_builder_repair_loop": true,
+        "expect_quality_gate": true,
+        "expect_real_repo_mutation_count": 0,
+        "expect_disposable_files_changed_min": 13,
+        "expect_recommendation": "PromoteLater"
+      }
+    }
+  ],
+  "expected": {
+    "messy_prompt_preserved": true,
+    "run_scoped_docs_created": true,
+    "planner_critic_evidence_passes": true,
+    "caged_builder_repair_loop_passes": true,
+    "quality_gate_passes": true,
+    "real_repo_mutation_count_zero": true,
+    "generated_minesweeper_app_contained": true,
+    "solitaire_specific_doc_ids_rejected": true
+  },
+  "boundary": "Loop-gated disposable build only. Generated Minesweeper app files must stay in the disposable workspace; run-scoped docs are evidence only; no accepted memory mutation, ticket acceptance, real repo writes, guardrail mutation, or self-approval."
+}

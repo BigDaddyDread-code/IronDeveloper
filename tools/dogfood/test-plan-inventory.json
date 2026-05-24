@@ -3,7 +3,7 @@
         "planFile":  "irondev-adversarial-memory-agents-183.json",
         "goalId":  "adversarial-memory-agents-183",
         "project":  "IronDev",
-        "description":  "Validate DoubtAgent adversarial review, Killjoy rebuttal, and MemoryImprovementAgent proposal-only staging under governed Alpha boundaries.",
+        "description":  "Validate DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent Level 1 proposal-only output, governed evidence bundles, and MemoryKeyGate boundaries.",
         "agentPath":  "TestAgent + ReplayRunner + AdversarialMemoryAgents183Command + DoubtAgent + MemoryImprovementAgent + ConscienceAgent",
         "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-adversarial-memory-agents-183.json",
         "requiredServices":  [
@@ -228,6 +228,36 @@
                              ],
         "regressionGroup":  "GovernedAgentExecution",
         "safetyBoundary":  "Loop-gated disposable build only; run-scoped docs are evidence, generated app files stay in the disposable workspace, and accepted memory mutation, ticket acceptance, real repo writes, and self-approval remain blocked.",
+        "kind":  "campaign-smoke"
+    },
+    {
+        "planFile":  "irondev-minesweeper-disposable-build-184.json",
+        "goalId":  "minesweeper-disposable-build-184",
+        "project":  "IronDev",
+        "description":  "Validate that the governed disposable build path can handle a second messy product request by building Minesweeper, not a renamed Solitaire run, inside the cage.",
+        "agentPath":  "TestAgent + ReplayRunner + LoopGatedDisposableBuild168Command + GovernedPlannerCriticLoopService + BuilderRepairLoopCommand + MinesweeperRepairLoopCommand + QualityAgent",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-minesweeper-disposable-build-184.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "GovernedPlannerCriticLoopService",
+                                 "GovernedToolRegistry",
+                                 "BuilderRepairLoopCommand",
+                                 "MinesweeperRepairLoopCommand",
+                                 "QualityAgent",
+                                 "Code Standards Alpha"
+                             ],
+        "expectedEvidence":  [
+                                 "messy Minesweeper prompt preserved",
+                                 "MINESWEEPER run-scoped docs created",
+                                 "Solitaire product scope rejected",
+                                 "Planner/Critic evidence validation passes",
+                                 "BuilderAgent caged Minesweeper repair loop passes",
+                                 "QualityAgent gate passes",
+                                 "real repo mutation count zero",
+                                 "generated Minesweeper app files stay disposable"
+                             ],
+        "regressionGroup":  "GovernedAgentExecution",
+        "safetyBoundary":  "Loop-gated disposable build only; generated Minesweeper files stay in the disposable workspace, run-scoped docs are evidence, and accepted memory mutation, ticket acceptance, guardrail mutation, real repo writes, and self-approval remain blocked.",
         "kind":  "campaign-smoke"
     },
     {

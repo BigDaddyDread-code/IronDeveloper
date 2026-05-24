@@ -76,7 +76,8 @@ public sealed class TestPlanRunner
         "controlled_write_policy_173",
         "controlled_write_approval_174",
         "controlled_worktree_dry_run_175",
-        "adversarial_memory_agents_183"
+        "adversarial_memory_agents_183",
+        "minesweeper_disposable_build_184"
     };
 
     private readonly string _repoRoot;
@@ -154,6 +155,7 @@ public sealed class TestPlanRunner
                     "controlled_write_approval_174" => await RunControlledWriteApproval174Async(runId, logPath),
                     "controlled_worktree_dry_run_175" => await RunControlledWorktreeDryRun175Async(runId, logPath),
                     "adversarial_memory_agents_183" => await RunAdversarialMemoryAgents183Async(runId, logPath),
+                    "minesweeper_disposable_build_184" => await RunMinesweeperDisposableBuild184Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -869,6 +871,76 @@ public sealed class TestPlanRunner
             parsed);
     }
 
+    private async Task<NativeActionResult> RunMinesweeperDisposableBuild184Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "build", "disposable", "run", "--project", "Minesweeper", "--goal", "i want build minesweeper", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"build disposable run for Minesweeper exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected status Succeeded, actual {ReadProperty(parsed, "status")}.");
+        if (!StringPropertyEquals(parsed, "project", "Minesweeper"))
+            failures.Add($"Expected project Minesweeper, actual {ReadProperty(parsed, "project")}.");
+        if (!StringPropertyEquals(parsed, "goal", "i want build minesweeper"))
+            failures.Add($"Expected messy goal to be preserved, actual {ReadProperty(parsed, "goal")}.");
+        if (!StringPropertyEquals(parsed, "recommendation", "PromoteLater"))
+            failures.Add($"Expected recommendation PromoteLater, actual {ReadProperty(parsed, "recommendation")}.");
+
+        var data = ReadElement(parsed, "data");
+        if (!ReadBoolProperty(data, "productSpikeCandidate"))
+            failures.Add("Expected productSpikeCandidate=true.");
+        if (!StringPropertyEquals(data, "normalizedProductName", "Minesweeper"))
+            failures.Add($"Expected normalizedProductName Minesweeper, actual {ReadProperty(data, "normalizedProductName")}.");
+        if (!ReadBoolProperty(data, "generatedAppContained"))
+            failures.Add("Expected generatedAppContained=true.");
+        if (ReadBoolProperty(data, "generatedSolitaireAppContained"))
+            failures.Add("Expected generatedSolitaireAppContained=false for Minesweeper.");
+        if (!ReadBoolProperty(data, "docsAreRunScoped"))
+            failures.Add("Expected docsAreRunScoped=true.");
+        if (!ReadBoolProperty(data, "memoryMutationBlocked") || !ReadBoolProperty(data, "ticketAcceptanceBlocked"))
+            failures.Add("Expected memory mutation and ticket acceptance to remain blocked.");
+
+        var docs = ReadElement(data, "docsCreated");
+        var docIds = string.Join(
+            '\n',
+            ReadProperty(docs, "intakeId") ?? "",
+            ReadProperty(docs, "buildBriefId") ?? "",
+            ReadProperty(docs, "ticketId") ?? "");
+        foreach (var expected in new[] { "MINESWEEPER_PRODUCT_SPIKE_INTAKE_168", "MINESWEEPER_DISPOSABLE_BUILD_BRIEF_168", "MINESWEEPER_DISPOSABLE_BUILD_TICKET_168" })
+        {
+            if (!docIds.Contains(expected, StringComparison.OrdinalIgnoreCase))
+                failures.Add($"Expected run-scoped doc id {expected}.");
+        }
+
+        var mutation = ReadElement(parsed, "mutation");
+        if (ReadIntProperty(mutation, "realRepoMutationCount") != 0)
+            failures.Add($"Expected real repo mutation count zero, actual {ReadIntProperty(mutation, "realRepoMutationCount")}.");
+        if (ReadIntProperty(mutation, "disposableFilesChanged") < 13)
+            failures.Add($"Expected disposableFilesChanged >= 13, actual {ReadIntProperty(mutation, "disposableFilesChanged")}.");
+        if (!(ReadProperty(mutation, "disposableWorkspacePath") ?? "").Contains("Minesweeper", StringComparison.OrdinalIgnoreCase))
+            failures.Add("Expected disposable workspace path to contain Minesweeper.");
+
+        var evidence = ReadArray(parsed, "evidence");
+        foreach (var expected in new[] { "RunScopedDocument", "PlannerCriticTrace", "BuilderTrace", "BuilderReport", "QualityCommandLog" })
+        {
+            if (!evidence.Any(item => string.Equals(ReadProperty(item, "type"), expected, StringComparison.OrdinalIgnoreCase)))
+                failures.Add($"Expected evidence type {expected}.");
+        }
+
+        var evidenceText = string.Join('\n', evidence.Select(item => ReadProperty(item, "path")));
+        if (evidenceText.Contains("SOLITAIRE_", StringComparison.OrdinalIgnoreCase))
+            failures.Add("Minesweeper run-scoped evidence should not use SOLITAIRE_ document ids.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Minesweeper disposable build 184 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
     private async Task<NativeActionResult> RunPromotionPackage169Async(string runId, string logPath)
     {
         var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "promotion-package-169", "--run-id", runId, "--json" };
@@ -1122,6 +1194,18 @@ public sealed class TestPlanRunner
         var readiness = ReadElement(memory, "authorityKeyReadiness");
         if (ReadBoolProperty(readiness, "readyForAcceptedMemoryKey"))
             failures.Add("MemoryImprovementAgent must not be ready for accepted-memory keys.");
+        if (!StringPropertyEquals(readiness, "currentAuthorityLevel", "Level1ProposalOnly"))
+            failures.Add("MemoryImprovementAgent must start at Level1ProposalOnly.");
+        var evidenceBundles = ReadArray(memory, "evidenceBundles");
+        if (evidenceBundles.Count != proposals.Count)
+            failures.Add("Expected every memory proposal to have an evidence bundle.");
+        if (evidenceBundles.Any(bundle => ReadArray(bundle, "evidenceRefs").Count == 0))
+            failures.Add("Every memory proposal evidence bundle must cite governed evidence.");
+        var keyGate = ReadElement(memory, "keyGateReview");
+        if (!StringPropertyEquals(keyGate, "decision", "NeedsMoreEvidence"))
+            failures.Add("MemoryKeyGate must require more evidence before granting staging-area write keys.");
+        if (!StringPropertyEquals(keyGate, "requestedLevelName", "Level2StagingAreaWrite"))
+            failures.Add("MemoryKeyGate must evaluate the first key: staging-area write.");
         if (!ReadBoolProperty(parsed, "realRepoMutationBlocked") ||
             !ReadBoolProperty(parsed, "acceptedMemoryMutationBlocked") ||
             !ReadBoolProperty(parsed, "ticketCreationBlocked") ||

@@ -84,7 +84,7 @@ These are closest to the control surface Codex will use.
 
 `agent doubt review` runs the formal Adversarial Review Agent. It returns Doubt findings only; it does not patch, create tickets, mutate memory, or approve writes.
 
-`agent memory-improvement propose` reads focused completed-run evidence and returns staged memory proposals only. Accepted-memory key readiness remains false during Alpha.
+`agent memory-improvement propose` reads focused completed-run evidence and returns Level 1 proposal-only memory improvements with evidence bundles and a MemoryKeyGate review. It cannot write staging memory or accepted memory. Accepted-memory key readiness remains false during Alpha.
 
 `agent retriever search` now returns a weighted context bundle. It preserves the real memory search result while adding included sources, rejected or filtered-context notes, source risk notes, semantic trace id, and an agent-facing summary.
 
@@ -92,11 +92,11 @@ These are closest to the control surface Codex will use.
 
 `agent builder trace-smoke` creates a synthetic BuildAgent trace/report for a future heavy-duty disposable build. It records stage status, build/test attempts, repair attempts, evidence artefacts, mutation counts, and recommendation. It does not create a disposable workspace, generate app files, apply patches, mutate memory, or approve writes.
 
-`agent builder repair-loop` runs the first real trace-backed disposable repair loop. It generates Solitaire inside an explicit disposable workspace, injects one build failure and one rule-test failure, repairs both inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
+`agent builder repair-loop` runs a real trace-backed disposable repair loop. It supports the original Solitaire proof and the Minesweeper 184 proof. The command generates product files inside an explicit disposable workspace, injects build/test failures, repairs inside the cage, reruns build/tests, and emits trace/report evidence with real repo mutation count zero.
 
 `build disposable repair` is the clean product-shaped alias for the direct trace-backed disposable repair loop. It accepts `--run-id`; `--dogfood-run-id` remains a compatibility alias.
 
-`build disposable run` is now the fuller product-shaped entrypoint for the 168 workflow. It takes a goal such as `I want build solitaire`, creates run-scoped docs, runs the governed Planner/Critic loop, runs the caged BuilderAgent repair build, runs QualityAgent/Killjoy evidence, and returns one compact report. It still writes generated app files only inside the disposable workspace.
+`build disposable run` is now the fuller product-shaped entrypoint for the 168 workflow. It takes a goal such as `I want build solitaire` or `i want build minesweeper`, creates project-shaped run-scoped docs, runs the governed Planner/Critic loop, runs the caged BuilderAgent repair build, runs QualityAgent/Killjoy evidence, and returns one compact report. It still writes generated app files only inside the disposable workspace.
 
 `test run-plan` is the product-shaped alias for `agent tester run-plan`. TesterAgent remains an execution/reporting wrapper only.
 
@@ -261,8 +261,10 @@ This is read/report infrastructure only. It does not change CLI command semantic
 ## 168 Loop-Gated Disposable Build
 
 - `build disposable run --project Solitaire --goal "I want build solitaire" --run-id <run> --json` turns a messy product prompt into run-scoped docs, Planner/Critic evidence, caged BuilderAgent repair-build evidence, QualityAgent evidence, and a final report.
+- `build disposable run --project Minesweeper --goal "i want build minesweeper" --run-id <run> --json` validates the same path against a second product so the command cannot hide behind Solitaire-specific assumptions.
 - `campaign loop-gated-disposable-build-168 --run-id <run> --json` validates the same workflow through the Test Agent native C# runner.
-- The command writes run evidence under `tools/dogfood/runs/{runId}` and generated Solitaire app files under the explicit temp disposable workspace.
+- `test run-plan --plan tools/dogfood/test-agent-plans/irondev-minesweeper-disposable-build-184.json --run-id <run> --json` validates the Minesweeper 184 path through the Test Agent native C# runner.
+- The command writes run evidence under `tools/dogfood/runs/{runId}` and generated app files under the explicit temp disposable workspace.
 - It does not mutate accepted memory, accept tickets, approve promotion, or write generated app files into the real repository.
 
 ## 169 Promotion Package And Language Runtime Spine

@@ -186,8 +186,11 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="12,0,0,0">
                         <TextBlock Text="MEMORY IMPROVEMENT" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding MemoryProposalCount, StringFormat={}{0} staged proposals}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding MemoryProposalCount, StringFormat={}{0} proposal-only items}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding MemoryHealthScore}" Foreground="{StaticResource Text/Muted}" Margin="0,4,0,8"/>
+                        <TextBlock Text="{Binding MemoryEvidenceBundleCount, StringFormat={}Evidence bundles: {0}}" Foreground="{StaticResource Text/Muted}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding MemoryKeyGateDecision, StringFormat={}Key gate: {0}}" Foreground="{StaticResource Text/Muted}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding MemoryKeyGateRequestedLevel, StringFormat={}Requested key: {0}}" Foreground="{StaticResource Text/Muted}" Margin="0,0,0,4"/>
                         <TextBlock Text="{Binding MemoryKeyReady, StringFormat={}Accepted-memory key ready: {0}}" Foreground="{StaticResource Text/Muted}" Margin="0,0,0,8"/>
                         <ItemsControl ItemsSource="{Binding MemoryProposals}">
                             <ItemsControl.ItemTemplate>

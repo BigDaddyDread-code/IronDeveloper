@@ -11,6 +11,9 @@ public static class BuilderRepairLoopCommand
                             ReadOption(args, "--dogfood-run-id") ??
                             $"builder-repair-loop-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
         var project = ReadOption(args, "--project") ?? "Solitaire";
+        if (string.Equals(project, "Minesweeper", StringComparison.OrdinalIgnoreCase))
+            return await MinesweeperRepairLoopCommand.HandleAsync(args, options);
+
         var repoRoot = SolitaireDisposableBuildSmokeCommand.FindRepositoryRoot();
         var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", dogfoodRunId);
         var evidenceRoot = Path.Combine(runRoot, "evidence");

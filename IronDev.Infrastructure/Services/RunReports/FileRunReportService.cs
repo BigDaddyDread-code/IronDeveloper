@@ -444,7 +444,9 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
                 MemoryAuthorityImpact = ReadString(item, "MemoryAuthorityImpact", "memoryAuthorityImpact") ?? ""
             })
             .ToArray();
+        var evidenceBundles = ReadArray(memory, "EvidenceBundles", "evidenceBundles");
         var readiness = ReadElement(memory, "AuthorityKeyReadiness", "authorityKeyReadiness");
+        var keyGate = ReadElement(memory, "KeyGateReview", "keyGateReview");
 
         return new RunMemoryImprovementReview
         {
@@ -452,6 +454,9 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
             MemoryHealthScore = ReadString(memory, "MemoryHealthScore", "memoryHealthScore") ?? "",
             ReadyForAcceptedMemoryKey = ReadBool(readiness, "ReadyForAcceptedMemoryKey", "readyForAcceptedMemoryKey"),
             CurrentAuthorityLevel = ReadString(readiness, "CurrentAuthorityLevel", "currentAuthorityLevel") ?? "",
+            EvidenceBundleCount = evidenceBundles.Count,
+            KeyGateDecision = ReadString(keyGate, "Decision", "decision") ?? "",
+            KeyGateRequestedLevel = ReadString(keyGate, "RequestedLevelName", "requestedLevelName") ?? "",
             Proposals = proposals
         };
     }
