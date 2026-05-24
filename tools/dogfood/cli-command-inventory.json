@@ -327,7 +327,7 @@
         "requiresSql":  false,
         "requiresWeaviate":  false,
         "status":  "loop-gated disposable build run",
-        "notes":  "Product-shaped entrypoint for messy prompt to run-scoped docs, governed Planner/Critic evidence, caged BuilderAgent repair loop, QualityAgent gate, and final report; real repo writes remain blocked."
+        "notes":  "Product-shaped entrypoint for messy prompt to run-scoped docs, governed Planner/Critic evidence, caged BuilderAgent repair loop, QualityAgent gate, and final report; supports Solitaire, Minesweeper, and TinyRestApi disposable targets; real repo writes remain blocked."
     },
     {
         "command":  "builder disposable-workspace-apply-smoke",

@@ -13,6 +13,10 @@ public static class BuilderRepairLoopCommand
         var project = ReadOption(args, "--project") ?? "Solitaire";
         if (string.Equals(project, "Minesweeper", StringComparison.OrdinalIgnoreCase))
             return await MinesweeperRepairLoopCommand.HandleAsync(args, options);
+        if (string.Equals(project, "TinyRestApi", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(project, "Tiny REST API", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(project, "RestApi", StringComparison.OrdinalIgnoreCase))
+            return await TinyRestApiRepairLoopCommand.HandleAsync(args, options);
 
         var repoRoot = SolitaireDisposableBuildSmokeCommand.FindRepositoryRoot();
         var runRoot = Path.Combine(repoRoot, "tools", "dogfood", "runs", dogfoodRunId);
