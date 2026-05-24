@@ -1,464 +1,476 @@
-{
-  "test_run_id": "MainAlphaRegressionPack",
-  "goal_id": "main-alpha-regression-pack-102",
-  "description": "Compact main-branch Alpha safety net after the Alpha Test Phase audit bundle.",
-  "expected": {
-    "checkpoint_memory_retrievable": true,
-    "agent_matrix_memory_retrievable": true,
-    "final_report_memory_retrievable": true,
-    "core_memory_search_passes": true,
-    "bookseller_project_smoke_passes": true,
-    "builder_preview_safety_passes": true,
-    "disposable_workspace_apply_passes": true,
-    "disposable_workspace_fail_closed_passes": true,
-    "memory_reindex_freshness_passes": true,
-    "foundation_break_test_pack_passes": true,
-    "conscience_agent_lite_passes": true,
-    "thought_ledger_passes": true,
-    "governed_action_review_passes": true,
-    "retriever_weighted_context_passes": true,
-    "supervisor_governed_autonomy_passes": true,
-    "supervisor_disposable_workspace_autonomy_passes": true,
-    "solitaire_product_spike_intake_passes": true,
-    "solitaire_product_spike_plan_passes": true,
-    "cli_command_surface_cleanup_passes": true,
-    "csharp_dogfood_runner_passes": true,
-    "run_report_viewer_service_passes": true,
-    "self_improvement_campaign_157_passes": true,
-    "live_governed_agent_execution_158_passes": true,
-    "live_critic_planner_agents_159_passes": true,
-    "live_retriever_sentinel_agents_160_passes": true,
-    "failure_handoff_passes": true,
-    "code_standards_passes": true,
-    "live_remaining_governed_agents_161_passes": true,
-    "governed_tool_loop_162_167_passes": true,
-    "loop_gated_disposable_build_168_passes": true,
-    "promotion_package_169_passes": true,
-    "isolated_promotion_apply_170_passes": true,
-    "promotion_review_cockpit_171_passes": true,
-    "controlled_write_path_design_172_passes": true,
-    "controlled_write_policy_173_passes": true,
-    "controlled_write_approval_174_passes": true,
-    "controlled_worktree_dry_run_175_passes": true
-  },
-  "steps": [
-    {
-      "step": 1,
-      "action": "memory_search",
-      "params": {
-        "project": "IronDev",
-        "query": "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
-        "take": 5,
-        "expect_project": "IronDev",
-        "expect_top_title_contains": "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
-        "expect_source_present": true,
-        "expect_semantic_trace_id": true,
-        "expect_raw_and_final_rank": true
-      }
-    },
-    {
-      "step": 2,
-      "action": "memory_search",
-      "params": {
-        "project": "IronDev",
-        "query": "AGENT_CAPABILITY_MATRIX",
-        "take": 5,
-        "expect_project": "IronDev",
-        "expect_top_title_contains": "AGENT_CAPABILITY_MATRIX",
-        "expect_source_present": true,
-        "expect_semantic_trace_id": true,
-        "expect_raw_and_final_rank": true
-      }
-    },
-    {
-      "step": 3,
-      "action": "memory_search",
-      "params": {
-        "project": "IronDev",
-        "query": "ALPHA_TEST_PHASE_REPORT",
-        "take": 5,
-        "expect_project": "IronDev",
-        "expect_top_title_contains": "ALPHA_TEST_PHASE_REPORT",
-        "expect_source_present": true,
-        "expect_semantic_trace_id": true,
-        "expect_raw_and_final_rank": true
-      }
-    },
-    {
-      "step": 4,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-codex-memory-search-cli-smoke.json",
-        "expect_nested_goal_id": "codex-memory-search-cli-013",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 5,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
-        "expect_nested_goal_id": "bookseller-project-fixture-020",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 6,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-builder-proposal-safety-smoke.json",
-        "expect_nested_goal_id": "builder-proposal-safety-016",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 7,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/bookseller-disposable-workspace-apply-smoke.json",
-        "expect_nested_goal_id": "disposable-workspace-apply-proof-104-115",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 8,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/bookseller-disposable-workspace-fail-closed-smoke.json",
-        "expect_nested_goal_id": "disposable-workspace-fail-closed-104-115",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 9,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-memory-reindex-freshness-smoke.json",
-        "expect_nested_goal_id": "memory-reindex-freshness-116",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 10,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-foundation-break-test-121-130-pack.json",
-        "expect_nested_goal_id": "foundation-break-test-121-130",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 11,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-conscience-agent-lite-131.json",
-        "expect_nested_goal_id": "conscience-agent-lite-131",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 12,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-thought-ledger-132.json",
-        "expect_nested_goal_id": "thought-ledger-132",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 13,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-governed-action-review-133.json",
-        "expect_nested_goal_id": "governed-action-review-133",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 14,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-retriever-weighted-context-bundle-134.json",
-        "expect_nested_goal_id": "retriever-weighted-context-bundle-134",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 15,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-governed-autonomous-loop-135.json",
-        "expect_nested_goal_id": "supervisor-governed-autonomous-loop-135",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 16,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-supervisor-disposable-workspace-autonomy-136.json",
-        "expect_nested_goal_id": "supervisor-disposable-workspace-autonomy-136",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 17,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-solitaire-product-spike-intake-137.json",
-        "expect_nested_goal_id": "solitaire-product-spike-intake-137",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 18,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-solitaire-product-spike-plan-138.json",
-        "expect_nested_goal_id": "solitaire-product-spike-plan-138",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 19,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-cli-command-surface-cleanup-142.json",
-        "expect_nested_goal_id": "cli-command-surface-cleanup-142",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 20,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-csharp-dogfood-runner-143.json",
-        "expect_nested_goal_id": "csharp-dogfood-runner-143",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 21,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-run-report-viewer-service-144.json",
-        "expect_nested_goal_id": "run-report-viewer-service-144",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 22,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-self-improvement-campaign-157.json",
-        "expect_nested_goal_id": "self-improvement-campaign-157",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 23,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-live-governed-agent-execution-158.json",
-        "expect_nested_goal_id": "live-governed-agent-execution-158",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 24,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-live-critic-planner-agents-159.json",
-        "expect_nested_goal_id": "live-critic-planner-agents-159",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 25,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-live-retriever-sentinel-agents-160.json",
-        "expect_nested_goal_id": "live-retriever-sentinel-agents-160",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 26,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-live-remaining-governed-agents-161.json",
-        "expect_nested_goal_id": "live-remaining-governed-agents-161",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 27,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-governed-tool-loop-162-167.json",
-        "expect_nested_goal_id": "governed-tool-loop-162-167",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 28,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-loop-gated-disposable-build-168.json",
-        "expect_nested_goal_id": "loop-gated-disposable-build-168",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 29,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-promotion-package-169.json",
-        "expect_nested_goal_id": "promotion-package-language-runtime-169",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 30,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-isolated-promotion-apply-170.json",
-        "expect_nested_goal_id": "isolated-promotion-apply-170",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 31,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-promotion-review-cockpit-171.json",
-        "expect_nested_goal_id": "promotion-review-cockpit-171",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 32,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-controlled-real-repo-write-path-design-172.json",
-        "expect_nested_goal_id": "controlled-real-repo-write-path-design-172",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 33,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-controlled-write-policy-settings-173.json",
-        "expect_nested_goal_id": "controlled-write-policy-settings-173",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 34,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-controlled-write-approval-record-174.json",
-        "expect_nested_goal_id": "controlled-write-approval-record-174",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 35,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-controlled-worktree-dry-run-175.json",
-        "expect_nested_goal_id": "controlled-worktree-dry-run-175",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 36,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
-        "expect_nested_goal_id": "failure-package-handoff-017",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    },
-    {
-      "step": 37,
-      "action": "agent_tester_run_plan",
-      "params": {
-        "plan_path": "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
-        "expect_nested_goal_id": "code-standards-alpha-009",
-        "expect_nested_status": "passed",
-        "expect_nested_overall_result": "SUCCESS",
-        "compact_report": true
-      }
-    }
-  ],
-  "max_turns": 37,
-  "early_stop_on_failure": true
+﻿{
+    "test_run_id":  "MainAlphaRegressionPack",
+    "goal_id":  "main-alpha-regression-pack-102",
+    "description":  "Compact main-branch Alpha safety net after the Alpha Test Phase audit bundle.",
+    "expected":  {
+                     "checkpoint_memory_retrievable":  true,
+                     "agent_matrix_memory_retrievable":  true,
+                     "final_report_memory_retrievable":  true,
+                     "core_memory_search_passes":  true,
+                     "bookseller_project_smoke_passes":  true,
+                     "builder_preview_safety_passes":  true,
+                     "disposable_workspace_apply_passes":  true,
+                     "disposable_workspace_fail_closed_passes":  true,
+                     "memory_reindex_freshness_passes":  true,
+                     "foundation_break_test_pack_passes":  true,
+                     "conscience_agent_lite_passes":  true,
+                     "thought_ledger_passes":  true,
+                     "governed_action_review_passes":  true,
+                     "retriever_weighted_context_passes":  true,
+                     "supervisor_governed_autonomy_passes":  true,
+                     "supervisor_disposable_workspace_autonomy_passes":  true,
+                     "solitaire_product_spike_intake_passes":  true,
+                     "solitaire_product_spike_plan_passes":  true,
+                     "cli_command_surface_cleanup_passes":  true,
+                     "csharp_dogfood_runner_passes":  true,
+                     "run_report_viewer_service_passes":  true,
+                     "self_improvement_campaign_157_passes":  true,
+                     "live_governed_agent_execution_158_passes":  true,
+                     "live_critic_planner_agents_159_passes":  true,
+                     "live_retriever_sentinel_agents_160_passes":  true,
+                     "failure_handoff_passes":  true,
+                     "code_standards_passes":  true,
+                     "live_remaining_governed_agents_161_passes":  true,
+                     "governed_tool_loop_162_167_passes":  true,
+                     "loop_gated_disposable_build_168_passes":  true,
+                     "promotion_package_169_passes":  true,
+                     "isolated_promotion_apply_170_passes":  true,
+                     "promotion_review_cockpit_171_passes":  true,
+                     "controlled_write_path_design_172_passes":  true,
+                     "controlled_write_policy_173_passes":  true,
+                     "controlled_write_approval_174_passes":  true,
+                     "controlled_worktree_dry_run_175_passes":  true,
+                     "adversarial_memory_agents_183_passes":  true
+                 },
+    "steps":  [
+                  {
+                      "step":  1,
+                      "action":  "memory_search",
+                      "params":  {
+                                     "project":  "IronDev",
+                                     "query":  "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
+                                     "take":  5,
+                                     "expect_project":  "IronDev",
+                                     "expect_top_title_contains":  "MAIN_BRANCH_ALPHA_CHECKPOINT_094",
+                                     "expect_source_present":  true,
+                                     "expect_semantic_trace_id":  true,
+                                     "expect_raw_and_final_rank":  true
+                                 }
+                  },
+                  {
+                      "step":  2,
+                      "action":  "memory_search",
+                      "params":  {
+                                     "project":  "IronDev",
+                                     "query":  "AGENT_CAPABILITY_MATRIX",
+                                     "take":  5,
+                                     "expect_project":  "IronDev",
+                                     "expect_top_title_contains":  "AGENT_CAPABILITY_MATRIX",
+                                     "expect_source_present":  true,
+                                     "expect_semantic_trace_id":  true,
+                                     "expect_raw_and_final_rank":  true
+                                 }
+                  },
+                  {
+                      "step":  3,
+                      "action":  "memory_search",
+                      "params":  {
+                                     "project":  "IronDev",
+                                     "query":  "ALPHA_TEST_PHASE_REPORT",
+                                     "take":  5,
+                                     "expect_project":  "IronDev",
+                                     "expect_top_title_contains":  "ALPHA_TEST_PHASE_REPORT",
+                                     "expect_source_present":  true,
+                                     "expect_semantic_trace_id":  true,
+                                     "expect_raw_and_final_rank":  true
+                                 }
+                  },
+                  {
+                      "step":  4,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-codex-memory-search-cli-smoke.json",
+                                     "expect_nested_goal_id":  "codex-memory-search-cli-013",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  5,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/bookseller-project-smoke.json",
+                                     "expect_nested_goal_id":  "bookseller-project-fixture-020",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  6,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-builder-proposal-safety-smoke.json",
+                                     "expect_nested_goal_id":  "builder-proposal-safety-016",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  7,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/bookseller-disposable-workspace-apply-smoke.json",
+                                     "expect_nested_goal_id":  "disposable-workspace-apply-proof-104-115",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  8,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/bookseller-disposable-workspace-fail-closed-smoke.json",
+                                     "expect_nested_goal_id":  "disposable-workspace-fail-closed-104-115",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  9,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-memory-reindex-freshness-smoke.json",
+                                     "expect_nested_goal_id":  "memory-reindex-freshness-116",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  10,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-foundation-break-test-121-130-pack.json",
+                                     "expect_nested_goal_id":  "foundation-break-test-121-130",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  11,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-conscience-agent-lite-131.json",
+                                     "expect_nested_goal_id":  "conscience-agent-lite-131",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  12,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-thought-ledger-132.json",
+                                     "expect_nested_goal_id":  "thought-ledger-132",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  13,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-governed-action-review-133.json",
+                                     "expect_nested_goal_id":  "governed-action-review-133",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  14,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-retriever-weighted-context-bundle-134.json",
+                                     "expect_nested_goal_id":  "retriever-weighted-context-bundle-134",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  15,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-supervisor-governed-autonomous-loop-135.json",
+                                     "expect_nested_goal_id":  "supervisor-governed-autonomous-loop-135",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  16,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-supervisor-disposable-workspace-autonomy-136.json",
+                                     "expect_nested_goal_id":  "supervisor-disposable-workspace-autonomy-136",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  17,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-solitaire-product-spike-intake-137.json",
+                                     "expect_nested_goal_id":  "solitaire-product-spike-intake-137",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  18,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-solitaire-product-spike-plan-138.json",
+                                     "expect_nested_goal_id":  "solitaire-product-spike-plan-138",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  19,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-cli-command-surface-cleanup-142.json",
+                                     "expect_nested_goal_id":  "cli-command-surface-cleanup-142",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  20,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-csharp-dogfood-runner-143.json",
+                                     "expect_nested_goal_id":  "csharp-dogfood-runner-143",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  21,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-run-report-viewer-service-144.json",
+                                     "expect_nested_goal_id":  "run-report-viewer-service-144",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  22,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-self-improvement-campaign-157.json",
+                                     "expect_nested_goal_id":  "self-improvement-campaign-157",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  23,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-live-governed-agent-execution-158.json",
+                                     "expect_nested_goal_id":  "live-governed-agent-execution-158",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  24,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-live-critic-planner-agents-159.json",
+                                     "expect_nested_goal_id":  "live-critic-planner-agents-159",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  25,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-live-retriever-sentinel-agents-160.json",
+                                     "expect_nested_goal_id":  "live-retriever-sentinel-agents-160",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  26,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-live-remaining-governed-agents-161.json",
+                                     "expect_nested_goal_id":  "live-remaining-governed-agents-161",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  27,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-governed-tool-loop-162-167.json",
+                                     "expect_nested_goal_id":  "governed-tool-loop-162-167",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  28,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-loop-gated-disposable-build-168.json",
+                                     "expect_nested_goal_id":  "loop-gated-disposable-build-168",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  29,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-promotion-package-169.json",
+                                     "expect_nested_goal_id":  "promotion-package-language-runtime-169",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  30,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-isolated-promotion-apply-170.json",
+                                     "expect_nested_goal_id":  "isolated-promotion-apply-170",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  31,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-promotion-review-cockpit-171.json",
+                                     "expect_nested_goal_id":  "promotion-review-cockpit-171",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  32,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-controlled-real-repo-write-path-design-172.json",
+                                     "expect_nested_goal_id":  "controlled-real-repo-write-path-design-172",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  33,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-controlled-write-policy-settings-173.json",
+                                     "expect_nested_goal_id":  "controlled-write-policy-settings-173",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  34,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-controlled-write-approval-record-174.json",
+                                     "expect_nested_goal_id":  "controlled-write-approval-record-174",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  35,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-controlled-worktree-dry-run-175.json",
+                                     "expect_nested_goal_id":  "controlled-worktree-dry-run-175",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  36,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-failure-package-handoff-smoke.json",
+                                     "expect_nested_goal_id":  "failure-package-handoff-017",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  37,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                                     "expect_nested_goal_id":  "code-standards-alpha-009",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  },
+                  {
+                      "step":  38,
+                      "action":  "agent_tester_run_plan",
+                      "params":  {
+                                     "plan_path":  "tools/dogfood/test-agent-plans/irondev-adversarial-memory-agents-183.json",
+                                     "expect_nested_goal_id":  "adversarial-memory-agents-183",
+                                     "expect_nested_status":  "passed",
+                                     "expect_nested_overall_result":  "SUCCESS",
+                                     "compact_report":  true
+                                 }
+                  }
+              ],
+    "max_turns":  37,
+    "early_stop_on_failure":  true
 }

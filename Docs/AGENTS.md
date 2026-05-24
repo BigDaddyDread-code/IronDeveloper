@@ -17,9 +17,11 @@ Agents may reason, package evidence, run bounded plans, and write inside explici
 | ArchitectAgent | Opt-in live governed architecture review | strong-reasoner | Reviews proposals against weighted context and safety boundaries. May call a configured model only when explicitly enabled. Does not create accepted decisions or patch. |
 | BuilderAgent | Caged disposable repair loop | code-builder | May write only inside explicit disposable workspaces. Real repo writes remain blocked. |
 | TesterAgent | C# dogfood runner wrapper | cheap-runner | Executes plans and reports. Does not fix. |
-| QualityAgent / KilljoyAgent | Opt-in live governed quality commentary | cheap-runner | Runs build/test/format/package/code-standards checks and reports debt. May call a configured model for advisory risk notes only. Does not refactor or override gates. |
+| QualityAgent / KilljoyAgent / Code Review Agent | Opt-in live governed quality commentary | cheap-runner | Runs build/test/format/package/code-standards checks and reports debt. May call a configured model for advisory risk notes only. Does not refactor or override gates. |
 | RetrieverAgent | Opt-in live governed weighted context packer | cheap-runner | Packages accepted project memory, rankings, rejected context, and trace evidence. May call a configured model only when explicitly enabled. Does not decide implementation or override ranking. |
 | CriticAgent | Opt-in live governed failure/evidence reviewer | strong-reviewer | Reviews failure packages and risks. May call a configured model only when explicitly enabled. Does not patch. |
+| DoubtAgent | Adversarial review path with deterministic fallback | strong-reviewer | Stress-tests plans, promotion packages, and proposed changes for hidden risk. High/Critical findings require explicit Killjoy rebuttal. Does not patch, block forever, mutate memory, or approve writes. |
+| MemoryImprovementAgent | Proposal-only memory improvement path | standard-reasoner | Reviews completed-run evidence and proposes staged memory improvements with token/proposal budgets. Does not mutate accepted memory, create tickets, or receive accepted-memory keys in Alpha. |
 | SentinelAgent | Opt-in live governed internal observation | cheap-runner | Emits advisory insight artefacts. May call a configured model only when explicitly enabled. Does not create tickets or mutate memory. |
 | ResearchAgent | Opt-in live governed external evidence packer | cheap-runner | Packages explicit external evidence only. May call a configured model only when explicitly enabled. Project memory remains authority. |
 | ConscienceAgent | Governance gate | cheap-runner | Returns Allow, Block, or NeedsMoreEvidence. Does not execute. |
@@ -47,6 +49,8 @@ Live model calls are opt-in per governed command. If the provider is unavailable
 - TesterAgent executes only.
 - SentinelAgent observes only.
 - ResearchAgent evidence cannot override accepted project memory.
+- DoubtAgent can require rebuttal/revision but cannot mutate state or create infinite review loops.
+- MemoryImprovementAgent proposes staged memory changes only; accepted memory remains human/Codex governed.
 - BuilderAgent may repair only inside the disposable workspace.
 - Human approval is still required before any future real repository apply path.
 
@@ -82,3 +86,5 @@ IRONDEV-171 hardens the Run Reports viewer into a promotion review cockpit. The 
 IRONDEV-172 defines the controlled real-repository write path before implementing it. The future path is settings-first for runtime adapters, commands, branch naming, worktree roots, reviewer roles, evidence retention, and policy thresholds, but hard invariants still win: no direct `main` writes, no active developer working tree writes, no self-approval, no ConscienceAgent/ThoughtLedger bypass, no accepted memory mutation, and no promotion of blocked files. This is design only; no branch apply command or PR creation authority exists yet.
 
 IRONDEV-173 through IRONDEV-175 add the first controlled-write gates without performing the write. IRONDEV-173 resolves layered policy settings into an effective policy while proving hard invariants cannot be configured away. IRONDEV-174 creates a scoped human approval record valid only for one promotion package and `ControlledWorktreeDryRun`. IRONDEV-175 validates a future worktree apply as a dry-run: target path explicit, target outside active repo, branch not main/master, approval/package/policy match, promotable files identified, blocked files rejected, active repo mutation count zero, and no worktree created. These slices still do not grant real repo write, PR creation, memory mutation, ticket acceptance, or self-approval authority.
+
+IRONDEV-183 adds the first advanced adversarial and self-improving memory agents. `DoubtAgent` is the formal Adversarial Review Agent and may be referred to internally as the AssholeAgent nickname, but product/docs use DoubtAgent. `MemoryImprovementAgent` analyses completed-run evidence, Doubt findings, Killjoy rebuttals, and promotion outcomes to propose staged memory improvements. It reports accepted-memory key readiness as false during Alpha; no accepted memory mutation, ticket creation, patching, or self-approval authority is granted.

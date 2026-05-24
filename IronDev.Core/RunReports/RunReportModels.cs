@@ -34,6 +34,8 @@ public sealed record RunReportDetail
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public string? ReportPath { get; init; }
     public RunPromotionReview? PromotionReview { get; init; }
+    public RunAdversarialReview? AdversarialReview { get; init; }
+    public RunMemoryImprovementReview? MemoryImprovement { get; init; }
     public RunReviewPolicySnapshot Policy { get; init; } = RunReviewPolicySnapshot.Default;
 }
 
@@ -133,4 +135,40 @@ public sealed record RunReviewPolicySnapshot
     public string PolicyId { get; init; } = string.Empty;
     public IReadOnlyList<string> ConfigurableSettings { get; init; } = [];
     public IReadOnlyList<string> HardInvariants { get; init; } = [];
+}
+
+public sealed record RunAdversarialReview
+{
+    public int FindingCount { get; init; }
+    public int HighCriticalCount { get; init; }
+    public bool RebuttalRequired { get; init; }
+    public bool KilljoyEscalation { get; init; }
+    public bool KilljoyAddressedHighCritical { get; init; }
+    public IReadOnlyList<RunDoubtFinding> Findings { get; init; } = [];
+}
+
+public sealed record RunDoubtFinding
+{
+    public string Severity { get; init; } = string.Empty;
+    public string Category { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string EvidenceCitation { get; init; } = string.Empty;
+    public string SuggestedFix { get; init; } = string.Empty;
+}
+
+public sealed record RunMemoryImprovementReview
+{
+    public int ProposalCount { get; init; }
+    public string MemoryHealthScore { get; init; } = string.Empty;
+    public bool ReadyForAcceptedMemoryKey { get; init; }
+    public string CurrentAuthorityLevel { get; init; } = string.Empty;
+    public IReadOnlyList<RunMemoryProposal> Proposals { get; init; } = [];
+}
+
+public sealed record RunMemoryProposal
+{
+    public string ActionType { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string RecommendedDisposition { get; init; } = string.Empty;
+    public string MemoryAuthorityImpact { get; init; } = string.Empty;
 }

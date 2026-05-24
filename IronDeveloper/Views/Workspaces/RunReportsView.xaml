@@ -164,6 +164,44 @@
                     </StackPanel>
                 </Grid>
 
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="DOUBT REVIEW" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding DoubtFindingCount, StringFormat={}{0} adversarial findings}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding DoubtHighCriticalCount, StringFormat={}{0} high/critical}" Foreground="{StaticResource Text/Muted}" Margin="0,4,0,8"/>
+                        <ItemsControl ItemsSource="{Binding DoubtFindings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding SuggestedFix}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                        <TextBlock Text="MEMORY IMPROVEMENT" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding MemoryProposalCount, StringFormat={}{0} staged proposals}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding MemoryHealthScore}" Foreground="{StaticResource Text/Muted}" Margin="0,4,0,8"/>
+                        <TextBlock Text="{Binding MemoryKeyReady, StringFormat={}Accepted-memory key ready: {0}}" Foreground="{StaticResource Text/Muted}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding MemoryProposals}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding RecommendedDisposition}" Foreground="{StaticResource Accent/Primary}" FontSize="11"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+
                 <TextBlock Text="STAGES" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
                 <ItemsControl ItemsSource="{Binding Stages}" Margin="0,0,0,20">
                     <ItemsControl.ItemTemplate>

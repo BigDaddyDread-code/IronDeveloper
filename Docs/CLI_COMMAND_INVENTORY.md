@@ -10,11 +10,11 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 16
+- Agent commands: 18
 - Build commands: 2
 - Chat commands: 1
 - Docs commands: 6
-- Dogfood commands: 11
+- Dogfood commands: 12
 - Ticket commands: 1
 - Failure commands: 1
 - Govern commands: 1
@@ -41,6 +41,8 @@ The machine-readable inventory is stored at:
 - `agent builder trace-smoke`
 - `agent builder repair-loop`
 - `agent loop plan-review`
+- `agent doubt review`
+- `agent memory-improvement propose`
 - `build disposable repair`
 - `build disposable run`
 - `govern review`
@@ -64,6 +66,7 @@ The machine-readable inventory is stored at:
 - `campaign controlled-write-policy-173`
 - `campaign controlled-write-approval-174`
 - `campaign controlled-worktree-dry-run-175`
+- `campaign adversarial-memory-agents-183`
 - `promotion package create`
 - `promotion apply isolated`
 - `promotion policy effective`
@@ -78,6 +81,10 @@ These are closest to the control surface Codex will use.
 `agent conscience review` and `agent thought-ledger explain` are governed-autonomy control-plane commands. They review and explain proposed actions only; they do not execute, mutate memory, create tickets, or patch files.
 
 `govern review` combines ConscienceAgent and ThoughtLedger into one review package. It still does not execute the proposed action.
+
+`agent doubt review` runs the formal Adversarial Review Agent. It returns Doubt findings only; it does not patch, create tickets, mutate memory, or approve writes.
+
+`agent memory-improvement propose` reads focused completed-run evidence and returns staged memory proposals only. Accepted-memory key readiness remains false during Alpha.
 
 `agent retriever search` now returns a weighted context bundle. It preserves the real memory search result while adding included sources, rejected or filtered-context notes, source risk notes, semantic trace id, and an agent-facing summary.
 

@@ -66,6 +66,9 @@ if (IsCommand(args, "campaign", "controlled-write-approval-174"))
 if (IsCommand(args, "campaign", "controlled-worktree-dry-run-175"))
     return await ControlledWritePath173175Command.HandleWorktreeDryRunCampaignAsync(args, options);
 
+if (IsCommand(args, "campaign", "adversarial-memory-agents-183"))
+    return await AdversarialMemoryAgents183Command.HandleCampaignAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
@@ -119,6 +122,22 @@ if (args.Length >= 3 &&
     string.Equals(args[2], "review-failure", StringComparison.OrdinalIgnoreCase))
 {
     return await HandleAgentCriticReviewFailureCommandAsync(args, options);
+}
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "doubt", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "review", StringComparison.OrdinalIgnoreCase))
+{
+    return await AdversarialMemoryAgents183Command.HandleDoubtReviewAsync(args, options);
+}
+
+if (args.Length >= 3 &&
+    string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "memory-improvement", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[2], "propose", StringComparison.OrdinalIgnoreCase))
+{
+    return await AdversarialMemoryAgents183Command.HandleMemoryImprovementProposeAsync(args, options);
 }
 
 if (args.Length >= 3 &&
@@ -1067,7 +1086,9 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
     string? sentinelModelProfile = null,
     string? supervisorModelProfile = null,
     string? qualityModelProfile = null,
-    string? researchModelProfile = null)
+    string? researchModelProfile = null,
+    string? doubtModelProfile = null,
+    string? memoryImprovementModelProfile = null)
 {
     var repoRoot = FindRepositoryRoot();
     var modelResolver = new AgentModelResolver(LoadModelProfiles(repoRoot));
@@ -1084,6 +1105,8 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                 "SupervisorAgent" => supervisorModelProfile,
                 "QualityAgent" => qualityModelProfile,
                 "ResearchAgent" => researchModelProfile,
+                "DoubtAgent" => doubtModelProfile,
+                "MemoryImprovementAgent" => memoryImprovementModelProfile,
                 _ => null
             };
 
@@ -1110,6 +1133,10 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
                     ? new RetrieverAgent(definition, modelResolver, repoRoot, agentLlmClient)
                 : string.Equals(definition.Name, "CriticAgent", StringComparison.OrdinalIgnoreCase)
                     ? new CriticAgent(definition, modelResolver, agentLlmClient)
+                : string.Equals(definition.Name, "DoubtAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new DoubtAgent(definition, modelResolver, agentLlmClient)
+                : string.Equals(definition.Name, "MemoryImprovementAgent", StringComparison.OrdinalIgnoreCase)
+                    ? new MemoryImprovementAgent(definition, modelResolver, agentLlmClient)
                 : string.Equals(definition.Name, "QualityAgent", StringComparison.OrdinalIgnoreCase)
                     ? new QualityAgent(definition, modelResolver, repoRoot, agentLlmClient)
                 : string.Equals(definition.Name, "PlannerAgent", StringComparison.OrdinalIgnoreCase)

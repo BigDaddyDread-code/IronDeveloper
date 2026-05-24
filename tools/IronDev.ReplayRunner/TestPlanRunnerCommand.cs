@@ -75,7 +75,8 @@ public sealed class TestPlanRunner
         "isolated_promotion_apply_170",
         "controlled_write_policy_173",
         "controlled_write_approval_174",
-        "controlled_worktree_dry_run_175"
+        "controlled_worktree_dry_run_175",
+        "adversarial_memory_agents_183"
     };
 
     private readonly string _repoRoot;
@@ -152,6 +153,7 @@ public sealed class TestPlanRunner
                     "controlled_write_policy_173" => await RunControlledWritePolicy173Async(runId, logPath),
                     "controlled_write_approval_174" => await RunControlledWriteApproval174Async(runId, logPath),
                     "controlled_worktree_dry_run_175" => await RunControlledWorktreeDryRun175Async(runId, logPath),
+                    "adversarial_memory_agents_183" => await RunAdversarialMemoryAgents183Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -1082,6 +1084,55 @@ public sealed class TestPlanRunner
         return new NativeActionResult(
             failures.Count == 0,
             failures.Count == 0 ? $"Controlled worktree dry-run 175 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
+    private async Task<NativeActionResult> RunAdversarialMemoryAgents183Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "adversarial-memory-agents-183", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign adversarial-memory-agents-183 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected 183 status Succeeded, actual {ReadProperty(parsed, "status")}.");
+
+        var doubt = ReadElement(parsed, "doubtReview");
+        var criticisms = ReadArray(doubt, "criticisms");
+        if (criticisms.Count == 0)
+            failures.Add("Expected DoubtAgent criticisms.");
+        if (!ReadBoolProperty(doubt, "rebuttalRequired"))
+            failures.Add("Expected DoubtAgent to require rebuttal.");
+        if (!ReadBoolProperty(doubt, "killjoyEscalation"))
+            failures.Add("Expected DoubtAgent to escalate to Killjoy.");
+
+        var killjoy = ReadElement(parsed, "killjoyReview");
+        if (!ReadBoolProperty(killjoy, "allHighCriticalFindingsAddressed"))
+            failures.Add("Expected Killjoy to address high/critical Doubt findings.");
+
+        var memory = ReadElement(parsed, "memoryImprovement");
+        var proposals = ReadArray(memory, "proposals");
+        if (proposals.Count is < 1 or > 3)
+            failures.Add($"Expected one to three memory proposals, actual {proposals.Count}.");
+        if (proposals.Any(proposal => string.Equals(ReadProperty(proposal, "memoryAuthorityImpact"), "UpdatesAcceptedMemory", StringComparison.OrdinalIgnoreCase)))
+            failures.Add("Memory proposals must not directly update accepted memory.");
+        var readiness = ReadElement(memory, "authorityKeyReadiness");
+        if (ReadBoolProperty(readiness, "readyForAcceptedMemoryKey"))
+            failures.Add("MemoryImprovementAgent must not be ready for accepted-memory keys.");
+        if (!ReadBoolProperty(parsed, "realRepoMutationBlocked") ||
+            !ReadBoolProperty(parsed, "acceptedMemoryMutationBlocked") ||
+            !ReadBoolProperty(parsed, "ticketCreationBlocked") ||
+            !ReadBoolProperty(parsed, "patchApplyBlocked"))
+        {
+            failures.Add("Expected all hard mutation boundaries to remain blocked.");
+        }
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Adversarial/memory agents 183 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
             "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
             run.ExitCode,
             parsed);

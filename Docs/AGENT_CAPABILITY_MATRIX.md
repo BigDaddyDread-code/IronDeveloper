@@ -26,6 +26,8 @@ Primary retrieval question: which IronDev agents are real vs stubbed?
 | QualityAgent | Deterministic wrapper | Runs code standards/tooling gate through existing plan machinery. | Reports quality; does not refactor. |
 | RetrieverAgent | Memory wrapper | Runs memory search and packages a weighted context bundle with included/rejected sources, ranking evidence, risk notes, and source guidance. | Uses dogfood memory search; not a full retrieval planner yet. |
 | CriticAgent | Deterministic wrapper | Reviews failure packages and returns evidence-backed recommendation. | Reviews only; no code changes. |
+| DoubtAgent | Deterministic adversarial reviewer | Stress-tests plans, promotion packages, and proposed changes for hidden assumptions, missing evidence, governance gaps, language-specific risks, and fake confidence. | Review only. High/Critical findings require Killjoy rebuttal, but DoubtAgent cannot patch, mutate memory, create tickets, approve writes, or block forever. |
+| MemoryImprovementAgent | Proposal-only memory reviewer | Reads focused completed-run evidence and proposes staged memory improvements with token/proposal budgets. | Staging/proposal only. Accepted-memory key readiness remains false in Alpha; no accepted memory mutation, ticket creation, patching, or self-approval. |
 | SentinelAgent | Deterministic wrapper | Observes campaign/failure/test evidence and emits insight artefacts. | Observational only; no tickets, memory writes, patches, or approvals. |
 | ResearchAgent | Deterministic wrapper | Packages explicit external evidence as a ResearchPackage. | Read-only; does not decide architecture, write memory, create tickets, patch code, or override project memory. |
 | ConscienceAgent | Deterministic safety reviewer | Reviews proposed actions and returns Allow, Block, or NeedsMoreEvidence. | Reviews only; no patching, ticket creation, memory mutation, or self-approval. |
@@ -59,3 +61,9 @@ This does not make BuilderAgent a mature autonomous engineer. It gives future di
 BuilderAgent can now run `agent builder repair-loop` for the Solitaire disposable workspace proof. The loop intentionally creates a build failure, repairs the WPF project reference inside the disposable workspace, intentionally creates a rule-test failure, repairs `KlondikeRules.cs` inside the disposable workspace, and records final build/test success in the 140 trace model.
 
 This is the first real caged repair loop. It still does not allow real repository writes, memory mutation, guardrail mutation, regression pack mutation, or self-approval.
+
+## 183 DoubtAgent And MemoryImprovementAgent
+
+DoubtAgent is the formal Adversarial Review Agent. It can produce high/critical findings and force explicit Killjoy rebuttal before promotion, but it remains review-only.
+
+MemoryImprovementAgent can review completed-run traces, Doubt findings, Killjoy rebuttals, and promotion outcomes, then stage a small number of memory improvement proposals. It cannot mutate accepted memory. During Alpha, accepted-memory key readiness is explicitly false.

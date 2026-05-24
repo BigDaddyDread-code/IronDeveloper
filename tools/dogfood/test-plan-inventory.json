@@ -1,5 +1,30 @@
 ﻿[
     {
+        "planFile":  "irondev-adversarial-memory-agents-183.json",
+        "goalId":  "adversarial-memory-agents-183",
+        "project":  "IronDev",
+        "description":  "Validate DoubtAgent adversarial review, Killjoy rebuttal, and MemoryImprovementAgent proposal-only staging under governed Alpha boundaries.",
+        "agentPath":  "TestAgent + ReplayRunner + AdversarialMemoryAgents183Command + DoubtAgent + MemoryImprovementAgent + ConscienceAgent",
+        "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-adversarial-memory-agents-183.json",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "DoubtAgent",
+                                 "MemoryImprovementAgent",
+                                 "ConscienceAgent"
+                             ],
+        "expectedEvidence":  [
+                                 "Doubt findings present",
+                                 "High/Critical findings require rebuttal",
+                                 "Killjoy addresses high/critical findings",
+                                 "Memory proposals are staged only",
+                                 "Accepted-memory key readiness is false",
+                                 "Hard mutation boundaries remain blocked"
+                             ],
+        "regressionGroup":  "GovernedAgents",
+        "safetyBoundary":  "Review/proposal only; no real repo writes, accepted memory mutation, ticket creation, patch apply, or self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-controlled-worktree-dry-run-175.json",
         "goalId":  "controlled-worktree-dry-run-175",
         "project":  "IronDev",

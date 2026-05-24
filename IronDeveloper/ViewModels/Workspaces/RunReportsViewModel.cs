@@ -21,6 +21,8 @@ public sealed partial class RunReportsViewModel : ObservableObject
     public ObservableCollection<string> PromotionChecklist { get; } = [];
     public ObservableCollection<string> HardInvariants { get; } = [];
     public ObservableCollection<string> ConfigurablePolicy { get; } = [];
+    public ObservableCollection<RunDoubtFinding> DoubtFindings { get; } = [];
+    public ObservableCollection<RunMemoryProposal> MemoryProposals { get; } = [];
 
     [ObservableProperty]
     private RunReportSummary? _selectedRun;
@@ -57,6 +59,12 @@ public sealed partial class RunReportsViewModel : ObservableObject
     public string TargetStack => SelectedRunDetail?.PromotionReview?.TargetStack ?? "";
     public int BlockedFileCount => SelectedRunDetail?.PromotionReview?.BlockedFileCount ?? 0;
     public bool HasPromotionReview => SelectedRunDetail?.PromotionReview is not null;
+    public int DoubtFindingCount => SelectedRunDetail?.AdversarialReview?.FindingCount ?? 0;
+    public int DoubtHighCriticalCount => SelectedRunDetail?.AdversarialReview?.HighCriticalCount ?? 0;
+    public bool KilljoyAddressedDoubt => SelectedRunDetail?.AdversarialReview?.KilljoyAddressedHighCritical ?? false;
+    public int MemoryProposalCount => SelectedRunDetail?.MemoryImprovement?.ProposalCount ?? 0;
+    public string MemoryHealthScore => SelectedRunDetail?.MemoryImprovement?.MemoryHealthScore ?? "";
+    public bool MemoryKeyReady => SelectedRunDetail?.MemoryImprovement?.ReadyForAcceptedMemoryKey ?? false;
 
     public RunReportsViewModel(IRunReportService runReportService, IRunEvidenceService runEvidenceService)
     {
@@ -123,6 +131,8 @@ public sealed partial class RunReportsViewModel : ObservableObject
         PromotionChecklist.Clear();
         HardInvariants.Clear();
         ConfigurablePolicy.Clear();
+        DoubtFindings.Clear();
+        MemoryProposals.Clear();
         SelectedEvidenceText = string.Empty;
         SelectedRunDetail = null;
 
@@ -164,6 +174,16 @@ public sealed partial class RunReportsViewModel : ObservableObject
                 HardInvariants.Add(invariant);
             foreach (var setting in detail.Policy.ConfigurableSettings)
                 ConfigurablePolicy.Add(setting);
+            if (detail.AdversarialReview is not null)
+            {
+                foreach (var finding in detail.AdversarialReview.Findings.Take(10))
+                    DoubtFindings.Add(finding);
+            }
+            if (detail.MemoryImprovement is not null)
+            {
+                foreach (var proposal in detail.MemoryImprovement.Proposals.Take(10))
+                    MemoryProposals.Add(proposal);
+            }
 
             StatusMessage = detail.Warnings.Count > 0
                 ? string.Join(" ", detail.Warnings)
@@ -217,5 +237,11 @@ public sealed partial class RunReportsViewModel : ObservableObject
         OnPropertyChanged(nameof(TargetStack));
         OnPropertyChanged(nameof(BlockedFileCount));
         OnPropertyChanged(nameof(HasPromotionReview));
+        OnPropertyChanged(nameof(DoubtFindingCount));
+        OnPropertyChanged(nameof(DoubtHighCriticalCount));
+        OnPropertyChanged(nameof(KilljoyAddressedDoubt));
+        OnPropertyChanged(nameof(MemoryProposalCount));
+        OnPropertyChanged(nameof(MemoryHealthScore));
+        OnPropertyChanged(nameof(MemoryKeyReady));
     }
 }
