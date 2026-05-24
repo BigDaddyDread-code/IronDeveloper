@@ -1,5 +1,38 @@
 [
   {
+    "Id": "CONTROLLED_WORKTREE_DRY_RUN_175",
+    "Project": "IronDev",
+    "Title": "Controlled Worktree Dry-Run 175",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CONTROLLED_WORKTREE_DRY_RUN_175.md",
+    "DogfoodRunId": "ControlledWorktreeDryRun175",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524180000000-controlled-worktree-dry-run-175.md",
+    "CreatedUtc": "2026-05-24T18:00:00+00:00"
+  },
+  {
+    "Id": "CONTROLLED_WRITE_APPROVAL_RECORD_174",
+    "Project": "IronDev",
+    "Title": "Controlled Write Approval Record 174",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CONTROLLED_WRITE_APPROVAL_RECORD_174.md",
+    "DogfoodRunId": "ControlledWriteApproval174",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524175000000-controlled-write-approval-record-174.md",
+    "CreatedUtc": "2026-05-24T17:50:00+00:00"
+  },
+  {
+    "Id": "CONTROLLED_WRITE_POLICY_SETTINGS_173",
+    "Project": "IronDev",
+    "Title": "Controlled Write Policy Settings 173",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\CONTROLLED_WRITE_POLICY_SETTINGS_173.md",
+    "DogfoodRunId": "ControlledWritePolicy173",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524174000000-controlled-write-policy-settings-173.md",
+    "CreatedUtc": "2026-05-24T17:40:00+00:00"
+  },
+  {
     "Id": "CONTROLLED_REAL_REPO_WRITE_PATH_DESIGN_172",
     "Project": "IronDev",
     "Title": "Controlled Real Repo Write Path Design 172",

@@ -1,0 +1,35 @@
+{
+  "test_run_id": "IronDev175-ControlledWorktreeDryRun",
+  "goal_id": "controlled-worktree-dry-run-175",
+  "description": "Proves a controlled worktree apply can be validated as a dry-run without creating the worktree, copying files, or mutating the active repository.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "controlled_worktree_dry_run_175",
+      "params": {
+        "expect_target_path_explicit": true,
+        "expect_target_outside_repo": true,
+        "expect_branch_not_main": true,
+        "expect_would_create_worktree": true,
+        "expect_would_copy_files": false,
+        "expect_files_that_would_apply_min": 10,
+        "expect_blocked_files_rejected_min": 1,
+        "expect_active_repo_mutation_count": 0,
+        "expect_isolated_files_changed": 0
+      }
+    }
+  ],
+  "expected": {
+    "target_path_explicit": true,
+    "target_outside_active_repo": true,
+    "target_branch_not_main": true,
+    "worktree_not_created": true,
+    "files_not_copied": true,
+    "promotable_files_identified": true,
+    "blocked_files_rejected": true,
+    "active_repo_mutation_count_zero": true
+  },
+  "boundary": "Dry-run only. No worktree creation, no file copy, no real repository write, no PR creation, no accepted memory mutation, no ticket acceptance, and no self-approval."
+}

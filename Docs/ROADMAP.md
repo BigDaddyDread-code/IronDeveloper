@@ -373,3 +373,86 @@ Still blocked:
 - Ticket acceptance.
 - Auto-merge.
 - Agent self-approval.
+
+## Controlled Write Policy Settings 173
+
+**Status: Delivered**
+
+Goal: resolve configurable controlled-write settings into a run-scoped effective policy while keeping hard invariants non-configurable.
+
+Delivered in this slice:
+
+- `ControlledWritePolicySettings` model.
+- `HardSafetyInvariant` model.
+- `ControlledWriteEffectivePolicy` model.
+- `promotion policy effective --project IronDev --run-id <run> --json`.
+- `campaign controlled-write-policy-173 --run-id <run> --json`.
+- evidence files under `tools/dogfood/runs/{runId}`.
+- ignored unsafe invariant override evidence.
+
+Still blocked:
+
+- Real repository writes.
+- Main branch writes.
+- Active developer working tree writes.
+- Branch/worktree apply.
+- PR creation.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Agent self-approval.
+
+## Controlled Write Approval Record 174
+
+**Status: Delivered**
+
+Goal: define a scoped approval record for one promotion package and controlled worktree dry-run only.
+
+Delivered in this slice:
+
+- `ControlledWriteApprovalRecord` model.
+- `promotion approval create --package-run-id <run> --run-id <approval-run> --json`.
+- `campaign controlled-write-approval-174 --run-id <run> --json`.
+- approval evidence bound to package id, proposed change id, source run id, and source trace id.
+- dry-run-only approval state.
+- explicit blocked actions for main write, active worktree write, PR creation, auto-merge, accepted memory mutation, ticket acceptance, and self-approval.
+
+Still blocked:
+
+- Real repository writes.
+- Branch/worktree apply.
+- PR creation.
+- Auto-merge.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Approval reuse for future packages.
+- Agent self-approval.
+
+## Controlled Worktree Dry-Run 175
+
+**Status: Delivered**
+
+Goal: validate the future controlled worktree apply path without creating a worktree or copying files.
+
+Delivered in this slice:
+
+- `ControlledWorktreeDryRunReport` model.
+- `promotion apply worktree-dry-run --package-run-id <package-run> --approval-run-id <approval-run> --target-worktree <path> --run-id <run> --json`.
+- `campaign controlled-worktree-dry-run-175 --run-id <run> --json`.
+- target path explicit proof.
+- target outside active repository proof.
+- non-main branch proof.
+- package/approval/policy matching.
+- promotable file list and blocked file rejection.
+- active repo mutation count zero.
+- dry-run target not created.
+
+Still blocked:
+
+- Worktree creation.
+- File copy.
+- Real repository writes.
+- PR creation.
+- Auto-merge.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Agent self-approval.

@@ -1,0 +1,28 @@
+{
+  "test_run_id": "IronDev173-ControlledWritePolicySettings",
+  "goal_id": "controlled-write-policy-settings-173",
+  "description": "Proves controlled write policy settings resolve to an effective policy while hard invariants remain non-configurable.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "controlled_write_policy_173",
+      "params": {
+        "project": "IronDev",
+        "expect_write_path_enabled": true,
+        "expect_mode": "ControlledWorktreeDryRun",
+        "expect_hard_invariants_min": 6,
+        "expect_ignored_override_min": 2
+      }
+    }
+  ],
+  "expected": {
+    "effective_policy_created": true,
+    "write_path_enabled_by_explicit_handoff": true,
+    "controlled_worktree_dry_run_permitted": true,
+    "hard_invariants_non_configurable": true,
+    "unsafe_overrides_ignored": true
+  },
+  "boundary": "Policy evidence only. No branch apply, no real repository write, no accepted memory mutation, no ticket acceptance, and no self-approval."
+}

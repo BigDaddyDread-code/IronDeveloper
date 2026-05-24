@@ -20,7 +20,7 @@ The machine-readable inventory is stored at:
 - Govern commands: 1
 - Inventory commands: 1
 - Memory commands: 8
-- Promotion commands: 2
+- Promotion commands: 5
 - Builder commands: 3
 - Foundation commands: 1
 - Run report commands: 1
@@ -61,8 +61,14 @@ The machine-readable inventory is stored at:
 - `campaign loop-gated-disposable-build-168`
 - `campaign promotion-package-169`
 - `campaign isolated-promotion-apply-170`
+- `campaign controlled-write-policy-173`
+- `campaign controlled-write-approval-174`
+- `campaign controlled-worktree-dry-run-175`
 - `promotion package create`
 - `promotion apply isolated`
+- `promotion policy effective`
+- `promotion approval create`
+- `promotion apply worktree-dry-run`
 - `agent architect review`
 
 These are closest to the control surface Codex will use.
@@ -112,6 +118,18 @@ As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` exec
 `promotion apply isolated` consumes a `PromotionPackage`, creates an isolated candidate workspace outside the active repo, copies only `FilesToPromote`, rejects `FilesBlocked`, runs runtime build/test, and reports active repo mutation count. It does not write main, mutate memory, accept tickets, auto-merge, or self-approve.
 
 `campaign isolated-promotion-apply-170` runs 169 first, then proves the promotion package can become an isolated candidate workspace with build/test evidence and active repo mutation count zero.
+
+`promotion policy effective` resolves controlled write settings into a run-scoped effective policy snapshot. Settings can configure runtime adapters, commands, branch naming, worktree roots, reviewer roles, evidence rules, and thresholds; hard invariants such as no direct main write, no active working tree write, no self-approval, no accepted memory mutation, and no blocked file promotion remain non-configurable.
+
+`campaign controlled-write-policy-173` validates the same policy shape and proves attempted unsafe invariant overrides are ignored.
+
+`promotion approval create` creates a scoped approval record for one promotion package. The approval is valid only for `ControlledWorktreeDryRun`, not real repository writes, PR creation, auto-merge, accepted memory mutation, ticket acceptance, or self-approval.
+
+`campaign controlled-write-approval-174` creates a deterministic promotion package fixture, then creates and validates the scoped approval record. The real disposable-output promotion package path remains covered by `campaign promotion-package-169`.
+
+`promotion apply worktree-dry-run` validates a future controlled worktree apply without creating the worktree or copying files. It checks package, approval, effective policy, explicit target path, target outside active repo, non-main branch name, promotable file list, blocked file rejection, and active repo mutation count.
+
+`campaign controlled-worktree-dry-run-175` creates deterministic package and approval fixtures, then proves the dry-run gate. The real disposable-output package path remains covered by `campaign promotion-package-169`. It does not create a worktree, copy files, open a PR, mutate accepted memory, accept tickets, or approve itself.
 
 ## Dogfood/Smoke Commands
 
@@ -253,4 +271,15 @@ This is read/report infrastructure only. It does not change CLI command semantic
 - `campaign isolated-promotion-apply-170 --run-id <run> --json` creates a fresh 169 package, copies only promotable files into the isolated candidate workspace, rejects blocked generated outputs, runs runtime build/test, and writes apply reports.
 - The command writes `isolated-promotion-apply-report.json`, `isolated-promotion-apply-report.md`, an isolated workspace manifest, and build/test logs.
 - It does not write main, mutate accepted memory, accept tickets, auto-merge, or self-approve.
+
+## 173-175 Controlled Write Gates
+
+- `promotion policy effective --project IronDev --run-id <run> --json` writes a run-scoped effective policy snapshot and proves hard invariants are non-configurable.
+- `campaign controlled-write-policy-173 --run-id <run> --json` validates write-path settings, permitted modes, hard invariants, and ignored unsafe overrides.
+- `promotion approval create --package-run-id <package-run> --run-id <approval-run> --json` writes a scoped approval record for one promotion package and controlled worktree dry-run only.
+- `campaign controlled-write-approval-174 --run-id <run> --json` creates a deterministic package fixture and validates the approval record.
+- `promotion apply worktree-dry-run --package-run-id <package-run> --approval-run-id <approval-run> --target-worktree <path> --run-id <run> --json` validates a future worktree apply without creating the worktree or copying files.
+- `campaign controlled-worktree-dry-run-175 --run-id <run> --json` creates deterministic package and approval fixtures, then proves dry-run evidence and active repo mutation count zero.
+
+These commands move the locked door forward one notch: policy, approval, and dry-run validation exist, but actual branch/worktree apply, PR creation, accepted memory mutation, ticket acceptance, auto-merge, and self-approval remain blocked.
 
