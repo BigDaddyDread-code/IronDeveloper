@@ -7,7 +7,7 @@
         "requiresSql":  false,
         "requiresWeaviate":  false,
         "status":  "advanced adversarial and proposal-only memory agent smoke",
-        "notes":  "Runs DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent staged proposal generation, and Conscience review while preserving no real repo writes, no accepted memory mutation, no ticket creation, no patch apply, and no self-approval."
+        "notes":  "Runs DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent Level 1 proposal generation, MemoryKeyGate review, and Conscience review while preserving no staging writes, no real repo writes, no accepted memory mutation, no ticket creation, no patch apply, and no self-approval."
     },
     {
         "command":  "agent doubt review",
@@ -27,7 +27,7 @@
         "requiresSql":  false,
         "requiresWeaviate":  false,
         "status":  "proposal-only memory improvement agent",
-        "notes":  "Reads focused completed-run evidence and proposes staged memory improvements under token/proposal budgets. Accepted-memory key readiness remains false in Alpha."
+        "notes":  "Reads focused completed-run evidence and returns proposal-only memory improvements with evidence bundles and a MemoryKeyGate review under token/proposal budgets. Staging writes and accepted-memory key readiness remain false in Alpha."
     },
     {
         "command":  "agent loop plan-review",

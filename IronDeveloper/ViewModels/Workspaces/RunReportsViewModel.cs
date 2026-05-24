@@ -65,6 +65,9 @@ public sealed partial class RunReportsViewModel : ObservableObject
     public int MemoryProposalCount => SelectedRunDetail?.MemoryImprovement?.ProposalCount ?? 0;
     public string MemoryHealthScore => SelectedRunDetail?.MemoryImprovement?.MemoryHealthScore ?? "";
     public bool MemoryKeyReady => SelectedRunDetail?.MemoryImprovement?.ReadyForAcceptedMemoryKey ?? false;
+    public int MemoryEvidenceBundleCount => SelectedRunDetail?.MemoryImprovement?.EvidenceBundleCount ?? 0;
+    public string MemoryKeyGateDecision => SelectedRunDetail?.MemoryImprovement?.KeyGateDecision ?? "";
+    public string MemoryKeyGateRequestedLevel => SelectedRunDetail?.MemoryImprovement?.KeyGateRequestedLevel ?? "";
 
     public RunReportsViewModel(IRunReportService runReportService, IRunEvidenceService runEvidenceService)
     {
@@ -243,5 +246,8 @@ public sealed partial class RunReportsViewModel : ObservableObject
         OnPropertyChanged(nameof(MemoryProposalCount));
         OnPropertyChanged(nameof(MemoryHealthScore));
         OnPropertyChanged(nameof(MemoryKeyReady));
+        OnPropertyChanged(nameof(MemoryEvidenceBundleCount));
+        OnPropertyChanged(nameof(MemoryKeyGateDecision));
+        OnPropertyChanged(nameof(MemoryKeyGateRequestedLevel));
     }
 }

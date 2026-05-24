@@ -162,6 +162,9 @@ public sealed record RunMemoryImprovementReview
     public string MemoryHealthScore { get; init; } = string.Empty;
     public bool ReadyForAcceptedMemoryKey { get; init; }
     public string CurrentAuthorityLevel { get; init; } = string.Empty;
+    public int EvidenceBundleCount { get; init; }
+    public string KeyGateDecision { get; init; } = string.Empty;
+    public string KeyGateRequestedLevel { get; init; } = string.Empty;
     public IReadOnlyList<RunMemoryProposal> Proposals { get; init; } = [];
 }
 

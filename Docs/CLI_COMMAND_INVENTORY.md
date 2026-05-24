@@ -84,7 +84,7 @@ These are closest to the control surface Codex will use.
 
 `agent doubt review` runs the formal Adversarial Review Agent. It returns Doubt findings only; it does not patch, create tickets, mutate memory, or approve writes.
 
-`agent memory-improvement propose` reads focused completed-run evidence and returns staged memory proposals only. Accepted-memory key readiness remains false during Alpha.
+`agent memory-improvement propose` reads focused completed-run evidence and returns Level 1 proposal-only memory improvements with evidence bundles and a MemoryKeyGate review. It cannot write staging memory or accepted memory. Accepted-memory key readiness remains false during Alpha.
 
 `agent retriever search` now returns a weighted context bundle. It preserves the real memory search result while adding included sources, rejected or filtered-context notes, source risk notes, semantic trace id, and an agent-facing summary.
 

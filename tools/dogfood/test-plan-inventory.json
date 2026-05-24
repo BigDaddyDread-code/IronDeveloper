@@ -3,7 +3,7 @@
         "planFile":  "irondev-adversarial-memory-agents-183.json",
         "goalId":  "adversarial-memory-agents-183",
         "project":  "IronDev",
-        "description":  "Validate DoubtAgent adversarial review, Killjoy rebuttal, and MemoryImprovementAgent proposal-only staging under governed Alpha boundaries.",
+        "description":  "Validate DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent Level 1 proposal-only output, governed evidence bundles, and MemoryKeyGate boundaries.",
         "agentPath":  "TestAgent + ReplayRunner + AdversarialMemoryAgents183Command + DoubtAgent + MemoryImprovementAgent + ConscienceAgent",
         "command":  "test run-plan --plan tools/dogfood/test-agent-plans/irondev-adversarial-memory-agents-183.json",
         "requiredServices":  [

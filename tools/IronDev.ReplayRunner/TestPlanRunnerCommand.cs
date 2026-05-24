@@ -1122,6 +1122,18 @@ public sealed class TestPlanRunner
         var readiness = ReadElement(memory, "authorityKeyReadiness");
         if (ReadBoolProperty(readiness, "readyForAcceptedMemoryKey"))
             failures.Add("MemoryImprovementAgent must not be ready for accepted-memory keys.");
+        if (!StringPropertyEquals(readiness, "currentAuthorityLevel", "Level1ProposalOnly"))
+            failures.Add("MemoryImprovementAgent must start at Level1ProposalOnly.");
+        var evidenceBundles = ReadArray(memory, "evidenceBundles");
+        if (evidenceBundles.Count != proposals.Count)
+            failures.Add("Expected every memory proposal to have an evidence bundle.");
+        if (evidenceBundles.Any(bundle => ReadArray(bundle, "evidenceRefs").Count == 0))
+            failures.Add("Every memory proposal evidence bundle must cite governed evidence.");
+        var keyGate = ReadElement(memory, "keyGateReview");
+        if (!StringPropertyEquals(keyGate, "decision", "NeedsMoreEvidence"))
+            failures.Add("MemoryKeyGate must require more evidence before granting staging-area write keys.");
+        if (!StringPropertyEquals(keyGate, "requestedLevelName", "Level2StagingAreaWrite"))
+            failures.Add("MemoryKeyGate must evaluate the first key: staging-area write.");
         if (!ReadBoolProperty(parsed, "realRepoMutationBlocked") ||
             !ReadBoolProperty(parsed, "acceptedMemoryMutationBlocked") ||
             !ReadBoolProperty(parsed, "ticketCreationBlocked") ||

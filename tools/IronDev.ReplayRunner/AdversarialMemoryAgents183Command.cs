@@ -33,6 +33,25 @@ public static class AdversarialMemoryAgents183Command
         var memoryEnvelope = JsonSerializer.Deserialize<JsonElement>(memory.OutputJson, options);
         var memoryProposal = memoryEnvelope.GetProperty("proposal").Deserialize<MemoryImprovementProposal>(options)
             ?? throw new InvalidOperationException("MemoryImprovementAgent did not return a proposal.");
+        var keyGatePath = Path.Combine(runRoot, "memory-key-gate-review.json");
+        await File.WriteAllTextAsync(keyGatePath, JsonSerializer.Serialize(memoryProposal.KeyGateReview, options));
+        var evidenceAuditPath = Path.Combine(runRoot, "memory-proposal-evidence-audit.json");
+        await File.WriteAllTextAsync(evidenceAuditPath, JsonSerializer.Serialize(new
+        {
+            memoryProposal.ProposalBatchId,
+            permissionLadder = new[]
+            {
+                "Level0ReadOnlyObserver",
+                "Level1ProposalOnly",
+                "Level2StagingAreaWrite",
+                "Level3AutoStageLowRiskLessons",
+                "Level4AutoApplyTinyNonAuthoritativeMemory",
+                "Level5AcceptedMemoryMutation"
+            },
+            evidenceRule = "MemoryImprovementAgent interprets evidence; it is not itself an evidence source.",
+            bundles = memoryProposal.EvidenceBundles,
+            gate = memoryProposal.KeyGateReview
+        }, options));
 
         var conscience = await RunConscienceAsync(definitions, resolver, runId, doubtReview, memoryProposal);
         await File.WriteAllTextAsync(Path.Combine(runRoot, "conscience-memory-review.json"), conscience.OutputJson);
@@ -61,10 +80,13 @@ public static class AdversarialMemoryAgents183Command
                 Path.Combine(runRoot, "doubt-review.json"),
                 killjoyPath,
                 Path.Combine(runRoot, "memory-improvement-proposal.json"),
+                keyGatePath,
+                evidenceAuditPath,
                 Path.Combine(runRoot, "conscience-memory-review.json")
             ],
             Warnings = [
-                "MemoryImprovementAgent is deliberately proposal-only; accepted-memory key readiness is false.",
+                "MemoryImprovementAgent is deliberately Level1ProposalOnly; accepted-memory key readiness is false.",
+                "MemoryKeyGate requires reviewed outcomes before any staging-area write key.",
                 "DoubtAgent can force rebuttal/revision, but it cannot block forever or mutate state."
             ],
             Errors = errors,
@@ -84,7 +106,15 @@ public static class AdversarialMemoryAgents183Command
             report.StageStatuses,
             doubtReview = new { doubtReview.ReviewId, findingCount = doubtReview.Criticisms.Count, doubtReview.RebuttalRequired },
             killjoyReview = new { killjoyReview.ReviewId, killjoyReview.AllHighCriticalFindingsAddressed },
-            memoryImprovement = new { memoryProposal.ProposalBatchId, proposalCount = memoryProposal.Proposals.Count, memoryProposal.AuthorityKeyReadiness.ReadyForAcceptedMemoryKey },
+            memoryImprovement = new
+            {
+                memoryProposal.ProposalBatchId,
+                proposalCount = memoryProposal.Proposals.Count,
+                evidenceBundleCount = memoryProposal.EvidenceBundles.Count,
+                memoryProposal.AuthorityKeyReadiness.ReadyForAcceptedMemoryKey,
+                keyGateDecision = memoryProposal.KeyGateReview.Decision,
+                keyGateRequestedLevel = memoryProposal.KeyGateReview.RequestedLevelName
+            },
             boundary = report.Boundary
         }, options));
         await File.WriteAllTextAsync(Path.Combine(runRoot, "report.md"), BuildMarkdown(report));
@@ -292,8 +322,20 @@ public static class AdversarialMemoryAgents183Command
             errors.Add("Expected one to three memory proposals.");
         if (memoryProposal.Proposals.Any(proposal => proposal.MemoryAuthorityImpact == "UpdatesAcceptedMemory"))
             errors.Add("MemoryImprovementAgent must not propose direct accepted-memory mutation.");
+        if (memoryProposal.AuthorityKeyReadiness.CurrentPermissionLevel != MemoryImprovementPermissionLevel.ProposalOnly)
+            errors.Add("MemoryImprovementAgent must start at Level1 ProposalOnly.");
         if (memoryProposal.AuthorityKeyReadiness.ReadyForAcceptedMemoryKey)
             errors.Add("MemoryImprovementAgent must not be ready for accepted-memory keys in Alpha.");
+        if (memoryProposal.EvidenceBundles.Count != memoryProposal.Proposals.Count)
+            errors.Add("Expected every memory proposal to include an evidence bundle.");
+        if (memoryProposal.EvidenceBundles.Any(bundle => bundle.EvidenceRefs.Count == 0))
+            errors.Add("Expected every memory proposal evidence bundle to cite external governed evidence.");
+        if (memoryProposal.KeyGateReview.Decision != "NeedsMoreEvidence")
+            errors.Add("Expected MemoryKeyGate to require more evidence before Level2 staging-area writes.");
+        if (memoryProposal.KeyGateReview.RequestedLevel != MemoryImprovementPermissionLevel.StagingAreaWrite)
+            errors.Add("Expected MemoryKeyGate to evaluate the first key: Level2 staging-area write.");
+        if (memoryProposal.KeyGateReview.Metrics.UnsafeProposalCount != 0)
+            errors.Add("Expected zero unsafe memory proposals.");
         if (memoryProposal.ContextTokensEstimated > memoryProposal.MaxContextTokens * 2)
             errors.Add("Memory context exceeded the hard budget tolerance.");
 
@@ -309,7 +351,10 @@ public static class AdversarialMemoryAgents183Command
 
         Doubt findings: {report.DoubtReview.Criticisms.Count}
         High/Critical addressed by Killjoy: {report.KilljoyReview.AllHighCriticalFindingsAddressed}
-        Memory proposals staged: {report.MemoryImprovement.Proposals.Count}
+        Memory proposal-only items: {report.MemoryImprovement.Proposals.Count}
+        Evidence bundles: {report.MemoryImprovement.EvidenceBundles.Count}
+        Memory key gate decision: {report.MemoryImprovement.KeyGateReview.Decision}
+        Requested key: {report.MemoryImprovement.KeyGateReview.RequestedLevelName}
         Accepted-memory key ready: {report.MemoryImprovement.AuthorityKeyReadiness.ReadyForAcceptedMemoryKey}
 
         Boundary: {report.Boundary}

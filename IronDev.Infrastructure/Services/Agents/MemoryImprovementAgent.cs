@@ -8,7 +8,7 @@ public sealed class MemoryImprovementAgent : StaticIronDevAgent
 {
     private const int DefaultMaxContextTokens = 2400;
     private const int DefaultMaxProposals = 3;
-    private const string ProposalBoundary = "MemoryImprovementAgent proposes staged memory improvements only. It does not mutate accepted memory, create tickets, patch files, or approve itself.";
+    private const string ProposalBoundary = "MemoryImprovementAgent is Level1ProposalOnly. It may recommend staging, but it cannot write staging memory, mutate accepted memory, create tickets, patch files, or approve itself.";
     private readonly IAgentModelResolver _modelResolver;
     private readonly IAgentLlmClient? _llmClient;
 
@@ -139,11 +139,30 @@ public sealed class MemoryImprovementAgent : StaticIronDevAgent
         int maxContextTokens,
         int maxProposals)
     {
+        var sourceEvidence = BuildEvidenceRefs(evidenceRefs, context);
+        var firstProposalId = $"memory-proposal-{Guid.NewGuid():N}"[..32];
+        var secondProposalId = $"memory-proposal-{Guid.NewGuid():N}"[..32];
+        var thirdProposalId = $"memory-proposal-{Guid.NewGuid():N}"[..32];
+        var firstBundle = BuildEvidenceBundle(
+            firstProposalId,
+            "High/critical adversarial findings must receive explicit Killjoy rebuttal before promotion.",
+            sourceEvidence,
+            missingEvidence: []);
+        var secondBundle = BuildEvidenceBundle(
+            secondProposalId,
+            "MemoryImprovementAgent must remain proposal-only until the memory key gate has enough reviewed outcomes.",
+            sourceEvidence,
+            missingEvidence: ["No human acceptance history for memory proposals exists yet."]);
+        var thirdBundle = BuildEvidenceBundle(
+            thirdProposalId,
+            "Future memory authority changes need a measurable key gate instead of ad hoc trust.",
+            sourceEvidence,
+            missingEvidence: ["No long-run proposal precision score exists yet.", "No retrieval improvement proof exists yet."]);
         var proposals = new List<MemoryImprovementAction>
         {
             new()
             {
-                ProposalId = $"memory-proposal-{Guid.NewGuid():N}"[..32],
+                ProposalId = firstProposalId,
                 ActionType = "CreateObservation",
                 TargetDocumentId = "ADVERSARIAL_REVIEW_OBSERVATION_183",
                 Title = "Capture adversarial review lessons without changing accepted memory",
@@ -152,38 +171,48 @@ public sealed class MemoryImprovementAgent : StaticIronDevAgent
                 MemoryAuthorityImpact = "None",
                 TargetLanguage = targetLanguage,
                 TargetStack = targetStack,
-                EvidenceRefs = evidenceRefs.Take(3).ToArray(),
+                EvidenceRefs = firstBundle.EvidenceRefs.Select(item => item.Source).ToArray(),
+                EvidenceBundle = firstBundle,
                 RequiredReviews = ["Killjoy", "Conscience", "HumanOrCodex"]
             },
             new()
             {
-                ProposalId = $"memory-proposal-{Guid.NewGuid():N}"[..32],
+                ProposalId = secondProposalId,
                 ActionType = "UpdateDraftMemory",
                 TargetDocumentId = "AGENTS",
                 Title = "Clarify MemoryImprovementAgent remains proposal-only",
-                Summary = "Update draft agent documentation to say MemoryImprovementAgent cannot receive accepted-memory authority during Alpha.",
+                Summary = "Update draft agent documentation to say MemoryImprovementAgent starts at Level 1 ProposalOnly and cannot receive accepted-memory authority during Alpha.",
                 RecommendedDisposition = "NeedsHumanReview",
                 MemoryAuthorityImpact = "DraftOnly",
                 TargetLanguage = targetLanguage,
                 TargetStack = targetStack,
-                EvidenceRefs = evidenceRefs.Take(3).ToArray(),
+                EvidenceRefs = secondBundle.EvidenceRefs.Select(item => item.Source).ToArray(),
+                EvidenceBundle = secondBundle,
                 RequiredReviews = ["Killjoy", "Conscience", "HumanOwner"]
             },
             new()
             {
-                ProposalId = $"memory-proposal-{Guid.NewGuid():N}"[..32],
+                ProposalId = thirdProposalId,
                 ActionType = "CreateDecisionCandidate",
                 TargetDocumentId = "MEMORY_AUTHORITY_KEY_POLICY",
                 Title = "Define when a memory agent may receive stronger authority",
-                Summary = "Create a future decision candidate for key-grant criteria: repeated clean proposals, no noisy context bloat, human approval, and reversible staging.",
+                Summary = "Create a future decision candidate for key-grant criteria: reviewed outcomes, evidence refs, no unsafe proposals, no duplicate spam, human approval, and retrieval improvement proof.",
                 RecommendedDisposition = "ObservationOnly",
                 MemoryAuthorityImpact = "None",
                 TargetLanguage = targetLanguage,
                 TargetStack = targetStack,
-                EvidenceRefs = evidenceRefs.Take(3).ToArray(),
+                EvidenceRefs = thirdBundle.EvidenceRefs.Select(item => item.Source).ToArray(),
+                EvidenceBundle = thirdBundle,
                 RequiredReviews = ["Conscience", "HumanOwner"]
             }
         };
+        var selectedProposals = proposals.Take(maxProposals).ToArray();
+        var selectedBundles = selectedProposals
+            .Select(proposal => proposal.EvidenceBundle)
+            .OfType<MemoryProposalEvidenceBundle>()
+            .ToArray();
+        var metrics = BuildAuditMetrics(selectedProposals, context, maxContextTokens);
+        var keyGate = ReviewKeyRequest(metrics, sourceEvidence);
 
         return new MemoryImprovementProposal
         {
@@ -194,22 +223,137 @@ public sealed class MemoryImprovementAgent : StaticIronDevAgent
             ContextTokensEstimated = context.EstimatedTokens,
             MaxProposalsPerRun = maxProposals,
             ContextRefsUsed = context.ContextRefs,
-            Proposals = proposals.Take(maxProposals).ToArray(),
+            Proposals = selectedProposals,
+            EvidenceBundles = selectedBundles,
             RejectedNoisyInputs = context.RejectedNoisyInputs,
             MemoryHealthScore = context.EstimatedTokens <= maxContextTokens ? "Cautious" : "ContextTooLarge",
-            LessonsLearnedSummary = "Doubt/Killjoy evidence can improve memory, but only as staged proposals with small context and explicit evidence refs.",
+            LessonsLearnedSummary = "Doubt/Killjoy evidence can improve memory, but MemoryImprovementAgent earns more keys only from reviewed outcomes, not self-assessment.",
             AuthorityKeyReadiness = new MemoryAuthorityKeyReadiness
             {
                 ReadyForAcceptedMemoryKey = false,
-                CurrentAuthorityLevel = "ProposalOnly",
-                RequiredBeforeKey = "Repeated low-noise staged proposals, explicit human approval, reversible versioning, and Conscience/Killjoy review.",
+                CurrentPermissionLevel = MemoryImprovementPermissionLevel.ProposalOnly,
+                CurrentAuthorityLevel = "Level1ProposalOnly",
+                RequiredBeforeKey = "Pass MemoryKeyGate with repeated reviewed proposals, explicit evidence refs, human acceptance history, low duplicate/noise rate, retrieval improvement proof, reversible staging, and Conscience/Killjoy review.",
                 MissingEvidence = [
                     "No long-run precision/recall evidence for memory proposals yet.",
                     "No accepted-memory rollback proof for autonomous memory updates.",
-                    "No human-approved key-grant policy exists."
+                    "No human-approved key-grant policy exists.",
+                    "No proposal acceptance/rejection audit history exists yet."
                 ]
             },
+            KeyGateReview = keyGate,
             Boundary = ProposalBoundary
+        };
+    }
+
+    private static IReadOnlyList<MemoryImprovementEvidenceRef> BuildEvidenceRefs(
+        IReadOnlyList<string> evidenceRefs,
+        MemoryImprovementContext context)
+    {
+        var refs = evidenceRefs
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Take(6)
+            .Select((source, index) => new MemoryImprovementEvidenceRef
+            {
+                EvidenceId = $"evidence-{index + 1}",
+                EvidenceType = ClassifyEvidenceType(source),
+                Source = source,
+                Summary = $"External governed evidence reference: {source}",
+                IsAuthoritativeEvidence = IsAuthoritativeEvidence(source)
+            })
+            .ToList();
+
+        if (refs.Count == 0 && context.ContextRefs.Count > 0)
+        {
+            refs.AddRange(context.ContextRefs.Take(3).Select((source, index) => new MemoryImprovementEvidenceRef
+            {
+                EvidenceId = $"context-evidence-{index + 1}",
+                EvidenceType = ClassifyEvidenceType(source),
+                Source = source,
+                Summary = $"Focused context reference: {source}",
+                IsAuthoritativeEvidence = IsAuthoritativeEvidence(source)
+            }));
+        }
+
+        return refs;
+    }
+
+    private static MemoryProposalEvidenceBundle BuildEvidenceBundle(
+        string proposalId,
+        string claim,
+        IReadOnlyList<MemoryImprovementEvidenceRef> evidenceRefs,
+        IReadOnlyList<string> missingEvidence) =>
+        new()
+        {
+            ProposalId = proposalId,
+            Claim = claim,
+            EvidenceRefs = evidenceRefs.Take(4).ToArray(),
+            MissingEvidence = missingEvidence,
+            EvidenceBoundary = "Evidence must come from run traces, tests, reviews, human outcomes, retrieval traces, or code/index facts. MemoryImprovementAgent self-assessment does not count."
+        };
+
+    private static MemoryProposalAuditMetrics BuildAuditMetrics(
+        IReadOnlyList<MemoryImprovementAction> proposals,
+        MemoryImprovementContext context,
+        int maxContextTokens)
+    {
+        var missingEvidenceCount = proposals.Count(proposal =>
+            proposal.EvidenceBundle is null ||
+            proposal.EvidenceBundle.EvidenceRefs.Count == 0 ||
+            proposal.EvidenceBundle.MissingEvidence.Count > 0);
+
+        return new MemoryProposalAuditMetrics
+        {
+            ProposalCount = proposals.Count,
+            AcceptedByHumanCount = 0,
+            RejectedByHumanCount = 0,
+            EditedByHumanCount = 0,
+            UnsafeProposalCount = proposals.Count(proposal => proposal.MemoryAuthorityImpact == "UpdatesAcceptedMemory"),
+            DuplicateProposalCount = 0,
+            MissingEvidenceCount = missingEvidenceCount,
+            KilljoyApprovalRate = 0m,
+            HumanAcceptanceRate = 0m,
+            ContextBudgetHealthy = context.EstimatedTokens <= maxContextTokens,
+            RetrievalImprovementProven = false
+        };
+    }
+
+    private static MemoryKeyGateReview ReviewKeyRequest(
+        MemoryProposalAuditMetrics metrics,
+        IReadOnlyList<MemoryImprovementEvidenceRef> evidenceRefs)
+    {
+        var reasons = new List<string>
+        {
+            "MemoryImprovementAgent is currently Level1ProposalOnly.",
+            "No human acceptance history has been recorded for memory proposals.",
+            "No retrieval improvement proof has been recorded after accepted memory changes."
+        };
+        if (metrics.UnsafeProposalCount > 0)
+            reasons.Add("Unsafe proposal count must be zero before any key increase.");
+        if (!metrics.ContextBudgetHealthy)
+            reasons.Add("Context budget must remain healthy before any key increase.");
+
+        return new MemoryKeyGateReview
+        {
+            ReviewId = $"memory-key-gate-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..48],
+            CurrentLevel = MemoryImprovementPermissionLevel.ProposalOnly,
+            CurrentLevelName = "Level1ProposalOnly",
+            RequestedLevel = MemoryImprovementPermissionLevel.StagingAreaWrite,
+            RequestedLevelName = "Level2StagingAreaWrite",
+            Decision = "NeedsMoreEvidence",
+            PrecisionScore = 0m,
+            Metrics = metrics,
+            EvidenceSourcesReviewed = evidenceRefs.Select(item => item.Source).ToArray(),
+            Reasons = reasons,
+            RequiredNextEvidence = [
+                "At least 10 proposal-only runs with explicit evidence refs.",
+                "Zero unsafe proposals.",
+                "Killjoy well-formed approval history.",
+                "Human accepted/rejected/edited outcome history.",
+                "Duplicate proposal count near zero.",
+                "Proof that accepted reviewed memory improves future retrieval."
+            ],
+            Boundary = "MemoryKeyGate can recommend permission changes only. It does not grant accepted-memory write authority."
         };
     }
 
@@ -309,6 +453,33 @@ public sealed class MemoryImprovementAgent : StaticIronDevAgent
 
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..maxLength];
+
+    private static string ClassifyEvidenceType(string source)
+    {
+        var value = source.ToLowerInvariant();
+        if (value.Contains("trace"))
+            return "RunTrace";
+        if (value.Contains("test-agent") || value.Contains("test"))
+            return "TestEvidence";
+        if (value.Contains("code-standards") || value.Contains("killjoy") || value.Contains("quality"))
+            return "KilljoyEvidence";
+        if (value.Contains("memory") || value.Contains("docs/") || value.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            return "MemoryEvidence";
+        if (value.Contains("report"))
+            return "RunReport";
+        return "EvidenceRef";
+    }
+
+    private static bool IsAuthoritativeEvidence(string source)
+    {
+        var value = source.ToLowerInvariant();
+        return value.Contains("runs/") ||
+               value.Contains("trace") ||
+               value.Contains("report") ||
+               value.Contains("test-agent") ||
+               value.Contains("code-standards") ||
+               value.Contains("killjoy");
+    }
 
     private sealed record MemoryImprovementContext(
         int EstimatedTokens,
