@@ -3,7 +3,7 @@ using IronDev.Core.Auth;
 namespace IronDev.Agent.Services;
 
 /// <summary>
-/// Bridge between the UI-driven ShellViewModel and the shared services in IronDev.Infrastructure.
+/// Local UI session context used by the shell for display and desktop-only state.
 /// This allows the core services to automatically use the currently selected tenant and project.
 /// </summary>
 public sealed class AgentTenantContext : ICurrentTenantContext

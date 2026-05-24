@@ -1,5 +1,6 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
+using IronDev.Client.Prompting;
 
 namespace IronDev.Agent.Models;
 
@@ -18,7 +19,7 @@ public sealed partial class ChatSummary : ObservableObject
 
     public bool HasPersistedMessage => PersistedMessageId > 0;
 
-    public global::IronDev.AI.ChatContextPacket? ContextPacket { get; init; }
+    public ChatContextPacket? ContextPacket { get; init; }
 
     public bool HasContext => ContextPacket != null
                               && (ContextPacket.Snippets.Count > 0

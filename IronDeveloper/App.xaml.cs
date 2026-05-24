@@ -13,7 +13,9 @@ using IronDev.Agent.ViewModels.Workflow;
 using IronDev.Agent.ViewModels.Workspaces;
 using IronDev.Agent.Views;
 using IronDev.Agent.Services;
-using IronDev.Infrastructure.DependencyInjection;
+using IronDev.Client.DependencyInjection;
+using IronDev.Client.Traces;
+using IronDev.Core.Interfaces;
 using IronDev.Agent.Services.Interfaces;
 using IronDev.Agent.Services.Mock;
 using IronDev.Agent.Services.Testing;
@@ -62,192 +64,45 @@ public partial class App : Application
             .UseSerilog()
             .ConfigureServices((context, services) =>
             {
-                // ── Data & Infrastructure ─────────────────────────────────────
-                services.AddSingleton<global::IronDev.Data.IDbConnectionFactory, global::IronDev.Data.SqlConnectionFactory>();
-                
-                // Tenancy Bridge
-                services.AddSingleton<AgentTenantContext>();
-                services.AddSingleton<global::IronDev.Core.Auth.ICurrentTenantContext>(sp => sp.GetRequiredService<AgentTenantContext>());
-                
-                // Real Services from Infrastructure
-                services.AddTransient<global::IronDev.Services.IUserService, global::IronDev.Services.UserService>();
-                services.AddTransient<global::IronDev.Services.IProjectService, global::IronDev.Services.ProjectService>();
-                services.AddTransient<global::IronDev.Services.ITicketService, global::IronDev.Services.TicketService>();
-                services.AddTransient<global::IronDev.Services.IChatHistoryService, global::IronDev.Services.ChatHistoryService>();
-                services.AddTransient<global::IronDev.Services.IProjectMemoryService, global::IronDev.Services.ProjectMemoryService>();
-                services.AddTransient<global::IronDev.Services.SqlCodeIndexService>();
-                services.AddTransient<global::IronDev.Services.ICodeIndexService, global::IronDev.Infrastructure.Tracing.TracingCodeIndexServiceDecorator>();
-                services.AddTransient<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
-                services.AddTransient<global::IronDev.Services.IChatFeedbackService, global::IronDev.Services.ChatFeedbackService>();
-                services.AddTransient<global::IronDev.Core.Interfaces.IArtifactSourceReferenceService, global::IronDev.Infrastructure.Services.ArtifactSourceReferenceService>();
-                services.AddTransient<global::IronDev.Services.IProjectContextExportService, global::IronDev.Infrastructure.Services.ProjectContextExportService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IProjectDocumentService,
-                    global::IronDev.Services.ProjectDocumentService>();
-                services.AddSingleton<
-                    global::IronDev.Core.Interfaces.IMarkdownRenderService,
-                    global::IronDev.Infrastructure.Services.MarkdownRenderService>();
-                services.AddSingleton<global::IronDev.Services.ILookupService, global::IronDev.Services.LookupService>();
-                services.AddSingleton<global::IronDev.Core.Interfaces.ILlmTraceService, global::IronDev.Infrastructure.Services.LlmTraceService>();
+                services.AddIronDevClient(context.Configuration);
+
+                // Local desktop-only services. These do not own product persistence.
                 services.AddSingleton<global::IronDev.Agent.Services.IAppSettingsService, global::IronDev.Agent.Services.AppSettingsService>();
-                services.AddTransient<global::IronDev.Agent.Services.ManualIndexingTask>();
+                services.AddSingleton<IScreenshotCaptureService, ScreenshotCaptureService>();
+                services.AddSingleton<ITestingCompanionAgent, TestingCompanionAgent>();
                 services.AddTransient<global::IronDev.Agent.Services.Interfaces.ILocalIndexingService, global::IronDev.Agent.Services.LocalIndexingService>();
-                services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.BuilderWorkspaceViewModel>();
-                services.AddTransient<global::IronDev.Agent.ViewModels.Workspaces.ProjectProfileViewModel>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IDiscussionSeedService,
-                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.DiscussionSeedService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IDiscussionResolverService,
-                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.DiscussionResolverService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IKnowledgeArtefactApplyService,
-                    global::IronDev.Infrastructure.Services.KnowledgeCompiler.KnowledgeArtefactApplyService>();
-                services.AddTransient<global::IronDev.AI.IPromptContextBuilder, global::IronDev.AI.PromptContextBuilder>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IChatCommandRouter,
-                    global::IronDev.Infrastructure.Services.ChatCommandRouter>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IContextAgentService,
-                    global::IronDev.Infrastructure.Services.ContextAgentService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IContextConflictService,
-                    global::IronDev.Infrastructure.Services.ContextConflictService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IContextAgentRouteJudge,
-                    global::IronDev.Infrastructure.Services.ContextAgentRouteJudgeService>();
-                // ── Code intelligence (semantic indexers, snapshot, grounding, prompt/parse) ──
-                services.AddCodeIntelligenceServices();
+                services.AddSingleton<global::IronDev.Agent.Services.Interfaces.IProjectShellService, global::IronDev.Agent.Services.Mock.MockProjectShellService>();
+                services.AddSingleton<global::IronDev.Core.Interfaces.IMarkdownRenderService, ClientMarkdownRenderService>();
 
-                var aiOptions = context.Configuration.GetSection("Ai").Get<global::IronDev.Core.Models.LlmOptions>() 
-                                ?? new global::IronDev.Core.Models.LlmOptions();
-
-                // Environment variable fallback for API key if not in config
-                if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
-                {
-                    aiOptions.ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                }
-
-                services.AddTransient<global::IronDev.Core.ILLMService>(sp =>
-                {
-                    try
-                    {
-                        var provider = aiOptions.Provider?.ToLowerInvariant() ?? "openai";
-                        global::IronDev.Core.ILLMService inner = provider switch
-                        {
-                            "openai"      => new global::IronDev.Infrastructure.Services.OpenAiLlmService(aiOptions),
-                            "localopenai" => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
-                            "ollama"      => new global::IronDev.Infrastructure.Services.OllamaLlmService(aiOptions),
-                            "custom"      => new global::IronDev.Infrastructure.Services.LocalOpenAiCompatibleLlmService(aiOptions),
-                            _ => throw new InvalidOperationException($"Unsupported AI provider: {aiOptions.Provider}. Check appsettings.json.")
-                        };
-
-                        return new global::IronDev.Infrastructure.Tracing.TracingLlmServiceDecorator(
-                            inner,
-                            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<global::IronDev.Infrastructure.Tracing.TracingLlmServiceDecorator>>());
-                    }
-                    catch (Exception ex)
-                    {
-                        // API key missing or provider misconfigured — return a stub so the
-                        // app starts normally. Run Grounding Test will surface the error message.
-                        return new NullLlmService($"LLM not configured: {ex.Message}\nCheck Ai:ApiKey / Ai:Provider in appsettings.json.");
-                    }
-                });
-
-                // ── Workflow ViewModels ───────────────────────────────────────
+                // Workflow ViewModels
                 services.AddTransient<LoginViewModel>();
                 services.AddTransient<ProjectHubViewModel>();
                 services.AddTransient<CreateProjectViewModel>();
                 services.AddTransient<ProjectOverviewViewModel>();
 
-                // ── Workspace ViewModels ──────────────────────────────────────
+                // Workspace ViewModels
                 services.AddTransient<ChatWorkspaceViewModel>();
                 services.AddTransient<KnowledgeCompilerViewModel>();
                 services.AddTransient<DocumentsWorkspaceViewModel>();
                 services.AddTransient<TicketsWorkspaceViewModel>();
-                services.AddSingleton<IScreenshotCaptureService, ScreenshotCaptureService>();
-                services.AddSingleton<ITestingCompanionAgent, TestingCompanionAgent>();
                 services.AddSingleton<TestingCompanionViewModel>();
                 services.AddTransient<DecisionsWorkspaceViewModel>();
                 services.AddTransient<ImplementationPlansWorkspaceViewModel>();
-                services.AddSingleton<PromptPlaygroundViewModel>(sp =>
-                    new PromptPlaygroundViewModel(
-                        sp.GetRequiredService<global::IronDev.AI.IPromptContextBuilder>(),
-                        sp.GetRequiredService<global::IronDev.Services.IProjectService>(),
-                        sp.GetRequiredService<global::IronDev.Core.ILLMService>(),
-                        sp.GetRequiredService<global::IronDev.Services.ICodeIndexService>(),
-                        sp.GetRequiredService<global::IronDev.Core.Auth.ICurrentTenantContext>(),
-                        sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
-
-                services.AddSingleton<LlmConsoleViewModel>(sp =>
-                    new LlmConsoleViewModel(
-                        sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>()));
-                services.AddSingleton<SettingsWorkspaceViewModel>(sp => new SettingsWorkspaceViewModel(
-                    sp.GetRequiredService<global::IronDev.Core.Interfaces.ILlmTraceService>(),
-                    sp.GetRequiredService<global::IronDev.Agent.Services.IAppSettingsService>()));
+                services.AddSingleton<LlmConsoleViewModel>();
+                services.AddSingleton<SettingsWorkspaceViewModel>();
+                services.AddTransient<BuilderWorkspaceViewModel>();
+                services.AddTransient<ProjectProfileViewModel>();
+                services.AddSingleton<PromptPlaygroundViewModel>();
                 services.AddSingleton(sp => new DevToolsWorkspaceViewModel(
                     () => sp.GetRequiredService<LlmConsoleViewModel>(),
                     () => sp.GetRequiredService<TestingCompanionViewModel>(),
                     () => sp.GetRequiredService<PromptPlaygroundViewModel>()));
                 services.AddSingleton<RunReportsViewModel>();
 
-
                 // Shell
+                services.AddSingleton<AgentTenantContext>();
                 services.AddSingleton<ShellViewModel>();
                 services.AddSingleton<MainWindow>();
-
-                // Mocks for pending features
-                services.AddSingleton<global::IronDev.Agent.Services.Interfaces.IProjectShellService, global::IronDev.Agent.Services.Mock.MockProjectShellService>();
-
-                // ── Build Ticket MVP — Phase 2 + 3 + 4A ────────────────────────
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IBuilderContextService,
-                    global::IronDev.Infrastructure.Builder.BuilderContextService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ICodeChangeProposalService,
-                    global::IronDev.Infrastructure.Builder.CodeChangeProposalService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ICodePatchService,
-                    global::IronDev.Infrastructure.Builder.CodePatchService>();
-                services.AddTransient<
-                    global::IronDev.Infrastructure.Builder.TicketBuildOrchestrator>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ITicketBuildOrchestrator,
-                    global::IronDev.Infrastructure.Tracing.TracingTicketBuildOrchestratorDecorator>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IDraftTicketService,
-                    global::IronDev.Infrastructure.Builder.DraftTicketService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IBuilderProposalService,
-                    global::IronDev.Infrastructure.Builder.BuilderProposalService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.ICodebaseTicketGeneratorService,
-                    global::IronDev.Infrastructure.Services.CodebaseTicketGeneratorService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IBuildErrorClassifierService,
-                    global::IronDev.Infrastructure.Builder.BuildErrorClassifierService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IBuilderReadinessService,
-                    global::IronDev.Infrastructure.Builder.BuilderReadinessService>();
-                services.AddSingleton<global::IronDev.Core.RunReports.IRunReportService, global::IronDev.Infrastructure.Services.RunReports.FileRunReportService>();
-                services.AddSingleton<global::IronDev.Core.RunReports.IRunEvidenceService>(sp =>
-                    (global::IronDev.Core.RunReports.IRunEvidenceService)sp.GetRequiredService<global::IronDev.Core.RunReports.IRunReportService>());
-
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IProjectProfileService,
-                    global::IronDev.Infrastructure.Services.ProjectProfileService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IProjectProfileDetectionService,
-                    global::IronDev.Infrastructure.Services.ProjectProfileDetectionService>();
-
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IDotNetBuildService,
-                    global::IronDev.Infrastructure.Services.DotNetRunnerService>();
-                services.AddTransient<
-                    global::IronDev.Core.Interfaces.IDotNetTestService,
-                    global::IronDev.Infrastructure.Services.DotNetRunnerService>();
-
-                services.AddTransient<BuilderWorkspaceViewModel>();
             })
             .Build();
     }
@@ -326,18 +181,33 @@ public partial class App : Application
         }
     }
 
-    /// <summary>
-    /// Stub LLM service returned when the AI provider is not configured.
-    /// Prevents the DI container from throwing during Singleton construction
-    /// and surfaces a clear error message when the user tries to run a test.
-    /// </summary>
-    private sealed class NullLlmService : global::IronDev.Core.ILLMService
+    private sealed class ClientMarkdownRenderService : IMarkdownRenderService
     {
-        private readonly string _reason;
-        public NullLlmService(string reason) => _reason = reason;
-        public System.Threading.Tasks.Task<string> GetResponseAsync(
-            string prompt,
-            System.Threading.CancellationToken ct = default)
-            => System.Threading.Tasks.Task.FromResult($"[AI not available] {_reason}");
+        public string ToHtml(string markdown) => System.Net.WebUtility.HtmlEncode(markdown ?? string.Empty)
+            .Replace("\r\n", "\n")
+            .Replace("\n", "<br/>");
+
+        public string ToStyledHtmlDocument(string markdown)
+        {
+            var encoded = ToHtml(markdown);
+
+            return """
+                <!doctype html>
+                <html>
+                <head>
+                    <meta charset="utf-8" />
+                    <style>
+                        body {{ background:#0D1117; color:#EAEBED; font-family:'Segoe UI', sans-serif; line-height:1.55; padding:20px; }}
+                        code, pre {{ font-family:Consolas, monospace; }}
+                    </style>
+                </head>
+                <body>
+                """
+                + encoded +
+                """
+                </body>
+                </html>
+                """;
+        }
     }
 }

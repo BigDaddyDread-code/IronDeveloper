@@ -12,7 +12,7 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
+    private readonly IronDev.Client.Memory.IMemoryApiClient _memoryService;
     private int _activeProjectId;
 
     [ObservableProperty] private ObservableCollection<ProjectContextDocument> _documents = [];
@@ -157,10 +157,17 @@ public sealed partial class DecisionsWorkspaceViewModel : ObservableObject
     public Action<string>? OnDiscussDocumentInChat { get; set; }
 
     public DecisionsWorkspaceViewModel(
-        global::IronDev.Services.IProjectMemoryService memoryService,
-        global::IronDev.Services.ILookupService lookupService)
+        IronDev.Client.Memory.IMemoryApiClient memoryService,
+        IronDev.Client.Settings.ISettingsApiClient lookupService)
     {
         _memoryService = memoryService;
+    }
+
+    public DecisionsWorkspaceViewModel(object memoryService, object lookupService)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Settings(lookupService))
+    {
     }
 
     internal async Task LoadAsync(Project project)

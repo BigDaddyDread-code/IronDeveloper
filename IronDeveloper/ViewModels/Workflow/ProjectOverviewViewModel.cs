@@ -7,18 +7,21 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Models;
 using IronDev.Agent.Services;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
 using IronDeveloperControls.Primitives;
 
 namespace IronDev.Agent.ViewModels.Workflow;
 
 public sealed partial class ProjectOverviewViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.ITicketService _ticketService;
-    private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
+    private readonly ITicketsApiClient _ticketService;
+    private readonly IMemoryApiClient _memoryService;
     private readonly global::IronDev.Agent.Services.Interfaces.ILocalIndexingService _indexingService;
     private readonly global::IronDev.Core.Interfaces.IProjectProfileService _profileService;
     private readonly global::IronDev.Core.Interfaces.IProjectProfileDetectionService _profileDetectionService;
-    private readonly global::IronDev.Services.IProjectContextExportService _exportService;
+    private readonly IProjectsApiClient _projectsApiClient;
 
     private global::IronDev.Data.Models.Project? _currentProject;
 
@@ -74,19 +77,36 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
     public string LastDecisionTitle  => RecentDecisions.Count > 0 ? RecentDecisions[0].Title : "None yet";
 
     public ProjectOverviewViewModel(
-        global::IronDev.Services.ITicketService ticketService,
-        global::IronDev.Services.IProjectMemoryService memoryService,
+        ITicketsApiClient ticketService,
+        IMemoryApiClient memoryService,
         global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService,
         global::IronDev.Core.Interfaces.IProjectProfileService profileService,
         global::IronDev.Core.Interfaces.IProjectProfileDetectionService profileDetectionService,
-        global::IronDev.Services.IProjectContextExportService exportService)
+        IProjectsApiClient projectsApiClient)
     {
         _ticketService   = ticketService;
         _memoryService   = memoryService;
         _indexingService = indexingService;
         _profileService  = profileService;
         _profileDetectionService = profileDetectionService;
-        _exportService   = exportService;
+        _projectsApiClient = projectsApiClient;
+    }
+
+    public ProjectOverviewViewModel(
+        object ticketService,
+        object memoryService,
+        global::IronDev.Agent.Services.Interfaces.ILocalIndexingService indexingService,
+        global::IronDev.Core.Interfaces.IProjectProfileService profileService,
+        global::IronDev.Core.Interfaces.IProjectProfileDetectionService profileDetectionService,
+        object projectsApiClient)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            indexingService,
+            profileService,
+            profileDetectionService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Projects(projectsApiClient))
+    {
     }
 
     internal async Task LoadAsync(global::IronDev.Data.Models.Project project)
@@ -380,7 +400,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
 
         try
         {
-            var content = await _exportService.ExportProjectContextPackAsync(_currentProject.Id);
+            var content = await _projectsApiClient.ExportProjectContextPackAsync(_currentProject.Id);
             var fileName = $"IronDev_ProjectContextPack_{DateTime.Now:yyyyMMdd_HHmm}.md";
             var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var filePath = Path.Combine(desktopPath, fileName);

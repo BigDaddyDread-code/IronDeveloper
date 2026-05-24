@@ -1,6 +1,6 @@
 <Solution>
   <Project Path="../IronDev.Core/IronDev.Core.csproj" Id="5e4d9394-238c-4324-9455-ffeb1baa91b2" />
-  <Project Path="../IronDev.Infrastructure/IronDev.Infrastructure.csproj" Id="1f4c6c76-ff36-43cb-b812-42ab32f412d5" />
+  <Project Path="../IronDev.Client/IronDev.Client.csproj" />
   <Project Path="IronDev.Agent.csproj" />
   <Project Path="../../IronDeveloper.Controls/IronDeveloperControls/IronDeveloperControls.csproj" />
   <Project Path="../IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj" />

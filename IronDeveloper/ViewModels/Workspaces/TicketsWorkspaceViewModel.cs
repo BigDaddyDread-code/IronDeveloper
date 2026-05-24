@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Client.Tickets;
 using IronDev.Agent.Models;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
@@ -19,11 +20,11 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorkspaceDirtyState
 {
-    private readonly global::IronDev.Services.ITicketService         _ticketService;
-    private readonly global::IronDev.Services.IProjectMemoryService  _memoryService;
-    private readonly ITicketBuildOrchestrator                        _orchestrator;
-    private readonly IDraftTicketService                             _draftService;
-    private readonly ICodebaseTicketGeneratorService                 _generatorService;
+    private readonly IronDev.Client.Tickets.ITicketsApiClient         _ticketService;
+    private readonly IronDev.Client.Memory.IMemoryApiClient  _memoryService;
+    private readonly ITicketsApiClient                               _orchestrator;
+    private readonly ITicketsApiClient                               _draftService;
+    private readonly ITicketsApiClient                               _generatorService;
     private readonly ILlmTraceService?                               _llmTraceService;
     private readonly IBuilderReadinessService?                       _readinessService;
 
@@ -242,11 +243,11 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
     public ObservableCollection<string> TypeOptions     { get; } = ["Task", "Bug", "Feature", "Spike", "Chore"];
 
     public TicketsWorkspaceViewModel(
-        global::IronDev.Services.ITicketService        ticketService,
-        global::IronDev.Services.IProjectMemoryService memoryService,
-        ITicketBuildOrchestrator                       orchestrator,
-        IDraftTicketService                            draftService,
-        ICodebaseTicketGeneratorService                generatorService,
+        IronDev.Client.Tickets.ITicketsApiClient        ticketService,
+        IronDev.Client.Memory.IMemoryApiClient memoryService,
+        ITicketsApiClient                              orchestrator,
+        ITicketsApiClient                              draftService,
+        ITicketsApiClient                              generatorService,
         IBuilderReadinessService?                      readinessService = null,
         ILlmTraceService?                              llmTraceService = null)
     {
@@ -260,6 +261,25 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
         CodexReview = new CodexTicketReviewViewModel(
             GenerateCodexTicketsForReviewAsync,
             ImportCodexReviewTicketsAsync);
+    }
+
+    public TicketsWorkspaceViewModel(
+        object ticketService,
+        object memoryService,
+        object orchestrator,
+        object draftService,
+        object generatorService,
+        IBuilderReadinessService? readinessService = null,
+        ILlmTraceService? llmTraceService = null)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService, orchestrator, draftService, generatorService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService, orchestrator, draftService, generatorService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService, orchestrator, draftService, generatorService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService, orchestrator, draftService, generatorService),
+            readinessService,
+            llmTraceService)
+    {
     }
 
     // ── Load ────────────────────────────────────────────────────────────────

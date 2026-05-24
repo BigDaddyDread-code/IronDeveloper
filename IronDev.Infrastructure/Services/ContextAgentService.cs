@@ -188,7 +188,8 @@ public sealed class ContextAgentService : IContextAgentService
                 };
             }
 
-            if (!string.IsNullOrWhiteSpace(request.CreateTicketIntent.WorkText))
+            if (!string.IsNullOrWhiteSpace(request.CreateTicketIntent.WorkText)
+                && request.RecentTickets.Count == 0)
             {
                 return new ContextAgentResult
                 {

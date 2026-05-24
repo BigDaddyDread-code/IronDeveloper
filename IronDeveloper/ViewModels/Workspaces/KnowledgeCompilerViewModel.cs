@@ -22,8 +22,8 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
     private readonly IDiscussionResolverService _resolverService;
     private readonly IKnowledgeArtefactApplyService _applyService;
     private readonly ISemanticMemoryService _semanticMemoryService;
-    private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
-    private readonly global::IronDev.Services.ITicketService _ticketService;
+    private readonly IronDev.Client.Memory.IMemoryApiClient _memoryService;
+    private readonly IronDev.Client.Tickets.ITicketsApiClient _ticketService;
 
     private int _activeProjectId;
     private string _activeProjectName = string.Empty;
@@ -68,8 +68,8 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
         IDiscussionResolverService resolverService,
         IKnowledgeArtefactApplyService applyService,
         ISemanticMemoryService semanticMemoryService,
-        global::IronDev.Services.IProjectMemoryService memoryService,
-        global::IronDev.Services.ITicketService ticketService)
+        IronDev.Client.Memory.IMemoryApiClient memoryService,
+        IronDev.Client.Tickets.ITicketsApiClient ticketService)
     {
         _seedService = seedService;
         _resolverService = resolverService;
@@ -80,6 +80,23 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
 
         DiscussionDocuments.CollectionChanged += OnCollectionChanged;
         Proposals.CollectionChanged += OnCollectionChanged;
+    }
+
+    public KnowledgeCompilerViewModel(
+        IDiscussionSeedService seedService,
+        IDiscussionResolverService resolverService,
+        IKnowledgeArtefactApplyService applyService,
+        ISemanticMemoryService semanticMemoryService,
+        object memoryService,
+        object ticketService)
+        : this(
+            seedService,
+            resolverService,
+            applyService,
+            semanticMemoryService,
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Tickets(ticketService))
+    {
     }
 
     public async Task LoadAsync(Project project)

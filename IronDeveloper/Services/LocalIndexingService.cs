@@ -1,28 +1,29 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Agent.Services.Interfaces;
 using IronDev.Data.Models;
-using IronDev.Services;
 
 namespace IronDev.Agent.Services;
 
 public sealed class LocalIndexingService : ILocalIndexingService
 {
-    private readonly ICodeIndexService _codeIndexService;
-    private readonly ManualIndexingTask _manualIndexingTask;
+    private readonly ICodeIndexApiClient _codeIndexService;
 
-    public LocalIndexingService(ICodeIndexService codeIndexService, ManualIndexingTask manualIndexingTask)
+    public LocalIndexingService(ICodeIndexApiClient codeIndexService)
     {
         _codeIndexService = codeIndexService;
-        _manualIndexingTask = manualIndexingTask;
     }
 
     public async Task<CodeIndexResult> IndexProjectAsync(Project project, CancellationToken ct = default)
     {
-        var resolvedProject = await _manualIndexingTask.ResolveProjectAsync(project, ct);
-
-        return await _codeIndexService.IndexDirectoryAsync(resolvedProject.Id, resolvedProject.LocalPath!, ct);
+        return await _codeIndexService.IndexDirectoryAsync(project.Id, project.LocalPath!, ct);
     }
 
     public Task<int> GetIndexedFileCountAsync(int projectId, CancellationToken ct = default)

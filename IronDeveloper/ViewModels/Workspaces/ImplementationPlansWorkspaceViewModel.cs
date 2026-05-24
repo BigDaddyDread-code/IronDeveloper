@@ -11,8 +11,8 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class ImplementationPlansWorkspaceViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.IProjectMemoryService _memoryService;
-    private readonly global::IronDev.Services.ILookupService _lookupService;
+    private readonly IronDev.Client.Memory.IMemoryApiClient _memoryService;
+    private readonly IronDev.Client.Settings.ISettingsApiClient _lookupService;
 
     private int _activeProjectId;
 
@@ -43,11 +43,18 @@ public sealed partial class ImplementationPlansWorkspaceViewModel : ObservableOb
     public ObservableCollection<string> StatusOptions { get; } = ["Draft", "Reviewed", "Approved", "In Progress", "Completed", "Abandoned"];
 
     public ImplementationPlansWorkspaceViewModel(
-        global::IronDev.Services.IProjectMemoryService memoryService,
-        global::IronDev.Services.ILookupService lookupService)
+        IronDev.Client.Memory.IMemoryApiClient memoryService,
+        IronDev.Client.Settings.ISettingsApiClient lookupService)
     {
         _memoryService = memoryService;
         _lookupService = lookupService;
+    }
+
+    public ImplementationPlansWorkspaceViewModel(object memoryService, object lookupService)
+        : this(
+            global::IronDev.Agent.Services.BoundaryCompatibility.Memory(memoryService),
+            global::IronDev.Agent.Services.BoundaryCompatibility.Settings(lookupService))
+    {
     }
 
     // ── Load ────────────────────────────────────────────────────────────────

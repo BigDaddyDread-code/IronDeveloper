@@ -1,3 +1,9 @@
+using IronDev.Client.Chat;
+using IronDev.Client.CodeIndex;
+using IronDev.Client.Memory;
+using IronDev.Client.Projects;
+using IronDev.Client.Tickets;
+using IronDev.Client.Traces;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -12,7 +18,7 @@ namespace IronDev.Agent.ViewModels.Workspaces;
 
 public sealed partial class LlmConsoleViewModel : ObservableObject, IDisposable
 {
-    private readonly ILlmTraceService _traceService;
+    private readonly ITraceApiClient _traceService;
     private bool _disposed;
 
     [ObservableProperty] private ObservableCollection<LlmTraceEntry> _traces = new();
@@ -20,7 +26,7 @@ public sealed partial class LlmConsoleViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _filterText = string.Empty;
 
     /// <summary>
-    /// Read-only reflection of ILlmTraceService.IsTracingEnabled for the console header badge.
+    /// Read-only reflection of ITraceApiClient.IsTracingEnabled for the console header badge.
     /// Changing this from the console is not supported — use Settings → Behaviour.
     /// </summary>
     public bool IsTracingEnabled => _traceService.IsTracingEnabled;
@@ -32,11 +38,16 @@ public sealed partial class LlmConsoleViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _filterFeature;
     [ObservableProperty] private bool _filterFailuresOnly;
 
-    public LlmConsoleViewModel(ILlmTraceService traceService)
+    public LlmConsoleViewModel(ITraceApiClient traceService)
     {
         _traceService = traceService;
         _traceService.TraceAdded += OnTraceAdded;
         Refresh();
+    }
+
+    public LlmConsoleViewModel(object traceService)
+        : this(global::IronDev.Agent.Services.BoundaryCompatibility.Trace(traceService))
+    {
     }
 
     // ── Live update ───────────────────────────────────────────────────────

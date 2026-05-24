@@ -4,20 +4,22 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Client.Projects;
+using IronDev.Data.Models;
 
 namespace IronDev.Agent.ViewModels.Workflow;
 
 public sealed partial class ProjectHubViewModel : ObservableObject
 {
-    private readonly global::IronDev.Services.IProjectService _projectService;
+    private readonly IProjectsApiClient _projectService;
 
-    [ObservableProperty] private ObservableCollection<global::IronDev.Data.Models.Project> _recentProjects = [];
+    [ObservableProperty] private ObservableCollection<Project> _recentProjects = [];
     [ObservableProperty] private bool _isProjectWizardOpen;
     [ObservableProperty] private CreateProjectViewModel? _projectWizard;
 
-    internal Action<global::IronDev.Data.Models.Project>? OnOpenProject   { get; set; }
+    internal Action<Project>? OnOpenProject   { get; set; }
 
-    public ProjectHubViewModel(global::IronDev.Services.IProjectService projectService)
+    public ProjectHubViewModel(IProjectsApiClient projectService)
     {
         _projectService = projectService;
     }
@@ -39,14 +41,14 @@ public sealed partial class ProjectHubViewModel : ObservableObject
         // Auto-select rule: If only one project is available, enter it automatically.
         if (RecentProjects.Count == 1)
         {
-            OpenProject(RecentProjects[0]);
+            await OpenProjectAsync(RecentProjects[0]);
         }
         // NOTE: We could also implement "Prefer last-used if count > 1" but usually 
         // the user wants to see the Hub if they have multiple projects, 
         // unless they specifically set a "Default Project" setting later.
     }
 
-    private static bool IsDogfoodGeneratedProject(global::IronDev.Data.Models.Project project)
+    private static bool IsDogfoodGeneratedProject(Project project)
     {
         var name = project.Name ?? string.Empty;
         var description = project.Description ?? string.Empty;
@@ -58,9 +60,10 @@ public sealed partial class ProjectHubViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenProject(global::IronDev.Data.Models.Project project)
+    private async Task OpenProjectAsync(Project project)
     {
         Serilog.Log.Information("[ProjectHub] Opening project from card: {ProjectId} {ProjectName}", project.Id, project.Name);
+        await _projectService.SelectProjectAsync(project.Id);
         OnOpenProject?.Invoke(project);
     }
 
