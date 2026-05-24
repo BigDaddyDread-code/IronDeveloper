@@ -49,6 +49,8 @@ public static class InventoryValidateCommand
                     "campaign loop-gated-disposable-build-168",
                     "promotion package create",
                     "campaign promotion-package-169",
+                    "promotion apply isolated",
+                    "campaign isolated-promotion-apply-170",
                     "dogfood build solitaire-disposable-build-smoke",
                     "dogfood build disposable-apply-smoke",
                     "dogfood foundation break-test"
@@ -142,6 +144,8 @@ public static class InventoryValidateCommand
         "campaign loop-gated-disposable-build-168",
         "promotion package create",
         "campaign promotion-package-169",
+        "promotion apply isolated",
+        "campaign isolated-promotion-apply-170",
         "dogfood build solitaire-disposable-build-smoke",
         "dogfood build disposable-apply-smoke",
         "dogfood foundation break-test",

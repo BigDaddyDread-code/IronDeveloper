@@ -1,5 +1,35 @@
 ﻿[
     {
+        "planFile":  "irondev-isolated-promotion-apply-170.json",
+        "goalId":  "isolated-promotion-apply-170",
+        "project":  "IronDev",
+        "description":  "Validate PromotionPackage isolated apply into a candidate workspace outside the active repo, with only promotable files copied, blocked files rejected, runtime build/test evidence, and active repo mutation count zero.",
+        "agentPath":  "TestAgent + ReplayRunner + IsolatedPromotionApply170Command + PromotionPackage169Command + LanguageRuntimeRegistry",
+        "command":  "campaign isolated-promotion-apply-170",
+        "requiredServices":  [
+                                 "ReplayRunner",
+                                 "PromotionPackage169Command",
+                                 "IsolatedPromotionApply170Command",
+                                 "LanguageRuntimeRegistry",
+                                 "dotnet build",
+                                 "dotnet test"
+                             ],
+        "expectedEvidence":  [
+                                 "PromotionPackage consumed",
+                                 "ProposedChange id preserved",
+                                 "isolated workspace outside active repo",
+                                 "only promotable files copied",
+                                 "blocked files rejected",
+                                 "runtime build succeeds",
+                                 "runtime tests succeed",
+                                 "active repo mutation count zero",
+                                 "approval state NeedsHumanReview"
+                             ],
+        "regressionGroup":  "PromotionPipeline",
+        "safetyBoundary":  "Isolated candidate workspace only; no main writes, accepted memory mutation, ticket acceptance, auto-merge, or self-approval.",
+        "kind":  "campaign-smoke"
+    },
+    {
         "planFile":  "irondev-governed-tool-loop-162-167.json",
         "goalId":  "governed-tool-loop-162-167",
         "project":  "IronDev",
