@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\IronDeveloper.Controls\IronDeveloperControls\IronDeveloperControls.csproj" />
     <ProjectReference Include="..\IronDev.Core\IronDev.Core.csproj" />
+    <ProjectReference Include="..\IronDev.Client\IronDev.Client.csproj" />
     <ProjectReference Include="..\IronDev.Infrastructure\IronDev.Infrastructure.csproj" />
   </ItemGroup>
 
