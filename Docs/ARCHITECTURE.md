@@ -173,4 +173,6 @@ IRONDEV-168 connects the governed loop to the product-shaped disposable build pa
 
 IRONDEV-169 adds the promotion bridge. `ProposedChange` is the review case file; `PromotionPackage` is the evidence package. Promotion package creation classifies disposable workspace files through `ILanguageRuntimeRegistry`, attaches build/test/quality evidence, blocks generated outputs such as `bin/` and `obj/`, and keeps approval at `NeedsHumanReview`. The `csharp-dotnet` runtime profile is executable; Java, TypeScript, and Python profiles are contract-only until reviewed runtime executors are added.
 
+IRONDEV-170 proves isolated promotion apply. `promotion apply isolated` consumes a `PromotionPackage`, creates an isolated candidate workspace outside the active repo, copies only `FilesToPromote`, rejects `FilesBlocked`, runs runtime build/test, and writes an isolated apply report. This proves the promotion bridge can become reviewable candidate code without writing main or granting self-approval.
+
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked until a future reviewed write-path design exists.

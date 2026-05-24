@@ -40,6 +40,16 @@
         "notes":  "Runs a 168 source build, creates a ProposedChange and PromotionPackage, classifies promotable/blocked files through the language runtime profile, and keeps approval at NeedsHumanReview."
     },
     {
+        "command":  "campaign isolated-promotion-apply-170",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "IsolatedPromotionApply170Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "isolated promotion apply smoke",
+        "notes":  "Runs 169 to create a PromotionPackage, then applies only promotable files into an isolated candidate workspace outside the active repo, runs build/test, rejects blocked files, and preserves active repo mutation count zero."
+    },
+    {
         "command":  "campaign live-remaining-agents-161",
         "category":  "campaign",
         "scope":  "dogfood/control",
@@ -498,6 +508,16 @@
         "requiresWeaviate":  false,
         "status":  "deterministic command/test-plan inventory validator",
         "notes":  "Validates command inventory, command docs, and test plan inventory without executing commands or mutating project state."
+    },
+    {
+        "command":  "promotion apply isolated",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "IsolatedPromotionApply170Command.cs + PromotionPackage",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "isolated promotion apply proof",
+        "notes":  "Consumes a PromotionPackage and copies only FilesToPromote into an isolated candidate workspace outside the active repo. It runs runtime build/test and does not write main, mutate memory, accept tickets, auto-merge, or self-approve."
     },
     {
         "command":  "promotion package create",

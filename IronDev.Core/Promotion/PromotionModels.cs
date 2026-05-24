@@ -122,3 +122,65 @@ public sealed record EvidenceSummary
     public required int BlockedFileCount { get; init; }
     public IReadOnlyList<string> EvidenceRefs { get; init; } = [];
 }
+
+public sealed record IsolatedPromotionApplyReport
+{
+    public required string Command { get; init; }
+    public required string Status { get; init; }
+    public required string RunId { get; init; }
+    public required string TraceId { get; init; }
+    public required string Project { get; init; }
+    public required string PackageId { get; init; }
+    public required string ProposedChangeId { get; init; }
+    public required string SourceRunId { get; init; }
+    public required string SourceTraceId { get; init; }
+    public required string IsolatedWorkspacePath { get; init; }
+    public required string IsolatedBranchName { get; init; }
+    public required LanguageRuntimeProfile RuntimeProfile { get; init; }
+    public IReadOnlyList<AppliedPromotionFile> AppliedFiles { get; init; } = [];
+    public IReadOnlyList<BlockedFile> RejectedBlockedFiles { get; init; } = [];
+    public required RuntimeCommandEvidence Build { get; init; }
+    public required RuntimeCommandEvidence Test { get; init; }
+    public required PromotionMutationReport Mutation { get; init; }
+    public IReadOnlyList<PromotionEvidenceRef> Evidence { get; init; } = [];
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public IReadOnlyList<string> Errors { get; init; } = [];
+    public required string Recommendation { get; init; }
+    public required string ApprovalState { get; init; }
+    public required string Boundary { get; init; }
+    public required string ReproCommand { get; init; }
+}
+
+public sealed record AppliedPromotionFile
+{
+    public required string RelativePath { get; init; }
+    public required string Language { get; init; }
+    public required string FileRole { get; init; }
+    public required string SourceSha256 { get; init; }
+    public required string AppliedSha256 { get; init; }
+    public required long SizeBytes { get; init; }
+    public required bool HashMatchesPackage { get; init; }
+}
+
+public sealed record RuntimeCommandEvidence
+{
+    public required string Command { get; init; }
+    public required int ExitCode { get; init; }
+    public required string Status { get; init; }
+    public required string LogPath { get; init; }
+    public required string Summary { get; init; }
+}
+
+public sealed record PromotionMutationReport
+{
+    public required bool ActiveRepoMutationAllowed { get; init; }
+    public required int ActiveRepoMutationCount { get; init; }
+    public required bool IsolatedWorkspaceMutationAllowed { get; init; }
+    public required string ActiveRepoStatusBefore { get; init; }
+    public required string ActiveRepoStatusAfter { get; init; }
+    public required string IsolatedWorkspacePath { get; init; }
+    public required int IsolatedFilesChanged { get; init; }
+    public IReadOnlyList<string> ForbiddenPathsTouched { get; init; } = [];
+}
+
+public sealed record PromotionEvidenceRef(string Type, string Path, string Summary);

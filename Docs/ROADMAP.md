@@ -264,7 +264,7 @@ Still blocked:
 
 ## Promotion Package And Language Runtime Spine 169
 
-**Status: Active**
+**Status: Delivered**
 
 Goal: create the bridge from a successful disposable build to reviewed promotable work without applying anything.
 
@@ -287,4 +287,34 @@ Still blocked:
 - Ticket acceptance.
 - Promotion approval.
 - Non-C# runtime execution.
+- Agent self-approval.
+
+## Isolated Promotion Apply Proof 170
+
+**Status: Active**
+
+Goal: consume a `PromotionPackage` and prove it can become an isolated candidate workspace without writing main.
+
+Delivered in this slice:
+
+- `IsolatedPromotionApplyReport` model.
+- `promotion apply isolated --package-run-id <run> --run-id <apply-run> --json`.
+- `campaign isolated-promotion-apply-170 --run-id <run> --json`.
+- isolated candidate workspace outside the active repo.
+- isolated candidate branch marker.
+- copy only `FilesToPromote`.
+- reject `FilesBlocked`.
+- C#/.NET build/test in the isolated workspace.
+- active repo mutation count proof.
+- JSON/Markdown isolated apply reports.
+
+Still blocked:
+
+- Real repository writes.
+- Main branch writes.
+- Pull request creation.
+- Auto-merge.
+- Accepted memory mutation.
+- Ticket acceptance.
+- Promotion approval.
 - Agent self-approval.

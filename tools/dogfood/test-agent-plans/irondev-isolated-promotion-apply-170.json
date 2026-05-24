@@ -1,0 +1,38 @@
+{
+  "test_run_id": "IronDev170-IsolatedPromotionApply",
+  "goal_id": "isolated-promotion-apply-170",
+  "description": "Proves a PromotionPackage can be applied into an isolated candidate workspace outside the active repo, with only promotable files copied, blocked files rejected, build/test evidence captured, and no active repo mutation.",
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "steps": [
+    {
+      "step": 1,
+      "action": "isolated_promotion_apply_170",
+      "params": {
+        "project": "Solitaire",
+        "expect_package": true,
+        "expect_proposed_change": true,
+        "expect_runtime_profile": "csharp-dotnet",
+        "expect_applied_files_min": 10,
+        "expect_blocked_files_rejected_min": 1,
+        "expect_active_repo_mutation_count": 0,
+        "expect_build_status": "Succeeded",
+        "expect_test_status": "Succeeded",
+        "expect_approval_state": "NeedsHumanReview",
+        "expect_recommendation": "ReviewIsolatedCandidate"
+      }
+    }
+  ],
+  "expected": {
+    "promotion_package_consumed": true,
+    "proposed_change_id_preserved": true,
+    "isolated_workspace_created_outside_repo": true,
+    "only_promotable_files_copied": true,
+    "blocked_files_rejected": true,
+    "runtime_build_passes": true,
+    "runtime_tests_pass": true,
+    "active_repo_mutation_count_zero": true,
+    "approval_state_needs_human_review": true
+  },
+  "boundary": "Isolated candidate workspace only. No main writes, accepted memory mutation, ticket acceptance, auto-merge, or self-approval."
+}

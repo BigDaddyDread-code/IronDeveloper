@@ -71,7 +71,8 @@ public sealed class TestPlanRunner
         "live_remaining_governed_agents_161",
         "governed_tool_loop_162_167",
         "loop_gated_disposable_build_168",
-        "promotion_package_169"
+        "promotion_package_169",
+        "isolated_promotion_apply_170"
     };
 
     private readonly string _repoRoot;
@@ -144,6 +145,7 @@ public sealed class TestPlanRunner
                     "governed_tool_loop_162_167" => await RunGovernedToolLoop162167Async(runId, logPath),
                     "loop_gated_disposable_build_168" => await RunLoopGatedDisposableBuild168Async(runId, logPath),
                     "promotion_package_169" => await RunPromotionPackage169Async(runId, logPath),
+                    "isolated_promotion_apply_170" => await RunIsolatedPromotionApply170Async(runId, logPath),
                     _ => throw new InvalidOperationException($"Unsupported native action: {step.Action}")
                 };
 
@@ -914,6 +916,63 @@ public sealed class TestPlanRunner
             parsed);
     }
 
+    private async Task<NativeActionResult> RunIsolatedPromotionApply170Async(string runId, string logPath)
+    {
+        var args = new[] { "run", "--no-build", "--project", _runnerProject, "--", "campaign", "isolated-promotion-apply-170", "--run-id", runId, "--json" };
+        var run = await RunProcessAsync("dotnet", args, logPath);
+        var parsed = ParseObject(run.Output);
+        var failures = new List<string>();
+        if (run.ExitCode != 0)
+            failures.Add($"campaign isolated-promotion-apply-170 exited with code {run.ExitCode}.");
+        if (!StringPropertyEquals(parsed, "status", "Succeeded"))
+            failures.Add($"Expected campaign status Succeeded, actual {ReadProperty(parsed, "status")}.");
+        if (!StringPropertyEquals(parsed, "project", "Solitaire"))
+            failures.Add($"Expected project Solitaire, actual {ReadProperty(parsed, "project")}.");
+        if (!StringPropertyEquals(parsed, "recommendation", "ReviewIsolatedCandidate"))
+            failures.Add($"Expected recommendation ReviewIsolatedCandidate, actual {ReadProperty(parsed, "recommendation")}.");
+        if (!StringPropertyEquals(parsed, "approvalState", "NeedsHumanReview"))
+            failures.Add($"Expected approvalState NeedsHumanReview, actual {ReadProperty(parsed, "approvalState")}.");
+
+        var workspace = ReadProperty(parsed, "isolatedWorkspacePath") ?? "";
+        if (string.IsNullOrWhiteSpace(workspace) || !Directory.Exists(workspace))
+            failures.Add("Expected isolated workspace path to exist.");
+        else if (IsUnderDirectory(workspace, _repoRoot))
+            failures.Add("Expected isolated workspace outside active repo root.");
+        if (string.IsNullOrWhiteSpace(ReadProperty(parsed, "isolatedBranchName")))
+            failures.Add("Expected isolated branch name.");
+
+        var runtime = ReadElement(parsed, "runtimeProfile");
+        if (!StringPropertyEquals(runtime, "runtimeProfileId", "csharp-dotnet"))
+            failures.Add($"Expected csharp-dotnet runtime, actual {ReadProperty(runtime, "runtimeProfileId")}.");
+        if (!StringPropertyEquals(runtime, "availability", "Executable"))
+            failures.Add($"Expected executable runtime profile, actual {ReadProperty(runtime, "availability")}.");
+
+        if (ReadArray(parsed, "appliedFiles").Count < 10)
+            failures.Add("Expected at least 10 applied files.");
+        if (ReadArray(parsed, "rejectedBlockedFiles").Count == 0)
+            failures.Add("Expected blocked generated files to remain rejected.");
+
+        var build = ReadElement(parsed, "build");
+        if (!StringPropertyEquals(build, "status", "Succeeded") || ReadIntProperty(build, "exitCode") != 0)
+            failures.Add($"Expected build success, actual {ReadProperty(build, "status")} exit {ReadIntProperty(build, "exitCode")}.");
+        var test = ReadElement(parsed, "test");
+        if (!StringPropertyEquals(test, "status", "Succeeded") || ReadIntProperty(test, "exitCode") != 0)
+            failures.Add($"Expected test success, actual {ReadProperty(test, "status")} exit {ReadIntProperty(test, "exitCode")}.");
+
+        var mutation = ReadElement(parsed, "mutation");
+        if (ReadIntProperty(mutation, "activeRepoMutationCount") != 0)
+            failures.Add($"Expected active repo mutation count zero, actual {ReadIntProperty(mutation, "activeRepoMutationCount")}.");
+        if (ReadArray(mutation, "forbiddenPathsTouched").Count != 0)
+            failures.Add("Expected no forbidden paths touched in isolated workspace.");
+
+        return new NativeActionResult(
+            failures.Count == 0,
+            failures.Count == 0 ? $"Isolated promotion apply 170 passed; trace={ReadProperty(parsed, "traceId")}" : string.Join(" ", failures),
+            "dotnet " + string.Join(" ", args.Select(QuoteIfNeeded)),
+            run.ExitCode,
+            parsed);
+    }
+
     private List<string> ValidateBuildTraceLike(TestPlanStep step, JsonElement parsed, string finalBuildKey, string finalTestKey)
     {
         var failures = new List<string>();
@@ -1196,6 +1255,14 @@ public sealed class TestPlanRunner
 
     private static bool StringPropertyEquals(JsonElement element, string propertyName, string expected) =>
         string.Equals(ReadProperty(element, propertyName), expected, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsUnderDirectory(string path, string directory)
+    {
+        var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fullDirectory = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(fullDirectory, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(fullPath.TrimEnd(Path.DirectorySeparatorChar), fullDirectory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool ReadBool(JsonElement element, string propertyName, bool defaultValue)
     {

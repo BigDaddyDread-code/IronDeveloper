@@ -14,13 +14,13 @@ The machine-readable inventory is stored at:
 - Build commands: 2
 - Chat commands: 1
 - Docs commands: 6
-- Dogfood commands: 10
+- Dogfood commands: 11
 - Ticket commands: 1
 - Failure commands: 1
 - Govern commands: 1
 - Inventory commands: 1
 - Memory commands: 8
-- Promotion commands: 1
+- Promotion commands: 2
 - Builder commands: 3
 - Foundation commands: 1
 - Run report commands: 1
@@ -60,7 +60,9 @@ The machine-readable inventory is stored at:
 - `campaign governed-tool-loop-162-167`
 - `campaign loop-gated-disposable-build-168`
 - `campaign promotion-package-169`
+- `campaign isolated-promotion-apply-170`
 - `promotion package create`
+- `promotion apply isolated`
 - `agent architect review`
 
 These are closest to the control surface Codex will use.
@@ -106,6 +108,10 @@ As of 143, `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` exec
 `promotion package create` creates a `ProposedChange` and `PromotionPackage` from a successful disposable source run. It classifies files through the language runtime profile, keeps generated build outputs blocked, and leaves approval at `NeedsHumanReview`.
 
 `campaign promotion-package-169` runs the 168 source build and then packages it, proving the bridge from disposable output to review evidence. It does not apply files or create a branch.
+
+`promotion apply isolated` consumes a `PromotionPackage`, creates an isolated candidate workspace outside the active repo, copies only `FilesToPromote`, rejects `FilesBlocked`, runs runtime build/test, and reports active repo mutation count. It does not write main, mutate memory, accept tickets, auto-merge, or self-approve.
+
+`campaign isolated-promotion-apply-170` runs 169 first, then proves the promotion package can become an isolated candidate workspace with build/test evidence and active repo mutation count zero.
 
 ## Dogfood/Smoke Commands
 
@@ -239,4 +245,11 @@ This is read/report infrastructure only. It does not change CLI command semantic
 - `campaign promotion-package-169 --run-id <run> --json` runs the 168 source build first, then packages its output.
 - The package includes the `csharp-dotnet` executable runtime profile, contract-only `java-maven`, `typescript-node`, and `python-pytest` profiles, promotable files, blocked files, test evidence, risks, checklist, and `NeedsHumanReview` approval state.
 - It does not apply files, create branches, mutate accepted memory, accept tickets, or approve writes.
+
+## 170 Isolated Promotion Apply Proof
+
+- `promotion apply isolated --package-run-id <package-run> --run-id <apply-run> --json` applies a PromotionPackage into an isolated candidate workspace outside the active repo.
+- `campaign isolated-promotion-apply-170 --run-id <run> --json` creates a fresh 169 package, copies only promotable files into the isolated candidate workspace, rejects blocked generated outputs, runs runtime build/test, and writes apply reports.
+- The command writes `isolated-promotion-apply-report.json`, `isolated-promotion-apply-report.md`, an isolated workspace manifest, and build/test logs.
+- It does not write main, mutate accepted memory, accept tickets, auto-merge, or self-approve.
 

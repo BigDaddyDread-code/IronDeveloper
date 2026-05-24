@@ -54,6 +54,9 @@ if (IsCommand(args, "campaign", "loop-gated-disposable-build-168"))
 if (IsCommand(args, "campaign", "promotion-package-169"))
     return await PromotionPackage169Command.HandleCampaignAsync(args, options);
 
+if (IsCommand(args, "campaign", "isolated-promotion-apply-170"))
+    return await IsolatedPromotionApply170Command.HandleCampaignAsync(args, options);
+
 if (IsCommand(args, "agent", "list"))
     return HandleAgentListCommand(args, options);
 
@@ -284,6 +287,9 @@ if (IsCommand3(args, "build", "disposable", "run"))
 if (IsCommand3(args, "promotion", "package", "create"))
     return await PromotionPackage169Command.HandleCreateAsync(args, options);
 
+if (IsCommand3(args, "promotion", "apply", "isolated"))
+    return await IsolatedPromotionApply170Command.HandleApplyAsync(args, options);
+
 if (IsCommand(args, "foundation", "break-test"))
     return await FoundationBreakTestCommand.HandleAsync(args, options);
 
@@ -430,7 +436,7 @@ static void PrintUsage()
     Console.Error.WriteLine("Govern: govern review");
     Console.Error.WriteLine("Inventory: inventory validate");
     Console.Error.WriteLine("Memory: memory builder-context-source-smoke | memory cross-project-smoke | memory reindex-freshness-smoke | memory search | memory sql-version-smoke | memory ticket-source-link-smoke | memory triage | memory weaviate-sql-version-smoke");
-    Console.Error.WriteLine("Clean aliases: test run-plan | dogfood run-plan | trace build-smoke | build disposable repair | build disposable run | promotion package create | campaign loop-gated-disposable-build-168 | campaign promotion-package-169 | dogfood build ... | dogfood memory ...");
+    Console.Error.WriteLine("Clean aliases: test run-plan | dogfood run-plan | trace build-smoke | build disposable repair | build disposable run | promotion package create | promotion apply isolated | campaign loop-gated-disposable-build-168 | campaign promotion-package-169 | campaign isolated-promotion-apply-170 | dogfood build ... | dogfood memory ...");
     Console.Error.WriteLine("Tickets: tickets document-to-tickets-smoke");
 }
 

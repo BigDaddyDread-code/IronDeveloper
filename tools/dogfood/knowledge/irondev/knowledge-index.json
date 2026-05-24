@@ -1,5 +1,16 @@
 [
   {
+    "Id": "ISOLATED_PROMOTION_APPLY_170",
+    "Project": "IronDev",
+    "Title": "Isolated Promotion Apply Proof 170",
+    "DocumentType": "ArchitectureCheckpoint",
+    "Authority": "Accepted",
+    "Source": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\Docs\\ISOLATED_PROMOTION_APPLY_170.md",
+    "DogfoodRunId": "IsolatedPromotionApply170",
+    "Path": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\dogfood\\knowledge\\irondev\\docs\\20260524170000000-isolated-promotion-apply-170.md",
+    "CreatedUtc": "2026-05-24T17:00:00+00:00"
+  },
+  {
     "Id": "PROMOTION_PACKAGE_LANGUAGE_RUNTIME_169",
     "Project": "IronDev",
     "Title": "Promotion Package And Language Runtime Spine 169",
