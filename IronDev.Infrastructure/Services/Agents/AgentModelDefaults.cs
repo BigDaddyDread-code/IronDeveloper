@@ -128,6 +128,20 @@ public static class AgentModelDefaults
         },
         new()
         {
+            Name = "DoubtAgent",
+            Purpose = "Act as an adversarial review agent that stress-tests plans, packages, and proposed changes for hidden risk.",
+            DefaultModelProfile = "strong-reviewer",
+            AllowedTools = ["memory.search", "trace.read", "repo.read", "evidence.review"]
+        },
+        new()
+        {
+            Name = "MemoryImprovementAgent",
+            Purpose = "Review completed-run evidence and propose staged memory improvements without mutating accepted memory.",
+            DefaultModelProfile = "standard-reasoner",
+            AllowedTools = ["trace.read", "memory.search", "memory.proposal.stage"]
+        },
+        new()
+        {
             Name = "SentinelAgent",
             Purpose = "Observe traces, campaigns, failures, and quality signals and raise evidence-backed insight artefacts.",
             DefaultModelProfile = "cheap-runner",

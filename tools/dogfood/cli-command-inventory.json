@@ -1,5 +1,35 @@
 ﻿[
     {
+        "command":  "campaign adversarial-memory-agents-183",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "AdversarialMemoryAgents183Command.cs + DoubtAgent + MemoryImprovementAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "advanced adversarial and proposal-only memory agent smoke",
+        "notes":  "Runs DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent staged proposal generation, and Conscience review while preserving no real repo writes, no accepted memory mutation, no ticket creation, no patch apply, and no self-approval."
+    },
+    {
+        "command":  "agent doubt review",
+        "category":  "agent",
+        "scope":  "control/review",
+        "implementation":  "AdversarialMemoryAgents183Command.cs + DoubtAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "adversarial review agent",
+        "notes":  "Produces strict adversarial findings for a plan or package. High/Critical findings require Killjoy rebuttal; the agent does not patch, mutate memory, create tickets, or approve writes."
+    },
+    {
+        "command":  "agent memory-improvement propose",
+        "category":  "agent",
+        "scope":  "control/review",
+        "implementation":  "AdversarialMemoryAgents183Command.cs + MemoryImprovementAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "proposal-only memory improvement agent",
+        "notes":  "Reads focused completed-run evidence and proposes staged memory improvements under token/proposal budgets. Accepted-memory key readiness remains false in Alpha."
+    },
+    {
         "command":  "agent loop plan-review",
         "category":  "agent",
         "scope":  "dogfood/control",
@@ -7,7 +37,7 @@
         "requiresSql":  false,
         "requiresWeaviate":  false,
         "status":  "governed Planner/Critic tool loop",
-        "notes":  "Runs a read/test/report-only Planner -> tool registry -> Critic -> revised plan loop with trace output, evidence validation, human escalation, and dotnet/node/python runtime profile contracts."
+        "notes":  "Runs a read/test/report-only Planner -\u003e tool registry -\u003e Critic -\u003e revised plan loop with trace output, evidence validation, human escalation, and dotnet/node/python runtime profile contracts."
     },
     {
         "command":  "campaign governed-tool-loop-162-167",

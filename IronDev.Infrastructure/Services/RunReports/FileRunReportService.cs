@@ -104,7 +104,9 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
                 WorkspacePath = ReadWorkspacePath(root),
                 Warnings = evidence.Count == 0 ? ["No evidence files were found for this run."] : [],
                 ReportPath = reportPath,
-                PromotionReview = ReadPromotionReview(root)
+                PromotionReview = ReadPromotionReview(root),
+                AdversarialReview = ReadAdversarialReview(root),
+                MemoryImprovement = ReadMemoryImprovement(root)
             };
         }
         catch (JsonException ex)
@@ -392,6 +394,65 @@ public sealed class FileRunReportService : IRunReportService, IRunEvidenceServic
             RequiredChecks = ReadStringArray(checklist, "RequiredChecks", "requiredChecks"),
             ExplicitApprovalsNeeded = ReadStringArray(checklist, "ExplicitApprovalsNeeded", "explicitApprovalsNeeded"),
             BlockedActions = ReadStringArray(checklist, "BlockedActions", "blockedActions")
+        };
+    }
+
+    private static RunAdversarialReview? ReadAdversarialReview(JsonElement root)
+    {
+        var doubt = ReadElement(root, "DoubtReview", "doubtReview");
+        if (doubt.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var findings = ReadArray(doubt, "Criticisms", "criticisms")
+            .Select(item => new RunDoubtFinding
+            {
+                Severity = ReadString(item, "Severity", "severity") ?? "",
+                Category = ReadString(item, "Category", "category") ?? "",
+                Title = ReadString(item, "Title", "title") ?? "",
+                EvidenceCitation = ReadString(item, "EvidenceCitation", "evidenceCitation") ?? "",
+                SuggestedFix = ReadString(item, "SuggestedFix", "suggestedFix") ?? ""
+            })
+            .ToArray();
+        var killjoy = ReadElement(root, "KilljoyReview", "killjoyReview");
+        var highCritical = findings.Count(finding =>
+            finding.Severity.Equals("High", StringComparison.OrdinalIgnoreCase) ||
+            finding.Severity.Equals("Critical", StringComparison.OrdinalIgnoreCase));
+
+        return new RunAdversarialReview
+        {
+            FindingCount = findings.Length,
+            HighCriticalCount = highCritical,
+            RebuttalRequired = ReadBool(doubt, "RebuttalRequired", "rebuttalRequired"),
+            KilljoyEscalation = ReadBool(doubt, "KilljoyEscalation", "killjoyEscalation"),
+            KilljoyAddressedHighCritical = ReadBool(killjoy, "AllHighCriticalFindingsAddressed", "allHighCriticalFindingsAddressed"),
+            Findings = findings
+        };
+    }
+
+    private static RunMemoryImprovementReview? ReadMemoryImprovement(JsonElement root)
+    {
+        var memory = ReadElement(root, "MemoryImprovement", "memoryImprovement");
+        if (memory.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var proposals = ReadArray(memory, "Proposals", "proposals")
+            .Select(item => new RunMemoryProposal
+            {
+                ActionType = ReadString(item, "ActionType", "actionType") ?? "",
+                Title = ReadString(item, "Title", "title") ?? "",
+                RecommendedDisposition = ReadString(item, "RecommendedDisposition", "recommendedDisposition") ?? "",
+                MemoryAuthorityImpact = ReadString(item, "MemoryAuthorityImpact", "memoryAuthorityImpact") ?? ""
+            })
+            .ToArray();
+        var readiness = ReadElement(memory, "AuthorityKeyReadiness", "authorityKeyReadiness");
+
+        return new RunMemoryImprovementReview
+        {
+            ProposalCount = proposals.Length,
+            MemoryHealthScore = ReadString(memory, "MemoryHealthScore", "memoryHealthScore") ?? "",
+            ReadyForAcceptedMemoryKey = ReadBool(readiness, "ReadyForAcceptedMemoryKey", "readyForAcceptedMemoryKey"),
+            CurrentAuthorityLevel = ReadString(readiness, "CurrentAuthorityLevel", "currentAuthorityLevel") ?? "",
+            Proposals = proposals
         };
     }
 

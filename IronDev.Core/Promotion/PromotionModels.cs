@@ -1,3 +1,5 @@
+using IronDev.Core.Agents;
+
 namespace IronDev.Core.Promotion;
 
 public static class LanguageRuntimeAvailability
@@ -67,6 +69,9 @@ public sealed record PromotionPackage
     public IReadOnlyList<RiskNote> Risks { get; init; } = [];
     public required HumanReviewChecklist Checklist { get; init; }
     public required EvidenceSummary EvidenceSummary { get; init; }
+    public IReadOnlyList<DoubtFinding> DoubtFindings { get; init; } = [];
+    public IReadOnlyList<DoubtFindingRebuttal> DoubtRebuttals { get; init; } = [];
+    public KilljoyReviewSummary? KilljoyReview { get; init; }
     public required string Recommendation { get; init; }
     public required string ApprovalState { get; init; }
     public required string Boundary { get; init; }

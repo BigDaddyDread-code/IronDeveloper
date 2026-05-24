@@ -1,0 +1,26 @@
+{
+  "test_run_id": "IronDevAdversarialMemoryAgents183",
+  "goal_id": "adversarial-memory-agents-183",
+  "description": "Proves DoubtAgent adversarial review and MemoryImprovementAgent proposal-only memory improvement run inside governed Alpha boundaries.",
+  "expected": {
+    "doubt_findings_present": true,
+    "high_critical_findings_require_rebuttal": true,
+    "killjoy_addresses_high_critical": true,
+    "memory_proposals_are_staged_only": true,
+    "accepted_memory_key_not_ready": true,
+    "real_repo_writes_blocked": true,
+    "accepted_memory_mutation_blocked": true,
+    "ticket_creation_blocked": true,
+    "patch_apply_blocked": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "adversarial_memory_agents_183",
+      "params": {}
+    }
+  ],
+  "max_turns": 1,
+  "early_stop_on_failure": true,
+  "boundary": "Campaign smoke only. Doubt reviews, Killjoy rebuts, and MemoryImprovementAgent stages proposals. No real repo writes, accepted memory mutation, ticket creation, patch apply, or self-approval are granted."
+}
