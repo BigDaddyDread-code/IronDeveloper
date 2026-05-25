@@ -212,6 +212,42 @@ public sealed class IronDevCliTests
         Assert.IsFalse(project.Contains("IronDev.Services", StringComparison.Ordinal), "CLI must not reference service implementations.");
     }
 
+    [TestMethod]
+    public void IronDevApi_MustNotReferenceCliReplayRunnerOrPowerShellForTicketCreation()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var apiProject = File.ReadAllText(Path.Combine(repoRoot, "IronDev.Api", "IronDev.Api.csproj"));
+        var apiSources = Directory
+            .EnumerateFiles(Path.Combine(repoRoot, "IronDev.Api"), "*.cs", SearchOption.AllDirectories)
+            .Select(path => (Path: path, Text: File.ReadAllText(path)))
+            .ToArray();
+
+        Assert.IsFalse(apiProject.Contains("IronDev.Cli", StringComparison.Ordinal), "API must not reference the CLI project.");
+        Assert.IsFalse(apiProject.Contains("IronDev.ReplayRunner", StringComparison.Ordinal), "API must not reference ReplayRunner.");
+
+        var forbidden = new[]
+        {
+            "IronDev.Cli",
+            "IronDev.ReplayRunner",
+            "ReplayRunner",
+            "PowerShell",
+            "Invoke-TestAgentPlan",
+            ".ps1",
+            "ProcessStartInfo",
+            "System.Diagnostics.Process"
+        };
+
+        foreach (var source in apiSources)
+        {
+            foreach (var token in forbidden)
+            {
+                Assert.IsFalse(
+                    source.Text.Contains(token, StringComparison.Ordinal),
+                    $"API source must not route ticket/product persistence through CLI, ReplayRunner, or shell wrappers. Forbidden token '{token}' found in {source.Path}.");
+            }
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

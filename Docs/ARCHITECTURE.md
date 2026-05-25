@@ -35,6 +35,31 @@ IronDeveloper WPF client
 
 `IronDeveloper` must not directly own SQL, Dapper repositories, Weaviate, OpenAI/provider calls, tenant enforcement, prompt context assembly, persistent ticket/document/memory mutations, or build workflow state mutation.
 
+## CLI/API Boundary
+
+The CLI is an operational client of the API.
+
+Correct product write paths:
+
+```text
+Codex -> CLI -> IronDev.Client/HTTP -> IronDev.Api -> services -> DB
+UI -> IronDev.Client/HTTP -> IronDev.Api -> services -> DB
+```
+
+Wrong product write paths:
+
+```text
+UI -> API -> CLI -> services
+Codex -> CLI -> Infrastructure -> DB
+API endpoint -> ReplayRunner command -> stdout -> response
+```
+
+The CLI may call `IronDev.Client` or direct HTTP endpoints on `IronDev.Api`. The CLI must not call SQL directly, Dapper repositories, Infrastructure services, `TicketService` directly, or GitHub issues as canonical ticket storage.
+
+The API may call application/domain services, Infrastructure services, repositories, and providers. The API must not call `IronDev.ReplayRunner`, `tools/IronDev.Cli` command handlers, PowerShell wrappers, shell commands for product persistence, or stdout-parsed command results.
+
+Do not put the CLI behind API endpoints. The API is the product boundary; the CLI is only one client of that boundary.
+
 ## Boundary Rules
 
 ### Hard rule
