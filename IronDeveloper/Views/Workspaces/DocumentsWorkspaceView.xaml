@@ -126,11 +126,12 @@
 
                                 <StackPanel>
                                     <DockPanel Margin="0,0,0,4">
-                                        <TextBlock DockPanel.Dock="Right"
-                                                   Text="{Binding LastUpdatedLabel}"
-                                                   Foreground="{StaticResource Text/Muted}"
-                                                   FontSize="{StaticResource IronDev.Font.Size.Caption}"
-                                                   Margin="8,1,0,0"/>
+                                         <TextBlock DockPanel.Dock="Right"
+                                                    Text="{Binding LastUpdatedLabel}"
+                                                    Foreground="{StaticResource Text/Muted}"
+                                                    FontSize="{StaticResource IronDev.Font.Size.Caption}"
+                                                    Margin="8,1,0,0"
+                                                    ToolTip="{Binding LastUpdatedUtcTooltip}"/>
                                         <TextBlock Text="{Binding Title}"
                                                    Foreground="{StaticResource Text/Primary}"
                                                    FontSize="{StaticResource IronDev.Font.Size.Body}"
@@ -214,10 +215,11 @@
                                                TextTrimming="CharacterEllipsis"
                                                Visibility="{Binding IsCreatingDocument, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                 </Grid>
-                                <TextBlock Text="{Binding DocumentSourceText}"
-                                           Foreground="{StaticResource Text/Secondary}"
-                                           FontSize="{StaticResource IronDev.Font.Size.Small}"
-                                           Margin="0,4,0,0"/>
+                                 <TextBlock Text="{Binding DocumentSourceText}"
+                                            Foreground="{StaticResource Text/Secondary}"
+                                            FontSize="{StaticResource IronDev.Font.Size.Small}"
+                                            Margin="0,4,0,0"
+                                            ToolTip="{Binding DocumentSourceTooltip}"/>
                             </StackPanel>
 
                             <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
@@ -247,10 +249,15 @@
                                 AutomationProperties.AutomationId="document.detail.versions">
                             <StackPanel>
                                 <TextBlock Text="VERSIONS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
-                                <TextBlock Text="{Binding VersionCountText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding SelectedVersion.DisplayLabel, FallbackValue='No version selected'}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </Border>
+                                 <TextBlock Text="{Binding VersionCountText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
+                                 <TextBlock Text="{Binding SelectedVersion.DisplayLabel, FallbackValue='No version selected'}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                 <TextBlock Text="{Binding SelectedVersion.VersionCreatedUtcMetadata, FallbackValue='VersionCreatedUtc unavailable'}"
+                                            Foreground="{StaticResource Text/Muted}"
+                                            FontSize="11"
+                                            Margin="0,3,0,0"
+                                            ToolTip="{Binding SelectedVersion.VersionCreatedUtcTooltip}"/>
+                             </StackPanel>
+                         </Border>
 
                         <Border Grid.Column="1"
                                 Background="{StaticResource IronDev.Brush.Surface.Interactive}"
@@ -530,9 +537,15 @@
                                     Margin="0,0,0,10">
                                 <StackPanel>
                                     <TextBlock Text="Provenance" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                                    <TextBlock Text="{Binding DocumentSourceText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Stored as IronDev project knowledge through the document service."
-                                               Foreground="{StaticResource Text/Muted}"
+                                     <TextBlock Text="{Binding DocumentSourceText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                     <TextBlock Text="{Binding SelectedDocument.LastUpdatedUtcMetadata, FallbackValue='UpdatedUtc unavailable'}"
+                                                Foreground="{StaticResource Text/Muted}"
+                                                FontSize="11"
+                                                TextWrapping="Wrap"
+                                                Margin="0,4,0,0"
+                                                ToolTip="{Binding SelectedDocument.LastUpdatedUtcTooltip}"/>
+                                     <TextBlock Text="Stored as IronDev project knowledge through the document service."
+                                                Foreground="{StaticResource Text/Muted}"
                                                FontSize="11"
                                                TextWrapping="Wrap"
                                                Margin="0,6,0,0"/>
@@ -548,10 +561,15 @@
                                     Margin="0,0,0,10">
                                 <StackPanel>
                                     <TextBlock Text="Source links" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
-                                    <TextBlock Text="No external source links are attached to this document."
-                                               Foreground="{StaticResource Text/Muted}"
-                                               FontSize="12"
-                                               TextWrapping="Wrap"/>
+                                     <TextBlock Text="No external source links are attached to this document."
+                                                Foreground="{StaticResource Text/Muted}"
+                                                FontSize="12"
+                                                TextWrapping="Wrap"/>
+                                     <TextBlock Text="Imported/observed UTC timestamp unavailable until source links are exposed."
+                                                Foreground="{StaticResource Text/Muted}"
+                                                FontSize="11"
+                                                TextWrapping="Wrap"
+                                                Margin="0,6,0,0"/>
                                 </StackPanel>
                             </Border>
 
@@ -586,10 +604,11 @@
                                                                    FontSize="11"
                                                                    TextWrapping="Wrap"
                                                                    Margin="0,3,0,0"/>
-                                                        <TextBlock Text="{Binding DateLabel}"
-                                                                   Foreground="{StaticResource Text/Muted}"
-                                                                   FontSize="10"
-                                                                   Margin="0,3,0,0"/>
+                                                         <TextBlock Text="{Binding DateLabel}"
+                                                                    Foreground="{StaticResource Text/Muted}"
+                                                                    FontSize="10"
+                                                                    Margin="0,3,0,0"
+                                                                    ToolTip="{Binding VersionCreatedUtcTooltip}"/>
                                                     </StackPanel>
                                                 </Border>
                                             </DataTemplate>

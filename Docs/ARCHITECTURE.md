@@ -145,6 +145,29 @@ No serious new UI shell work starts until the Playwright harness exists, the `da
 
 The UI testing contract lives in `Docs/UI_TESTING_CONTRACT.md`. The Codex-readable result schema lives in `Docs/UI_TEST_RESULT_SCHEMA.md`.
 
+## UTC Timestamp Contract
+
+All persisted product timestamps are UTC-first. This applies to project memory, tickets, documents, traces, build/test runs, imports, provenance, CLI output, and API DTOs.
+
+Rules:
+
+- Store timestamps as UTC.
+- Prefer `DateTimeOffset.UtcNow` or `DateTime.UtcNow`; do not use `DateTime.Now` for product or audit timestamps.
+- API and client DTO timestamp properties should make UTC semantics explicit with names such as `CreatedUtc`, `UpdatedUtc`, `ArchivedUtc`, `VersionCreatedUtc`, `LastIndexedUtc`, `StartedUtc`, `FinishedUtc`, `ImportedUtc`, `SourceCreatedUtc`, and `SourceUpdatedUtc`.
+- JSON responses and CLI JSON output preserve ISO 8601 UTC values.
+- UI surfaces must not display ambiguous local-only timestamps such as `25/05/2026`.
+- UI primary display may use friendly local time, but secondary metadata or tooltip text must expose UTC clearly.
+- Shared formatting helpers must be used instead of one-off timestamp formatting in view models or XAML.
+- Stale/currentness warnings must be calculated from UTC timestamps.
+
+Recommended UI pattern:
+
+```text
+Primary: 25 May 2026, 14:32
+Tooltip: 2026-05-25T02:32:00Z UTC
+Compact: Updated 12m ago · 2026-05-25 02:32 UTC
+```
+
 ## Tenancy Model
 
 Every domain entity carries a `TenantId` foreign key. All service reads filter by `TenantId`. All service writes validate project ownership before insert.

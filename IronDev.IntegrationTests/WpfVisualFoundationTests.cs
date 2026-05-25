@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using IronDev.Agent.Services;
 
 namespace IronDev.IntegrationTests;
 
@@ -164,6 +165,37 @@ public sealed class WpfVisualFoundationTests
         {
             StringAssert.Contains(memoryXaml, $"AutomationProperties.AutomationId=\"{automationId}\"");
         }
+    }
+
+    [TestMethod]
+    public void DocumentsAndMemorySurface_UsesUtcTimestampDisplayContract()
+    {
+        var root = FindRepositoryRoot();
+        var documentsViewModel = File.ReadAllText(Path.Combine(root, "IronDeveloper", "ViewModels", "Workspaces", "DocumentsWorkspaceViewModel.cs"));
+        var documentsXaml = File.ReadAllText(Path.Combine(root, "IronDeveloper", "Views", "Workspaces", "DocumentsWorkspaceView.xaml"));
+        var memoryViewModel = File.ReadAllText(Path.Combine(root, "IronDeveloper", "ViewModels", "Workspaces", "KnowledgeCompilerViewModel.cs"));
+        var memoryXaml = File.ReadAllText(Path.Combine(root, "IronDeveloper", "Views", "Workspaces", "KnowledgeCompilerView.xaml"));
+        var semanticModels = File.ReadAllText(Path.Combine(root, "IronDev.Core", "KnowledgeCompiler", "SemanticMemoryModels.cs"));
+        var architecture = File.ReadAllText(Path.Combine(root, "Docs", "ARCHITECTURE.md"));
+
+        foreach (var source in new[] { documentsViewModel, memoryViewModel })
+        {
+            var forbiddenLocalClock = "DateTime" + ".Now";
+            Assert.IsFalse(source.Contains(forbiddenLocalClock, StringComparison.Ordinal), "Product UI timestamp code must not use the local system clock.");
+            StringAssert.Contains(source, "DateTimeDisplay.");
+        }
+
+        StringAssert.Contains(documentsXaml, "LastUpdatedUtcTooltip");
+        StringAssert.Contains(documentsXaml, "VersionCreatedUtcMetadata");
+        StringAssert.Contains(documentsXaml, "VersionCreatedUtcTooltip");
+        StringAssert.Contains(memoryXaml, "IndexedUtcLabel");
+        StringAssert.Contains(memoryXaml, "IndexedUtcTooltip");
+        StringAssert.Contains(semanticModels, "IndexedUtc");
+        StringAssert.Contains(architecture, "UTC Timestamp Contract");
+
+        var timestamp = new DateTimeOffset(2026, 5, 25, 2, 32, 0, TimeSpan.Zero);
+        Assert.AreEqual("2026-05-25 02:32 UTC", DateTimeDisplay.ToUtcMetadata(timestamp));
+        Assert.AreEqual("2026-05-25T02:32:00Z UTC", DateTimeDisplay.ToUtcTooltip(timestamp));
     }
 
     private static string FindRepositoryRoot()

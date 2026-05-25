@@ -117,6 +117,7 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
                 ExplicitLinkBoost = directLinkScore,
                 StalePenalty = isStale ? 0.40 : 0,
                 IsStale = isStale,
+                IndexedUtc = embedding.EmbeddedAtUtc,
                 MatchReason = $"Semantic similarity: {similarity:F2}, Authority: {doc.AuthorityLevel}",
                 AuthorityLevel = doc.AuthorityLevel,
                 SourceDocumentVersionId = null

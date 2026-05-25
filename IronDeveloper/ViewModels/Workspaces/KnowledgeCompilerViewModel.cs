@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Agent.Services;
 using IronDev.Core.Interfaces;
 using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
@@ -334,7 +335,7 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
             var providerStatus = string.IsNullOrWhiteSpace(health.ProviderStatus) ? "Unknown" : health.ProviderStatus;
             SemanticMemoryStatusText = $"{provider} {providerStatus} | Documents {health.DocumentCount} | Embedded {health.EmbeddedCount} | Stale {health.StaleEmbeddingCount}";
             SemanticMemoryDetailText = health.LastEmbeddedAtUtc.HasValue
-                ? $"Last embedded {health.LastEmbeddedAtUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm}"
+                ? DateTimeDisplay.ToCompactMetadata(health.LastEmbeddedAtUtc.Value, "Last embedded")
                 : "No semantic embeddings have been created for this project yet.";
         }
         catch (Exception ex)
@@ -543,6 +544,8 @@ public sealed class SemanticSearchResultItemViewModel
     public string SimilarityText { get; init; } = string.Empty;
     public string MatchReason { get; init; } = string.Empty;
     public string Snippet { get; init; } = string.Empty;
+    public string IndexedUtcLabel { get; init; } = string.Empty;
+    public string IndexedUtcTooltip { get; init; } = string.Empty;
     public bool IsStale { get; init; }
     public string StaleText => IsStale ? "Stale" : "Fresh";
 
@@ -558,6 +561,12 @@ public sealed class SemanticSearchResultItemViewModel
             SimilarityText = $"Similarity {result.SimilarityScore:F2}",
             MatchReason = result.MatchReason,
             Snippet = BuildSnippet(document),
+            IndexedUtcLabel = result.IndexedUtc.HasValue
+                ? DateTimeDisplay.ToCompactMetadata(result.IndexedUtc.Value, "Indexed")
+                : "Indexed UTC unavailable",
+            IndexedUtcTooltip = result.IndexedUtc.HasValue
+                ? DateTimeDisplay.ToUtcTooltip(result.IndexedUtc.Value)
+                : "No indexed UTC timestamp was returned with this memory result.",
             IsStale = result.IsStale
         };
     }

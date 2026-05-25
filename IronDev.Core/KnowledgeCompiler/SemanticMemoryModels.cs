@@ -38,6 +38,7 @@ public sealed record SemanticSearchResult
     public double ExplicitLinkBoost { get; init; }
     public double StalePenalty { get; init; }
     public bool IsStale { get; init; }
+    public DateTime? IndexedUtc { get; init; }
     public string MatchReason { get; init; } = string.Empty;
     public string AuthorityLevel { get; init; } = string.Empty;
     public string SourceEntityType { get; init; } = string.Empty;
