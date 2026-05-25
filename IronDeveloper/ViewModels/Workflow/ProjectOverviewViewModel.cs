@@ -401,7 +401,7 @@ public sealed partial class ProjectOverviewViewModel : ObservableObject
         try
         {
             var content = await _projectsApiClient.ExportProjectContextPackAsync(_currentProject.Id);
-            var fileName = $"IronDev_ProjectContextPack_{DateTime.Now:yyyyMMdd_HHmm}.md";
+            var fileName = $"IronDev_ProjectContextPack_{DateTime.UtcNow:yyyyMMdd_HHmm}_UTC.md";
             var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var filePath = Path.Combine(desktopPath, fileName);
 

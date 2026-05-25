@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Time;
 using IronDev.Data.Models;
 using IronDev.Services;
 
@@ -56,7 +57,7 @@ public class ProjectContextExportService : IProjectContextExportService
         sb.AppendLine($"# Project Context Pack: {project.Name}");
         sb.AppendLine($"IronDev: {AppBuildInfo.DisplayName} ({AppBuildInfo.Version})");
         sb.AppendLine($"Workflow: {AppBuildInfo.WorkflowName}");
-        sb.AppendLine($"Exported: {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine($"ExportedUtc: {DateTimeDisplay.ToUtcMetadata(DateTimeOffset.UtcNow)}");
         sb.AppendLine();
 
         sb.AppendLine("## Project Details");
@@ -169,7 +170,7 @@ public class ProjectContextExportService : IProjectContextExportService
             {
                 sb.AppendLine($"### {d.Title} ({d.Status})");
                 sb.AppendLine($"- **Category:** {d.Category}");
-                sb.AppendLine($"- **Date:** {d.CreatedDate:yyyy-MM-dd}");
+                sb.AppendLine($"- **CreatedUtc:** {DateTimeDisplay.ToUtcMetadata(d.CreatedDate)}");
                 sb.AppendLine();
                 sb.AppendLine("#### Detail");
                 sb.AppendLine(Scrub(d.Detail));

@@ -5,7 +5,8 @@ public sealed class TestRunReport
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TestRunId { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    /// <summary>UTC timestamp. Legacy name retained for compatibility.</summary>
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public string Markdown { get; set; } = "";
     public string Summary { get; set; } = "";

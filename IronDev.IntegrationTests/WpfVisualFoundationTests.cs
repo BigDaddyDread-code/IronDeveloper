@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using IronDev.Agent.Services;
+using IronDev.Core.Time;
 
 namespace IronDev.IntegrationTests;
 

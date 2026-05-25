@@ -6,7 +6,10 @@ public sealed class TestRun
     public int ProjectId { get; set; }
     public string ProjectName { get; set; } = "";
 
-    public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.Now;
+    /// <summary>UTC timestamp. Legacy name retained for compatibility.</summary>
+    public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>UTC timestamp. Legacy name retained for compatibility.</summary>
     public DateTimeOffset? EndedAt { get; set; }
 
     public TestRunStatus Status { get; set; } = TestRunStatus.Running;
@@ -26,7 +29,10 @@ public sealed class TestRun
     public string? ScreenshotFolderPath { get; set; }
     public string? AudioFolderPath { get; set; }
     public string? ReportFolderPath { get; set; }
+    /// <summary>UTC timestamp. Legacy name retained for compatibility.</summary>
     public DateTimeOffset? TraceCollectionStartedAt { get; set; }
+
+    /// <summary>UTC timestamp. Legacy name retained for compatibility.</summary>
     public DateTimeOffset? TraceCollectionEndedAt { get; set; }
     public string? SessionLogPath { get; set; }
     public string? SessionTracePath { get; set; }

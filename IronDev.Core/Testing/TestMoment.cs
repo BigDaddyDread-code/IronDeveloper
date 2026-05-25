@@ -5,7 +5,8 @@ public sealed class TestMoment
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TestRunId { get; set; }
 
-    public DateTimeOffset MarkedAt { get; set; } = DateTimeOffset.Now;
+    /// <summary>UTC timestamp. Legacy name retained for compatibility.</summary>
+    public DateTimeOffset MarkedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public TestMomentType MomentType { get; set; } = TestMomentType.Bug;
 

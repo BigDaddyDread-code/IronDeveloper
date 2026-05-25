@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IronDev.Agent.Services.Testing;
 using IronDev.Core.Testing;
+using IronDev.Core.Time;
 using IronDev.Data.Models;
 using Microsoft.Win32;
 
@@ -120,7 +121,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         await LoadPersistedRunsAsync();
         ReportPath = "";
         LlmDebugPrompt = "";
-        StatusText = $"Test started at {CurrentRun.StartedAt:HH:mm:ss}. Collecting logs and LLM traces until you mark a bug or end the test.";
+        StatusText = $"Test started at {DateTimeDisplay.ToUtcMetadata(CurrentRun.StartedAt)}. Collecting logs and LLM traces until you mark a bug or end the test.";
         RefreshState();
 
         if (AutoReturnAfterStart && CanReturnToWork)
@@ -215,7 +216,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         Moments.Insert(0, item);
         SelectedMoment = item;
         LlmDebugPrompt = BuildCopyPrompt(moment);
-        StatusText = $"Saved moment at {moment.MarkedAt:HH:mm:ss}. Logs and LLM traces were captured from test start to this bug.";
+        StatusText = $"Saved moment at {DateTimeDisplay.ToUtcMetadata(moment.MarkedAt)}. Logs and LLM traces were captured from test start to this bug.";
         RefreshState();
     }
 
@@ -451,7 +452,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
             return;
 
         LlmDebugPrompt = BuildCopyPrompt(value.Moment);
-        StatusText = $"Selected captured moment from {value.Moment.MarkedAt:HH:mm:ss}.";
+        StatusText = $"Selected captured moment from {DateTimeDisplay.ToUtcMetadata(value.Moment.MarkedAt)}.";
     }
 
     private static string ResolveDefaultIronDevLogPath()
@@ -497,7 +498,7 @@ public sealed partial class TestingCompanionViewModel : ObservableObject
         Branch: {CurrentRun?.GitBranch ?? "Unknown"}
         Commit: {CurrentRun?.GitCommit ?? "Unknown"}
         Moment type: {moment.MomentType}
-        Time: {moment.MarkedAt:yyyy-MM-dd HH:mm:ss}
+        MarkedUtc: {DateTimeDisplay.ToUtcMetadata(moment.MarkedAt)}
 
         Tester note:
         {moment.UserTextNote}
@@ -538,7 +539,7 @@ public sealed class TestRunRecordItemViewModel
     }
 
     public TestRunRecord Record { get; }
-    public string TimeText => Record.StartedAt.ToString("yyyy-MM-dd HH:mm");
+    public string TimeText => DateTimeDisplay.ToCompactMetadata(Record.StartedAt, "Started");
     public string TargetText => $"{Record.TargetName} ({Record.TargetType})";
     public string StatusText => Record.Status.ToString();
     public string MomentCountText => $"{Record.MomentCount} moment(s)";
@@ -571,7 +572,7 @@ public sealed partial class MarkMomentViewModel : ObservableObject
     }
 
     public string ScreenshotPath => Draft.ScreenshotPath;
-    public string CapturedText => $"Captured {Draft.CapturedAt:HH:mm:ss}";
+    public string CapturedText => $"Captured {DateTimeDisplay.ToUtcMetadata(Draft.CapturedAt)}";
     public IReadOnlyList<TestMomentType> MomentTypes { get; } = Enum.GetValues<TestMomentType>();
     public IReadOnlyList<string> Severities { get; } = ["Low", "Medium", "High", "Blocker"];
 
@@ -604,7 +605,7 @@ public sealed partial class TestMomentItemViewModel : ObservableObject
     [ObservableProperty] private bool _isIncludedInGroup = true;
 
     public TestMoment Moment { get; }
-    public string TimeText => Moment.MarkedAt.ToString("HH:mm:ss");
+    public string TimeText => DateTimeDisplay.ToCompactMetadata(Moment.MarkedAt, "Marked");
     public string TypeText => Moment.MomentType.ToString();
     public string Title => FirstLine(Moment.ActualBehavior ?? Moment.UserTextNote ?? "Captured moment");
     public string Detail => Moment.ExpectedBehavior ?? Moment.SuspectedArea ?? "";

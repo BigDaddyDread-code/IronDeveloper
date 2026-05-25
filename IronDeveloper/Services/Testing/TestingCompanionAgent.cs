@@ -12,6 +12,7 @@ using System.Text.Json;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.Testing;
+using IronDev.Core.Time;
 
 namespace IronDev.Agent.Services.Testing;
 
@@ -58,7 +59,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             Id = runId,
             ProjectId = request.ProjectId,
             ProjectName = projectName,
-            StartedAt = DateTimeOffset.Now,
+            StartedAt = DateTimeOffset.UtcNow,
             Status = TestRunStatus.Running,
             TargetId = request.Target.Id,
             TargetName = targetName,
@@ -96,7 +97,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
     public async Task<BrokenMomentCaptureDraft> BeginMarkMomentAsync(Guid testRunId, string? activeWorkspace, CancellationToken ct = default)
     {
         var run = EnsureRun(testRunId);
-        var capturedAt = DateTimeOffset.Now;
+        var capturedAt = DateTimeOffset.UtcNow;
         var stamp = capturedAt.ToString("yyyyMMdd-HHmmss");
         var screenshotPath = Path.Combine(run.ScreenshotFolderPath!, $"screenshot-{stamp}.png");
 
@@ -296,7 +297,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             var moment = moments[i];
             sb.AppendLine($"## Issue {i + 1}: {FirstUsefulLine(moment)}");
             sb.AppendLine();
-            sb.AppendLine($"- Time: {moment.MarkedAt:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"- MarkedUtc: {DateTimeDisplay.ToUtcMetadata(moment.MarkedAt)}");
             sb.AppendLine($"- Type: {moment.MomentType}");
             sb.AppendLine($"- Severity: {moment.Severity ?? "Unspecified"}");
             sb.AppendLine($"- Workspace: {moment.ActiveWorkspace ?? "Unknown"}");
@@ -318,7 +319,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
     public async Task<TestRunReport> EndSessionAndGenerateReportAsync(Guid testRunId, CancellationToken ct = default)
     {
         var run = EnsureRun(testRunId);
-        run.EndedAt = DateTimeOffset.Now;
+        run.EndedAt = DateTimeOffset.UtcNow;
         run.TraceCollectionEndedAt = run.EndedAt;
         run.Status = TestRunStatus.Completed;
         run.Summary = $"{_moments.Count} captured test moments.";
@@ -338,7 +339,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         var report = new TestRunReport
         {
             TestRunId = run.Id,
-            CreatedAt = DateTimeOffset.Now,
+            CreatedAt = DateTimeOffset.UtcNow,
             Markdown = markdown,
             Summary = run.Summary,
             ReportPath = reportPath
@@ -462,7 +463,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
                 return null;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Log window captured for test interval {startedAt:yyyy-MM-dd HH:mm:ss} -> {endedAt:yyyy-MM-dd HH:mm:ss}.");
+            sb.AppendLine($"Log window captured for test interval {DateTimeDisplay.ToUtcMetadata(startedAt)} -> {DateTimeDisplay.ToUtcMetadata(endedAt)}.");
             sb.AppendLine($"Source log: {logFilePath}");
             sb.AppendLine();
             foreach (var line in lines)
@@ -493,7 +494,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
 
         var sb = new StringBuilder();
         sb.AppendLine($"LLM traces captured for {windowName} ({traces.Count}):");
-        sb.AppendLine($"Window: {startedAt:yyyy-MM-dd HH:mm:ss} -> {endedAt:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"WindowUtc: {DateTimeDisplay.ToUtcMetadata(startedAt)} -> {DateTimeDisplay.ToUtcMetadata(endedAt)}");
         sb.AppendLine();
 
         foreach (var trace in traces)
@@ -504,7 +505,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
 
     private static void AppendLlmTraceSummary(StringBuilder sb, LlmTraceEntry trace)
     {
-        sb.AppendLine($"- {trace.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss} | {trace.FeatureName} | {trace.Model} | Success={trace.WasSuccessful} | Duration={trace.DurationMs}ms");
+        sb.AppendLine($"- {DateTimeDisplay.ToUtcMetadata(trace.CreatedAt)} | {trace.FeatureName} | {trace.Model} | Success={trace.WasSuccessful} | Duration={trace.DurationMs}ms");
 
         if (trace.ProjectId.HasValue)
             sb.AppendLine($"  ProjectId: {trace.ProjectId}");
@@ -572,10 +573,10 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         sb.AppendLine($"- Target: {run.TargetName} ({run.TargetType})");
         sb.AppendLine($"- Branch: {run.GitBranch ?? "Unknown"}");
         sb.AppendLine($"- Commit: {run.GitCommit ?? "Unknown"}");
-        sb.AppendLine($"- Started: {run.StartedAt:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"- Ended: {run.EndedAt:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"- Trace collection started: {run.TraceCollectionStartedAt:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"- Trace collection ended: {run.TraceCollectionEndedAt:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"- StartedUtc: {DateTimeDisplay.ToUtcMetadata(run.StartedAt)}");
+        sb.AppendLine($"- EndedUtc: {FormatUtcMetadata(run.EndedAt)}");
+        sb.AppendLine($"- TraceCollectionStartedUtc: {FormatUtcMetadata(run.TraceCollectionStartedAt)}");
+        sb.AppendLine($"- TraceCollectionEndedUtc: {FormatUtcMetadata(run.TraceCollectionEndedAt)}");
         if (!string.IsNullOrWhiteSpace(run.SessionLogPath))
             sb.AppendLine($"- Session logs: `{run.SessionLogPath}`");
         if (!string.IsNullOrWhiteSpace(run.SessionTracePath))
@@ -589,7 +590,7 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
             var moment = moments[i];
             sb.AppendLine($"### {i + 1}. {FirstUsefulLine(moment)}");
             sb.AppendLine();
-            sb.AppendLine($"**Time:** {moment.MarkedAt:HH:mm:ss}  ");
+            sb.AppendLine($"**MarkedUtc:** {DateTimeDisplay.ToUtcMetadata(moment.MarkedAt)}  ");
             sb.AppendLine($"**Type:** {moment.MomentType}  ");
             sb.AppendLine($"**Workspace:** {moment.ActiveWorkspace ?? "Unknown"}  ");
             sb.AppendLine($"**Severity:** {moment.Severity ?? "Unspecified"}  ");
@@ -647,6 +648,9 @@ public sealed class TestingCompanionAgent : ITestingCompanionAgent
         sb.AppendLine("```");
         sb.AppendLine();
     }
+
+    private static string FormatUtcMetadata(DateTimeOffset? value)
+        => value.HasValue ? DateTimeDisplay.ToUtcMetadata(value.Value) : "Not recorded";
 
     private static string BuildPrompt(TestRun run, TestMoment moment)
     {

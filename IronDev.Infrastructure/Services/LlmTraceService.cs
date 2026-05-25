@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Time;
 using Microsoft.Extensions.Logging;
 
 namespace IronDev.Infrastructure.Services;
@@ -102,7 +103,7 @@ public class LlmTraceService : ILlmTraceService
         sb.AppendLine($"IronDev: {AppBuildInfo.DisplayName} ({AppBuildInfo.Version})");
         sb.AppendLine($"Feature: {trace.FeatureName}");
         sb.AppendLine($"Model: {trace.Model}");
-        sb.AppendLine($"Created: {trace.CreatedAt:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"CreatedUtc: {DateTimeDisplay.ToUtcMetadata(trace.CreatedAt)}");
         sb.AppendLine($"Duration: {trace.DurationMs}ms");
         sb.AppendLine($"Estimated tokens: {trace.EstimatedTokens}");
         sb.AppendLine($"Success: {trace.WasSuccessful}");
