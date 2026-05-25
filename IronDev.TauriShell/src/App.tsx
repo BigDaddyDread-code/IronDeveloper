@@ -3,9 +3,11 @@ import { createIronDevApiClient, getIronDevApiConfig, IronDevApiError } from './
 import type {
   ApiStatus,
   BuildReadinessResult,
+  CreateProjectTicketRequest,
   ProductAccessStatus,
   ProjectSummary,
   ProjectTicket,
+  TicketCreateStatus,
   TicketDetailLoadStatus,
   TicketReadinessLoadStatus,
   TenantSummary,
@@ -13,6 +15,7 @@ import type {
 } from './api/types';
 import { ApiStatusBadge } from './components/ApiStatusBadge';
 import { AppShell } from './components/AppShell';
+import type { CreateTicketDraft } from './components/CreateTicketPanel';
 import { StatusBadge } from './components/StatusBadge';
 import { WorkspaceHeader } from './components/WorkspaceHeader';
 import { TicketsWorkspace } from './features/tickets/TicketsWorkspace';
@@ -23,6 +26,14 @@ const initialStatus: ApiStatus = {
   status: 'loading',
   baseUrl: initialConfig.apiBaseUrl,
   message: 'Checking IronDev.Api...'
+};
+
+const initialCreateDraft: CreateTicketDraft = {
+  title: '',
+  summary: '',
+  type: 'Feature / Workflow',
+  priority: 'Medium',
+  acceptanceCriteria: ''
 };
 
 export default function App() {
@@ -54,6 +65,11 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<CreateTicketDraft>(initialCreateDraft);
+  const [createStatus, setCreateStatus] = useState<TicketCreateStatus>('idle');
+  const [createMessage, setCreateMessage] = useState('Create a new IronDev ticket in the selected project.');
+  const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
 
   const tokenConfigured = Boolean(config.token);
   const selectedTicketFromQueue = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0] ?? null;
@@ -64,6 +80,28 @@ export default function App() {
 
   const refreshConfig = useCallback(() => {
     setConfigVersion((value) => value + 1);
+  }, []);
+
+  const openCreatePanel = useCallback(() => {
+    setIsCreatePanelOpen(true);
+    setCreatedTicketId(null);
+
+    const blocker = getCreateTicketBlocker(apiStatus, accessStatus, tokenConfigured, selectedTenantId, selectedProjectId);
+
+    if (blocker) {
+      setCreateStatus('error');
+      setCreateMessage(blocker);
+    } else {
+      setCreateStatus('idle');
+      setCreateMessage('Create a new IronDev ticket in the selected project.');
+    }
+  }, [accessStatus, apiStatus, selectedProjectId, selectedTenantId, tokenConfigured]);
+
+  const closeCreatePanel = useCallback(() => {
+    setIsCreatePanelOpen(false);
+    setCreateStatus('idle');
+    setCreateMessage('Create a new IronDev ticket in the selected project.');
+    setCreatedTicketId(null);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -222,6 +260,100 @@ export default function App() {
     }
   }, [client, selectedProjectId, selectedTicketId]);
 
+  const createTicket = useCallback(async () => {
+    setCreateStatus('validating');
+    setCreatedTicketId(null);
+
+    const blocker = getCreateTicketBlocker(apiStatus, accessStatus, tokenConfigured, selectedTenantId, selectedProjectId);
+
+    if (blocker) {
+      setCreateStatus('error');
+      setCreateMessage(blocker);
+      return;
+    }
+
+    const title = createDraft.title.trim();
+    const summary = createDraft.summary.trim();
+
+    if (!title) {
+      setCreateStatus('error');
+      setCreateMessage('Title is required before IronDev can create a ticket.');
+      return;
+    }
+
+    if (!summary) {
+      setCreateStatus('error');
+      setCreateMessage('Summary is required so the ticket has enough context.');
+      return;
+    }
+
+    const projectId = selectedProjectId;
+
+    if (!projectId) {
+      setCreateStatus('error');
+      setCreateMessage('Select a project before creating a ticket.');
+      return;
+    }
+
+    const request: CreateProjectTicketRequest = {
+      title,
+      summary,
+      type: createDraft.type.trim() || undefined,
+      priority: createDraft.priority.trim() || undefined,
+      acceptanceCriteria: splitAcceptanceCriteria(createDraft.acceptanceCriteria),
+      provenance: {
+        source: 'tauri-shell',
+        createdBy: userProfile?.displayName ?? 'tauri-shell',
+        notes: 'Created from the Tauri Tickets cockpit.'
+      }
+    };
+
+    setCreateStatus('submitting');
+    setCreateMessage('Creating ticket through IronDev.Api...');
+
+    try {
+      const createdTicket = await client.createProjectTicket(projectId, request);
+      const ticketResult = await client.getProjectTickets(projectId);
+      const createdId = createdTicket.id ?? null;
+
+      setTickets(ticketResult.tickets);
+      setSelectedTicketId(createdId ?? ticketResult.tickets[0]?.id ?? null);
+      setSelectedTicketDetail(createdTicket);
+      setTicketDetailStatus('loaded');
+      setTicketDetailMessage('Created ticket detail loaded.');
+      setReadiness(null);
+      setReadinessStatus('idle');
+      setReadinessMessage('Build readiness has not been checked for this ticket.');
+      setTicketMessage(`Loaded ${ticketResult.tickets.length} ticket(s) after create.`);
+      setAccessStatus(ticketResult.tickets.length === 0 ? 'emptyTickets' : 'ready');
+      setCreatedTicketId(createdId);
+      setCreateStatus('success');
+      setCreateMessage(createdId ? `IronDev ticket #${createdId} was created and selected.` : 'IronDev ticket was created.');
+      setCreateDraft(initialCreateDraft);
+    } catch (error) {
+      setCreateStatus('error');
+
+      if (error instanceof IronDevApiError && error.isAuthFailure) {
+        setCreateMessage('IronDev.Api rejected the current token. Sign in again before creating tickets.');
+      } else if (error instanceof IronDevApiError && error.status === 400) {
+        setCreateMessage('IronDev.Api rejected the ticket payload. Check the title, summary, and acceptance criteria.');
+      } else if (error instanceof IronDevApiError) {
+        setCreateMessage(`Ticket creation failed with HTTP ${error.status}.`);
+      } else {
+        setCreateMessage('Ticket creation could not reach IronDev.Api.');
+      }
+    }
+  }, [
+    accessStatus,
+    apiStatus,
+    client,
+    createDraft,
+    selectedProjectId,
+    selectedTenantId,
+    tokenConfigured,
+    userProfile?.displayName
+  ]);
+
   const signIn = useCallback(async () => {
     if (!email.trim() || !password) {
       setErrorMessage('Email and password are required.');
@@ -349,6 +481,7 @@ export default function App() {
           tenantName={tenants.find((tenant) => tenant.id === selectedTenantId)?.name ?? null}
           isRefreshing={isRefreshing}
           onRefresh={() => void refresh()}
+          onCreateTicket={openCreatePanel}
         />
       }
       navigation={
@@ -385,6 +518,11 @@ export default function App() {
         readiness={readiness}
         readinessStatus={readinessStatus}
         readinessMessage={readinessMessage}
+        isCreatePanelOpen={isCreatePanelOpen}
+        createDraft={createDraft}
+        createStatus={createStatus}
+        createMessage={createMessage}
+        createdTicketId={createdTicketId}
         selectedTicketId={selectedTicketIdForList}
         ticketMessage={ticketMessage}
         tokenDraft={tokenDraft}
@@ -395,6 +533,9 @@ export default function App() {
         errorMessage={errorMessage}
         onSelectTicket={setSelectedTicketId}
         onRefreshReadiness={() => void refreshReadiness()}
+        onCreateDraftChange={setCreateDraft}
+        onSubmitCreateTicket={() => void createTicket()}
+        onCancelCreateTicket={closeCreatePanel}
         onConfigureToken={() => setIsTokenConfigOpen((value) => !value)}
         onRetry={() => void refresh()}
         onTokenDraftChange={setTokenDraft}
@@ -433,4 +574,47 @@ function statusLabel(status: ProductAccessStatus) {
     default:
       return 'Auth required';
   }
+}
+
+function getCreateTicketBlocker(
+  apiStatus: ApiStatus,
+  accessStatus: ProductAccessStatus,
+  tokenConfigured: boolean,
+  selectedTenantId: number | null,
+  selectedProjectId: number | null
+) {
+  if (apiStatus.status === 'disconnected') {
+    return 'IronDev.Api is offline. Start the backend before creating tickets.';
+  }
+
+  if (apiStatus.status !== 'connected') {
+    return 'IronDev.Api is not ready yet. Retry the connection before creating tickets.';
+  }
+
+  if (!tokenConfigured || accessStatus === 'authRequired' || accessStatus === 'authInvalid') {
+    return 'Sign in or configure a valid token before creating IronDev tickets.';
+  }
+
+  if (!selectedTenantId || accessStatus === 'tenantRequired') {
+    return 'Select a tenant before creating IronDev tickets.';
+  }
+
+  if (!selectedProjectId || accessStatus === 'projectRequired') {
+    return 'Select a project before creating IronDev tickets.';
+  }
+
+  if (accessStatus === 'apiError' || accessStatus === 'apiOffline') {
+    return 'Resolve the current API state before creating tickets.';
+  }
+
+  return null;
+}
+
+function splitAcceptanceCriteria(value: string) {
+  const items = value
+    .split(/\r?\n/)
+    .map((item) => item.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean);
+
+  return items.length > 0 ? items : undefined;
 }

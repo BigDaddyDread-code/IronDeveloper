@@ -4,12 +4,15 @@ import type {
   ProductAccessStatus,
   ProjectSummary,
   ProjectTicket,
+  TicketCreateStatus,
   TenantSummary,
   TicketDetailLoadStatus,
   TicketReadinessLoadStatus
 } from '../../api/types';
 import { AuthRequiredState } from '../../components/AuthRequiredState';
 import { ContextInspector } from '../../components/ContextInspector';
+import type { CreateTicketDraft } from '../../components/CreateTicketPanel';
+import { CreateTicketPanel } from '../../components/CreateTicketPanel';
 import { SurfacePanel } from '../../components/SurfacePanel';
 import { TicketDetail } from '../../components/TicketDetail';
 import { TicketList } from '../../components/TicketList';
@@ -34,6 +37,11 @@ interface TicketsWorkspaceProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   readinessMessage: string;
+  isCreatePanelOpen: boolean;
+  createDraft: CreateTicketDraft;
+  createStatus: TicketCreateStatus;
+  createMessage: string;
+  createdTicketId: number | null;
   selectedTicketId: number | null;
   ticketMessage: string;
   tokenDraft: string;
@@ -44,6 +52,9 @@ interface TicketsWorkspaceProps {
   errorMessage: string | null;
   onSelectTicket: (ticketId: number) => void;
   onRefreshReadiness: () => void;
+  onCreateDraftChange: (draft: CreateTicketDraft) => void;
+  onSubmitCreateTicket: () => void;
+  onCancelCreateTicket: () => void;
   onConfigureToken: () => void;
   onRetry: () => void;
   onTokenDraftChange: (value: string) => void;
@@ -74,6 +85,11 @@ export function TicketsWorkspace({
   readiness,
   readinessStatus,
   readinessMessage,
+  isCreatePanelOpen,
+  createDraft,
+  createStatus,
+  createMessage,
+  createdTicketId,
   selectedTicketId,
   ticketMessage,
   tokenDraft,
@@ -84,6 +100,9 @@ export function TicketsWorkspace({
   errorMessage,
   onSelectTicket,
   onRefreshReadiness,
+  onCreateDraftChange,
+  onSubmitCreateTicket,
+  onCancelCreateTicket,
   onConfigureToken,
   onRetry,
   onTokenDraftChange,
@@ -107,7 +126,19 @@ export function TicketsWorkspace({
           />
         }
         center={
-          productAccessBlocked ? (
+          isCreatePanelOpen ? (
+            <CreateTicketPanel
+              projectId={selectedProjectId}
+              projectName={projects.find((project) => project.id === selectedProjectId)?.name ?? null}
+              draft={createDraft}
+              status={createStatus}
+              message={createMessage}
+              createdTicketId={createdTicketId}
+              onChange={onCreateDraftChange}
+              onSubmit={onSubmitCreateTicket}
+              onCancel={onCancelCreateTicket}
+            />
+          ) : productAccessBlocked ? (
             <SurfacePanel className="ticket-detail ticket-detail--auth" testId="ticket.detail">
               <AuthRequiredState
                 apiStatus={apiStatus}

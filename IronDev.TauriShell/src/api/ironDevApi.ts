@@ -2,6 +2,7 @@ import type {
   ApiConnectionStatus,
   ApiStatus,
   BuildReadinessResult,
+  CreateProjectTicketRequest,
   LoginRequest,
   LoginResponse,
   ProjectSummary,
@@ -182,6 +183,18 @@ class IronDevApiClient {
         message: 'Ticket request could not reach IronDev.Api.'
       };
     }
+  }
+
+  async createProjectTicket(
+    projectId: number,
+    request: CreateProjectTicketRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectTicket> {
+    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
   }
 
   async getProjectTicket(projectId: number, ticketId: number, signal?: AbortSignal): Promise<ProjectTicket> {

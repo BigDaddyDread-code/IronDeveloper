@@ -124,6 +124,8 @@ Required API/auth states:
 - Readiness unavailable
 - Missing context/evidence
 
+Ticket actions must separate safe creation from destructive or repository-changing work. Create/refresh actions can appear in the cockpit command area. Archive, delete, apply, build, promotion approval, and repository mutation actions must not appear until their API path, validation, and confirmation model are explicit.
+
 Auth-required copy should explain that `IronDev.Api` is reachable or expected locally, but product data needs a token. Use calm badges and clear actions:
 
 - Retry connection
@@ -211,6 +213,17 @@ Current required selectors:
 - `ticket.inspector.traceLinks`
 - `ticket.command.refresh`
 - `ticket.command.refreshReadiness`
+- `ticket.command.create`
+- `ticket.create.panel`
+- `ticket.create.title`
+- `ticket.create.summary`
+- `ticket.create.type`
+- `ticket.create.priority`
+- `ticket.create.acceptanceCriteria`
+- `ticket.create.submit`
+- `ticket.create.cancel`
+- `ticket.create.success`
+- `ticket.create.error`
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`

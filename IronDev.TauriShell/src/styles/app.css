@@ -22,12 +22,14 @@ body {
 
 button,
 input,
+textarea,
 select {
   font: inherit;
 }
 
 button:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 select:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
@@ -289,7 +291,8 @@ p {
 .workspace-list-pane,
 .ticket-list,
 .context-inspector,
-.ticket-detail {
+.ticket-detail,
+.ticket-create-panel {
   display: grid;
   gap: var(--space-4);
   align-content: start;
@@ -339,6 +342,10 @@ p {
 .workspace-list-item__meta,
 .ticket-detail__header,
 .ticket-detail__meta,
+.ticket-create-panel__header,
+.ticket-create-panel__metadata,
+.ticket-create-panel__state,
+.ticket-create-form,
 .detail-grid,
 .context-inspector,
 .inspector-section,
@@ -372,13 +379,15 @@ p {
 .ticket-detail__badges,
 .auth-required-state__actions,
 .token-config,
-.auth-form__actions {
+.auth-form__actions,
+.ticket-create-panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.ticket-detail__header {
+.ticket-detail__header,
+.ticket-create-panel__header {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
 }
@@ -513,7 +522,8 @@ p {
 }
 
 .auth-form label,
-.context-select {
+.context-select,
+.ticket-create-form label {
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-strong);
@@ -522,7 +532,10 @@ p {
 
 .auth-form input,
 .context-select select,
-.token-config input {
+.token-config input,
+.ticket-create-form input,
+.ticket-create-form select,
+.ticket-create-form textarea {
   min-width: 12rem;
   min-height: 2rem;
   border: var(--border-subtle);
@@ -533,9 +546,52 @@ p {
 }
 
 .auth-form input,
-.context-select select {
+.context-select select,
+.ticket-create-form input,
+.ticket-create-form select,
+.ticket-create-form textarea {
   width: 100%;
   margin-top: var(--space-1);
+}
+
+.ticket-create-form textarea {
+  min-height: 6rem;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+
+.ticket-create-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.ticket-create-panel__actions {
+  justify-content: flex-end;
+}
+
+.ticket-create-panel__state {
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-subtle);
+  padding: var(--space-3);
+}
+
+.ticket-create-panel__state h3 {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-section);
+}
+
+.ticket-create-panel__state p {
+  color: var(--color-text-secondary);
+}
+
+.ticket-create-panel__state--success {
+  border-color: color-mix(in srgb, var(--color-status-ready) 42%, var(--color-border-subtle));
+}
+
+.ticket-create-panel__state--error {
+  border-color: color-mix(in srgb, var(--color-status-warning) 42%, var(--color-border-subtle));
 }
 
 .token-config input {
@@ -590,6 +646,11 @@ p {
   }
 
   .ticket-detail__header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ticket-create-panel__header,
+  .ticket-create-form__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

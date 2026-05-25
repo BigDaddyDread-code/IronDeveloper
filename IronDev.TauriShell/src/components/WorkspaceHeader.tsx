@@ -14,6 +14,7 @@ interface WorkspaceHeaderProps {
   tenantName: string | null;
   isRefreshing: boolean;
   onRefresh: () => void;
+  onCreateTicket: () => void;
 }
 
 export function WorkspaceHeader({
@@ -27,7 +28,8 @@ export function WorkspaceHeader({
   userDisplayName,
   tenantName,
   isRefreshing,
-  onRefresh
+  onRefresh,
+  onCreateTicket
 }: WorkspaceHeaderProps) {
   return (
     <header className="workspace-header" data-testid="app.header">
@@ -59,6 +61,9 @@ export function WorkspaceHeader({
         </span>
         <CommandButton testId="ticket.command.refresh" onClick={onRefresh} disabled={isRefreshing}>
           {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </CommandButton>
+        <CommandButton testId="ticket.command.create" variant="primary" onClick={onCreateTicket}>
+          Create Ticket
         </CommandButton>
       </div>
     </header>

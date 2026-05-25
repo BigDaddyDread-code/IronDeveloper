@@ -35,6 +35,7 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('ticket.detail')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector')).toBeVisible();
   await expect(page.getByTestId('ticket.command.refresh')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.create')).toBeVisible();
   await expect(page.getByTestId('app.authState')).toBeVisible();
   await expect(page.getByTestId('auth.form')).toBeVisible();
   await expect(page.getByTestId('auth.email')).toBeVisible();
@@ -263,6 +264,86 @@ test('tickets shell handles readiness loading and unavailable state', async ({ p
   await expectNoHorizontalOverflow(page);
 });
 
+test('tickets shell opens create panel and validates required title', async ({ page }) => {
+  await mockTicketProject(page);
+  await page.goto('/');
+
+  await page.getByTestId('ticket.command.create').click();
+
+  await expect(page.getByTestId('ticket.create.panel')).toBeVisible();
+  await expect(page.getByTestId('ticket.create.title')).toBeVisible();
+  await expect(page.getByTestId('ticket.create.summary')).toBeVisible();
+  await expect(page.getByTestId('ticket.create.type')).toBeVisible();
+  await expect(page.getByTestId('ticket.create.priority')).toBeVisible();
+  await expect(page.getByTestId('ticket.create.acceptanceCriteria')).toBeVisible();
+
+  await page.getByTestId('ticket.create.summary').fill('Summary without a title should not submit.');
+  await page.getByTestId('ticket.create.submit').click();
+
+  await expect(page.getByTestId('ticket.create.error')).toContainText('Title is required');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell creates a ticket through the API and selects the result', async ({ page }) => {
+  let postedBody: unknown = null;
+  await mockTicketProjectForCreate(page, async (request) => {
+    postedBody = request.postDataJSON();
+
+    return {
+      id: 201,
+      projectId: 7,
+      title: 'Create safe Tauri ticket action',
+      ticketType: 'UI / Workflow',
+      status: 'Draft',
+      priority: 'High',
+      summary: 'Prove ticket creation through IronDev.Api.',
+      acceptanceCriteria: 'Create through API\nReload ticket list',
+      contextSummary: 'Created from deterministic Playwright test.',
+      createdDate: '2026-05-26T01:15:00Z'
+    };
+  });
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.create').click();
+  await page.getByTestId('ticket.create.title').fill('Create safe Tauri ticket action');
+  await page.getByTestId('ticket.create.summary').fill('Prove ticket creation through IronDev.Api.');
+  await page.getByTestId('ticket.create.type').fill('UI / Workflow');
+  await page.getByTestId('ticket.create.priority').selectOption('High');
+  await page.getByTestId('ticket.create.acceptanceCriteria').fill('Create through API\nReload ticket list');
+  await page.getByTestId('ticket.create.submit').click();
+
+  await expect(page.getByTestId('ticket.create.success')).toContainText('IronDev ticket #201 was created and selected.');
+  await expect(page.getByTestId('ticket.row')).toHaveCount(3);
+  await page.getByTestId('ticket.create.cancel').click();
+  await expect(page.getByTestId('ticket.detail.header')).toContainText('Create safe Tauri ticket action');
+  expect(postedBody).toMatchObject({
+    title: 'Create safe Tauri ticket action',
+    summary: 'Prove ticket creation through IronDev.Api.',
+    type: 'UI / Workflow',
+    priority: 'High',
+    acceptanceCriteria: ['Create through API', 'Reload ticket list']
+  });
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell shows product error when ticket create API fails', async ({ page }) => {
+  await mockTicketProjectForCreate(page, async () => {
+    throw new Error('api failure');
+  });
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.create').click();
+  await page.getByTestId('ticket.create.title').fill('Create should fail cleanly');
+  await page.getByTestId('ticket.create.summary').fill('The API mock returns a server error.');
+  await page.getByTestId('ticket.create.submit').click();
+
+  await expect(page.getByTestId('ticket.create.error')).toContainText('Ticket creation failed with HTTP 500.');
+  await expect(page.getByTestId('ticket.row')).toHaveCount(2);
+  await page.getByTestId('ticket.create.cancel').click();
+  await expect(page.getByTestId('ticket.detail')).not.toContainText('Create should fail cleanly');
+  await expectNoHorizontalOverflow(page);
+});
+
 async function mockTicketProject(page: import('@playwright/test').Page) {
   await seedToken(page);
   await mockHealthyApi(page);
@@ -318,6 +399,90 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
           summary: 'Pick active project before loading tickets.'
         }
       ])
+    });
+  });
+}
+
+async function mockTicketProjectForCreate(
+  page: import('@playwright/test').Page,
+  createTicket: (request: import('@playwright/test').Request) => Promise<Record<string, unknown>>
+) {
+  await seedToken(page);
+  await mockHealthyApi(page);
+
+  const baseTickets = [
+    {
+      id: 101,
+      projectId: 7,
+      title: 'Make tickets cockpit real',
+      status: 'Ready',
+      priority: 'High',
+      summary: 'Render ticket data through the Tauri API client.'
+    },
+    {
+      id: 102,
+      projectId: 7,
+      title: 'Add project selection',
+      status: 'Draft',
+      priority: 'Medium',
+      summary: 'Pick active project before loading tickets.'
+    }
+  ];
+  let createdTicket: Record<string, unknown> | null = null;
+
+  await page.route('**/irondev-api/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 7, tenantId: 3, name: 'IronDeveloper', description: 'Dogfood project' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketDetail101) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketDetail102) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/201', async (route) => {
+    await route.fulfill({
+      status: createdTicket ? 200 : 404,
+      contentType: 'application/json',
+      body: JSON.stringify(createdTicket ?? { message: 'Not found' })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    if (route.request().method() === 'POST') {
+      try {
+        createdTicket = await createTicket(route.request());
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(createdTicket) });
+      } catch {
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) });
+      }
+
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createdTicket ? [createdTicket, ...baseTickets] : baseTickets)
     });
   });
 }

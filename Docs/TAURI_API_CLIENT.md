@@ -50,7 +50,7 @@ Current layers:
 
 - `src/api/generated/ironDevApiTypes.ts`: generated schema/path types.
 - `src/api/types.ts`: shell-facing aliases and state types.
-- `src/api/ironDevApi.ts`: typed HTTP facade for health, auth, tenants, projects, project selection, ticket queue, selected ticket detail, and build readiness.
+- `src/api/ironDevApi.ts`: typed HTTP facade for health, auth, tenants, projects, project selection, ticket queue, selected ticket detail, build readiness, and safe ticket creation.
 
 This is intentionally small. Future slices can replace the typed facade with a fuller generated client, but the boundary must remain the same.
 
@@ -67,8 +67,27 @@ The shell supports:
 - ticket loading for the selected project
 - selected ticket detail loading
 - build readiness refresh for the selected ticket
+- non-destructive ticket creation for the selected project
 
 Token storage is local/dev-safe only for this spike: `localStorage` is used so the UI can prove the workflow. This is not a production credential vault.
+
+## Ticket Create Action
+
+The first Tauri mutation is intentionally narrow and non-destructive:
+
+```text
+Tauri UI -> typed API facade -> IronDev.Api -> ticket database
+```
+
+The shell calls:
+
+```text
+POST /api/projects/{projectId}/tickets
+```
+
+The create panel collects title, summary, optional type, optional priority, and acceptance criteria. It requires an active API connection, token, tenant context where required, and selected project. On success, the shell reloads the selected project's ticket list and selects the created ticket when the API response includes an id.
+
+This slice does not add archive/delete, apply proposal, build/apply mutation, repository file mutation, promotion approval, or self-approval actions. Future ticket actions must stay behind `IronDev.Api` and must be added as explicit typed facade methods before React components consume them.
 
 ## Local Configuration
 
@@ -103,7 +122,8 @@ localStorage.setItem("irondev.selectedProjectId", "1");
 - Production-safe token storage.
 - Full auth UX polish.
 - Generated client coverage beyond the Tickets shell path.
-- Ticket mutation/action parity with WPF.
+- Ticket edit/review/action parity with WPF.
+- Safe action expansion beyond create ticket.
 - Rich ticket evidence endpoints for linked documents, decisions, traces, and run/build artifacts.
 - Documents/Memory, Chat, Build/Run Reports, and Testing Companion workspace parity.
 - Desktop automation against the packaged Tauri window, not only the Vite shell.
