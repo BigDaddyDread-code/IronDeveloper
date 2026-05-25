@@ -25,7 +25,7 @@ export default function App() {
   const [tokenDraft, setTokenDraft] = useState('');
 
   const tokenConfigured = Boolean(config.token);
-  const ticketAccessRequiresAuth = !tokenConfigured || ticketStatus === 'authRequired';
+  const productAccessBlocked = apiStatus.status !== 'connected' || !tokenConfigured || ticketStatus === 'authRequired';
   const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0] ?? null;
   const selectedTicketIdForList = selectedTicket?.id ?? null;
 
@@ -94,7 +94,7 @@ export default function App() {
         <footer className="shell-footer">
           <ApiStatusBadge status={apiStatus.status} withTestId={false} />
           <span>{apiStatus.message}</span>
-          {ticketAccessRequiresAuth ? (
+          {productAccessBlocked ? (
             <StatusBadge status="authRequired">Auth required</StatusBadge>
           ) : null}
         </footer>
@@ -105,7 +105,7 @@ export default function App() {
         apiBaseUrl={config.apiBaseUrl}
         projectId={config.projectId}
         tokenConfigured={tokenConfigured}
-        ticketAccessRequiresAuth={ticketAccessRequiresAuth}
+        productAccessBlocked={productAccessBlocked}
         authLabel={tokenConfigured ? 'Token rejected' : 'Missing token'}
         tickets={tickets}
         selectedTicket={selectedTicket}

@@ -120,10 +120,16 @@ Required API/auth states:
 
 Auth-required copy should explain that `IronDev.Api` is reachable or expected locally, but product data needs a token. Use calm badges and clear actions:
 
-- Configure token
 - Retry connection
+- Configure token
 
 Use banners only for genuinely blocking states. Prefer contextual state panels inside the affected workflow area.
+
+Disconnected API state should be explicit and operational:
+
+- Title: `IronDev.Api is offline`
+- Body: `Start the backend with: dotnet run --project IronDev.Api`
+- Actions: `Retry connection`
 
 ## Responsive Behaviour
 
