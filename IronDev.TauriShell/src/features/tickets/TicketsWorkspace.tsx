@@ -11,7 +11,7 @@ interface TicketsWorkspaceProps {
   apiBaseUrl: string;
   projectId: number;
   tokenConfigured: boolean;
-  ticketAccessRequiresAuth: boolean;
+  productAccessBlocked: boolean;
   authLabel: string;
   tickets: ProjectTicket[];
   selectedTicket: ProjectTicket | null;
@@ -31,7 +31,7 @@ export function TicketsWorkspace({
   apiBaseUrl,
   projectId,
   tokenConfigured,
-  ticketAccessRequiresAuth,
+  productAccessBlocked,
   authLabel,
   tickets,
   selectedTicket,
@@ -57,7 +57,7 @@ export function TicketsWorkspace({
           />
         }
         center={
-          ticketAccessRequiresAuth ? (
+          productAccessBlocked ? (
             <SurfacePanel className="ticket-detail ticket-detail--auth" testId="ticket.detail">
               <AuthRequiredState
                 apiStatus={apiStatus}

@@ -26,6 +26,7 @@ export function WorkspaceHeader({
         <h1>IronDev</h1>
         <p className="workspace-header__subtitle">Tauri + React shell proving the API-backed cockpit model.</p>
         <div className="workspace-header__summary">
+          <span className="metadata-chip" data-testid="tickets.header">Workspace Tickets</span>
           <span className="metadata-chip">Tickets {ticketCount}</span>
           <span className="metadata-chip">{tokenConfigured ? 'Token configured' : 'Token missing'}</span>
         </div>
