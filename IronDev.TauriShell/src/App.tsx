@@ -57,7 +57,9 @@ export default function App() {
   const [selectedTenantId, setSelectedTenantId] = useState<number | null>(config.selectedTenantId ?? null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(config.selectedProjectId ?? null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
-  const [projectSelectionMode, setProjectSelectionMode] = useState<'api' | 'fallback-config'>('fallback-config');
+  const [projectSelectionMode, setProjectSelectionMode] = useState<'api' | 'fallback-config' | 'missing'>(
+    config.selectedProjectId ? 'api' : 'missing'
+  );
   const [ticketMessage, setTicketMessage] = useState('Waiting for API health check.');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTokenConfigOpen, setIsTokenConfigOpen] = useState(false);
@@ -76,7 +78,15 @@ export default function App() {
   const selectedTicket = selectedTicketDetail?.id === selectedTicketId ? selectedTicketDetail : selectedTicketFromQueue;
   const selectedTicketIdForList = selectedTicket?.id ?? null;
   const productAccessBlocked = !['ready', 'emptyTickets', 'loadingTickets'].includes(accessStatus);
-  const projectBadgeStatus = selectedProjectId ? 'selected' : 'missing';
+  const projectBadgeStatus = selectedProjectId ? (projectSelectionMode === 'fallback-config' ? 'fallback' : 'selected') : 'missing';
+  const createBlockedReason = getCreateTicketBlocker(
+    apiStatus,
+    accessStatus,
+    tokenConfigured,
+    selectedTenantId,
+    selectedProjectId,
+    projectSelectionMode
+  );
 
   const refreshConfig = useCallback(() => {
     setConfigVersion((value) => value + 1);
@@ -86,7 +96,14 @@ export default function App() {
     setIsCreatePanelOpen(true);
     setCreatedTicketId(null);
 
-    const blocker = getCreateTicketBlocker(apiStatus, accessStatus, tokenConfigured, selectedTenantId, selectedProjectId);
+    const blocker = getCreateTicketBlocker(
+      apiStatus,
+      accessStatus,
+      tokenConfigured,
+      selectedTenantId,
+      selectedProjectId,
+      projectSelectionMode
+    );
 
     if (blocker) {
       setCreateStatus('error');
@@ -95,7 +112,7 @@ export default function App() {
       setCreateStatus('idle');
       setCreateMessage('Create a new IronDev ticket in the selected project.');
     }
-  }, [accessStatus, apiStatus, selectedProjectId, selectedTenantId, tokenConfigured]);
+  }, [accessStatus, apiStatus, projectSelectionMode, selectedProjectId, selectedTenantId, tokenConfigured]);
 
   const closeCreatePanel = useCallback(() => {
     setIsCreatePanelOpen(false);
@@ -115,6 +132,13 @@ export default function App() {
     setApiStatus(health);
 
     if (health.status !== 'connected') {
+      setUserProfile(null);
+      setTenants([]);
+      setProjects([]);
+      setSelectedTenantId(null);
+      setSelectedProjectId(null);
+      setSelectedProjectName(null);
+      setProjectSelectionMode('missing');
       setTickets([]);
       setSelectedTicketId(null);
       setSelectedTicketDetail(null);
@@ -127,6 +151,13 @@ export default function App() {
     }
 
     if (!config.token) {
+      setUserProfile(null);
+      setTenants([]);
+      setProjects([]);
+      setSelectedTenantId(null);
+      setSelectedProjectId(null);
+      setSelectedProjectName(null);
+      setProjectSelectionMode('missing');
       setTickets([]);
       setSelectedTicketId(null);
       setSelectedTicketDetail(null);
@@ -149,6 +180,10 @@ export default function App() {
       setSelectedTenantId(tenantId);
 
       if (!tenantId) {
+        setProjects([]);
+        setSelectedProjectId(null);
+        setSelectedProjectName(null);
+        setProjectSelectionMode('missing');
         setTickets([]);
         setSelectedTicketId(null);
         setSelectedTicketDetail(null);
@@ -167,7 +202,7 @@ export default function App() {
       const projectId = selectedProject?.id ?? null;
       setSelectedProjectId(projectId ?? null);
       setSelectedProjectName(selectedProject?.name ?? null);
-      setProjectSelectionMode(config.selectedProjectId ? 'api' : 'fallback-config');
+      setProjectSelectionMode(selectedProject?.mode ?? 'missing');
 
       if (!projectId) {
         setTickets([]);
@@ -181,7 +216,9 @@ export default function App() {
         return;
       }
 
-      await client.selectProject(projectId, controller.signal).catch(() => undefined);
+      if (selectedProject?.mode === 'api') {
+        await client.selectProject(projectId, controller.signal).catch(() => undefined);
+      }
 
       setAccessStatus('loadingTickets');
       setTicketMessage('Loading tickets...');
@@ -194,6 +231,9 @@ export default function App() {
       setTicketMessage(ticketResult.message);
       setAccessStatus(ticketResult.tickets.length === 0 ? 'emptyTickets' : 'ready');
     } catch (error) {
+      setSelectedProjectId(null);
+      setSelectedProjectName(null);
+      setProjectSelectionMode('missing');
       setTickets([]);
       setSelectedTicketId(null);
       setSelectedTicketDetail(null);
@@ -264,7 +304,14 @@ export default function App() {
     setCreateStatus('validating');
     setCreatedTicketId(null);
 
-    const blocker = getCreateTicketBlocker(apiStatus, accessStatus, tokenConfigured, selectedTenantId, selectedProjectId);
+    const blocker = getCreateTicketBlocker(
+      apiStatus,
+      accessStatus,
+      tokenConfigured,
+      selectedTenantId,
+      selectedProjectId,
+      projectSelectionMode
+    );
 
     if (blocker) {
       setCreateStatus('error');
@@ -350,6 +397,7 @@ export default function App() {
     createDraft,
     selectedProjectId,
     selectedTenantId,
+    projectSelectionMode,
     tokenConfigured,
     userProfile?.displayName
   ]);
@@ -471,15 +519,15 @@ export default function App() {
       header={
         <WorkspaceHeader
           apiStatus={apiStatus}
-          projectId={selectedProjectId ?? config.fallbackProjectId}
+          projectId={selectedProjectId}
           projectName={selectedProjectName}
           projectStatus={projectBadgeStatus}
-          projectSelectionMode={projectSelectionMode}
           ticketCount={tickets.length}
           tokenConfigured={tokenConfigured}
           userDisplayName={userProfile?.displayName ?? null}
           tenantName={tenants.find((tenant) => tenant.id === selectedTenantId)?.name ?? null}
           isRefreshing={isRefreshing}
+          createBlockedReason={createBlockedReason}
           onRefresh={() => void refresh()}
           onCreateTicket={openCreatePanel}
         />
@@ -503,7 +551,8 @@ export default function App() {
         apiStatus={apiStatus}
         accessStatus={accessStatus}
         apiBaseUrl={config.apiBaseUrl}
-        projectId={selectedProjectId ?? config.fallbackProjectId}
+        projectId={selectedProjectId}
+        projectStatus={projectBadgeStatus}
         tokenConfigured={tokenConfigured}
         productAccessBlocked={productAccessBlocked}
         authLabel={tokenConfigured ? 'Token rejected' : 'Missing token'}
@@ -522,6 +571,7 @@ export default function App() {
         createDraft={createDraft}
         createStatus={createStatus}
         createMessage={createMessage}
+        createBlockedReason={createBlockedReason}
         createdTicketId={createdTicketId}
         selectedTicketId={selectedTicketIdForList}
         ticketMessage={ticketMessage}
@@ -551,12 +601,21 @@ export default function App() {
 }
 
 function selectProject(projects: ProjectSummary[], selectedProjectId?: number, fallbackProjectId?: number) {
-  return (
-    projects.find((project) => project.id === selectedProjectId) ??
-    projects.find((project) => project.id === fallbackProjectId) ??
-    projects[0] ??
-    null
-  );
+  const selectedProject = projects.find((project) => project.id === selectedProjectId);
+
+  if (selectedProject) {
+    return { ...selectedProject, mode: 'api' as const };
+  }
+
+  if (!selectedProjectId) {
+    const fallbackProject = projects.find((project) => project.id === fallbackProjectId);
+
+    if (fallbackProject) {
+      return { ...fallbackProject, mode: 'fallback-config' as const };
+    }
+  }
+
+  return null;
 }
 
 function statusLabel(status: ProductAccessStatus) {
@@ -581,7 +640,8 @@ function getCreateTicketBlocker(
   accessStatus: ProductAccessStatus,
   tokenConfigured: boolean,
   selectedTenantId: number | null,
-  selectedProjectId: number | null
+  selectedProjectId: number | null,
+  projectSelectionMode: 'api' | 'fallback-config' | 'missing'
 ) {
   if (apiStatus.status === 'disconnected') {
     return 'IronDev.Api is offline. Start the backend before creating tickets.';
@@ -601,6 +661,10 @@ function getCreateTicketBlocker(
 
   if (!selectedProjectId || accessStatus === 'projectRequired') {
     return 'Select a project before creating IronDev tickets.';
+  }
+
+  if (projectSelectionMode === 'fallback-config') {
+    return 'Select a project explicitly before creating tickets. Fallback project context is read-only.';
   }
 
   if (accessStatus === 'apiError' || accessStatus === 'apiOffline') {

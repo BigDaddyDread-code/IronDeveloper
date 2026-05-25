@@ -22,7 +22,8 @@ interface TicketsWorkspaceProps {
   apiStatus: ApiStatus;
   accessStatus: ProductAccessStatus;
   apiBaseUrl: string;
-  projectId: number;
+  projectId: number | null;
+  projectStatus: 'selected' | 'missing' | 'fallback';
   tokenConfigured: boolean;
   productAccessBlocked: boolean;
   authLabel: string;
@@ -41,6 +42,7 @@ interface TicketsWorkspaceProps {
   createDraft: CreateTicketDraft;
   createStatus: TicketCreateStatus;
   createMessage: string;
+  createBlockedReason: string | null;
   createdTicketId: number | null;
   selectedTicketId: number | null;
   ticketMessage: string;
@@ -71,6 +73,7 @@ export function TicketsWorkspace({
   accessStatus,
   apiBaseUrl,
   projectId,
+  projectStatus,
   tokenConfigured,
   productAccessBlocked,
   authLabel,
@@ -89,6 +92,7 @@ export function TicketsWorkspace({
   createDraft,
   createStatus,
   createMessage,
+  createBlockedReason,
   createdTicketId,
   selectedTicketId,
   ticketMessage,
@@ -130,9 +134,11 @@ export function TicketsWorkspace({
             <CreateTicketPanel
               projectId={selectedProjectId}
               projectName={projects.find((project) => project.id === selectedProjectId)?.name ?? null}
+              projectStatus={projectStatus}
               draft={createDraft}
               status={createStatus}
               message={createMessage}
+              blockedReason={createBlockedReason}
               createdTicketId={createdTicketId}
               onChange={onCreateDraftChange}
               onSubmit={onSubmitCreateTicket}
@@ -184,6 +190,7 @@ export function TicketsWorkspace({
             readinessStatus={readinessStatus}
             apiBaseUrl={apiBaseUrl}
             projectId={projectId}
+            projectStatus={projectStatus}
             tokenConfigured={tokenConfigured}
           />
         }

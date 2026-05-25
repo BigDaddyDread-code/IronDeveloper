@@ -4,15 +4,15 @@ import { CommandButton } from './CommandButton';
 
 interface WorkspaceHeaderProps {
   apiStatus: ApiStatus;
-  projectId: number;
+  projectId: number | null;
   projectName: string | null;
-  projectStatus: 'selected' | 'missing';
-  projectSelectionMode: 'api' | 'fallback-config';
+  projectStatus: 'selected' | 'missing' | 'fallback';
   ticketCount: number;
   tokenConfigured: boolean;
   userDisplayName: string | null;
   tenantName: string | null;
   isRefreshing: boolean;
+  createBlockedReason: string | null;
   onRefresh: () => void;
   onCreateTicket: () => void;
 }
@@ -22,15 +22,22 @@ export function WorkspaceHeader({
   projectId,
   projectName,
   projectStatus,
-  projectSelectionMode,
   ticketCount,
   tokenConfigured,
   userDisplayName,
   tenantName,
   isRefreshing,
+  createBlockedReason,
   onRefresh,
   onCreateTicket
 }: WorkspaceHeaderProps) {
+  const projectLabel =
+    projectStatus === 'selected'
+      ? projectName ?? `Project ${projectId}`
+      : projectStatus === 'fallback'
+        ? `Fallback project ${projectId}`
+        : 'Project required';
+
   return (
     <header className="workspace-header" data-testid="app.header">
       <div className="workspace-header__identity">
@@ -53,18 +60,33 @@ export function WorkspaceHeader({
         </div>
         <span
           className="project-pill"
-          data-testid={projectStatus === 'selected' ? 'project.status.selected' : 'project.status.missing'}
+          data-testid={
+            projectStatus === 'selected'
+              ? 'project.status.selected'
+              : projectStatus === 'fallback'
+                ? 'project.status.fallback'
+                : 'project.status.missing'
+          }
         >
-          {projectStatus === 'selected'
-            ? `${projectName ?? `Project ${projectId}`}${projectSelectionMode === 'fallback-config' ? ' (fallback)' : ''}`
-            : 'Project required'}
+          {projectLabel}
         </span>
         <CommandButton testId="ticket.command.refresh" onClick={onRefresh} disabled={isRefreshing}>
           {isRefreshing ? 'Refreshing...' : 'Refresh'}
         </CommandButton>
-        <CommandButton testId="ticket.command.create" variant="primary" onClick={onCreateTicket}>
+        <CommandButton
+          testId="ticket.command.create"
+          variant="primary"
+          onClick={onCreateTicket}
+          disabled={Boolean(createBlockedReason) || isRefreshing}
+          title={createBlockedReason ?? undefined}
+        >
           Create Ticket
         </CommandButton>
+        {createBlockedReason ? (
+          <span className="command-blocked-reason" data-testid="ticket.create.blockedReason">
+            {createBlockedReason}
+          </span>
+        ) : null}
       </div>
     </header>
   );

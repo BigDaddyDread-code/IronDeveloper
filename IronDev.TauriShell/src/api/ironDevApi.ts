@@ -83,7 +83,15 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
     };
   }
 
-  return createIronDevApiClient(config).getProjectTickets(config.selectedProjectId ?? config.fallbackProjectId, signal);
+  if (!config.selectedProjectId) {
+    return {
+      tickets: [],
+      status: 'error',
+      message: 'Select a project before loading tickets.'
+    };
+  }
+
+  return createIronDevApiClient(config).getProjectTickets(config.selectedProjectId, signal);
 }
 
 class IronDevApiClient {

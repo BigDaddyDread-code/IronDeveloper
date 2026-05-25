@@ -144,6 +144,9 @@ Tenant and project states are first-class product states. Do not hide them as ge
 - `Tenant required`: show `tenant.selector`.
 - `Project required`: show `project.selector` and `project.status.missing`.
 - `Project selected`: show `project.status.selected`.
+- `Fallback project`: show `project.status.fallback` and label it as fallback, not selected.
+
+Fallback project context is allowed only as an explicit read context. It must not be displayed as a selected project, and it must not enable write actions. Ticket creation requires API connected, valid auth, tenant selected, and explicit project selected.
 
 ## Responsive Behaviour
 
@@ -229,6 +232,8 @@ Current required selectors:
 - `api.status.authRequired`
 - `project.status.selected`
 - `project.status.missing`
+- `project.status.fallback`
+- `ticket.create.blockedReason`
 
 ## What Not To Do
 

@@ -21,6 +21,12 @@ async function seedToken(page: import('@playwright/test').Page) {
   });
 }
 
+async function seedSelectedProject(page: import('@playwright/test').Page, projectId: number) {
+  await page.addInitScript((id) => {
+    window.localStorage.setItem('irondev.selectedProjectId', `${id}`);
+  }, projectId);
+}
+
 test('tickets shell exposes cockpit regions and auth state', async ({ page }) => {
   await mockHealthyApi(page);
   await page.goto('/');
@@ -36,8 +42,11 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('ticket.inspector')).toBeVisible();
   await expect(page.getByTestId('ticket.command.refresh')).toBeVisible();
   await expect(page.getByTestId('ticket.command.create')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
+  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Sign in or configure a valid token');
   await expect(page.getByTestId('app.authState')).toBeVisible();
   await expect(page.getByTestId('auth.form')).toBeVisible();
+  await expect(page.getByTestId('auth.signIn')).toBeVisible();
   await expect(page.getByTestId('auth.email')).toBeVisible();
   await expect(page.getByTestId('auth.password')).toBeVisible();
   await expect(page.getByTestId('auth.submit')).toBeVisible();
@@ -45,6 +54,10 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.authState.retry')).toBeVisible();
   await expect(page.getByTestId('api.status.authRequired')).toBeVisible();
   await expect(page.getByTestId('api.status.connected')).toBeVisible();
+  await expect(page.getByTestId('project.status.missing')).toBeVisible();
+  expect(await page.getByTestId('project.status.selected').count()).toBe(0);
+  expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
+  await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Project required');
 
   await page.getByTestId('app.authState.configureToken').click();
   await expect(page.getByTestId('auth.tokenInput')).toBeVisible();
@@ -67,6 +80,8 @@ test('tickets shell shows offline state and does not overflow in a narrow deskto
   await expect(page.getByText('IronDev.Api is offline', { exact: true })).toBeVisible();
   await expect(page.getByText('dotnet run --project IronDev.Api', { exact: true })).toBeVisible();
   await expect(page.getByTestId('api.status.disconnected')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
+  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('IronDev.Api is offline');
   expect(await page.getByTestId('app.authState.configureToken').count()).toBe(0);
   await expectNoHorizontalOverflow(page);
 });
@@ -95,6 +110,8 @@ test('tickets shell shows tenant required state after token auth', async ({ page
   await expect(page.getByTestId('tenant.selector')).toBeVisible();
   await expect(page.getByTestId('tenant.option')).toHaveCount(1);
   await expect(page.getByTestId('api.status.connected')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
+  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Select a tenant');
   await expectNoHorizontalOverflow(page);
 });
 
@@ -124,11 +141,58 @@ test('tickets shell shows project required state when no projects are available'
   await expect(page.getByRole('heading', { name: 'Project required' })).toBeVisible();
   await expect(page.getByTestId('project.selector')).toBeVisible();
   await expect(page.getByTestId('app.header').getByTestId('project.status.missing')).toBeVisible();
+  expect(await page.getByTestId('project.status.selected').count()).toBe(0);
+  expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
+  await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Project required');
+  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
+  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Select a project');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell labels fallback project context without treating it as selected', async ({ page }) => {
+  await seedToken(page);
+  await mockHealthyApi(page);
+  await page.route('**/irondev-api/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 1, tenantId: 3, name: 'Fallback Project', description: 'Configured project' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/1/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 1 }) });
+  });
+  await page.route('**/irondev-api/api/projects/1/tickets', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('project.status.fallback')).toContainText('Fallback project 1');
+  expect(await page.getByTestId('project.status.selected').count()).toBe(0);
+  await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Fallback project 1');
+  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
+  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Fallback project context is read-only');
   await expectNoHorizontalOverflow(page);
 });
 
 test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await seedToken(page);
+  await seedSelectedProject(page, 7);
   await mockHealthyApi(page);
   await page.route('**/irondev-api/api/auth/me', async (route) => {
     await route.fulfill({
@@ -209,6 +273,7 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByTestId('project.status.selected')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.create')).toBeEnabled();
   await expect(page.getByTestId('ticket.row')).toHaveCount(2);
   await expect(page.getByTestId('ticket.detail.header')).toBeVisible();
   await expect(page.getByTestId('ticket.detail.brief')).toBeVisible();
@@ -346,6 +411,7 @@ test('tickets shell shows product error when ticket create API fails', async ({ 
 
 async function mockTicketProject(page: import('@playwright/test').Page) {
   await seedToken(page);
+  await seedSelectedProject(page, 7);
   await mockHealthyApi(page);
   await page.route('**/irondev-api/api/auth/me', async (route) => {
     await route.fulfill({
@@ -408,6 +474,7 @@ async function mockTicketProjectForCreate(
   createTicket: (request: import('@playwright/test').Request) => Promise<Record<string, unknown>>
 ) {
   await seedToken(page);
+  await seedSelectedProject(page, 7);
   await mockHealthyApi(page);
 
   const baseTickets = [

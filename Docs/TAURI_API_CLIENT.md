@@ -71,6 +71,14 @@ The shell supports:
 
 Token storage is local/dev-safe only for this spike: `localStorage` is used so the UI can prove the workflow. This is not a production credential vault.
 
+Project state has one source of truth:
+
+- `Project required` means no project is active and product data/actions stay blocked.
+- `Fallback project` means the shell is using the configured fallback id for read-only ticket loading convenience.
+- `Project selected` means the user/session has an explicit selected project context.
+
+Fallback project context must not be rendered as a selected project, and write actions such as ticket creation require an explicit selected project.
+
 ## Ticket Create Action
 
 The first Tauri mutation is intentionally narrow and non-destructive:
@@ -86,6 +94,8 @@ POST /api/projects/{projectId}/tickets
 ```
 
 The create panel collects title, summary, optional type, optional priority, and acceptance criteria. It requires an active API connection, token, tenant context where required, and selected project. On success, the shell reloads the selected project's ticket list and selects the created ticket when the API response includes an id.
+
+Create is blocked when the API is offline, auth is missing/invalid, tenant context is missing, project context is missing, or only fallback project context is active. The disabled command exposes the reason through `ticket.create.blockedReason`.
 
 This slice does not add archive/delete, apply proposal, build/apply mutation, repository file mutation, promotion approval, or self-approval actions. Future ticket actions must stay behind `IronDev.Api` and must be added as explicit typed facade methods before React components consume them.
 

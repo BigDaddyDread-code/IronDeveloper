@@ -103,6 +103,13 @@ p {
   min-width: 16rem;
 }
 
+.command-blocked-reason {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  text-align: right;
+}
+
 .api-status {
   color: var(--color-text-muted);
 }
@@ -252,6 +259,11 @@ p {
 
 .status-badge--neutral {
   color: var(--color-status-neutral);
+}
+
+.project-pill[data-testid="project.status.fallback"] {
+  border-color: color-mix(in srgb, var(--color-status-info) 38%, var(--color-border-subtle));
+  color: var(--color-status-info);
 }
 
 .command-button {

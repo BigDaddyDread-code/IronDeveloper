@@ -10,7 +10,8 @@ interface ContextInspectorProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   apiBaseUrl: string;
-  projectId: number;
+  projectId: number | null;
+  projectStatus: 'selected' | 'missing' | 'fallback';
   tokenConfigured: boolean;
 }
 
@@ -20,6 +21,7 @@ export function ContextInspector({
   readinessStatus,
   apiBaseUrl,
   projectId,
+  projectStatus,
   tokenConfigured
 }: ContextInspectorProps) {
   const affectedFiles = splitList(ticket?.linkedFilePaths);
@@ -31,6 +33,12 @@ export function ContextInspector({
     ...(!ticket?.contextSummary ? ['Context summary is not exposed for this ticket.'] : []),
     ...(readinessStatus === 'unavailable' ? ['Build readiness endpoint did not return a usable result.'] : [])
   ];
+  const projectLabel =
+    projectStatus === 'selected'
+      ? `Project ${projectId}`
+      : projectStatus === 'fallback'
+        ? `Fallback project ${projectId}`
+        : 'Project required';
 
   return (
     <SurfacePanel className="context-inspector" testId="ticket.inspector">
@@ -41,7 +49,7 @@ export function ContextInspector({
 
       <InspectorSection title="Boundary" testId="ticket.inspector.evidence">
         <MetadataRow label="API" value={<code>{apiBaseUrl}</code>} />
-        <MetadataRow label="Project" value={projectId} />
+        <MetadataRow label="Project" value={projectLabel} />
         <MetadataRow
           label="Auth"
           value={

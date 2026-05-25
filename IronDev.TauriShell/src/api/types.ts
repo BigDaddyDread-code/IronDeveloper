@@ -65,5 +65,5 @@ export interface ProjectContextState {
   selectedTenantId: number | null;
   selectedProjectId: number | null;
   selectedProjectName: string | null;
-  projectSelectionMode: 'api' | 'fallback-config';
+  projectSelectionMode: 'api' | 'fallback-config' | 'missing';
 }

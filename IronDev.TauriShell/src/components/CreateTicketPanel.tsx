@@ -15,9 +15,11 @@ export interface CreateTicketDraft {
 interface CreateTicketPanelProps {
   projectId: number | null;
   projectName: string | null;
+  projectStatus: 'selected' | 'missing' | 'fallback';
   draft: CreateTicketDraft;
   status: TicketCreateStatus;
   message: string;
+  blockedReason: string | null;
   createdTicketId: number | null;
   onChange: (draft: CreateTicketDraft) => void;
   onSubmit: () => void;
@@ -27,15 +29,24 @@ interface CreateTicketPanelProps {
 export function CreateTicketPanel({
   projectId,
   projectName,
+  projectStatus,
   draft,
   status,
   message,
+  blockedReason,
   createdTicketId,
   onChange,
   onSubmit,
   onCancel
 }: CreateTicketPanelProps) {
   const isSubmitting = status === 'submitting';
+  const isBlocked = Boolean(blockedReason);
+  const projectLabel =
+    projectStatus === 'selected'
+      ? projectName ?? `Project ${projectId}`
+      : projectStatus === 'fallback'
+        ? `Fallback project ${projectId}`
+        : 'Project required';
 
   return (
     <SurfacePanel className="ticket-create-panel" testId="ticket.create.panel">
@@ -50,11 +61,18 @@ export function CreateTicketPanel({
       </div>
 
       <div className="ticket-create-panel__metadata">
-        <MetadataRow label="Project" value={projectName ?? (projectId ? `Project ${projectId}` : 'Project required')} />
+        <MetadataRow label="Project" value={projectLabel} />
         <MetadataRow label="Write path" value="Tauri UI -> IronDev.Api -> ticket database" />
       </div>
 
-      {status === 'success' ? (
+      {blockedReason ? (
+        <div className="ticket-create-panel__state ticket-create-panel__state--error" data-testid="ticket.create.blockedReason">
+          <h3>Create ticket is blocked</h3>
+          <p>{blockedReason}</p>
+        </div>
+      ) : null}
+
+      {status === 'success' && !blockedReason ? (
         <div className="ticket-create-panel__state ticket-create-panel__state--success" data-testid="ticket.create.success">
           <h3>Ticket created</h3>
           <p>{message}</p>
@@ -62,7 +80,7 @@ export function CreateTicketPanel({
         </div>
       ) : null}
 
-      {status === 'error' ? (
+      {status === 'error' && !blockedReason ? (
         <div className="ticket-create-panel__state ticket-create-panel__state--error" data-testid="ticket.create.error">
           <h3>Ticket was not created</h3>
           <p>{message}</p>
@@ -75,7 +93,7 @@ export function CreateTicketPanel({
           <input
             data-testid="ticket.create.title"
             value={draft.title}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isBlocked}
             onChange={(event) => onChange({ ...draft, title: event.target.value })}
             placeholder="Short, specific work item"
           />
@@ -86,7 +104,7 @@ export function CreateTicketPanel({
           <textarea
             data-testid="ticket.create.summary"
             value={draft.summary}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isBlocked}
             onChange={(event) => onChange({ ...draft, summary: event.target.value })}
             placeholder="What needs to change, and why?"
             rows={4}
@@ -99,7 +117,7 @@ export function CreateTicketPanel({
             <input
               data-testid="ticket.create.type"
               value={draft.type}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isBlocked}
               onChange={(event) => onChange({ ...draft, type: event.target.value })}
               placeholder="UI / Workflow"
             />
@@ -110,7 +128,7 @@ export function CreateTicketPanel({
             <select
               data-testid="ticket.create.priority"
               value={draft.priority}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isBlocked}
               onChange={(event) => onChange({ ...draft, priority: event.target.value })}
             >
               <option value="Critical">Critical</option>
@@ -126,7 +144,7 @@ export function CreateTicketPanel({
           <textarea
             data-testid="ticket.create.acceptanceCriteria"
             value={draft.acceptanceCriteria}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isBlocked}
             onChange={(event) => onChange({ ...draft, acceptanceCriteria: event.target.value })}
             placeholder="One criterion per line"
             rows={5}
@@ -138,7 +156,14 @@ export function CreateTicketPanel({
         <CommandButton type="button" variant="subtle" testId="ticket.create.cancel" disabled={isSubmitting} onClick={onCancel}>
           Cancel
         </CommandButton>
-        <CommandButton type="button" variant="primary" testId="ticket.create.submit" disabled={isSubmitting} onClick={onSubmit}>
+        <CommandButton
+          type="button"
+          variant="primary"
+          testId="ticket.create.submit"
+          disabled={isSubmitting || isBlocked}
+          title={blockedReason ?? undefined}
+          onClick={onSubmit}
+        >
           {isSubmitting ? 'Creating ticket' : 'Create'}
         </CommandButton>
       </div>
