@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using IronDev.Agent.Services;
 using IronDev.Core.Interfaces;
 using IronDev.Data.Models;
 
@@ -67,6 +68,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
     public string DocumentSourceText => SelectedDocument == null
         ? "No source selected"
         : $"{SelectedDocument.TypeLabel} / {SelectedDocument.LastUpdatedLabel}";
+    public string DocumentSourceTooltip => SelectedDocument?.LastUpdatedUtcTooltip ?? "No UTC timestamp available.";
     public string DocumentNextActionText
     {
         get
@@ -428,6 +430,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
         OnPropertyChanged(nameof(VersionCountText));
         OnPropertyChanged(nameof(DocumentCurrentnessText));
         OnPropertyChanged(nameof(DocumentSourceText));
+        OnPropertyChanged(nameof(DocumentSourceTooltip));
         OnPropertyChanged(nameof(DocumentNextActionText));
     }
 }
@@ -461,10 +464,35 @@ public sealed class ProjectDocumentItemViewModel
     {
         get
         {
-            var dt = (_doc.UpdatedAtUtc ?? _doc.CreatedAtUtc).ToLocalTime();
-            return (DateTime.Today - dt.Date).Days == 0
-                ? dt.ToString("h:mm tt")
-                : dt.ToString("MMM d");
+            var updatedUtc = _doc.UpdatedAtUtc ?? _doc.CreatedAtUtc;
+            return DateTimeDisplay.ToCompactMetadata(updatedUtc, "Updated");
+        }
+    }
+
+    public string LastUpdatedLocalLabel
+    {
+        get
+        {
+            var updatedUtc = _doc.UpdatedAtUtc ?? _doc.CreatedAtUtc;
+            return DateTimeDisplay.ToLocalDisplay(updatedUtc);
+        }
+    }
+
+    public string LastUpdatedUtcMetadata
+    {
+        get
+        {
+            var updatedUtc = _doc.UpdatedAtUtc ?? _doc.CreatedAtUtc;
+            return DateTimeDisplay.ToUtcMetadata(updatedUtc);
+        }
+    }
+
+    public string LastUpdatedUtcTooltip
+    {
+        get
+        {
+            var updatedUtc = _doc.UpdatedAtUtc ?? _doc.CreatedAtUtc;
+            return DateTimeDisplay.ToUtcTooltip(updatedUtc);
         }
     }
 }
@@ -490,12 +518,13 @@ public sealed class ProjectDocumentVersionItemViewModel
     {
         get
         {
-            var dt = _version.CreatedAtUtc.ToLocalTime();
-            return (DateTime.Today - dt.Date).Days == 0
-                ? dt.ToString("h:mm tt")
-                : dt.ToString("MMM d");
+            return DateTimeDisplay.ToCompactMetadata(_version.CreatedAtUtc, "Created");
         }
     }
+
+    public string VersionCreatedUtcLabel => DateTimeDisplay.ToLocalDisplay(_version.CreatedAtUtc);
+    public string VersionCreatedUtcMetadata => DateTimeDisplay.ToUtcMetadata(_version.CreatedAtUtc);
+    public string VersionCreatedUtcTooltip => DateTimeDisplay.ToUtcTooltip(_version.CreatedAtUtc);
 
     public string DisplayLabel => IsCurrent
         ? $"{VersionLabel}  ·  {Status}  ·  Current"

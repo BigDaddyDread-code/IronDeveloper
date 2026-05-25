@@ -59,6 +59,7 @@ public sealed class SemanticRankingService : ISemanticRankingService
             ExplicitLinkBoost = explicitLinkBoost,
             StalePenalty = stalePenalty,
             IsStale = artefact.IsStale || chunk.IsStale || candidate.ContentHashMismatch,
+            IndexedUtc = chunk.EmbeddedAtUtc ?? artefact.UpdatedUtc,
             MatchReason = BuildMatchReason(candidate.VectorSimilarity, authorityBoost, sourceTypeBoost, explicitLinkBoost, stalePenalty),
             AuthorityLevel = artefact.AuthorityLevel,
             SourceEntityType = artefact.SourceEntityType,
