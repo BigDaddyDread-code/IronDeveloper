@@ -109,6 +109,63 @@ public sealed class WpfVisualFoundationTests
         }
     }
 
+    [TestMethod]
+    public void DocumentsAndMemorySurface_ExposesStableAutomationIds()
+    {
+        var root = FindRepositoryRoot();
+        var documentsXaml = File.ReadAllText(Path.Combine(root, "IronDeveloper", "Views", "Workspaces", "DocumentsWorkspaceView.xaml"));
+        var memoryXaml = File.ReadAllText(Path.Combine(root, "IronDeveloper", "Views", "Workspaces", "KnowledgeCompilerView.xaml"));
+
+        foreach (var automationId in new[]
+        {
+            "documents.workspace",
+            "documents.header",
+            "document.list",
+            "document.row",
+            "document.detail",
+            "document.detail.brief",
+            "document.detail.content",
+            "document.detail.versions",
+            "document.detail.decisions",
+            "document.detail.tickets",
+            "document.detail.evidence",
+            "document.inspector",
+            "document.inspector.provenance",
+            "document.inspector.sourceLinks",
+            "document.inspector.versions",
+            "document.inspector.relatedDecisions",
+            "document.inspector.linkedTickets",
+            "document.inspector.memoryEvidence",
+            "document.inspector.traceLinks",
+            "document.command.resolveDiscussion",
+            "document.command.createTickets",
+            "document.command.saveDecision",
+            "document.command.searchRelatedMemory",
+            "document.command.reloadIntoChat",
+            "document.command.save",
+            "document.command.cancel",
+            "document.command.archive"
+        })
+        {
+            StringAssert.Contains(documentsXaml, $"AutomationProperties.AutomationId=\"{automationId}\"");
+        }
+
+        foreach (var automationId in new[]
+        {
+            "memory.workspace",
+            "memory.search",
+            "memory.resultList",
+            "memory.resultRow",
+            "memory.result.detail",
+            "memory.inspector",
+            "memory.command.search",
+            "memory.command.createTicketFromResult"
+        })
+        {
+            StringAssert.Contains(memoryXaml, $"AutomationProperties.AutomationId=\"{automationId}\"");
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

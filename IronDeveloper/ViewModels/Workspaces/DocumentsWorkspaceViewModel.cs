@@ -17,6 +17,7 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
     private readonly IMarkdownRenderService _markdownRenderer;
 
     private int _activeProjectId;
+    private string _activeProjectName = string.Empty;
 
     // ── List state ────────────────────────────────────────────────────
     [ObservableProperty] private string _filterType = string.Empty; // empty = all
@@ -53,6 +54,36 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
     public bool HasStatusText => !string.IsNullOrEmpty(StatusText);
     public bool HasDirtyEditState => IsEditing && CanSaveVersion;
     public string DirtyEditMessage => "This document has unsaved edit text. Leave Documents and discard those changes?";
+    public string ActiveProjectName => string.IsNullOrWhiteSpace(_activeProjectName) ? "No active project" : _activeProjectName;
+    public string DocumentCountText => $"{Documents.Count} document{(Documents.Count == 1 ? string.Empty : "s")}";
+    public string VersionCountText => $"{VersionHistory.Count} version{(VersionHistory.Count == 1 ? string.Empty : "s")}";
+    public string DocumentCurrentnessText => IsEditing
+        ? "Editing draft"
+        : SelectedVersion == null
+            ? "No version selected"
+            : SelectedVersion.IsCurrent
+                ? "Current"
+                : "Historical version";
+    public string DocumentSourceText => SelectedDocument == null
+        ? "No source selected"
+        : $"{SelectedDocument.TypeLabel} / {SelectedDocument.LastUpdatedLabel}";
+    public string DocumentNextActionText
+    {
+        get
+        {
+            if (IsEditing)
+                return CanSaveVersion ? "Next: save version" : "Next: complete required fields";
+
+            if (SelectedDocument == null)
+                return "Next: select or create a document";
+
+            if (SelectedVersion is { IsCurrent: false })
+                return "Next: compare with current version";
+
+            return "Next: review evidence";
+        }
+    }
+
     public bool CanSaveVersion => IsEditing
         && (!IsCreatingDocument || !string.IsNullOrWhiteSpace(EditorTitle))
         && !string.IsNullOrWhiteSpace(EditorMarkdown)
@@ -78,6 +109,8 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
     public async Task LoadAsync(Project project)
     {
         _activeProjectId = project.Id;
+        _activeProjectName = project.Name;
+        OnPropertyChanged(nameof(ActiveProjectName));
         FilterType = string.Empty;
         await LoadDocumentsAsync();
     }
@@ -285,6 +318,12 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
     partial void OnIsEditingChanged(bool value)
         => RefreshComputedState();
 
+    partial void OnIsSavingVersionChanged(bool value)
+        => RefreshComputedState();
+
+    partial void OnEditorDocumentTypeChanged(string value)
+        => RefreshComputedState();
+
     partial void OnEditorMarkdownChanged(string value)
     {
         RefreshComputedState();
@@ -385,6 +424,11 @@ public sealed partial class DocumentsWorkspaceViewModel : ObservableObject, IWor
         OnPropertyChanged(nameof(HasStatusText));
         OnPropertyChanged(nameof(CanSaveVersion));
         OnPropertyChanged(nameof(HasDirtyEditState));
+        OnPropertyChanged(nameof(DocumentCountText));
+        OnPropertyChanged(nameof(VersionCountText));
+        OnPropertyChanged(nameof(DocumentCurrentnessText));
+        OnPropertyChanged(nameof(DocumentSourceText));
+        OnPropertyChanged(nameof(DocumentNextActionText));
     }
 }
 
