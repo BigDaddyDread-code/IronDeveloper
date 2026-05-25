@@ -32,6 +32,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
     private int?   _activeTenantId;
     private string _activeProjectPath = string.Empty;
     private string _activeProjectName = string.Empty;
+    public string ActiveProjectName => string.IsNullOrWhiteSpace(_activeProjectName) ? "No active project" : _activeProjectName;
 
     // ── List panel ──────────────────────────────────────────────────────────
     [ObservableProperty] private ObservableCollection<TicketItem> _tickets = [];
@@ -290,6 +291,7 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
         _activeTenantId    = project.TenantId;
         _activeProjectPath = project.LocalPath ?? string.Empty;
         _activeProjectName = project.Name;
+        OnPropertyChanged(nameof(ActiveProjectName));
         await RefreshListAsync();
     }
 
@@ -623,6 +625,12 @@ public sealed partial class TicketsWorkspaceViewModel : ObservableObject, IWorks
 
         Clipboard.SetText(sb.ToString().TrimEnd());
         SaveStatus = "Ticket copied.";
+    }
+
+    [RelayCommand]
+    private void ReviewContext()
+    {
+        ActiveTab = TicketDetailTab.CodeContext;
     }
 
     [RelayCommand]
