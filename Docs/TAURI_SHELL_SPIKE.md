@@ -13,7 +13,7 @@ React and TypeScript can make the cockpit UI faster to iterate, and Playwright k
 - A Tauri/Vite/React shell can start as a desktop-oriented frontend.
 - The shell checks `GET /health` on `IronDev.Api`.
 - The shell has generated OpenAPI types plus a typed HTTP facade for auth, tenants, projects, and tickets.
-- The shell renders a minimal Tickets cockpit with stable `data-testid` selectors.
+- The shell renders a Tickets cockpit with selected-ticket detail, readiness refresh, and stable `data-testid` selectors.
 - Playwright can smoke-test the Vite-hosted shell surface.
 - WPF remains in place while the future shell is evaluated.
 
@@ -72,6 +72,8 @@ Ticket data is loaded through:
 
 ```text
 GET /api/projects/{projectId}/tickets
+GET /api/projects/{projectId}/tickets/{ticketId}
+GET /api/projects/{projectId}/tickets/{ticketId}/build-readiness
 ```
 
 Ticket/project routes are authenticated. For this spike, either sign in through the shell, paste a token, or pass a token through environment configuration/browser local storage:
@@ -142,8 +144,25 @@ The smoke test verifies:
 - `ticket.list`
 - `ticket.row` when API data is available
 - `ticket.detail`
+- `ticket.detail.header`
+- `ticket.detail.brief`
+- `ticket.detail.plan`
+- `ticket.detail.context`
+- `ticket.detail.tests`
+- `ticket.detail.build`
+- `ticket.detail.acceptanceCriteria`
+- `ticket.detail.readiness`
 - `ticket.inspector`
+- `ticket.inspector.evidence`
+- `ticket.inspector.linkedDocuments`
+- `ticket.inspector.decisions`
+- `ticket.inspector.affectedFiles`
+- `ticket.inspector.affectedSymbols`
+- `ticket.inspector.buildReadiness`
+- `ticket.inspector.warnings`
+- `ticket.inspector.traceLinks`
 - `ticket.command.refresh`
+- `ticket.command.refreshReadiness`
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`
@@ -160,6 +179,22 @@ npm run tauri:build
 ```
 
 This PR does not implement updater support. Future desktop update support should use the Tauri updater plugin after the shell direction is accepted.
+
+## Ticket Detail Parity Status
+
+The Tauri shell now uses API-backed ticket detail for the selected ticket. The detail surface includes Brief, Plan, Context, Tests, and Build sections. Readiness refresh is a safe `GET` action through `IronDev.Api`.
+
+Real data:
+
+- ticket title, status, priority, type, summary, problem, content/proposed change, acceptance criteria, technical notes, linked files/symbols, test notes, context summary, generated/source metadata, and created UTC metadata
+- build readiness status, message, warnings, blocking issues, and ready flag
+
+Unavailable until richer API endpoints exist:
+
+- structured related decisions
+- structured linked document detail beyond source document version id
+- trace URL/detail records
+- run/build report evidence packages
 
 ## Migration Rule
 

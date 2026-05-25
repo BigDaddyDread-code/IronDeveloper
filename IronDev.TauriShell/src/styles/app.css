@@ -338,6 +338,7 @@ p {
 .workspace-list-item__content,
 .workspace-list-item__meta,
 .ticket-detail__header,
+.ticket-detail__meta,
 .detail-grid,
 .context-inspector,
 .inspector-section,
@@ -391,6 +392,10 @@ p {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.detail-grid--workflow {
+  align-items: stretch;
+}
+
 .workflow-section,
 .inspector-section,
 .empty-state,
@@ -409,11 +414,51 @@ p {
   font-weight: var(--font-weight-strong);
 }
 
+.workflow-section h4,
+.readiness-block h4 {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
+}
+
+.workflow-section__header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .workflow-section p,
 .empty-state p,
 .evidence-card p {
   color: var(--color-text-secondary);
   line-height: var(--line-height-body);
+}
+
+.workflow-section--wide {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.detail-list,
+.inspector-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.detail-list li,
+.inspector-list li {
+  margin: var(--space-1) 0;
+  overflow-wrap: anywhere;
+}
+
+.readiness-block {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
 }
 
 .metadata-row {
@@ -499,6 +544,10 @@ p {
 
 .state-error {
   color: var(--color-status-danger);
+}
+
+.state-muted {
+  color: var(--color-text-muted);
 }
 
 .shell-footer {

@@ -1,4 +1,13 @@
-import type { ApiStatus, ProductAccessStatus, ProjectSummary, ProjectTicket, TenantSummary } from '../../api/types';
+import type {
+  ApiStatus,
+  BuildReadinessResult,
+  ProductAccessStatus,
+  ProjectSummary,
+  ProjectTicket,
+  TenantSummary,
+  TicketDetailLoadStatus,
+  TicketReadinessLoadStatus
+} from '../../api/types';
 import { AuthRequiredState } from '../../components/AuthRequiredState';
 import { ContextInspector } from '../../components/ContextInspector';
 import { SurfacePanel } from '../../components/SurfacePanel';
@@ -20,6 +29,11 @@ interface TicketsWorkspaceProps {
   selectedProjectId: number | null;
   tickets: ProjectTicket[];
   selectedTicket: ProjectTicket | null;
+  ticketDetailStatus: TicketDetailLoadStatus;
+  ticketDetailMessage: string;
+  readiness: BuildReadinessResult | null;
+  readinessStatus: TicketReadinessLoadStatus;
+  readinessMessage: string;
   selectedTicketId: number | null;
   ticketMessage: string;
   tokenDraft: string;
@@ -29,6 +43,7 @@ interface TicketsWorkspaceProps {
   isBusy: boolean;
   errorMessage: string | null;
   onSelectTicket: (ticketId: number) => void;
+  onRefreshReadiness: () => void;
   onConfigureToken: () => void;
   onRetry: () => void;
   onTokenDraftChange: (value: string) => void;
@@ -54,6 +69,11 @@ export function TicketsWorkspace({
   selectedProjectId,
   tickets,
   selectedTicket,
+  ticketDetailStatus,
+  ticketDetailMessage,
+  readiness,
+  readinessStatus,
+  readinessMessage,
   selectedTicketId,
   ticketMessage,
   tokenDraft,
@@ -63,6 +83,7 @@ export function TicketsWorkspace({
   isBusy,
   errorMessage,
   onSelectTicket,
+  onRefreshReadiness,
   onConfigureToken,
   onRetry,
   onTokenDraftChange,
@@ -114,12 +135,22 @@ export function TicketsWorkspace({
               />
             </SurfacePanel>
           ) : (
-            <TicketDetail ticket={selectedTicket} isLoading={accessStatus === 'loadingTickets'} />
+            <TicketDetail
+              ticket={selectedTicket}
+              detailStatus={accessStatus === 'loadingTickets' ? 'loading' : ticketDetailStatus}
+              detailMessage={ticketDetailMessage}
+              readiness={readiness}
+              readinessStatus={readinessStatus}
+              readinessMessage={readinessMessage}
+              onRefreshReadiness={onRefreshReadiness}
+            />
           )
         }
         right={
           <ContextInspector
             ticket={selectedTicket}
+            readiness={readiness}
+            readinessStatus={readinessStatus}
             apiBaseUrl={apiBaseUrl}
             projectId={projectId}
             tokenConfigured={tokenConfigured}

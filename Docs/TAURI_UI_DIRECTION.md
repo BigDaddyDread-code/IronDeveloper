@@ -119,6 +119,10 @@ Required API/auth states:
 - Project required
 - Loading
 - Error
+- Selected ticket loading
+- Readiness loading
+- Readiness unavailable
+- Missing context/evidence
 
 Auth-required copy should explain that `IronDev.Api` is reachable or expected locally, but product data needs a token. Use calm badges and clear actions:
 
@@ -188,8 +192,25 @@ Current required selectors:
 - `ticket.list`
 - `ticket.row`
 - `ticket.detail`
+- `ticket.detail.header`
+- `ticket.detail.brief`
+- `ticket.detail.plan`
+- `ticket.detail.context`
+- `ticket.detail.tests`
+- `ticket.detail.build`
+- `ticket.detail.acceptanceCriteria`
+- `ticket.detail.readiness`
 - `ticket.inspector`
+- `ticket.inspector.evidence`
+- `ticket.inspector.linkedDocuments`
+- `ticket.inspector.decisions`
+- `ticket.inspector.affectedFiles`
+- `ticket.inspector.affectedSymbols`
+- `ticket.inspector.buildReadiness`
+- `ticket.inspector.warnings`
+- `ticket.inspector.traceLinks`
 - `ticket.command.refresh`
+- `ticket.command.refreshReadiness`
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`

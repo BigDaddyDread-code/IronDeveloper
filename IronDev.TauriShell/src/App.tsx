@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createIronDevApiClient, getIronDevApiConfig, IronDevApiError } from './api/ironDevApi';
 import type {
   ApiStatus,
+  BuildReadinessResult,
   ProductAccessStatus,
   ProjectSummary,
   ProjectTicket,
+  TicketDetailLoadStatus,
+  TicketReadinessLoadStatus,
   TenantSummary,
   UserProfile
 } from './api/types';
@@ -34,6 +37,12 @@ export default function App() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [selectedTicketDetail, setSelectedTicketDetail] = useState<ProjectTicket | null>(null);
+  const [ticketDetailStatus, setTicketDetailStatus] = useState<TicketDetailLoadStatus>('idle');
+  const [ticketDetailMessage, setTicketDetailMessage] = useState('Select a ticket to load detail.');
+  const [readiness, setReadiness] = useState<BuildReadinessResult | null>(null);
+  const [readinessStatus, setReadinessStatus] = useState<TicketReadinessLoadStatus>('idle');
+  const [readinessMessage, setReadinessMessage] = useState('Build readiness has not been checked for this ticket.');
   const [selectedTenantId, setSelectedTenantId] = useState<number | null>(config.selectedTenantId ?? null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(config.selectedProjectId ?? null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
@@ -47,7 +56,8 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const tokenConfigured = Boolean(config.token);
-  const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0] ?? null;
+  const selectedTicketFromQueue = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0] ?? null;
+  const selectedTicket = selectedTicketDetail?.id === selectedTicketId ? selectedTicketDetail : selectedTicketFromQueue;
   const selectedTicketIdForList = selectedTicket?.id ?? null;
   const productAccessBlocked = !['ready', 'emptyTickets', 'loadingTickets'].includes(accessStatus);
   const projectBadgeStatus = selectedProjectId ? 'selected' : 'missing';
@@ -69,6 +79,9 @@ export default function App() {
     if (health.status !== 'connected') {
       setTickets([]);
       setSelectedTicketId(null);
+      setSelectedTicketDetail(null);
+      setReadiness(null);
+      setReadinessStatus('idle');
       setAccessStatus(health.status === 'disconnected' ? 'apiOffline' : 'apiError');
       setTicketMessage(health.message);
       setIsRefreshing(false);
@@ -78,6 +91,9 @@ export default function App() {
     if (!config.token) {
       setTickets([]);
       setSelectedTicketId(null);
+      setSelectedTicketDetail(null);
+      setReadiness(null);
+      setReadinessStatus('idle');
       setAccessStatus('authRequired');
       setTicketMessage('Sign in or configure a token to load tickets.');
       setIsRefreshing(false);
@@ -97,6 +113,9 @@ export default function App() {
       if (!tenantId) {
         setTickets([]);
         setSelectedTicketId(null);
+        setSelectedTicketDetail(null);
+        setReadiness(null);
+        setReadinessStatus('idle');
         setAccessStatus('tenantRequired');
         setTicketMessage('Select a tenant before loading project tickets.');
         setIsRefreshing(false);
@@ -115,6 +134,9 @@ export default function App() {
       if (!projectId) {
         setTickets([]);
         setSelectedTicketId(null);
+        setSelectedTicketDetail(null);
+        setReadiness(null);
+        setReadinessStatus('idle');
         setAccessStatus('projectRequired');
         setTicketMessage('Select a project before loading tickets.');
         setIsRefreshing(false);
@@ -128,11 +150,17 @@ export default function App() {
       const ticketResult = await client.getProjectTickets(projectId, controller.signal);
       setTickets(ticketResult.tickets);
       setSelectedTicketId(ticketResult.tickets[0]?.id ?? null);
+      setSelectedTicketDetail(null);
+      setReadiness(null);
+      setReadinessStatus('idle');
       setTicketMessage(ticketResult.message);
       setAccessStatus(ticketResult.tickets.length === 0 ? 'emptyTickets' : 'ready');
     } catch (error) {
       setTickets([]);
       setSelectedTicketId(null);
+      setSelectedTicketDetail(null);
+      setReadiness(null);
+      setReadinessStatus('idle');
 
       if (error instanceof IronDevApiError && error.isAuthFailure) {
         setAccessStatus('authInvalid');
@@ -161,6 +189,38 @@ export default function App() {
     setIsTokenConfigOpen(false);
     refreshConfig();
   }, [refreshConfig, tokenDraft]);
+
+  const refreshReadiness = useCallback(async () => {
+    if (!selectedProjectId || !selectedTicketId) {
+      setReadiness(null);
+      setReadinessStatus('unavailable');
+      setReadinessMessage('Select a project ticket before checking build readiness.');
+      return;
+    }
+
+    setReadinessStatus('loading');
+    setReadinessMessage('Checking build readiness through IronDev.Api...');
+
+    try {
+      const result = await client.getTicketBuildReadiness(selectedProjectId, selectedTicketId);
+      setReadiness(result);
+      setReadinessStatus('loaded');
+      setReadinessMessage(result.message ?? 'Build readiness returned without a message.');
+    } catch (error) {
+      setReadiness(null);
+
+      if (error instanceof IronDevApiError && error.status === 404) {
+        setReadinessStatus('unavailable');
+        setReadinessMessage('Build readiness is not available for this ticket yet.');
+      } else if (error instanceof IronDevApiError) {
+        setReadinessStatus('error');
+        setReadinessMessage(`Build readiness failed with HTTP ${error.status}.`);
+      } else {
+        setReadinessStatus('error');
+        setReadinessMessage('Build readiness request could not reach IronDev.Api.');
+      }
+    }
+  }, [client, selectedProjectId, selectedTicketId]);
 
   const signIn = useCallback(async () => {
     if (!email.trim() || !password) {
@@ -228,6 +288,52 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (productAccessBlocked || !selectedProjectId || !selectedTicketId) {
+      setSelectedTicketDetail(null);
+      setTicketDetailStatus('idle');
+      setTicketDetailMessage('Select a ticket to load detail.');
+      setReadiness(null);
+      setReadinessStatus('idle');
+      setReadinessMessage('Build readiness has not been checked for this ticket.');
+      return;
+    }
+
+    const controller = new AbortController();
+    setTicketDetailStatus('loading');
+    setTicketDetailMessage('Loading selected ticket detail through IronDev.Api...');
+    setReadiness(null);
+    setReadinessStatus('idle');
+    setReadinessMessage('Build readiness has not been checked for this ticket.');
+
+    client
+      .getProjectTicket(selectedProjectId, selectedTicketId, controller.signal)
+      .then((ticket) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSelectedTicketDetail(ticket);
+        setTicketDetailStatus('loaded');
+        setTicketDetailMessage('Ticket detail loaded.');
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSelectedTicketDetail(null);
+        setTicketDetailStatus('error');
+        setTicketDetailMessage(
+          error instanceof IronDevApiError
+            ? `Ticket detail failed with HTTP ${error.status}.`
+            : 'Ticket detail request could not reach IronDev.Api.'
+        );
+      });
+
+    return () => controller.abort();
+  }, [client, productAccessBlocked, selectedProjectId, selectedTicketId]);
+
   return (
     <AppShell
       header={
@@ -274,6 +380,11 @@ export default function App() {
         selectedProjectId={selectedProjectId}
         tickets={tickets}
         selectedTicket={selectedTicket}
+        ticketDetailStatus={ticketDetailStatus}
+        ticketDetailMessage={ticketDetailMessage}
+        readiness={readiness}
+        readinessStatus={readinessStatus}
+        readinessMessage={readinessMessage}
         selectedTicketId={selectedTicketIdForList}
         ticketMessage={ticketMessage}
         tokenDraft={tokenDraft}
@@ -283,6 +394,7 @@ export default function App() {
         isBusy={isRefreshing}
         errorMessage={errorMessage}
         onSelectTicket={setSelectedTicketId}
+        onRefreshReadiness={() => void refreshReadiness()}
         onConfigureToken={() => setIsTokenConfigOpen((value) => !value)}
         onRetry={() => void refresh()}
         onTokenDraftChange={setTokenDraft}

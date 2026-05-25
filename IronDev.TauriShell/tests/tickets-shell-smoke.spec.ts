@@ -153,6 +153,33 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
+  await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ticketDetail101)
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ticketDetail102)
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-readiness', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 0,
+        message: 'Ready to build.',
+        warnings: [],
+        blockingIssues: [],
+        isReady: true
+      })
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
     await route.fulfill({
       status: 200,
@@ -182,7 +209,160 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
 
   await expect(page.getByTestId('project.status.selected')).toBeVisible();
   await expect(page.getByTestId('ticket.row')).toHaveCount(2);
+  await expect(page.getByTestId('ticket.detail.header')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.brief')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.plan')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.context')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.tests')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.build')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.acceptanceCriteria')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.readiness')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.evidence')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.linkedDocuments')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.decisions')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.affectedFiles')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.affectedSymbols')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.buildReadiness')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.warnings')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.traceLinks')).toBeVisible();
   await expect(page.getByTestId('ticket.detail')).toContainText('Make tickets cockpit real');
   await expect(page.getByTestId('ticket.detail')).toContainText('Render ticket data through the Tauri API client.');
+
+  await page.getByTestId('ticket.command.refreshReadiness').click();
+  await expect(page.getByTestId('ticket.detail.readiness')).toContainText('Ready to build.');
+  await expect(page.getByTestId('ticket.inspector.buildReadiness')).toContainText('Ready to build.');
   await expectNoHorizontalOverflow(page);
 });
+
+test('tickets shell changes selected ticket detail through the API facade', async ({ page }) => {
+  await mockTicketProject(page);
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('ticket.detail.header')).toContainText('Make tickets cockpit real');
+  await page.getByText('Add project selection', { exact: true }).click();
+  await expect(page.getByTestId('ticket.detail.header')).toContainText('Add project selection');
+  await expect(page.getByTestId('ticket.detail.brief')).toContainText('Pick active project before loading tickets.');
+  await expect(page.getByTestId('ticket.inspector.affectedFiles')).toContainText('src/App.tsx');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell handles readiness loading and unavailable state', async ({ page }) => {
+  await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-readiness', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Not found' }) });
+  });
+
+  await page.goto('/');
+
+  await page.getByTestId('ticket.command.refreshReadiness').click();
+  await expect(page.getByTestId('ticket.command.refreshReadiness')).toContainText('Checking readiness');
+  await expect(page.getByTestId('ticket.detail.readiness')).toContainText('Build readiness is not available for this ticket yet.');
+  await expect(page.getByTestId('ticket.inspector.buildReadiness')).toContainText('Unavailable');
+  await expectNoHorizontalOverflow(page);
+});
+
+async function mockTicketProject(page: import('@playwright/test').Page) {
+  await seedToken(page);
+  await mockHealthyApi(page);
+  await page.route('**/irondev-api/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 7, tenantId: 3, name: 'IronDeveloper', description: 'Dogfood project' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketDetail101) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketDetail102) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 101,
+          projectId: 7,
+          title: 'Make tickets cockpit real',
+          status: 'Ready',
+          priority: 'High',
+          summary: 'Render ticket data through the Tauri API client.'
+        },
+        {
+          id: 102,
+          projectId: 7,
+          title: 'Add project selection',
+          status: 'Draft',
+          priority: 'Medium',
+          summary: 'Pick active project before loading tickets.'
+        }
+      ])
+    });
+  });
+}
+
+const ticketDetail101 = {
+  id: 101,
+  projectId: 7,
+  title: 'Make tickets cockpit real',
+  ticketType: 'UI / Workflow',
+  status: 'Ready',
+  priority: 'High',
+  summary: 'Render ticket data through the Tauri API client.',
+  problem: 'The shell needs selected-ticket workflow parity, not only queue loading.',
+  content: 'Use API-backed detail and a safe readiness refresh action.',
+  acceptanceCriteria: 'Brief section renders\nPlan section renders\nInspector shows affected files',
+  technicalNotes: 'Keep endpoint strings inside the API facade.',
+  linkedFilePaths: 'src/App.tsx\nsrc/components/TicketDetail.tsx',
+  linkedSymbols: 'TicketsWorkspace\nTicketDetail',
+  unitTests: 'Playwright mocked API journey',
+  integrationTests: 'Typed facade request coverage through deterministic route mocks',
+  manualTests: 'Inspect cockpit at narrow desktop width',
+  regressionTests: 'No horizontal overflow',
+  buildValidation: 'Readiness endpoint is safe GET.',
+  contextSummary: 'Project ticket loaded from IronDev.Api.',
+  isGenerated: true,
+  generationNote: 'Created from Tauri ticket detail parity slice.',
+  sourceChatSessionId: 44,
+  sourceChatMessageId: 45,
+  sourceDocumentVersionId: 12,
+  createdDate: '2026-05-25T02:32:00Z'
+};
+
+const ticketDetail102 = {
+  id: 102,
+  projectId: 7,
+  title: 'Add project selection',
+  ticketType: 'UI / Context',
+  status: 'Draft',
+  priority: 'Medium',
+  summary: 'Pick active project before loading tickets.',
+  problem: 'Ticket loading without project context is ambiguous.',
+  content: 'Require selected project context before ticket detail loading.',
+  acceptanceCriteria: 'Project selector renders\nSelected project badge renders',
+  linkedFilePaths: 'src/App.tsx',
+  linkedSymbols: 'ProjectContextState',
+  contextSummary: 'Project context is selected before ticket data loads.',
+  createdDate: '2026-05-25T03:15:00Z'
+};

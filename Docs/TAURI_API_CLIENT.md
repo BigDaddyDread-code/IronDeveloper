@@ -50,7 +50,7 @@ Current layers:
 
 - `src/api/generated/ironDevApiTypes.ts`: generated schema/path types.
 - `src/api/types.ts`: shell-facing aliases and state types.
-- `src/api/ironDevApi.ts`: typed HTTP facade for health, auth, tenants, projects, project selection, and tickets.
+- `src/api/ironDevApi.ts`: typed HTTP facade for health, auth, tenants, projects, project selection, ticket queue, selected ticket detail, and build readiness.
 
 This is intentionally small. Future slices can replace the typed facade with a fuller generated client, but the boundary must remain the same.
 
@@ -65,6 +65,8 @@ The shell supports:
 - project selection
 - configured fallback project id
 - ticket loading for the selected project
+- selected ticket detail loading
+- build readiness refresh for the selected ticket
 
 Token storage is local/dev-safe only for this spike: `localStorage` is used so the UI can prove the workflow. This is not a production credential vault.
 
@@ -101,6 +103,25 @@ localStorage.setItem("irondev.selectedProjectId", "1");
 - Production-safe token storage.
 - Full auth UX polish.
 - Generated client coverage beyond the Tickets shell path.
-- Ticket detail parity with WPF.
+- Ticket mutation/action parity with WPF.
+- Rich ticket evidence endpoints for linked documents, decisions, traces, and run/build artifacts.
 - Documents/Memory, Chat, Build/Run Reports, and Testing Companion workspace parity.
 - Desktop automation against the packaged Tauri window, not only the Vite shell.
+
+## Ticket Detail Data Status
+
+API-backed in the Tauri shell:
+
+- `GET /api/projects/{projectId}/tickets`
+- `GET /api/projects/{projectId}/tickets/{ticketId}`
+- `GET /api/projects/{projectId}/tickets/{ticketId}/build-readiness`
+- ticket title, status, priority, type, summary, problem, proposed-change content, acceptance criteria, technical notes, linked file paths, linked symbols, tests, context summary, generated/source metadata, and legacy UTC `createdDate`
+- readiness message, warnings, blocking issues, and `isReady`
+
+Still unavailable or represented as honest empty states until the API exposes richer context:
+
+- linked document detail beyond `sourceDocumentVersionId`
+- related decisions
+- structured evidence records
+- trace URLs/detail records
+- full build/run report linkage
