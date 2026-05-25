@@ -41,9 +41,9 @@ export async function checkApiHealth(config: IronDevApiConfig, signal?: AbortSig
 
     if (!response.ok) {
       return {
-        status: 'disconnected',
+        status: 'error',
         baseUrl: config.apiBaseUrl,
-        message: `IronDev.Api health check returned HTTP ${response.status}.`
+        message: `IronDev.Api responded, but health is not passing (HTTP ${response.status}). Check the local API process.`
       };
     }
 
@@ -65,7 +65,7 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
   if (!config.token) {
     return {
       tickets: [],
-      status: 'unauthenticated',
+      status: 'authRequired',
       message: 'Ticket data requires an IronDev API token. Set VITE_IRONDEV_DEV_TOKEN or localStorage irondev.token.'
     };
   }
@@ -82,7 +82,7 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
     if (response.status === 401 || response.status === 403) {
       return {
         tickets: [],
-        status: 'unauthenticated',
+        status: 'authRequired',
         message: 'IronDev.Api rejected the token for ticket data.'
       };
     }
@@ -90,7 +90,7 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
     if (!response.ok) {
       return {
         tickets: [],
-        status: 'disconnected',
+        status: 'error',
         message: `Ticket request failed with HTTP ${response.status}.`
       };
     }

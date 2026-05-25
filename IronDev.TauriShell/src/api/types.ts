@@ -1,4 +1,4 @@
-export type ApiConnectionStatus = 'checking' | 'connected' | 'disconnected' | 'unauthenticated';
+export type ApiConnectionStatus = 'loading' | 'connected' | 'disconnected' | 'authRequired' | 'error';
 
 export interface ApiStatus {
   status: ApiConnectionStatus;

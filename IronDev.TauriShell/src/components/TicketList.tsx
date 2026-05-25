@@ -1,5 +1,8 @@
 import type { ProjectTicket } from '../api/types';
+import { EmptyState } from './EmptyState';
 import { StatusBadge } from './StatusBadge';
+import { WorkspaceListItem } from './WorkspaceListItem';
+import { WorkspaceListPane } from './WorkspaceListPane';
 
 interface TicketListProps {
   tickets: ProjectTicket[];
@@ -10,38 +13,29 @@ interface TicketListProps {
 
 export function TicketList({ tickets, selectedTicketId, message, onSelect }: TicketListProps) {
   return (
-    <section className="surface-panel ticket-list" data-testid="ticket.list">
-      <div className="section-heading">
-        <p className="eyebrow">TICKET QUEUE</p>
-        <h2>Tickets</h2>
-      </div>
-
+    <WorkspaceListPane eyebrow="Ticket queue" title="Tickets" testId="ticket.list">
       {tickets.length === 0 ? (
-        <div className="empty-state">
-          <p>{message}</p>
-        </div>
+        <EmptyState title="No ticket data loaded" body={message} />
       ) : (
-        <div className="ticket-list__items">
+        <div className="workspace-list-pane__items">
           {tickets.map((ticket) => (
-            <button
+            <WorkspaceListItem
               key={ticket.id}
-              className={ticket.id === selectedTicketId ? 'ticket-row ticket-row--selected' : 'ticket-row'}
-              data-testid="ticket.row"
-              onClick={() => onSelect(ticket.id)}
-            >
-              <span className="ticket-row__rail" aria-hidden="true" />
-              <span className="ticket-row__content">
-                <span className="ticket-row__title">{ticket.title}</span>
-                <span className="ticket-row__summary">{ticket.summary ?? ticket.problem ?? 'No summary captured yet.'}</span>
-                <span className="ticket-row__badges">
+              testId="ticket.row"
+              title={ticket.title}
+              summary={ticket.summary ?? ticket.problem ?? 'No summary captured yet.'}
+              isSelected={ticket.id === selectedTicketId}
+              onSelect={() => onSelect(ticket.id)}
+              badges={
+                <>
                   <StatusBadge status="neutral">{ticket.status ?? 'Draft'}</StatusBadge>
                   <StatusBadge status="info">{ticket.priority ?? 'Medium'}</StatusBadge>
-                </span>
-              </span>
-            </button>
+                </>
+              }
+            />
           ))}
         </div>
       )}
-    </section>
+    </WorkspaceListPane>
   );
 }

@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import type { ApiConnectionStatus } from '../api/types';
 
 type BadgeStatus = ApiConnectionStatus | 'neutral' | 'info';
+type BadgeTone = BadgeStatus | 'ready' | 'warning' | 'danger';
 
 interface StatusBadgeProps {
-  status: BadgeStatus;
+  status: BadgeTone;
   children: ReactNode;
   'data-testid'?: string;
 }

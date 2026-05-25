@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { checkApiHealth, getIronDevApiConfig, loadProjectTickets } from './api/ironDevApi';
-import type { ApiStatus, ProjectTicket } from './api/types';
-import { ContextInspector } from './components/ContextInspector';
+import type { ApiConnectionStatus, ApiStatus, ProjectTicket } from './api/types';
+import { ApiStatusBadge } from './components/ApiStatusBadge';
+import { AppShell } from './components/AppShell';
 import { StatusBadge } from './components/StatusBadge';
-import { TicketDetail } from './components/TicketDetail';
-import { TicketList } from './components/TicketList';
 import { WorkspaceHeader } from './components/WorkspaceHeader';
-import { WorkspaceShell } from './components/WorkspaceShell';
+import { TicketsWorkspace } from './features/tickets/TicketsWorkspace';
 
 const initialStatus: ApiStatus = {
-  status: 'checking',
+  status: 'loading',
   baseUrl: getIronDevApiConfig().apiBaseUrl,
   message: 'Checking IronDev.Api...'
 };
@@ -19,15 +18,22 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>(initialStatus);
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [ticketStatus, setTicketStatus] = useState<ApiConnectionStatus>('loading');
   const [ticketMessage, setTicketMessage] = useState('Waiting for API health check.');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTokenConfigOpen, setIsTokenConfigOpen] = useState(false);
+  const [tokenDraft, setTokenDraft] = useState('');
 
+  const tokenConfigured = Boolean(config.token);
+  const ticketAccessRequiresAuth = !tokenConfigured || ticketStatus === 'authRequired';
   const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0] ?? null;
+  const selectedTicketIdForList = selectedTicket?.id ?? null;
 
   const refresh = useCallback(async () => {
     const controller = new AbortController();
     setIsRefreshing(true);
-    setApiStatus({ status: 'checking', baseUrl: config.apiBaseUrl, message: 'Checking IronDev.Api...' });
+    setApiStatus({ status: 'loading', baseUrl: config.apiBaseUrl, message: 'Checking IronDev.Api...' });
+    setTicketStatus('loading');
 
     const health = await checkApiHealth(config, controller.signal);
     setApiStatus(health);
@@ -35,6 +41,7 @@ export default function App() {
     if (health.status !== 'connected') {
       setTickets([]);
       setSelectedTicketId(null);
+      setTicketStatus(health.status);
       setTicketMessage(health.message);
       setIsRefreshing(false);
       return;
@@ -43,56 +50,75 @@ export default function App() {
     const ticketResult = await loadProjectTickets(config, controller.signal);
     setTickets(ticketResult.tickets);
     setSelectedTicketId(ticketResult.tickets[0]?.id ?? null);
+    setTicketStatus(ticketResult.status);
     setTicketMessage(ticketResult.message);
 
     setIsRefreshing(false);
   }, [config]);
+
+  const saveToken = useCallback(() => {
+    const trimmed = tokenDraft.trim();
+
+    if (!trimmed) {
+      return;
+    }
+
+    window.localStorage.setItem('irondev.token', trimmed);
+    window.location.reload();
+  }, [tokenDraft]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   return (
-    <div className="app-shell" data-testid="app.shell">
-      <WorkspaceHeader
-        apiStatus={apiStatus}
-        projectId={config.projectId}
-        isRefreshing={isRefreshing}
-        onRefresh={() => void refresh()}
-      />
-
-      <nav className="shell-nav" aria-label="Workspace navigation">
-        <button className="shell-nav__item shell-nav__item--active" data-testid="shell.nav.tickets">
-          Tickets
-        </button>
-      </nav>
-
-      <main className="tickets-workspace" data-testid="tickets.workspace">
-        <WorkspaceShell
-          left={
-            <TicketList
-              tickets={tickets}
-              selectedTicketId={selectedTicket?.id ?? null}
-              message={ticketMessage}
-              onSelect={setSelectedTicketId}
-            />
-          }
-          center={<TicketDetail ticket={selectedTicket} />}
-          right={
-            <ContextInspector
-              ticket={selectedTicket}
-              apiBaseUrl={config.apiBaseUrl}
-              projectId={config.projectId}
-              tokenConfigured={Boolean(config.token)}
-            />
-          }
+    <AppShell
+      header={
+        <WorkspaceHeader
+          apiStatus={apiStatus}
+          projectId={config.projectId}
+          ticketCount={tickets.length}
+          tokenConfigured={tokenConfigured}
+          isRefreshing={isRefreshing}
+          onRefresh={() => void refresh()}
         />
-      </main>
-
-      <footer className="shell-footer">
-        <StatusBadge status={apiStatus.status}>{apiStatus.status}</StatusBadge>
-        <span>{apiStatus.message}</span>
-      </footer>
-    </div>
+      }
+      navigation={
+        <nav className="shell-nav" aria-label="Workspace navigation">
+          <button className="shell-nav__item shell-nav__item--active" data-testid="shell.nav.tickets">
+            Tickets
+          </button>
+        </nav>
+      }
+      footer={
+        <footer className="shell-footer">
+          <ApiStatusBadge status={apiStatus.status} withTestId={false} />
+          <span>{apiStatus.message}</span>
+          {ticketAccessRequiresAuth ? (
+            <StatusBadge status="authRequired">Auth required</StatusBadge>
+          ) : null}
+        </footer>
+      }
+    >
+      <TicketsWorkspace
+        apiStatus={apiStatus}
+        apiBaseUrl={config.apiBaseUrl}
+        projectId={config.projectId}
+        tokenConfigured={tokenConfigured}
+        ticketAccessRequiresAuth={ticketAccessRequiresAuth}
+        authLabel={tokenConfigured ? 'Token rejected' : 'Missing token'}
+        tickets={tickets}
+        selectedTicket={selectedTicket}
+        selectedTicketId={selectedTicketIdForList}
+        ticketMessage={ticketMessage}
+        tokenDraft={tokenDraft}
+        isTokenConfigOpen={isTokenConfigOpen}
+        onSelectTicket={setSelectedTicketId}
+        onConfigureToken={() => setIsTokenConfigOpen((value) => !value)}
+        onRetry={() => void refresh()}
+        onTokenDraftChange={setTokenDraft}
+        onSaveToken={saveToken}
+      />
+    </AppShell>
   );
 }
