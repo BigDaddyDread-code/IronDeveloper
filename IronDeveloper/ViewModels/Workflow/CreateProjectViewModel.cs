@@ -192,7 +192,7 @@ public sealed partial class CreateProjectViewModel : ObservableObject
         {
             Name = ProjectName.Trim(),
             LocalPath = projectPath,
-            Description = $"Created on {DateTime.Now:yyyy-MM-dd}"
+            Description = $"Created on {DateTime.UtcNow:yyyy-MM-dd} UTC"
         };
 
         try

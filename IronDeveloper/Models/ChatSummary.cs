@@ -12,6 +12,8 @@ public sealed partial class ChatSummary : ObservableObject
     [ObservableProperty] private string _role = "assistant"; // "user" | "assistant"
     [ObservableProperty] private string _messageText = string.Empty;
     [ObservableProperty] private string _formattedPrompt = string.Empty;
+
+    /// <summary>UTC timestamp. Legacy property name retained for compatibility.</summary>
     [ObservableProperty] private DateTime _timestamp = DateTime.UtcNow;
 
     /// <summary>Persisted ChatMessage.Id, set after the message is saved to the database.</summary>

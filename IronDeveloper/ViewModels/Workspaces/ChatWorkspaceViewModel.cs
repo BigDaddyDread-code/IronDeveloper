@@ -22,6 +22,7 @@ using IronDev.Core;
 using IronDev.Data.Models;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Time;
 using System.Threading.Tasks;
 
 namespace IronDev.Agent.ViewModels.Workspaces;
@@ -804,7 +805,7 @@ public sealed partial class ChatWorkspaceViewModel : ObservableObject
             var role = string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
                 ? "User"
                 : "IronDev";
-            sb.AppendLine($"## {role} - {message.Timestamp:yyyy-MM-dd HH:mm}");
+            sb.AppendLine($"## {role} - {DateTimeDisplay.ToUtcMetadata(message.Timestamp)}");
             sb.AppendLine(message.MessageText);
             sb.AppendLine();
         }

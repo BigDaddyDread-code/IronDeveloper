@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace IronDev.Agent.Services;
+namespace IronDev.Core.Time;
 
 public static class DateTimeDisplay
 {
@@ -62,7 +62,7 @@ public static class DateTimeDisplay
         => ToCompactMetadata(ToUtcOffset(utc), label);
 
     public static string ToCompactMetadata(DateTimeOffset utc, string label)
-        => $"{label} {ToRelativeDisplay(utc)} · {ToUtcMetadata(utc)}";
+        => $"{label} {ToRelativeDisplay(utc)} - {ToUtcMetadata(utc)}";
 
     private static DateTimeOffset ToUtcOffset(DateTime value)
     {

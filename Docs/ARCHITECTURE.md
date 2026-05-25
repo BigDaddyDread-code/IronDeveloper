@@ -149,6 +149,8 @@ The UI testing contract lives in `Docs/UI_TESTING_CONTRACT.md`. The Codex-readab
 
 All persisted product timestamps are UTC-first. This applies to project memory, tickets, documents, traces, build/test runs, imports, provenance, CLI output, and API DTOs.
 
+The full engineering standard lives in `Docs/DATETIME_UTC_STANDARD.md`.
+
 Rules:
 
 - Store timestamps as UTC.
@@ -165,7 +167,7 @@ Recommended UI pattern:
 ```text
 Primary: 25 May 2026, 14:32
 Tooltip: 2026-05-25T02:32:00Z UTC
-Compact: Updated 12m ago · 2026-05-25 02:32 UTC
+Compact: Updated 12m ago - 2026-05-25 02:32 UTC
 ```
 
 ## Tenancy Model
