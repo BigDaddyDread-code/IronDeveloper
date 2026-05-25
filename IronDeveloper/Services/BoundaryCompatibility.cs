@@ -201,6 +201,50 @@ internal static class BoundaryCompatibility
 
     private sealed class TicketAdapter(object? ticket, object? build, object? draft, object? generator) : ITicketsApiClient
     {
+        public async Task<ProjectTicket> CreateTicketAsync(int projectId, CreateProjectTicketRequest request, CancellationToken cancellationToken = default)
+        {
+            var item = new ProjectTicket
+            {
+                ProjectId = projectId,
+                Title = request.Title,
+                TicketType = request.Type ?? "Task",
+                Priority = request.Priority ?? "Medium",
+                Summary = request.Summary,
+                Problem = request.Problem,
+                AcceptanceCriteria = request.AcceptanceCriteria.Count == 0
+                    ? null
+                    : string.Join(Environment.NewLine, request.AcceptanceCriteria.Select(item => $"- {item}")),
+                TechnicalNotes = request.ProposedChange,
+                GenerationNote = request.Provenance?.Notes
+            };
+            item.Id = await SaveTicketAsync(item, cancellationToken).ConfigureAwait(false);
+            return item;
+        }
+
+        public Task<ProjectTicket> ImportExternalTicketAsync(int projectId, ImportExternalTicketRequest request, CancellationToken cancellationToken = default) =>
+            CreateTicketAsync(projectId, new CreateProjectTicketRequest
+            {
+                Title = request.Title,
+                Type = request.Type,
+                Priority = request.Priority,
+                Summary = request.Summary,
+                Problem = request.Problem,
+                ProposedChange = request.ProposedChange,
+                AcceptanceCriteria = request.AcceptanceCriteria,
+                ExternalReferences = [request.ExternalReference],
+                Provenance = request.Provenance
+            }, cancellationToken);
+
+        public Task<ProjectTicket> GenerateTicketFromDiscussionAsync(int projectId, GenerateTicketFromDiscussionRequest request, CancellationToken cancellationToken = default) =>
+            CreateTicketAsync(projectId, new CreateProjectTicketRequest
+            {
+                Title = string.IsNullOrWhiteSpace(request.Title) ? request.Discussion : request.Title,
+                Type = request.Type ?? "Discussion",
+                Priority = request.Priority,
+                Summary = request.Discussion,
+                Provenance = request.Provenance
+            }, cancellationToken);
+
         public async Task<long> SaveTicketAsync(ProjectTicket item, CancellationToken cancellationToken = default) =>
             await InvokeAsync<long>(ticket, nameof(SaveTicketAsync), item, cancellationToken).ConfigureAwait(false);
 

@@ -19,6 +19,8 @@ IronDeveloper WPF
 
 Product persistence and workflow behaviour go through `IronDev.Client` and `IronDev.Api`.
 
+IronDev tickets are canonical for implementation work. GitHub issues may be linked or backfilled as external references, but they are not the source of truth unless a task explicitly says to create or use a GitHub issue.
+
 ## Layer Map
 
 ```text

@@ -1,0 +1,25 @@
+{
+  "title": "UI slice: Tickets premium workflow shell",
+  "type": "UI / Dogfooding",
+  "priority": "High",
+  "summary": "Backfill GitHub issue #73 as an external reference while keeping IronDev as the canonical ticket store.",
+  "problem": "GitHub issue #73 exists as coordination context, but implementation work should live as an IronDev ticket.",
+  "proposedChange": "Import the GitHub issue as an external reference attached to an IronDev ticket.",
+  "acceptanceCriteria": [
+    "The GitHub issue is linked as an external reference.",
+    "The IronDev ticket remains the canonical implementation record.",
+    "Future updates happen through IronDev tickets and documents."
+  ],
+  "externalReference": {
+    "provider": "github",
+    "kind": "issue",
+    "externalId": "73",
+    "url": "https://github.com/BigDaddyDread-code/IronDeveloper/issues/73",
+    "title": "UI slice: Tickets premium workflow shell"
+  },
+  "provenance": {
+    "source": "github-issue-backfill",
+    "createdBy": "codex",
+    "notes": "Imported as an external reference, not as the canonical source of truth."
+  }
+}

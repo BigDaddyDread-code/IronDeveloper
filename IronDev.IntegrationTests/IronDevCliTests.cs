@@ -2,7 +2,9 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using IronDev.Client.Tickets;
 using IronDev.Cli;
+using IronDev.Core.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -42,7 +44,7 @@ public sealed class IronDevCliTests
         await File.WriteAllTextAsync(ticketPath, """
             {
               "title": "Make IronDev tickets canonical",
-              "ticketType": "Architecture",
+              "type": "Architecture",
               "priority": "Critical"
             }
             """);
@@ -74,10 +76,13 @@ public sealed class IronDevCliTests
         await File.WriteAllTextAsync(ticketPath, """
             {
               "title": "Make IronDev tickets canonical",
-              "ticketType": "Architecture",
+              "type": "Architecture",
               "priority": "Critical",
               "summary": "IronDev tickets are the source of truth.",
-              "generationNote": "Provenance: created from design discussion."
+              "provenance": {
+                "source": "design-discussion",
+                "createdBy": "codex"
+              }
             }
             """);
 
@@ -104,7 +109,96 @@ public sealed class IronDevCliTests
             handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
         Assert.AreEqual("Bearer", handler.Requests[1].Headers.Authorization?.Scheme);
         Assert.AreEqual("test-token", handler.Requests[1].Headers.Authorization?.Parameter);
+        StringAssert.Contains(await handler.Requests[1].Content!.ReadAsStringAsync(), "\"type\": \"Architecture\"");
         StringAssert.Contains(output.ToString(), "\"id\": 123");
+    }
+
+    [TestMethod]
+    public async Task TicketListShowAndImport_UseProductApiEndpoints()
+    {
+        var importPath = Path.Combine(Path.GetTempPath(), $"irondev-github-import-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(importPath, """
+            {
+              "title": "Import GitHub issue",
+              "type": "Backfill",
+              "priority": "High",
+              "externalReference": {
+                "provider": "github",
+                "kind": "issue",
+                "externalId": "73",
+                "url": "https://github.com/BigDaddyDread-code/IronDeveloper/issues/73",
+                "title": "Issue 73"
+              }
+            }
+            """);
+
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var list = await IronDevCli.RunAsync(
+            ["ticket", "list", "--project-id", "42", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, list, error.ToString());
+
+        var show = await IronDevCli.RunAsync(
+            ["ticket", "show", "--project-id", "42", "--ticket-id", "123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, show, error.ToString());
+
+        var import = await IronDevCli.RunAsync(
+            ["ticket", "import-github-issue", "--project-id", "42", "--file", importPath, "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, import, error.ToString());
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/projects/42/tickets",
+                "/health",
+                "/api/projects/42/tickets/123",
+                "/health",
+                "/api/projects/42/tickets/import-external"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+    }
+
+    [TestMethod]
+    public async Task TicketsApiClient_CallsStructuredTicketEndpoints()
+    {
+        var handler = new RecordingHandler { IncludeApiClientBasePath = true };
+        using var http = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://localhost:5000/api/")
+        };
+        var client = new TicketsApiClient(http);
+
+        await client.CreateTicketAsync(42, new CreateProjectTicketRequest { Title = "Create" });
+        await client.ImportExternalTicketAsync(42, new ImportExternalTicketRequest
+        {
+            Title = "Import",
+            ExternalReference = new ExternalReferenceDto { Provider = "github", Kind = "issue", ExternalId = "73" }
+        });
+        await client.GenerateTicketFromDiscussionAsync(42, new GenerateTicketFromDiscussionRequest { Discussion = "Discuss" });
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/api/projects/42/tickets",
+                "/api/projects/42/tickets/import-external",
+                "/api/projects/42/tickets/generate-from-discussion"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
     }
 
     [TestMethod]
@@ -140,6 +234,7 @@ public sealed class IronDevCliTests
     private sealed class RecordingHandler : HttpMessageHandler
     {
         public List<HttpRequestMessage> Requests { get; } = [];
+        public bool IncludeApiClientBasePath { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -149,6 +244,26 @@ public sealed class IronDevCliTests
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent("""{"status":"healthy"}""", Encoding.UTF8, "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath.EndsWith("/tickets", StringComparison.Ordinal) == true)
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        [
+                          {
+                            "id": 123,
+                            "projectId": 42,
+                            "title": "Make IronDev tickets canonical",
+                            "ticketType": "Architecture",
+                            "priority": "Critical",
+                            "status": "Draft"
+                          }
+                        ]
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
                 };
 
             return new HttpResponseMessage(HttpStatusCode.OK)

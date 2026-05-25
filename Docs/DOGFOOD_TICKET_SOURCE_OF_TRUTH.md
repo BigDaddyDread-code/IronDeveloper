@@ -24,6 +24,14 @@ dotnet run --project .\tools\IronDev.Cli\IronDev.Cli.csproj -- ticket create `
   --json
 ```
 
+Product-shaped ticket commands:
+
+```powershell
+dotnet run --project .\tools\IronDev.Cli\IronDev.Cli.csproj -- ticket list --project-id 1 --json
+dotnet run --project .\tools\IronDev.Cli\IronDev.Cli.csproj -- ticket show --project-id 1 --ticket-id 123 --json
+dotnet run --project .\tools\IronDev.Cli\IronDev.Cli.csproj -- ticket import-github-issue --project-id 1 --file .\tools\dogfood\tickets\examples\github-issue-import.json --json
+```
+
 The CLI checks `GET /health` before write commands. If the API is unavailable, it exits non-zero and prints:
 
 ```text
@@ -33,6 +41,8 @@ dotnet run --project IronDev.Api
 ```
 
 There is no direct SQL fallback, no Infrastructure service fallback, and no GitHub issue fallback.
+
+Structured ticket creation uses `CreateProjectTicketRequest`. External references and provenance are currently preserved in existing `ProjectTicket.TechnicalNotes` and `ProjectTicket.GenerationNote` fields. This keeps the write path canonical without introducing a schema redesign before the product needs richer querying over references.
 
 ## Configuration Order
 
