@@ -8,26 +8,30 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:TicketsWorkspaceViewModel, IsDesignTimeCreatable=False}">
 
-    <Grid Background="{StaticResource Background/App}">
+    <Grid Background="{StaticResource IronDev.Brush.Background.App}"
+          AutomationProperties.AutomationId="ticket.workspace.root">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <controls:WorkspaceHeader Grid.Row="0"
                                   Eyebrow="WORKFLOW"
-                                  Title="Ticket Management"
-                                  Margin="0">
+                                  Title="Tickets"
+                                  Margin="0"
+                                  AutomationProperties.AutomationId="ticket.workspace.header">
             <controls:WorkspaceHeader.Actions>
                 <controls:CrudCommandBar ShowCreate="True"
                                          CreateText="+ New Ticket"
                                          CreateCommand="{Binding NewTicketCommand}"
                                          CreateToolTip="Create a new draft ticket."
-                                         ShowRefresh="False">
+                                         ShowRefresh="False"
+                                         AutomationProperties.AutomationId="ticket.commandBar.primary">
                     <controls:CrudCommandBar.SecondaryActions>
                         <StackPanel Orientation="Horizontal">
                             <Button Command="{Binding GenerateCodebaseTicketsCommand}"
-                                    Style="{StaticResource AppButton.CompactGhost}"
+                                    Style="{StaticResource IronDev.CommandButton.Ghost}"
                                     Margin="0,0,8,0"
+                                    AutomationProperties.AutomationId="ticket.generateFromCodebase"
                                     ToolTip="Analyze project context and generate improvement tickets">
                                 <TextBlock Text="Analyze Codebase" VerticalAlignment="Center">
                                     <TextBlock.Style>
@@ -43,7 +47,8 @@
                             </Button>
                             <Button Content="Open Draft Review"
                                     IsEnabled="{Binding CodexReview.HasTickets}"
-                                    Style="{StaticResource AppButton.CompactGhost}"
+                                    Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                    AutomationProperties.AutomationId="ticket.review.open"
                                     ToolTipService.ShowOnDisabled="True"
                                     ToolTip="Available when generated draft tickets are waiting for review."/>
                         </StackPanel>
@@ -60,6 +65,7 @@
 
             <!-- LEFT: Ticket List -->
             <controls:WorkspaceListPane Grid.Column="0" Title="PROJECT TICKETS" Margin="0,0,12,0"
+                                        AutomationProperties.AutomationId="ticket.list"
                                         ItemsSource="{Binding Tickets}"
                                         SelectedItem="{Binding SelectedTicket, Mode=TwoWay}">
                 <controls:WorkspaceListPane.ItemTemplate>
@@ -67,16 +73,19 @@
                         <controls:WorkspaceListItem Title="{Binding Title}"
                                                     Subtitle="{Binding Summary, Converter={StaticResource MarkdownPreviewConverter}}"
                                                     Metadata="{Binding Status}"
-                                                    IconData="{StaticResource Icon.Nav.Tickets}"/>
+                                                    IconData="{StaticResource Icon.Nav.Tickets}"
+                                                    AutomationProperties.AutomationId="ticket.row"/>
                     </DataTemplate>
                 </controls:WorkspaceListPane.ItemTemplate>
             </controls:WorkspaceListPane>
 
             <!-- RIGHT: Detail/Editor -->
-            <controls:SurfacePanel Grid.Column="1" Variant="Subtle" Padding="0">
+            <controls:SurfacePanel Grid.Column="1" Variant="Subtle" Padding="0"
+                                   AutomationProperties.AutomationId="ticket.detail.surface">
                 <Grid>
                     <controls:EmptyResultsState Title="No Ticket Selected" 
-                                               Description="Select a ticket from the list or create a new one with IronDev Architect to begin.">
+                                               Description="Select a ticket from the list or create a new one with IronDev Architect to begin."
+                                               AutomationProperties.AutomationId="ticket.emptyState">
                         <controls:EmptyResultsState.Style>
                             <Style TargetType="controls:EmptyResultsState">
                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -96,7 +105,7 @@
 
                     <!-- Preflight: Index Choice Panel -->
                     <!-- Visible when DraftPreflight is NeedsChoice, Indexing, or IndexFailed -->
-                    <Grid>
+                    <Grid AutomationProperties.AutomationId="ticket.preflight">
                         <Grid.Style>
                             <Style TargetType="Grid">
                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -116,7 +125,8 @@
 
                         <controls:SurfacePanel Variant="Subtle" Padding="28" Margin="32"
                                                VerticalAlignment="Center" HorizontalAlignment="Center"
-                                               MaxWidth="520">
+                                               MaxWidth="520"
+                                               AutomationProperties.AutomationId="ticket.preflight.panel">
                             <StackPanel>
 
                                 <!-- Header: changes per state -->
@@ -125,7 +135,7 @@
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Text" Value="&#x26A0;"/>
-                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                <Setter Property="Foreground" Value="{StaticResource IronDev.Brush.Status.Warning}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Indexing}" Value="True">
                                                         <Setter Property="Text" Value="&#x23F3;"/>
@@ -133,7 +143,7 @@
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=IndexFailed}" Value="True">
                                                         <Setter Property="Text" Value="&#x2716;"/>
-                                                        <Setter Property="Foreground" Value="#EF4444"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource IronDev.Brush.Status.Danger}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -143,7 +153,7 @@
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Text" Value="Project Not Indexed"/>
-                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                <Setter Property="Foreground" Value="{StaticResource IronDev.Brush.Status.Warning}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Indexing}" Value="True">
                                                         <Setter Property="Text" Value="Indexing Project..."/>
@@ -151,7 +161,7 @@
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding DraftPreflight, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=IndexFailed}" Value="True">
                                                         <Setter Property="Text" Value="Indexing Did Not Complete"/>
-                                                        <Setter Property="Foreground" Value="#EF4444"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource IronDev.Brush.Status.Danger}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -182,23 +192,26 @@
                                 <!-- Action buttons: Index First and Continue disabled while Indexing -->
                                 <Button Content="&#x1F5C2; Index Project First"
                                         Command="{Binding PreflightIndexProjectCommand}"
-                                        Style="{StaticResource AppButton.Primary}"
+                                        Style="{StaticResource IronDev.CommandButton.Primary}"
                                         Padding="20,10" Margin="0,0,0,8"
                                         HorizontalAlignment="Stretch"
+                                        AutomationProperties.AutomationId="ticket.preflight.indexProject"
                                         IsEnabled="{Binding IsDraftIndexing, Converter={StaticResource InverseBoolConverter}}"
                                         ToolTip="Run the local code indexer, then automatically generate the draft with full context"/>
                                 <Button Content="&#x26A1; Continue Without Index"
                                         Command="{Binding PreflightContinueCommand}"
-                                        Style="{StaticResource AppButton.Secondary}"
+                                        Style="{StaticResource IronDev.CommandButton.Secondary}"
                                         Padding="20,10" Margin="0,0,0,8"
                                         HorizontalAlignment="Stretch"
+                                        AutomationProperties.AutomationId="ticket.preflight.continueWithoutIndex"
                                         IsEnabled="{Binding IsDraftIndexing, Converter={StaticResource InverseBoolConverter}}"
                                         ToolTip="Generate draft now using limited context (no code snippets)"/>
                                 <Button Content="&#x2715; Cancel"
                                         Command="{Binding PreflightCancelCommand}"
-                                        Style="{StaticResource AppButton.Ghost}"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
                                         Padding="20,8"
                                         HorizontalAlignment="Stretch"
+                                        AutomationProperties.AutomationId="ticket.preflight.cancel"
                                         ToolTip="Discard and return to Chat"/>
 
                             </StackPanel>
@@ -206,7 +219,8 @@
                     </Grid>
 
                     <!-- Codex generated ticket review/import surface -->
-                    <Grid Visibility="{Binding CodexReview.HasTickets, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid Visibility="{Binding CodexReview.HasTickets, Converter={StaticResource BoolToVisibilityConverter}}"
+                          AutomationProperties.AutomationId="ticket.review.queue">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
@@ -248,8 +262,10 @@
 
                         <ScrollViewer Grid.Row="1"
                                       VerticalScrollBarVisibility="Auto"
-                                      Padding="18">
-                            <ItemsControl ItemsSource="{Binding CodexReview.Tickets}">
+                                      Padding="18"
+                                      AutomationProperties.AutomationId="ticket.review.scroll">
+                            <ItemsControl ItemsSource="{Binding CodexReview.Tickets}"
+                                          AutomationProperties.AutomationId="ticket.review.list">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Expander IsExpanded="False"
@@ -272,7 +288,8 @@
                                                     </Grid.ColumnDefinitions>
                                                     <CheckBox Grid.Column="0"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                              VerticalAlignment="Center"/>
+                                                              VerticalAlignment="Center"
+                                                              AutomationProperties.AutomationId="ticket.review.row.select"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding SuggestedBuildOrder}"
                                                                Foreground="{StaticResource Text/Muted}"
@@ -346,17 +363,20 @@
                                                   Background="{StaticResource Background/Surface}"
                                                   SeparatorThickness="0,1,0,0"
                                                   BarPadding="16,12"
-                                                  StatusText="{Binding CodexReview.StatusText}">
+                                                  StatusText="{Binding CodexReview.StatusText}"
+                                                  AutomationProperties.AutomationId="ticket.review.commandBar">
                             <controls:EditorActionBar.LeftActions>
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="Import Selected"
                                             Command="{Binding CodexReview.ImportSelectedTicketsCommand}"
-                                            Style="{StaticResource AppButton.Primary}"
+                                            Style="{StaticResource IronDev.CommandButton.Primary}"
                                             Margin="0,0,8,0"
+                                            AutomationProperties.AutomationId="ticket.review.importSelected"
                                             IsEnabled="{Binding CodexReview.IsImporting, Converter={StaticResource InverseBoolConverter}}"/>
                                     <Button Content="Clear Review"
                                             Command="{Binding CodexReview.ClearCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"/>
+                                            Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                            AutomationProperties.AutomationId="ticket.review.clear"/>
                                 </StackPanel>
                             </controls:EditorActionBar.LeftActions>
                             <controls:EditorActionBar.RightActions>
@@ -368,7 +388,8 @@
                         </controls:EditorActionBar>
                     </Grid>
 
-                    <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"
+                          AutomationProperties.AutomationId="ticket.editor">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>  <!-- 0: draft banner -->
                             <RowDefinition Height="Auto"/>  <!-- 1: tab header -->
@@ -430,13 +451,17 @@
                             <StackPanel Orientation="Horizontal">
                                 
                                 <RadioButton Content="Overview" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Overview, Mode=TwoWay}"
-                                           Style="{StaticResource AppRadioTab}"/>
+                                           Style="{StaticResource AppRadioTab}"
+                                           AutomationProperties.AutomationId="ticket.tab.overview"/>
                                 <RadioButton Content="Implementation Plan" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=ImplementationPlan, Mode=TwoWay}"
-                                           Style="{StaticResource AppRadioTab}"/>
+                                           Style="{StaticResource AppRadioTab}"
+                                           AutomationProperties.AutomationId="ticket.tab.plan"/>
                                 <RadioButton Content="Code Context" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=CodeContext, Mode=TwoWay}"
-                                           Style="{StaticResource AppRadioTab}"/>
+                                           Style="{StaticResource AppRadioTab}"
+                                           AutomationProperties.AutomationId="ticket.tab.codeContext"/>
                                 <RadioButton Content="Tests" IsChecked="{Binding ActiveTab, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Tests, Mode=TwoWay}"
-                                           Style="{StaticResource AppRadioTab}"/>
+                                           Style="{StaticResource AppRadioTab}"
+                                           AutomationProperties.AutomationId="ticket.tab.tests"/>
                             </StackPanel>
                         </Border>
 
@@ -445,7 +470,8 @@
                                       Grid.Row="2"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled"
-                                      Padding="16">
+                                      Padding="16"
+                                      AutomationProperties.AutomationId="ticket.editor.scroll">
                             <Grid Width="{Binding ViewportWidth, ElementName=TicketDetailScroll}">
                                 <!-- TAB: Overview -->
                                 <StackPanel>
@@ -473,7 +499,11 @@
                                     <controls:SurfacePanel Variant="Subtle" Padding="20,16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <controls:FormField Label="TICKET TITLE">
-                                                <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" FontSize="16" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontSize="16"
+                                                         FontWeight="SemiBold"
+                                                         Style="{StaticResource IronDev.Input.TextBox}"
+                                                         AutomationProperties.AutomationId="ticket.editor.title"/>
                                             </controls:FormField>
 
                                             <!-- Status / Priority / Type - native ComboBox for reliable text display -->
@@ -483,6 +513,8 @@
                                                     <ComboBox ItemsSource="{Binding StatusOptions}"
                                                               SelectedItem="{Binding EditStatus}"
                                                               MinWidth="170" Height="38"
+                                                              Style="{StaticResource IronDev.Input.ComboBox}"
+                                                              AutomationProperties.AutomationId="ticket.editor.status"
                                                               Foreground="{StaticResource Input.Foreground}"
                                                               Background="{StaticResource Input.Background}"/>
                                                 </StackPanel>
@@ -491,6 +523,8 @@
                                                     <ComboBox ItemsSource="{Binding PriorityOptions}"
                                                               SelectedItem="{Binding EditPriority}"
                                                               MinWidth="170" Height="38"
+                                                              Style="{StaticResource IronDev.Input.ComboBox}"
+                                                              AutomationProperties.AutomationId="ticket.editor.priority"
                                                               Foreground="{StaticResource Input.Foreground}"
                                                               Background="{StaticResource Input.Background}"/>
                                                 </StackPanel>
@@ -499,17 +533,23 @@
                                                     <ComboBox ItemsSource="{Binding TypeOptions}"
                                                               SelectedItem="{Binding EditTicketType}"
                                                               MinWidth="170" Height="38"
+                                                              Style="{StaticResource IronDev.Input.ComboBox}"
+                                                              AutomationProperties.AutomationId="ticket.editor.type"
                                                               Foreground="{StaticResource Input.Foreground}"
                                                               Background="{StaticResource Input.Background}"/>
                                                 </StackPanel>
                                             </StackPanel>
 
                                             <controls:FormField Label="SUMMARY">
-                                                <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
+                                                <TextBox Text="{Binding EditSummary, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                                         Style="{StaticResource IronDev.Input.TextBox}"
+                                                         AutomationProperties.AutomationId="ticket.editor.summary"/>
                                             </controls:FormField>
 
                                             <controls:FormField Label="ACCEPTANCE CRITERIA">
-                                                <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"/>
+                                                <TextBox Text="{Binding EditAcceptanceCriteria, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                                         Style="{StaticResource IronDev.Input.TextBox}"
+                                                         AutomationProperties.AutomationId="ticket.editor.acceptanceCriteria"/>
                                             </controls:FormField>
                                         </StackPanel>
                                     </controls:SurfacePanel>
@@ -536,8 +576,9 @@
                                                                        Description="Create a plan to outline the technical steps for this ticket."/>
                                             <Button Content="Generate Implementation Plan"
                                                     Command="{Binding GenerateImplementationPlanCommand}"
-                                                    Style="{StaticResource AppButton.Primary}"
-                                                    Padding="20,10" Margin="0,24,0,0"/>
+                                                    Style="{StaticResource IronDev.CommandButton.Primary}"
+                                                    Padding="20,10" Margin="0,24,0,0"
+                                                    AutomationProperties.AutomationId="ticket.plan.generate"/>
                                         </StackPanel>
                                     </controls:SurfacePanel>
 
@@ -554,8 +595,9 @@
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,16" HorizontalAlignment="Left">
                                                     <Button Content="Ask about this plan"
                                                             Command="{Binding AskAboutPlanCommand}"
-                                                            Style="{StaticResource AppButton.Ghost}"
-                                                            Padding="12,5"/>
+                                                            Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                                            Padding="12,5"
+                                                            AutomationProperties.AutomationId="ticket.plan.ask"/>
                                                 </StackPanel>
 
                                                 <controls:FormField Label="PLAN GOAL">
@@ -581,12 +623,14 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <Button Content="Save Plan"
                                                             Command="{Binding SavePlanCommand}"
-                                                            Style="{StaticResource AppButton.Primary}"
+                                                            Style="{StaticResource IronDev.CommandButton.Primary}"
                                                             Margin="0,0,8,0"
+                                                            AutomationProperties.AutomationId="ticket.plan.save"
                                                             IsEnabled="{Binding IsSavingPlan, Converter={StaticResource InverseBoolConverter}}"/>
                                                     <Button Content="Reset"
                                                             Command="{Binding CancelPlanEditCommand}"
-                                                            Style="{StaticResource AppButton.CompactGhost}"/>
+                                                            Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                                            AutomationProperties.AutomationId="ticket.plan.reset"/>
                                                 </StackPanel>
                                             </controls:EditorActionBar.LeftActions>
                                         </controls:EditorActionBar>
@@ -815,7 +859,8 @@
                                                   Background="{StaticResource Background/Surface}"
                                                   SeparatorThickness="0,1,0,0"
                                                   BarPadding="16,12"
-                                                  StatusText="{Binding SaveStatus}">
+                                                  StatusText="{Binding SaveStatus}"
+                                                  AutomationProperties.AutomationId="ticket.editor.commandBar">
                             <controls:EditorActionBar.LeftActions>
                                 <controls:CrudCommandBar ShowSave="True"
                                                          SaveText="Save Ticket"
@@ -829,18 +874,21 @@
                                                          CopyToolTip="Copy this ticket as Markdown."
                                                          ShowArchive="True"
                                                          ArchiveCommand="{Binding ArchiveSelectedTicketCommand}"
-                                                         ArchiveToolTip="Archive this ticket after confirmation.">
+                                                         ArchiveToolTip="Archive this ticket after confirmation."
+                                                         AutomationProperties.AutomationId="ticket.editor.crudCommandBar">
                                     <controls:CrudCommandBar.SecondaryActions>
                                         <StackPanel Orientation="Horizontal">
                                             <Button Content="Generate Plan"
                                                     Command="{Binding GenerateImplementationPlanCommand}"
-                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Style="{StaticResource IronDev.CommandButton.Ghost}"
                                                     Margin="0,0,8,0"
+                                                    AutomationProperties.AutomationId="ticket.editor.generatePlan"
                                                     ToolTipService.ShowOnDisabled="True"
                                                     ToolTip="Generate or refresh an implementation plan for this ticket."/>
                                             <Button Content="Build Ticket"
                                                     Command="{Binding BuildSelectedTicketProposalCommand}"
-                                                    Style="{StaticResource AppButton.CompactGhost}"
+                                                    Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                                    AutomationProperties.AutomationId="ticket.editor.buildTicket"
                                                     ToolTipService.ShowOnDisabled="True"
                                                     ToolTip="Generate a code change proposal. Disabled until the ticket is ready and project context is available."/>
                                         </StackPanel>
@@ -855,19 +903,22 @@
                                                   Background="{StaticResource Background/Surface}"
                                                   SeparatorThickness="0,1,0,0"
                                                   BarPadding="16,12"
-                                                  StatusText="{Binding SaveStatus}">
+                                                  StatusText="{Binding SaveStatus}"
+                                                  AutomationProperties.AutomationId="ticket.draft.commandBar">
                             <controls:EditorActionBar.LeftActions>
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="Regenerate All"
                                             Command="{Binding RegenerateAllCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            Style="{StaticResource IronDev.CommandButton.Ghost}"
                                             IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
                                             Margin="0,0,6,0"
+                                            AutomationProperties.AutomationId="ticket.draft.regenerateAll"
                                             ToolTip="Re-generate all draft fields from the original chat context"/>
                                     <Button Content="Regenerate Tests"
                                             Command="{Binding RegenerateTestsCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            Style="{StaticResource IronDev.CommandButton.Ghost}"
                                             IsEnabled="{Binding IsDraftGenerating, Converter={StaticResource InverseBoolConverter}}"
+                                            AutomationProperties.AutomationId="ticket.draft.regenerateTests"
                                             ToolTip="Re-generate only the Tests / Validation fields"/>
                                 </StackPanel>
                             </controls:EditorActionBar.LeftActions>
@@ -875,25 +926,29 @@
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="Cancel"
                                             Command="{Binding CancelDraftCommand}"
-                                            Style="{StaticResource AppButton.CompactGhost}"
+                                            Style="{StaticResource IronDev.CommandButton.Ghost}"
                                             Margin="0,0,8,0"
+                                            AutomationProperties.AutomationId="ticket.draft.cancel"
                                             ToolTip="Discard draft and return to Chat"/>
                                      <Button Content="Save Ticket"
                                              Command="{Binding ApproveDraftCommand}"
-                                             Style="{StaticResource AppButton.Primary}"
+                                             Style="{StaticResource IronDev.CommandButton.Primary}"
                                              IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
                                              Margin="0,0,6,0"
+                                             AutomationProperties.AutomationId="ticket.draft.save"
                                              ToolTip="Save this ticket to the database"/>
                                      <Button Content="Save All Drafts"
                                              Command="{Binding SaveAllDraftsCommand}"
-                                             Style="{StaticResource AppButton.CompactGhost}"
+                                             Style="{StaticResource IronDev.CommandButton.Ghost}"
                                              IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
                                              Margin="0,0,6,0"
+                                             AutomationProperties.AutomationId="ticket.draft.saveAll"
                                              ToolTip="Save all generated draft tickets in the review queue"/>
                                      <Button Content="Save Ticket + Plan"
                                              Command="{Binding ApproveDraftWithPlanCommand}"
-                                             Style="{StaticResource AppButton.CompactGhost}"
+                                             Style="{StaticResource IronDev.CommandButton.Ghost}"
                                             IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBoolConverter}}"
+                                            AutomationProperties.AutomationId="ticket.draft.saveWithPlan"
                                             ToolTip="Save ticket and navigate to Plans to create an implementation plan"/>
                                 </StackPanel>
                             </controls:EditorActionBar.RightActions>

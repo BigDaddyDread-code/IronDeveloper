@@ -1,0 +1,28 @@
+{
+  "title": "Make IronDev tickets the source of truth for project work",
+  "type": "Architecture / Dogfooding",
+  "priority": "Critical",
+  "summary": "IronDev project work should be tracked as IronDev tickets inside IDA/IronDev.",
+  "problem": "GitHub issues are being used as canonical implementation tickets.",
+  "proposedChange": "Harden API/CLI workflow for creating IronDev tickets from discussions and external references.",
+  "acceptanceCriteria": [
+    "IronDev can create tickets from a discussion/design prompt.",
+    "Tickets are stored in IronDev's own ticket model/database.",
+    "Tickets can link to GitHub issues/PRs as external references.",
+    "Future work items are created in IronDev first."
+  ],
+  "externalReferences": [
+    {
+      "provider": "github",
+      "kind": "issue",
+      "externalId": "73",
+      "url": "https://github.com/BigDaddyDread-code/IronDeveloper/issues/73",
+      "title": "UI slice: Tickets premium workflow shell"
+    }
+  ],
+  "provenance": {
+    "source": "design-discussion",
+    "createdBy": "codex",
+    "notes": "Created from discussion about making IronDev tickets canonical."
+  }
+}

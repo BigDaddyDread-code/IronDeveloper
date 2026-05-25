@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document summarises the current `IronDev.ReplayRunner` command surface.
+This document summarises the current `IronDev.ReplayRunner` and product-shaped `irondev` command surfaces.
 
 The machine-readable inventory is stored at:
 
@@ -15,7 +15,7 @@ The machine-readable inventory is stored at:
 - Chat commands: 1
 - Docs commands: 6
 - Dogfood commands: 12
-- Ticket commands: 1
+- Ticket commands: 5
 - Failure commands: 1
 - Govern commands: 1
 - Inventory commands: 1
@@ -30,6 +30,10 @@ The machine-readable inventory is stored at:
 
 ## Product-Ish Commands
 
+- `ticket create`
+- `ticket list`
+- `ticket show`
+- `ticket import-github-issue`
 - `memory search`
 - `memory triage`
 - `agent tester run-plan`
@@ -75,6 +79,8 @@ The machine-readable inventory is stored at:
 - `agent architect review`
 
 These are closest to the control surface Codex will use.
+
+`ticket create`, `ticket list`, `ticket show`, and `ticket import-github-issue` run through `tools/IronDev.Cli`. They use the canonical localhost API boundary: CLI -> HTTP -> `IronDev.Api` -> IronDev ticket database. They must not use direct SQL, Dapper, Infrastructure services, or GitHub issues as the canonical ticket store.
 
 `foundation break-test` is a dogfood control command for the 121-130 hardening phase. It is evidence/report oriented and must not mutate the real repository.
 

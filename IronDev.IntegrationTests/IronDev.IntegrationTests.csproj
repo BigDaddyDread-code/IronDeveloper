@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IronDev.Core\IronDev.Core.csproj" />
+    <ProjectReference Include="..\tools\IronDev.Cli\IronDev.Cli.csproj" />
     <ProjectReference Include="..\IronDeveloper\IronDev.Agent.csproj" />
     <ProjectReference Include="..\IronDev.Infrastructure\IronDev.Infrastructure.csproj" />
   </ItemGroup>

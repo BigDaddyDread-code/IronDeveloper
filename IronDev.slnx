@@ -6,4 +6,5 @@
   <Project Path="IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj" />
   <Project Path="IronDev.IntegrationTests/IronDev.IntegrationTests.csproj" />
   <Project Path="IronDev.Api/IronDev.Api.csproj" />
+  <Project Path="tools/IronDev.Cli/IronDev.Cli.csproj" />
 </Solution>

@@ -12,9 +12,27 @@ public sealed class TicketsApiClient : IronDevApiClientBase, ITicketsApiClient
     {
     }
 
+    public Task<ProjectTicket> CreateTicketAsync(
+        int projectId,
+        CreateProjectTicketRequest request,
+        CancellationToken cancellationToken = default) =>
+        PostAsync<ProjectTicket>($"projects/{projectId}/tickets", request, cancellationToken);
+
+    public Task<ProjectTicket> ImportExternalTicketAsync(
+        int projectId,
+        ImportExternalTicketRequest request,
+        CancellationToken cancellationToken = default) =>
+        PostAsync<ProjectTicket>($"projects/{projectId}/tickets/import-external", request, cancellationToken);
+
+    public Task<ProjectTicket> GenerateTicketFromDiscussionAsync(
+        int projectId,
+        GenerateTicketFromDiscussionRequest request,
+        CancellationToken cancellationToken = default) =>
+        PostAsync<ProjectTicket>($"projects/{projectId}/tickets/generate-from-discussion", request, cancellationToken);
+
     public async Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default)
     {
-        var saved = await PostAsync<ProjectTicket>($"projects/{ticket.ProjectId}/tickets", ticket, cancellationToken);
+        var saved = await PostAsync<ProjectTicket>($"projects/{ticket.ProjectId}/tickets/legacy", ticket, cancellationToken);
         return saved.Id;
     }
 
