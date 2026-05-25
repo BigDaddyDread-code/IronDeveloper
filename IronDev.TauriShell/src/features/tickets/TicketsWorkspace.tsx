@@ -2,18 +2,22 @@ import type {
   ApiStatus,
   BuildReadinessResult,
   ProductAccessStatus,
+  ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
   TicketCreateStatus,
   TenantSummary,
   TicketDetailLoadStatus,
-  TicketReadinessLoadStatus
+  TicketPlanStatus,
+  TicketReadinessLoadStatus,
+  TicketSaveStatus
 } from '../../api/types';
 import { AuthRequiredState } from '../../components/AuthRequiredState';
 import { ContextInspector } from '../../components/ContextInspector';
 import type { CreateTicketDraft } from '../../components/CreateTicketPanel';
 import { CreateTicketPanel } from '../../components/CreateTicketPanel';
 import { SurfacePanel } from '../../components/SurfacePanel';
+import type { TicketEditDraft } from '../../components/TicketEditForm';
 import { TicketDetail } from '../../components/TicketDetail';
 import { TicketList } from '../../components/TicketList';
 import { WorkspaceLayout } from '../../components/WorkspaceLayout';
@@ -38,6 +42,16 @@ interface TicketsWorkspaceProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   readinessMessage: string;
+  implementationPlan: ProjectImplementationPlan | null;
+  planStatus: TicketPlanStatus;
+  planMessage: string;
+  isEditingTicket: boolean;
+  editDraft: TicketEditDraft;
+  saveStatus: TicketSaveStatus;
+  saveMessage: string;
+  isEditDirty: boolean;
+  editValidationMessage: string | null;
+  editBlockedReason: string | null;
   isCreatePanelOpen: boolean;
   createDraft: CreateTicketDraft;
   createStatus: TicketCreateStatus;
@@ -53,6 +67,11 @@ interface TicketsWorkspaceProps {
   isBusy: boolean;
   errorMessage: string | null;
   onSelectTicket: (ticketId: number) => void;
+  onEditTicket: () => void;
+  onEditDraftChange: (draft: TicketEditDraft) => void;
+  onSaveTicket: () => void;
+  onCancelEditTicket: () => void;
+  onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
   onCreateDraftChange: (draft: CreateTicketDraft) => void;
   onSubmitCreateTicket: () => void;
@@ -88,6 +107,16 @@ export function TicketsWorkspace({
   readiness,
   readinessStatus,
   readinessMessage,
+  implementationPlan,
+  planStatus,
+  planMessage,
+  isEditingTicket,
+  editDraft,
+  saveStatus,
+  saveMessage,
+  isEditDirty,
+  editValidationMessage,
+  editBlockedReason,
   isCreatePanelOpen,
   createDraft,
   createStatus,
@@ -103,6 +132,11 @@ export function TicketsWorkspace({
   isBusy,
   errorMessage,
   onSelectTicket,
+  onEditTicket,
+  onEditDraftChange,
+  onSaveTicket,
+  onCancelEditTicket,
+  onRefreshPlan,
   onRefreshReadiness,
   onCreateDraftChange,
   onSubmitCreateTicket,
@@ -179,6 +213,21 @@ export function TicketsWorkspace({
               readiness={readiness}
               readinessStatus={readinessStatus}
               readinessMessage={readinessMessage}
+              implementationPlan={implementationPlan}
+              planStatus={planStatus}
+              planMessage={planMessage}
+              isEditing={isEditingTicket}
+              editDraft={editDraft}
+              saveStatus={saveStatus}
+              saveMessage={saveMessage}
+              isEditDirty={isEditDirty}
+              editValidationMessage={editValidationMessage}
+              editBlockedReason={editBlockedReason}
+              onEdit={onEditTicket}
+              onEditDraftChange={onEditDraftChange}
+              onSave={onSaveTicket}
+              onCancelEdit={onCancelEditTicket}
+              onRefreshPlan={onRefreshPlan}
               onRefreshReadiness={onRefreshReadiness}
             />
           )

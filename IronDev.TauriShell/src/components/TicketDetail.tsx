@@ -1,8 +1,11 @@
 import type {
   BuildReadinessResult,
+  ProjectImplementationPlan,
   ProjectTicket,
   TicketDetailLoadStatus,
-  TicketReadinessLoadStatus
+  TicketPlanStatus,
+  TicketReadinessLoadStatus,
+  TicketSaveStatus
 } from '../api/types';
 import { DateTimeDisplay } from '../utils/dateTimeDisplay';
 import { CommandButton } from './CommandButton';
@@ -10,6 +13,7 @@ import { EmptyState } from './EmptyState';
 import { MetadataRow } from './MetadataRow';
 import { StatusBadge } from './StatusBadge';
 import { SurfacePanel } from './SurfacePanel';
+import { TicketEditForm, type TicketEditDraft } from './TicketEditForm';
 
 interface TicketDetailProps {
   ticket: ProjectTicket | null;
@@ -18,6 +22,21 @@ interface TicketDetailProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   readinessMessage: string;
+  implementationPlan: ProjectImplementationPlan | null;
+  planStatus: TicketPlanStatus;
+  planMessage: string;
+  isEditing: boolean;
+  editDraft: TicketEditDraft;
+  saveStatus: TicketSaveStatus;
+  saveMessage: string;
+  isEditDirty: boolean;
+  editValidationMessage: string | null;
+  editBlockedReason: string | null;
+  onEdit: () => void;
+  onEditDraftChange: (draft: TicketEditDraft) => void;
+  onSave: () => void;
+  onCancelEdit: () => void;
+  onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
 }
 
@@ -28,6 +47,21 @@ export function TicketDetail({
   readiness,
   readinessStatus,
   readinessMessage,
+  implementationPlan,
+  planStatus,
+  planMessage,
+  isEditing,
+  editDraft,
+  saveStatus,
+  saveMessage,
+  isEditDirty,
+  editValidationMessage,
+  editBlockedReason,
+  onEdit,
+  onEditDraftChange,
+  onSave,
+  onCancelEdit,
+  onRefreshPlan,
   onRefreshReadiness
 }: TicketDetailProps) {
   if (detailStatus === 'loading') {
@@ -68,6 +102,24 @@ export function TicketDetail({
     'CreatedUtc unavailable'
   );
 
+  if (isEditing) {
+    return (
+      <SurfacePanel className="ticket-detail" testId="ticket.detail">
+        <TicketEditForm
+          draft={editDraft}
+          status={saveStatus}
+          message={saveMessage}
+          isDirty={isEditDirty}
+          validationMessage={editValidationMessage}
+          blockedReason={editBlockedReason}
+          onChange={onEditDraftChange}
+          onSave={onSave}
+          onCancel={onCancelEdit}
+        />
+      </SurfacePanel>
+    );
+  }
+
   return (
     <SurfacePanel className="ticket-detail" testId="ticket.detail">
       <div className="ticket-detail__header" data-testid="ticket.detail.header">
@@ -84,9 +136,21 @@ export function TicketDetail({
           <StatusBadge status="neutral">{ticket.status ?? 'Draft'}</StatusBadge>
           <StatusBadge status="info">{ticket.priority ?? 'Medium'}</StatusBadge>
           <StatusBadge status="neutral">{ticket.ticketType ?? 'Work item'}</StatusBadge>
+          {saveStatus === 'saved' ? <StatusBadge status="ready" data-testid="ticket.edit.success">{saveMessage}</StatusBadge> : null}
+          {saveStatus === 'error' ? <StatusBadge status="warning" data-testid="ticket.edit.error">{saveMessage}</StatusBadge> : null}
           <StatusBadge status={readiness?.isReady ? 'ready' : readinessStatus === 'loaded' ? 'warning' : 'neutral'}>
             {readinessStatus === 'loaded' ? readinessLabel(readiness?.status) : 'Readiness pending'}
           </StatusBadge>
+          <CommandButton
+            type="button"
+            variant="secondary"
+            testId="ticket.command.edit"
+            disabled={Boolean(editBlockedReason)}
+            title={editBlockedReason ?? undefined}
+            onClick={onEdit}
+          >
+            Edit
+          </CommandButton>
         </div>
       </div>
 
@@ -116,11 +180,36 @@ export function TicketDetail({
         <section className="workflow-section" data-testid="ticket.detail.plan">
           <div className="workflow-section__header">
             <h3>Plan</h3>
-            <StatusBadge status={ticket.technicalNotes || ticket.content ? 'ready' : 'neutral'}>
-              {ticket.technicalNotes || ticket.content ? 'Captured' : 'Unavailable'}
+            <StatusBadge status={implementationPlan ? 'ready' : planStatus === 'error' ? 'warning' : 'neutral'}>
+              {planStatusLabel(planStatus, implementationPlan)}
             </StatusBadge>
           </div>
-          <p>{ticket.technicalNotes ?? ticket.content ?? 'Implementation plan data is not exposed for this ticket yet.'}</p>
+          {implementationPlan ? (
+            <div className="readiness-block">
+              <MetadataRow label="Goal" value={implementationPlan.goal ?? 'No goal exposed.'} />
+              <MetadataRow label="Scope" value={implementationPlan.scope ?? 'No scope exposed.'} />
+              <MetadataRow label="Steps" value={implementationPlan.proposedSteps ?? 'No steps exposed.'} />
+              <MetadataRow label="Risks" value={implementationPlan.risksNotes ?? 'No plan risks exposed.'} />
+              {implementationPlan.updatedDate || implementationPlan.createdDate ? (
+                <MetadataRow
+                  label={implementationPlan.updatedDate ? 'Updated UTC' : 'Created UTC'}
+                  value={DateTimeDisplay.toUtcMetadata(implementationPlan.updatedDate ?? implementationPlan.createdDate)}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <p>{planMessage}</p>
+          )}
+          <CommandButton
+            type="button"
+            variant="secondary"
+            testId="ticket.command.generatePlan"
+            disabled={planStatus === 'loading' || Boolean(editBlockedReason)}
+            title={editBlockedReason ?? undefined}
+            onClick={onRefreshPlan}
+          >
+            {planStatus === 'loading' ? 'Refreshing plan' : 'Refresh plan'}
+          </CommandButton>
         </section>
 
         <section className="workflow-section" data-testid="ticket.detail.context">
@@ -172,7 +261,8 @@ export function TicketDetail({
             type="button"
             variant="primary"
             testId="ticket.command.refreshReadiness"
-            disabled={readinessStatus === 'loading'}
+            disabled={readinessStatus === 'loading' || Boolean(editBlockedReason)}
+            title={editBlockedReason ?? undefined}
             onClick={onRefreshReadiness}
           >
             {readinessStatus === 'loading' ? 'Checking readiness' : 'Refresh readiness'}
@@ -263,4 +353,24 @@ function readinessStatusTone(status: TicketReadinessLoadStatus, readiness: Build
   }
 
   return 'neutral';
+}
+
+function planStatusLabel(status: TicketPlanStatus, implementationPlan: ProjectImplementationPlan | null) {
+  if (status === 'loading') {
+    return 'Refreshing';
+  }
+
+  if (implementationPlan) {
+    return 'Plan loaded';
+  }
+
+  if (status === 'error') {
+    return 'Error';
+  }
+
+  if (status === 'unavailable') {
+    return 'Unavailable';
+  }
+
+  return 'Not loaded';
 }

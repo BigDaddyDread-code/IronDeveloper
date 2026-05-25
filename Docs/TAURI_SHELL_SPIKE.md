@@ -68,11 +68,14 @@ GET /api/projects
 POST /api/projects/{projectId}/select
 ```
 
-Ticket data is loaded through:
+Ticket data and safe workflow actions are routed through:
 
 ```text
 GET /api/projects/{projectId}/tickets
 GET /api/projects/{projectId}/tickets/{ticketId}
+POST /api/projects/{projectId}/tickets
+POST /api/projects/{projectId}/tickets/legacy
+GET /api/tickets/{ticketId}/implementation-plan
 GET /api/projects/{projectId}/tickets/{ticketId}/build-readiness
 ```
 
@@ -163,11 +166,19 @@ The smoke test verifies:
 - `ticket.inspector.traceLinks`
 - `ticket.command.refresh`
 - `ticket.command.refreshReadiness`
+- `ticket.command.generatePlan`
+- `ticket.command.create`
+- `ticket.command.edit`
+- `ticket.command.save`
+- `ticket.command.cancel`
+- `ticket.edit.form`
+- `ticket.edit.dirtyState`
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`
 - `project.status.selected`
 - `project.status.missing`
+- `project.status.fallback`
 
 ## Tauri Desktop Check
 
@@ -180,13 +191,15 @@ npm run tauri:build
 
 This PR does not implement updater support. Future desktop update support should use the Tauri updater plugin after the shell direction is accepted.
 
-## Ticket Detail Parity Status
+## Ticket Workflow Parity Status
 
-The Tauri shell now uses API-backed ticket detail for the selected ticket. The detail surface includes Brief, Plan, Context, Tests, and Build sections. Readiness refresh is a safe `GET` action through `IronDev.Api`.
+The Tauri shell now uses API-backed ticket detail for the selected ticket. The detail surface includes Brief, Plan, Context, Tests, and Build sections. Ticket creation, ticket edit/save, implementation-plan refresh, and readiness refresh all go through `IronDev.Api`.
 
 Real data:
 
 - ticket title, status, priority, type, summary, problem, content/proposed change, acceptance criteria, technical notes, linked files/symbols, test notes, context summary, generated/source metadata, and created UTC metadata
+- editable selected-ticket fields saved through the existing API ticket save endpoint
+- implementation-plan title, goal, scope, steps, affected context, risks, status, and UTC metadata where exposed
 - build readiness status, message, warnings, blocking issues, and ready flag
 
 Unavailable until richer API endpoints exist:
@@ -195,6 +208,8 @@ Unavailable until richer API endpoints exist:
 - structured linked document detail beyond source document version id
 - trace URL/detail records
 - run/build report evidence packages
+- destructive/archive/build/apply workflows
+- production edit conflict/version handling
 
 ## Migration Rule
 

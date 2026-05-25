@@ -5,11 +5,14 @@ import type {
   BuildReadinessResult,
   CreateProjectTicketRequest,
   ProductAccessStatus,
+  ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
   TicketCreateStatus,
   TicketDetailLoadStatus,
+  TicketPlanStatus,
   TicketReadinessLoadStatus,
+  TicketSaveStatus,
   TenantSummary,
   UserProfile
 } from './api/types';
@@ -17,6 +20,7 @@ import { ApiStatusBadge } from './components/ApiStatusBadge';
 import { AppShell } from './components/AppShell';
 import type { CreateTicketDraft } from './components/CreateTicketPanel';
 import { StatusBadge } from './components/StatusBadge';
+import type { TicketEditDraft } from './components/TicketEditForm';
 import { WorkspaceHeader } from './components/WorkspaceHeader';
 import { TicketsWorkspace } from './features/tickets/TicketsWorkspace';
 
@@ -34,6 +38,22 @@ const initialCreateDraft: CreateTicketDraft = {
   type: 'Feature / Workflow',
   priority: 'Medium',
   acceptanceCriteria: ''
+};
+
+const initialEditDraft: TicketEditDraft = {
+  title: '',
+  summary: '',
+  problem: '',
+  proposedChange: '',
+  type: '',
+  priority: 'Medium',
+  acceptanceCriteria: '',
+  technicalNotes: '',
+  unitTests: '',
+  integrationTests: '',
+  manualTests: '',
+  regressionTests: '',
+  buildValidation: ''
 };
 
 export default function App() {
@@ -54,6 +74,9 @@ export default function App() {
   const [readiness, setReadiness] = useState<BuildReadinessResult | null>(null);
   const [readinessStatus, setReadinessStatus] = useState<TicketReadinessLoadStatus>('idle');
   const [readinessMessage, setReadinessMessage] = useState('Build readiness has not been checked for this ticket.');
+  const [implementationPlan, setImplementationPlan] = useState<ProjectImplementationPlan | null>(null);
+  const [planStatus, setPlanStatus] = useState<TicketPlanStatus>('idle');
+  const [planMessage, setPlanMessage] = useState('Plan has not been refreshed for this ticket.');
   const [selectedTenantId, setSelectedTenantId] = useState<number | null>(config.selectedTenantId ?? null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(config.selectedProjectId ?? null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
@@ -72,6 +95,10 @@ export default function App() {
   const [createStatus, setCreateStatus] = useState<TicketCreateStatus>('idle');
   const [createMessage, setCreateMessage] = useState('Create a new IronDev ticket in the selected project.');
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
+  const [isEditingTicket, setIsEditingTicket] = useState(false);
+  const [editDraft, setEditDraft] = useState<TicketEditDraft>(initialEditDraft);
+  const [saveStatus, setSaveStatus] = useState<TicketSaveStatus>('idle');
+  const [saveMessage, setSaveMessage] = useState('Ticket is clean.');
 
   const tokenConfigured = Boolean(config.token);
   const selectedTicketFromQueue = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0] ?? null;
@@ -79,14 +106,20 @@ export default function App() {
   const selectedTicketIdForList = selectedTicket?.id ?? null;
   const productAccessBlocked = !['ready', 'emptyTickets', 'loadingTickets'].includes(accessStatus);
   const projectBadgeStatus = selectedProjectId ? (projectSelectionMode === 'fallback-config' ? 'fallback' : 'selected') : 'missing';
-  const createBlockedReason = getCreateTicketBlocker(
+  const createBlockedReason = isEditingTicket
+    ? 'Save or cancel the current ticket changes before creating another ticket.'
+    : getCreateTicketBlocker(apiStatus, accessStatus, tokenConfigured, selectedTenantId, selectedProjectId, projectSelectionMode);
+  const ticketActionBlockedReason = getTicketActionBlocker(
     apiStatus,
     accessStatus,
     tokenConfigured,
     selectedTenantId,
     selectedProjectId,
-    projectSelectionMode
+    projectSelectionMode,
+    selectedTicketIdForList
   );
+  const editValidationMessage = validateEditDraft(editDraft);
+  const isEditDirty = selectedTicket ? !areEditDraftsEqual(editDraft, draftFromTicket(selectedTicket)) : false;
 
   const refreshConfig = useCallback(() => {
     setConfigVersion((value) => value + 1);
@@ -94,6 +127,7 @@ export default function App() {
 
   const openCreatePanel = useCallback(() => {
     setIsCreatePanelOpen(true);
+    setIsEditingTicket(false);
     setCreatedTicketId(null);
 
     const blocker = getCreateTicketBlocker(
@@ -121,6 +155,16 @@ export default function App() {
     setCreatedTicketId(null);
   }, []);
 
+  const resetTicketWorkflowState = useCallback(() => {
+    setImplementationPlan(null);
+    setPlanStatus('idle');
+    setPlanMessage('Plan has not been refreshed for this ticket.');
+    setIsEditingTicket(false);
+    setEditDraft(initialEditDraft);
+    setSaveStatus('idle');
+    setSaveMessage('Ticket is clean.');
+  }, []);
+
   const refresh = useCallback(async () => {
     const controller = new AbortController();
     setIsRefreshing(true);
@@ -144,6 +188,7 @@ export default function App() {
       setSelectedTicketDetail(null);
       setReadiness(null);
       setReadinessStatus('idle');
+      resetTicketWorkflowState();
       setAccessStatus(health.status === 'disconnected' ? 'apiOffline' : 'apiError');
       setTicketMessage(health.message);
       setIsRefreshing(false);
@@ -163,6 +208,7 @@ export default function App() {
       setSelectedTicketDetail(null);
       setReadiness(null);
       setReadinessStatus('idle');
+      resetTicketWorkflowState();
       setAccessStatus('authRequired');
       setTicketMessage('Sign in or configure a token to load tickets.');
       setIsRefreshing(false);
@@ -189,6 +235,7 @@ export default function App() {
         setSelectedTicketDetail(null);
         setReadiness(null);
         setReadinessStatus('idle');
+        resetTicketWorkflowState();
         setAccessStatus('tenantRequired');
         setTicketMessage('Select a tenant before loading project tickets.');
         setIsRefreshing(false);
@@ -210,6 +257,7 @@ export default function App() {
         setSelectedTicketDetail(null);
         setReadiness(null);
         setReadinessStatus('idle');
+        resetTicketWorkflowState();
         setAccessStatus('projectRequired');
         setTicketMessage('Select a project before loading tickets.');
         setIsRefreshing(false);
@@ -228,6 +276,7 @@ export default function App() {
       setSelectedTicketDetail(null);
       setReadiness(null);
       setReadinessStatus('idle');
+      resetTicketWorkflowState();
       setTicketMessage(ticketResult.message);
       setAccessStatus(ticketResult.tickets.length === 0 ? 'emptyTickets' : 'ready');
     } catch (error) {
@@ -239,6 +288,7 @@ export default function App() {
       setSelectedTicketDetail(null);
       setReadiness(null);
       setReadinessStatus('idle');
+      resetTicketWorkflowState();
 
       if (error instanceof IronDevApiError && error.isAuthFailure) {
         setAccessStatus('authInvalid');
@@ -253,7 +303,7 @@ export default function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [client, config]);
+  }, [client, config, resetTicketWorkflowState]);
 
   const saveToken = useCallback(() => {
     const trimmed = tokenDraft.trim();
@@ -373,6 +423,13 @@ export default function App() {
       setReadinessMessage('Build readiness has not been checked for this ticket.');
       setTicketMessage(`Loaded ${ticketResult.tickets.length} ticket(s) after create.`);
       setAccessStatus(ticketResult.tickets.length === 0 ? 'emptyTickets' : 'ready');
+      setImplementationPlan(null);
+      setPlanStatus('idle');
+      setPlanMessage('Plan has not been refreshed for this ticket.');
+      setIsEditingTicket(false);
+      setEditDraft(draftFromTicket(createdTicket));
+      setSaveStatus('idle');
+      setSaveMessage('Ticket is clean.');
       setCreatedTicketId(createdId);
       setCreateStatus('success');
       setCreateMessage(createdId ? `IronDev ticket #${createdId} was created and selected.` : 'IronDev ticket was created.');
@@ -401,6 +458,152 @@ export default function App() {
     tokenConfigured,
     userProfile?.displayName
   ]);
+
+  const handleSelectTicket = useCallback(
+    (ticketId: number) => {
+      if (isEditingTicket && isEditDirty) {
+        setSaveStatus('validation');
+        setSaveMessage('Save or cancel the current ticket changes before switching selection.');
+        return;
+      }
+
+      setSelectedTicketId(ticketId);
+      setIsCreatePanelOpen(false);
+      setIsEditingTicket(false);
+      setSaveStatus('idle');
+      setSaveMessage('Ticket is clean.');
+    },
+    [isEditDirty, isEditingTicket]
+  );
+
+  const beginEditTicket = useCallback(() => {
+    if (!selectedTicket) {
+      setSaveStatus('validation');
+      setSaveMessage('Select a ticket before editing.');
+      return;
+    }
+
+    if (ticketActionBlockedReason) {
+      setSaveStatus('validation');
+      setSaveMessage(ticketActionBlockedReason);
+      return;
+    }
+
+    setIsCreatePanelOpen(false);
+    setEditDraft(draftFromTicket(selectedTicket));
+    setSaveStatus('editing');
+    setSaveMessage('Editing selected ticket.');
+    setIsEditingTicket(true);
+  }, [selectedTicket, ticketActionBlockedReason]);
+
+  const cancelEditTicket = useCallback(() => {
+    setEditDraft(selectedTicket ? draftFromTicket(selectedTicket) : initialEditDraft);
+    setSaveStatus('idle');
+    setSaveMessage('Ticket changes discarded.');
+    setIsEditingTicket(false);
+  }, [selectedTicket]);
+
+  const saveTicket = useCallback(async () => {
+    if (!selectedTicket || !selectedTicket.id) {
+      setSaveStatus('validation');
+      setSaveMessage('Select a ticket before saving.');
+      return;
+    }
+
+    if (ticketActionBlockedReason) {
+      setSaveStatus('validation');
+      setSaveMessage(ticketActionBlockedReason);
+      return;
+    }
+
+    const validationMessage = validateEditDraft(editDraft);
+
+    if (validationMessage) {
+      setSaveStatus('validation');
+      setSaveMessage(validationMessage);
+      return;
+    }
+
+    if (!isEditDirty) {
+      setSaveStatus('idle');
+      setSaveMessage('No changes to save.');
+      return;
+    }
+
+    const projectId = selectedProjectId;
+
+    if (!projectId) {
+      setSaveStatus('validation');
+      setSaveMessage('Select a project before saving.');
+      return;
+    }
+
+    setSaveStatus('saving');
+    setSaveMessage('Saving ticket through IronDev.Api...');
+
+    try {
+      const savedTicket = await client.saveProjectTicket(projectId, buildTicketFromEditDraft(selectedTicket, editDraft, projectId));
+      setTickets((current) =>
+        current.map((ticket) => (ticket.id === savedTicket.id ? { ...ticket, ...savedTicket } : ticket))
+      );
+      setSelectedTicketId(savedTicket.id ?? selectedTicket.id ?? null);
+      setSelectedTicketDetail(savedTicket);
+      setEditDraft(draftFromTicket(savedTicket));
+      setIsEditingTicket(false);
+      setSaveStatus('saved');
+      setSaveMessage('Ticket saved through IronDev.Api.');
+      setTicketMessage('Ticket saved and local queue state refreshed.');
+    } catch (error) {
+      setSaveStatus('error');
+
+      if (error instanceof IronDevApiError && error.isAuthFailure) {
+        setSaveMessage('IronDev.Api rejected the current token. Sign in again before saving tickets.');
+      } else if (error instanceof IronDevApiError && error.status === 400) {
+        setSaveMessage('IronDev.Api rejected the ticket update. Check required fields.');
+      } else if (error instanceof IronDevApiError) {
+        setSaveMessage(`Ticket save failed with HTTP ${error.status}.`);
+      } else {
+        setSaveMessage('Ticket save could not reach IronDev.Api.');
+      }
+    }
+  }, [client, editDraft, isEditDirty, selectedProjectId, selectedTicket, ticketActionBlockedReason]);
+
+  const refreshImplementationPlan = useCallback(async () => {
+    if (!selectedTicketIdForList) {
+      setPlanStatus('unavailable');
+      setPlanMessage('Select a ticket before refreshing the implementation plan.');
+      return;
+    }
+
+    if (ticketActionBlockedReason) {
+      setPlanStatus('unavailable');
+      setPlanMessage(ticketActionBlockedReason);
+      return;
+    }
+
+    setPlanStatus('loading');
+    setPlanMessage('Refreshing implementation plan through IronDev.Api...');
+
+    try {
+      const plan = await client.getTicketImplementationPlan(selectedTicketIdForList);
+      setImplementationPlan(plan);
+      setPlanStatus('loaded');
+      setPlanMessage(plan.proposedSteps || plan.goal ? 'Implementation plan loaded.' : 'Implementation plan returned without detailed steps.');
+    } catch (error) {
+      setImplementationPlan(null);
+
+      if (error instanceof IronDevApiError && error.status === 404) {
+        setPlanStatus('unavailable');
+        setPlanMessage('Plan not available yet. The API has not exposed a plan for this ticket.');
+      } else if (error instanceof IronDevApiError) {
+        setPlanStatus('error');
+        setPlanMessage(`Plan refresh failed with HTTP ${error.status}.`);
+      } else {
+        setPlanStatus('error');
+        setPlanMessage('Plan refresh could not reach IronDev.Api.');
+      }
+    }
+  }, [client, selectedTicketIdForList, ticketActionBlockedReason]);
 
   const signIn = useCallback(async () => {
     if (!email.trim() || !password) {
@@ -476,6 +679,13 @@ export default function App() {
       setReadiness(null);
       setReadinessStatus('idle');
       setReadinessMessage('Build readiness has not been checked for this ticket.');
+      setImplementationPlan(null);
+      setPlanStatus('idle');
+      setPlanMessage('Plan has not been refreshed for this ticket.');
+      setIsEditingTicket(false);
+      setEditDraft(initialEditDraft);
+      setSaveStatus('idle');
+      setSaveMessage('Ticket is clean.');
       return;
     }
 
@@ -485,6 +695,12 @@ export default function App() {
     setReadiness(null);
     setReadinessStatus('idle');
     setReadinessMessage('Build readiness has not been checked for this ticket.');
+    setImplementationPlan(null);
+    setPlanStatus('idle');
+    setPlanMessage('Plan has not been refreshed for this ticket.');
+    setIsEditingTicket(false);
+    setSaveStatus('idle');
+    setSaveMessage('Ticket is clean.');
 
     client
       .getProjectTicket(selectedProjectId, selectedTicketId, controller.signal)
@@ -494,6 +710,7 @@ export default function App() {
         }
 
         setSelectedTicketDetail(ticket);
+        setEditDraft(draftFromTicket(ticket));
         setTicketDetailStatus('loaded');
         setTicketDetailMessage('Ticket detail loaded.');
       })
@@ -567,6 +784,16 @@ export default function App() {
         readiness={readiness}
         readinessStatus={readinessStatus}
         readinessMessage={readinessMessage}
+        implementationPlan={implementationPlan}
+        planStatus={planStatus}
+        planMessage={planMessage}
+        isEditingTicket={isEditingTicket}
+        editDraft={editDraft}
+        saveStatus={saveStatus}
+        saveMessage={saveMessage}
+        isEditDirty={isEditDirty}
+        editValidationMessage={editValidationMessage}
+        editBlockedReason={ticketActionBlockedReason}
         isCreatePanelOpen={isCreatePanelOpen}
         createDraft={createDraft}
         createStatus={createStatus}
@@ -581,7 +808,12 @@ export default function App() {
         isTokenConfigOpen={isTokenConfigOpen}
         isBusy={isRefreshing}
         errorMessage={errorMessage}
-        onSelectTicket={setSelectedTicketId}
+        onSelectTicket={handleSelectTicket}
+        onEditTicket={beginEditTicket}
+        onEditDraftChange={setEditDraft}
+        onSaveTicket={() => void saveTicket()}
+        onCancelEditTicket={cancelEditTicket}
+        onRefreshPlan={() => void refreshImplementationPlan()}
         onRefreshReadiness={() => void refreshReadiness()}
         onCreateDraftChange={setCreateDraft}
         onSubmitCreateTicket={() => void createTicket()}
@@ -672,6 +904,117 @@ function getCreateTicketBlocker(
   }
 
   return null;
+}
+
+function getTicketActionBlocker(
+  apiStatus: ApiStatus,
+  accessStatus: ProductAccessStatus,
+  tokenConfigured: boolean,
+  selectedTenantId: number | null,
+  selectedProjectId: number | null,
+  projectSelectionMode: 'api' | 'fallback-config' | 'missing',
+  selectedTicketId: number | null
+) {
+  const sessionBlocker = getCreateTicketBlocker(
+    apiStatus,
+    accessStatus,
+    tokenConfigured,
+    selectedTenantId,
+    selectedProjectId,
+    projectSelectionMode
+  );
+
+  if (sessionBlocker) {
+    return sessionBlocker;
+  }
+
+  if (!selectedTicketId) {
+    return 'Select a ticket before using ticket workflow actions.';
+  }
+
+  return null;
+}
+
+function draftFromTicket(ticket: ProjectTicket): TicketEditDraft {
+  return {
+    title: ticket.title ?? '',
+    summary: ticket.summary ?? '',
+    problem: ticket.problem ?? ticket.background ?? '',
+    proposedChange: ticket.content ?? '',
+    type: ticket.ticketType ?? 'Feature / Workflow',
+    priority: ticket.priority ?? 'Medium',
+    acceptanceCriteria: ticket.acceptanceCriteria ?? '',
+    technicalNotes: ticket.technicalNotes ?? '',
+    unitTests: ticket.unitTests ?? '',
+    integrationTests: ticket.integrationTests ?? '',
+    manualTests: ticket.manualTests ?? '',
+    regressionTests: ticket.regressionTests ?? '',
+    buildValidation: ticket.buildValidation ?? ''
+  };
+}
+
+function buildTicketFromEditDraft(ticket: ProjectTicket, draft: TicketEditDraft, projectId: number): ProjectTicket {
+  return {
+    ...ticket,
+    projectId,
+    title: draft.title.trim(),
+    summary: nullIfBlank(draft.summary),
+    problem: nullIfBlank(draft.problem),
+    content: nullIfBlank(draft.proposedChange),
+    ticketType: nullIfBlank(draft.type),
+    priority: nullIfBlank(draft.priority),
+    acceptanceCriteria: nullIfBlank(draft.acceptanceCriteria),
+    technicalNotes: nullIfBlank(draft.technicalNotes),
+    unitTests: nullIfBlank(draft.unitTests),
+    integrationTests: nullIfBlank(draft.integrationTests),
+    manualTests: nullIfBlank(draft.manualTests),
+    regressionTests: nullIfBlank(draft.regressionTests),
+    buildValidation: nullIfBlank(draft.buildValidation)
+  };
+}
+
+function validateEditDraft(draft: TicketEditDraft) {
+  if (!draft.title.trim()) {
+    return 'Title is required before saving a ticket.';
+  }
+
+  return null;
+}
+
+function areEditDraftsEqual(left: TicketEditDraft, right: TicketEditDraft) {
+  return JSON.stringify(normalizeEditDraft(left)) === JSON.stringify(normalizeEditDraft(right));
+}
+
+function normalizeEditDraft(draft: TicketEditDraft) {
+  return {
+    title: draft.title.trim(),
+    summary: draft.summary.trim(),
+    problem: draft.problem.trim(),
+    proposedChange: draft.proposedChange.trim(),
+    type: draft.type.trim(),
+    priority: draft.priority.trim(),
+    acceptanceCriteria: normalizeMultiline(draft.acceptanceCriteria),
+    technicalNotes: draft.technicalNotes.trim(),
+    unitTests: draft.unitTests.trim(),
+    integrationTests: draft.integrationTests.trim(),
+    manualTests: draft.manualTests.trim(),
+    regressionTests: draft.regressionTests.trim(),
+    buildValidation: draft.buildValidation.trim()
+  };
+}
+
+function normalizeMultiline(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function nullIfBlank(value: string) {
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function splitAcceptanceCriteria(value: string) {

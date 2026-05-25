@@ -355,9 +355,13 @@ p {
 .ticket-detail__header,
 .ticket-detail__meta,
 .ticket-create-panel__header,
+.ticket-edit__header,
 .ticket-create-panel__metadata,
 .ticket-create-panel__state,
 .ticket-create-form,
+.ticket-edit,
+.ticket-edit__form,
+.ticket-edit__state,
 .detail-grid,
 .context-inspector,
 .inspector-section,
@@ -389,6 +393,7 @@ p {
 
 .workspace-list-item__badges,
 .ticket-detail__badges,
+.ticket-edit__commands,
 .auth-required-state__actions,
 .token-config,
 .auth-form__actions,
@@ -399,7 +404,8 @@ p {
 }
 
 .ticket-detail__header,
-.ticket-create-panel__header {
+.ticket-create-panel__header,
+.ticket-edit__header {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
 }
@@ -535,7 +541,8 @@ p {
 
 .auth-form label,
 .context-select,
-.ticket-create-form label {
+.ticket-create-form label,
+.ticket-edit__form label {
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-strong);
@@ -547,7 +554,10 @@ p {
 .token-config input,
 .ticket-create-form input,
 .ticket-create-form select,
-.ticket-create-form textarea {
+.ticket-create-form textarea,
+.ticket-edit__form input,
+.ticket-edit__form select,
+.ticket-edit__form textarea {
   min-width: 12rem;
   min-height: 2rem;
   border: var(--border-subtle);
@@ -561,24 +571,30 @@ p {
 .context-select select,
 .ticket-create-form input,
 .ticket-create-form select,
-.ticket-create-form textarea {
+.ticket-create-form textarea,
+.ticket-edit__form input,
+.ticket-edit__form select,
+.ticket-edit__form textarea {
   width: 100%;
   margin-top: var(--space-1);
 }
 
-.ticket-create-form textarea {
+.ticket-create-form textarea,
+.ticket-edit__form textarea {
   min-height: 6rem;
   padding: var(--space-2) var(--space-3);
   resize: vertical;
 }
 
-.ticket-create-form__grid {
+.ticket-create-form__grid,
+.ticket-edit__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
-.ticket-create-panel__actions {
+.ticket-create-panel__actions,
+.ticket-edit__commands {
   justify-content: flex-end;
 }
 
@@ -612,6 +628,10 @@ p {
 
 .state-error {
   color: var(--color-status-danger);
+}
+
+.state-success {
+  color: var(--color-status-ready);
 }
 
 .state-muted {
@@ -662,7 +682,9 @@ p {
   }
 
   .ticket-create-panel__header,
-  .ticket-create-form__grid {
+  .ticket-edit__header,
+  .ticket-create-form__grid,
+  .ticket-edit__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -5,6 +5,7 @@ import type {
   CreateProjectTicketRequest,
   LoginRequest,
   LoginResponse,
+  ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
   TenantSummary,
@@ -205,8 +206,23 @@ class IronDevApiClient {
     });
   }
 
+  async saveProjectTicket(projectId: number, ticket: ProjectTicket, signal?: AbortSignal): Promise<ProjectTicket> {
+    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/legacy`, {
+      method: 'POST',
+      body: ticket,
+      signal
+    });
+  }
+
   async getProjectTicket(projectId: number, ticketId: number, signal?: AbortSignal): Promise<ProjectTicket> {
     return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/${ticketId}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getTicketImplementationPlan(ticketId: number, signal?: AbortSignal): Promise<ProjectImplementationPlan> {
+    return this.request<ProjectImplementationPlan>(`/api/tickets/${ticketId}/implementation-plan`, {
       method: 'GET',
       signal
     });

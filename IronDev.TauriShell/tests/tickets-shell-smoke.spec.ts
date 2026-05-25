@@ -329,6 +329,130 @@ test('tickets shell handles readiness loading and unavailable state', async ({ p
   await expectNoHorizontalOverflow(page);
 });
 
+test('tickets shell opens edit mode, validates title, and cancels dirty changes', async ({ page }) => {
+  await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
+
+  await page.goto('/');
+
+  await page.getByTestId('ticket.command.edit').click();
+  await expect(page.getByTestId('ticket.edit.form')).toBeVisible();
+  await expect(page.getByTestId('ticket.edit.title')).toHaveValue('Make tickets cockpit real');
+
+  await page.getByTestId('ticket.edit.title').fill('Updated workflow title');
+  await expect(page.getByTestId('ticket.edit.dirtyState')).toContainText('Unsaved changes');
+
+  await page.getByTestId('ticket.edit.title').fill('');
+  await expect(page.getByTestId('ticket.edit.validation')).toContainText('Title is required');
+  await expect(page.getByTestId('ticket.command.save')).toBeDisabled();
+
+  await page.getByTestId('ticket.command.cancel').click();
+  await expect(page.getByTestId('ticket.detail.header')).toContainText('Make tickets cockpit real');
+  await expect(page.getByTestId('ticket.edit.form')).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell saves edited ticket through the API and clears dirty state', async ({ page }) => {
+  let postedBody: unknown = null;
+  await mockTicketProjectForEdit(page, async (request) => {
+    postedBody = request.postDataJSON();
+
+    return {
+      ...(postedBody as Record<string, unknown>),
+      title: 'Saved Tauri workflow title',
+      summary: 'Saved through the ticket workflow parity form.'
+    };
+  });
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('ticket.edit.title').fill('Saved Tauri workflow title');
+  await page.getByTestId('ticket.edit.summary').fill('Saved through the ticket workflow parity form.');
+  await page.getByTestId('ticket.command.save').click();
+
+  await expect(page.getByTestId('ticket.edit.success')).toContainText('Ticket saved through IronDev.Api.');
+  await expect(page.getByTestId('ticket.detail.header')).toContainText('Saved Tauri workflow title');
+  await expect(page.getByRole('button', { name: 'Saved Tauri workflow title' })).toBeVisible();
+  expect(postedBody).toMatchObject({
+    id: 101,
+    projectId: 7,
+    title: 'Saved Tauri workflow title',
+    summary: 'Saved through the ticket workflow parity form.'
+  });
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell shows product error when ticket save API fails', async ({ page }) => {
+  await mockTicketProjectForEdit(page, async () => {
+    throw new Error('save failed');
+  });
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('ticket.edit.title').fill('Save failure title');
+  await page.getByTestId('ticket.command.save').click();
+
+  await expect(page.getByTestId('ticket.edit.error')).toContainText('Ticket save failed with HTTP 500.');
+  await expect(page.getByTestId('ticket.edit.form')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell blocks selection changes while edit form is dirty', async ({ page }) => {
+  await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('ticket.edit.title').fill('Dirty title that should block selection');
+  await page.getByText('Add project selection', { exact: true }).click();
+
+  await expect(page.getByTestId('ticket.edit.form')).toBeVisible();
+  await expect(page.getByTestId('ticket.edit.title')).toHaveValue('Dirty title that should block selection');
+  await expect(page.getByTestId('ticket.edit.validation')).toContainText('Save or cancel');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell refreshes implementation plan through the API', async ({ page }) => {
+  await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
+  await page.route('**/irondev-api/api/tickets/101/implementation-plan', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 71,
+        tenantId: 3,
+        projectId: 7,
+        ticketId: 101,
+        title: 'Tauri ticket workflow plan',
+        goal: 'Prove safe edit and review workflow parity.',
+        scope: 'Tauri ticket surface only.',
+        proposedSteps: 'Edit draft\nSave through API\nRefresh readiness',
+        risksNotes: 'No apply/build mutation in this slice.',
+        status: 'Draft',
+        updatedDate: '2026-05-26T02:15:00Z'
+      })
+    });
+  });
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.generatePlan').click();
+
+  await expect(page.getByTestId('ticket.detail.plan')).toContainText('Prove safe edit and review workflow parity.');
+  await expect(page.getByTestId('ticket.detail.plan')).toContainText('Edit draft');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('tickets shell shows unavailable plan state when plan endpoint has no data', async ({ page }) => {
+  await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
+  await page.route('**/irondev-api/api/tickets/101/implementation-plan', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Not found' }) });
+  });
+
+  await page.goto('/');
+  await page.getByTestId('ticket.command.generatePlan').click();
+
+  await expect(page.getByTestId('ticket.detail.plan')).toContainText('Plan not available yet.');
+  await expectNoHorizontalOverflow(page);
+});
+
 test('tickets shell opens create panel and validates required title', async ({ page }) => {
   await mockTicketProject(page);
   await page.goto('/');
@@ -550,6 +674,86 @@ async function mockTicketProjectForCreate(
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(createdTicket ? [createdTicket, ...baseTickets] : baseTickets)
+    });
+  });
+}
+
+async function mockTicketProjectForEdit(
+  page: import('@playwright/test').Page,
+  saveTicket: (request: import('@playwright/test').Request) => Promise<Record<string, unknown>>
+) {
+  await seedToken(page);
+  await seedSelectedProject(page, 7);
+  await mockHealthyApi(page);
+
+  let detail101: Record<string, unknown> = { ...ticketDetail101 };
+  const detail102: Record<string, unknown> = { ...ticketDetail102 };
+
+  await page.route('**/irondev-api/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 7, tenantId: 3, name: 'IronDeveloper', description: 'Dogfood project' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail101) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail102) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/legacy', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fulfill({ status: 405, contentType: 'application/json', body: JSON.stringify({ message: 'Method not allowed' }) });
+      return;
+    }
+
+    try {
+      detail101 = await saveTicket(route.request());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail101) });
+    } catch {
+      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) });
+    }
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: detail101.id,
+          projectId: detail101.projectId,
+          title: detail101.title,
+          status: detail101.status,
+          priority: detail101.priority,
+          summary: detail101.summary
+        },
+        {
+          id: detail102.id,
+          projectId: detail102.projectId,
+          title: detail102.title,
+          status: detail102.status,
+          priority: detail102.priority,
+          summary: detail102.summary
+        }
+      ])
     });
   });
 }

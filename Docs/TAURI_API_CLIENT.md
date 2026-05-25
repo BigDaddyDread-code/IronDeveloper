@@ -50,7 +50,7 @@ Current layers:
 
 - `src/api/generated/ironDevApiTypes.ts`: generated schema/path types.
 - `src/api/types.ts`: shell-facing aliases and state types.
-- `src/api/ironDevApi.ts`: typed HTTP facade for health, auth, tenants, projects, project selection, ticket queue, selected ticket detail, build readiness, and safe ticket creation.
+- `src/api/ironDevApi.ts`: typed HTTP facade for health, auth, tenants, projects, project selection, ticket queue, selected ticket detail, safe ticket creation, safe ticket save, implementation-plan refresh, and build readiness.
 
 This is intentionally small. Future slices can replace the typed facade with a fuller generated client, but the boundary must remain the same.
 
@@ -68,6 +68,8 @@ The shell supports:
 - selected ticket detail loading
 - build readiness refresh for the selected ticket
 - non-destructive ticket creation for the selected project
+- non-destructive selected-ticket editing/saving
+- implementation-plan refresh where the API exposes one
 
 Token storage is local/dev-safe only for this spike: `localStorage` is used so the UI can prove the workflow. This is not a production credential vault.
 
@@ -98,6 +100,29 @@ The create panel collects title, summary, optional type, optional priority, and 
 Create is blocked when the API is offline, auth is missing/invalid, tenant context is missing, project context is missing, or only fallback project context is active. The disabled command exposes the reason through `ticket.create.blockedReason`.
 
 This slice does not add archive/delete, apply proposal, build/apply mutation, repository file mutation, promotion approval, or self-approval actions. Future ticket actions must stay behind `IronDev.Api` and must be added as explicit typed facade methods before React components consume them.
+
+## Ticket Edit And Workflow Actions
+
+Ticket edit parity uses the existing API save surface:
+
+```text
+POST /api/projects/{projectId}/tickets/legacy
+```
+
+The endpoint accepts the existing `ProjectTicket` model, so the shell keeps edit logic limited to draft state, validation, dirty detection, and API error handling. It does not own ticket lifecycle rules.
+
+Editable fields currently include title, summary, problem, proposed-change content, type, priority, acceptance criteria, technical notes, unit tests, integration tests, manual tests, regression notes, and build validation.
+
+Dirty ticket selection is guarded in the shell so a user does not accidentally leave a local edit draft. The API still remains the only persistence boundary.
+
+Safe workflow reads:
+
+```text
+GET /api/tickets/{ticketId}/implementation-plan
+GET /api/projects/{projectId}/tickets/{ticketId}/build-readiness
+```
+
+These actions refresh reviewable text/evidence only. They do not apply code, mutate repository files, start builds, approve promotion packages, or self-approve anything.
 
 ## Local Configuration
 
@@ -132,8 +157,8 @@ localStorage.setItem("irondev.selectedProjectId", "1");
 - Production-safe token storage.
 - Full auth UX polish.
 - Generated client coverage beyond the Tickets shell path.
-- Ticket edit/review/action parity with WPF.
-- Safe action expansion beyond create ticket.
+- Remaining ticket review actions that are not yet exposed as safe API endpoints.
+- Production-grade edit conflict/version handling.
 - Rich ticket evidence endpoints for linked documents, decisions, traces, and run/build artifacts.
 - Documents/Memory, Chat, Build/Run Reports, and Testing Companion workspace parity.
 - Desktop automation against the packaged Tauri window, not only the Vite shell.
@@ -144,8 +169,12 @@ API-backed in the Tauri shell:
 
 - `GET /api/projects/{projectId}/tickets`
 - `GET /api/projects/{projectId}/tickets/{ticketId}`
+- `POST /api/projects/{projectId}/tickets`
+- `POST /api/projects/{projectId}/tickets/legacy`
+- `GET /api/tickets/{ticketId}/implementation-plan`
 - `GET /api/projects/{projectId}/tickets/{ticketId}/build-readiness`
 - ticket title, status, priority, type, summary, problem, proposed-change content, acceptance criteria, technical notes, linked file paths, linked symbols, tests, context summary, generated/source metadata, and legacy UTC `createdDate`
+- implementation-plan title, goal, scope, proposed steps, affected context, risk notes, status, linked files/symbols, and UTC metadata when exposed
 - readiness message, warnings, blocking issues, and `isReady`
 
 Still unavailable or represented as honest empty states until the API exposes richer context:
@@ -155,3 +184,5 @@ Still unavailable or represented as honest empty states until the API exposes ri
 - structured evidence records
 - trace URLs/detail records
 - full build/run report linkage
+- explicit generated-plan mutation endpoint, if the product wants plan generation rather than plan refresh
+- destructive/archive/build/apply workflows

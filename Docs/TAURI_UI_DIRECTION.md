@@ -124,7 +124,9 @@ Required API/auth states:
 - Readiness unavailable
 - Missing context/evidence
 
-Ticket actions must separate safe creation from destructive or repository-changing work. Create/refresh actions can appear in the cockpit command area. Archive, delete, apply, build, promotion approval, and repository mutation actions must not appear until their API path, validation, and confirmation model are explicit.
+Ticket actions must separate safe creation/edit/review from destructive or repository-changing work. Create, edit, save, refresh readiness, and refresh plan can appear in the cockpit command area when API/auth/tenant/project/ticket state is valid. Archive, delete, apply, build, promotion approval, and repository mutation actions must not appear until their API path, validation, and confirmation model are explicit.
+
+Editing is local draft state until the user saves through `IronDev.Api`. The UI may track dirty state, validation state, save state, and blocked reasons, but the backend remains the source of persistence truth. Dirty drafts should block ticket selection changes unless the user saves or cancels.
 
 Auth-required copy should explain that `IronDev.Api` is reachable or expected locally, but product data needs a token. Use calm badges and clear actions:
 
@@ -216,7 +218,11 @@ Current required selectors:
 - `ticket.inspector.traceLinks`
 - `ticket.command.refresh`
 - `ticket.command.refreshReadiness`
+- `ticket.command.generatePlan`
 - `ticket.command.create`
+- `ticket.command.edit`
+- `ticket.command.save`
+- `ticket.command.cancel`
 - `ticket.create.panel`
 - `ticket.create.title`
 - `ticket.create.summary`
@@ -227,6 +233,19 @@ Current required selectors:
 - `ticket.create.cancel`
 - `ticket.create.success`
 - `ticket.create.error`
+- `ticket.edit.form`
+- `ticket.edit.title`
+- `ticket.edit.summary`
+- `ticket.edit.problem`
+- `ticket.edit.proposedChange`
+- `ticket.edit.type`
+- `ticket.edit.priority`
+- `ticket.edit.acceptanceCriteria`
+- `ticket.edit.technicalNotes`
+- `ticket.edit.dirtyState`
+- `ticket.edit.validation`
+- `ticket.edit.success`
+- `ticket.edit.error`
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`
