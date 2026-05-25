@@ -2,3 +2,5 @@ node_modules/
 dist/
 reports/
 test-results/
+src-tauri/gen/
+src-tauri/target/
