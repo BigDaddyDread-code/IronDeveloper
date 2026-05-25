@@ -47,6 +47,7 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
     [ObservableProperty] private string _semanticMemoryDetailText = "Rebuild the semantic index after adding or changing project knowledge.";
     [ObservableProperty] private string _semanticSearchQuery = string.Empty;
     [ObservableProperty] private string _semanticSearchStatusText = "Enter a search query to test project memory retrieval.";
+    [ObservableProperty] private SemanticSearchResultItemViewModel? _selectedSemanticSearchResult;
 
     public ObservableCollection<DiscussionDocumentItemViewModel> DiscussionDocuments { get; } = [];
     public ObservableCollection<ArtefactProposalItemViewModel> Proposals { get; } = [];
@@ -61,8 +62,50 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
     public bool HasResolutionSummary => !string.IsNullOrWhiteSpace(ResolutionSummary);
     public bool HasOpenQuestions => OpenQuestions.Count > 0;
     public bool HasBuildOrder => BuildOrder.Count > 0;
+    public bool HasSelectedSemanticSearchResult => SelectedSemanticSearchResult != null;
+    public string ActiveProjectName => string.IsNullOrWhiteSpace(_activeProjectName) ? "No active project" : _activeProjectName;
     public string CompilerStatusText =>
         $"Discussions: {DiscussionDocuments.Count} | Proposals: {Proposals.Count} | Selected: {Proposals.Count(p => p.IsSelected)}";
+    public string DiscussionCountText => $"{DiscussionDocuments.Count} discussion{(DiscussionDocuments.Count == 1 ? string.Empty : "s")}";
+    public string ProposalCountText => $"{Proposals.Count} proposal{(Proposals.Count == 1 ? string.Empty : "s")}";
+    public string MemoryResultCountText => $"{SemanticSearchResults.Count} memory result{(SemanticSearchResults.Count == 1 ? string.Empty : "s")}";
+    public string DecisionProposalCountText => $"{Proposals.Count(p => p.Proposal.Kind == ArtefactProposalKind.Decision)} decision proposal{(Proposals.Count(p => p.Proposal.Kind == ArtefactProposalKind.Decision) == 1 ? string.Empty : "s")}";
+    public string TicketProposalCountText => $"{Proposals.Count(p => p.Proposal.Kind == ArtefactProposalKind.Ticket)} ticket candidate{(Proposals.Count(p => p.Proposal.Kind == ArtefactProposalKind.Ticket) == 1 ? string.Empty : "s")}";
+    public string SelectedDiscussionTitle => SelectedDiscussion?.Title ?? "No discussion selected";
+    public string SelectedDiscussionSourceText => SelectedDiscussion?.SourceLabel ?? "No source selected";
+    public string SelectedDiscussionUtcMetadata => SelectedDiscussion?.LastChangedUtcMetadata ?? "UpdatedUtc unavailable";
+    public string SelectedDiscussionUtcTooltip => SelectedDiscussion?.LastChangedUtcTooltip ?? "No UTC timestamp is available for this discussion.";
+    public string KnowledgeCurrentnessText => SelectedDiscussion?.CurrentnessText ?? "No document selected";
+    public string KnowledgeNextActionText
+    {
+        get
+        {
+            if (IsGenerating)
+                return "Generating discussion drafts";
+            if (IsResolving)
+                return "Resolving selected discussion";
+            if (IsApplying)
+                return "Applying selected artefacts";
+            if (SelectedDiscussion == null)
+                return HasDiscussions ? "Select a discussion" : "Generate discussion drafts";
+            if (!SelectedDiscussion.IsPersisted)
+                return "Save selected draft";
+            if (string.IsNullOrWhiteSpace(DiscussionNotes))
+                return "Add discussion notes";
+            if (HasSelectedProposals)
+                return "Apply selected proposals";
+
+            return "Resolve discussion";
+        }
+    }
+    public string SelectedMemoryEvidenceText => SelectedSemanticSearchResult == null
+        ? "Select a memory search result to inspect ranking evidence."
+        : $"{SelectedSemanticSearchResult.ScoreText} | {SelectedSemanticSearchResult.SimilarityText}";
+    public string SelectedMemorySourceText => SelectedSemanticSearchResult == null
+        ? "No memory result selected"
+        : $"{SelectedSemanticSearchResult.DocumentType} | {SelectedSemanticSearchResult.AuthorityLevel}";
+    public string SelectedMemoryUtcMetadata => SelectedSemanticSearchResult?.IndexedUtcLabel ?? "IndexedUtc unavailable";
+    public string SelectedMemoryUtcTooltip => SelectedSemanticSearchResult?.IndexedUtcTooltip ?? "No indexed UTC timestamp is available.";
 
     public KnowledgeCompilerViewModel(
         IDiscussionSeedService seedService,
@@ -81,6 +124,7 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
 
         DiscussionDocuments.CollectionChanged += OnCollectionChanged;
         Proposals.CollectionChanged += OnCollectionChanged;
+        SemanticSearchResults.CollectionChanged += OnCollectionChanged;
     }
 
     public KnowledgeCompilerViewModel(
@@ -104,6 +148,7 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
     {
         _activeProjectId = project.Id;
         _activeProjectName = project.Name;
+        OnPropertyChanged(nameof(ActiveProjectName));
 
         var summary = await _memoryService.GetLatestSummaryAsync(project.Id);
         ProjectSummaryText = summary?.Summary ?? project.Description ?? string.Empty;
@@ -413,6 +458,8 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
             foreach (var result in results)
                 SemanticSearchResults.Add(SemanticSearchResultItemViewModel.FromResult(result));
 
+            SelectedSemanticSearchResult = SemanticSearchResults.FirstOrDefault();
+
             SemanticSearchStatusText = results.Count == 0
                 ? "No semantic matches found. Rebuild the index if this looks wrong."
                 : $"Found {results.Count} semantic matches.";
@@ -447,6 +494,9 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
         ClearResolution();
         RefreshComputedState();
     }
+
+    partial void OnSelectedSemanticSearchResultChanged(SemanticSearchResultItemViewModel? value)
+        => RefreshComputedState();
 
     private async Task LoadDiscussionDocumentsAsync(bool keepSelection = false)
     {
@@ -531,6 +581,22 @@ public sealed partial class KnowledgeCompilerViewModel : ObservableObject
         OnPropertyChanged(nameof(HasResolutionSummary));
         OnPropertyChanged(nameof(HasOpenQuestions));
         OnPropertyChanged(nameof(HasBuildOrder));
+        OnPropertyChanged(nameof(HasSelectedSemanticSearchResult));
+        OnPropertyChanged(nameof(DiscussionCountText));
+        OnPropertyChanged(nameof(ProposalCountText));
+        OnPropertyChanged(nameof(MemoryResultCountText));
+        OnPropertyChanged(nameof(DecisionProposalCountText));
+        OnPropertyChanged(nameof(TicketProposalCountText));
+        OnPropertyChanged(nameof(SelectedDiscussionTitle));
+        OnPropertyChanged(nameof(SelectedDiscussionSourceText));
+        OnPropertyChanged(nameof(SelectedDiscussionUtcMetadata));
+        OnPropertyChanged(nameof(SelectedDiscussionUtcTooltip));
+        OnPropertyChanged(nameof(KnowledgeCurrentnessText));
+        OnPropertyChanged(nameof(KnowledgeNextActionText));
+        OnPropertyChanged(nameof(SelectedMemoryEvidenceText));
+        OnPropertyChanged(nameof(SelectedMemorySourceText));
+        OnPropertyChanged(nameof(SelectedMemoryUtcMetadata));
+        OnPropertyChanged(nameof(SelectedMemoryUtcTooltip));
         OnPropertyChanged(nameof(CompilerStatusText));
     }
 }
@@ -597,12 +663,41 @@ public sealed partial class DiscussionDocumentItemViewModel : ObservableObject
     public string SuggestedArea { get; init; } = string.Empty;
     public int SuggestedOrder { get; init; }
     public string Summary { get; init; } = string.Empty;
+    public string DocumentType { get; init; } = "DiscussionDocument";
+    public string AuthorityLevel { get; init; } = "DiscussionPrompt";
+    public string Status { get; init; } = "Draft";
+    public string Source { get; init; } = "Knowledge Compiler";
+    public DateTime? CreatedUtc { get; init; }
+    public DateTime? UpdatedUtc { get; init; }
     public bool IsPersisted => Id > 0;
     public string PersistenceText => IsPersisted ? "Saved" : "Draft";
+    public string CurrentnessText
+    {
+        get
+        {
+            if (!IsPersisted)
+                return "Draft";
+
+            return Status.Equals("Active", StringComparison.OrdinalIgnoreCase)
+                ? "Current"
+                : Status;
+        }
+    }
+    public string SourceLabel => string.IsNullOrWhiteSpace(Source) ? "IronDev memory" : Source;
+    public string LastChangedLabel => LastChangedUtc.HasValue
+        ? DateTimeDisplay.ToCompactMetadata(LastChangedUtc.Value, "Updated")
+        : "UpdatedUtc unavailable";
+    public string LastChangedUtcMetadata => LastChangedUtc.HasValue
+        ? DateTimeDisplay.ToUtcMetadata(LastChangedUtc.Value)
+        : "UpdatedUtc unavailable";
+    public string LastChangedUtcTooltip => LastChangedUtc.HasValue
+        ? DateTimeDisplay.ToUtcTooltip(LastChangedUtc.Value)
+        : "No UTC timestamp is available for this discussion document.";
     public string PromptText => ToLines(Prompts);
     public string PossibleOutputsText => ToLines(PossibleOutputs);
     public string PreviewText => string.IsNullOrWhiteSpace(Summary) ? Purpose : Summary;
     public string FullPromptText => BuildFullPromptText();
+    private DateTime? LastChangedUtc => UpdatedUtc ?? CreatedUtc;
 
     public static DiscussionDocumentItemViewModel FromGenerated(GeneratedDiscussionDocument document)
     {
@@ -614,7 +709,9 @@ public sealed partial class DiscussionDocumentItemViewModel : ObservableObject
             PossibleOutputs = document.PossibleOutputs.ToList(),
             SuggestedArea = document.SuggestedArea,
             SuggestedOrder = document.SuggestedOrder,
-            Summary = document.Purpose
+            Summary = document.Purpose,
+            Source = "Generated by Knowledge Compiler",
+            CreatedUtc = DateTime.UtcNow
         };
     }
 
@@ -628,7 +725,13 @@ public sealed partial class DiscussionDocumentItemViewModel : ObservableObject
             Prompts = ExtractListSection(document.Content, "Prompts"),
             PossibleOutputs = ExtractListSection(document.Content, "Possible Outputs"),
             SuggestedArea = document.AppliesToArea ?? string.Empty,
-            Summary = document.Summary ?? string.Empty
+            Summary = document.Summary ?? string.Empty,
+            DocumentType = document.DocumentType,
+            AuthorityLevel = document.AuthorityLevel,
+            Status = document.Status,
+            Source = document.Source ?? "IronDev project memory",
+            CreatedUtc = document.CreatedDate,
+            UpdatedUtc = document.UpdatedDate
         };
     }
 
@@ -637,6 +740,7 @@ public sealed partial class DiscussionDocumentItemViewModel : ObservableObject
         Id = id;
         OnPropertyChanged(nameof(IsPersisted));
         OnPropertyChanged(nameof(PersistenceText));
+        OnPropertyChanged(nameof(CurrentnessText));
     }
 
     public ProjectContextDocument ToContextDocument(int projectId)

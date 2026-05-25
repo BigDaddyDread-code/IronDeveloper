@@ -154,11 +154,19 @@ public sealed class WpfVisualFoundationTests
         foreach (var automationId in new[]
         {
             "memory.workspace",
+            "memory.header",
             "memory.search",
             "memory.resultList",
             "memory.resultRow",
             "memory.result.detail",
             "memory.inspector",
+            "memory.inspector.provenance",
+            "memory.inspector.sourceLinks",
+            "memory.inspector.relatedDecisions",
+            "memory.inspector.linkedTickets",
+            "memory.inspector.memoryEvidence",
+            "memory.inspector.traceLinks",
+            "memory.inspector.warnings",
             "memory.command.search",
             "memory.command.createTicketFromResult"
         })
