@@ -83,7 +83,8 @@
                     <Border Grid.Row="3"
                             Style="{StaticResource SurfacePanel.Interactive}"
                             Padding="12"
-                            Margin="0,0,0,12">
+                            Margin="0,0,0,12"
+                            AutomationProperties.AutomationId="memory.inspector">
                         <StackPanel>
                             <DockPanel LastChildFill="False"
                                        Margin="0,0,0,8">
@@ -116,7 +117,8 @@
                     <Border Grid.Row="4"
                             Style="{StaticResource SurfacePanel.Interactive}"
                             Padding="12"
-                            Margin="0,0,0,12">
+                            Margin="0,0,0,12"
+                            AutomationProperties.AutomationId="memory.workspace">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -130,12 +132,14 @@
                                        Margin="0,0,0,8"/>
                             <DockPanel Grid.Row="1"
                                        LastChildFill="True"
-                                       Margin="0,0,0,8">
+                                       Margin="0,0,0,8"
+                                       AutomationProperties.AutomationId="memory.search">
                                 <Button DockPanel.Dock="Right"
                                         Content="Search"
                                         Command="{Binding RunSemanticSearchCommand}"
                                         Style="{StaticResource AppButton.CompactGhost}"
-                                        Margin="8,0,0,0"/>
+                                        Margin="8,0,0,0"
+                                        AutomationProperties.AutomationId="memory.command.search"/>
                                 <TextBox Text="{Binding SemanticSearchQuery, UpdateSourceTrigger=PropertyChanged}"
                                          MinHeight="34"/>
                             </DockPanel>
@@ -150,10 +154,12 @@
                                      ItemContainerStyle="{StaticResource AppListBoxItem.Compact}"
                                      Background="Transparent"
                                      BorderThickness="0"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     AutomationProperties.AutomationId="memory.resultList">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Margin="2,6">
+                                        <StackPanel Margin="2,6"
+                                                    AutomationProperties.AutomationId="memory.resultRow">
                                             <DockPanel LastChildFill="True">
                                                 <StackPanel DockPanel.Dock="Right"
                                                             Orientation="Horizontal"
@@ -169,12 +175,22 @@
                                                            FontWeight="SemiBold"
                                                            TextTrimming="CharacterEllipsis"/>
                                             </DockPanel>
-                                            <TextBlock Text="{Binding Snippet}"
-                                                       Foreground="{StaticResource Text/Secondary}"
-                                                       FontSize="11"
-                                                       TextWrapping="Wrap"
-                                                       MaxHeight="44"
-                                                       Margin="0,4,0,0"/>
+                                            <StackPanel AutomationProperties.AutomationId="memory.result.detail">
+                                                <TextBlock Text="{Binding Snippet}"
+                                                           Foreground="{StaticResource Text/Secondary}"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap"
+                                                           MaxHeight="44"
+                                                           Margin="0,4,0,0"/>
+                                                <Button Content="Create Ticket"
+                                                        IsEnabled="False"
+                                                        Style="{StaticResource AppButton.CompactGhost}"
+                                                        HorizontalAlignment="Left"
+                                                        Margin="0,6,0,0"
+                                                        AutomationProperties.AutomationId="memory.command.createTicketFromResult"
+                                                        ToolTipService.ShowOnDisabled="True"
+                                                        ToolTip="Creating tickets from memory results must go through the IronDev ticket API and is not wired here yet."/>
+                                            </StackPanel>
                                             <TextBlock Text="{Binding SimilarityText}"
                                                        Foreground="{StaticResource Text/Muted}"
                                                        FontSize="10"

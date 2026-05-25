@@ -2,21 +2,22 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="http://schemas.irondeveloper.com/controls"
-             xmlns:primitives="clr-namespace:IronDeveloperControls.Primitives;assembly=IronDeveloperControls"
+             xmlns:local="clr-namespace:IronDev.Agent.ViewModels.Workspaces"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
              Background="Transparent">
 
-    <Grid>
+    <Grid Background="{StaticResource IronDev.Brush.Background.App}"
+          AutomationProperties.AutomationId="documents.workspace">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ── Header ───────────────────────────────────────────────── -->
         <controls:WorkspaceHeader Grid.Row="0"
-                                  Eyebrow="PROJECT DOCUMENTS"
-                                  Title="Documents"
-                                  Subtitle="Versioned Markdown project artefacts">
+                                  Eyebrow="PROJECT KNOWLEDGE"
+                                  Title="Documents / Memory"
+                                  Subtitle="{Binding ActiveProjectName}"
+                                  AutomationProperties.AutomationId="documents.header">
             <controls:WorkspaceHeader.Actions>
                 <controls:CrudCommandBar ShowCreate="True"
                                          CreateText="+ New Document"
@@ -24,294 +25,330 @@
                                          CreateToolTip="Create a new project document."
                                          ShowRefresh="True"
                                          RefreshCommand="{Binding RefreshCommand}"
-                                         RefreshToolTip="Reload document list."/>
+                                         RefreshToolTip="Reload document list.">
+                    <controls:CrudCommandBar.SecondaryActions>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Style="{StaticResource IronDev.StatusBadge.Host}"
+                                    Margin="0,0,10,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding DocumentCountText}"
+                                           Foreground="{StaticResource IronDev.Brush.Text.Secondary}"
+                                           FontSize="{StaticResource IronDev.Font.Size.Caption}"
+                                           FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Style="{StaticResource IronDev.StatusBadge.Host}"
+                                    Margin="0,0,10,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding DocumentCurrentnessText}"
+                                           Foreground="{StaticResource IronDev.Brush.Accent.Trace}"
+                                           FontSize="{StaticResource IronDev.Font.Size.Caption}"
+                                           FontWeight="SemiBold"/>
+                            </Border>
+                        </StackPanel>
+                    </controls:CrudCommandBar.SecondaryActions>
+                </controls:CrudCommandBar>
             </controls:WorkspaceHeader.Actions>
         </controls:WorkspaceHeader>
 
-        <!-- ── Three-column body ────────────────────────────────────── -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="290" MinWidth="240"/>
-                <ColumnDefinition Width="*" MinWidth="400"/>
-                <ColumnDefinition Width="260" MinWidth="220"/>
+                <ColumnDefinition Width="340" MinWidth="280"/>
+                <ColumnDefinition Width="*" MinWidth="460"/>
+                <ColumnDefinition Width="320" MinWidth="280"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ── Col 0: Document list ─────────────────────────────── -->
-            <Border Grid.Column="0"
-                    Style="{StaticResource SurfacePanel.Subtle}"
-                    Padding="12"
-                    Margin="0,0,10,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <controls:WorkspaceListPane Grid.Column="0"
+                                        Eyebrow="KNOWLEDGE QUEUE"
+                                        Title="Documents"
+                                        Margin="0,0,12,0"
+                                        ItemsSource="{Binding Documents}"
+                                        SelectedItem="{Binding SelectedDocument, Mode=TwoWay}"
+                                        AutomationProperties.AutomationId="document.list">
+                <controls:WorkspaceListPane.SearchField>
+                    <StackPanel>
+                        <TextBlock Text="Filter by type" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{x:Static local:DocumentsWorkspaceViewModel.DocumentTypes}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:FilterChip Text="{Binding}"
+                                                         Command="{Binding DataContext.SetFilterTypeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                         CommandParameter="{Binding}"
+                                                         Margin="0,0,6,6"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </controls:WorkspaceListPane.SearchField>
 
-                    <!-- Section label -->
-                    <TextBlock Grid.Row="0"
-                               Text="DOCUMENTS"
-                               Style="{StaticResource Typography.Eyebrow}"
-                               Margin="0,0,0,10"/>
+                <controls:WorkspaceListPane.ItemTemplate>
+                    <DataTemplate>
+                        <Grid AutomationProperties.AutomationId="document.row"
+                              Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0"
+                                    Width="3"
+                                    Background="{StaticResource IronDev.Brush.Accent.Trace}"
+                                    CornerRadius="2"
+                                    Margin="0,2,8,2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
 
-                    <!-- Type filter chips -->
-                    <ItemsControl Grid.Row="1"
-                                  ItemsSource="{x:Static local:DocumentsWorkspaceViewModel.DocumentTypes}"
-                                  Margin="0,0,0,10"
-                                  xmlns:local="clr-namespace:IronDev.Agent.ViewModels.Workspaces">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Content="{Binding}"
-                                        Command="{Binding DataContext.SetFilterTypeCommand,
-                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        Style="{StaticResource AppButton.CompactGhost}"
-                                        Margin="0,0,4,4"
-                                        Padding="8,3"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                            <controls:SurfacePanel Grid.Column="1"
+                                                   Padding="12,10"
+                                                   CornerRadius="{StaticResource IronDev.Radius.Medium}">
+                                <controls:SurfacePanel.Style>
+                                    <Style TargetType="{x:Type controls:SurfacePanel}">
+                                        <Setter Property="Variant" Value="Subtle"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                                <Setter Property="Variant" Value="Selected"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </controls:SurfacePanel.Style>
 
-                    <!-- Document list -->
-                    <ListBox Grid.Row="2"
-                             ItemsSource="{Binding Documents}"
-                             SelectedItem="{Binding SelectedDocument, Mode=TwoWay}"
-                             ItemContainerStyle="{StaticResource AppListBoxItem.Compact}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="2,5">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <DockPanel Grid.Row="0">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,4">
                                         <TextBlock DockPanel.Dock="Right"
                                                    Text="{Binding LastUpdatedLabel}"
                                                    Foreground="{StaticResource Text/Muted}"
-                                                   FontSize="11"
-                                                   VerticalAlignment="Center"/>
+                                                   FontSize="{StaticResource IronDev.Font.Size.Caption}"
+                                                   Margin="8,1,0,0"/>
                                         <TextBlock Text="{Binding Title}"
                                                    Foreground="{StaticResource Text/Primary}"
+                                                   FontSize="{StaticResource IronDev.Font.Size.Body}"
                                                    FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </DockPanel>
+                                    <TextBlock Text="{Binding DocumentType}"
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="{StaticResource IronDev.Font.Size.Caption}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,0,0,8"/>
+                                    <WrapPanel>
+                                        <controls:StatusBadge Text="{Binding TypeLabel}" Status="Info" Margin="0,0,6,4"/>
+                                        <controls:StatusBadge Text="{Binding Status}" Status="Ready" Margin="0,0,6,4"/>
+                                        <controls:StatusBadge Text="SOURCE" Status="Neutral" Margin="0,0,6,4"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </controls:SurfacePanel>
+                        </Grid>
+                    </DataTemplate>
+                </controls:WorkspaceListPane.ItemTemplate>
 
-                                    <StackPanel Grid.Row="1"
-                                                Orientation="Horizontal"
-                                                Margin="0,3,0,0">
-                                        <primitives:StatusBadge Text="{Binding TypeLabel}"
-                                                                Status="Info"
-                                                                Margin="0,0,6,0"/>
-                                        <primitives:StatusBadge Text="{Binding Status}"
-                                                                Status="Ready"/>
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
+                <controls:WorkspaceListPane.FooterActions>
+                    <TextBlock Text="{Binding StatusText}"
+                               Foreground="{StaticResource Text/Muted}"
+                               FontSize="{StaticResource IronDev.Font.Size.Caption}"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding HasStatusText, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </controls:WorkspaceListPane.FooterActions>
+            </controls:WorkspaceListPane>
 
-                        <!-- Empty state -->
-                        <ListBox.Style>
-                            <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasDocuments}" Value="False">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate>
-                                                    <StackPanel HorizontalAlignment="Center"
-                                                                VerticalAlignment="Center"
-                                                                Margin="0,40,0,0">
-                                                        <TextBlock Text="No documents yet"
-                                                                   Foreground="{StaticResource Text/Muted}"
-                                                                   FontSize="13"
-                                                                   HorizontalAlignment="Center"/>
-                                                        <TextBlock Text="Save a chat discussion as a document to get started."
-                                                                   Foreground="{StaticResource Text/Muted}"
-                                                                   FontSize="11"
-                                                                   TextWrapping="Wrap"
-                                                                   TextAlignment="Center"
-                                                                   Margin="0,6,0,0"
-                                                                   MaxWidth="200"/>
-                                                    </StackPanel>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ListBox.Style>
-                    </ListBox>
-                </Grid>
-            </Border>
-
-            <!-- ── Col 1: Viewer / Editor ───────────────────────────── -->
             <Border Grid.Column="1"
                     Style="{StaticResource SurfacePanel.Subtle}"
                     Padding="0"
-                    Margin="0,0,10,0">
+                    Margin="0,0,12,0"
+                    AutomationProperties.AutomationId="document.detail">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Document header -->
                     <Border Grid.Row="0"
-                            Padding="16,14,16,12"
+                            Padding="18,16"
                             BorderBrush="{StaticResource Border/Subtle}"
-                            BorderThickness="0,0,0,1">
+                            BorderThickness="0,0,0,1"
+                            AutomationProperties.AutomationId="document.detail.brief">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="{Binding SelectedDocument.Title, FallbackValue='Select a document'}"
-                                           Foreground="{StaticResource Text/Primary}"
-                                           FontSize="17"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <DockPanel Margin="0,5,0,0">
-                                    <primitives:StatusBadge DockPanel.Dock="Left"
-                                                            Text="{Binding SelectedDocument.TypeLabel, FallbackValue=''}"
-                                                            Status="Info"
-                                                            Margin="0,0,8,0"/>
-                                    <primitives:StatusBadge DockPanel.Dock="Left"
-                                                            Text="{Binding SelectedVersion.VersionLabel, FallbackValue=''}"
-                                                            Status="Ready"
-                                                            Margin="0,0,8,0"/>
-                                    <primitives:StatusBadge DockPanel.Dock="Left"
-                                                            Text="{Binding SelectedVersion.Status, FallbackValue=''}"
-                                                            Status="ReviewRequired"/>
-                                </DockPanel>
+                            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                <TextBlock Text="SELECTED KNOWLEDGE"
+                                           Style="{StaticResource Typography.Eyebrow}"
+                                           Margin="0,0,0,4"/>
+                                <Grid>
+                                    <TextBlock Text="{Binding SelectedDocument.Title, FallbackValue='Select a document'}"
+                                               Foreground="{StaticResource Text/Primary}"
+                                               FontSize="20"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCreatingDocument}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding EditorTitle, FallbackValue='New document', TargetNullValue='New document'}"
+                                               Foreground="{StaticResource Text/Primary}"
+                                               FontSize="20"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding IsCreatingDocument, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
+                                <TextBlock Text="{Binding DocumentSourceText}"
+                                           Foreground="{StaticResource Text/Secondary}"
+                                           FontSize="{StaticResource IronDev.Font.Size.Small}"
+                                           Margin="0,4,0,0"/>
                             </StackPanel>
 
-                            <!-- Toolbar -->
-                            <StackPanel Grid.Column="1"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <!-- View mode buttons -->
-                                <controls:CrudCommandBar ShowEdit="True"
-                                                         EditCommand="{Binding StartEditingCommand}"
-                                                         EditToolTip="Edit the selected document version."
-                                                         ShowCopy="True"
-                                                         CopyCommand="{Binding CopyDocumentCommand}"
-                                                         CopyToolTip="Copy the selected document version as Markdown."
-                                                         ShowArchive="True"
-                                                         ArchiveCommand="{Binding ArchiveDocumentCommand}"
-                                                         ArchiveToolTip="Archive the selected document."
-                                                         Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <controls:CrudCommandBar.SecondaryActions>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Resolve Discussion"
-                                                    IsEnabled="False"
-                                                    Style="{StaticResource AppButton.CompactGhost}"
-                                                    Margin="0,0,8,0"
-                                                    ToolTipService.ShowOnDisabled="True"
-                                                    ToolTip="Resolve Discussion is not wired for this document workspace yet."/>
-                                            <Button Content="Create Tickets"
-                                                    IsEnabled="False"
-                                                    Style="{StaticResource AppButton.CompactGhost}"
-                                                    Margin="0,0,8,0"
-                                                    ToolTipService.ShowOnDisabled="True"
-                                                    ToolTip="Create Tickets from documents is not service-backed in this workspace yet."/>
-                                            <Button Content="Send to Chat"
-                                                    IsEnabled="False"
-                                                    Style="{StaticResource AppButton.CompactGhost}"
-                                                    ToolTipService.ShowOnDisabled="True"
-                                                    ToolTip="Send to Chat is not service-backed in this workspace yet."/>
-                                        </StackPanel>
-                                    </controls:CrudCommandBar.SecondaryActions>
-                                </controls:CrudCommandBar>
-
-                                <!-- Edit mode buttons -->
-                                <controls:CrudCommandBar ShowCancel="True"
-                                                         CancelCommand="{Binding CancelEditingCommand}"
-                                                         CancelToolTip="Cancel document editing."
-                                                         ShowSave="True"
-                                                         SaveText="Save Version"
-                                                         SaveCommand="{Binding SaveNewVersionCommand}"
-                                                         SaveToolTip="Save the document as a new version. Disabled until title, markdown, and change summary are present."
-                                                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                            </StackPanel>
+                            <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                <controls:StatusBadge Text="{Binding SelectedDocument.TypeLabel, FallbackValue='Document'}" Status="Info" Margin="0,0,6,6"/>
+                                <controls:StatusBadge Text="{Binding DocumentCurrentnessText}" Status="Ready" Margin="0,0,6,6"/>
+                                <controls:StatusBadge Text="DIRTY" Status="Warning" Margin="0,0,0,6"
+                                                      Visibility="{Binding HasDirtyEditState, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            </WrapPanel>
                         </Grid>
                     </Border>
 
-                    <!-- VIEW MODE: WebView2 Markdown renderer -->
-                    <Grid Grid.Row="1"
-                          Visibility="{Binding IsViewMode,
-                                       Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid Grid.Row="1" Margin="14,12,14,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                        <!-- Empty state when no document selected -->
-                        <StackPanel HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Visibility="{Binding HasSelectedDocument,
-                                                 Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                            <TextBlock Text="Select a document"
-                                       Foreground="{StaticResource Text/Muted}"
-                                       FontSize="15"
-                                       HorizontalAlignment="Center"/>
-                            <TextBlock Text="Choose a document from the list to view its content."
-                                       Foreground="{StaticResource Text/Muted}"
-                                       FontSize="12"
-                                       Margin="0,8,0,0"
-                                       TextAlignment="Center"
-                                       MaxWidth="260"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <Border Grid.Column="0"
+                                Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                Padding="12"
+                                Margin="0,0,8,0"
+                                AutomationProperties.AutomationId="document.detail.versions">
+                            <StackPanel>
+                                <TextBlock Text="VERSIONS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding VersionCountText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding SelectedVersion.DisplayLabel, FallbackValue='No version selected'}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
 
-                        <!-- WebView2 for rendered Markdown -->
-                        <wv2:WebView2 x:Name="MarkdownViewer"
-                                      Visibility="{Binding HasSelectedDocument,
-                                                   Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <Border Grid.Column="1"
+                                Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                Padding="12"
+                                Margin="0,0,8,0"
+                                AutomationProperties.AutomationId="document.detail.decisions">
+                            <StackPanel>
+                                <TextBlock Text="DECISIONS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="No linked decisions" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Text="Save Decision is not wired here yet" Foreground="{StaticResource Text/Muted}" FontSize="11"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                Padding="12"
+                                Margin="0,0,8,0"
+                                AutomationProperties.AutomationId="document.detail.tickets">
+                            <StackPanel>
+                                <TextBlock Text="TICKETS" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="No generated tickets" Foreground="{StaticResource Text/Muted}" FontSize="12"/>
+                                <TextBlock Text="Create through IronDev API when enabled" Foreground="{StaticResource Text/Muted}" FontSize="11"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="3"
+                                Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                BorderBrush="{StaticResource Border/Subtle}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                Padding="12"
+                                AutomationProperties.AutomationId="document.detail.evidence">
+                            <StackPanel>
+                                <TextBlock Text="NEXT ACTION" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding DocumentNextActionText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource Text/Muted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
-                    <!-- EDIT MODE: Raw Markdown editor -->
-                    <Grid Grid.Row="1"
-                          Visibility="{Binding IsEditing,
-                                       Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                    <Grid Grid.Row="2"
+                          Margin="14"
+                          AutomationProperties.AutomationId="document.detail.content">
+                        <controls:EmptyResultsState Title="No document selected"
+                                                   Description="Select a document or create a new project knowledge item.">
+                            <controls:EmptyResultsState.Style>
+                                <Style TargetType="controls:EmptyResultsState">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding HasSelectedDocument}" Value="False"/>
+                                                <Condition Binding="{Binding IsEditing}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </controls:EmptyResultsState.Style>
+                        </controls:EmptyResultsState>
 
-                        <Border Grid.Row="0"
-                                Background="#0D1117"
-                                Padding="14,10"
-                                BorderBrush="{StaticResource Border/Subtle}"
-                                BorderThickness="0,0,0,1"
-                                Visibility="{Binding IsCreatingDocument, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid>
+                        <Grid Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <wv2:WebView2 x:Name="MarkdownViewer"
+                                          Visibility="{Binding HasSelectedDocument, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </Grid>
+
+                        <Grid Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0"
+                                  Margin="0,0,0,12"
+                                  Visibility="{Binding IsCreatingDocument, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="12"/>
                                     <ColumnDefinition Width="220"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="TITLE"
-                                               Style="{StaticResource Typography.Eyebrow}"
-                                               Margin="0,0,0,4"/>
+                                    <TextBlock Text="TITLE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
                                     <TextBox Text="{Binding EditorTitle, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource IronDev.Input.TextBox}"
                                              MinHeight="34"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="TYPE"
-                                               Style="{StaticResource Typography.Eyebrow}"
-                                               Margin="0,0,0,4"/>
+                                    <TextBlock Text="TYPE" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
                                     <ComboBox Text="{Binding EditorDocumentType, UpdateSourceTrigger=PropertyChanged}"
                                               IsEditable="True"
+                                              Style="{StaticResource IronDev.Input.ComboBox}"
                                               MinHeight="34">
                                         <ComboBoxItem Content="DiscussionSummary"/>
                                         <ComboBoxItem Content="Architecture"/>
@@ -320,144 +357,345 @@
                                     </ComboBox>
                                 </StackPanel>
                             </Grid>
-                        </Border>
 
-                        <TextBox Grid.Row="1"
-                                 x:Name="MarkdownEditor"
-                                 Text="{Binding EditorMarkdown, UpdateSourceTrigger=PropertyChanged}"
-                                 AcceptsReturn="True"
-                                 AcceptsTab="True"
-                                 TextWrapping="NoWrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 HorizontalScrollBarVisibility="Auto"
-                                 FontFamily="Cascadia Code, Consolas, monospace"
-                                 FontSize="13"
-                                 Foreground="{StaticResource Text/Primary}"
-                                 Background="#0B0F14"
-                                 BorderThickness="0"
-                                 Padding="16"/>
+                            <TextBox Grid.Row="1"
+                                     x:Name="MarkdownEditor"
+                                     Text="{Binding EditorMarkdown, UpdateSourceTrigger=PropertyChanged}"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="True"
+                                     TextWrapping="NoWrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="{StaticResource IronDev.Font.Family.Mono}"
+                                     FontSize="{StaticResource IronDev.Font.Size.Body}"
+                                     Foreground="{StaticResource Text/Primary}"
+                                     Background="{StaticResource Background/App}"
+                                     BorderBrush="{StaticResource Border/Subtle}"
+                                     BorderThickness="1"
+                                     Padding="16"/>
 
-                        <!-- Change summary bar -->
-                        <Border Grid.Row="2"
-                                Background="#0D1117"
-                                Padding="14,10"
-                                BorderBrush="{StaticResource Border/Subtle}"
-                                BorderThickness="0,1,0,0">
-                            <DockPanel>
-                                <TextBlock DockPanel.Dock="Left"
-                                           Text="Change summary:"
-                                           Foreground="{StaticResource Text/Muted}"
-                                           VerticalAlignment="Center"
-                                           Margin="0,0,10,0"
-                                           FontSize="12"/>
-                                <TextBox Text="{Binding EditorChangeSummary, UpdateSourceTrigger=PropertyChanged}"
-                                         Foreground="{StaticResource Text/Primary}"
-                                         Background="Transparent"
-                                         BorderThickness="0,0,0,1"
-                                         Padding="4,2"
-                                         FontSize="12"
-                                         VerticalAlignment="Center"
-                                         MaxLength="300"/>
-                            </DockPanel>
-                        </Border>
+                            <Border Grid.Row="2"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,12,0,0">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="Change summary"
+                                               Style="{StaticResource Typography.Eyebrow}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <TextBox Text="{Binding EditorChangeSummary, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource IronDev.Input.TextBox}"
+                                             BorderThickness="0,0,0,1"
+                                             MaxLength="300"/>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
                     </Grid>
 
-                    <!-- Status bar -->
-                    <Border Grid.Row="2"
-                            Padding="14,8"
-                            Background="#0B0F14"
-                            BorderBrush="{StaticResource Border/Subtle}"
-                            BorderThickness="0,1,0,0"
-                            Visibility="{Binding HasStatusText,
-                                         Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="{Binding StatusText}"
-                                   Foreground="{StaticResource Text/Secondary}"
-                                   FontSize="11"
-                                   TextTrimming="CharacterEllipsis"/>
-                    </Border>
+                    <controls:EditorActionBar Grid.Row="3"
+                                              Background="{StaticResource Background/Surface}"
+                                              SeparatorThickness="0,1,0,0"
+                                              BarPadding="16,12"
+                                              StatusText="{Binding StatusText}">
+                        <controls:EditorActionBar.LeftActions>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Resolve Discussion"
+                                        IsEnabled="False"
+                                        Style="{StaticResource IronDev.CommandButton.Secondary}"
+                                        Margin="0,0,8,0"
+                                        AutomationProperties.AutomationId="document.command.resolveDiscussion"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Resolution is handled in Knowledge Compiler; this document workspace does not resolve discussions yet."/>
+                                <Button Content="Create Tickets"
+                                        IsEnabled="False"
+                                        Style="{StaticResource IronDev.CommandButton.Secondary}"
+                                        Margin="0,0,8,0"
+                                        AutomationProperties.AutomationId="document.command.createTickets"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Ticket generation from documents must go through IronDev.Api and is not wired for this workspace yet."/>
+                                <Button Content="Save Decision"
+                                        IsEnabled="False"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        Margin="0,0,8,0"
+                                        AutomationProperties.AutomationId="document.command.saveDecision"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Decision persistence is not exposed from this document workflow yet."/>
+                                <Button Content="Search Related Memory"
+                                        IsEnabled="False"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        Margin="0,0,8,0"
+                                        AutomationProperties.AutomationId="document.command.searchRelatedMemory"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Semantic memory search is available in Knowledge Compiler; inline document search is not wired yet."/>
+                                <Button Content="Reload Into Chat"
+                                        IsEnabled="False"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        AutomationProperties.AutomationId="document.command.reloadIntoChat"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Reload into Chat is not service-backed in this workspace yet."/>
+                            </StackPanel>
+                        </controls:EditorActionBar.LeftActions>
+
+                        <controls:EditorActionBar.RightActions>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Edit"
+                                        Command="{Binding StartEditingCommand}"
+                                        IsEnabled="{Binding HasSelectedVersion}"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        Margin="0,0,8,0"
+                                        Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Edit the selected document version."/>
+                                <Button Content="Copy"
+                                        Command="{Binding CopyDocumentCommand}"
+                                        IsEnabled="{Binding HasSelectedVersion}"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        Margin="0,0,8,0"
+                                        Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Copy the selected document version as Markdown."/>
+                                <Button Content="Save"
+                                        Command="{Binding SaveNewVersionCommand}"
+                                        Style="{StaticResource IronDev.CommandButton.Primary}"
+                                        Margin="0,0,8,0"
+                                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        AutomationProperties.AutomationId="document.command.save"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Save the document as a new version. Disabled until title, markdown, and change summary are present."/>
+                                <Button Content="Cancel"
+                                        Command="{Binding CancelEditingCommand}"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        Margin="0,0,12,0"
+                                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        AutomationProperties.AutomationId="document.command.cancel"
+                                        ToolTip="Cancel document editing."/>
+                                <Border Width="1"
+                                        Height="24"
+                                        Background="{StaticResource Border/Subtle}"
+                                        Margin="0,0,12,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                <Button Content="Archive"
+                                        Command="{Binding ArchiveDocumentCommand}"
+                                        IsEnabled="{Binding HasSelectedDocument}"
+                                        Style="{StaticResource IronDev.CommandButton.Ghost}"
+                                        Visibility="{Binding IsViewMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        AutomationProperties.AutomationId="document.command.archive"
+                                        ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="Archive the selected document."/>
+                            </StackPanel>
+                        </controls:EditorActionBar.RightActions>
+                    </controls:EditorActionBar>
                 </Grid>
             </Border>
 
-            <!-- ── Col 2: Version history ────────────────────────────── -->
-            <Border Grid.Column="2"
-                    Style="{StaticResource SurfacePanel.Subtle}"
-                    Padding="12">
+            <controls:SurfacePanel Grid.Column="2"
+                                   Variant="Subtle"
+                                   Padding="0"
+                                   AutomationProperties.AutomationId="document.inspector">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0"
-                               Text="VERSION HISTORY"
-                               Style="{StaticResource Typography.Eyebrow}"
-                               Margin="0,0,0,10"/>
+                    <Border Grid.Row="0"
+                            Padding="16,18,16,12"
+                            BorderBrush="{StaticResource Border/Subtle}"
+                            BorderThickness="0,0,0,1">
+                        <StackPanel>
+                            <TextBlock Text="CONTEXT INSPECTOR" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Provenance, versions, memory evidence, and downstream workflow links"
+                                       Foreground="{StaticResource Text/Secondary}"
+                                       FontSize="{StaticResource IronDev.Font.Size.Body}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
 
-                    <ListBox Grid.Row="1"
-                             ItemsSource="{Binding VersionHistory}"
-                             SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
-                             ItemContainerStyle="{StaticResource AppListBoxItem.Compact}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="4,6">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="14">
+                        <StackPanel>
+                            <Border AutomationProperties.AutomationId="document.inspector.provenance"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Provenance" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{Binding DocumentSourceText}" Foreground="{StaticResource Text/Primary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Stored as IronDev project knowledge through the document service."
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"
+                                               Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
 
-                                        <DockPanel Grid.Row="0">
-                                            <primitives:StatusBadge DockPanel.Dock="Right"
-                                                                    Text="{Binding Status}"
-                                                                    Status="Info"/>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding VersionLabel}"
-                                                           Foreground="{StaticResource Text/Primary}"
-                                                           FontWeight="SemiBold"
-                                                           FontSize="13"
-                                                           Margin="0,0,8,0"/>
-                                                <!-- Current marker -->
-                                                <TextBlock Text="● CURRENT"
-                                                           Foreground="{StaticResource Accent/Primary}"
-                                                           FontSize="9"
-                                                           FontWeight="SemiBold"
-                                                           VerticalAlignment="Center">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsCurrent}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </DockPanel>
+                            <Border AutomationProperties.AutomationId="document.inspector.sourceLinks"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Source links" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="No external source links are attached to this document."
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
 
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding ChangeSummary}"
-                                                   Foreground="{StaticResource Text/Secondary}"
-                                                   FontSize="11"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,3,0,0"/>
+                            <Border AutomationProperties.AutomationId="document.inspector.versions"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <TextBlock Text="Versions" Style="{StaticResource Typography.Eyebrow}" DockPanel.Dock="Left"/>
+                                        <controls:StatusBadge Text="{Binding VersionCountText}" Status="Info" DockPanel.Dock="Right"/>
+                                    </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding VersionHistory}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource Border/Subtle}"
+                                                        BorderThickness="0,0,0,1"
+                                                        Padding="0,6">
+                                                    <StackPanel>
+                                                        <DockPanel>
+                                                            <TextBlock Text="{Binding VersionLabel}"
+                                                                       Foreground="{StaticResource Text/Primary}"
+                                                                       FontWeight="SemiBold"
+                                                                       DockPanel.Dock="Left"/>
+                                                            <controls:StatusBadge Text="{Binding Status}" Status="Info" DockPanel.Dock="Right"/>
+                                                        </DockPanel>
+                                                        <TextBlock Text="{Binding ChangeSummary}"
+                                                                   Foreground="{StaticResource Text/Muted}"
+                                                                   FontSize="11"
+                                                                   TextWrapping="Wrap"
+                                                                   Margin="0,3,0,0"/>
+                                                        <TextBlock Text="{Binding DateLabel}"
+                                                                   Foreground="{StaticResource Text/Muted}"
+                                                                   FontSize="10"
+                                                                   Margin="0,3,0,0"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
 
-                                        <TextBlock Grid.Row="2"
-                                                   Text="{Binding DateLabel}"
-                                                   Foreground="{StaticResource Text/Muted}"
-                                                   FontSize="10"
-                                                   Margin="0,3,0,0"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                            <Border AutomationProperties.AutomationId="document.inspector.relatedDecisions"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Related decisions" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="No related decisions linked."
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border AutomationProperties.AutomationId="document.inspector.linkedTickets"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Generated / linked tickets" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="No IronDev tickets have been generated from this document."
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border AutomationProperties.AutomationId="document.inspector.memoryEvidence"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Memory ranking evidence" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{Binding SelectedVersion.DisplayLabel, FallbackValue='No memory evidence selected'}"
+                                               Foreground="{StaticResource Text/Primary}"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="Semantic ranking evidence is available in Knowledge Compiler search."
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"
+                                               Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border AutomationProperties.AutomationId="document.inspector.traceLinks"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Trace links" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="No trace links are attached to this document."
+                                               Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border AutomationProperties.AutomationId="document.inspector.warnings"
+                                    Background="{StaticResource IronDev.Brush.Surface.Interactive}"
+                                    BorderBrush="{StaticResource Border/Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource IronDev.Radius.Medium}"
+                                    Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Stale / conflict warnings" Style="{StaticResource Typography.Eyebrow}" Margin="0,0,0,8"/>
+                                    <TextBlock Foreground="{StaticResource Text/Muted}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="No active stale or conflict warnings."/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedVersion.IsCurrent}" Value="False">
+                                                        <Setter Property="Text" Value="You are viewing a historical version. Use the current version before creating tickets or build context."/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Status.Warning.Foreground}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
-            </Border>
+            </controls:SurfacePanel>
         </Grid>
     </Grid>
 </UserControl>
