@@ -1,4 +1,19 @@
+import type { components } from './generated/ironDevApiTypes';
+
 export type ApiConnectionStatus = 'loading' | 'connected' | 'disconnected' | 'authRequired' | 'error';
+
+export type ProductAccessStatus =
+  | 'loading'
+  | 'apiOffline'
+  | 'apiError'
+  | 'authRequired'
+  | 'authInvalid'
+  | 'tenantRequired'
+  | 'projectRequired'
+  | 'loadingTickets'
+  | 'ready'
+  | 'emptyTickets'
+  | 'error';
 
 export interface ApiStatus {
   status: ApiConnectionStatus;
@@ -6,23 +21,44 @@ export interface ApiStatus {
   message: string;
 }
 
-export interface ProjectTicket {
+export type ProjectTicket = components['schemas']['ProjectTicket'];
+export type ProjectSummary = components['schemas']['Project'];
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  userId: number;
+  displayName: string;
+}
+
+export interface UserProfile {
+  userId: number;
+  email: string;
+  displayName: string;
+  selectedTenantId: number | null;
+}
+
+export interface TenantSummary {
   id: number;
-  projectId: number;
-  title: string;
-  ticketType?: string;
-  priority?: string;
-  status?: string;
-  summary?: string | null;
-  problem?: string | null;
-  acceptanceCriteria?: string | null;
-  contextSummary?: string | null;
-  buildValidation?: string | null;
-  createdDate?: string;
+  name: string;
+  slug: string;
 }
 
 export interface TicketLoadResult {
   tickets: ProjectTicket[];
   status: ApiConnectionStatus;
   message: string;
+}
+
+export interface ProjectContextState {
+  tenants: TenantSummary[];
+  projects: ProjectSummary[];
+  selectedTenantId: number | null;
+  selectedProjectId: number | null;
+  selectedProjectName: string | null;
+  projectSelectionMode: 'api' | 'fallback-config';
 }

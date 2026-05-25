@@ -115,6 +115,8 @@ Required API/auth states:
 - Connected
 - Disconnected
 - Auth required
+- Tenant required
+- Project required
 - Loading
 - Error
 
@@ -130,6 +132,12 @@ Disconnected API state should be explicit and operational:
 - Title: `IronDev.Api is offline`
 - Body: `Start the backend with: dotnet run --project IronDev.Api`
 - Actions: `Retry connection`
+
+Tenant and project states are first-class product states. Do not hide them as generic auth failures:
+
+- `Tenant required`: show `tenant.selector`.
+- `Project required`: show `project.selector` and `project.status.missing`.
+- `Project selected`: show `project.status.selected`.
 
 ## Responsive Behaviour
 
@@ -164,8 +172,19 @@ Current required selectors:
 - `app.authState`
 - `app.authState.configureToken`
 - `app.authState.retry`
+- `auth.form`
+- `auth.email`
+- `auth.password`
+- `auth.submit`
+- `auth.tokenInput`
+- `auth.saveToken`
+- `tenant.selector`
+- `tenant.option`
+- `project.selector`
+- `project.option`
 - `shell.nav.tickets`
 - `tickets.workspace`
+- `tickets.header`
 - `ticket.list`
 - `ticket.row`
 - `ticket.detail`
@@ -174,6 +193,8 @@ Current required selectors:
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`
+- `project.status.selected`
+- `project.status.missing`
 
 ## What Not To Do
 

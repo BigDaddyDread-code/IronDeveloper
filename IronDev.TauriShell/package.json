@@ -10,6 +10,8 @@
     "test": "playwright test",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
+    "api:fetch-openapi": "node scripts/fetch-openapi-spec.mjs",
+    "api:generate": "npm run api:fetch-openapi && openapi-typescript openapi/irondev-api.openapi.json -o src/api/generated/ironDevApiTypes.ts",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
@@ -25,6 +27,7 @@
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.5"
   }
