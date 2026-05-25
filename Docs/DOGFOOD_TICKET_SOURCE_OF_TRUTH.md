@@ -42,6 +42,48 @@ dotnet run --project IronDev.Api
 
 There is no direct SQL fallback, no Infrastructure service fallback, and no GitHub issue fallback.
 
+## CLI/API Boundary
+
+The CLI is an operational client of the API. It is not an implementation layer behind API endpoints.
+
+Correct:
+
+```text
+Codex -> CLI -> IronDev.Client/HTTP -> IronDev.Api -> services -> DB
+UI -> IronDev.Client/HTTP -> IronDev.Api -> services -> DB
+```
+
+Wrong:
+
+```text
+UI -> API -> CLI -> services
+Codex -> CLI -> Infrastructure -> DB
+API endpoint -> ReplayRunner command -> stdout -> response
+```
+
+The API may call application/domain services, Infrastructure services, repositories, and providers. It must not call ReplayRunner, CLI command handlers, PowerShell wrappers, shell commands for product persistence, or stdout-parsed command results.
+
+Important:
+The new ticket commands must be thin clients over the API.
+
+They should:
+
+- parse command arguments
+- read JSON payloads
+- check `/health`
+- authenticate/select tenant if required
+- call `IronDev.Client` or HTTP
+- print JSON result
+- exit non-zero on failure
+
+They should not:
+
+- own ticket creation business logic
+- map directly to SQL
+- instantiate `TicketService`
+- reference `IronDev.Infrastructure`
+- be called by `IronDev.Api`
+
 Structured ticket creation uses `CreateProjectTicketRequest`. External references and provenance are currently preserved in existing `ProjectTicket.TechnicalNotes` and `ProjectTicket.GenerationNote` fields. This keeps the write path canonical without introducing a schema redesign before the product needs richer querying over references.
 
 ## Configuration Order
