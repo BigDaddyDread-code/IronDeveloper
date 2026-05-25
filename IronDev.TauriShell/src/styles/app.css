@@ -21,12 +21,14 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
 }
@@ -368,7 +370,8 @@ p {
 .workspace-list-item__badges,
 .ticket-detail__badges,
 .auth-required-state__actions,
-.token-config {
+.token-config,
+.auth-form__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -447,7 +450,9 @@ p {
   overflow-wrap: anywhere;
 }
 
-.auth-required-state__header {
+.auth-required-state__header,
+.auth-form,
+.context-select {
   display: grid;
   gap: var(--space-2);
 }
@@ -462,15 +467,38 @@ p {
   align-items: center;
 }
 
+.auth-form label,
+.context-select {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
+}
+
+.auth-form input,
+.context-select select,
 .token-config input {
   min-width: 12rem;
-  flex: 1 1 14rem;
   min-height: 2rem;
   border: var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--color-bg-input);
   color: var(--color-text-primary);
   padding: 0 var(--space-3);
+}
+
+.auth-form input,
+.context-select select {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.token-config input {
+  flex: 1 1 14rem;
+}
+
+.state-error {
+  color: var(--color-status-danger);
 }
 
 .shell-footer {

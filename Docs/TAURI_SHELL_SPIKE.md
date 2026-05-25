@@ -12,7 +12,7 @@ React and TypeScript can make the cockpit UI faster to iterate, and Playwright k
 
 - A Tauri/Vite/React shell can start as a desktop-oriented frontend.
 - The shell checks `GET /health` on `IronDev.Api`.
-- The shell has a typed fetch wrapper for API-backed ticket data.
+- The shell has generated OpenAPI types plus a typed HTTP facade for auth, tenants, projects, and tickets.
 - The shell renders a minimal Tickets cockpit with stable `data-testid` selectors.
 - Playwright can smoke-test the Vite-hosted shell surface.
 - WPF remains in place while the future shell is evaluated.
@@ -24,7 +24,7 @@ React and TypeScript can make the cockpit UI faster to iterate, and Playwright k
 - It does not migrate all workspaces.
 - It does not move backend/product logic into TypeScript.
 - It does not bypass `IronDev.Api`.
-- It does not implement production auth, desktop packaging, or updater support.
+- It does not implement production credential vaulting, full desktop automation, or updater support.
 
 ## API Boundary
 
@@ -32,12 +32,12 @@ The shell follows the product boundary:
 
 ```text
 Tauri / React UI
-  -> typed TypeScript fetch wrapper
+  -> generated OpenAPI types + typed HTTP facade
   -> IronDev.Api
   -> services / database / memory / tickets / agents
 ```
 
-The current spike uses a tiny typed fetch wrapper. The intended production path is a generated TypeScript client from the `IronDev.Api` OpenAPI/Swagger contract once auth/project selection and endpoint coverage settle.
+The shell checks in an OpenAPI snapshot and generated TypeScript types. See `Docs/TAURI_API_CLIENT.md` for regeneration and drift detection.
 
 The shell assumes `IronDev.Api` is already running locally at:
 
@@ -57,29 +57,43 @@ The shell checks:
 GET /health
 ```
 
+Auth and project context use:
+
+```text
+POST /api/auth/login
+GET /api/auth/me
+GET /api/tenants
+POST /api/tenants/select
+GET /api/projects
+POST /api/projects/{projectId}/select
+```
+
 Ticket data is loaded through:
 
 ```text
 GET /api/projects/{projectId}/tickets
 ```
 
-That route is authenticated. For this spike, pass a token through environment configuration or browser local storage:
+Ticket/project routes are authenticated. For this spike, either sign in through the shell, paste a token, or pass a token through environment configuration/browser local storage:
 
 ```powershell
 $env:VITE_IRONDEV_DEV_TOKEN = "<tenant-jwt>"
 $env:VITE_IRONDEV_PROJECT_ID = "1"
 $env:VITE_IRONDEV_API_BASE_URL = "http://localhost:5000"
+$env:IRONDEV_API_PROXY_TARGET = "https://localhost:7000"
 ```
 
 or set:
 
 ```js
 localStorage.setItem("irondev.token", "<tenant-jwt>");
-localStorage.setItem("irondev.projectId", "1");
+localStorage.setItem("irondev.selectedProjectId", "1");
 localStorage.setItem("irondev.apiBaseUrl", "http://localhost:5000");
 ```
 
-If no token is configured, the shell shows an unauthenticated state instead of faking ticket data.
+If no token/project context is configured, the shell shows product states instead of faking ticket data.
+
+In Vite dev mode, default localhost API calls go through `/irondev-api`. The proxy targets `https://localhost:7000` by default to avoid browser-visible CORS failures when the .NET API redirects HTTP to HTTPS. Override `IRONDEV_API_PROXY_TARGET` if your local API uses a different profile.
 
 ## How To Run
 
@@ -103,16 +117,28 @@ From `IronDev.TauriShell`:
 ```powershell
 npm run build
 npm run test:e2e:install
-npm run test:e2e
+npm run test
 ```
 
 The smoke test verifies:
 
 - `app.shell`
+- `app.header`
 - `app.apiStatus`
-- `shell.header`
+- `app.authState`
+- `auth.form`
+- `auth.email`
+- `auth.password`
+- `auth.submit`
+- `auth.tokenInput`
+- `auth.saveToken`
+- `tenant.selector`
+- `tenant.option`
+- `project.selector`
+- `project.option`
 - `shell.nav.tickets`
 - `tickets.workspace`
+- `tickets.header`
 - `ticket.list`
 - `ticket.row` when API data is available
 - `ticket.detail`
@@ -120,7 +146,9 @@ The smoke test verifies:
 - `ticket.command.refresh`
 - `api.status.connected`
 - `api.status.disconnected`
-- `api.status.unauthenticated`
+- `api.status.authRequired`
+- `project.status.selected`
+- `project.status.missing`
 
 ## Tauri Desktop Check
 

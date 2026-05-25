@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const apiProxyTarget = process.env.IRONDEV_API_PROXY_TARGET ?? 'https://localhost:7000';
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -9,8 +11,9 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/irondev-api': {
-        target: 'http://localhost:5000',
+        target: apiProxyTarget,
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path.replace(/^\/irondev-api/, '')
       }
     }

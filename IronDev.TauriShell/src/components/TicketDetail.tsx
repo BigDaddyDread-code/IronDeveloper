@@ -5,9 +5,18 @@ import { SurfacePanel } from './SurfacePanel';
 
 interface TicketDetailProps {
   ticket: ProjectTicket | null;
+  isLoading?: boolean;
 }
 
-export function TicketDetail({ ticket }: TicketDetailProps) {
+export function TicketDetail({ ticket, isLoading = false }: TicketDetailProps) {
+  if (isLoading) {
+    return (
+      <SurfacePanel className="ticket-detail ticket-detail--empty" testId="ticket.detail">
+        <EmptyState title="Loading tickets" body="IronDev is loading the selected project ticket queue." />
+      </SurfacePanel>
+    );
+  }
+
   if (!ticket) {
     return (
       <SurfacePanel className="ticket-detail ticket-detail--empty" testId="ticket.detail">
@@ -24,7 +33,7 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
       <div className="ticket-detail__header">
         <div className="ticket-detail__title">
           <p className="eyebrow">Selected ticket</p>
-          <h2>{ticket.title}</h2>
+          <h2>{ticket.title ?? `Ticket ${ticket.id}`}</h2>
           <p>{ticket.summary ?? ticket.problem ?? 'No brief captured yet.'}</p>
         </div>
         <div className="ticket-detail__badges">
