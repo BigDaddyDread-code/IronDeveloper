@@ -596,77 +596,6 @@ export function useTicketsWorkspace() {
     }
   }, [editDraft, isEditDirty, project, selectedProjectId, selectedTicket, session.client, ticketActionBlockedReason]);
 
-  const refreshReadiness = useCallback(async () => {
-    if (!selectedProjectId || !selectedTicketIdForList) {
-      setReadiness(null);
-      setReadinessStatus('unavailable');
-      setReadinessMessage('Select a project ticket before checking build readiness.');
-      return;
-    }
-
-    setReadinessStatus('loading');
-    setReadinessMessage('Checking build readiness through IronDev.Api...');
-
-    try {
-      const result = await session.client.getTicketBuildReadiness(selectedProjectId, selectedTicketIdForList);
-      setReadiness(result);
-      setReadinessStatus('loaded');
-      setReadinessMessage(result.message ?? 'Build readiness returned without a message.');
-      void refreshEvidence();
-    } catch (error) {
-      setReadiness(null);
-
-      if (error instanceof IronDevApiError && error.status === 404) {
-        setReadinessStatus('unavailable');
-        setReadinessMessage('Build readiness is not available for this ticket yet.');
-      } else if (error instanceof IronDevApiError) {
-        setReadinessStatus('error');
-        setReadinessMessage(`Build readiness failed with HTTP ${error.status}.`);
-      } else {
-        setReadinessStatus('error');
-        setReadinessMessage('Build readiness request could not reach IronDev.Api.');
-        void refreshEvidence();
-      }
-    }
-  }, [refreshEvidence, selectedProjectId, selectedTicketIdForList, session.client]);
-
-  const refreshImplementationPlan = useCallback(async () => {
-    if (!selectedTicketIdForList) {
-      setPlanStatus('unavailable');
-      setPlanMessage('Select a ticket before refreshing the implementation plan.');
-      return;
-    }
-
-    if (ticketActionBlockedReason) {
-      setPlanStatus('unavailable');
-      setPlanMessage(ticketActionBlockedReason);
-      return;
-    }
-
-    setPlanStatus('loading');
-    setPlanMessage('Refreshing implementation plan through IronDev.Api...');
-
-    try {
-      const plan = await session.client.getTicketImplementationPlan(selectedTicketIdForList);
-      setImplementationPlan(plan);
-      setPlanStatus('loaded');
-      setPlanMessage(plan.proposedSteps || plan.goal ? 'Implementation plan loaded.' : 'Implementation plan returned without detailed steps.');
-    } catch (error) {
-      setImplementationPlan(null);
-
-      if (error instanceof IronDevApiError && error.status === 404) {
-        setPlanStatus('unavailable');
-        setPlanMessage('Plan not available yet. The API has not exposed a plan for this ticket.');
-      } else if (error instanceof IronDevApiError) {
-        setPlanStatus('error');
-        setPlanMessage(`Plan refresh failed with HTTP ${error.status}.`);
-      } else {
-        setPlanStatus('error');
-        setPlanMessage('Plan refresh could not reach IronDev.Api.');
-      }
-    }
-  }, [session.client, selectedTicketIdForList, ticketActionBlockedReason]);
-
   const refreshEvidence = useCallback(async () => {
     if (!selectedTicket) {
       setEvidenceSummary(null);
@@ -745,6 +674,77 @@ export function useTicketsWorkspace() {
       setEvidenceMessage('Execution evidence could not be loaded from run reports.');
     }
   }, [readiness, readinessStatus, selectedTicket, session.client]);
+
+  const refreshReadiness = useCallback(async () => {
+    if (!selectedProjectId || !selectedTicketIdForList) {
+      setReadiness(null);
+      setReadinessStatus('unavailable');
+      setReadinessMessage('Select a project ticket before checking build readiness.');
+      return;
+    }
+
+    setReadinessStatus('loading');
+    setReadinessMessage('Checking build readiness through IronDev.Api...');
+
+    try {
+      const result = await session.client.getTicketBuildReadiness(selectedProjectId, selectedTicketIdForList);
+      setReadiness(result);
+      setReadinessStatus('loaded');
+      setReadinessMessage(result.message ?? 'Build readiness returned without a message.');
+      void refreshEvidence();
+    } catch (error) {
+      setReadiness(null);
+
+      if (error instanceof IronDevApiError && error.status === 404) {
+        setReadinessStatus('unavailable');
+        setReadinessMessage('Build readiness is not available for this ticket yet.');
+      } else if (error instanceof IronDevApiError) {
+        setReadinessStatus('error');
+        setReadinessMessage(`Build readiness failed with HTTP ${error.status}.`);
+      } else {
+        setReadinessStatus('error');
+        setReadinessMessage('Build readiness request could not reach IronDev.Api.');
+        void refreshEvidence();
+      }
+    }
+  }, [refreshEvidence, selectedProjectId, selectedTicketIdForList, session.client]);
+
+  const refreshImplementationPlan = useCallback(async () => {
+    if (!selectedTicketIdForList) {
+      setPlanStatus('unavailable');
+      setPlanMessage('Select a ticket before refreshing the implementation plan.');
+      return;
+    }
+
+    if (ticketActionBlockedReason) {
+      setPlanStatus('unavailable');
+      setPlanMessage(ticketActionBlockedReason);
+      return;
+    }
+
+    setPlanStatus('loading');
+    setPlanMessage('Refreshing implementation plan through IronDev.Api...');
+
+    try {
+      const plan = await session.client.getTicketImplementationPlan(selectedTicketIdForList);
+      setImplementationPlan(plan);
+      setPlanStatus('loaded');
+      setPlanMessage(plan.proposedSteps || plan.goal ? 'Implementation plan loaded.' : 'Implementation plan returned without detailed steps.');
+    } catch (error) {
+      setImplementationPlan(null);
+
+      if (error instanceof IronDevApiError && error.status === 404) {
+        setPlanStatus('unavailable');
+        setPlanMessage('Plan not available yet. The API has not exposed a plan for this ticket.');
+      } else if (error instanceof IronDevApiError) {
+        setPlanStatus('error');
+        setPlanMessage(`Plan refresh failed with HTTP ${error.status}.`);
+      } else {
+        setPlanStatus('error');
+        setPlanMessage('Plan refresh could not reach IronDev.Api.');
+      }
+    }
+  }, [session.client, selectedTicketIdForList, ticketActionBlockedReason]);
 
   const onStartDisposableRun = useCallback(() => {
     if (startDisposableRunBlockedReason) {
