@@ -4,7 +4,7 @@
 
 This document is the historical dogfood/replay inventory for `IronDev.ReplayRunner` and older product-shaped aliases. The current product/internal classification lives in `Docs/cli/CLI_COMMAND_INVENTORY.md`.
 
-`tools/IronDev.Cli` is the product CLI and must move to `IronDev.Client`; today it calls `IronDev.Api` directly with `HttpClient`. `tools/IronDev.ReplayRunner` is internal dogfood/replay tooling.
+`tools/IronDev.Cli` is the product CLI and current ticket commands use `IronDev.Client`; `tools/IronDev.ReplayRunner` is internal dogfood/replay tooling.
 
 The machine-readable inventory is stored at:
 

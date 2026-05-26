@@ -10,13 +10,13 @@ TauriShell / Product CLI / Future Clients
     -> IronDev.Api
 ```
 
-Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and no `IronDev.Infrastructure` project reference, but `tools/IronDev.Cli` still builds direct `HttpClient` calls instead of consuming these typed clients.
+Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and no `IronDev.Infrastructure` project reference, and `tools/IronDev.Cli` now routes its current product ticket commands through `IIronDevApiClient`. Durable runs, document-to-ticket generation, and several product CLI commands remain missing.
 
 ## Summary
 
 | Client area | HTTP-backed methods | Status |
 |---|---:|---|
-| Auth facade `IIronDevApiClient` | 6 | Implemented, overlapping legacy facade |
+| Product facade `IIronDevApiClient` | 10 | Implemented for health/auth/current Product CLI ticket operations; overlaps with narrower typed clients |
 | Auth `IAuthApiClient` | 5 | Implemented |
 | Projects | 7 | Implemented |
 | Tickets/build/proposals | 20 | Implemented |
@@ -30,20 +30,20 @@ Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and n
 | Traces | 0 | In-memory local client, not HTTP |
 | Prompting | 3 | Client boundary adapter over chat/prompt services, not direct REST methods |
 
-HTTP-backed typed operation count, excluding the overlapping legacy auth facade: **81**.
+HTTP-backed typed operation count, excluding the overlapping product facade: **81**.
 
 ## Consumer Evidence
 
 | Consumer | Current state |
 |---|---|
 | `IronDeveloper` WPF | Registers `AddIronDevClient`, receives typed client services through DI, including report services backed by `RunReportsApiClient`. |
-| `tools/IronDev.Cli` | Does not reference `IronDev.Client`; uses direct `HttpClient` against API routes. This is a boundary gap. |
+| `tools/IronDev.Cli` | References `IronDev.Client` and uses `IIronDevApiClient` for current product ticket commands. |
 | `IronDev.TauriShell` | Uses generated OpenAPI TypeScript types and browser fetch helpers, not the C# `IronDev.Client`. It does not reference Infrastructure. |
 | `tools/IronDev.ReplayRunner` | Internal dogfood runner; not expected to use `IronDev.Client` for every diagnostic path. |
 
 ## Auth Facade
 
-`IIronDevApiClient`/`IronDevApiClient` is a small legacy/general facade. It overlaps with `IAuthApiClient`.
+`IIronDevApiClient`/`IronDevApiClient` is a product facade for health/auth and current Product CLI ticket commands. It overlaps with `IAuthApiClient` and `ITicketsApiClient`; that overlap should be collapsed once the single public client contract is finalized.
 
 | Client method | HTTP method | API route | Request DTO | Response DTO | Current consumers | Status |
 |---|---|---|---|---|---|---|
@@ -53,6 +53,10 @@ HTTP-backed typed operation count, excluding the overlapping legacy auth facade:
 | `GetTenantsAsync` | GET | `/api/tenants` | None | `IReadOnlyList<TenantDto>` | Legacy/general | Implemented |
 | `SelectTenantAsync` | POST | `/api/tenants/select` | `SelectTenantRequest` | `LoginResponse` | Legacy/general | Implemented |
 | `LogoutAsync` | POST | `/api/auth/logout` | None | None | Legacy/general | Implemented |
+| `CreateTicketAsync` | POST | `/api/projects/{projectId}/tickets` | `CreateProjectTicketRequest` | `ProjectTicket` | Product CLI | Implemented |
+| `GetTicketsAsync` | GET | `/api/projects/{projectId}/tickets?take={take}` | None | `IReadOnlyList<ProjectTicket>` | Product CLI | Implemented |
+| `GetProjectTicketAsync` | GET | `/api/projects/{projectId}/tickets/{ticketId}` | None | `ProjectTicket?` | Product CLI | Implemented |
+| `ImportExternalTicketAsync` | POST | `/api/projects/{projectId}/tickets/import-external` | `ImportExternalTicketRequest` | `ProjectTicket` | Product CLI | Implemented |
 
 ## Auth
 

@@ -1,4 +1,6 @@
 using IronDev.Core.Auth;
+using IronDev.Core.Models;
+using IronDev.Data.Models;
 
 namespace IronDev.Client;
 
@@ -15,4 +17,12 @@ public interface IIronDevApiClient
     Task<LoginResponse> SelectTenantAsync(SelectTenantRequest request, CancellationToken cancellationToken = default);
 
     Task LogoutAsync(CancellationToken cancellationToken = default);
+
+    Task<ProjectTicket> CreateTicketAsync(int projectId, CreateProjectTicketRequest request, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProjectTicket>> GetTicketsAsync(int projectId, int take = 50, CancellationToken cancellationToken = default);
+
+    Task<ProjectTicket?> GetProjectTicketAsync(int projectId, long ticketId, CancellationToken cancellationToken = default);
+
+    Task<ProjectTicket> ImportExternalTicketAsync(int projectId, ImportExternalTicketRequest request, CancellationToken cancellationToken = default);
 }

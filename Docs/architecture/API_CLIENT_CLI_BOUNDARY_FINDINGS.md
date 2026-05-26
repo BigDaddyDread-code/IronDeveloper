@@ -23,14 +23,13 @@ This branch is an evidence slice. It documents what is true now and where the bo
 
 ## Partially Clean
 
-- Product CLI commands call `IronDev.Api`, so ticket persistence is API-backed rather than SQL/file/repository-backed.
-- Product CLI commands do not use `IronDev.Client`; they construct `HttpClient` directly in `tools/IronDev.Cli/IronDevCli.cs`.
+- Product CLI commands call `IronDev.Api` through `IronDev.Client`/`IIronDevApiClient`, so current ticket persistence is API-backed rather than SQL/file/repository-backed.
 - `IronDev.TauriShell` uses generated OpenAPI TypeScript types and browser API helpers, not the C# `IronDev.Client`. That keeps it away from Infrastructure but means it is not literally on the same typed client library.
 - `IronDev.Client` includes run report methods, but they map to `/api/run-reports/*`, not the planned durable `/api/runs/*` model.
 
 ## Leaking Or Missing
 
-- Product CLI is **not** currently truly API/client-boundary clean because it bypasses `IronDev.Client`.
+- Current Product CLI ticket commands are now API/client-boundary clean; they use `IIronDevApiClient`.
 - Product CLI has only four ticket commands: `ticket create`, `ticket list`, `ticket show`, and `ticket import-github-issue`.
 - Product CLI lacks project, document, memory, run status, run report, ticket generation, and build run commands.
 - Run status/report/event workflows still leak report-shaped details. Existing routes are `/api/run-reports`, `/api/run-reports/{runId}`, `/api/run-reports/{runId}/evidence`, and `/api/run-reports/{runId}/evidence/text?path=...`.
@@ -46,8 +45,8 @@ This branch is an evidence slice. It documents what is true now and where the bo
 |---|---:|
 | Actual IronDev.Api routes | 84 |
 | Planned endpoint gaps documented | 14 |
-| HTTP-backed typed client methods, excluding overlapping auth facade | 81 |
-| Legacy/general `IIronDevApiClient` facade methods | 6 |
+| HTTP-backed typed client methods, excluding overlapping product facade | 81 |
+| Product `IIronDevApiClient` facade methods | 10 |
 | Product CLI commands | 4 |
 | ReplayRunner/dogfood commands | 76 |
 
@@ -66,7 +65,6 @@ This branch is an evidence slice. It documents what is true now and where the bo
 
 | Violation | Evidence | Severity | Follow-up |
 |---|---|---|---|
-| Product CLI bypasses `IronDev.Client`. | `tools/IronDev.Cli/IronDevCli.cs` constructs `HttpClient` and calls routes directly. | High | Route Product CLI through `IronDev.Client`. |
 | Product CLI surface is incomplete. | Only four ticket commands exist. | High | Add API/client-backed project, document, memory, run, generation, and build commands. |
 | Durable run API is missing. | Only `/api/run-reports/*` exists. | High | Add `/api/runs/{runId}`, `/api/runs/{runId}/report`, and later SSE `/api/runs/{runId}/events`. |
 | Document resolution is stubbed. | `POST /api/projects/{projectId}/documents/{documentId}/resolve` returns not implemented. | Medium | Implement or remove from product inventory until ready. |
@@ -75,11 +73,10 @@ This branch is an evidence slice. It documents what is true now and where the bo
 
 ## Recommended Follow-Up Tickets
 
-1. Route `tools/IronDev.Cli` through `IronDev.Client` and remove direct `HttpClient` calls from command handlers.
-2. Add missing Product CLI commands for projects, documents, memory search, run status/report, ticket generation, and build runs.
-3. Add durable run API and client methods: `GET /api/runs/{runId}`, `GET /api/runs/{runId}/report`.
-4. Add SSE run event streaming after durable run status exists: `GET /api/runs/{runId}/events`.
-5. Add product API/client route for document-version to ticket generation.
-6. Decide whether `DocumentsController.ResolveDocument` should be implemented or removed from the product route surface.
-7. Split or rename ReplayRunner/dogfood commands so product-shaped internal commands cannot be mistaken for public CLI commands.
-8. Extend boundary tests once the Product CLI is actually migrated to `IronDev.Client`; today that assertion would correctly fail.
+1. Add missing Product CLI commands for projects, documents, memory search, run status/report, ticket generation, and build runs.
+2. Add durable run API and client methods: `GET /api/runs/{runId}`, `GET /api/runs/{runId}/report`.
+3. Add SSE run event streaming after durable run status exists: `GET /api/runs/{runId}/events`.
+4. Add product API/client route for document-version to ticket generation.
+5. Decide whether `DocumentsController.ResolveDocument` should be implemented or removed from the product route surface.
+6. Split or rename ReplayRunner/dogfood commands so product-shaped internal commands cannot be mistaken for public CLI commands.
+7. Collapse overlapping `IIronDevApiClient`, `IAuthApiClient`, and `ITicketsApiClient` surface into one clear public contract.

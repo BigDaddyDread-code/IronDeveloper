@@ -17,6 +17,37 @@ public sealed class ApiBoundaryTests
     }
 
     [TestMethod]
+    public void ProductCli_MustUseIronDevClientInsteadOfDirectHttp()
+    {
+        var root = FindRepositoryRoot();
+        var cliRoot = Path.Combine(root, "tools", "IronDev.Cli");
+        var project = File.ReadAllText(Path.Combine(cliRoot, "IronDev.Cli.csproj"));
+        StringAssert.Contains(project, "IronDev.Client");
+
+        var forbidden = new[]
+        {
+            "new HttpClient",
+            ".GetAsync(",
+            ".PostAsJsonAsync(",
+            ".PutAsJsonAsync(",
+            ".DeleteAsync(",
+            "ReadFromJsonAsync",
+            "System.Net.Http.Json"
+        };
+
+        foreach (var source in Directory.EnumerateFiles(cliRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(source);
+            foreach (var token in forbidden)
+            {
+                Assert.IsFalse(
+                    text.Contains(token, StringComparison.Ordinal),
+                    $"Product CLI must use IronDev.Client instead of direct HTTP. Found '{token}' in {source}.");
+            }
+        }
+    }
+
+    [TestMethod]
     public void TauriShellSource_MustNotReferenceInfrastructureStorageDetails()
     {
         var root = FindRepositoryRoot();

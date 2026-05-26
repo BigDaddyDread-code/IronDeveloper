@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using IronDev.Core.Auth;
+using IronDev.Core.Models;
+using IronDev.Data.Models;
 
 namespace IronDev.Client;
 
@@ -34,6 +36,30 @@ public sealed class IronDevApiClient : IIronDevApiClient
 
     public Task LogoutAsync(CancellationToken cancellationToken = default)
         => PostAsync<object, object>("api/auth/logout", new { }, cancellationToken);
+
+    public Task<ProjectTicket> CreateTicketAsync(
+        int projectId,
+        CreateProjectTicketRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<CreateProjectTicketRequest, ProjectTicket>($"api/projects/{projectId}/tickets", request, cancellationToken);
+
+    public Task<IReadOnlyList<ProjectTicket>> GetTicketsAsync(
+        int projectId,
+        int take = 50,
+        CancellationToken cancellationToken = default)
+        => GetAsync<IReadOnlyList<ProjectTicket>>($"api/projects/{projectId}/tickets?take={take}", cancellationToken);
+
+    public Task<ProjectTicket?> GetProjectTicketAsync(
+        int projectId,
+        long ticketId,
+        CancellationToken cancellationToken = default)
+        => GetAsync<ProjectTicket?>($"api/projects/{projectId}/tickets/{ticketId}", cancellationToken);
+
+    public Task<ProjectTicket> ImportExternalTicketAsync(
+        int projectId,
+        ImportExternalTicketRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<ImportExternalTicketRequest, ProjectTicket>($"api/projects/{projectId}/tickets/import-external", request, cancellationToken);
 
     private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
     {

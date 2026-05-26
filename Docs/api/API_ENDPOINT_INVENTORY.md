@@ -37,7 +37,7 @@ Intended consumers:
 
 | Method | Route | Controller/action | Purpose | Status | Intended consumers | Notes/gaps |
 |---|---|---|---|---|---|---|
-| GET | `/health` | `Program.MapGet` | API health probe. | Implemented | TauriShell, Product CLI, Legacy WPF, Dogfood Runner | Product CLI currently probes this directly with `HttpClient`. |
+| GET | `/health` | `Program.MapGet` | API health probe. | Implemented | TauriShell, Product CLI, Legacy WPF, Dogfood Runner | Product CLI probes through `IIronDevApiClient`. |
 
 ## Auth/Tenants
 
@@ -66,12 +66,12 @@ Intended consumers:
 
 | Method | Route | Controller/action | Purpose | Status | Intended consumers | Notes/gaps |
 |---|---|---|---|---|---|---|
-| GET | `/api/projects/{projectId}/tickets` | `TicketsController.GetRecentTickets` | List project tickets. | Implemented | TauriShell, Product CLI, Legacy WPF | Product CLI uses direct HTTP, not `IronDev.Client`. |
+| GET | `/api/projects/{projectId}/tickets` | `TicketsController.GetRecentTickets` | List project tickets. | Implemented | TauriShell, Product CLI, Legacy WPF | Product CLI uses `IIronDevApiClient`. |
 | GET | `/api/tickets/{ticketId}` | `TicketsController.GetTicketById` | Load ticket by id. | Implemented | Legacy WPF | Absolute ticket lookup. |
-| GET | `/api/projects/{projectId}/tickets/{ticketId}` | `TicketsController.GetTicketById` | Load ticket scoped to project route. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI uses direct HTTP. |
-| POST | `/api/projects/{projectId}/tickets` | `TicketsController.CreateTicket` | Create product ticket. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI reads local JSON file then posts directly. |
+| GET | `/api/projects/{projectId}/tickets/{ticketId}` | `TicketsController.GetTicketById` | Load ticket scoped to project route. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI uses `IIronDevApiClient`. |
+| POST | `/api/projects/{projectId}/tickets` | `TicketsController.CreateTicket` | Create product ticket. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI reads local JSON file then calls `IIronDevApiClient`. |
 | POST | `/api/projects/{projectId}/tickets/legacy` | `TicketsController.SaveLegacyTicket` | Save legacy ticket model. | Implemented | Legacy WPF | Product clients should prefer create/update product DTOs. |
-| POST | `/api/projects/{projectId}/tickets/import-external` | `TicketsController.ImportExternalTicket` | Import external issue as IronDev ticket. | Implemented | Product CLI, Legacy WPF | Product CLI reads local JSON file then posts directly. |
+| POST | `/api/projects/{projectId}/tickets/import-external` | `TicketsController.ImportExternalTicket` | Import external issue as IronDev ticket. | Implemented | Product CLI, Legacy WPF | Product CLI reads local JSON file then calls `IIronDevApiClient`. |
 | POST | `/api/projects/{projectId}/tickets/generate-from-discussion` | `TicketsController.GenerateFromDiscussion` | Generate ticket from discussion. | Implemented | Legacy WPF, TauriShell | Missing product CLI command. |
 | DELETE | `/api/tickets/{ticketId}` | `TicketsController.ArchiveTicket` | Archive ticket. | Implemented | Legacy WPF, TauriShell | Missing product CLI command. |
 | POST | `/api/projects/{projectId}/tickets/draft` | `TicketsController.GenerateDraft` | Generate draft ticket. | Implemented | Legacy WPF, TauriShell | Product workflow route. |

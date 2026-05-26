@@ -109,7 +109,7 @@ public sealed class IronDevCliTests
             handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
         Assert.AreEqual("Bearer", handler.Requests[1].Headers.Authorization?.Scheme);
         Assert.AreEqual("test-token", handler.Requests[1].Headers.Authorization?.Parameter);
-        StringAssert.Contains(await handler.Requests[1].Content!.ReadAsStringAsync(), "\"type\": \"Architecture\"");
+        StringAssert.Contains(await handler.Requests[1].Content!.ReadAsStringAsync(), "\"type\":\"Architecture\"");
         StringAssert.Contains(output.ToString(), "\"id\": 123");
     }
 

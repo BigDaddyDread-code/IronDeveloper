@@ -8,7 +8,7 @@ This inventory classifies the current public CLI and ReplayRunner/dogfood comman
 
 | Classification | Count | Notes |
 |---|---:|---|
-| Product | 4 | All are in `tools/IronDev.Cli`; all call API routes but bypass `IronDev.Client` with direct `HttpClient`. |
+| Product | 4 | All are in `tools/IronDev.Cli`; all call API routes through `IIronDevApiClient`. |
 | Internal Dogfood | 50 | ReplayRunner commands for governed agents, campaigns, docs, memory diagnostics, promotion, and internal review. |
 | Smoke Test | 22 | ReplayRunner smoke commands. |
 | Replay/Test Harness | 4 | Replay plan and test plan execution commands. |
@@ -18,14 +18,14 @@ This inventory classifies the current public CLI and ReplayRunner/dogfood comman
 
 ## Product CLI: `tools/IronDev.Cli`
 
-These commands are product-intended but not yet on the desired typed boundary. They use `IronDev.Api` directly through local `HttpClient` construction in `IronDevCli.cs`; they do not reference `IronDev.Client`.
+These commands are product-intended and now route through `IronDev.Client` via `IIronDevApiClient`.
 
 | Command name | Purpose | Uses `IronDev.Client` | Bypasses API | Reads/writes local files directly | Calls Infrastructure directly | Classification | Recommended future home |
 |---|---|---|---|---|---|---|---|
-| `irondev ticket create --project-id <id> --file <ticket.json>` | Create an IronDev ticket from local JSON. | No | No, calls API directly | Reads JSON input file | No | Product | `IronDev.Cli`, routed through `IronDev.Client` |
-| `irondev ticket list --project-id <id>` | List project tickets. | No | No, calls API directly | No | No | Product | `IronDev.Cli`, routed through `IronDev.Client` |
-| `irondev ticket show --project-id <id> --ticket-id <id>` | Show one ticket. | No | No, calls API directly | No | No | Product | `IronDev.Cli`, routed through `IronDev.Client` |
-| `irondev ticket import-github-issue --project-id <id> --file <github-issue.json>` | Import external issue JSON as an IronDev ticket. | No | No, calls API directly | Reads JSON input file | No | Product | `IronDev.Cli`, routed through `IronDev.Client` |
+| `irondev ticket create --project-id <id> --file <ticket.json>` | Create an IronDev ticket from local JSON. | Yes | No | Reads JSON input file | No | Product | `IronDev.Cli` |
+| `irondev ticket list --project-id <id>` | List project tickets. | Yes | No | No | No | Product | `IronDev.Cli` |
+| `irondev ticket show --project-id <id> --ticket-id <id>` | Show one ticket. | Yes | No | No | No | Product | `IronDev.Cli` |
+| `irondev ticket import-github-issue --project-id <id> --file <github-issue.json>` | Import external issue JSON as an IronDev ticket. | Yes | No | Reads JSON input file | No | Product | `IronDev.Cli` |
 
 Missing product CLI commands from the intended surface:
 
@@ -133,7 +133,7 @@ Default values for this table:
 
 ## Boundary Assessment
 
-- Product CLI is not truly on the desired typed boundary yet: it calls API routes, but not through `IronDev.Client`.
-- Product CLI does not reference `IronDev.Infrastructure` and does not directly call repositories or SQL.
+- Product CLI now uses `IronDev.Client` for the four current product ticket commands.
+- Product CLI does not reference `IronDev.Infrastructure` and does not directly call repositories, SQL, or `HttpClient`.
 - ReplayRunner is correctly internal in spirit, but its breadth makes it easy to confuse smoke/dogfood commands with product commands unless docs and naming stay explicit.
 - Several ReplayRunner commands are product-shaped (`memory search`, `docs list`, `build disposable run`) but should not be advertised as public product CLI commands.

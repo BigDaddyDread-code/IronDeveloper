@@ -1,7 +1,5 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
+using IronDev.Client;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 
@@ -99,8 +97,8 @@ public static class IronDevCli
             return 2;
         }
 
-        using var http = await CreateReadyHttpClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
-        if (http is null)
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
             return 1;
 
         CreateProjectTicketRequest request;
@@ -116,32 +114,25 @@ public static class IronDevCli
             return 2;
         }
 
-        using var response = await http.PostAsJsonAsync(
-            $"/api/projects/{projectId}/tickets",
-            request,
-            JsonOptions,
-            cancellationToken);
+        try
+        {
+            var saved = await client.CreateTicketAsync(projectId, request, cancellationToken);
+            if (json)
+            {
+                await output.WriteLineAsync(JsonSerializer.Serialize(saved, JsonOptions));
+            }
+            else
+            {
+                await output.WriteLineAsync($"Created IronDev ticket {saved.Id}: {saved.Title}");
+            }
 
-        if (!await EnsureApiSuccessAsync(response, "ticket create", error, cancellationToken))
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("ticket create", ex, error);
             return 1;
-
-        var saved = await response.Content.ReadFromJsonAsync<ProjectTicket>(JsonOptions, cancellationToken);
-        if (saved is null)
-        {
-            error.WriteLine("IronDev.Api returned an empty ticket response.");
-            return 1;
         }
-
-        if (json)
-        {
-            await output.WriteLineAsync(JsonSerializer.Serialize(saved, JsonOptions));
-        }
-        else
-        {
-            await output.WriteLineAsync($"Created IronDev ticket {saved.Id}: {saved.Title}");
-        }
-
-        return 0;
     }
 
     private static async Task<int> HandleTicketListAsync(
@@ -159,18 +150,21 @@ public static class IronDevCli
         }
 
         var take = TryGetIntOption(args, "--take", out var parsedTake) ? parsedTake : 50;
-        using var http = await CreateReadyHttpClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
-        if (http is null)
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
             return 1;
 
-        using var response = await http.GetAsync($"/api/projects/{projectId}/tickets?take={take}", cancellationToken);
-        if (!await EnsureApiSuccessAsync(response, "ticket list", error, cancellationToken))
+        try
+        {
+            var tickets = await client.GetTicketsAsync(projectId, take, cancellationToken);
+            await WriteJsonOrTextAsync(output, tickets, HasFlag(args, "--json"), $"Found {tickets.Count} IronDev tickets.");
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("ticket list", ex, error);
             return 1;
-
-        var tickets = await response.Content.ReadFromJsonAsync<IReadOnlyList<ProjectTicket>>(JsonOptions, cancellationToken)
-            ?? [];
-        await WriteJsonOrTextAsync(output, tickets, HasFlag(args, "--json"), $"Found {tickets.Count} IronDev tickets.");
-        return 0;
+        }
     }
 
     private static async Task<int> HandleTicketShowAsync(
@@ -193,23 +187,27 @@ public static class IronDevCli
             return 2;
         }
 
-        using var http = await CreateReadyHttpClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
-        if (http is null)
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
             return 1;
 
-        using var response = await http.GetAsync($"/api/projects/{projectId}/tickets/{ticketId}", cancellationToken);
-        if (!await EnsureApiSuccessAsync(response, "ticket show", error, cancellationToken))
-            return 1;
-
-        var ticket = await response.Content.ReadFromJsonAsync<ProjectTicket>(JsonOptions, cancellationToken);
-        if (ticket is null)
+        try
         {
-            error.WriteLine("IronDev.Api returned an empty ticket response.");
+            var ticket = await client.GetProjectTicketAsync(projectId, ticketId, cancellationToken);
+            if (ticket is null)
+            {
+                error.WriteLine("IronDev.Api returned an empty ticket response.");
+                return 1;
+            }
+
+            await WriteJsonOrTextAsync(output, ticket, HasFlag(args, "--json"), $"{ticket.Id}: {ticket.Title}");
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("ticket show", ex, error);
             return 1;
         }
-
-        await WriteJsonOrTextAsync(output, ticket, HasFlag(args, "--json"), $"{ticket.Id}: {ticket.Title}");
-        return 0;
     }
 
     private static async Task<int> HandleTicketImportGithubIssueAsync(
@@ -252,67 +250,42 @@ public static class IronDevCli
             return 2;
         }
 
-        using var http = await CreateReadyHttpClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
-        if (http is null)
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
             return 1;
 
-        using var response = await http.PostAsJsonAsync(
-            $"/api/projects/{projectId}/tickets/import-external",
-            request,
-            JsonOptions,
-            cancellationToken);
-
-        if (!await EnsureApiSuccessAsync(response, "ticket import-github-issue", error, cancellationToken))
-            return 1;
-
-        var saved = await response.Content.ReadFromJsonAsync<ProjectTicket>(JsonOptions, cancellationToken);
-        if (saved is null)
+        try
         {
-            error.WriteLine("IronDev.Api returned an empty ticket response.");
+            var saved = await client.ImportExternalTicketAsync(projectId, request, cancellationToken);
+            await WriteJsonOrTextAsync(output, saved, HasFlag(args, "--json"), $"Imported GitHub issue as IronDev ticket {saved.Id}: {saved.Title}");
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("ticket import-github-issue", ex, error);
             return 1;
         }
-
-        await WriteJsonOrTextAsync(output, saved, HasFlag(args, "--json"), $"Imported GitHub issue as IronDev ticket {saved.Id}: {saved.Title}");
-        return 0;
     }
 
-    private static async Task<HttpClient?> CreateReadyHttpClientAsync(
+    private static async Task<IIronDevApiClient?> CreateReadyApiClientAsync(
         string[] args,
         string apiBaseUrl,
         TextWriter error,
         HttpMessageHandler? handler,
         CancellationToken cancellationToken)
     {
-        var http = CreateHttpClient(apiBaseUrl, handler);
-        var health = await CheckHealthAsync(http, cancellationToken);
+        var token = ResolveToken(GetOption(args, "--token"), ReadEnvironment(), GetOption(args, "--config"));
+        var client = IronDevApiClientFactory.Create(apiBaseUrl, token, handler);
+        var health = await CheckHealthAsync(client, cancellationToken);
         if (!health)
         {
             error.WriteLine($"IronDev.Api is not reachable at {apiBaseUrl}.");
             error.WriteLine("Start it with:");
             error.WriteLine("dotnet run --project IronDev.Api");
-            http.Dispose();
             return null;
         }
 
-        var token = ResolveToken(GetOption(args, "--token"), ReadEnvironment(), GetOption(args, "--config"));
-        if (!string.IsNullOrWhiteSpace(token))
-            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        return http;
-    }
-
-    private static async Task<bool> EnsureApiSuccessAsync(
-        HttpResponseMessage response,
-        string operation,
-        TextWriter error,
-        CancellationToken cancellationToken)
-    {
-        if (response.IsSuccessStatusCode)
-            return true;
-
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        error.WriteLine(BuildApiErrorMessage(operation, response.StatusCode, body));
-        return false;
+        return client;
     }
 
     private static async Task WriteJsonOrTextAsync<T>(TextWriter output, T value, bool json, string text)
@@ -323,20 +296,15 @@ public static class IronDevCli
             await output.WriteLineAsync(text);
     }
 
-    private static HttpClient CreateHttpClient(string apiBaseUrl, HttpMessageHandler? handler)
-    {
-        var http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
-        http.BaseAddress = new Uri(apiBaseUrl);
-        http.Timeout = TimeSpan.FromSeconds(15);
-        return http;
-    }
-
-    private static async Task<bool> CheckHealthAsync(HttpClient http, CancellationToken cancellationToken)
+    private static async Task<bool> CheckHealthAsync(IIronDevApiClient client, CancellationToken cancellationToken)
     {
         try
         {
-            using var response = await http.GetAsync("/health", cancellationToken);
-            return response.IsSuccessStatusCode;
+            return await client.CheckHealthAsync(cancellationToken);
+        }
+        catch (IronDevApiException)
+        {
+            return false;
         }
         catch (HttpRequestException)
         {
@@ -348,13 +316,13 @@ public static class IronDevCli
         }
     }
 
-    private static string BuildApiErrorMessage(string operation, HttpStatusCode statusCode, string body)
+    private static void WriteApiError(string operation, IronDevApiException ex, TextWriter error)
     {
-        var prefix = $"IronDev.Api {operation} failed with {(int)statusCode} {statusCode}.";
-        if (statusCode == HttpStatusCode.Unauthorized)
+        var prefix = $"IronDev.Api {operation} failed with {(int)ex.StatusCode} {ex.StatusCode}.";
+        if ((int)ex.StatusCode == 401)
             prefix += $"{Environment.NewLine}Authenticate through IronDev.Api and provide a tenant-scoped JWT with --token or IRONDEV_API_TOKEN.";
 
-        return string.IsNullOrWhiteSpace(body) ? prefix : $"{prefix}{Environment.NewLine}{body}";
+        error.WriteLine(string.IsNullOrWhiteSpace(ex.ResponseBody) ? prefix : $"{prefix}{Environment.NewLine}{ex.ResponseBody}");
     }
 
     private static string? ResolveToken(
