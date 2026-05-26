@@ -22,6 +22,9 @@ public sealed class RunReportsApiClient : IronDevApiClientBase, IRunReportsApiCl
     public Task<RunReportDto> GetRunReportAsync(string runId, CancellationToken cancellationToken = default) =>
         GetAsync<RunReportDto>($"runs/{Uri.EscapeDataString(runId)}/report", cancellationToken);
 
+    public IAsyncEnumerable<RunEventDto> StreamRunEventsAsync(string runId, CancellationToken cancellationToken = default) =>
+        StreamSseRunEventsAsync($"runs/{Uri.EscapeDataString(runId)}/events", cancellationToken);
+
     public Task<IReadOnlyList<RunEvidenceItem>> GetEvidenceAsync(string runId, CancellationToken cancellationToken = default) =>
         GetAsync<IReadOnlyList<RunEvidenceItem>>($"run-reports/{Uri.EscapeDataString(runId)}/evidence", cancellationToken);
 

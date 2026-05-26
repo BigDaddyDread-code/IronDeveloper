@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using IronDev.Core.Auth;
 using IronDev.Core.Models;
@@ -72,6 +73,52 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => GetAsync<RunReportDto>($"api/runs/{Uri.EscapeDataString(runId)}/report", cancellationToken);
 
+    public async IAsyncEnumerable<RunEventDto> StreamRunEventsAsync(
+        string runId,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient
+            .GetAsync($"api/runs/{Uri.EscapeDataString(runId)}/events", HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var reader = new StreamReader(stream);
+        string? eventType = null;
+        var data = new List<string>();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            if (line is null)
+                break;
+
+            if (line.Length == 0)
+            {
+                var parsed = TryParseRunEvent(eventType, data);
+                if (parsed is not null)
+                    yield return parsed;
+
+                eventType = null;
+                data.Clear();
+                continue;
+            }
+
+            if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+            {
+                eventType = line["event:".Length..].Trim();
+            }
+            else if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                data.Add(line["data:".Length..].TrimStart());
+            }
+        }
+
+        var trailing = TryParseRunEvent(eventType, data);
+        if (trailing is not null)
+            yield return trailing;
+    }
+
     private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(path, cancellationToken).ConfigureAwait(false);
@@ -90,14 +137,7 @@ public sealed class IronDevApiClient : IIronDevApiClient
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            var message = string.IsNullOrWhiteSpace(body)
-                ? $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}."
-                : $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}";
-
-            throw new IronDevApiException(response.StatusCode, message, body);
-        }
+        ThrowIfUnsuccessful(response, body);
 
         if (typeof(T) == typeof(object))
             return (T)new object();
@@ -107,5 +147,42 @@ public sealed class IronDevApiClient : IIronDevApiClient
 
         var result = JsonSerializer.Deserialize<T>(body, JsonOptions);
         return result ?? throw new IronDevApiException(response.StatusCode, "IronDev API returned a null or invalid response body.", body);
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var body = response.Content is null
+            ? null
+            : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        ThrowIfUnsuccessful(response, body);
+    }
+
+    private static void ThrowIfUnsuccessful(HttpResponseMessage response, string? body)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var message = string.IsNullOrWhiteSpace(body)
+            ? $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}."
+            : $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}";
+
+        throw new IronDevApiException(response.StatusCode, message, body);
+    }
+
+    private static RunEventDto? TryParseRunEvent(string? eventType, IReadOnlyCollection<string> data)
+    {
+        if (data.Count == 0)
+            return null;
+
+        var json = string.Join('\n', data);
+        var parsed = JsonSerializer.Deserialize<RunEventDto>(json, JsonOptions);
+        if (parsed is null || !string.IsNullOrWhiteSpace(parsed.EventType) || string.IsNullOrWhiteSpace(eventType))
+            return parsed;
+
+        return parsed with { EventType = eventType };
     }
 }

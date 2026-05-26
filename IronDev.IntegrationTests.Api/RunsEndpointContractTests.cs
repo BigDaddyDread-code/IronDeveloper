@@ -1,3 +1,5 @@
+using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using IronDev.Api.Controllers;
 using IronDev.Core.RunReports;
@@ -38,6 +40,33 @@ public sealed class RunsEndpointContractTests
         Assert.IsInstanceOfType<NotFoundResult>(report.Result);
     }
 
+    [TestMethod]
+    public async Task RunsController_StreamsReportBackedSseEvents()
+    {
+        var controller = new RunsController(new StubRunReportService());
+        await using var body = new MemoryStream();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                Response =
+                {
+                    Body = body
+                }
+            }
+        };
+
+        await controller.GetRunEvents("run-123", CancellationToken.None);
+
+        Assert.AreEqual("text/event-stream", controller.Response.ContentType);
+        var text = Encoding.UTF8.GetString(body.ToArray());
+        StringAssert.Contains(text, "event: RunStarted");
+        StringAssert.Contains(text, "event: StepCompleted");
+        StringAssert.Contains(text, "event: Warning");
+        StringAssert.Contains(text, "event: RunCompleted");
+        StringAssert.Contains(text, "\"runId\":\"run-123\"");
+    }
+
     private sealed class StubRunReportService : IRunReportService
     {
         public Task<IReadOnlyList<RunReportSummary>> GetRecentRunsAsync(string? project = null, CancellationToken cancellationToken = default) =>
@@ -58,7 +87,18 @@ public sealed class RunsEndpointContractTests
                 Summary = "Run completed.",
                 Recommendation = "Review",
                 RealRepoMutationCount = 0,
-                DisposableFilesChanged = 2
+                DisposableFilesChanged = 2,
+                Stages =
+                [
+                    new RunStageStatus
+                    {
+                        StageName = "Build",
+                        AgentName = "Builder",
+                        Status = "Completed",
+                        Summary = "Build passed."
+                    }
+                ],
+                Warnings = ["Review manually."]
             });
         }
     }

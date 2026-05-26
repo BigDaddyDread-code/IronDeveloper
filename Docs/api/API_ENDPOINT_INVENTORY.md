@@ -16,9 +16,9 @@ This inventory lists the REST surface currently exposed by `IronDev.Api`. It sep
 | Memory | 20 | 2 |
 | Chat | 8 | 0 |
 | Profiles | 7 | 0 |
-| Runs/reports | 6 | 1 |
+| Runs/reports | 7 | 0 |
 | Agents/build workflows | 0 | 4 |
-| **Total actual routes** | **86** | **12** |
+| **Total actual routes** | **87** | **11** |
 
 Status meanings:
 
@@ -170,7 +170,7 @@ Intended consumers:
 | GET | `/api/run-reports/{runId}/evidence/text` | `RunReportsController.ReadEvidenceText` | Read evidence text by path query. | Implemented | Legacy WPF, Dogfood Runner | Query still exposes evidence path concept. |
 | GET | `/api/runs/{runId}` | `RunsController.GetRun` | Durable product-shaped run status over current report backend. | Implemented | Product CLI, TauriShell | Real lifecycle creation is still missing; status is mapped from stored report detail. |
 | GET | `/api/runs/{runId}/report` | `RunsController.GetRunReport` | Final run report by run id. | Implemented | Product CLI, TauriShell | Hides `/api/run-reports/*` from product CLI. |
-| GET | `/api/runs/{runId}/events` | Planned | SSE run event stream. | Planned | Product CLI, TauriShell | Do not mark implemented; no SSE endpoint exists today. |
+| GET | `/api/runs/{runId}/events` | `RunsController.GetRunEvents` | SSE run event stream. | Implemented | Product CLI, TauriShell | Emits report-backed snapshot events today; durable live event store is still missing. |
 
 ## Agents/Build Workflows
 

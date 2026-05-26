@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using IronDev.Core.RunReports;
 
 namespace IronDev.Client.Http;
 
@@ -17,6 +19,50 @@ public abstract class IronDevApiClientBase
     {
         using var response = await Http.GetAsync(path, ct);
         return await ReadAsync<T>(response, ct);
+    }
+
+    protected async IAsyncEnumerable<RunEventDto> StreamSseRunEventsAsync(
+        string path,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var response = await Http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, ct);
+        await EnsureSuccessAsync(response, ct);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+        string? eventType = null;
+        var data = new List<string>();
+
+        while (!ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (line is null)
+                break;
+
+            if (line.Length == 0)
+            {
+                var parsed = TryParseRunEvent(eventType, data);
+                if (parsed is not null)
+                    yield return parsed;
+
+                eventType = null;
+                data.Clear();
+                continue;
+            }
+
+            if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+            {
+                eventType = line["event:".Length..].Trim();
+            }
+            else if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                data.Add(line["data:".Length..].TrimStart());
+            }
+        }
+
+        var trailing = TryParseRunEvent(eventType, data);
+        if (trailing is not null)
+            yield return trailing;
     }
 
     protected async Task<T> PostAsync<T>(string path, object? body, CancellationToken ct = default)
@@ -55,5 +101,18 @@ public abstract class IronDevApiClientBase
             : body;
 
         throw new IronDevApiException(response.StatusCode, message, body);
+    }
+
+    private static RunEventDto? TryParseRunEvent(string? eventType, IReadOnlyCollection<string> data)
+    {
+        if (data.Count == 0)
+            return null;
+
+        var json = string.Join('\n', data);
+        var parsed = JsonSerializer.Deserialize<RunEventDto>(json, JsonOptions);
+        if (parsed is null || !string.IsNullOrWhiteSpace(parsed.EventType) || string.IsNullOrWhiteSpace(eventType))
+            return parsed;
+
+        return parsed with { EventType = eventType };
     }
 }

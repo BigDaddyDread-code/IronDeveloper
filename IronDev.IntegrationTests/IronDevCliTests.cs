@@ -196,16 +196,27 @@ public sealed class IronDevCliTests
             CancellationToken.None);
         Assert.AreEqual(0, report, error.ToString());
 
+        var stream = await IronDevCli.RunAsync(
+            ["runs", "stream", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, stream, error.ToString());
+
         CollectionAssert.AreEqual(
             new[]
             {
                 "/health",
                 "/api/runs/run-123",
                 "/health",
-                "/api/runs/run-123/report"
+                "/api/runs/run-123/report",
+                "/health",
+                "/api/runs/run-123/events"
             },
             handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
         StringAssert.Contains(output.ToString(), "\"runId\": \"run-123\"");
+        StringAssert.Contains(output.ToString(), "RunCompleted run-123");
     }
 
 
@@ -380,6 +391,22 @@ public sealed class IronDevCliTests
                         """,
                         Encoding.UTF8,
                         "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123/events")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        event: RunStarted
+                        data: {"timestampUtc":"2026-05-26T00:00:00Z","runId":"run-123","eventType":"RunStarted","message":"Run started","payload":{}}
+
+                        event: RunCompleted
+                        data: {"timestampUtc":"2026-05-26T00:01:00Z","runId":"run-123","eventType":"RunCompleted","message":"Run completed","payload":{"status":"Completed"}}
+
+                        """,
+                        Encoding.UTF8,
+                        "text/event-stream")
                 };
 
             return new HttpResponseMessage(HttpStatusCode.OK)

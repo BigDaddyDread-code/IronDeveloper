@@ -30,4 +30,6 @@ public interface IIronDevApiClient
     Task<RunStatusDto> GetRunAsync(string runId, CancellationToken cancellationToken = default);
 
     Task<RunReportDto> GetRunReportAsync(string runId, CancellationToken cancellationToken = default);
+
+    IAsyncEnumerable<RunEventDto> StreamRunEventsAsync(string runId, CancellationToken cancellationToken = default);
 }

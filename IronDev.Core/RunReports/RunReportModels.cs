@@ -34,6 +34,15 @@ public sealed record RunReportDto
     public RunReportDetail? Report { get; init; }
 }
 
+public sealed record RunEventDto
+{
+    public DateTimeOffset TimestampUtc { get; init; } = DateTimeOffset.UtcNow;
+    public string RunId { get; init; } = string.Empty;
+    public string EventType { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public IReadOnlyDictionary<string, string> Payload { get; init; } = new Dictionary<string, string>();
+}
+
 public sealed record RunReportDetail
 {
     public string RunId { get; init; } = string.Empty;
