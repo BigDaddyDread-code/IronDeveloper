@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This document summarises the current `IronDev.ReplayRunner` and product-shaped `irondev` command surfaces.
+This document is the historical dogfood/replay inventory for `IronDev.ReplayRunner` and older product-shaped aliases. The current product/internal classification lives in `Docs/cli/CLI_COMMAND_INVENTORY.md`.
+
+`tools/IronDev.Cli` is the product CLI and must move to `IronDev.Client`; today it calls `IronDev.Api` directly with `HttpClient`. `tools/IronDev.ReplayRunner` is internal dogfood/replay tooling.
 
 The machine-readable inventory is stored at:
 
@@ -10,12 +12,13 @@ The machine-readable inventory is stored at:
 
 ## Command Groups
 
-- Agent commands: 18
+- Agent commands: 19
 - Build commands: 2
 - Chat commands: 1
 - Docs commands: 6
-- Dogfood commands: 12
-- Ticket commands: 5
+- Dogfood commands: 10
+- Ticket commands: 1
+- Campaign commands: 13
 - Failure commands: 1
 - Govern commands: 1
 - Inventory commands: 1
@@ -27,6 +30,7 @@ The machine-readable inventory is stored at:
 - Test commands: 1
 - Trace commands: 1
 - Replay scenario entrypoint: 1
+- Product CLI ticket commands: 4
 
 ## Product-Ish Commands
 
@@ -78,7 +82,7 @@ The machine-readable inventory is stored at:
 - `promotion apply worktree-dry-run`
 - `agent architect review`
 
-These are closest to the control surface Codex will use.
+These are closest to the control surface Codex and internal dogfood use; the current product-only classification lives in `Docs/cli/CLI_COMMAND_INVENTORY.md`.
 
 `ticket create`, `ticket list`, `ticket show`, and `ticket import-github-issue` run through `tools/IronDev.Cli`. They use the canonical localhost API boundary: CLI -> HTTP -> `IronDev.Api` -> IronDev ticket database. They must not use direct SQL, Dapper, Infrastructure services, or GitHub issues as the canonical ticket store.
 
