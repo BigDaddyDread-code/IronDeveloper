@@ -94,6 +94,35 @@ export interface TicketBuildRunDto {
   message?: string | null;
 }
 
+export interface RunEventDto {
+  eventId?: string | null;
+  timestampUtc?: string | null;
+  runId?: string | null;
+  eventType?: string | null;
+  message?: string | null;
+  payload?: Record<string, string> | null;
+}
+
+export interface TicketRunReview {
+  runId: string;
+  projectId: number;
+  ticketId: number;
+  ticketTitle: string;
+  status: string;
+  startedUtc?: string | null;
+  completedUtc?: string | null;
+  isDisposableRun: boolean;
+  traceId?: string | null;
+  evidenceSummary: string;
+  outputSummary: string;
+  failureReason?: string | null;
+  reportPath?: string | null;
+  tracePath?: string | null;
+  logPath?: string | null;
+  evidence: RunEvidenceItem[];
+  events: RunEventDto[];
+}
+
 export interface RunReportSummaryRow {
   runId?: string | null;
   traceId?: string | null;

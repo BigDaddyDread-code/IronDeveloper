@@ -9,6 +9,7 @@ import type {
   LinkedRunStatus,
   TicketEvidenceLoadStatus,
   TicketEvidenceSummary,
+  TicketRunReview,
   ProductAccessStatus,
   ProjectImplementationPlan,
   ProjectSummary,
@@ -79,6 +80,10 @@ interface TicketsWorkspaceState {
   evidenceSummary: TicketEvidenceSummary | null;
   evidenceStatus: TicketEvidenceLoadStatus;
   evidenceMessage: string;
+  runReview: TicketRunReview | null;
+  runReviewStatus: TicketEvidenceLoadStatus;
+  runReviewMessage: string;
+  isRunReviewOpen: boolean;
   reviewLatestRunBlockedReason: string | null;
   startDisposableRunBlockedReason: string | null;
   isEditingTicket: boolean;
@@ -115,6 +120,8 @@ interface TicketsWorkspaceActions {
   onRefreshEvidence: () => void;
   onStartDisposableRun: () => void;
   onReviewLatestRun: () => void;
+  onRefreshRunReview: () => void;
+  onDismissRunReview: () => void;
   onOpenPromotionReview: () => void;
   onCreateDraftChange: (draft: CreateTicketDraft) => void;
   onSubmitCreateTicket: () => void;
@@ -157,6 +164,10 @@ export function useTicketsWorkspace() {
   const [evidenceSummary, setEvidenceSummary] = useState<TicketEvidenceSummary | null>(null);
   const [evidenceStatus, setEvidenceStatus] = useState<TicketEvidenceLoadStatus>('idle');
   const [evidenceMessage, setEvidenceMessage] = useState('Execution evidence has not been loaded for this ticket.');
+  const [runReview, setRunReview] = useState<TicketRunReview | null>(null);
+  const [runReviewStatus, setRunReviewStatus] = useState<TicketEvidenceLoadStatus>('idle');
+  const [runReviewMessage, setRunReviewMessage] = useState('No run review has been opened for this ticket.');
+  const [isRunReviewOpen, setIsRunReviewOpen] = useState(false);
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateTicketDraft>(initialCreateDraft);
   const [createStatus, setCreateStatus] = useState<TicketCreateStatus>('idle');
@@ -241,6 +252,10 @@ export function useTicketsWorkspace() {
     setEvidenceSummary(null);
     setEvidenceStatus('idle');
     setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
+    setRunReview(null);
+    setRunReviewStatus('idle');
+    setRunReviewMessage('No run review has been opened for this ticket.');
+    setIsRunReviewOpen(false);
     setReadinessMessage('Build readiness has not been checked for this ticket.');
   }, []);
 
@@ -329,6 +344,10 @@ export function useTicketsWorkspace() {
       setEvidenceSummary(null);
       setEvidenceStatus('idle');
       setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
+      setRunReview(null);
+      setRunReviewStatus('idle');
+      setRunReviewMessage('No run review has been opened for this ticket.');
+      setIsRunReviewOpen(false);
       return;
     }
 
@@ -344,6 +363,10 @@ export function useTicketsWorkspace() {
     setEvidenceSummary(null);
     setEvidenceStatus('loading');
     setEvidenceMessage('Execution evidence is being resolved from available run reports.');
+    setRunReview(null);
+    setRunReviewStatus('idle');
+    setRunReviewMessage('No run review has been opened for this ticket.');
+    setIsRunReviewOpen(false);
     setIsEditingTicket(false);
     setSaveStatus('idle');
     setSaveMessage('Ticket is clean.');
@@ -798,6 +821,43 @@ export function useTicketsWorkspace() {
     }
   }, [session.client, selectedTicketIdForList, ticketActionBlockedReason]);
 
+  const loadRunReview = useCallback(
+    async (runId: string | null = evidenceSummary?.latestRun?.runId ?? null) => {
+      if (!runId) {
+        setRunReviewStatus('unavailable');
+        setRunReviewMessage('No linked run is available to review yet.');
+        return;
+      }
+
+      if (!selectedProjectId || !selectedTicketIdForList) {
+        setRunReviewStatus('unavailable');
+        setRunReviewMessage('Select a project ticket before reviewing a run.');
+        return;
+      }
+
+      setIsRunReviewOpen(true);
+      setRunReviewStatus('loading');
+      setRunReviewMessage('Loading run review through IronDev.Api...');
+
+      try {
+        const review = await session.client.getTicketRunReview(selectedProjectId, selectedTicketIdForList, runId);
+        setRunReview(review);
+        setRunReviewStatus('loaded');
+        setRunReviewMessage('Run review loaded from IronDev.Api.');
+        navigation.setSelectedRunId(runId);
+      } catch (error) {
+        const message =
+          error instanceof IronDevApiError
+            ? `Run review failed with HTTP ${error.status}.`
+            : 'Run review could not reach IronDev.Api.';
+        setRunReview(null);
+        setRunReviewStatus(error instanceof IronDevApiError && error.status === 404 ? 'unavailable' : 'error');
+        setRunReviewMessage(message);
+      }
+    },
+    [evidenceSummary?.latestRun?.runId, navigation, selectedProjectId, selectedTicketIdForList, session.client]
+  );
+
   const onStartDisposableRun = useCallback(async () => {
     if (startDisposableRunBlockedReason) {
       setEvidenceMessage(startDisposableRunBlockedReason);
@@ -820,7 +880,9 @@ export function useTicketsWorkspace() {
 
       setEvidenceMessage(result.message ?? `Disposable run ${result.runId} started.`);
       await refreshEvidence();
-      navigation.navigateToWorkspace('run-reports');
+      if (result.runId) {
+        await loadRunReview(result.runId);
+      }
     } catch (error) {
       const message =
         error instanceof IronDevApiError
@@ -840,7 +902,7 @@ export function useTicketsWorkspace() {
       setEvidenceStatus('error');
       setEvidenceMessage(message);
     }
-  }, [navigation, refreshEvidence, selectedProjectId, selectedTicketIdForList, session.client, startDisposableRunBlockedReason]);
+  }, [loadRunReview, navigation, refreshEvidence, selectedProjectId, selectedTicketIdForList, session.client, startDisposableRunBlockedReason]);
 
   const onReviewLatestRun = useCallback(() => {
     const latestRunId = evidenceSummary?.latestRun?.runId ?? null;
@@ -851,8 +913,16 @@ export function useTicketsWorkspace() {
     }
 
     navigation.setSelectedRunId(latestRunId);
-    navigation.navigateToWorkspace('run-reports');
-  }, [evidenceSummary?.latestRun?.runId, evidenceSummary?.latestRun, navigation]);
+    void loadRunReview(latestRunId);
+  }, [evidenceSummary?.latestRun?.runId, evidenceSummary?.latestRun, loadRunReview, navigation]);
+
+  const onRefreshRunReview = useCallback(() => {
+    void loadRunReview(runReview?.runId ?? evidenceSummary?.latestRun?.runId ?? null);
+  }, [evidenceSummary?.latestRun?.runId, loadRunReview, runReview?.runId]);
+
+  const onDismissRunReview = useCallback(() => {
+    setIsRunReviewOpen(false);
+  }, []);
 
   const onOpenPromotionReview = useCallback(() => {
     const latestRunId = evidenceSummary?.latestPromotionPackage?.sourceRunId ?? evidenceSummary?.latestRun?.runId ?? null;
@@ -904,6 +974,10 @@ export function useTicketsWorkspace() {
     evidenceSummary,
     evidenceStatus,
     evidenceMessage,
+    runReview,
+    runReviewStatus,
+    runReviewMessage,
+    isRunReviewOpen,
     reviewLatestRunBlockedReason,
     startDisposableRunBlockedReason,
     implementationPlan,
@@ -947,6 +1021,8 @@ export function useTicketsWorkspace() {
       onRefreshEvidence: refreshEvidence,
       onStartDisposableRun: onStartDisposableRun,
       onReviewLatestRun: onReviewLatestRun,
+      onRefreshRunReview,
+      onDismissRunReview,
       onOpenPromotionReview: onOpenPromotionReview,
       onCreateDraftChange: setCreateDraft,
       onSubmitCreateTicket: createTicket,

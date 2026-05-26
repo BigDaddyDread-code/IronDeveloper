@@ -9,16 +9,16 @@ public sealed class TicketEvidenceSummaryService : ITicketEvidenceSummaryService
 {
     private readonly ITicketService _tickets;
     private readonly IBuilderReadinessService _readiness;
-    private readonly IRunReportService _runReports;
+    private readonly IRunEventStore _events;
 
     public TicketEvidenceSummaryService(
         ITicketService tickets,
         IBuilderReadinessService readiness,
-        IRunReportService runReports)
+        IRunEventStore events)
     {
         _tickets = tickets;
         _readiness = readiness;
-        _runReports = runReports;
+        _events = events;
     }
 
     public async Task<TicketEvidenceSummaryDto?> GetEvidenceSummaryAsync(
@@ -31,8 +31,7 @@ public sealed class TicketEvidenceSummaryService : ITicketEvidenceSummaryService
             return null;
 
         var readiness = await EvaluateReadinessOrNullAsync(projectId, ticketId, cancellationToken);
-        var recentRuns = await _runReports.GetRecentRunsAsync(cancellationToken: cancellationToken);
-        var latestRun = FindLatestTrustedTicketRun(recentRuns, ticket);
+        var latestRun = await FindLatestTrustedTicketRunAsync(ticket, cancellationToken).ConfigureAwait(false);
         var blockedActions = BuildBlockedActions(readiness, latestRun);
 
         return new TicketEvidenceSummaryDto
@@ -69,14 +68,79 @@ public sealed class TicketEvidenceSummaryService : ITicketEvidenceSummaryService
         }
     }
 
-    private static LinkedRunSummaryDto? FindLatestTrustedTicketRun(
-        IReadOnlyList<RunReportSummary> runs,
-        ProjectTicket ticket)
+    private async Task<LinkedRunSummaryDto?> FindLatestTrustedTicketRunAsync(
+        ProjectTicket ticket,
+        CancellationToken cancellationToken)
     {
-        // RunReportSummary does not currently expose a ticket source relationship.
-        // Until it does, the backend must not infer links from titles or loose text.
-        return null;
+        var recentRunIds = await _events.GetRecentRunIdsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        LinkedRunSummaryDto? latest = null;
+        DateTimeOffset latestTimestamp = DateTimeOffset.MinValue;
+
+        foreach (var runId in recentRunIds)
+        {
+            var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+            if (!BelongsToTicket(events, ticket.ProjectId, ticket.Id))
+                continue;
+
+            var first = events[0];
+            var last = events[^1];
+            var completedUtc = IsTerminal(last.EventType) ? last.TimestampUtc : (DateTimeOffset?)null;
+            var candidate = new LinkedRunSummaryDto
+            {
+                RunId = runId,
+                TraceId = null,
+                Title = first.Message,
+                Status = MapRunStatus(ReadPayload(last, "status") ?? last.EventType),
+                Recommendation = last.EventType == "ApprovalRequired" ? "Human review required." : last.Message,
+                StartedUtc = first.TimestampUtc,
+                CompletedUtc = completedUtc
+            };
+
+            if (last.TimestampUtc > latestTimestamp)
+            {
+                latestTimestamp = last.TimestampUtc;
+                latest = candidate;
+            }
+        }
+
+        return latest;
     }
+
+    private static bool BelongsToTicket(IReadOnlyList<RunEventDto> events, int projectId, long ticketId) =>
+        events.Any(runEvent =>
+            string.Equals(ReadPayload(runEvent, "projectId"), projectId.ToString(), StringComparison.Ordinal) &&
+            string.Equals(ReadPayload(runEvent, "ticketId"), ticketId.ToString(), StringComparison.Ordinal));
+
+    private static string? ReadPayload(RunEventDto runEvent, string key) =>
+        runEvent.Payload.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
+
+    private static string MapRunStatus(string status)
+    {
+        if (status.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("error", StringComparison.OrdinalIgnoreCase))
+            return "failed";
+
+        if (status.Contains("approval", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("review", StringComparison.OrdinalIgnoreCase))
+            return "needsHumanReview";
+
+        if (status.Contains("running", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("started", StringComparison.OrdinalIgnoreCase))
+            return "running";
+
+        if (status.Contains("complete", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("passed", StringComparison.OrdinalIgnoreCase))
+            return "passed";
+
+        return "unknown";
+    }
+
+    private static bool IsTerminal(string eventType) =>
+        string.Equals(eventType, "RunCompleted", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(eventType, "RunFailed", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(eventType, "ApprovalRequired", StringComparison.OrdinalIgnoreCase);
 
     private static List<string> BuildBlockedActions(
         BuildReadinessResult? readiness,

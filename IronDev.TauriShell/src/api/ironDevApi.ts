@@ -16,6 +16,7 @@ import type {
   TicketBuildRunDto,
   TicketEvidenceSummary,
   TicketLoadResult,
+  TicketRunReview,
   UserProfile
 } from './types';
 
@@ -267,6 +268,21 @@ class IronDevApiClient {
       body: request,
       signal
     });
+  }
+
+  async getTicketRunReview(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<TicketRunReview> {
+    return this.request<TicketRunReview>(
+      `/api/projects/${projectId}/tickets/${ticketId}/build-runs/${encodeURIComponent(runId)}/review`,
+      {
+        method: 'GET',
+        signal
+      }
+    );
   }
 
   async getRunReports(signal?: AbortSignal): Promise<RunReportSummary[]> {

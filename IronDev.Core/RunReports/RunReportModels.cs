@@ -102,6 +102,27 @@ public sealed record RunEvidenceItem
     public string Summary { get; init; } = string.Empty;
 }
 
+public sealed record TicketRunReviewDto
+{
+    public string RunId { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public long TicketId { get; init; }
+    public string TicketTitle { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public DateTimeOffset? StartedUtc { get; init; }
+    public DateTimeOffset? CompletedUtc { get; init; }
+    public bool IsDisposableRun { get; init; }
+    public string? TraceId { get; init; }
+    public string EvidenceSummary { get; init; } = string.Empty;
+    public string OutputSummary { get; init; } = string.Empty;
+    public string? FailureReason { get; init; }
+    public string? ReportPath { get; init; }
+    public string? TracePath { get; init; }
+    public string? LogPath { get; init; }
+    public IReadOnlyList<RunEvidenceItem> Evidence { get; init; } = [];
+    public IReadOnlyList<RunEventDto> Events { get; init; } = [];
+}
+
 public sealed record RunPromotionReview
 {
     public string PackageId { get; init; } = string.Empty;

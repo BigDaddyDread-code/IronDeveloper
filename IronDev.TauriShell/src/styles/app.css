@@ -147,6 +147,23 @@ p {
   min-height: 0;
 }
 
+.tickets-workspace__main-stack {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.ticket-run-review {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.ticket-run-review__content,
+.ticket-run-review__summary {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .workspace-layout {
   min-width: 0;
   min-height: 0;

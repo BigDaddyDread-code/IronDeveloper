@@ -654,6 +654,9 @@ test('ticket evidence links open run report and promotion context', async ({ pag
   await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryWithLinkedRun) });
   });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs/run-901/review', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketRunReviewForPromotion) });
+  });
   await mockRunReportWorkspace(page, {
     runs: [runReportSummaryForPromotion],
     runDetails: {
@@ -670,10 +673,56 @@ test('ticket evidence links open run report and promotion context', async ({ pag
   await expect(page.getByTestId('ticket.evidence.latestPromotionPackage')).toBeVisible();
   await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeEnabled();
   await page.getByTestId('ticket.command.reviewLatestRun').click();
-  await expect(page.getByTestId('run-reports.workspace')).toBeVisible();
-  await expect(page.getByTestId('run-reports.summary')).toContainText('run-901');
-  await page.getByTestId('shell.nav.tickets').click();
-  await expect(page.getByTestId('ticket.detail')).toBeVisible();
+  await expect(page.getByTestId('tickets.workspace')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.header')).toContainText('Make tickets cockpit real');
+  await expect(page.getByTestId('ticket.runReview')).toBeVisible();
+  await expect(page.getByTestId('ticket.runReview.summary')).toContainText('run-901');
+  await expect(page.getByTestId('ticket.runReview.disposable')).toBeVisible();
+  await expect(page.getByTestId('ticket.runReview.evidence')).toContainText('Primary build timeline');
+  await expect(page.getByTestId('ticket.runReview.evidence')).toContainText('evidence/run-901/build.log');
+  await expect(page.getByTestId('ticket.runReview.events')).toContainText('ApprovalRequired');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('ticket start disposable run links a real run review without enabling review early', async ({ page }) => {
+  let runStarted = false;
+  await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(runStarted ? ticketEvidenceSummaryWithLinkedRun : ticketEvidenceSummaryNoLinkedRun)
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs', async (route) => {
+    runStarted = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        runId: 'run-901',
+        projectId: 7,
+        ticketId: 101,
+        status: 'Running',
+        currentNode: 'LoadTicket',
+        requiresHumanApproval: false,
+        message: 'Disposable run started.'
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs/run-901/review', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketRunReviewForPromotion) });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
+  await page.getByTestId('ticket.command.startDisposableRun').click();
+  await expect(page.getByTestId('ticket.runReview')).toBeVisible();
+  await expect(page.getByTestId('ticket.runReview.summary')).toContainText('run-901');
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeEnabled();
+  await expect(page.getByTestId('ticket.runReview.status')).toContainText('AwaitingCodeApproval');
+  await expect(page.getByTestId('ticket.runReview.disposable')).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -991,6 +1040,43 @@ const ticketEvidenceSummaryWithLinkedRun = {
   hasBlockingWarnings: false,
   blockedActions: [],
   nextSafeAction: 'Review latest run'
+};
+
+const ticketRunReviewForPromotion = {
+  runId: 'run-901',
+  projectId: 7,
+  ticketId: 101,
+  ticketTitle: 'Make tickets cockpit real',
+  status: 'AwaitingCodeApproval',
+  startedUtc: '2026-05-26T01:15:00Z',
+  completedUtc: '2026-05-26T01:18:00Z',
+  isDisposableRun: true,
+  traceId: 'trace-901',
+  evidenceSummary: '2 evidence item(s) are attached to this run.',
+  outputSummary: 'Code proposal is ready for human approval.',
+  failureReason: null,
+  reportPath: 'runs/run-901/report.json',
+  tracePath: 'trace:trace-901',
+  logPath: 'runs/run-901/report.json',
+  evidence: runReportEvidenceSuccess,
+  events: [
+    {
+      eventId: 'evt-1',
+      timestampUtc: '2026-05-26T01:15:00Z',
+      runId: 'run-901',
+      eventType: 'RunStarted',
+      message: 'Ticket build run started for ticket 101.',
+      payload: { projectId: '7', ticketId: '101', disposableRun: 'true', status: 'Running' }
+    },
+    {
+      eventId: 'evt-2',
+      timestampUtc: '2026-05-26T01:18:00Z',
+      runId: 'run-901',
+      eventType: 'ApprovalRequired',
+      message: 'Code proposal is ready for human approval.',
+      payload: { projectId: '7', ticketId: '101', disposableRun: 'true', status: 'AwaitingCodeApproval' }
+    }
+  ]
 };
 
 type RunReportDetailPayload =
