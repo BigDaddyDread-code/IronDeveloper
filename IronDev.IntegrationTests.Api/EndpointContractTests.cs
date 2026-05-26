@@ -30,6 +30,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/tickets/import-external",
             "/api/projects/{projectId}/tickets/generate-from-discussion",
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs",
+            "/api/projects/{projectId}/tickets/{ticketId}/evidence-summary",
             "/api/projects/{projectId}/documents",
             "/api/projects/{projectId}/documents/{documentId}",
             "/api/projects/{projectId}/documents/{documentId}/resolve",
@@ -206,6 +207,72 @@ public sealed class EndpointContractTests : ApiTestBase
         var discussionTicket = await discussionResponse.Content.ReadFromJsonAsync<ProjectTicket>();
         Assert.IsNotNull(discussionTicket);
         Assert.AreEqual("Dogfood discussion should become an IronDev ticket.", discussionTicket!.Title);
+    }
+
+    [TestMethod]
+    public async Task TicketEvidenceSummary_WithNoLinkedRun_ShouldReturnHonestEmptyEvidence()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Ticket Evidence Summary Test");
+        var saveTicket = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/legacy", new ProjectTicket
+        {
+            ProjectId = project.Id,
+            SessionId = Guid.NewGuid(),
+            Title = "Evidence summary has no linked run",
+            Summary = "The summary should not invent run evidence.",
+            Content = "No run report source relationship exists yet.",
+            SourceChatSessionId = 44,
+            SourceChatMessageId = 45,
+            SourceDocumentVersionId = 12
+        });
+        Assert.AreEqual(HttpStatusCode.OK, saveTicket.StatusCode);
+
+        var ticket = await saveTicket.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var response = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket!.Id}/evidence-summary");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+        var summary = await response.Content.ReadFromJsonAsync<TicketEvidenceSummaryDto>();
+        Assert.IsNotNull(summary);
+        Assert.AreEqual(ticket.Id, summary!.TicketId);
+        Assert.IsNull(summary.LatestRun);
+        Assert.IsNull(summary.LatestPromotionPackage);
+        Assert.AreEqual(0, summary.LinkedRunCount);
+        Assert.AreEqual(1, summary.LinkedDocumentCount);
+        Assert.AreEqual(2, summary.LinkedTraceCount);
+        CollectionAssert.Contains(summary.BlockedActions.ToList(), "No execution run is linked to this ticket yet.");
+    }
+
+    [TestMethod]
+    public async Task TicketEvidenceSummary_ForMissingOrWrongProjectTicket_ShouldReturnNotFound()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Ticket Evidence Owner Project");
+        var otherProject = await CreateProjectAsync(client, "Ticket Evidence Wrong Project");
+        var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Project-owned evidence ticket",
+            Summary = "Evidence summary must enforce the project route boundary.",
+            Priority = "Medium",
+            Type = "Task"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var ticket = await createResponse.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var wrongProjectResponse = await client.GetAsync($"/api/projects/{otherProject.Id}/tickets/{ticket!.Id}/evidence-summary");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectResponse.StatusCode);
+
+        var missingResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/987654321/evidence-summary");
+        Assert.AreEqual(HttpStatusCode.NotFound, missingResponse.StatusCode);
     }
 
     private static async Task<Project> CreateProjectAsync(HttpClient client, string name)

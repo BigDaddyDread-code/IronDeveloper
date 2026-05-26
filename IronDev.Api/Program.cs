@@ -77,6 +77,7 @@ builder.Services.AddScoped<IBuilderProposalService, BuilderProposalService>();
 builder.Services.AddScoped<ICodebaseTicketGeneratorService, CodebaseTicketGeneratorService>();
 builder.Services.AddScoped<IBuildErrorClassifierService, BuildErrorClassifierService>();
 builder.Services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
+builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryService>();
 builder.Services.AddScoped<IDotNetBuildService, DotNetRunnerService>();
 builder.Services.AddScoped<IDotNetTestService, DotNetRunnerService>();
 builder.Services.AddSingleton<IRunReportService, FileRunReportService>();

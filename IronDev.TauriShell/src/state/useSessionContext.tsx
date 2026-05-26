@@ -112,29 +112,49 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const tokenConfigured = Boolean(config.token);
 
-  const value: SessionContextState = {
-    config,
-    client,
-    tokenConfigured,
-    isConnectionBusy,
-    isAuthBusy,
-    isConnectionReady: !isConnectionBusy && !isAuthBusy && apiStatus.status === 'connected',
-    isTokenEditorOpen,
-    apiStatus,
-    tokenDraft,
-    email,
-    password,
-    errorMessage,
-    refreshConfig,
-    clearError,
-    checkApiConnection,
-    saveToken,
-    signIn,
-    setTokenDraft,
-    setEmail,
-    setPassword,
-    setTokenEditorOpen
-  };
+  const value: SessionContextState = useMemo(
+    () => ({
+      config,
+      client,
+      tokenConfigured,
+      isConnectionBusy,
+      isAuthBusy,
+      isConnectionReady: !isConnectionBusy && !isAuthBusy && apiStatus.status === 'connected',
+      isTokenEditorOpen,
+      apiStatus,
+      tokenDraft,
+      email,
+      password,
+      errorMessage,
+      refreshConfig,
+      clearError,
+      checkApiConnection,
+      saveToken,
+      signIn,
+      setTokenDraft,
+      setEmail,
+      setPassword,
+      setTokenEditorOpen
+    }),
+    [
+      apiStatus,
+      checkApiConnection,
+      clearError,
+      client,
+      config,
+      email,
+      errorMessage,
+      isAuthBusy,
+      isConnectionBusy,
+      isTokenEditorOpen,
+      password,
+      refreshConfig,
+      saveToken,
+      signIn,
+      tokenConfigured,
+      tokenDraft
+    ]
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

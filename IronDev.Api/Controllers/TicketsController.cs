@@ -19,6 +19,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ITicketBuildOrchestrator _orchestrator;
     private readonly ITicketBuildWorkflowOrchestrator _buildRuns;
     private readonly IBuilderReadinessService _readiness;
+    private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly IBuilderProposalService _proposals;
 
     public TicketsController(
@@ -28,6 +29,7 @@ public sealed class TicketsController : ControllerBase
         ITicketBuildOrchestrator orchestrator,
         ITicketBuildWorkflowOrchestrator buildRuns,
         IBuilderReadinessService readiness,
+        ITicketEvidenceSummaryService evidenceSummary,
         IBuilderProposalService proposals)
     {
         _tickets = tickets;
@@ -36,6 +38,7 @@ public sealed class TicketsController : ControllerBase
         _orchestrator = orchestrator;
         _buildRuns = buildRuns;
         _readiness = readiness;
+        _evidenceSummary = evidenceSummary;
         _proposals = proposals;
     }
 
@@ -177,6 +180,13 @@ public sealed class TicketsController : ControllerBase
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-readiness")]
     public Task<BuildReadinessResult> EvaluateReadiness(int projectId, long ticketId, CancellationToken ct) =>
         _readiness.EvaluateReadinessAsync(projectId, ticketId, ct);
+
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/evidence-summary")]
+    public async Task<ActionResult<TicketEvidenceSummaryDto>> GetEvidenceSummary(int projectId, long ticketId, CancellationToken ct)
+    {
+        var summary = await _evidenceSummary.GetEvidenceSummaryAsync(projectId, ticketId, ct);
+        return summary is null ? NotFound() : Ok(summary);
+    }
 
     [HttpPost("api/tickets/{ticketId:long}/proposal")]
     public Task<BuilderProposal> GenerateProposal(long ticketId, CancellationToken ct) =>

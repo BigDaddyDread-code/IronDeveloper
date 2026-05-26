@@ -79,6 +79,21 @@ export interface TicketEvidenceSummary {
   nextSafeAction?: string | null;
 }
 
+export interface StartTicketBuildRunRequest {
+  workflowRunId?: string | null;
+  maxRetries?: number | null;
+}
+
+export interface TicketBuildRunDto {
+  runId: string;
+  projectId: number;
+  ticketId: number;
+  status: string;
+  currentNode: string;
+  requiresHumanApproval: boolean;
+  message?: string | null;
+}
+
 export interface RunReportSummaryRow {
   runId?: string | null;
   traceId?: string | null;
@@ -92,11 +107,11 @@ export interface RunReportSummaryRow {
   disposableFilesChanged?: number | null;
 }
 
-export interface RunEvidenceItem extends components['schemas']['RunEvidenceItem'] {}
-export interface RunReportDetail extends components['schemas']['RunReportDetail'] {}
-export interface RunReportSummary extends components['schemas']['RunReportSummary'] {}
-export interface RunPromotionReview extends components['schemas']['RunPromotionReview'] {}
-export interface RunReviewPolicySnapshot extends components['schemas']['RunReviewPolicySnapshot'] {}
+export type RunEvidenceItem = components['schemas']['RunEvidenceItem'];
+export type RunReportDetail = components['schemas']['RunReportDetail'];
+export type RunReportSummary = components['schemas']['RunReportSummary'];
+export type RunPromotionReview = components['schemas']['RunPromotionReview'];
+export type RunReviewPolicySnapshot = components['schemas']['RunReviewPolicySnapshot'];
 
 export interface LoginRequest {
   email: string;

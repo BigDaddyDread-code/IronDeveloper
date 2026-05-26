@@ -23,8 +23,13 @@ async function seedToken(page: import('@playwright/test').Page) {
 
 async function seedSelectedProject(page: import('@playwright/test').Page, projectId: number) {
   await page.addInitScript((id) => {
+    window.localStorage.setItem('irondev.tenantId', '3');
     window.localStorage.setItem('irondev.selectedProjectId', `${id}`);
   }, projectId);
+}
+
+function isTicketListRoute(url: string) {
+  return new URL(url).pathname === '/irondev-api/api/projects/7/tickets';
 }
 
 test('tickets shell exposes cockpit regions and auth state', async ({ page }) => {
@@ -92,18 +97,21 @@ test('tickets shell shows offline state and does not overflow in a narrow deskto
 test('tickets shell shows tenant required state after token auth', async ({ page }) => {
   await seedToken(page);
   await mockHealthyApi(page);
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: null })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+      body: JSON.stringify([
+        { id: 3, name: 'IronDev Local', slug: 'irondev-local' },
+        { id: 4, name: 'IronDev Review', slug: 'irondev-review' }
+      ])
     });
   });
 
@@ -111,7 +119,7 @@ test('tickets shell shows tenant required state after token auth', async ({ page
 
   await expect(page.getByRole('heading', { name: 'Tenant required' })).toBeVisible();
   await expect(page.getByTestId('tenant.selector')).toBeVisible();
-  await expect(page.getByTestId('tenant.option')).toHaveCount(1);
+  await expect(page.getByTestId('tenant.option')).toHaveCount(2);
   await expect(page.getByTestId('api.status.connected')).toBeVisible();
   await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
   await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Select a tenant');
@@ -121,14 +129,14 @@ test('tickets shell shows tenant required state after token auth', async ({ page
 test('tickets shell shows project required state when no projects are available', async ({ page }) => {
   await seedToken(page);
   await mockHealthyApi(page);
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -155,14 +163,14 @@ test('tickets shell shows project required state when no projects are available'
 test('tickets shell labels fallback project context without treating it as selected', async ({ page }) => {
   await seedToken(page);
   await mockHealthyApi(page);
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -197,14 +205,14 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await seedToken(page);
   await seedSelectedProject(page, 7);
   await mockHealthyApi(page);
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -220,6 +228,12 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   });
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryNoLinkedRun) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...ticketEvidenceSummaryNoLinkedRun, ticketId: 102 }) });
   });
   await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
     await route.fulfill({
@@ -249,6 +263,11 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
     });
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    if (!isTicketListRoute(route.request().url())) {
+      await route.fallback();
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -272,6 +291,20 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
       ])
     });
   });
+  await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ticketDetail101)
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ticketDetail102)
+    });
+  });
 
   await page.goto('/');
 
@@ -279,7 +312,7 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await expect(page.getByTestId('ticket.command.create')).toBeEnabled();
   await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeVisible();
   await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeDisabled();
+  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeEnabled();
   await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
   await expect(page.getByTestId('ticket.row')).toHaveCount(2);
   await expect(page.getByTestId('ticket.detail.header')).toBeVisible();
@@ -304,13 +337,13 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await expect(page.getByTestId('ticket.inspector.latestRun')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector.latestPromotionPackage')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector.blockedActions')).toBeVisible();
-  await expect(page.getByTestId('ticket.inspector.blockedActions')).toContainText('No linked execution run is linked to this ticket yet.');
+  await expect(page.getByTestId('ticket.inspector.blockedActions')).toContainText('No execution run is linked to this ticket yet.');
   await expect(page.getByTestId('ticket.inspector.nextSafeAction')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector.nextSafeAction')).toContainText('Refresh build readiness');
   await expect(page.getByTestId('ticket.detail')).toContainText('Make tickets cockpit real');
   await expect(page.getByTestId('ticket.detail')).toContainText('Render ticket data through the Tauri API client.');
 
-  await page.getByTestId('ticket.command.refreshReadiness').click();
+  await page.getByTestId('ticket.detail.build').getByTestId('ticket.command.refreshReadiness').click();
   await expect(page.getByTestId('ticket.detail.readiness')).toContainText('Ready to build.');
   await expect(page.getByTestId('ticket.inspector.buildReadiness')).toContainText('Ready to build.');
   await expectNoHorizontalOverflow(page);
@@ -338,8 +371,8 @@ test('tickets shell handles readiness loading and unavailable state', async ({ p
 
   await page.goto('/');
 
-  await page.getByTestId('ticket.command.refreshReadiness').click();
-  await expect(page.getByTestId('ticket.command.refreshReadiness')).toContainText('Checking readiness');
+  await page.getByTestId('ticket.detail.build').getByTestId('ticket.command.refreshReadiness').click();
+  await expect(page.getByTestId('ticket.detail.build').getByTestId('ticket.command.refreshReadiness')).toContainText('Checking readiness');
   await expect(page.getByTestId('ticket.detail.readiness')).toContainText('Build readiness is not available for this ticket yet.');
   await expect(page.getByTestId('ticket.inspector.buildReadiness')).toContainText('Unavailable');
   await expectNoHorizontalOverflow(page);
@@ -350,7 +383,7 @@ test('tickets shell opens edit mode, validates title, and cancels dirty changes'
 
   await page.goto('/');
 
-  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await expect(page.getByTestId('ticket.edit.form')).toBeVisible();
   await expect(page.getByTestId('ticket.edit.title')).toHaveValue('Make tickets cockpit real');
 
@@ -380,7 +413,7 @@ test('tickets shell saves edited ticket through the API and clears dirty state',
   });
 
   await page.goto('/');
-  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await page.getByTestId('ticket.edit.title').fill('Saved Tauri workflow title');
   await page.getByTestId('ticket.edit.summary').fill('Saved through the ticket workflow parity form.');
   await page.getByTestId('ticket.command.save').click();
@@ -403,7 +436,7 @@ test('tickets shell shows product error when ticket save API fails', async ({ pa
   });
 
   await page.goto('/');
-  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await page.getByTestId('ticket.edit.title').fill('Save failure title');
   await page.getByTestId('ticket.command.save').click();
 
@@ -416,7 +449,7 @@ test('tickets shell blocks selection changes while edit form is dirty', async ({
   await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
 
   await page.goto('/');
-  await page.getByTestId('ticket.command.edit').click();
+  await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await page.getByTestId('ticket.edit.title').fill('Dirty title that should block selection');
   await page.getByText('Add project selection', { exact: true }).click();
 
@@ -449,7 +482,7 @@ test('tickets shell refreshes implementation plan through the API', async ({ pag
   });
 
   await page.goto('/');
-  await page.getByTestId('ticket.command.generatePlan').click();
+  await page.getByTestId('workspace.commands').getByTestId('ticket.command.generatePlan').click();
 
   await expect(page.getByTestId('ticket.detail.plan')).toContainText('Prove safe edit and review workflow parity.');
   await expect(page.getByTestId('ticket.detail.plan')).toContainText('Edit draft');
@@ -463,7 +496,7 @@ test('tickets shell shows unavailable plan state when plan endpoint has no data'
   });
 
   await page.goto('/');
-  await page.getByTestId('ticket.command.generatePlan').click();
+  await page.getByTestId('workspace.commands').getByTestId('ticket.command.generatePlan').click();
 
   await expect(page.getByTestId('ticket.detail.plan')).toContainText('Plan not available yet.');
   await expectNoHorizontalOverflow(page);
@@ -558,8 +591,8 @@ test('run reports cockpit shows summaries, timeline, and evidence', async ({ pag
       'run-901': runReportDetailSuccess
     },
     evidence: {
-      'run-900': [runReportEvidenceFailure],
-      'run-901': [runReportEvidenceSuccess]
+      'run-900': runReportEvidenceFailure,
+      'run-901': runReportEvidenceSuccess
     }
   });
 
@@ -594,7 +627,7 @@ test('promotion review cockpit shows promotable and blocked files with next acti
       'run-901': runReportDetailForPromotion
     },
     evidence: {
-      'run-901': [runReportEvidenceSuccess]
+      'run-901': runReportEvidenceSuccess
     }
   });
 
@@ -618,14 +651,16 @@ test('promotion review cockpit shows promotable and blocked files with next acti
 
 test('ticket evidence links open run report and promotion context', async ({ page }) => {
   await mockTicketProject(page);
-  const linkedRun = { ...runReportSummaryForPromotion, sourceEntityType: 'Ticket', sourceEntityId: 101 };
+  await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryWithLinkedRun) });
+  });
   await mockRunReportWorkspace(page, {
-    runs: [linkedRun],
+    runs: [runReportSummaryForPromotion],
     runDetails: {
       'run-901': runReportDetailForPromotion
     },
     evidence: {
-      'run-901': [runReportEvidenceSuccess]
+      'run-901': runReportEvidenceSuccess
     }
   });
 
@@ -646,14 +681,14 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
   await seedToken(page);
   await seedSelectedProject(page, 7);
   await mockHealthyApi(page);
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -670,6 +705,27 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryNoLinkedRun) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...ticketEvidenceSummaryNoLinkedRun, ticketId: 102 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        runId: 'run-901',
+        projectId: 7,
+        ticketId: 101,
+        status: 'Running',
+        currentNode: 'LoadTicket',
+        requiresHumanApproval: false,
+        message: 'Disposable run started.'
+      })
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketDetail101) });
   });
@@ -677,6 +733,11 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketDetail102) });
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    if (!isTicketListRoute(route.request().url())) {
+      await route.fallback();
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -883,6 +944,55 @@ const runReportEvidenceFailure = [
   }
 ];
 
+const ticketEvidenceSummaryNoLinkedRun = {
+  ticketId: 101,
+  status: 'loaded',
+  message: 'No linked execution evidence is available yet.',
+  latestRun: null,
+  latestPromotionPackage: null,
+  linkedTraceCount: 2,
+  linkedDocumentCount: 1,
+  linkedDecisionCount: 0,
+  linkedRunCount: 0,
+  hasBlockingWarnings: true,
+  blockedActions: ['No execution run is linked to this ticket yet.'],
+  nextSafeAction: 'Refresh build readiness'
+};
+
+const ticketEvidenceSummaryWithLinkedRun = {
+  ticketId: 101,
+  status: 'loaded',
+  message: 'Execution evidence is available for this ticket.',
+  latestRun: {
+    runId: 'run-901',
+    traceId: 'trace-901',
+    title: 'Promotion review for disposable feature',
+    status: 'needsHumanReview',
+    recommendation: 'Needs human review',
+    startedUtc: '2026-05-26T01:15:00Z',
+    completedUtc: '2026-05-26T01:18:00Z'
+  },
+  latestPromotionPackage: {
+    packageId: 'pkg-run-901',
+    proposedChangeId: 'chg-run-901',
+    approvalState: 'NeedsHumanReview',
+    recommendation: 'Proceed to human review.',
+    runtimeProfile: 'dotnet-csharp',
+    targetLanguage: 'C#',
+    filesToPromoteCount: 1,
+    filesBlockedCount: 1,
+    activeRepoMutationCount: 1,
+    sourceRunId: 'run-901'
+  },
+  linkedTraceCount: 2,
+  linkedDocumentCount: 1,
+  linkedDecisionCount: 0,
+  linkedRunCount: 1,
+  hasBlockingWarnings: false,
+  blockedActions: [],
+  nextSafeAction: 'Review latest run'
+};
+
 type RunReportDetailPayload =
   | typeof runReportDetailSuccess
   | typeof runReportDetailFailure
@@ -917,14 +1027,14 @@ async function mockTicketProjectForCreate(
   ];
   let createdTicket: Record<string, unknown> | null = null;
 
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -955,6 +1065,11 @@ async function mockTicketProjectForCreate(
     });
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    if (!isTicketListRoute(route.request().url())) {
+      await route.fallback();
+      return;
+    }
+
     if (route.request().method() === 'POST') {
       try {
         createdTicket = await createTicket(route.request());
@@ -992,14 +1107,14 @@ async function mockTicketProjectForEdit(
   let detail101: Record<string, unknown> = { ...ticketDetail101 };
   const detail102: Record<string, unknown> = { ...ticketDetail102 };
 
-  await page.route('**/irondev-api/api/auth/me', async (route) => {
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
     });
   });
-  await page.route('**/irondev-api/api/tenants', async (route) => {
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -1015,6 +1130,12 @@ async function mockTicketProjectForEdit(
   });
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryNoLinkedRun) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/102/evidence-summary', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...ticketEvidenceSummaryNoLinkedRun, ticketId: 102 }) });
   });
   await page.route('**/irondev-api/api/projects/7/tickets/101', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail101) });
@@ -1036,6 +1157,11 @@ async function mockTicketProjectForEdit(
     }
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    if (!isTicketListRoute(route.request().url())) {
+      await route.fallback();
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

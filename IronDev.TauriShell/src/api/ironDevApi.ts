@@ -11,7 +11,10 @@ import type {
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
+  StartTicketBuildRunRequest,
   TenantSummary,
+  TicketBuildRunDto,
+  TicketEvidenceSummary,
   TicketLoadResult,
   UserProfile
 } from './types';
@@ -238,6 +241,30 @@ class IronDevApiClient {
   ): Promise<BuildReadinessResult> {
     return this.request<BuildReadinessResult>(`/api/projects/${projectId}/tickets/${ticketId}/build-readiness`, {
       method: 'GET',
+      signal
+    });
+  }
+
+  async getTicketEvidenceSummary(
+    projectId: number,
+    ticketId: number,
+    signal?: AbortSignal
+  ): Promise<TicketEvidenceSummary> {
+    return this.request<TicketEvidenceSummary>(`/api/projects/${projectId}/tickets/${ticketId}/evidence-summary`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async startTicketBuildRun(
+    projectId: number,
+    ticketId: number,
+    request: StartTicketBuildRunRequest = {},
+    signal?: AbortSignal
+  ): Promise<TicketBuildRunDto> {
+    return this.request<TicketBuildRunDto>(`/api/projects/${projectId}/tickets/${ticketId}/build-runs`, {
+      method: 'POST',
+      body: request,
       signal
     });
   }

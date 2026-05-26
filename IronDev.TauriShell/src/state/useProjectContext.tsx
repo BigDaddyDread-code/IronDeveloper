@@ -24,11 +24,19 @@ const ProjectContext = createContext<ProjectContextState | null>(null);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const session = useSessionContext();
+  const {
+    checkApiConnection,
+    client,
+    config,
+    refreshConfig,
+    setTokenEditorOpen,
+    tokenConfigured
+  } = session;
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [selectedTenantId, setSelectedTenantId] = useState<number | null>(session.config.selectedTenantId ?? null);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(session.config.selectedProjectId ?? null);
+  const [selectedTenantId, setSelectedTenantId] = useState<number | null>(config.selectedTenantId ?? null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(config.selectedProjectId ?? null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
   const [projectSelectionMode, setProjectSelectionMode] = useState<'api' | 'fallback-config' | 'missing'>('missing');
   const [accessStatus, setAccessStatus] = useState<ProductAccessStatus>('loading');
@@ -47,18 +55,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setUserProfile(null);
     setTenants([]);
     setProjects([]);
-    setSelectedTenantId(session.config.selectedTenantId ?? null);
-    setSelectedProjectId(session.config.selectedProjectId ?? null);
+    setSelectedTenantId(config.selectedTenantId ?? null);
+    setSelectedProjectId(config.selectedProjectId ?? null);
     setSelectedProjectName(null);
     setProjectSelectionMode('missing');
-  }, [session.config.selectedProjectId, session.config.selectedTenantId]);
+  }, [config.selectedProjectId, config.selectedTenantId]);
 
   const refreshProjectContext = useCallback(async () => {
     setIsRefreshing(true);
     setAccessStatus('loading');
 
     try {
-      const health = await session.checkApiConnection();
+      const health = await checkApiConnection();
 
       if (health.status === 'disconnected' || health.status === 'error') {
         clearWorkspace();
@@ -66,19 +74,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!session.tokenConfigured) {
+      if (!tokenConfigured) {
         clearWorkspace();
         setAccessStatus('authRequired');
         return;
       }
 
-      const profile = await session.client.getCurrentUser();
+      const profile = await client.getCurrentUser();
       setUserProfile(profile);
 
-      const tenantList = await session.client.getTenants();
+      const tenantList = await client.getTenants();
       setTenants(tenantList);
 
-      const tenantId = profile.selectedTenantId ?? session.config.selectedTenantId ?? null;
+      const tenantId = profile.selectedTenantId ?? config.selectedTenantId ?? (tenantList.length === 1 ? tenantList[0].id ?? null : null);
       setSelectedTenantId(tenantId);
 
       if (!tenantId) {
@@ -90,10 +98,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const projectList = await session.client.getProjects();
+      const projectList = await client.getProjects();
       setProjects(projectList);
 
-      const configuredProject = getSelectedProject(projectList, session.config.selectedProjectId, session.config.fallbackProjectId);
+      const configuredProject = getSelectedProject(projectList, config.selectedProjectId, config.fallbackProjectId);
       const resolvedProjectId = configuredProject?.id ?? null;
       setSelectedProjectId(resolvedProjectId);
       setProjectSelectionMode(configuredProject?.mode ?? 'missing');
@@ -105,7 +113,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
 
       if (configuredProject?.mode === 'api') {
-        await session.client.selectProject(resolvedProjectId);
+        await client.selectProject(resolvedProjectId);
       }
 
       setAccessStatus('loadingTickets');
@@ -122,9 +130,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       setIsRefreshing(false);
-      session.setTokenEditorOpen(false);
+      setTokenEditorOpen(false);
     }
-  }, [clearWorkspace, session]);
+  }, [checkApiConnection, clearWorkspace, client, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, setTokenEditorOpen, tokenConfigured]);
 
   const refreshTicketsContext = useCallback(() => {
     if (accessStatus === 'ready' || accessStatus === 'emptyTickets') {
@@ -146,7 +154,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsRefreshing(true);
 
       try {
-        const response = await session.client.selectTenant(tenantId);
+        const response = await client.selectTenant(tenantId);
         window.localStorage.setItem('irondev.token', response.token);
         window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
         window.localStorage.removeItem('irondev.selectedProjectId');
@@ -155,7 +163,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setSelectedProjectName(null);
         setProjectSelectionMode('missing');
         setAccessStatus('loading');
-        session.refreshConfig();
+        refreshConfig();
       } catch (error) {
         if (error instanceof IronDevApiError) {
           setAccessStatus('apiError');
@@ -166,7 +174,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setIsRefreshing(false);
       }
     },
-    [session]
+    [client, refreshConfig]
   );
 
   const selectProjectContext = useCallback(
@@ -180,33 +188,50 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjectSelectionMode('api');
       setSelectedProjectName(projects.find((project) => project.id === projectId)?.name ?? `Project ${projectId}`);
       setAccessStatus('loadingTickets');
-      session.refreshConfig();
+      refreshConfig();
     },
-    [projects, session]
+    [projects, refreshConfig]
   );
 
   useEffect(() => {
-    setSelectedTenantId(session.config.selectedTenantId ?? null);
-    setSelectedProjectId(session.config.selectedProjectId ?? null);
+    setSelectedTenantId(config.selectedTenantId ?? null);
+    setSelectedProjectId(config.selectedProjectId ?? null);
     void refreshProjectContext();
-  }, [session.config.selectedTenantId, session.config.selectedProjectId, refreshProjectContext, session.config.token]);
+  }, [config.selectedTenantId, config.selectedProjectId, refreshProjectContext, config.token]);
 
-  const value: ProjectContextState = {
-    userProfile,
-    tenants,
-    projects,
-    selectedTenantId,
-    selectedProjectId,
-    selectedProjectName,
-    projectSelectionMode,
-    accessStatus,
-    isRefreshing,
-    refreshProjectContext,
-    refreshTicketsContext,
-    selectTenantContext,
-    selectProjectContext,
-    setProjectAccessStatus: setAccessStatus
-  };
+  const value: ProjectContextState = useMemo(
+    () => ({
+      userProfile,
+      tenants,
+      projects,
+      selectedTenantId,
+      selectedProjectId,
+      selectedProjectName,
+      projectSelectionMode,
+      accessStatus,
+      isRefreshing,
+      refreshProjectContext,
+      refreshTicketsContext,
+      selectTenantContext,
+      selectProjectContext,
+      setProjectAccessStatus: setAccessStatus
+    }),
+    [
+      accessStatus,
+      isRefreshing,
+      projectSelectionMode,
+      projects,
+      refreshProjectContext,
+      refreshTicketsContext,
+      selectProjectContext,
+      selectTenantContext,
+      selectedProjectId,
+      selectedProjectName,
+      selectedTenantId,
+      tenants,
+      userProfile
+    ]
+  );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }

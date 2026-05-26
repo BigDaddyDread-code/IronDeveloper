@@ -6,6 +6,7 @@ import type {
   CreateProjectTicketRequest,
   LinkedPromotionPackageSummary,
   LinkedRunSummary,
+  LinkedRunStatus,
   TicketEvidenceLoadStatus,
   TicketEvidenceSummary,
   ProductAccessStatus,
@@ -194,9 +195,17 @@ export function useTicketsWorkspace() {
     projectSelectionMode,
     selectedTicketIdForList
   );
-  const startDisposableRunBlockedReason = ticketActionBlockedReason
-    ? ticketActionBlockedReason
-    : 'Disposable run start is not exposed by IronDev.Api yet.';
+  const startDisposableRunBlockedReason = useMemo(() => {
+    if (ticketActionBlockedReason) {
+      return ticketActionBlockedReason;
+    }
+
+    if (readinessStatus === 'loaded' && readiness && !readiness.isReady) {
+      return readiness.message ?? readiness.blockingIssues?.[0] ?? 'Resolve build readiness blockers before starting a disposable run.';
+    }
+
+    return null;
+  }, [readiness, readinessStatus, ticketActionBlockedReason]);
   const isEditDirty = selectedTicket ? !areEditDraftsEqual(editDraft, draftFromTicket(selectedTicket)) : false;
   const editValidationMessage = useMemo(() => validateEditDraft(editDraft), [editDraft]);
   const isBusy = project.isRefreshing || session.isConnectionBusy || session.isAuthBusy;
@@ -303,6 +312,14 @@ export function useTicketsWorkspace() {
       resetTicketWorkflowState();
     }
   }, [accessStatus, loadTickets, productAccessBlocked, resetTicketWorkflowState]);
+
+  useEffect(() => {
+    if (productAccessBlocked || selectedTicketId || tickets.length === 0) {
+      return;
+    }
+
+    setSelectedTicketId(tickets[0]?.id ?? null);
+  }, [productAccessBlocked, selectedTicketId, tickets]);
 
   useEffect(() => {
     if (productAccessBlocked || !selectedProjectId || !selectedTicketId) {
@@ -581,7 +598,6 @@ export function useTicketsWorkspace() {
       setSaveStatus('saved');
       setSaveMessage('Ticket saved through IronDev.Api.');
       setTicketMessage('Ticket saved and local queue state refreshed.');
-      project.refreshTicketsContext();
     } catch (error) {
       setSaveStatus('error');
       if (error instanceof IronDevApiError && error.isAuthFailure) {
@@ -608,72 +624,108 @@ export function useTicketsWorkspace() {
     setEvidenceMessage('Loading execution evidence...');
 
     try {
-      const runReports = await session.client.getRunReports();
-      const sortedRunReports = [...runReports].sort((left, right) => {
-        const leftTime = Date.parse(left.startedUtc ?? left.completedUtc ?? '') || 0;
-        const rightTime = Date.parse(right.startedUtc ?? right.completedUtc ?? '') || 0;
-
-        return rightTime - leftTime;
-      });
-
-      const latestRelatedRun = getLatestTicketRelatedRun(sortedRunReports, selectedTicket);
-
-      let latestPromotionPackage: LinkedPromotionPackageSummary | null = null;
-      let latestRunSummary: LinkedRunSummary | null = null;
-
-      if (latestRelatedRun) {
-        const runSummary = mapRunSummary(latestRelatedRun);
-        latestRunSummary = runSummary;
-
-        try {
-          if (!latestRelatedRun.runId) {
-            throw new Error('No run id to resolve promotion data');
-          }
-
-          const runDetail = await session.client.getRunReport(latestRelatedRun.runId);
-          if (runDetail?.promotionReview) {
-            latestPromotionPackage = mapPromotionSummary(runDetail.promotionReview, latestRelatedRun.runId, runDetail);
-          }
-        } catch {
-          // A run detail can transiently be unavailable even when a run exists.
-          latestPromotionPackage = null;
-        }
+      if (!selectedProjectId || !selectedTicket.id) {
+        throw new IronDevApiError('Ticket evidence requires a selected project and ticket.', 400);
       }
 
-      const summary = buildTicketEvidenceSummary({
-        ticket: selectedTicket,
-        readiness,
-        readinessStatus,
-        latestRelatedRun: latestRunSummary
-      });
-
-      setEvidenceSummary({
-        ...summary,
-        latestPromotionPackage,
-        latestRun: latestRunSummary
-      });
-
+      const summary = await session.client.getTicketEvidenceSummary(selectedProjectId, selectedTicket.id);
+      setEvidenceSummary(summary);
       setEvidenceStatus('loaded');
       setEvidenceMessage(summary.message);
     } catch (error) {
-      setEvidenceSummary({
-        ticketId: selectedTicket.id ?? 0,
-        status: 'error',
-        message: error instanceof IronDevApiError ? `Execution evidence failed with HTTP ${error.status}.` : 'Execution evidence could not be loaded.',
-        latestRun: null,
-        latestPromotionPackage: null,
-        linkedTraceCount: getLinkedTraceCount(selectedTicket),
-        linkedDocumentCount: getLinkedDocumentCount(selectedTicket),
-        linkedDecisionCount: 0,
-        linkedRunCount: 0,
-        hasBlockingWarnings: true,
-        blockedActions: ['Execution evidence could not be loaded at this time.'],
-        nextSafeAction: readiness?.isReady ? 'Review latest run' : 'Refresh build readiness'
-      });
-      setEvidenceStatus('error');
-      setEvidenceMessage('Execution evidence could not be loaded from run reports.');
+      if (error instanceof IronDevApiError && error.status !== 404) {
+        setEvidenceSummary({
+          ticketId: selectedTicket.id ?? 0,
+          status: 'error',
+          message: `Execution evidence failed with HTTP ${error.status}.`,
+          latestRun: null,
+          latestPromotionPackage: null,
+          linkedTraceCount: getLinkedTraceCount(selectedTicket),
+          linkedDocumentCount: getLinkedDocumentCount(selectedTicket),
+          linkedDecisionCount: 0,
+          linkedRunCount: 0,
+          hasBlockingWarnings: true,
+          blockedActions: ['Execution evidence could not be loaded at this time.'],
+          nextSafeAction: readiness?.isReady ? 'Start disposable run' : 'Refresh build readiness'
+        });
+        setEvidenceStatus('error');
+        setEvidenceMessage(`Execution evidence failed with HTTP ${error.status}.`);
+        return;
+      }
+
+      if (!(error instanceof IronDevApiError)) {
+        setEvidenceStatus('unavailable');
+        setEvidenceMessage('Evidence summary endpoint is unavailable. Falling back to local evidence resolution.');
+      }
+
+      try {
+        const runReports = await session.client.getRunReports();
+        const sortedRunReports = [...runReports].sort((left, right) => {
+          const leftTime = Date.parse(left.startedUtc ?? left.completedUtc ?? '') || 0;
+          const rightTime = Date.parse(right.startedUtc ?? right.completedUtc ?? '') || 0;
+
+          return rightTime - leftTime;
+        });
+
+        const latestRelatedRun = getLatestTicketRelatedRun(sortedRunReports, selectedTicket);
+
+        let latestPromotionPackage: LinkedPromotionPackageSummary | null = null;
+        let latestRunSummary: LinkedRunSummary | null = null;
+
+        if (latestRelatedRun) {
+          const runSummary = mapRunSummary(latestRelatedRun);
+          latestRunSummary = runSummary;
+
+          try {
+            if (!latestRelatedRun.runId) {
+              throw new Error('No run id to resolve promotion data');
+            }
+
+            const runDetail = await session.client.getRunReport(latestRelatedRun.runId);
+            if (runDetail?.promotionReview) {
+              latestPromotionPackage = mapPromotionSummary(runDetail.promotionReview, latestRelatedRun.runId, runDetail);
+            }
+          } catch {
+            // A run detail can transiently be unavailable even when a run exists.
+            latestPromotionPackage = null;
+          }
+        }
+
+        const summary = buildTicketEvidenceSummary({
+          ticket: selectedTicket,
+          readiness,
+          readinessStatus,
+          latestRelatedRun: latestRunSummary
+        });
+
+        setEvidenceSummary({
+          ...summary,
+          latestPromotionPackage,
+          latestRun: latestRunSummary
+        });
+
+        setEvidenceStatus('loaded');
+        setEvidenceMessage(summary.message);
+      } catch {
+        setEvidenceSummary({
+          ticketId: selectedTicket.id ?? 0,
+          status: 'error',
+          message: 'Execution evidence could not be loaded.',
+          latestRun: null,
+          latestPromotionPackage: null,
+          linkedTraceCount: getLinkedTraceCount(selectedTicket),
+          linkedDocumentCount: getLinkedDocumentCount(selectedTicket),
+          linkedDecisionCount: 0,
+          linkedRunCount: 0,
+          hasBlockingWarnings: true,
+          blockedActions: ['Execution evidence could not be loaded at this time.'],
+          nextSafeAction: readiness?.isReady ? 'Start disposable run' : 'Refresh build readiness'
+        });
+        setEvidenceStatus('error');
+        setEvidenceMessage('Execution evidence could not be loaded.');
+      }
     }
-  }, [readiness, readinessStatus, selectedTicket, session.client]);
+  }, [readiness, readinessStatus, selectedProjectId, selectedTicket, session.client]);
 
   const refreshReadiness = useCallback(async () => {
     if (!selectedProjectId || !selectedTicketIdForList) {
@@ -746,14 +798,49 @@ export function useTicketsWorkspace() {
     }
   }, [session.client, selectedTicketIdForList, ticketActionBlockedReason]);
 
-  const onStartDisposableRun = useCallback(() => {
+  const onStartDisposableRun = useCallback(async () => {
     if (startDisposableRunBlockedReason) {
       setEvidenceMessage(startDisposableRunBlockedReason);
       return;
     }
 
-    setEvidenceMessage('Disposable run start is currently unavailable in this shell.');
-  }, [startDisposableRunBlockedReason]);
+    if (!selectedProjectId || !selectedTicketIdForList) {
+      setEvidenceMessage('Select a project ticket before starting a disposable run.');
+      return;
+    }
+
+    setEvidenceStatus('loading');
+    setEvidenceMessage('Starting disposable run through IronDev.Api...');
+
+    try {
+      const result = await session.client.startTicketBuildRun(selectedProjectId, selectedTicketIdForList, {});
+      if (result.runId) {
+        navigation.setSelectedRunId(result.runId);
+      }
+
+      setEvidenceMessage(result.message ?? `Disposable run ${result.runId} started.`);
+      await refreshEvidence();
+      navigation.navigateToWorkspace('run-reports');
+    } catch (error) {
+      const message =
+        error instanceof IronDevApiError
+          ? `Disposable run start failed with HTTP ${error.status}.`
+          : 'Disposable run start could not reach IronDev.Api.';
+      setEvidenceSummary((current) =>
+        current
+          ? {
+              ...current,
+              status: 'error',
+              message,
+              hasBlockingWarnings: true,
+              blockedActions: [...current.blockedActions, message]
+            }
+          : current
+      );
+      setEvidenceStatus('error');
+      setEvidenceMessage(message);
+    }
+  }, [navigation, refreshEvidence, selectedProjectId, selectedTicketIdForList, session.client, startDisposableRunBlockedReason]);
 
   const onReviewLatestRun = useCallback(() => {
     const latestRunId = evidenceSummary?.latestRun?.runId ?? null;
@@ -801,7 +888,7 @@ export function useTicketsWorkspace() {
     projectStatus: projectStatus === 'fallback' ? 'fallback' : projectStatus === 'selected' ? 'selected' : 'missing',
     tokenConfigured,
     projectBadgeStatus: projectSelectionMode === 'api' ? 'selected' : projectSelectionMode === 'fallback-config' ? 'fallback' : 'missing',
-    projectAccessBlocked,
+    projectAccessBlocked: productAccessBlocked,
     authLabel: tokenConfigured ? 'Token rejected' : 'Missing token',
     tenants: project.tenants,
     projects: project.projects,
@@ -1101,7 +1188,11 @@ function buildTicketEvidenceSummary(args: {
     linkedRunCount: args.latestRelatedRun ? 1 : 0,
     hasBlockingWarnings: blockedActions.length > 0,
     blockedActions,
-    nextSafeAction: args.readiness?.isReady ? 'Start disposable run' : 'Refresh build readiness'
+    nextSafeAction: args.latestRelatedRun
+      ? 'Review latest run'
+      : args.readiness?.isReady
+        ? 'Start disposable run'
+        : 'Refresh build readiness'
   };
 }
 

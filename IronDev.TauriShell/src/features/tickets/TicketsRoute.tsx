@@ -19,7 +19,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
         intent: 'primary',
         onExecute: state.actions.onStartDisposableRun,
         disabled: Boolean(state.startDisposableRunBlockedReason),
-        disabledReason: state.startDisposableRunBlockedReason,
+        disabledReason: state.startDisposableRunBlockedReason ?? undefined,
         testId: 'ticket.command.startDisposableRun'
       },
       {
@@ -28,7 +28,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
         intent: 'secondary',
         onExecute: state.actions.onReviewLatestRun,
         disabled: Boolean(state.reviewLatestRunBlockedReason),
-        disabledReason: state.reviewLatestRunBlockedReason,
+        disabledReason: state.reviewLatestRunBlockedReason ?? undefined,
         testId: 'ticket.command.reviewLatestRun'
       },
       {
@@ -37,7 +37,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
         intent: 'secondary',
         onExecute: state.actions.onRefreshReadiness,
         disabled: Boolean(state.editBlockedReason) || state.readinessStatus === 'loading',
-        disabledReason: state.editBlockedReason,
+        disabledReason: state.editBlockedReason ?? undefined,
         busy: state.readinessStatus === 'loading',
         testId: 'ticket.command.refreshReadiness'
       },
@@ -47,7 +47,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
         intent: 'secondary',
         onExecute: state.actions.onRefreshPlan,
         disabled: Boolean(state.editBlockedReason) || state.planStatus === 'loading',
-        disabledReason: state.editBlockedReason,
+        disabledReason: state.editBlockedReason ?? undefined,
         busy: state.planStatus === 'loading',
         testId: 'ticket.command.generatePlan'
       },
@@ -57,7 +57,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
         intent: 'ghost',
         onExecute: state.actions.onEditTicket,
         disabled: Boolean(state.editBlockedReason),
-        disabledReason: state.editBlockedReason,
+        disabledReason: state.editBlockedReason ?? undefined,
         testId: 'ticket.command.edit'
       },
       {
@@ -66,7 +66,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
         intent: 'secondary',
         onExecute: state.actions.onOpenCreate,
         disabled: Boolean(state.createBlockedReason) || state.isBusy,
-        disabledReason: state.createBlockedReason,
+        disabledReason: state.createBlockedReason ?? undefined,
         testId: 'ticket.command.create'
       }
     ],
@@ -119,7 +119,7 @@ function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel) {
     projectId: state.projectId,
     projectStatus: state.projectStatus,
     tokenConfigured: state.tokenConfigured,
-    projectAccessBlocked: state.projectAccessBlocked,
+    productAccessBlocked: state.projectAccessBlocked,
     authLabel: state.authLabel,
     tenants: state.tenants,
     projects: state.projects,

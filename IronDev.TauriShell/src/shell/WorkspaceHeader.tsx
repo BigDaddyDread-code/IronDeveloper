@@ -1,4 +1,5 @@
-import { CommandBar, type WorkspaceCommand } from '../design-system/CommandBar';
+import { CommandBar } from '../design-system/CommandBar';
+import type { WorkspaceCommand } from '../app/routes';
 import { ApiStatusBadge } from '../components/ApiStatusBadge';
 import type { ApiStatus } from '../api/types';
 

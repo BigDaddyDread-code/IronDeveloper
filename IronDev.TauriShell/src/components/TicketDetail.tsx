@@ -242,7 +242,7 @@ export function TicketDetail({
             <MetadataRow label="Linked traces" value={`${evidenceSummary.linkedTraceCount}`} />
             <MetadataRow label="Linked decisions" value={`${evidenceSummary.linkedDecisionCount}`} />
             <MetadataRow label="Linked runs" value={`${evidenceSummary.linkedRunCount}`} />
-            <div className="workflow-section__meta">
+            <div className="workflow-section__meta" data-testid="ticket.evidence.blockedActions">
               <p>Blocked actions</p>
               {evidenceSummary.blockedActions.length > 0 ? (
                 <ul className="detail-list">

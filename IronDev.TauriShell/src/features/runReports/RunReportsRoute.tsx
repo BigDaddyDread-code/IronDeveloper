@@ -311,8 +311,8 @@ function RunReportSummaryPanel({
           label="Policy settings"
           value={policy?.configurableSettings && policy.configurableSettings.length > 0 ? policy.configurableSettings.join(', ') : 'none'}
         />
-        <MetadataRow label="Started" value={DateTimeDisplay.toLocalDisplay(run.startedUtc)} />
-        <MetadataRow label="Completed" value={DateTimeDisplay.toLocalDisplay(run.completedUtc)} />
+        <MetadataRow label="Started" value={DateTimeDisplay.toLocalDisplay((run as { startedUtc?: string | null }).startedUtc)} />
+        <MetadataRow label="Completed" value={DateTimeDisplay.toLocalDisplay((run as { completedUtc?: string | null }).completedUtc)} />
         <MetadataRow
           label="Notes"
           value={
