@@ -13,7 +13,8 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $weaviateScript = Join-Path $repoRoot "Scripts\weaviate-dev.ps1"
 $dbSetupScript = Join-Path $repoRoot "Database\local_dev_setup.sql"
 $solutionFile = Join-Path $repoRoot "IronDev.slnx"
-$appProject = Join-Path $repoRoot "IronDeveloper\IronDev.Agent.csproj"
+$apiProject = Join-Path $repoRoot "IronDev.Api\IronDev.Api.csproj"
+$cliProject = Join-Path $repoRoot "tools\IronDev.Cli\IronDev.Cli.csproj"
 $integrationTests = Join-Path $repoRoot "IronDev.IntegrationTests\IronDev.IntegrationTests.csproj"
 
 function Write-Step {
@@ -92,9 +93,10 @@ else {
 }
 
 if (-not $SkipBuild) {
-    Write-Step "Building IronDev WPF app"
-    dotnet build $appProject --no-restore -p:UseSharedCompilation=false -nr:false
-    Write-Ok "App build complete"
+    Write-Step "Building IronDev API and product CLI"
+    dotnet build $apiProject --no-restore -p:UseSharedCompilation=false -nr:false
+    dotnet build $cliProject --no-restore -p:UseSharedCompilation=false -nr:false
+    Write-Ok "API and CLI build complete"
 }
 else {
     Write-Warn "Build skipped."
@@ -104,7 +106,7 @@ if (-not $SkipTests) {
     Write-Step "Running focused smoke tests"
     dotnet test $integrationTests `
         --no-restore `
-        --filter "ChatCommandRouter_CreateTickets_IsActionFirst|ChatCommandRouter_SaveDecision_IsActionFirst|SaveAllDraftsCommand_MultiDraft_SavesEntireQueue" `
+        --filter "ApiBoundaryTests|IronDevCliTests" `
         -p:UseSharedCompilation=false `
         -nr:false
     Write-Ok "Focused smoke tests passed"
@@ -114,11 +116,12 @@ else {
 }
 
 Write-Step "Next steps"
-Write-Host "1. Confirm IronDeveloper/appsettings.Development.json has the right SQL connection string."
-Write-Host "2. Start the app:"
-Write-Host "   cd IronDeveloper"
-Write-Host "   dotnet run"
-Write-Host "3. Login:"
+Write-Host "1. Confirm IronDev.Api/appsettings.Development.json has the right SQL connection string."
+Write-Host "2. Start the API:"
+Write-Host "   dotnet run --project IronDev.Api/IronDev.Api.csproj"
+Write-Host "3. Use the product CLI:"
+Write-Host "   dotnet run --project tools/IronDev.Cli/IronDev.Cli.csproj -- --help"
+Write-Host "4. Login seed:"
 Write-Host "   Email:    bob@irondev.local"
 Write-Host "   Password: change-me-local-only"
-Write-Host "4. Open Knowledge Compiler and check Semantic Memory health."
+Write-Host "5. Use TauriShell only through API/OpenAPI once the API is running."

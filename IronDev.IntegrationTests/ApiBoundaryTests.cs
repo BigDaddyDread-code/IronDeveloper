@@ -13,7 +13,21 @@ public sealed class ApiBoundaryTests
 
         AssertProjectDoesNotReference(root, "IronDev.Client", "IronDev.Infrastructure");
         AssertProjectDoesNotReference(root, Path.Combine("tools", "IronDev.Cli"), "IronDev.Infrastructure");
-        AssertProjectDoesNotReference(root, "IronDeveloper", "IronDev.Infrastructure");
+    }
+
+    [TestMethod]
+    public void RetiredWpfProject_MustNotBeInProductBuild()
+    {
+        var root = FindRepositoryRoot();
+
+        Assert.IsFalse(
+            File.Exists(Path.Combine(root, "IronDeveloper", "IronDev.Agent.csproj")),
+            "WPF was retired; IronDeveloper/IronDev.Agent.csproj must not be restored as a product project.");
+
+        var solution = File.ReadAllText(Path.Combine(root, "IronDev.slnx"));
+        Assert.IsFalse(
+            solution.Contains("IronDeveloper", StringComparison.Ordinal),
+            "IronDev.slnx must not reference the retired WPF project.");
     }
 
     [TestMethod]

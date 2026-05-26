@@ -13,9 +13,11 @@ public sealed class InMemoryRunEventStore : IRunEventStore
         if (string.IsNullOrWhiteSpace(runEvent.RunId))
             return Task.CompletedTask;
 
-        var normalized = runEvent.TimestampUtc == default
-            ? runEvent with { TimestampUtc = DateTimeOffset.UtcNow }
-            : runEvent;
+        var normalized = runEvent with
+        {
+            EventId = runEvent.EventId == Guid.Empty ? Guid.NewGuid() : runEvent.EventId,
+            TimestampUtc = runEvent.TimestampUtc == default ? DateTimeOffset.UtcNow : runEvent.TimestampUtc
+        };
 
         var buffer = _runs.GetOrAdd(normalized.RunId, _ => new RunEventBuffer());
         buffer.Publish(normalized);

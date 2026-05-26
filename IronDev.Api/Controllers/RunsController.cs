@@ -27,10 +27,6 @@ public sealed class RunsController : ControllerBase
         if (events.Count > 0)
             return Ok(ToStatus(runId, events));
 
-        var report = await _reports.GetRunAsync(runId, ct);
-        if (report is not null)
-            return Ok(ToStatus(report));
-
         return NotFound();
     }
 
@@ -53,8 +49,7 @@ public sealed class RunsController : ControllerBase
     public async Task GetRunEvents(string runId, CancellationToken ct)
     {
         var events = await _events.GetEventsAsync(runId, ct);
-        var report = events.Count == 0 ? await _reports.GetRunAsync(runId, ct) : null;
-        if (events.Count == 0 && report is null)
+        if (events.Count == 0)
         {
             Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -63,17 +58,7 @@ public sealed class RunsController : ControllerBase
         Response.ContentType = "text/event-stream";
         Response.Headers.CacheControl = "no-cache";
 
-        if (events.Count > 0)
-        {
-            await foreach (var runEvent in _events.StreamEventsAsync(runId, ct))
-            {
-                await WriteSseEventAsync(runEvent, ct);
-            }
-
-            return;
-        }
-
-        foreach (var runEvent in ToEvents(report!))
+        await foreach (var runEvent in _events.StreamEventsAsync(runId, ct))
         {
             await WriteSseEventAsync(runEvent, ct);
         }
@@ -117,68 +102,6 @@ public sealed class RunsController : ControllerBase
         await Response.WriteAsync($"data: {JsonSerializer.Serialize(runEvent, JsonOptions)}\n\n", ct);
         await Response.Body.FlushAsync(ct);
     }
-
-    private static IEnumerable<RunEventDto> ToEvents(RunReportDetail report)
-    {
-        yield return CreateEvent(report.RunId, "RunStarted", $"Run started: {report.Title}");
-
-        foreach (var stage in report.Stages)
-        {
-            yield return CreateEvent(
-                report.RunId,
-                "StepStarted",
-                $"Stage started: {stage.StageName}",
-                new Dictionary<string, string>
-                {
-                    ["stageName"] = stage.StageName,
-                    ["agentName"] = stage.AgentName
-                });
-
-            yield return CreateEvent(
-                report.RunId,
-                IsFailureStatus(stage.Status) ? "Error" : "StepCompleted",
-                $"Stage {stage.Status}: {stage.StageName}",
-                new Dictionary<string, string>
-                {
-                    ["stageName"] = stage.StageName,
-                    ["agentName"] = stage.AgentName,
-                    ["status"] = stage.Status,
-                    ["summary"] = stage.Summary
-                });
-        }
-
-        foreach (var warning in report.Warnings)
-        {
-            yield return CreateEvent(report.RunId, "Warning", warning);
-        }
-
-        yield return CreateEvent(
-            report.RunId,
-            IsFailureStatus(report.Status) ? "RunFailed" : "RunCompleted",
-            string.IsNullOrWhiteSpace(report.Summary) ? $"Run {report.Status}: {report.Title}" : report.Summary,
-            new Dictionary<string, string>
-            {
-                ["status"] = report.Status,
-                ["recommendation"] = report.Recommendation
-            });
-    }
-
-    private static RunEventDto CreateEvent(
-        string runId,
-        string eventType,
-        string message,
-        IReadOnlyDictionary<string, string>? payload = null) => new()
-        {
-            RunId = runId,
-            EventType = eventType,
-            Message = message,
-            Payload = payload ?? new Dictionary<string, string>()
-        };
-
-    private static bool IsFailureStatus(string status) =>
-        status.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
-        status.Contains("error", StringComparison.OrdinalIgnoreCase) ||
-        status.Contains("block", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsTerminalEvent(string eventType) =>
         string.Equals(eventType, "RunCompleted", StringComparison.OrdinalIgnoreCase) ||

@@ -14,7 +14,25 @@ public sealed class RunsEndpointContractTests
     [TestMethod]
     public async Task RunsController_ReturnsStatusAndReport()
     {
-        var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
+        var events = new InMemoryRunEventStore();
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = "run-123",
+            EventType = "RunStarted",
+            Message = "Boundary hardening"
+        });
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = "run-123",
+            EventType = "RunCompleted",
+            Message = "Run completed.",
+            Payload = new Dictionary<string, string>
+            {
+                ["status"] = "Completed"
+            }
+        });
+
+        var controller = new RunsController(new StubRunReportService(), events);
 
         var statusResult = await controller.GetRun("run-123", CancellationToken.None);
         var status = ((OkObjectResult)statusResult.Result!).Value as RunStatusDto;
@@ -42,7 +60,7 @@ public sealed class RunsEndpointContractTests
     }
 
     [TestMethod]
-    public async Task RunsController_StreamsReportBackedSseEvents()
+    public async Task RunsController_ReturnsNotFoundWhenRunHasOnlyFileBackedReport()
     {
         var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
         await using var body = new MemoryStream();
@@ -59,17 +77,13 @@ public sealed class RunsEndpointContractTests
 
         await controller.GetRunEvents("run-123", CancellationToken.None);
 
-        Assert.AreEqual("text/event-stream", controller.Response.ContentType);
+        Assert.AreEqual(StatusCodes.Status404NotFound, controller.Response.StatusCode);
         var text = Encoding.UTF8.GetString(body.ToArray());
-        StringAssert.Contains(text, "event: RunStarted");
-        StringAssert.Contains(text, "event: StepCompleted");
-        StringAssert.Contains(text, "event: Warning");
-        StringAssert.Contains(text, "event: RunCompleted");
-        StringAssert.Contains(text, "\"runId\":\"run-123\"");
+        Assert.AreEqual(string.Empty, text);
     }
 
     [TestMethod]
-    public async Task RunsController_StreamsLiveStoredEventsBeforeReportFallback()
+    public async Task RunsController_StreamsStoredEventsInsteadOfFileReportSnapshots()
     {
         var events = new InMemoryRunEventStore();
         await events.PublishAsync(new RunEventDto
@@ -113,7 +127,7 @@ public sealed class RunsEndpointContractTests
         StringAssert.Contains(text, "event: RunStarted");
         StringAssert.Contains(text, "event: ApprovalRequired");
         StringAssert.Contains(text, "Live run started.");
-        Assert.IsFalse(text.Contains("Run completed.", StringComparison.Ordinal), "Live events should be streamed before report snapshot fallback.");
+        Assert.IsFalse(text.Contains("Run completed.", StringComparison.Ordinal), "SSE must not synthesize events from file-backed reports.");
     }
 
     private sealed class StubRunReportService : IRunReportService

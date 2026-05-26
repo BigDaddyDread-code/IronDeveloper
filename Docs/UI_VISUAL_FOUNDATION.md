@@ -1,5 +1,7 @@
 # IronDev UI Visual Foundation
 
+Status: historical WPF note. The `IronDeveloper` WPF project has been retired; future UI visual work belongs in `IronDev.TauriShell` and must stay API-bound.
+
 This is the first visual-system slice for the IronDev cockpit. It is not a rewrite and does not choose a new production UI framework.
 
 ## Product Tone

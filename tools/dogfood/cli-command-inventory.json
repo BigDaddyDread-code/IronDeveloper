@@ -1,153 +1,13 @@
 ﻿[
     {
-        "command":  "campaign adversarial-memory-agents-183",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "AdversarialMemoryAgents183Command.cs + DoubtAgent + MemoryImprovementAgent",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "advanced adversarial and proposal-only memory agent smoke",
-        "notes":  "Runs DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent Level 1 proposal generation, MemoryKeyGate review, and Conscience review while preserving no staging writes, no real repo writes, no accepted memory mutation, no ticket creation, no patch apply, and no self-approval."
-    },
-    {
-        "command":  "agent doubt review",
-        "category":  "agent",
-        "scope":  "control/review",
-        "implementation":  "AdversarialMemoryAgents183Command.cs + DoubtAgent",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "adversarial review agent",
-        "notes":  "Produces strict adversarial findings for a plan or package. High/Critical findings require Killjoy rebuttal; the agent does not patch, mutate memory, create tickets, or approve writes."
-    },
-    {
-        "command":  "agent memory-improvement propose",
-        "category":  "agent",
-        "scope":  "control/review",
-        "implementation":  "AdversarialMemoryAgents183Command.cs + MemoryImprovementAgent",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "proposal-only memory improvement agent",
-        "notes":  "Reads focused completed-run evidence and returns proposal-only memory improvements with evidence bundles and a MemoryKeyGate review under token/proposal budgets. Staging writes and accepted-memory key readiness remain false in Alpha."
-    },
-    {
-        "command":  "agent loop plan-review",
+        "command":  "agent architect review",
         "category":  "agent",
         "scope":  "dogfood/control",
-        "implementation":  "GovernedToolLoop162167Command.cs + GovernedPlannerCriticLoopService",
+        "implementation":  "Program.cs + ArchitectAgent",
         "requiresSql":  false,
         "requiresWeaviate":  false,
-        "status":  "governed Planner/Critic tool loop",
-        "notes":  "Runs a read/test/report-only Planner -\u003e tool registry -\u003e Critic -\u003e revised plan loop with trace output, evidence validation, human escalation, and dotnet/node/python runtime profile contracts."
-    },
-    {
-        "command":  "campaign governed-tool-loop-162-167",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "GovernedToolLoop162167Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "governed tool loop smoke",
-        "notes":  "Proves the tool contract, registry, trace report, evidence validation layer, human escalation gate, runtime profiles, and hard no-write/no-memory-mutation/no-ticket/no-patch boundaries."
-    },
-    {
-        "command":  "campaign loop-gated-disposable-build-168",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "LoopGatedDisposableBuild168Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "loop-gated disposable build smoke",
-        "notes":  "Runs messy prompt to run-scoped docs, governed Planner/Critic loop, caged Solitaire BuilderAgent repair loop, QualityAgent gate, and final evidence report with real repo mutation count zero."
-    },
-    {
-        "command":  "campaign promotion-package-169",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "PromotionPackage169Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "promotion package smoke",
-        "notes":  "Runs a 168 source build, creates a ProposedChange and PromotionPackage, classifies promotable/blocked files through the language runtime profile, and keeps approval at NeedsHumanReview."
-    },
-    {
-        "command":  "campaign isolated-promotion-apply-170",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "IsolatedPromotionApply170Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "isolated promotion apply smoke",
-        "notes":  "Runs 169 to create a PromotionPackage, then applies only promotable files into an isolated candidate workspace outside the active repo, runs build/test, rejects blocked files, and preserves active repo mutation count zero."
-    },
-    {
-        "command":  "campaign controlled-write-policy-173",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "ControlledWritePath173175Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "controlled write policy smoke",
-        "notes":  "Resolves layered settings into an effective controlled write policy and proves hard invariants cannot be configured away."
-    },
-    {
-        "command":  "campaign controlled-write-approval-174",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "ControlledWritePath173175Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "controlled write approval smoke",
-        "notes":  "Creates a deterministic promotion package fixture and a scoped approval record valid only for ControlledWorktreeDryRun. The real disposable-output package path remains covered by campaign promotion-package-169."
-    },
-    {
-        "command":  "campaign controlled-worktree-dry-run-175",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "ControlledWritePath173175Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "controlled worktree dry-run smoke",
-        "notes":  "Creates deterministic package and approval fixtures, then validates a future worktree apply without creating the worktree or copying files. The real package path remains covered by campaign promotion-package-169."
-    },
-    {
-        "command":  "campaign live-remaining-agents-161",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "LiveRemainingGovernedAgents161Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  true,
-        "status":  "live governed ResearchAgent, QualityAgent, and SupervisorAgent smoke",
-        "notes":  "Runs ResearchAgent, QualityAgent, and SupervisorAgent deterministic fallback plus opt-in live local model attempts while preserving no-write, no-memory-mutation, no-ticket-creation, no-patch-apply, no-quality-override, and no-self-approval governance boundaries."
-    },
-    {
-        "command":  "campaign live-retriever-sentinel-160",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "LiveRetrieverSentinelAgents160Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  true,
-        "status":  "live governed RetrieverAgent and SentinelAgent smoke",
-        "notes":  "Runs RetrieverAgent and SentinelAgent deterministic fallback plus opt-in live local model attempts while preserving no-write and no-ranking-override governance boundaries."
-    },
-    {
-        "command":  "campaign live-critic-planner-159",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "LiveCriticPlannerAgents159Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "live governed CriticAgent and PlannerAgent smoke",
-        "notes":  "Runs CriticAgent and PlannerAgent deterministic fallback plus opt-in live local model attempts while preserving no-write governance boundaries."
-    },
-    {
-        "command":  "campaign live-governed-agent-158",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "LiveGovernedAgentExecution158Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "live governed agent execution smoke",
-        "notes":  "Runs ArchitectAgent deterministic fallback, opt-in live local model attempt, and missing-evidence review while preserving no-write governance boundaries."
+        "status":  "governed architecture reviewer",
+        "notes":  "Reviews proposals against weighted context and safety boundaries; does not patch, mutate memory, create decisions, or approve writes."
     },
     {
         "command":  "agent builder repair-loop",
@@ -170,16 +30,6 @@
         "notes":  "Creates trace/report evidence for future disposable build work; no workspace creation or repo writes."
     },
     {
-        "command":  "agent architect review",
-        "category":  "agent",
-        "scope":  "dogfood/control",
-        "implementation":  "Program.cs + ArchitectAgent",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "governed architecture reviewer",
-        "notes":  "Reviews proposals against weighted context and safety boundaries; does not patch, mutate memory, create decisions, or approve writes."
-    },
-    {
         "command":  "agent conscience review",
         "category":  "agent",
         "scope":  "dogfood/control",
@@ -200,6 +50,16 @@
         "notes":  "Reviews generated failure packages; no code changes."
     },
     {
+        "command":  "agent doubt review",
+        "category":  "agent",
+        "scope":  "control/review",
+        "implementation":  "AdversarialMemoryAgents183Command.cs + DoubtAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "adversarial review agent",
+        "notes":  "Produces strict adversarial findings for a plan or package. High/Critical findings require Killjoy rebuttal; the agent does not patch, mutate memory, create tickets, or approve writes."
+    },
+    {
         "command":  "agent list",
         "category":  "agent",
         "scope":  "dogfood/control",
@@ -208,6 +68,26 @@
         "requiresWeaviate":  false,
         "status":  "real deterministic registry listing",
         "notes":  "Lists registered agent definitions."
+    },
+    {
+        "command":  "agent loop plan-review",
+        "category":  "agent",
+        "scope":  "dogfood/control",
+        "implementation":  "GovernedToolLoop162167Command.cs + GovernedPlannerCriticLoopService",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed Planner/Critic tool loop",
+        "notes":  "Runs a read/test/report-only Planner -\u003e tool registry -\u003e Critic -\u003e revised plan loop with trace output, evidence validation, human escalation, and dotnet/node/python runtime profile contracts."
+    },
+    {
+        "command":  "agent memory-improvement propose",
+        "category":  "agent",
+        "scope":  "control/review",
+        "implementation":  "AdversarialMemoryAgents183Command.cs + MemoryImprovementAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "proposal-only memory improvement agent",
+        "notes":  "Reads focused completed-run evidence and returns proposal-only memory improvements with evidence bundles and a MemoryKeyGate review under token/proposal budgets. Staging writes and accepted-memory key readiness remain false in Alpha."
     },
     {
         "command":  "agent planner draft-test-plan",
@@ -358,6 +238,136 @@
         "requiresWeaviate":  false,
         "status":  "synthetic Solitaire disposable build proof",
         "notes":  "Builds trace evidence for the Solitaire product spike without mutating the real repo."
+    },
+    {
+        "command":  "campaign adversarial-memory-agents-183",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "AdversarialMemoryAgents183Command.cs + DoubtAgent + MemoryImprovementAgent",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "advanced adversarial and proposal-only memory agent smoke",
+        "notes":  "Runs DoubtAgent adversarial review, Killjoy rebuttal, MemoryImprovementAgent Level 1 proposal generation, MemoryKeyGate review, and Conscience review while preserving no staging writes, no real repo writes, no accepted memory mutation, no ticket creation, no patch apply, and no self-approval."
+    },
+    {
+        "command":  "campaign controlled-worktree-dry-run-175",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled worktree dry-run smoke",
+        "notes":  "Creates deterministic package and approval fixtures, then validates a future worktree apply without creating the worktree or copying files. The real package path remains covered by campaign promotion-package-169."
+    },
+    {
+        "command":  "campaign controlled-write-approval-174",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write approval smoke",
+        "notes":  "Creates a deterministic promotion package fixture and a scoped approval record valid only for ControlledWorktreeDryRun. The real disposable-output package path remains covered by campaign promotion-package-169."
+    },
+    {
+        "command":  "campaign controlled-write-policy-173",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write policy smoke",
+        "notes":  "Resolves layered settings into an effective controlled write policy and proves hard invariants cannot be configured away."
+    },
+    {
+        "command":  "campaign governed-tool-loop-162-167",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "GovernedToolLoop162167Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed tool loop smoke",
+        "notes":  "Proves the tool contract, registry, trace report, evidence validation layer, human escalation gate, runtime profiles, and hard no-write/no-memory-mutation/no-ticket/no-patch boundaries."
+    },
+    {
+        "command":  "campaign isolated-promotion-apply-170",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "IsolatedPromotionApply170Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "isolated promotion apply smoke",
+        "notes":  "Runs 169 to create a PromotionPackage, then applies only promotable files into an isolated candidate workspace outside the active repo, runs build/test, rejects blocked files, and preserves active repo mutation count zero."
+    },
+    {
+        "command":  "campaign live-critic-planner-159",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LiveCriticPlannerAgents159Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "live governed CriticAgent and PlannerAgent smoke",
+        "notes":  "Runs CriticAgent and PlannerAgent deterministic fallback plus opt-in live local model attempts while preserving no-write governance boundaries."
+    },
+    {
+        "command":  "campaign live-governed-agent-158",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LiveGovernedAgentExecution158Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "live governed agent execution smoke",
+        "notes":  "Runs ArchitectAgent deterministic fallback, opt-in live local model attempt, and missing-evidence review while preserving no-write governance boundaries."
+    },
+    {
+        "command":  "campaign live-remaining-agents-161",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LiveRemainingGovernedAgents161Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  true,
+        "status":  "live governed ResearchAgent, QualityAgent, and SupervisorAgent smoke",
+        "notes":  "Runs ResearchAgent, QualityAgent, and SupervisorAgent deterministic fallback plus opt-in live local model attempts while preserving no-write, no-memory-mutation, no-ticket-creation, no-patch-apply, no-quality-override, and no-self-approval governance boundaries."
+    },
+    {
+        "command":  "campaign live-retriever-sentinel-160",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LiveRetrieverSentinelAgents160Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  true,
+        "status":  "live governed RetrieverAgent and SentinelAgent smoke",
+        "notes":  "Runs RetrieverAgent and SentinelAgent deterministic fallback plus opt-in live local model attempts while preserving no-write and no-ranking-override governance boundaries."
+    },
+    {
+        "command":  "campaign loop-gated-disposable-build-168",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "LoopGatedDisposableBuild168Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "loop-gated disposable build smoke",
+        "notes":  "Runs messy prompt to run-scoped docs, governed Planner/Critic loop, caged Solitaire BuilderAgent repair loop, QualityAgent gate, and final evidence report with real repo mutation count zero."
+    },
+    {
+        "command":  "campaign promotion-package-169",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "PromotionPackage169Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "promotion package smoke",
+        "notes":  "Runs a 168 source build, creates a ProposedChange and PromotionPackage, classifies promotable/blocked files through the language runtime profile, and keeps approval at NeedsHumanReview."
+    },
+    {
+        "command":  "campaign self-improvement-157",
+        "category":  "campaign",
+        "scope":  "dogfood/control",
+        "implementation":  "SelfImprovementCampaign157Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "governed autonomy maturity campaign smoke",
+        "notes":  "Reports control-plane maturity evidence for IRONDEV-144 through IRONDEV-156 without real repo writes or external LLM calls."
     },
     {
         "command":  "chat send",
@@ -570,56 +580,6 @@
         "notes":  "Validates command inventory, command docs, and test plan inventory without executing commands or mutating project state."
     },
     {
-        "command":  "promotion apply isolated",
-        "category":  "promotion",
-        "scope":  "dogfood/control",
-        "implementation":  "IsolatedPromotionApply170Command.cs + PromotionPackage",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "isolated promotion apply proof",
-        "notes":  "Consumes a PromotionPackage and copies only FilesToPromote into an isolated candidate workspace outside the active repo. It runs runtime build/test and does not write main, mutate memory, accept tickets, auto-merge, or self-approve."
-    },
-    {
-        "command":  "promotion apply worktree-dry-run",
-        "category":  "promotion",
-        "scope":  "dogfood/control",
-        "implementation":  "ControlledWritePath173175Command.cs + PromotionPackage",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "controlled worktree dry-run gate",
-        "notes":  "Validates package, scoped approval, effective policy, target path, non-main branch, promotable files, blocked file rejection, and active repo mutation count without creating a worktree or copying files."
-    },
-    {
-        "command":  "promotion approval create",
-        "category":  "promotion",
-        "scope":  "dogfood/control",
-        "implementation":  "ControlledWritePath173175Command.cs + PromotionPackage",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "controlled write approval record creator",
-        "notes":  "Creates a scoped approval record valid only for ControlledWorktreeDryRun and explicitly invalid for real repo writes, PR creation, auto-merge, memory mutation, ticket acceptance, and self-approval."
-    },
-    {
-        "command":  "promotion package create",
-        "category":  "promotion",
-        "scope":  "dogfood/control",
-        "implementation":  "PromotionPackage169Command.cs + LanguageRuntimeRegistry",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "promotion package creator",
-        "notes":  "Creates ProposedChange and PromotionPackage review evidence from a successful disposable source run. It does not apply files, create branches, mutate memory, accept tickets, or approve writes."
-    },
-    {
-        "command":  "promotion policy effective",
-        "category":  "promotion",
-        "scope":  "dogfood/control",
-        "implementation":  "ControlledWritePath173175Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "controlled write effective policy snapshot",
-        "notes":  "Resolves global/project/run/human override settings into an effective policy while keeping hard invariants non-configurable."
-    },
-    {
         "command":  "memory builder-context-source-smoke",
         "category":  "memory",
         "scope":  "smoke",
@@ -700,6 +660,56 @@
         "notes":  "Raw vector vs authority rerank proof."
     },
     {
+        "command":  "promotion apply isolated",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "IsolatedPromotionApply170Command.cs + PromotionPackage",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "isolated promotion apply proof",
+        "notes":  "Consumes a PromotionPackage and copies only FilesToPromote into an isolated candidate workspace outside the active repo. It runs runtime build/test and does not write main, mutate memory, accept tickets, auto-merge, or self-approve."
+    },
+    {
+        "command":  "promotion apply worktree-dry-run",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs + PromotionPackage",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled worktree dry-run gate",
+        "notes":  "Validates package, scoped approval, effective policy, target path, non-main branch, promotable files, blocked file rejection, and active repo mutation count without creating a worktree or copying files."
+    },
+    {
+        "command":  "promotion approval create",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs + PromotionPackage",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write approval record creator",
+        "notes":  "Creates a scoped approval record valid only for ControlledWorktreeDryRun and explicitly invalid for real repo writes, PR creation, auto-merge, memory mutation, ticket acceptance, and self-approval."
+    },
+    {
+        "command":  "promotion package create",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "PromotionPackage169Command.cs + LanguageRuntimeRegistry",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "promotion package creator",
+        "notes":  "Creates ProposedChange and PromotionPackage review evidence from a successful disposable source run. It does not apply files, create branches, mutate memory, accept tickets, or approve writes."
+    },
+    {
+        "command":  "promotion policy effective",
+        "category":  "promotion",
+        "scope":  "dogfood/control",
+        "implementation":  "ControlledWritePath173175Command.cs",
+        "requiresSql":  false,
+        "requiresWeaviate":  false,
+        "status":  "controlled write effective policy snapshot",
+        "notes":  "Resolves global/project/run/human override settings into an effective policy while keeping hard invariants non-configurable."
+    },
+    {
         "command":  "\u003creplay-plan.json\u003e",
         "category":  "replay",
         "scope":  "dogfood/control",
@@ -708,16 +718,6 @@
         "requiresWeaviate":  false,
         "status":  "deterministic replay runner",
         "notes":  "Runs chat route replay scenario files."
-    },
-    {
-        "command":  "campaign self-improvement-157",
-        "category":  "campaign",
-        "scope":  "dogfood/control",
-        "implementation":  "SelfImprovementCampaign157Command.cs",
-        "requiresSql":  false,
-        "requiresWeaviate":  false,
-        "status":  "governed autonomy maturity campaign smoke",
-        "notes":  "Reports control-plane maturity evidence for IRONDEV-144 through IRONDEV-156 without real repo writes or external LLM calls."
     },
     {
         "command":  "run-report viewer-smoke",

@@ -29,7 +29,7 @@ Agents may reason, package evidence, run bounded plans, and write inside explici
 
 ## Model Profiles
 
-Model profiles are runtime-configurable from `IronDeveloper/appsettings*.json`.
+Model profiles are runtime-configurable from `IronDev.Api/appsettings*.json`.
 
 Supported providers:
 

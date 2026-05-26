@@ -1,5 +1,7 @@
 # Run Report Viewer Service 144
 
+Status: historical WPF note. The `IronDeveloper` WPF project has been retired; product clients must use `/api/runs/*` through `IronDev.Client` or OpenAPI helpers.
+
 ## Purpose
 
 This slice adds the first durable Run Reports surface over shared C# services.

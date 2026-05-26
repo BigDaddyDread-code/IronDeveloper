@@ -17,12 +17,12 @@ Tauri / Product CLI / Future Clients
 
 ## Consequences
 
-- `IronDeveloper` WPF remains in the repo as a frozen legacy shell while flows migrate. It must reference `IronDev.Client`, not `IronDev.Infrastructure`, and must not receive new product workflows.
+- `IronDeveloper` WPF is retired and removed from the repo/product solution. It must not be restored as a supported shell.
 - `IronDev.TauriShell` is a forward shell spike. It uses API/OpenAPI calls and must not reference storage/provider internals.
 - `tools/IronDev.Cli` is the public product CLI. Its current ticket/run commands route through `IronDev.Client`/`IIronDevApiClient`; future product commands must follow the same boundary.
 - `tools/IronDev.ReplayRunner` is internal dogfood/replay infrastructure. It may keep smoke, replay, campaign, benchmark, and diagnostics commands, but they are not public product CLI commands.
-- Direct disk report reads are allowed inside dogfood/internal tooling only. Product clients read run status, report, and events through `/api/runs/{runId}`, `/api/runs/{runId}/report`, and `/api/runs/{runId}/events`. Live events are in-memory for Alpha; durable event storage is a follow-up.
+- Direct disk report reads are allowed inside dogfood/internal tooling only. Product clients read run status, report, and events through `/api/runs/{runId}`, `/api/runs/{runId}/report`, and `/api/runs/{runId}/events`. Live run events are persisted through SQL-backed event history; durable resumable workflow state remains a follow-up.
 
 ## Verification
 
-`ApiBoundaryTests` fails normal validation when `IronDev.Client`, `tools/IronDev.Cli`, `IronDev.TauriShell`, or the WPF shell reintroduce forbidden Infrastructure coupling. It also fails if the Product CLI reintroduces direct HTTP calls instead of using `IronDev.Client`.
+`ApiBoundaryTests` fails normal validation when `IronDev.Client`, `tools/IronDev.Cli`, or `IronDev.TauriShell` reintroduce forbidden Infrastructure coupling. It also fails if the Product CLI reintroduces direct HTTP calls instead of using `IronDev.Client`, or if the retired WPF project is restored to the product build.

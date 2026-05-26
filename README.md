@@ -2,7 +2,7 @@
 
 IronDev is a governed AI software development cockpit.
 
-It combines persistent project memory, code-aware ticketing, governed agents, safe tool-use, caged build/repair loops, test execution, trace evidence, and WPF review surfaces so developers can move from messy intent to reviewed engineering work without giving AI uncontrolled write access.
+It combines persistent project memory, code-aware ticketing, governed agents, safe tool-use, caged build/repair loops, test execution, trace evidence, and API-backed review surfaces so developers can move from messy intent to reviewed engineering work without giving AI uncontrolled write access.
 
 IronDev is currently a **Private Technical Alpha**.
 
@@ -17,7 +17,7 @@ Messy intent
   -> safe read/test/report tool use
   -> caged disposable build/repair when allowed
   -> test and quality evidence
-  -> run report / WPF review surface
+  -> run report / API review surface
   -> future promotion package
 ```
 
@@ -43,7 +43,7 @@ But the project has moved beyond a ticket generator. IronDev now treats tickets,
 - **Governed Planner/Critic tool loop** — PlannerAgent can request named safe capabilities, the registry validates them, tools collect evidence, CriticAgent reviews sufficiency, PlannerAgent revises, and a human escalation gate records review requirements.
 - **Caged BuilderAgent repair loop** — BuilderAgent can build, break, repair, and retest generated code only inside explicit disposable workspaces.
 - **C# dogfood/Test Agent runner** — `test run-plan`, `dogfood run-plan`, and `agent tester run-plan` now execute through the C# ReplayRunner path. PowerShell remains as compatibility/fallback only.
-- **Run Reports WPF viewer** — the WPF app reads trace/report/evidence files through shared C# services. It does not shell out to the CLI or parse stdout.
+- **Run reports API boundary** — product clients read run status, reports, and SSE events through `IronDev.Api`/`IronDev.Client`; dogfood-only tooling may still inspect local evidence files.
 - **Clean CLI control surface** — product-shaped commands and explicit dogfood commands give Codex, humans, and future CI a predictable command language.
 - **Tenant-aware architecture** — the application keeps user, tenant, project, and memory separation as a first-class design concern.
 
@@ -83,7 +83,7 @@ It can:
 - run governed Planner/Critic tool loops using safe read/test/report tools
 - run caged disposable BuilderAgent build/repair loops
 - execute dogfood/test plans through a C# runner
-- show trace-backed run reports in WPF
+- show trace-backed run reports through API/client surfaces
 - attempt opt-in live model calls as advisory evidence
 
 It cannot yet:
@@ -179,20 +179,19 @@ This proves the build/repair loop, not permission to write to the real repo.
 
 ---
 
-## Run Reports viewer
+## Run Reports API
 
-The WPF app includes a service-backed Run Reports viewer.
-
-It reads file-backed run evidence through shared C# services:
+Product clients use API-backed run status, report, and event endpoints:
 
 ```text
-WPF UI
-  -> RunReportsViewModel
-  -> IRunReportService / IRunEvidenceService
-  -> file-backed run reports
+Product CLI / TauriShell
+  -> IronDev.Client or OpenAPI helper
+  -> /api/runs/{runId}
+  -> /api/runs/{runId}/report
+  -> /api/runs/{runId}/events
 ```
 
-It does **not** shell out to `IronDev.ReplayRunner`, parse CLI stdout, or couple WPF view models to command names.
+Dogfood/internal tooling may still read local evidence files directly. Product clients do not.
 
 Run reports are currently read from:
 
@@ -258,9 +257,9 @@ Docs/                          Architecture, roadmap, agent, testing, and local 
 IronDev.Api/                   ASP.NET Core REST backend
 IronDev.Core/                  Shared models, interfaces, DTOs, agent/run-report contracts
 IronDev.Infrastructure/        Dapper SQL services, AI providers, agent/runtime services
-IronDev.IntegrationTests/      Infrastructure, DB, agent, runner, and WPF/service tests
+IronDev.IntegrationTests/      Infrastructure, DB, agent, runner, CLI, and boundary tests
 IronDev.IntegrationTests.Api/  API-level integration tests
-IronDeveloper/                 WPF desktop client
+IronDev.TauriShell/            Forward shell spike using API/OpenAPI
 Scripts/                       Local setup and development scripts
 tools/IronDev.ReplayRunner/    CLI/dogfood runner and governed campaign surface
 tools/dogfood/                 Dogfood plans, run evidence, knowledge mirror, fixtures
@@ -278,10 +277,6 @@ IronDev.slnx                   Root solution file
 - Visual Studio or another .NET-capable IDE
 - Optional: OpenAI API key, local OpenAI-compatible endpoint, or Ollama
 - Optional: Docker Desktop for Weaviate semantic-memory dogfooding
-- `IronDeveloper.Controls` cloned locally if using the source-referenced controls project
-
-> **Note:** Do not convert `IronDeveloper.Controls` to a NuGet package yet. The controls library is still evolving and should remain source/project referenced for now.
-
 ---
 
 ## Quick bootstrap script
@@ -292,7 +287,7 @@ For a local dev machine with .NET and Docker Desktop installed:
 powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
 ```
 
-This restores packages, starts and smoke-tests Weaviate, builds the WPF app, and runs a small stabilisation smoke test set.
+This restores packages, starts and smoke-tests Weaviate, builds the API/product CLI, and runs focused boundary smoke tests.
 
 Database setup is opt-in:
 
@@ -327,8 +322,8 @@ Recommended setup flow:
 ```text
 1. Create SQL Server database: IronDeveloper
 2. Run Database/local_dev_setup.sql
-3. Update IronDeveloper/appsettings.Development.json connection string
-4. Launch the WPF app
+3. Update `IronDev.Api/appsettings.Development.json` connection string
+4. Launch the API
 5. Login with bob@irondev.local / change-me-local-only
 6. Open the seeded IronDeveloper project
 7. Click Index Project before using code-aware AI features
@@ -366,7 +361,7 @@ For settings and troubleshooting, see [Docs/weaviate-local-setup.md](Docs/weavia
 
 ## AI provider configuration
 
-Configure the AI provider in `IronDeveloper/appsettings.Development.json`.
+Configure the AI provider in `IronDev.Api/appsettings.Development.json`.
 
 ### OpenAI
 
@@ -403,39 +398,12 @@ Useful for LM Studio, vLLM, Ollama `/v1`, or another OpenAI-compatible local/pri
 }
 ```
 
-All app-facing AI flows should use `ILLMService` or the governed agent/model services. ViewModels should not know which provider is being used.
-
----
-
-## Controls library
-
-The WPF app currently uses the separate `IronDeveloper.Controls` source project.
-
-Expected local path:
-
-```text
-C:\Users\bob\source\repos\IronDeveloper.Controls
-```
-
-Build controls first if needed:
-
-```powershell
-dotnet build C:\Users\bob\source\repos\IronDeveloper.Controls\IronDeveloperControls\IronDeveloperControls.csproj
-```
+All app-facing AI flows should use `ILLMService` or the governed agent/model services. Shell code should not know which provider is being used.
 
 Then build IronDev:
 
 ```powershell
 dotnet build IronDev.slnx
-```
-
----
-
-## Run the WPF client
-
-```powershell
-cd IronDeveloper
-dotnet run
 ```
 
 ---
@@ -473,8 +441,6 @@ For more detail, see [Docs/TESTING.md](Docs/TESTING.md) and [Docs/TEST_AGENT_SPE
 
 | File | Purpose |
 |---|---|
-| `IronDeveloper/appsettings.json` | WPF app default connection string and AI provider config |
-| `IronDeveloper/appsettings.Development.json` | Local WPF app overrides |
 | `IronDev.Api/appsettings.json` | API connection string and JWT settings |
 | `IronDev.Api/appsettings.Development.json` | API dev overrides |
 | `IronDev.IntegrationTests/appsettings.Test.json` | Test DB connection |
@@ -504,6 +470,6 @@ Near-term work is focused on turning caged execution into reviewable real-work o
 - [Docs/CLI_COMMAND_INVENTORY.md](Docs/CLI_COMMAND_INVENTORY.md) — current ReplayRunner command surface
 - [Docs/ROADMAP.md](Docs/ROADMAP.md) — sprint history and planned milestones
 - [Docs/TEST_AGENT_SPEC.md](Docs/TEST_AGENT_SPEC.md) — C# dogfood runner and Test Agent contract
-- [Docs/RUN_REPORT_VIEWER_SERVICE_144.md](Docs/RUN_REPORT_VIEWER_SERVICE_144.md) — WPF Run Reports viewer/service boundary
+- [Docs/architecture/API_CLIENT_CLI_BOUNDARY_FINDINGS.md](Docs/architecture/API_CLIENT_CLI_BOUNDARY_FINDINGS.md) — current API/client/CLI boundary status
 - [Docs/local-development.md](Docs/local-development.md) — full local setup guide
 - [Docs/TESTING.md](Docs/TESTING.md) — how to run tests and the test matrix

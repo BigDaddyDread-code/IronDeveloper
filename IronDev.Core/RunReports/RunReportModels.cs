@@ -36,6 +36,7 @@ public sealed record RunReportDto
 
 public sealed record RunEventDto
 {
+    public Guid EventId { get; init; }
     public DateTimeOffset TimestampUtc { get; init; } = DateTimeOffset.UtcNow;
     public string RunId { get; init; } = string.Empty;
     public string EventType { get; init; } = string.Empty;

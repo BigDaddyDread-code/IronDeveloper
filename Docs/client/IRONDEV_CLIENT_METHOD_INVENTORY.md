@@ -36,7 +36,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 
 | Consumer | Current state |
 |---|---|
-| `IronDeveloper` WPF | Registers `AddIronDevClient`, receives typed client services through DI, including report services backed by `RunReportsApiClient`. |
+| `IronDeveloper` WPF | Retired and removed; historical WPF-oriented client methods remain in inventory until the public client surface is collapsed. |
 | `tools/IronDev.Cli` | References `IronDev.Client` and uses `IIronDevApiClient` for current product ticket commands. |
 | `IronDev.TauriShell` | Uses generated OpenAPI TypeScript types and browser fetch helpers, not the C# `IronDev.Client`. It does not reference Infrastructure. |
 | `tools/IronDev.ReplayRunner` | Internal dogfood runner; not expected to use `IronDev.Client` for every diagnostic path. |
@@ -60,7 +60,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `StartTicketBuildRunRequest` | `TicketBuildRunDto` | Product CLI | Implemented |
 | `GetRunAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI | Implemented |
 | `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI | Implemented |
-| `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI | Implemented; live in-memory stream for Alpha with report snapshot fallback |
+| `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI | Implemented; live SQL-backed stream, no report-snapshot synthesis |
 
 ## Auth
 
@@ -195,7 +195,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `ReadEvidenceTextAsync` | GET | `/api/run-reports/{runId}/evidence/text?path={evidencePath}` | Evidence path query | `string?` | Legacy WPF | Implemented |
 | `GetRunStatusAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI/TauriShell | Implemented |
 | `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI/TauriShell | Implemented |
-| `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI/TauriShell | Implemented; live in-memory stream for Alpha with report snapshot fallback |
+| `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI/TauriShell | Implemented; live SQL-backed stream, no report-snapshot synthesis |
 
 ## Non-HTTP Boundary Helpers
 
