@@ -174,6 +174,42 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task RunsStatusAndReport_UseProductRunApiEndpoints()
+    {
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var status = await IronDevCli.RunAsync(
+            ["runs", "status", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, status, error.ToString());
+
+        var report = await IronDevCli.RunAsync(
+            ["runs", "report", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, report, error.ToString());
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/runs/run-123",
+                "/health",
+                "/api/runs/run-123/report"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+        StringAssert.Contains(output.ToString(), "\"runId\": \"run-123\"");
+    }
+
+
+    [TestMethod]
     public async Task TicketsApiClient_CallsStructuredTicketEndpoints()
     {
         var handler = new RecordingHandler { IncludeApiClientBasePath = true };
@@ -297,6 +333,50 @@ public sealed class IronDevCliTests
                             "status": "Draft"
                           }
                         ]
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "runId": "run-123",
+                          "project": "IronDev",
+                          "title": "Boundary hardening",
+                          "status": "Completed",
+                          "recommendation": "Review"
+                        }
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123/report")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "status": {
+                            "runId": "run-123",
+                            "project": "IronDev",
+                            "title": "Boundary hardening",
+                            "status": "Completed",
+                            "recommendation": "Review"
+                          },
+                          "report": {
+                            "runId": "run-123",
+                            "project": "IronDev",
+                            "title": "Boundary hardening",
+                            "status": "Completed",
+                            "summary": "Run completed.",
+                            "recommendation": "Review"
+                          }
+                        }
                         """,
                         Encoding.UTF8,
                         "application/json")

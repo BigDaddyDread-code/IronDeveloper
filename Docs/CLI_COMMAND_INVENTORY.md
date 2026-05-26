@@ -30,7 +30,7 @@ The machine-readable inventory is stored at:
 - Test commands: 1
 - Trace commands: 1
 - Replay scenario entrypoint: 1
-- Product CLI ticket commands: 4
+- Product CLI commands: 6
 
 ## Product-Ish Commands
 

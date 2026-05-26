@@ -1,6 +1,7 @@
 using System.Text.Json;
 using IronDev.Client;
 using IronDev.Core.Models;
+using IronDev.Core.RunReports;
 using IronDev.Data.Models;
 
 namespace IronDev.Cli;
@@ -41,6 +42,10 @@ public static class IronDevCli
             return await HandleTicketShowAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "ticket", "import-github-issue"))
             return await HandleTicketImportGithubIssueAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "runs", "status"))
+            return await HandleRunStatusAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "runs", "report"))
+            return await HandleRunReportAsync(args, output, error, handler, cancellationToken);
 
         error.WriteLine($"Unknown command: {string.Join(' ', args)}");
         PrintUsage(error);
@@ -267,6 +272,70 @@ public static class IronDevCli
         }
     }
 
+    private static async Task<int> HandleRunStatusAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        var runId = GetOption(args, "--run-id");
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            error.WriteLine("Missing required option: --run-id <id>");
+            return 2;
+        }
+
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        try
+        {
+            var status = await client.GetRunAsync(runId, cancellationToken);
+            await WriteJsonOrTextAsync(output, status, HasFlag(args, "--json"), FormatRunStatus(status));
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("runs status", ex, error);
+            return 1;
+        }
+    }
+
+    private static async Task<int> HandleRunReportAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        var runId = GetOption(args, "--run-id");
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            error.WriteLine("Missing required option: --run-id <id>");
+            return 2;
+        }
+
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        try
+        {
+            var report = await client.GetRunReportAsync(runId, cancellationToken);
+            await WriteJsonOrTextAsync(output, report, HasFlag(args, "--json"), FormatRunReport(report));
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("runs report", ex, error);
+            return 1;
+        }
+    }
+
     private static async Task<IIronDevApiClient?> CreateReadyApiClientAsync(
         string[] args,
         string apiBaseUrl,
@@ -323,6 +392,18 @@ public static class IronDevCli
             prefix += $"{Environment.NewLine}Authenticate through IronDev.Api and provide a tenant-scoped JWT with --token or IRONDEV_API_TOKEN.";
 
         error.WriteLine(string.IsNullOrWhiteSpace(ex.ResponseBody) ? prefix : $"{prefix}{Environment.NewLine}{ex.ResponseBody}");
+    }
+
+    private static string FormatRunStatus(RunStatusDto status) =>
+        $"{status.RunId}: {status.Status} - {status.Title}";
+
+    private static string FormatRunReport(RunReportDto report)
+    {
+        var detail = report.Report;
+        if (detail is null)
+            return FormatRunStatus(report.Status);
+
+        return $"{report.Status.RunId}: {report.Status.Status} - {detail.Summary}";
     }
 
     private static string? ResolveToken(
@@ -407,6 +488,8 @@ public static class IronDevCli
         error.WriteLine("  irondev ticket list --project-id <id> [--take 50] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket show --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket import-github-issue --project-id <id> --file <github-issue.json> [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev runs status --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev runs report --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine();
         error.WriteLine("Default API base URL: http://localhost:5000");
         error.WriteLine("Overrides: --api-base-url, IRONDEV_API_BASE_URL, irondev.cli.json");

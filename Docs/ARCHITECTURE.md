@@ -103,7 +103,7 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 
 - auth and tenant selection
 - project, ticket, document, memory, chat, code-index, build, run-report, and profile endpoints
-- API-backed report endpoints today, with durable run status/report/event endpoints planned
+- API-backed report endpoints and product-shaped run status/report endpoints today, with durable run creation/events planned
 - request-scoped tenancy from JWT claims
 - orchestration through `IronDev.Infrastructure`
 

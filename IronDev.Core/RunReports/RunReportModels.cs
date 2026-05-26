@@ -14,6 +14,26 @@ public sealed record RunReportSummary
     public int DisposableFilesChanged { get; init; }
 }
 
+public sealed record RunStatusDto
+{
+    public string RunId { get; init; } = string.Empty;
+    public string? TraceId { get; init; }
+    public string Project { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public string Recommendation { get; init; } = string.Empty;
+    public DateTimeOffset? StartedUtc { get; init; }
+    public DateTimeOffset? CompletedUtc { get; init; }
+    public int RealRepoMutationCount { get; init; }
+    public int DisposableFilesChanged { get; init; }
+}
+
+public sealed record RunReportDto
+{
+    public RunStatusDto Status { get; init; } = new();
+    public RunReportDetail? Report { get; init; }
+}
+
 public sealed record RunReportDetail
 {
     public string RunId { get; init; } = string.Empty;

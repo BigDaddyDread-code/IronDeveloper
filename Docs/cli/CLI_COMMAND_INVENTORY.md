@@ -8,13 +8,13 @@ This inventory classifies the current public CLI and ReplayRunner/dogfood comman
 
 | Classification | Count | Notes |
 |---|---:|---|
-| Product | 4 | All are in `tools/IronDev.Cli`; all call API routes through `IIronDevApiClient`. |
+| Product | 6 | All are in `tools/IronDev.Cli`; all call API routes through `IIronDevApiClient`. |
 | Internal Dogfood | 50 | ReplayRunner commands for governed agents, campaigns, docs, memory diagnostics, promotion, and internal review. |
 | Smoke Test | 22 | ReplayRunner smoke commands. |
 | Replay/Test Harness | 4 | Replay plan and test plan execution commands. |
 | Deprecated | 0 | No command is explicitly deprecated in the current inventory. |
 | To Be Moved | 0 | Several commands are product-shaped but remain classified internal until a split/refactor ticket moves them. |
-| **Total** | **80** | 4 product CLI commands + 76 ReplayRunner/dogfood commands. |
+| **Total** | **82** | 6 product CLI commands + 76 ReplayRunner/dogfood commands. |
 
 ## Product CLI: `tools/IronDev.Cli`
 
@@ -26,6 +26,8 @@ These commands are product-intended and now route through `IronDev.Client` via `
 | `irondev ticket list --project-id <id>` | List project tickets. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev ticket show --project-id <id> --ticket-id <id>` | Show one ticket. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev ticket import-github-issue --project-id <id> --file <github-issue.json>` | Import external issue JSON as an IronDev ticket. | Yes | No | Reads JSON input file | No | Product | `IronDev.Cli` |
+| `irondev runs status --run-id <id>` | Show product-shaped run status. | Yes | No | No | No | Product | `IronDev.Cli` |
+| `irondev runs report --run-id <id>` | Show product-shaped final run report. | Yes | No | No | No | Product | `IronDev.Cli` |
 
 Missing product CLI commands from the intended surface:
 
@@ -40,8 +42,8 @@ Missing product CLI commands from the intended surface:
 | `irondev documents version` | Missing | `IronDev.Cli` via `IronDev.Client` |
 | `irondev documents generate-tickets` | Missing API/client route | `IronDev.Cli` after product route exists |
 | `irondev memory search` | Missing product CLI command | `IronDev.Cli`; current `memory search` exists only in ReplayRunner |
-| `irondev runs status` | Missing API/client route | `IronDev.Cli` after `/api/runs/{runId}` exists |
-| `irondev runs report` | Missing product CLI command and `/api/runs/{runId}/report` | `IronDev.Cli` |
+| `irondev runs status` | Implemented over `/api/runs/{runId}` | `IronDev.Cli` |
+| `irondev runs report` | Implemented over `/api/runs/{runId}/report` | `IronDev.Cli` |
 
 ## ReplayRunner/Dogfood Commands
 

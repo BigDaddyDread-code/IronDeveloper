@@ -16,7 +16,7 @@ Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and n
 
 | Client area | HTTP-backed methods | Status |
 |---|---:|---|
-| Product facade `IIronDevApiClient` | 10 | Implemented for health/auth/current Product CLI ticket operations; overlaps with narrower typed clients |
+| Product facade `IIronDevApiClient` | 12 | Implemented for health/auth/current Product CLI ticket and run report/status operations; overlaps with narrower typed clients |
 | Auth `IAuthApiClient` | 5 | Implemented |
 | Projects | 7 | Implemented |
 | Tickets/build/proposals | 20 | Implemented |
@@ -25,12 +25,12 @@ Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and n
 | Code index | 5 | Implemented |
 | Chat | 8 | Implemented |
 | Profiles | 7 | Implemented |
-| Run reports | 4 | Implemented report API, not durable run API |
+| Run reports | 6 | Implemented report API plus product-shaped run status/report methods |
 | Settings | 0 | Stubbed/no-op |
 | Traces | 0 | In-memory local client, not HTTP |
 | Prompting | 3 | Client boundary adapter over chat/prompt services, not direct REST methods |
 
-HTTP-backed typed operation count, excluding the overlapping product facade: **81**.
+HTTP-backed typed operation count, excluding the overlapping product facade: **83**.
 
 ## Consumer Evidence
 
@@ -57,6 +57,8 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `GetTicketsAsync` | GET | `/api/projects/{projectId}/tickets?take={take}` | None | `IReadOnlyList<ProjectTicket>` | Product CLI | Implemented |
 | `GetProjectTicketAsync` | GET | `/api/projects/{projectId}/tickets/{ticketId}` | None | `ProjectTicket?` | Product CLI | Implemented |
 | `ImportExternalTicketAsync` | POST | `/api/projects/{projectId}/tickets/import-external` | `ImportExternalTicketRequest` | `ProjectTicket` | Product CLI | Implemented |
+| `GetRunAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI | Implemented |
+| `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI | Implemented |
 
 ## Auth
 
@@ -189,8 +191,8 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `GetRunAsync` | GET | `/api/run-reports/{runId}` | None | `RunReportDetail?` | Legacy WPF | Implemented |
 | `GetEvidenceAsync` | GET | `/api/run-reports/{runId}/evidence` | None | `IReadOnlyList<RunEvidenceItem>` | Legacy WPF | Implemented |
 | `ReadEvidenceTextAsync` | GET | `/api/run-reports/{runId}/evidence/text?path={evidencePath}` | Evidence path query | `string?` | Legacy WPF | Implemented |
-| `GetRunAsync(Guid runId)` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI/TauriShell | Missing |
-| `GetRunReportAsync(Guid runId)` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI/TauriShell | Missing |
+| `GetRunStatusAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI/TauriShell | Implemented |
+| `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI/TauriShell | Implemented |
 | `StreamRunEventsAsync(Guid runId)` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI/TauriShell | Missing |
 
 ## Non-HTTP Boundary Helpers

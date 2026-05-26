@@ -16,9 +16,9 @@ This inventory lists the REST surface currently exposed by `IronDev.Api`. It sep
 | Memory | 20 | 2 |
 | Chat | 8 | 0 |
 | Profiles | 7 | 0 |
-| Runs/reports | 4 | 3 |
+| Runs/reports | 6 | 1 |
 | Agents/build workflows | 0 | 4 |
-| **Total actual routes** | **84** | **14** |
+| **Total actual routes** | **86** | **12** |
 
 Status meanings:
 
@@ -168,8 +168,8 @@ Intended consumers:
 | GET | `/api/run-reports/{runId}` | `RunReportsController.GetRun` | Read one run report. | Implemented | Legacy WPF, Dogfood Runner | Route is report-shaped, not `/api/runs/{runId}`. |
 | GET | `/api/run-reports/{runId}/evidence` | `RunReportsController.GetEvidence` | List report evidence. | Implemented | Legacy WPF, Dogfood Runner | File-backed storage hidden behind API for WPF. |
 | GET | `/api/run-reports/{runId}/evidence/text` | `RunReportsController.ReadEvidenceText` | Read evidence text by path query. | Implemented | Legacy WPF, Dogfood Runner | Query still exposes evidence path concept. |
-| GET | `/api/runs/{runId}` | Planned | Durable run status. | Planned | Product CLI, TauriShell | Required for product run UX. |
-| GET | `/api/runs/{runId}/report` | Planned | Final run report by run id. | Planned | Product CLI, TauriShell | Required to hide report file details from clients. |
+| GET | `/api/runs/{runId}` | `RunsController.GetRun` | Durable product-shaped run status over current report backend. | Implemented | Product CLI, TauriShell | Real lifecycle creation is still missing; status is mapped from stored report detail. |
+| GET | `/api/runs/{runId}/report` | `RunsController.GetRunReport` | Final run report by run id. | Implemented | Product CLI, TauriShell | Hides `/api/run-reports/*` from product CLI. |
 | GET | `/api/runs/{runId}/events` | Planned | SSE run event stream. | Planned | Product CLI, TauriShell | Do not mark implemented; no SSE endpoint exists today. |
 
 ## Agents/Build Workflows
