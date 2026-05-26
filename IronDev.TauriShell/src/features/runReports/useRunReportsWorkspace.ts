@@ -9,6 +9,7 @@ import type {
 } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 
 export type RunReportsFilter = 'latest' | 'failed' | 'needsHumanReview' | 'promotionCandidate';
 
@@ -49,8 +50,9 @@ const defaultFilters: RunReportsFilter[] = ['latest', 'failed', 'needsHumanRevie
 export function useRunReportsWorkspace() {
   const session = useSessionContext();
   const project = useProjectContext();
+  const navigation = useWorkspaceNavigation();
   const [runs, setRuns] = useState<RunReportSummary[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const selectedRunId = navigation.selectedRunId;
   const [selectedRun, setSelectedRun] = useState<RunReportDetail | null>(null);
   const [runListStatus, setRunListStatus] = useState<RunReportsLoadStatus>('idle');
   const [runListMessage, setRunListMessage] = useState(defaultLoadStatusMessage.list);
@@ -72,7 +74,7 @@ export function useRunReportsWorkspace() {
       setRunListMessage(runAccessBlocked);
       setRunListStatus('unavailable');
       setRuns([]);
-      setSelectedRunId(null);
+      navigation.setSelectedRunId(null);
       return;
     }
 
@@ -102,16 +104,16 @@ export function useRunReportsWorkspace() {
           : `Loaded ${sortedRuns.length} run report(s).`
       );
 
-      setSelectedRunId((current) =>
-        current && sortedRuns.some((run) => run.runId === current) ? current : sortedRuns[0]?.runId ?? null
-      );
-  } catch (error) {
+      const nextRunId =
+        selectedRunId && sortedRuns.some((run) => run.runId === selectedRunId) ? selectedRunId : sortedRuns[0]?.runId ?? null;
+      navigation.setSelectedRunId(nextRunId);
+    } catch (error) {
       if (controller.signal.aborted) {
         return;
       }
 
       setRunListStatus('error');
-      setSelectedRunId(null);
+      navigation.setSelectedRunId(null);
       setSelectedRun(null);
       setRunEvidence([]);
 
@@ -125,7 +127,7 @@ export function useRunReportsWorkspace() {
     } finally {
       controller.abort();
     }
-  }, [runAccessBlocked, session.client]);
+  }, [navigation, runAccessBlocked, selectedRunId, session.client]);
 
   const loadSelectedRun = useCallback(
     async (runId: string | null) => {
@@ -165,18 +167,18 @@ export function useRunReportsWorkspace() {
         setSelectedRunStatus('loaded');
         setSelectedRunMessage(report.summary ?? `${runId} report loaded.`);
       } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
+        if (controller.signal.aborted) {
+          return;
+        }
 
-      setSelectedRunStatus('error');
-      setSelectedRun(null);
-      setRunEvidence([]);
-      setSelectedRunMessage(
-        error instanceof IronDevApiError ? `Run detail failed with HTTP ${error.status}.` : 'Could not load run report details.'
-      );
-    } finally {
-      controller.abort();
+        setSelectedRunStatus('error');
+        setSelectedRun(null);
+        setRunEvidence([]);
+        setSelectedRunMessage(
+          error instanceof IronDevApiError ? `Run detail failed with HTTP ${error.status}.` : 'Could not load run report details.'
+        );
+      } finally {
+        controller.abort();
       }
     },
     [runAccessBlocked, session.client]
@@ -188,24 +190,24 @@ export function useRunReportsWorkspace() {
 
   useEffect(() => {
     void loadSelectedRun(selectedRunId);
-  }, [loadSelectedRun, selectedRunId, selectedRunId?.toString()]);
+  }, [loadSelectedRun, selectedRunId]);
 
   const actions: RunReportsWorkspaceActions = useMemo(
     () => ({
       onSelectRun: (runId) => {
-        setSelectedRunId(runId);
+        navigation.setSelectedRunId(runId);
       },
       onRefreshRuns: () => void loadRuns(),
       onSelectFilter: (next) => {
         setSelectedFilter(next);
-        setSelectedRunId((current) => {
-          const nextRuns = getFilteredRuns(runs, next);
-          return current && nextRuns.some((run) => run.runId === current) ? current : nextRuns[0]?.runId ?? null;
-        });
+        const filteredSelectedRunId = navigation.selectedRunId;
+        const nextRuns = getFilteredRuns(runs, next);
+        const nextRunId = filteredSelectedRunId && nextRuns.some((run) => run.runId === filteredSelectedRunId) ? filteredSelectedRunId : nextRuns[0]?.runId ?? null;
+        navigation.setSelectedRunId(nextRunId);
       },
       onRefreshSelectedRun: () => void loadSelectedRun(selectedRunId)
     }),
-    [loadRuns, loadSelectedRun, runs, selectedRunId]
+    [loadRuns, loadSelectedRun, navigation, runs, selectedRunId]
   );
 
   const state: RunReportsWorkspaceState = {

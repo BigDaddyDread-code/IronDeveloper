@@ -1,5 +1,6 @@
 import { SessionProvider } from '../state/useSessionContext';
 import { ProjectProvider } from '../state/useProjectContext';
+import { WorkspaceNavigationProvider } from '../state/useWorkspaceNavigation';
 import type { ReactNode } from 'react';
 
 interface AppProvidersProps {
@@ -9,7 +10,9 @@ interface AppProvidersProps {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <SessionProvider>
-      <ProjectProvider>{children}</ProjectProvider>
+      <ProjectProvider>
+        <WorkspaceNavigationProvider>{children}</WorkspaceNavigationProvider>
+      </ProjectProvider>
     </SessionProvider>
   );
 }

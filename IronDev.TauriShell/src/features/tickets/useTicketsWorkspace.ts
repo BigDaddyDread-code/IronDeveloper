@@ -4,12 +4,17 @@ import type {
   ApiStatus,
   BuildReadinessResult,
   CreateProjectTicketRequest,
+  LinkedPromotionPackageSummary,
+  LinkedRunSummary,
+  TicketEvidenceLoadStatus,
+  TicketEvidenceSummary,
   ProductAccessStatus,
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
   TicketCreateStatus,
   TicketDetailLoadStatus,
+  RunReportSummary,
   TicketPlanStatus,
   TicketReadinessLoadStatus,
   TicketSaveStatus,
@@ -20,6 +25,7 @@ import type { CreateTicketDraft } from '../../components/CreateTicketPanel';
 import type { TicketEditDraft } from '../../components/TicketEditForm';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 
 const initialCreateDraft: CreateTicketDraft = {
   title: '',
@@ -69,6 +75,11 @@ interface TicketsWorkspaceState {
   implementationPlan: ProjectImplementationPlan | null;
   planStatus: TicketPlanStatus;
   planMessage: string;
+  evidenceSummary: TicketEvidenceSummary | null;
+  evidenceStatus: TicketEvidenceLoadStatus;
+  evidenceMessage: string;
+  reviewLatestRunBlockedReason: string | null;
+  startDisposableRunBlockedReason: string | null;
   isEditingTicket: boolean;
   editDraft: TicketEditDraft;
   saveStatus: TicketSaveStatus;
@@ -100,6 +111,10 @@ interface TicketsWorkspaceActions {
   onCancelEditTicket: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
+  onRefreshEvidence: () => void;
+  onStartDisposableRun: () => void;
+  onReviewLatestRun: () => void;
+  onOpenPromotionReview: () => void;
   onCreateDraftChange: (draft: CreateTicketDraft) => void;
   onSubmitCreateTicket: () => void;
   onCancelCreateTicket: () => void;
@@ -126,6 +141,7 @@ export interface TicketsWorkspaceViewModel extends TicketsWorkspaceState {
 export function useTicketsWorkspace() {
   const session = useSessionContext();
   const project = useProjectContext();
+  const navigation = useWorkspaceNavigation();
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [selectedTicketDetail, setSelectedTicketDetail] = useState<ProjectTicket | null>(null);
@@ -137,6 +153,9 @@ export function useTicketsWorkspace() {
   const [implementationPlan, setImplementationPlan] = useState<ProjectImplementationPlan | null>(null);
   const [planStatus, setPlanStatus] = useState<TicketPlanStatus>('idle');
   const [planMessage, setPlanMessage] = useState('Plan has not been refreshed for this ticket.');
+  const [evidenceSummary, setEvidenceSummary] = useState<TicketEvidenceSummary | null>(null);
+  const [evidenceStatus, setEvidenceStatus] = useState<TicketEvidenceLoadStatus>('idle');
+  const [evidenceMessage, setEvidenceMessage] = useState('Execution evidence has not been loaded for this ticket.');
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateTicketDraft>(initialCreateDraft);
   const [createStatus, setCreateStatus] = useState<TicketCreateStatus>('idle');
@@ -175,9 +194,27 @@ export function useTicketsWorkspace() {
     projectSelectionMode,
     selectedTicketIdForList
   );
+  const startDisposableRunBlockedReason = ticketActionBlockedReason
+    ? ticketActionBlockedReason
+    : 'Disposable run start is not exposed by IronDev.Api yet.';
   const isEditDirty = selectedTicket ? !areEditDraftsEqual(editDraft, draftFromTicket(selectedTicket)) : false;
   const editValidationMessage = useMemo(() => validateEditDraft(editDraft), [editDraft]);
   const isBusy = project.isRefreshing || session.isConnectionBusy || session.isAuthBusy;
+  const reviewLatestRunBlockedReason = useMemo(() => {
+    if (!selectedTicket) {
+      return 'Select a ticket before reviewing execution runs.';
+    }
+
+    if (!evidenceSummary) {
+      return 'Execution evidence has not been loaded for this ticket.';
+    }
+
+    if (evidenceSummary.latestRun) {
+      return null;
+    }
+
+    return 'No linked execution run yet.';
+  }, [evidenceSummary, selectedTicket]);
 
   const resetTicketWorkflowState = useCallback(() => {
     setImplementationPlan(null);
@@ -192,6 +229,9 @@ export function useTicketsWorkspace() {
     setSelectedTicketDetail(null);
     setReadiness(null);
     setReadinessStatus('idle');
+    setEvidenceSummary(null);
+    setEvidenceStatus('idle');
+    setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
     setReadinessMessage('Build readiness has not been checked for this ticket.');
   }, []);
 
@@ -269,6 +309,9 @@ export function useTicketsWorkspace() {
       setSelectedTicketDetail(null);
       setTicketDetailStatus('idle');
       setTicketDetailMessage('Select a ticket to load detail.');
+      setEvidenceSummary(null);
+      setEvidenceStatus('idle');
+      setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
       return;
     }
 
@@ -281,6 +324,9 @@ export function useTicketsWorkspace() {
     setImplementationPlan(null);
     setPlanStatus('idle');
     setPlanMessage('Plan has not been refreshed for this ticket.');
+    setEvidenceSummary(null);
+    setEvidenceStatus('loading');
+    setEvidenceMessage('Execution evidence is being resolved from available run reports.');
     setIsEditingTicket(false);
     setSaveStatus('idle');
     setSaveMessage('Ticket is clean.');
@@ -307,6 +353,22 @@ export function useTicketsWorkspace() {
         setTicketDetailMessage(
           error instanceof IronDevApiError ? `Ticket detail failed with HTTP ${error.status}.` : 'Ticket detail request could not reach IronDev.Api.'
         );
+        setEvidenceSummary({
+          ticketId: selectedTicketId,
+          status: 'error',
+          message: 'Could not load ticket detail; evidence could not be refreshed.',
+          latestRun: null,
+          latestPromotionPackage: null,
+          linkedTraceCount: 0,
+          linkedDocumentCount: 0,
+          linkedDecisionCount: 0,
+          linkedRunCount: 0,
+          hasBlockingWarnings: true,
+          blockedActions: ['Ticket detail failed to load. Refresh evidence after ticket detail resolves.'],
+          nextSafeAction: 'Review readiness'
+        });
+        setEvidenceStatus('error');
+        setEvidenceMessage('Could not refresh execution evidence because ticket detail failed to load.');
       });
 
     return () => controller.abort();
@@ -550,6 +612,7 @@ export function useTicketsWorkspace() {
       setReadiness(result);
       setReadinessStatus('loaded');
       setReadinessMessage(result.message ?? 'Build readiness returned without a message.');
+      void refreshEvidence();
     } catch (error) {
       setReadiness(null);
 
@@ -562,9 +625,10 @@ export function useTicketsWorkspace() {
       } else {
         setReadinessStatus('error');
         setReadinessMessage('Build readiness request could not reach IronDev.Api.');
+        void refreshEvidence();
       }
     }
-  }, [selectedProjectId, selectedTicketIdForList, session.client]);
+  }, [refreshEvidence, selectedProjectId, selectedTicketIdForList, session.client]);
 
   const refreshImplementationPlan = useCallback(async () => {
     if (!selectedTicketIdForList) {
@@ -603,6 +667,127 @@ export function useTicketsWorkspace() {
     }
   }, [session.client, selectedTicketIdForList, ticketActionBlockedReason]);
 
+  const refreshEvidence = useCallback(async () => {
+    if (!selectedTicket) {
+      setEvidenceSummary(null);
+      setEvidenceStatus('unavailable');
+      setEvidenceMessage('Select a ticket to load execution evidence.');
+      return;
+    }
+
+    setEvidenceStatus('loading');
+    setEvidenceMessage('Loading execution evidence...');
+
+    try {
+      const runReports = await session.client.getRunReports();
+      const sortedRunReports = [...runReports].sort((left, right) => {
+        const leftTime = Date.parse(left.startedUtc ?? left.completedUtc ?? '') || 0;
+        const rightTime = Date.parse(right.startedUtc ?? right.completedUtc ?? '') || 0;
+
+        return rightTime - leftTime;
+      });
+
+      const latestRelatedRun = getLatestTicketRelatedRun(sortedRunReports, selectedTicket);
+
+      let latestPromotionPackage: LinkedPromotionPackageSummary | null = null;
+      let latestRunSummary: LinkedRunSummary | null = null;
+
+      if (latestRelatedRun) {
+        const runSummary = mapRunSummary(latestRelatedRun);
+        latestRunSummary = runSummary;
+
+        try {
+          if (!latestRelatedRun.runId) {
+            throw new Error('No run id to resolve promotion data');
+          }
+
+          const runDetail = await session.client.getRunReport(latestRelatedRun.runId);
+          if (runDetail?.promotionReview) {
+            latestPromotionPackage = mapPromotionSummary(runDetail.promotionReview, latestRelatedRun.runId, runDetail);
+          }
+        } catch {
+          // A run detail can transiently be unavailable even when a run exists.
+          latestPromotionPackage = null;
+        }
+      }
+
+      const summary = buildTicketEvidenceSummary({
+        ticket: selectedTicket,
+        readiness,
+        readinessStatus,
+        latestRelatedRun: latestRunSummary
+      });
+
+      setEvidenceSummary({
+        ...summary,
+        latestPromotionPackage,
+        latestRun: latestRunSummary
+      });
+
+      setEvidenceStatus('loaded');
+      setEvidenceMessage(summary.message);
+    } catch (error) {
+      setEvidenceSummary({
+        ticketId: selectedTicket.id ?? 0,
+        status: 'error',
+        message: error instanceof IronDevApiError ? `Execution evidence failed with HTTP ${error.status}.` : 'Execution evidence could not be loaded.',
+        latestRun: null,
+        latestPromotionPackage: null,
+        linkedTraceCount: getLinkedTraceCount(selectedTicket),
+        linkedDocumentCount: getLinkedDocumentCount(selectedTicket),
+        linkedDecisionCount: 0,
+        linkedRunCount: 0,
+        hasBlockingWarnings: true,
+        blockedActions: ['Execution evidence could not be loaded at this time.'],
+        nextSafeAction: readiness?.isReady ? 'Review latest run' : 'Refresh build readiness'
+      });
+      setEvidenceStatus('error');
+      setEvidenceMessage('Execution evidence could not be loaded from run reports.');
+    }
+  }, [readiness, readinessStatus, selectedTicket, session.client]);
+
+  const onStartDisposableRun = useCallback(() => {
+    if (startDisposableRunBlockedReason) {
+      setEvidenceMessage(startDisposableRunBlockedReason);
+      return;
+    }
+
+    setEvidenceMessage('Disposable run start is currently unavailable in this shell.');
+  }, [startDisposableRunBlockedReason]);
+
+  const onReviewLatestRun = useCallback(() => {
+    const latestRunId = evidenceSummary?.latestRun?.runId ?? null;
+
+    if (!latestRunId || !evidenceSummary?.latestRun) {
+      setEvidenceMessage('No linked run is available to review yet.');
+      return;
+    }
+
+    navigation.setSelectedRunId(latestRunId);
+    navigation.navigateToWorkspace('run-reports');
+  }, [evidenceSummary?.latestRun?.runId, evidenceSummary?.latestRun, navigation]);
+
+  const onOpenPromotionReview = useCallback(() => {
+    const latestRunId = evidenceSummary?.latestPromotionPackage?.sourceRunId ?? evidenceSummary?.latestRun?.runId ?? null;
+    if (!latestRunId || !evidenceSummary?.latestPromotionPackage) {
+      setEvidenceMessage('No promotion review package is available for this ticket yet.');
+      return;
+    }
+
+    navigation.setSelectedRunId(latestRunId);
+    navigation.navigateToWorkspace('promotion-review');
+  }, [evidenceSummary?.latestPromotionPackage, evidenceSummary?.latestRun?.runId, navigation]);
+
+  useEffect(() => {
+    if (selectedTicket?.id) {
+      void refreshEvidence();
+    } else {
+      setEvidenceSummary(null);
+      setEvidenceStatus('idle');
+      setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
+    }
+  }, [refreshEvidence, selectedTicket?.id]);
+
   const onSignIn = useCallback(async () => {
     await session.signIn({ email: session.email.trim(), password: session.password });
     await project.refreshProjectContext();
@@ -629,6 +814,11 @@ export function useTicketsWorkspace() {
     readiness,
     readinessStatus,
     readinessMessage,
+    evidenceSummary,
+    evidenceStatus,
+    evidenceMessage,
+    reviewLatestRunBlockedReason,
+    startDisposableRunBlockedReason,
     implementationPlan,
     planStatus,
     planMessage,
@@ -667,6 +857,10 @@ export function useTicketsWorkspace() {
       onCancelEditTicket: cancelEditTicket,
       onRefreshPlan: refreshImplementationPlan,
       onRefreshReadiness: refreshReadiness,
+      onRefreshEvidence: refreshEvidence,
+      onStartDisposableRun: onStartDisposableRun,
+      onReviewLatestRun: onReviewLatestRun,
+      onOpenPromotionReview: onOpenPromotionReview,
       onCreateDraftChange: setCreateDraft,
       onSubmitCreateTicket: createTicket,
       onCancelCreateTicket: closeCreatePanel,
@@ -756,6 +950,159 @@ function getTicketActionBlocker(
   }
 
   return null;
+}
+
+function getTicketEvidenceBlockedActions(args: {
+  readinessStatus: TicketReadinessLoadStatus;
+  readiness: BuildReadinessResult | null;
+  latestRelatedRun?: LinkedRunSummary | null;
+}): string[] {
+  const blockedActions: string[] = [];
+
+  if (args.readinessStatus !== 'loaded') {
+    blockedActions.push('Build readiness has not been refreshed.');
+  }
+
+  if (args.readiness && !args.readiness.isReady) {
+    blockedActions.push(args.readiness.message ?? 'Build readiness is not ready.');
+  }
+
+  if (!args.latestRelatedRun) {
+    blockedActions.push('No execution run is linked to this ticket yet.');
+  }
+
+  return blockedActions;
+}
+
+function getLinkedDocumentCount(ticket: ProjectTicket) {
+  return ticket.sourceDocumentVersionId ? 1 : 0;
+}
+
+function getLinkedTraceCount(ticket: ProjectTicket) {
+  return Number(Boolean(ticket.sourceChatSessionId)) + Number(Boolean(ticket.sourceChatMessageId));
+}
+
+function mapRunStatus(run: Pick<RunReportSummary, 'status' | 'recommendation'>): LinkedRunStatus {
+  const value = `${run.status ?? ''} ${run.recommendation ?? ''}`.toLowerCase();
+
+  if (value.includes('running')) {
+    return 'running';
+  }
+
+  if (value.includes('blocked')) {
+    return 'blocked';
+  }
+
+  if (value.includes('human') || value.includes('review')) {
+    return 'needsHumanReview';
+  }
+
+  if (value.includes('fail') || value.includes('error') || value.includes('warning')) {
+    return 'failed';
+  }
+
+  if (value.includes('pass') || value.includes('succ') || value.includes('done')) {
+    return 'passed';
+  }
+
+  return 'unknown';
+}
+
+function mapRunSummary(run: RunReportSummary): LinkedRunSummary {
+  return {
+    runId: run.runId ?? 'unknown-run',
+    traceId: run.traceId ?? null,
+    title: run.title ?? null,
+    status: mapRunStatus(run),
+    recommendation: run.recommendation ?? null,
+    startedUtc: run.startedUtc ?? null,
+    completedUtc: run.completedUtc ?? null
+  };
+}
+
+function mapPromotionSummary(
+  review: {
+    packageId?: string | null;
+    proposedChangeId?: string | null;
+    approvalState?: string | null;
+    recommendation?: string | null;
+    runtimeProfileId?: string | null;
+    targetLanguage?: string | null;
+    promotableFileCount?: number | null;
+    blockedFileCount?: number | null;
+    realRepoMutationCount?: number | null;
+  },
+  sourceRunId: string | null,
+  run: { realRepoMutationCount?: number | null } | null = null
+): LinkedPromotionPackageSummary {
+  return {
+    packageId: review.packageId ?? null,
+    proposedChangeId: review.proposedChangeId ?? null,
+    approvalState: review.approvalState ?? null,
+    recommendation: review.recommendation ?? null,
+    runtimeProfile: review.runtimeProfileId ?? null,
+    targetLanguage: review.targetLanguage ?? null,
+    filesToPromoteCount: review.promotableFileCount ?? null,
+    filesBlockedCount: review.blockedFileCount ?? null,
+    activeRepoMutationCount: (run?.realRepoMutationCount ?? null) as number | null,
+    sourceRunId
+  };
+}
+
+function getLatestTicketRelatedRun(runs: RunReportSummary[], ticket: ProjectTicket): RunReportSummary | null {
+  const related = runs.find((run) => {
+    if (!run || !ticket?.id) {
+      return false;
+    }
+
+    const sourceEntityType = (run as { sourceEntityType?: string | null }).sourceEntityType;
+    const sourceEntityId = (run as { sourceEntityId?: number | null }).sourceEntityId;
+    if (typeof sourceEntityId !== 'number' || sourceEntityId <= 0) {
+      return false;
+    }
+
+    if (sourceEntityId !== ticket.id) {
+      return false;
+    }
+
+    if (typeof sourceEntityType !== 'string' || sourceEntityType.length === 0) {
+      return false;
+    }
+
+    const normalizedSourceType = sourceEntityType.toLowerCase();
+    return normalizedSourceType === 'ticket' || normalizedSourceType === 'projectticket';
+  });
+
+  return related ?? null;
+}
+
+function buildTicketEvidenceSummary(args: {
+  ticket: ProjectTicket;
+  readiness: BuildReadinessResult | null;
+  readinessStatus: TicketReadinessLoadStatus;
+  latestRelatedRun?: LinkedRunSummary | null;
+  latestPromotionPackage?: LinkedPromotionPackageSummary | null;
+}): Omit<TicketEvidenceSummary, 'latestRun' | 'latestPromotionPackage'> {
+  const linkedTraceCount = getLinkedTraceCount(args.ticket);
+  const linkedDocumentCount = getLinkedDocumentCount(args.ticket);
+  const blockedActions = getTicketEvidenceBlockedActions({
+    readinessStatus: args.readinessStatus,
+    readiness: args.readiness,
+    latestRelatedRun: args.latestRelatedRun
+  });
+
+  return {
+    ticketId: args.ticket.id ?? 0,
+    status: 'loaded',
+    message: args.latestRelatedRun ? 'Execution evidence is available for this ticket.' : 'No linked execution evidence is available yet.',
+    linkedTraceCount,
+    linkedDocumentCount,
+    linkedDecisionCount: 0,
+    linkedRunCount: args.latestRelatedRun ? 1 : 0,
+    hasBlockingWarnings: blockedActions.length > 0,
+    blockedActions,
+    nextSafeAction: args.readiness?.isReady ? 'Start disposable run' : 'Refresh build readiness'
+  };
 }
 
 function draftFromTicket(ticket: ProjectTicket): TicketEditDraft {

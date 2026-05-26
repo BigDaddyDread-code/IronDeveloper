@@ -3,6 +3,7 @@ import { AppShell } from '../components/AppShell';
 import { WorkspaceRoute, WorkspaceRouteMeta, routeForId, workspaceRoutes } from '../app/routes';
 import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
+import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
 import { PromotionReviewRoute } from '../features/runReports/PromotionReviewRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
@@ -18,7 +19,7 @@ const defaultWorkspaceRouteMeta: WorkspaceRouteMeta = {
 };
 
 export function IronDevShell() {
-  const [activeRouteId, setActiveRouteId] = useState<WorkspaceRoute['id']>(() => workspaceRoutes[0]?.id ?? 'tickets');
+  const navigation = useWorkspaceNavigation();
   const [routeMeta, setRouteMeta] = useState<WorkspaceRouteMeta>(defaultWorkspaceRouteMeta);
   const session = useSessionContext();
   const project = useProjectContext();
@@ -30,12 +31,12 @@ export function IronDevShell() {
     []
   );
 
-  const onRouteChange = useCallback((routeId: WorkspaceRoute['id']) => {
-    setActiveRouteId(routeId);
+  const onWorkspaceNavigate = useCallback((routeId: WorkspaceRoute['id']) => {
+    navigation.navigateToWorkspace(routeId);
     setRouteMeta(defaultWorkspaceRouteMeta);
-  }, []);
+  }, [navigation]);
 
-  const activeRoute = useMemo(() => routeForId(activeRouteId), [activeRouteId]);
+  const activeRoute = useMemo(() => routeForId(navigation.activeRouteId), [navigation.activeRouteId]);
   const routeWorkspace = useMemo(() => {
     switch (activeRoute.id) {
       case 'run-reports':
@@ -93,8 +94,8 @@ export function IronDevShell() {
       }
       navigation={
         <WorkspaceNav
-          activeRouteId={activeRouteId}
-          onSelect={onRouteChange}
+          activeRouteId={activeRoute.id}
+          onSelect={onWorkspaceNavigate}
         />
       }
       footer={<StatusFooter apiStatus={session.apiStatus} />}

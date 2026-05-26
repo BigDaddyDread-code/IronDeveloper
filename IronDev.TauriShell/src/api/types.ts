@@ -32,6 +32,52 @@ export type TicketCreateStatus = 'idle' | 'validating' | 'submitting' | 'success
 export type TicketSaveStatus = 'idle' | 'editing' | 'dirty' | 'saving' | 'saved' | 'error' | 'validation';
 export type TicketPlanStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
 export type RunReportsLoadStatus = 'idle' | 'loading' | 'loaded' | 'error' | 'unavailable';
+export type TicketEvidenceLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
+export type LinkedRunStatus =
+  | 'passed'
+  | 'failed'
+  | 'needsHumanReview'
+  | 'blocked'
+  | 'running'
+  | 'unknown';
+
+export interface LinkedRunSummary {
+  runId: string;
+  traceId?: string | null;
+  title?: string | null;
+  status: LinkedRunStatus;
+  recommendation?: string | null;
+  startedUtc?: string | null;
+  completedUtc?: string | null;
+}
+
+export interface LinkedPromotionPackageSummary {
+  packageId?: string | null;
+  proposedChangeId?: string | null;
+  approvalState?: string | null;
+  recommendation?: string | null;
+  runtimeProfile?: string | null;
+  targetLanguage?: string | null;
+  filesToPromoteCount?: number | null;
+  filesBlockedCount?: number | null;
+  activeRepoMutationCount?: number | null;
+  sourceRunId?: string | null;
+}
+
+export interface TicketEvidenceSummary {
+  ticketId: number;
+  status: TicketEvidenceLoadStatus;
+  message: string;
+  latestRun?: LinkedRunSummary | null;
+  latestPromotionPackage?: LinkedPromotionPackageSummary | null;
+  linkedTraceCount: number;
+  linkedDocumentCount: number;
+  linkedDecisionCount: number;
+  linkedRunCount: number;
+  hasBlockingWarnings: boolean;
+  blockedActions: string[];
+  nextSafeAction?: string | null;
+}
 
 export interface RunReportSummaryRow {
   runId?: string | null;

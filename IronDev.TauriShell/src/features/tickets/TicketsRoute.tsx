@@ -8,30 +8,79 @@ interface TicketsRouteProps {
   route: WorkspaceRoute;
   onRouteReady?: (state: WorkspaceRouteMeta) => void;
 }
-
 export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
   const state = useTicketsWorkspace();
 
-  const commands: WorkspaceCommand[] = [
-    {
-      id: `workspace.${route.id}.refresh`,
-      label: state.isBusy ? 'Refreshing...' : 'Refresh',
-      intent: 'secondary',
-      onExecute: state.actions.onRetry,
-      disabled: state.isBusy,
-      busy: state.isBusy,
-      testId: route.id === 'tickets' ? 'ticket.command.refresh' : `workspace.${route.id}.refresh`
-    },
-    {
-      id: `workspace.${route.id}.create`,
-      label: 'Create Ticket',
-      intent: 'primary',
-      onExecute: state.actions.onOpenCreate,
-      disabled: Boolean(state.createBlockedReason) || state.isBusy,
-      disabledReason: state.createBlockedReason,
-      testId: 'ticket.command.create'
-    }
-  ];
+  const commands: WorkspaceCommand[] = useMemo(
+    () => [
+      {
+        id: 'ticket.startDisposableRun',
+        label: 'Start Disposable Run',
+        intent: 'primary',
+        onExecute: state.actions.onStartDisposableRun,
+        disabled: Boolean(state.startDisposableRunBlockedReason),
+        disabledReason: state.startDisposableRunBlockedReason,
+        testId: 'ticket.command.startDisposableRun'
+      },
+      {
+        id: 'ticket.reviewLatestRun',
+        label: 'Review Latest Run',
+        intent: 'secondary',
+        onExecute: state.actions.onReviewLatestRun,
+        disabled: Boolean(state.reviewLatestRunBlockedReason),
+        disabledReason: state.reviewLatestRunBlockedReason,
+        testId: 'ticket.command.reviewLatestRun'
+      },
+      {
+        id: 'ticket.refreshReadiness',
+        label: state.readinessStatus === 'loading' ? 'Checking...' : 'Refresh Readiness',
+        intent: 'secondary',
+        onExecute: state.actions.onRefreshReadiness,
+        disabled: Boolean(state.editBlockedReason) || state.readinessStatus === 'loading',
+        disabledReason: state.editBlockedReason,
+        busy: state.readinessStatus === 'loading',
+        testId: 'ticket.command.refreshReadiness'
+      },
+      {
+        id: 'ticket.refreshPlan',
+        label: state.planStatus === 'loading' ? 'Refreshing Plan...' : 'Refresh Plan',
+        intent: 'secondary',
+        onExecute: state.actions.onRefreshPlan,
+        disabled: Boolean(state.editBlockedReason) || state.planStatus === 'loading',
+        disabledReason: state.editBlockedReason,
+        busy: state.planStatus === 'loading',
+        testId: 'ticket.command.generatePlan'
+      },
+      {
+        id: 'ticket.edit',
+        label: 'Edit',
+        intent: 'ghost',
+        onExecute: state.actions.onEditTicket,
+        disabled: Boolean(state.editBlockedReason),
+        disabledReason: state.editBlockedReason,
+        testId: 'ticket.command.edit'
+      },
+      {
+        id: `workspace.${route.id}.create`,
+        label: 'Create Ticket',
+        intent: 'secondary',
+        onExecute: state.actions.onOpenCreate,
+        disabled: Boolean(state.createBlockedReason) || state.isBusy,
+        disabledReason: state.createBlockedReason,
+        testId: 'ticket.command.create'
+      }
+    ],
+    [
+      state.actions,
+      state.createBlockedReason,
+      state.editBlockedReason,
+      state.isBusy,
+      state.planStatus,
+      state.readinessStatus,
+      state.reviewLatestRunBlockedReason,
+      state.startDisposableRunBlockedReason
+    ]
+  );
 
   const routeSummary: WorkspaceSummaryChip[] = useMemo(
     () => [
@@ -83,6 +132,9 @@ function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel) {
     readiness: state.readiness,
     readinessStatus: state.readinessStatus,
     readinessMessage: state.readinessMessage,
+    evidenceSummary: state.evidenceSummary,
+    evidenceStatus: state.evidenceStatus,
+    evidenceMessage: state.evidenceMessage,
     implementationPlan: state.implementationPlan,
     planStatus: state.planStatus,
     planMessage: state.planMessage,
@@ -114,6 +166,9 @@ function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel) {
     onCancelEditTicket: state.actions.onCancelEditTicket,
     onRefreshPlan: state.actions.onRefreshPlan,
     onRefreshReadiness: state.actions.onRefreshReadiness,
+    onRefreshEvidence: state.actions.onRefreshEvidence,
+    onReviewLatestRun: state.actions.onReviewLatestRun,
+    onOpenPromotionReview: state.actions.onOpenPromotionReview,
     onCreateDraftChange: state.actions.onCreateDraftChange,
     onSubmitCreateTicket: () => state.actions.onSubmitCreateTicket(),
     onCancelCreateTicket: state.actions.onCancelCreateTicket,
@@ -125,6 +180,8 @@ function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel) {
     onSaveToken: state.actions.onSaveToken,
     onSignIn: state.actions.onSignIn,
     onSelectTenant: state.actions.onSelectTenant,
-    onSelectProject: state.actions.onSelectProject
+    onSelectProject: state.actions.onSelectProject,
+    startDisposableRunBlockedReason: state.startDisposableRunBlockedReason,
+    reviewLatestRunBlockedReason: state.reviewLatestRunBlockedReason
   };
 }

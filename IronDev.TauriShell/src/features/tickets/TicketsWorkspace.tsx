@@ -5,6 +5,8 @@ import type {
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
+  TicketEvidenceLoadStatus,
+  TicketEvidenceSummary,
   TicketCreateStatus,
   TenantSummary,
   TicketDetailLoadStatus,
@@ -42,6 +44,9 @@ interface TicketsWorkspaceProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   readinessMessage: string;
+  evidenceSummary: TicketEvidenceSummary | null;
+  evidenceStatus: TicketEvidenceLoadStatus;
+  evidenceMessage: string;
   implementationPlan: ProjectImplementationPlan | null;
   planStatus: TicketPlanStatus;
   planMessage: string;
@@ -73,6 +78,9 @@ interface TicketsWorkspaceProps {
   onCancelEditTicket: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
+  onRefreshEvidence: () => void;
+  onReviewLatestRun: () => void;
+  onOpenPromotionReview: () => void;
   onCreateDraftChange: (draft: CreateTicketDraft) => void;
   onSubmitCreateTicket: () => void;
   onCancelCreateTicket: () => void;
@@ -107,6 +115,9 @@ export function TicketsWorkspace({
   readiness,
   readinessStatus,
   readinessMessage,
+  evidenceSummary,
+  evidenceStatus,
+  evidenceMessage,
   implementationPlan,
   planStatus,
   planMessage,
@@ -138,6 +149,9 @@ export function TicketsWorkspace({
   onCancelEditTicket,
   onRefreshPlan,
   onRefreshReadiness,
+  onRefreshEvidence,
+  onReviewLatestRun,
+  onOpenPromotionReview,
   onCreateDraftChange,
   onSubmitCreateTicket,
   onCancelCreateTicket,
@@ -213,6 +227,9 @@ export function TicketsWorkspace({
               readiness={readiness}
               readinessStatus={readinessStatus}
               readinessMessage={readinessMessage}
+              evidenceSummary={evidenceSummary}
+              evidenceStatus={evidenceStatus}
+              evidenceMessage={evidenceMessage}
               implementationPlan={implementationPlan}
               planStatus={planStatus}
               planMessage={planMessage}
@@ -229,18 +246,26 @@ export function TicketsWorkspace({
               onCancelEdit={onCancelEditTicket}
               onRefreshPlan={onRefreshPlan}
               onRefreshReadiness={onRefreshReadiness}
+              onRefreshEvidence={onRefreshEvidence}
+              onReviewLatestRun={onReviewLatestRun}
+              onOpenPromotionReview={onOpenPromotionReview}
             />
           )
         }
         right={
           <ContextInspector
             ticket={selectedTicket}
+            evidenceSummary={evidenceSummary}
+            evidenceStatus={evidenceStatus}
+            evidenceMessage={evidenceMessage}
             readiness={readiness}
             readinessStatus={readinessStatus}
             apiBaseUrl={apiBaseUrl}
             projectId={projectId}
             projectStatus={projectStatus}
             tokenConfigured={tokenConfigured}
+            onReviewLatestRun={onReviewLatestRun}
+            onOpenPromotionReview={onOpenPromotionReview}
           />
         }
       />

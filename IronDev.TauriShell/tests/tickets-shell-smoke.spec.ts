@@ -40,7 +40,10 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('ticket.list')).toBeVisible();
   await expect(page.getByTestId('ticket.detail')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.refresh')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeDisabled();
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
   await expect(page.getByTestId('ticket.command.create')).toBeVisible();
   await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
   await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Sign in or configure a valid token');
@@ -274,8 +277,15 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
 
   await expect(page.getByTestId('project.status.selected')).toBeVisible();
   await expect(page.getByTestId('ticket.command.create')).toBeEnabled();
+  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeDisabled();
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
   await expect(page.getByTestId('ticket.row')).toHaveCount(2);
   await expect(page.getByTestId('ticket.detail.header')).toBeVisible();
+  await expect(page.getByTestId('ticket.detail.executionEvidence')).toBeVisible();
+  await expect(page.getByTestId('ticket.evidence.empty')).toBeVisible();
+  await expect(page.getByTestId('ticket.evidence.empty')).toContainText('No execution evidence yet');
   await expect(page.getByTestId('ticket.detail.brief')).toBeVisible();
   await expect(page.getByTestId('ticket.detail.plan')).toBeVisible();
   await expect(page.getByTestId('ticket.detail.context')).toBeVisible();
@@ -291,6 +301,12 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await expect(page.getByTestId('ticket.inspector.buildReadiness')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector.warnings')).toBeVisible();
   await expect(page.getByTestId('ticket.inspector.traceLinks')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.latestRun')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.latestPromotionPackage')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.blockedActions')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.blockedActions')).toContainText('No linked execution run is linked to this ticket yet.');
+  await expect(page.getByTestId('ticket.inspector.nextSafeAction')).toBeVisible();
+  await expect(page.getByTestId('ticket.inspector.nextSafeAction')).toContainText('Refresh build readiness');
   await expect(page.getByTestId('ticket.detail')).toContainText('Make tickets cockpit real');
   await expect(page.getByTestId('ticket.detail')).toContainText('Render ticket data through the Tauri API client.');
 
@@ -600,6 +616,32 @@ test('promotion review cockpit shows promotable and blocked files with next acti
   await expectNoHorizontalOverflow(page);
 });
 
+test('ticket evidence links open run report and promotion context', async ({ page }) => {
+  await mockTicketProject(page);
+  const linkedRun = { ...runReportSummaryForPromotion, sourceEntityType: 'Ticket', sourceEntityId: 101 };
+  await mockRunReportWorkspace(page, {
+    runs: [linkedRun],
+    runDetails: {
+      'run-901': runReportDetailForPromotion
+    },
+    evidence: {
+      'run-901': [runReportEvidenceSuccess]
+    }
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('ticket.evidence.latestRun')).toBeVisible();
+  await expect(page.getByTestId('ticket.evidence.latestPromotionPackage')).toBeVisible();
+  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeEnabled();
+  await page.getByTestId('ticket.command.reviewLatestRun').click();
+  await expect(page.getByTestId('run-reports.workspace')).toBeVisible();
+  await expect(page.getByTestId('run-reports.summary')).toContainText('run-901');
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('ticket.detail')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 async function mockTicketProject(page: import('@playwright/test').Page) {
   await seedToken(page);
   await seedSelectedProject(page, 7);
@@ -656,6 +698,13 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
           summary: 'Pick active project before loading tickets.'
         }
       ])
+    });
+  });
+  await page.route('**/irondev-api/api/run-reports', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
     });
   });
 }
@@ -923,6 +972,13 @@ async function mockTicketProjectForCreate(
       body: JSON.stringify(createdTicket ? [createdTicket, ...baseTickets] : baseTickets)
     });
   });
+  await page.route('**/irondev-api/api/run-reports', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
 }
 
 async function mockTicketProjectForEdit(
@@ -1001,6 +1057,13 @@ async function mockTicketProjectForEdit(
           summary: detail102.summary
         }
       ])
+    });
+  });
+  await page.route('**/irondev-api/api/run-reports', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
     });
   });
 }
