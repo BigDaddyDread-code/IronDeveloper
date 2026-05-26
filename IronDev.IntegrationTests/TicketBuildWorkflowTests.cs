@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.KnowledgeCompiler;
+using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
+using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Workflow;
 using IronDev.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -104,9 +106,38 @@ public sealed class TicketBuildWorkflowTests
         StringAssert.Contains(result.Message!, "belongs to project 99");
     }
 
+    [TestMethod]
+    public async Task StartAsync_ShouldPublishLiveRunEvents()
+    {
+        var ticket = new ProjectTicket
+        {
+            Id = 42,
+            ProjectId = 7,
+            Title = "Emit live workflow events",
+            Summary = "Build workflow should publish live run events."
+        };
+        var events = new InMemoryRunEventStore();
+        var orchestrator = CreateOrchestrator(ticket, new SemanticWorkflowContext(), events);
+
+        var result = await orchestrator.StartAsync(new TicketBuildWorkflowRequest
+        {
+            WorkflowRunId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            ProjectId = 7,
+            TicketId = 42
+        });
+
+        Assert.AreEqual(TicketBuildWorkflowStatus.AwaitingCodeApproval, result.Status);
+        var runEvents = await events.GetEventsAsync("11111111-1111-1111-1111-111111111111");
+        Assert.IsTrue(runEvents.Any(e => e.EventType == "RunStarted"));
+        Assert.IsTrue(runEvents.Any(e => e.EventType == "StepStarted" && e.Payload.GetValueOrDefault("node") == TicketBuildWorkflowNodes.LoadTicket));
+        Assert.IsTrue(runEvents.Any(e => e.EventType == "ToolCallCompleted" && e.Payload.GetValueOrDefault("toolName") == "ProposePatch"));
+        Assert.IsTrue(runEvents.Any(e => e.EventType == "ApprovalRequired"));
+    }
+
     private static TicketBuildWorkflowOrchestrator CreateOrchestrator(
         ProjectTicket ticket,
-        SemanticWorkflowContext memoryContext)
+        SemanticWorkflowContext memoryContext,
+        IRunEventStore? events = null)
     {
         IWorkflowNode<TicketBuildWorkflowState>[] nodes =
         [
@@ -121,7 +152,7 @@ public sealed class TicketBuildWorkflowTests
             new RequestPlanApprovalNode()
         ];
 
-        return new TicketBuildWorkflowOrchestrator(nodes);
+        return new TicketBuildWorkflowOrchestrator(nodes, events);
     }
 
     private sealed class StubTicketService : ITicketService

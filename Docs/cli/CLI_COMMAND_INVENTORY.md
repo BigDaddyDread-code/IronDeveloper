@@ -46,7 +46,7 @@ Missing product CLI commands from the intended surface:
 | `irondev memory search` | Missing product CLI command | `IronDev.Cli`; current `memory search` exists only in ReplayRunner |
 | `irondev runs status` | Implemented over `/api/runs/{runId}` | `IronDev.Cli` |
 | `irondev runs report` | Implemented over `/api/runs/{runId}/report` | `IronDev.Cli` |
-| `irondev runs stream` | Implemented over `/api/runs/{runId}/events`; stream is report-backed until durable live events exist | `IronDev.Cli` |
+| `irondev runs stream` | Implemented over `/api/runs/{runId}/events`; streams live in-memory events when available and report snapshots for legacy report-only runs | `IronDev.Cli` |
 
 ## ReplayRunner/Dogfood Commands
 

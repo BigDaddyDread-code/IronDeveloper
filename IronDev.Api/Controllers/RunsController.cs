@@ -12,20 +12,26 @@ public sealed class RunsController : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IRunReportService _reports;
+    private readonly IRunEventStore _events;
 
-    public RunsController(IRunReportService reports)
+    public RunsController(IRunReportService reports, IRunEventStore events)
     {
         _reports = reports;
+        _events = events;
     }
 
     [HttpGet("{runId}")]
     public async Task<ActionResult<RunStatusDto>> GetRun(string runId, CancellationToken ct)
     {
-        var report = await _reports.GetRunAsync(runId, ct);
-        if (report is null)
-            return NotFound();
+        var events = await _events.GetEventsAsync(runId, ct);
+        if (events.Count > 0)
+            return Ok(ToStatus(runId, events));
 
-        return Ok(ToStatus(report));
+        var report = await _reports.GetRunAsync(runId, ct);
+        if (report is not null)
+            return Ok(ToStatus(report));
+
+        return NotFound();
     }
 
     [HttpGet("{runId}/report")]
@@ -46,8 +52,9 @@ public sealed class RunsController : ControllerBase
     [Produces("text/event-stream")]
     public async Task GetRunEvents(string runId, CancellationToken ct)
     {
-        var report = await _reports.GetRunAsync(runId, ct);
-        if (report is null)
+        var events = await _events.GetEventsAsync(runId, ct);
+        var report = events.Count == 0 ? await _reports.GetRunAsync(runId, ct) : null;
+        if (events.Count == 0 && report is null)
         {
             Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -56,7 +63,17 @@ public sealed class RunsController : ControllerBase
         Response.ContentType = "text/event-stream";
         Response.Headers.CacheControl = "no-cache";
 
-        foreach (var runEvent in ToEvents(report))
+        if (events.Count > 0)
+        {
+            await foreach (var runEvent in _events.StreamEventsAsync(runId, ct))
+            {
+                await WriteSseEventAsync(runEvent, ct);
+            }
+
+            return;
+        }
+
+        foreach (var runEvent in ToEvents(report!))
         {
             await WriteSseEventAsync(runEvent, ct);
         }
@@ -75,6 +92,24 @@ public sealed class RunsController : ControllerBase
         RealRepoMutationCount = report.RealRepoMutationCount,
         DisposableFilesChanged = report.DisposableFilesChanged
     };
+
+    private static RunStatusDto ToStatus(string runId, IReadOnlyList<RunEventDto> events)
+    {
+        var last = events[^1];
+        var first = events[0];
+        var payload = last.Payload;
+        payload.TryGetValue("status", out var status);
+
+        return new RunStatusDto
+        {
+            RunId = runId,
+            Title = first.Message,
+            Status = string.IsNullOrWhiteSpace(status) ? last.EventType : status,
+            Recommendation = last.EventType == "ApprovalRequired" ? "Approval required" : string.Empty,
+            StartedUtc = first.TimestampUtc,
+            CompletedUtc = IsTerminalEvent(last.EventType) ? last.TimestampUtc : null
+        };
+    }
 
     private async Task WriteSseEventAsync(RunEventDto runEvent, CancellationToken ct)
     {
@@ -144,4 +179,9 @@ public sealed class RunsController : ControllerBase
         status.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
         status.Contains("error", StringComparison.OrdinalIgnoreCase) ||
         status.Contains("block", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsTerminalEvent(string eventType) =>
+        string.Equals(eventType, "RunCompleted", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(eventType, "RunFailed", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(eventType, "ApprovalRequired", StringComparison.OrdinalIgnoreCase);
 }

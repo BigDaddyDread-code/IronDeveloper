@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using IronDev.Api.Controllers;
 using IronDev.Core.RunReports;
+using IronDev.Infrastructure.Services.RunReports;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -13,7 +14,7 @@ public sealed class RunsEndpointContractTests
     [TestMethod]
     public async Task RunsController_ReturnsStatusAndReport()
     {
-        var controller = new RunsController(new StubRunReportService());
+        var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
 
         var statusResult = await controller.GetRun("run-123", CancellationToken.None);
         var status = ((OkObjectResult)statusResult.Result!).Value as RunStatusDto;
@@ -31,7 +32,7 @@ public sealed class RunsEndpointContractTests
     [TestMethod]
     public async Task RunsController_ReturnsNotFoundForMissingRun()
     {
-        var controller = new RunsController(new StubRunReportService());
+        var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
 
         var status = await controller.GetRun("missing", CancellationToken.None);
         var report = await controller.GetRunReport("missing", CancellationToken.None);
@@ -43,7 +44,7 @@ public sealed class RunsEndpointContractTests
     [TestMethod]
     public async Task RunsController_StreamsReportBackedSseEvents()
     {
-        var controller = new RunsController(new StubRunReportService());
+        var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
         await using var body = new MemoryStream();
         controller.ControllerContext = new ControllerContext
         {
@@ -65,6 +66,54 @@ public sealed class RunsEndpointContractTests
         StringAssert.Contains(text, "event: Warning");
         StringAssert.Contains(text, "event: RunCompleted");
         StringAssert.Contains(text, "\"runId\":\"run-123\"");
+    }
+
+    [TestMethod]
+    public async Task RunsController_StreamsLiveStoredEventsBeforeReportFallback()
+    {
+        var events = new InMemoryRunEventStore();
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = "live-run",
+            EventType = "RunStarted",
+            Message = "Live run started."
+        });
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = "live-run",
+            EventType = "ApprovalRequired",
+            Message = "Review generated code proposal.",
+            Payload = new Dictionary<string, string>
+            {
+                ["status"] = "AwaitingCodeApproval"
+            }
+        });
+
+        var controller = new RunsController(new StubRunReportService(), events);
+        await using var body = new MemoryStream();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                Response =
+                {
+                    Body = body
+                }
+            }
+        };
+
+        var statusResult = await controller.GetRun("live-run", CancellationToken.None);
+        var status = ((OkObjectResult)statusResult.Result!).Value as RunStatusDto;
+        Assert.IsNotNull(status);
+        Assert.AreEqual("AwaitingCodeApproval", status.Status);
+
+        await controller.GetRunEvents("live-run", CancellationToken.None);
+
+        var text = Encoding.UTF8.GetString(body.ToArray());
+        StringAssert.Contains(text, "event: RunStarted");
+        StringAssert.Contains(text, "event: ApprovalRequired");
+        StringAssert.Contains(text, "Live run started.");
+        Assert.IsFalse(text.Contains("Run completed.", StringComparison.Ordinal), "Live events should be streamed before report snapshot fallback.");
     }
 
     private sealed class StubRunReportService : IRunReportService

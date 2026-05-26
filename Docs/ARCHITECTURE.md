@@ -6,16 +6,16 @@ IronDev is structured as a multi-tenant client-server system.
 
 The product boundary is the REST API. The desktop UI is a cockpit, not the owner of persistence, tenancy, memory, tickets, documents, or AI workflow state.
 
-IronDev is moving toward a thin desktop-client boundary; the current boundary is not sealed.
+IronDev is moving toward a thin product-client boundary. New product work targets `IronDev.Api`, `IronDev.Client`, `tools/IronDev.Cli`, and the Tauri shell path.
 
 ```text
-IronDeveloper WPF
+TauriShell / Product CLI / Future Clients
   -> IronDev.Client
   -> IronDev.Api
   -> IronDev.Infrastructure
 ```
 
-`IronDeveloper` owns presentation, view composition, view model state, navigation, selection, dirty editor state, keyboard shortcuts, local path selection, local preview state, and desktop affordances such as screenshots, clipboard, and windows.
+`IronDeveloper` WPF is legacy and frozen. It may stay buildable while flows migrate, but it is not the forward product shell and must not receive new product workflows.
 
 Product persistence and workflow behaviour should go through `IronDev.Client` and `IronDev.Api`. Current boundary gaps are tracked in `Docs/architecture/API_CLIENT_CLI_BOUNDARY_FINDINGS.md`.
 
@@ -24,7 +24,7 @@ IronDev tickets are canonical for implementation work. GitHub issues may be link
 ## Layer Map
 
 ```text
-IronDeveloper WPF client
+TauriShell / Product CLI / Future Clients
   -> IronDev.Client typed HTTP client
   -> IronDev.Api REST backend
   -> IronDev.Infrastructure services/repositories/providers
@@ -33,7 +33,7 @@ IronDeveloper WPF client
 
 `IronDeveloper/IronDev.Agent.csproj` references `IronDev.Client` and `IronDev.Core`. It must not reference `IronDev.Infrastructure`.
 
-`IronDeveloper` must not directly own SQL, Dapper repositories, Weaviate, OpenAI/provider calls, tenant enforcement, prompt context assembly, persistent ticket/document/memory mutations, or build workflow state mutation.
+`IronDeveloper` must not directly own SQL, Dapper repositories, Weaviate, OpenAI/provider calls, tenant enforcement, prompt context assembly, persistent ticket/document/memory mutations, or build workflow state mutation. New product behaviour must not be added to WPF; add it to API/client/CLI/Tauri instead.
 
 ## CLI/API Boundary
 
@@ -103,7 +103,7 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 
 - auth and tenant selection
 - project, ticket, document, memory, chat, code-index, build, run-report, and profile endpoints
-- API-backed report endpoints, product-shaped run status/report/event endpoints, and a ticket build-run starter today, with durable workflow state and live event storage planned
+- API-backed report endpoints, product-shaped run status/report/event endpoints, a ticket build-run starter, and in-memory live run events today, with durable workflow state and durable event storage planned
 - request-scoped tenancy from JWT claims
 - orchestration through `IronDev.Infrastructure`
 
@@ -118,7 +118,7 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 
 ## Local-Only Exceptions
 
-The WPF client keeps only desktop-local behaviour:
+The frozen WPF client keeps only desktop-local behaviour:
 
 - `IAppSettingsService` for client presentation/settings preferences
 - screenshot capture and testing companion local files
@@ -135,7 +135,7 @@ These exceptions must not persist product state directly to SQL or Infrastructur
 - `IronDev.Client` has no `IronDev.Infrastructure` project reference.
 - `tools/IronDev.Cli` references `IronDev.Client`, does not reference `IronDev.Infrastructure`, and does not construct direct `HttpClient` calls.
 - `IronDev.TauriShell` is a TypeScript shell spike that calls API routes and generated OpenAPI types; it does not reference Infrastructure, SQL, repositories, or Weaviate directly.
-- `IronDeveloper` WPF is legacy but remains mostly on the client boundary: it references `IronDev.Client`, and local behaviours are presentation/testing compatibility only.
+- `IronDeveloper` WPF is legacy/frozen, references `IronDev.Client`, and local behaviours are presentation/testing compatibility only. It is not the forward product shell.
 
 The executable boundary checks live in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
 
@@ -245,8 +245,8 @@ Services resolve `ICurrentTenantContext` from the JWT claim per request.
 | Decision | Detail |
 |---|---|
 | API as product boundary | UI shells are replaceable; backend owns product behaviour |
-| `IronDev.Client` first | Typed HTTP abstraction between forward clients and API; current Product CLI ticket commands use it |
-| No second UI stack until boundary is proven | WPF stays; direct Infrastructure dependency is removed, while CLI/client gaps are documented |
+| `IronDev.Client` first | Typed HTTP abstraction between forward clients and API; current Product CLI ticket/run commands use it |
+| WPF legacy freeze | WPF remains buildable only as legacy compatibility; new product shell work targets API/client/CLI/Tauri |
 | Dapper over EF Core | SQL-native, explicit queries, no migration complexity |
 | BCrypt for password hashing | Industry standard, no extra ASP.NET dependency |
 | JWT re-issue on tenant select | Tenant identity embedded in token, not a client-controlled header |

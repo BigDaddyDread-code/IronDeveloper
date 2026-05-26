@@ -168,9 +168,9 @@ Intended consumers:
 | GET | `/api/run-reports/{runId}` | `RunReportsController.GetRun` | Read one run report. | Implemented | Legacy WPF, Dogfood Runner | Route is report-shaped, not `/api/runs/{runId}`. |
 | GET | `/api/run-reports/{runId}/evidence` | `RunReportsController.GetEvidence` | List report evidence. | Implemented | Legacy WPF, Dogfood Runner | File-backed storage hidden behind API for WPF. |
 | GET | `/api/run-reports/{runId}/evidence/text` | `RunReportsController.ReadEvidenceText` | Read evidence text by path query. | Implemented | Legacy WPF, Dogfood Runner | Query still exposes evidence path concept. |
-| GET | `/api/runs/{runId}` | `RunsController.GetRun` | Durable product-shaped run status over current report backend. | Implemented | Product CLI, TauriShell | Real lifecycle creation is still missing; status is mapped from stored report detail. |
+| GET | `/api/runs/{runId}` | `RunsController.GetRun` | Product-shaped run status over live event store or report backend. | Implemented | Product CLI, TauriShell | In-memory live event status exists for Alpha; durable run status persistence is still missing. |
 | GET | `/api/runs/{runId}/report` | `RunsController.GetRunReport` | Final run report by run id. | Implemented | Product CLI, TauriShell | Hides `/api/run-reports/*` from product CLI. |
-| GET | `/api/runs/{runId}/events` | `RunsController.GetRunEvents` | SSE run event stream. | Implemented | Product CLI, TauriShell | Emits report-backed snapshot events today; durable live event store is still missing. |
+| GET | `/api/runs/{runId}/events` | `RunsController.GetRunEvents` | SSE run event stream. | Implemented | Product CLI, TauriShell | Streams live in-memory events when available; falls back to report snapshot events for legacy report-only runs. Durable event storage is still missing. |
 
 ## Agents/Build Workflows
 
