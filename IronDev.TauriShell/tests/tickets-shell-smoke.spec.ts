@@ -533,6 +533,73 @@ test('tickets shell shows product error when ticket create API fails', async ({ 
   await expectNoHorizontalOverflow(page);
 });
 
+test('run reports cockpit shows summaries, timeline, and evidence', async ({ page }) => {
+  await mockTicketProject(page);
+  await mockRunReportWorkspace(page, {
+    runs: [runReportSummaryWithFailures, runReportSummarySuccess],
+    runDetails: {
+      'run-900': runReportDetailFailure,
+      'run-901': runReportDetailSuccess
+    },
+    evidence: {
+      'run-900': [runReportEvidenceFailure],
+      'run-901': [runReportEvidenceSuccess]
+    }
+  });
+
+  await page.goto('/');
+
+  await page.getByTestId('shell.nav.run-reports').click();
+  await expect(page.getByTestId('run-reports.workspace')).toBeVisible();
+  await expect(page.getByTestId('run-reports.list')).toBeVisible();
+  await expect(page.getByTestId('run-reports.summary')).toBeVisible();
+  await expect(page.getByTestId('run-reports.inspector')).toBeVisible();
+  await expect(page.getByTestId('run-reports.filters')).toBeVisible();
+  await expect(page.getByTestId('run-reports.filter.latest')).toBeVisible();
+  await expect(page.getByTestId('run-reports.filter.failed')).toBeVisible();
+  await expect(page.getByTestId('run-reports.row')).toHaveCount(2);
+  await expect(page.getByTestId('run-reports.summary')).toContainText('run-901');
+  await expect(page.getByTestId('run-reports.timeline')).toContainText('Build');
+  await expect(page.getByTestId('run-reports.evidence')).toContainText('evidence/run-901');
+  await expect(page.getByTestId('run-reports.governance')).toBeVisible();
+  await expect(page.getByTestId('run-reports.invariants')).toBeVisible();
+  await expect(page.getByTestId('run-reports.blockedActions')).toBeVisible();
+  await expect(page.getByTestId('run-reports.nextAction')).toContainText('No explicit blocks surfaced');
+  await expect(page.getByTestId('run-reports.command.refresh')).toBeVisible();
+  await expect(page.getByTestId('run-reports.command.refresh')).toBeEnabled();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('promotion review cockpit shows promotable and blocked files with next action guidance', async ({ page }) => {
+  await mockTicketProject(page);
+  await mockRunReportWorkspace(page, {
+    runs: [runReportSummaryForPromotion],
+    runDetails: {
+      'run-901': runReportDetailForPromotion
+    },
+    evidence: {
+      'run-901': [runReportEvidenceSuccess]
+    }
+  });
+
+  await page.goto('/');
+  await page.getByTestId('shell.nav.promotion-review').click();
+
+  await expect(page.getByTestId('promotion-review.workspace')).toBeVisible();
+  await expect(page.getByTestId('promotion-review.list')).toBeVisible();
+  await expect(page.getByTestId('promotion-review.summary')).toBeVisible();
+  await expect(page.getByTestId('promotion-review.inspector')).toBeVisible();
+  await expect(page.getByTestId('promotion-review.detail')).toBeVisible();
+  await expect(page.getByTestId('promotion-review.detail')).toContainText('pkg-run-901');
+  await expect(page.getByTestId('promotion-review.detail')).toContainText('src/App.Feature.cs');
+  await expect(page.getByTestId('promotion-review.detail')).toContainText('src/App.Blocked.cs');
+  await expect(page.getByTestId('promotion-review.blockedActions.empty')).toHaveCount(0);
+  await expect(page.getByTestId('promotion-review.nextAction')).toContainText('Address blocked actions');
+  await expect(page.getByTestId('promotion-review.command.refresh')).toBeVisible();
+  await expect(page.getByTestId('promotion-review.filter.needsHumanReview')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 async function mockTicketProject(page: import('@playwright/test').Page) {
   await seedToken(page);
   await seedSelectedProject(page, 7);
@@ -592,6 +659,186 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
     });
   });
 }
+
+async function mockRunReportWorkspace(
+  page: import('@playwright/test').Page,
+  payload: {
+    runs: Array<typeof runReportSummarySuccess>;
+    runDetails: Record<string, RunReportDetailPayload>;
+    evidence: Record<string, RunReportEvidencePayload[]>;
+  }
+) {
+  await page.route('**/irondev-api/api/run-reports', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(payload.runs)
+    });
+  });
+
+  await page.route('**/irondev-api/api/run-reports/*/evidence', async (route) => {
+    const url = new URL(route.request().url());
+    const parts = url.pathname.split('/');
+    const runId = decodeURIComponent(parts.at(-2) ?? '');
+    const items = payload.evidence[runId] ?? [];
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(items)
+    });
+  });
+
+  await page.route('**/irondev-api/api/run-reports/*', async (route) => {
+    const url = new URL(route.request().url());
+    const parts = url.pathname.split('/');
+    const runId = decodeURIComponent(parts.at(-1) ?? '');
+
+    if (payload.runDetails[runId]) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload.runDetails[runId])
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: `Run ${runId} not found` })
+    });
+  });
+}
+
+const runReportSummarySuccess = {
+  runId: 'run-901',
+  traceId: 'trace-901',
+  project: 'IronDeveloper',
+  title: 'Promotion review for disposable feature',
+  status: 'Succeeded',
+  recommendation: 'Needs human review',
+  startedUtc: '2026-05-26T01:15:00Z',
+  completedUtc: '2026-05-26T01:18:00Z',
+  realRepoMutationCount: 1,
+  disposableFilesChanged: 3
+};
+
+const runReportSummaryWithFailures = {
+  runId: 'run-900',
+  traceId: 'trace-900',
+  project: 'IronDeveloper',
+  title: 'Earlier failed run',
+  status: 'Failed',
+  recommendation: 'Needs rerun',
+  startedUtc: '2026-05-25T23:15:00Z',
+  completedUtc: '2026-05-25T23:18:00Z',
+  realRepoMutationCount: 0,
+  disposableFilesChanged: 2
+};
+
+const runReportSummaryForPromotion = runReportSummarySuccess;
+
+const runReportDetailSuccess = {
+  ...runReportSummarySuccess,
+  stages: [
+    {
+      stageName: 'Build',
+      status: 'success',
+      summary: 'Build and checks completed.'
+    }
+  ],
+  summary: 'Run completed with expected output for evidence collection.',
+  workspacePath: '/tmp/irondev-run-901',
+  boundary: 'workspace'
+};
+
+const runReportDetailFailure = {
+  ...runReportSummaryWithFailures,
+  attempts: [
+    {
+      type: 'Build',
+      attemptNumber: 1,
+      status: 'failed',
+      summary: 'Compilation failed due to temporary tooling issue.'
+    }
+  ],
+  summary: 'Build failure prevented promotion packaging.',
+  workspacePath: '/tmp/irondev-run-900',
+  boundary: 'workspace'
+};
+
+const runReportDetailForPromotion = {
+  ...runReportSummarySuccess,
+  promotionReview: {
+    packageId: 'pkg-run-901',
+    proposedChangeId: 'chg-run-901',
+    approvalState: 'NeedsHumanReview',
+    recommendation: 'Proceed to human review.',
+    runtimeProfileId: 'dotnet-csharp',
+    targetLanguage: 'C#',
+    targetStack: 'ASP.NET Core',
+    promotableFileCount: 1,
+    blockedFileCount: 1,
+    promotableFiles: [{ relativePath: 'src/App.Feature.cs' }],
+    blockedFiles: [{ relativePath: 'src/App.Blocked.cs' }],
+    risks: [
+      {
+        severity: 'Medium',
+        category: 'Governance',
+        message: 'Manual review required before apply.',
+        mitigation: 'Use policy approval.'
+      }
+    ],
+    requiredChecks: ['policy-compliance'],
+    explicitApprovalsNeeded: ['approval-ticket-901'],
+    blockedActions: ['Apply operation is blocked until human approval is recorded.']
+  },
+  policy: {
+    policyId: 'policy-run-901',
+    configurableSettings: ['require-human-review'],
+    hardInvariants: ['No production writes without approval.', 'No schema changes without migration plan.']
+  },
+  summary: 'Promotion package is ready for review.',
+  stages: [
+    {
+      stageName: 'Generate Promotion Package',
+      status: 'success',
+      summary: 'Packaging completed with policy snapshot included.'
+    }
+  ],
+  realRepoMutationCount: 1,
+  disposableFilesChanged: 3,
+  workspacePath: '/tmp/irondev-run-901',
+  boundary: 'governed'
+};
+
+const runReportEvidenceSuccess = [
+  {
+    type: 'file',
+    path: 'evidence/run-901/build.log',
+    summary: 'Primary build timeline'
+  },
+  {
+    type: 'policy',
+    path: 'evidence/run-901/policy.json',
+    summary: 'Policy snapshot'
+  }
+];
+
+const runReportEvidenceFailure = [
+  {
+    type: 'file',
+    path: 'evidence/run-900/build.log',
+    summary: 'Failure trace'
+  }
+];
+
+type RunReportDetailPayload =
+  | typeof runReportDetailSuccess
+  | typeof runReportDetailFailure
+  | typeof runReportDetailForPromotion;
+type RunReportEvidencePayload = (typeof runReportEvidenceSuccess)[number];
 
 async function mockTicketProjectForCreate(
   page: import('@playwright/test').Page,

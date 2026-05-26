@@ -296,8 +296,22 @@ p {
   color: var(--color-accent-strong);
 }
 
+.command-button--danger {
+  border-color: color-mix(in srgb, var(--color-status-danger) 58%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-status-danger) 14%, var(--color-bg-surface-subtle));
+  color: var(--color-status-danger);
+}
+
 .command-button--subtle {
   color: var(--color-text-secondary);
+}
+
+.command-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .workspace-list-pane,
@@ -462,6 +476,72 @@ p {
 .evidence-card p {
   color: var(--color-text-secondary);
   line-height: var(--line-height-body);
+}
+
+.run-reports-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.run-reports-filter {
+  min-height: 1.75rem;
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-subtle);
+  color: var(--color-text-muted);
+  padding: 0 var(--space-2);
+  cursor: pointer;
+}
+
+.run-reports-filter:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.run-reports-filter--active {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.run-reports-workspace,
+.promotion-review-workspace {
+  min-width: 0;
+  min-height: 0;
+}
+
+.run-reports-evidence-list,
+.promotion-review-file-list,
+.promotion-review-policy-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.run-reports-evidence-list li,
+.promotion-review-file-list li,
+.promotion-review-policy-list li {
+  overflow-wrap: anywhere;
+}
+
+.run-report-timeline {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.run-report-timeline__item {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.promotion-review-panels {
+  align-items: stretch;
 }
 
 .workflow-section--wide {

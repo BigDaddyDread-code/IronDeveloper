@@ -31,6 +31,26 @@ export type TicketReadinessLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavail
 export type TicketCreateStatus = 'idle' | 'validating' | 'submitting' | 'success' | 'error';
 export type TicketSaveStatus = 'idle' | 'editing' | 'dirty' | 'saving' | 'saved' | 'error' | 'validation';
 export type TicketPlanStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
+export type RunReportsLoadStatus = 'idle' | 'loading' | 'loaded' | 'error' | 'unavailable';
+
+export interface RunReportSummaryRow {
+  runId?: string | null;
+  traceId?: string | null;
+  project?: string | null;
+  title?: string | null;
+  status?: string | null;
+  recommendation?: string | null;
+  startedUtc?: string | null;
+  completedUtc?: string | null;
+  realRepoMutationCount?: number | null;
+  disposableFilesChanged?: number | null;
+}
+
+export interface RunEvidenceItem extends components['schemas']['RunEvidenceItem'] {}
+export interface RunReportDetail extends components['schemas']['RunReportDetail'] {}
+export interface RunReportSummary extends components['schemas']['RunReportSummary'] {}
+export interface RunPromotionReview extends components['schemas']['RunPromotionReview'] {}
+export interface RunReviewPolicySnapshot extends components['schemas']['RunReviewPolicySnapshot'] {}
 
 export interface LoginRequest {
   email: string;

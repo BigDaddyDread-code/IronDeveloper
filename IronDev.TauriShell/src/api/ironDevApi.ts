@@ -3,6 +3,9 @@ import type {
   ApiStatus,
   BuildReadinessResult,
   CreateProjectTicketRequest,
+  RunEvidenceItem,
+  RunReportDetail,
+  RunReportSummary,
   LoginRequest,
   LoginResponse,
   ProjectImplementationPlan,
@@ -234,6 +237,24 @@ class IronDevApiClient {
     signal?: AbortSignal
   ): Promise<BuildReadinessResult> {
     return this.request<BuildReadinessResult>(`/api/projects/${projectId}/tickets/${ticketId}/build-readiness`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getRunReports(signal?: AbortSignal): Promise<RunReportSummary[]> {
+    return this.request<RunReportSummary[]>('/api/run-reports', { method: 'GET', signal });
+  }
+
+  async getRunReport(runId: string, signal?: AbortSignal): Promise<RunReportDetail> {
+    return this.request<RunReportDetail>(`/api/run-reports/${encodeURIComponent(runId)}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getRunReportEvidence(runId: string, signal?: AbortSignal): Promise<RunEvidenceItem[]> {
+    return this.request<RunEvidenceItem[]>(`/api/run-reports/${encodeURIComponent(runId)}/evidence`, {
       method: 'GET',
       signal
     });
