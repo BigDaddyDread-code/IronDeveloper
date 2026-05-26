@@ -13,7 +13,52 @@ public sealed class ApiBoundaryTests
 
         AssertProjectDoesNotReference(root, "IronDev.Client", "IronDev.Infrastructure");
         AssertProjectDoesNotReference(root, Path.Combine("tools", "IronDev.Cli"), "IronDev.Infrastructure");
-        AssertProjectDoesNotReference(root, "IronDeveloper", "IronDev.Infrastructure");
+    }
+
+    [TestMethod]
+    public void RetiredWpfProject_MustNotBeInProductBuild()
+    {
+        var root = FindRepositoryRoot();
+
+        Assert.IsFalse(
+            File.Exists(Path.Combine(root, "IronDeveloper", "IronDev.Agent.csproj")),
+            "WPF was retired; IronDeveloper/IronDev.Agent.csproj must not be restored as a product project.");
+
+        var solution = File.ReadAllText(Path.Combine(root, "IronDev.slnx"));
+        Assert.IsFalse(
+            solution.Contains("IronDeveloper", StringComparison.Ordinal),
+            "IronDev.slnx must not reference the retired WPF project.");
+    }
+
+    [TestMethod]
+    public void ProductCli_MustUseIronDevClientInsteadOfDirectHttp()
+    {
+        var root = FindRepositoryRoot();
+        var cliRoot = Path.Combine(root, "tools", "IronDev.Cli");
+        var project = File.ReadAllText(Path.Combine(cliRoot, "IronDev.Cli.csproj"));
+        StringAssert.Contains(project, "IronDev.Client");
+
+        var forbidden = new[]
+        {
+            "new HttpClient",
+            ".GetAsync(",
+            ".PostAsJsonAsync(",
+            ".PutAsJsonAsync(",
+            ".DeleteAsync(",
+            "ReadFromJsonAsync",
+            "System.Net.Http.Json"
+        };
+
+        foreach (var source in Directory.EnumerateFiles(cliRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(source);
+            foreach (var token in forbidden)
+            {
+                Assert.IsFalse(
+                    text.Contains(token, StringComparison.Ordinal),
+                    $"Product CLI must use IronDev.Client instead of direct HTTP. Found '{token}' in {source}.");
+            }
+        }
     }
 
     [TestMethod]

@@ -10,40 +10,40 @@ TauriShell / Product CLI / Future Clients
     -> IronDev.Api
 ```
 
-Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and no `IronDev.Infrastructure` project reference, but `tools/IronDev.Cli` still builds direct `HttpClient` calls instead of consuming these typed clients.
+Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and no `IronDev.Infrastructure` project reference, and `tools/IronDev.Cli` now routes its current product ticket and run commands through `IIronDevApiClient`. Ticket build run starting exists through the API/client boundary, but durable run persistence, document-to-ticket generation, and several product CLI commands remain missing.
 
 ## Summary
 
 | Client area | HTTP-backed methods | Status |
 |---|---:|---|
-| Auth facade `IIronDevApiClient` | 6 | Implemented, overlapping legacy facade |
+| Product facade `IIronDevApiClient` | 14 | Implemented for health/auth/current Product CLI ticket/build and run status/report/event operations; overlaps with narrower typed clients |
 | Auth `IAuthApiClient` | 5 | Implemented |
 | Projects | 7 | Implemented |
-| Tickets/build/proposals | 20 | Implemented |
+| Tickets/build/proposals | 21 | Implemented |
 | Documents | 10 | Implemented, missing update/resolve wrappers |
 | Memory | 15 | Implemented |
 | Code index | 5 | Implemented |
 | Chat | 8 | Implemented |
 | Profiles | 7 | Implemented |
-| Run reports | 4 | Implemented report API, not durable run API |
+| Run reports | 7 | Implemented report API plus product-shaped run status/report/event methods |
 | Settings | 0 | Stubbed/no-op |
 | Traces | 0 | In-memory local client, not HTTP |
 | Prompting | 3 | Client boundary adapter over chat/prompt services, not direct REST methods |
 
-HTTP-backed typed operation count, excluding the overlapping legacy auth facade: **81**.
+HTTP-backed typed operation count, excluding the overlapping product facade: **85**.
 
 ## Consumer Evidence
 
 | Consumer | Current state |
 |---|---|
-| `IronDeveloper` WPF | Registers `AddIronDevClient`, receives typed client services through DI, including report services backed by `RunReportsApiClient`. |
-| `tools/IronDev.Cli` | Does not reference `IronDev.Client`; uses direct `HttpClient` against API routes. This is a boundary gap. |
+| `IronDeveloper` WPF | Retired and removed; historical WPF-oriented client methods remain in inventory until the public client surface is collapsed. |
+| `tools/IronDev.Cli` | References `IronDev.Client` and uses `IIronDevApiClient` for current product ticket commands. |
 | `IronDev.TauriShell` | Uses generated OpenAPI TypeScript types and browser fetch helpers, not the C# `IronDev.Client`. It does not reference Infrastructure. |
 | `tools/IronDev.ReplayRunner` | Internal dogfood runner; not expected to use `IronDev.Client` for every diagnostic path. |
 
 ## Auth Facade
 
-`IIronDevApiClient`/`IronDevApiClient` is a small legacy/general facade. It overlaps with `IAuthApiClient`.
+`IIronDevApiClient`/`IronDevApiClient` is a product facade for health/auth and current Product CLI ticket commands. It overlaps with `IAuthApiClient` and `ITicketsApiClient`; that overlap should be collapsed once the single public client contract is finalized.
 
 | Client method | HTTP method | API route | Request DTO | Response DTO | Current consumers | Status |
 |---|---|---|---|---|---|---|
@@ -53,6 +53,14 @@ HTTP-backed typed operation count, excluding the overlapping legacy auth facade:
 | `GetTenantsAsync` | GET | `/api/tenants` | None | `IReadOnlyList<TenantDto>` | Legacy/general | Implemented |
 | `SelectTenantAsync` | POST | `/api/tenants/select` | `SelectTenantRequest` | `LoginResponse` | Legacy/general | Implemented |
 | `LogoutAsync` | POST | `/api/auth/logout` | None | None | Legacy/general | Implemented |
+| `CreateTicketAsync` | POST | `/api/projects/{projectId}/tickets` | `CreateProjectTicketRequest` | `ProjectTicket` | Product CLI | Implemented |
+| `GetTicketsAsync` | GET | `/api/projects/{projectId}/tickets?take={take}` | None | `IReadOnlyList<ProjectTicket>` | Product CLI | Implemented |
+| `GetProjectTicketAsync` | GET | `/api/projects/{projectId}/tickets/{ticketId}` | None | `ProjectTicket?` | Product CLI | Implemented |
+| `ImportExternalTicketAsync` | POST | `/api/projects/{projectId}/tickets/import-external` | `ImportExternalTicketRequest` | `ProjectTicket` | Product CLI | Implemented |
+| `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `StartTicketBuildRunRequest` | `TicketBuildRunDto` | Product CLI | Implemented |
+| `GetRunAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI | Implemented |
+| `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI | Implemented |
+| `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI | Implemented; live SQL-backed stream, no report-snapshot synthesis |
 
 ## Auth
 
@@ -100,7 +108,7 @@ HTTP-backed typed operation count, excluding the overlapping legacy auth facade:
 | `ApplyProposalAsync` | POST | `/api/projects/{projectId}/proposal/apply` | `BuilderProposal` | None | Legacy WPF | Implemented |
 | `ApplyAndBuildAsync` | POST | `/api/tickets/{ticketId}/apply-and-build` | `TicketBuildApproval` | `TicketBuildResult` | Legacy WPF | Implemented |
 | `ValidateProposalArchitectureAsync` | POST | `/api/projects/{projectId}/proposal/validate-architecture` | `BuilderProposal` | `BuildReadinessResult` | Legacy WPF | Implemented |
-| `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | Planned | Planned run DTO | Product CLI/TauriShell | Missing |
+| `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `StartTicketBuildRunRequest` | `TicketBuildRunDto` | Product CLI/TauriShell | Implemented; workflow state persistence still planned |
 | `GenerateTicketsFromDocumentVersionAsync` | POST | `/api/document-versions/{versionId}/generate-tickets` | Planned | Planned ticket result DTO | Product CLI/TauriShell | Missing |
 
 ## Documents
@@ -185,9 +193,9 @@ HTTP-backed typed operation count, excluding the overlapping legacy auth facade:
 | `GetRunAsync` | GET | `/api/run-reports/{runId}` | None | `RunReportDetail?` | Legacy WPF | Implemented |
 | `GetEvidenceAsync` | GET | `/api/run-reports/{runId}/evidence` | None | `IReadOnlyList<RunEvidenceItem>` | Legacy WPF | Implemented |
 | `ReadEvidenceTextAsync` | GET | `/api/run-reports/{runId}/evidence/text?path={evidencePath}` | Evidence path query | `string?` | Legacy WPF | Implemented |
-| `GetRunAsync(Guid runId)` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI/TauriShell | Missing |
-| `GetRunReportAsync(Guid runId)` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI/TauriShell | Missing |
-| `StreamRunEventsAsync(Guid runId)` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI/TauriShell | Missing |
+| `GetRunStatusAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI/TauriShell | Implemented |
+| `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI/TauriShell | Implemented |
+| `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI/TauriShell | Implemented; live SQL-backed stream, no report-snapshot synthesis |
 
 ## Non-HTTP Boundary Helpers
 

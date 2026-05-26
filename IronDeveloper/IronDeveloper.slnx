@@ -1,9 +1,0 @@
-<Solution>
-  <Project Path="../IronDev.Core/IronDev.Core.csproj" Id="5e4d9394-238c-4324-9455-ffeb1baa91b2" />
-  <Project Path="../IronDev.Client/IronDev.Client.csproj" />
-  <Project Path="IronDev.Agent.csproj" />
-  <Project Path="../../IronDeveloper.Controls/IronDeveloperControls/IronDeveloperControls.csproj" />
-  <Project Path="../IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj" />
-  <Project Path="../IronDev.IntegrationTests/IronDev.IntegrationTests.csproj" />
-  <Project Path="../IronDev.Api/IronDev.Api.csproj" />
-</Solution>

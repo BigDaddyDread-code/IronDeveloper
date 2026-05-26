@@ -6,7 +6,7 @@ This guide helps you set up a local development environment for IronDev.
 
 1.  **SQL Server**: LocalDB, SQL Express, or a full SQL Server instance.
 2.  **AI Provider**: Access to OpenAI, a local OpenAI-compatible API (e.g., vLLM, LMStudio), or Ollama.
-3.  **IronDeveloper.Controls**: The UI controls library must be cloned locally (currently source-referenced).
+3.  **Docker Desktop**: Optional, only needed for local Weaviate semantic-memory dogfooding.
 
 ---
 
@@ -18,7 +18,7 @@ For a local machine that already has .NET and Docker Desktop installed, run this
 powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
 ```
 
-This restores packages, starts/smoke-tests Weaviate, builds the WPF app, and runs a small stabilisation smoke test set.
+This restores packages, starts/smoke-tests Weaviate, builds the API/product CLI, and runs focused boundary smoke tests.
 
 Database setup is opt-in so the script does not accidentally reseed an existing database:
 
@@ -44,7 +44,7 @@ Useful switches:
 1.  **Create Database**: Create a new database named `IronDeveloper`.
 2.  **Run Setup Script**: Execute `Database/local_dev_setup.sql` against the `IronDeveloper` database.
     *   This script creates all required tables and seeds a default local tenant, user, and project.
-3.  **Connection String**: Update `IronDeveloper/appsettings.Development.json` with your connection string:
+3.  **Connection String**: Update `IronDev.Api/appsettings.Development.json` with your connection string:
 
 ```json
 {
@@ -92,7 +92,7 @@ IronDev supports multiple AI providers. Configure your choice in `appsettings.De
 
 ## 3. Optional Weaviate Semantic Memory
 
-Weaviate is optional for local development. IronDev defaults to safe startup with Weaviate disabled, while `IronDeveloper/appsettings.Development.json` can enable it when Docker is running.
+Weaviate is optional for local development. IronDev defaults to safe startup with Weaviate disabled, while `IronDev.Api/appsettings.Development.json` can enable it when Docker is running.
 
 Start the local container:
 

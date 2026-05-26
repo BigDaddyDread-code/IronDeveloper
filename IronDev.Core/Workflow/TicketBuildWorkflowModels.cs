@@ -45,6 +45,23 @@ public sealed class TicketBuildWorkflowRequest
     public int MaxRetries { get; init; } = 3;
 }
 
+public sealed record StartTicketBuildRunRequest
+{
+    public Guid? WorkflowRunId { get; init; }
+    public int MaxRetries { get; init; } = 3;
+}
+
+public sealed record TicketBuildRunDto
+{
+    public string RunId { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public long TicketId { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string CurrentNode { get; init; } = string.Empty;
+    public bool RequiresHumanApproval { get; init; }
+    public string? Message { get; init; }
+}
+
 public sealed class TicketBuildWorkflowResult
 {
     public Guid WorkflowRunId { get; init; }

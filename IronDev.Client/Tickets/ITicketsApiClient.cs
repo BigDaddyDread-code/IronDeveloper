@@ -1,6 +1,7 @@
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 
 namespace IronDev.Client.Tickets;
@@ -19,4 +20,5 @@ public interface ITicketsApiClient :
     Task<ProjectTicket?> GetTicketByIdAsync(long ticketId, CancellationToken cancellationToken = default);
     Task<bool> ArchiveTicketAsync(long ticketId, CancellationToken cancellationToken = default);
     Task<CodebaseTicketGenerationResult> GenerateTicketsAsync(int projectId, CancellationToken cancellationToken = default);
+    Task<TicketBuildRunDto> StartTicketBuildRunAsync(int projectId, long ticketId, StartTicketBuildRunRequest request, CancellationToken cancellationToken = default);
 }

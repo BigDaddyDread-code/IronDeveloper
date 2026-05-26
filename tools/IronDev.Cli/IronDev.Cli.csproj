@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\IronDev.Client\IronDev.Client.csproj" />
     <ProjectReference Include="..\..\IronDev.Core\IronDev.Core.csproj" />
   </ItemGroup>
 </Project>

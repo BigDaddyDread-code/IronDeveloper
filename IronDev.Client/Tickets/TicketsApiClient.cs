@@ -1,6 +1,7 @@
 using IronDev.Client.Http;
 using IronDev.Core.Builder;
 using IronDev.Core.Models;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 
 namespace IronDev.Client.Tickets;
@@ -78,6 +79,13 @@ public sealed class TicketsApiClient : IronDevApiClientBase, ITicketsApiClient
 
     public Task<TicketBuildPreview> CreateBuildPreviewAsync(int projectId, long ticketId, CancellationToken cancellationToken = default) =>
         PostAsync<TicketBuildPreview>($"projects/{projectId}/tickets/{ticketId}/build-preview", new { }, cancellationToken);
+
+    public Task<TicketBuildRunDto> StartTicketBuildRunAsync(
+        int projectId,
+        long ticketId,
+        StartTicketBuildRunRequest request,
+        CancellationToken cancellationToken = default) =>
+        PostAsync<TicketBuildRunDto>($"projects/{projectId}/tickets/{ticketId}/build-runs", request, cancellationToken);
 
     public Task<BuildReadinessResult> EvaluateReadinessAsync(int projectId, long ticketId, CancellationToken cancellationToken = default) =>
         GetAsync<BuildReadinessResult>($"projects/{projectId}/tickets/{ticketId}/build-readiness", cancellationToken);

@@ -6,34 +6,32 @@ IronDev is structured as a multi-tenant client-server system.
 
 The product boundary is the REST API. The desktop UI is a cockpit, not the owner of persistence, tenancy, memory, tickets, documents, or AI workflow state.
 
-IronDev now uses the thin desktop-client boundary completed for #68:
+IronDev uses a thin product-client boundary. New product work targets `IronDev.Api`, `IronDev.Client`, `tools/IronDev.Cli`, and the Tauri shell path.
 
 ```text
-IronDeveloper WPF
+TauriShell / Product CLI / Future Clients
   -> IronDev.Client
   -> IronDev.Api
   -> IronDev.Infrastructure
 ```
 
-`IronDeveloper` owns presentation, view composition, view model state, navigation, selection, dirty editor state, keyboard shortcuts, local path selection, local preview state, and desktop affordances such as screenshots, clipboard, and windows.
+`IronDeveloper` WPF has been retired and removed from the product build. It must not be restored as a supported shell; any replacement UI work belongs in the API/client/Tauri path.
 
-Product persistence and workflow behaviour should go through `IronDev.Client` and `IronDev.Api`. Current boundary gaps are tracked in `Docs/architecture/API_CLIENT_CLI_BOUNDARY_FINDINGS.md`.
+Product persistence and workflow behaviour goes through `IronDev.Client` and `IronDev.Api`. The current forward boundary is sealed for Product CLI and TauriShell source; remaining gaps are missing product features, not approved client-side Infrastructure bypasses.
 
 IronDev tickets are canonical for implementation work. GitHub issues may be linked or backfilled as external references, but they are not the source of truth unless a task explicitly says to create or use a GitHub issue.
 
 ## Layer Map
 
 ```text
-IronDeveloper WPF client
+TauriShell / Product CLI / Future Clients
   -> IronDev.Client typed HTTP client
   -> IronDev.Api REST backend
   -> IronDev.Infrastructure services/repositories/providers
   -> SQL Server / Weaviate / OpenAI / file/build adapters
 ```
 
-`IronDeveloper/IronDev.Agent.csproj` references `IronDev.Client` and `IronDev.Core`. It must not reference `IronDev.Infrastructure`.
-
-`IronDeveloper` must not directly own SQL, Dapper repositories, Weaviate, OpenAI/provider calls, tenant enforcement, prompt context assembly, persistent ticket/document/memory mutations, or build workflow state mutation.
+No forward-facing client project may reference `IronDev.Infrastructure`.
 
 ## CLI/API Boundary
 
@@ -54,7 +52,7 @@ Codex -> CLI -> Infrastructure -> DB
 API endpoint -> ReplayRunner command -> stdout -> response
 ```
 
-The product CLI must move to `IronDev.Client`; direct HTTP construction belongs inside `IronDev.Client` only. Today `tools/IronDev.Cli` still constructs `HttpClient` directly, so it is API-backed but not client-boundary clean. The CLI must not call SQL directly, Dapper repositories, Infrastructure services, `TicketService` directly, or GitHub issues as canonical ticket storage.
+The product CLI must use `IronDev.Client`; direct HTTP construction belongs inside `IronDev.Client` only. Today `tools/IronDev.Cli` routes its current ticket commands through `IIronDevApiClient`. The CLI must not call SQL directly, Dapper repositories, Infrastructure services, `TicketService` directly, or GitHub issues as canonical ticket storage.
 
 `tools/IronDev.Cli` is the product CLI. `tools/IronDev.ReplayRunner` is internal dogfood/replay tooling and may keep smoke plans, campaign checks, replay harnesses, memory spine tests, benchmark scripts, Weaviate smoke checks, SQL smoke checks, and lower-level diagnostics. Dogfood commands must be labelled internal and must not be presented as normal product commands.
 
@@ -66,7 +64,7 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 
 ### Hard rule
 
-`IronDeveloper` must not reference or call `IronDev.Infrastructure` directly.
+Forward clients must not reference or call `IronDev.Infrastructure` directly.
 
 ### Allowed UI responsibilities
 
@@ -97,13 +95,13 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 - JWT/session handling
 - typed API clients
 - shared HTTP error handling
-- API-facing workflow methods for WPF ViewModels
+- API-facing workflow methods for product clients
 
 `IronDev.Api` owns:
 
 - auth and tenant selection
 - project, ticket, document, memory, chat, code-index, build, run-report, and profile endpoints
-- API-backed report endpoints today, with durable run status/report/event endpoints planned
+- API-backed report endpoints, product-shaped run status/report/event endpoints, a ticket build-run starter, and SQL-backed live run event history; durable workflow state beyond event history is still planned
 - request-scoped tenancy from JWT claims
 - orchestration through `IronDev.Infrastructure`
 
@@ -118,36 +116,25 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 
 ## Local-Only Exceptions
 
-The WPF client keeps only desktop-local behaviour:
+Forward clients may keep desktop-local behaviour only when it does not persist product state:
 
 - `IAppSettingsService` for client presentation/settings preferences
 - screenshot capture and testing companion local files
 - shell/window/navigation state
 - in-memory trace display state
 - markdown rendering fallback for document preview
-- prompt playground compatibility shims used for diagnostics, not authoritative product persistence
-- local test compatibility adapters for legacy integration test construction only
+- prompt playground or diagnostics shims only when they remain non-authoritative
 
 These exceptions must not persist product state directly to SQL or Infrastructure services. Results that become persistent product state must be sent through `IronDev.Api`.
 
 ## Current Boundary Verification
 
 - `IronDev.Client` has no `IronDev.Infrastructure` project reference.
-- `tools/IronDev.Cli` does not reference `IronDev.Infrastructure`, but it still constructs direct `HttpClient` calls instead of using `IronDev.Client`.
+- `tools/IronDev.Cli` references `IronDev.Client`, does not reference `IronDev.Infrastructure`, and does not construct direct `HttpClient` calls.
 - `IronDev.TauriShell` is a TypeScript shell spike that calls API routes and generated OpenAPI types; it does not reference Infrastructure, SQL, repositories, or Weaviate directly.
-- `IronDeveloper` WPF is legacy but remains mostly on the client boundary: it references `IronDev.Client`, and local behaviours are presentation/testing compatibility only.
+- `IronDeveloper` WPF is removed from the repository and from `IronDev.slnx`.
 
 The executable boundary checks live in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
-
-## Guardrail
-
-Run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File ./Scripts/Assert-WpfApiBoundary.ps1
-```
-
-The guard fails if `IronDeveloper` reintroduces forbidden WPF coupling such as `IronDev.Infrastructure`, `IronDev.Services`, or the old direct service interface names.
 
 ## UI Testability Gate
 
@@ -205,7 +192,7 @@ The tenancy abstraction is interface-based and scoped per request/operation.
 |---|---|---|
 | `JwtTenantContext` | ASP.NET Core API | Reads `tenant_id` claim from JWT |
 | `TestTenantContext` | Integration tests | Mutable; tests switch tenants to verify isolation |
-| `DevelopmentTenantContext` | Legacy local migration seam only | Always `TenantId = 1`; remove from WPF paths as they migrate to API |
+| `DevelopmentTenantContext` | Legacy local/test migration seam only | Always `TenantId = 1`; do not use from forward clients |
 
 ## Auth Flow
 
@@ -245,8 +232,8 @@ Services resolve `ICurrentTenantContext` from the JWT claim per request.
 | Decision | Detail |
 |---|---|
 | API as product boundary | UI shells are replaceable; backend owns product behaviour |
-| `IronDev.Client` first | Typed HTTP abstraction between forward clients and API; Product CLI migration is still pending |
-| No second UI stack until boundary is proven | WPF stays; direct Infrastructure dependency is removed, while CLI/client gaps are documented |
+| `IronDev.Client` first | Typed HTTP abstraction between forward clients and API; current Product CLI ticket/run commands use it |
+| WPF retired | The WPF project is removed; new product shell work targets API/client/CLI/Tauri |
 | Dapper over EF Core | SQL-native, explicit queries, no migration complexity |
 | BCrypt for password hashing | Industry standard, no extra ASP.NET dependency |
 | JWT re-issue on tenant select | Tenant identity embedded in token, not a client-controlled header |

@@ -1,7 +1,7 @@
 # Tauri Shell Spike
 
 IronDev is evaluating a future desktop shell built with Tauri, React, TypeScript, and Playwright.
-This spike proves the shell direction without replacing WPF or moving product logic out of `IronDev.Api`.
+This spike proves the shell direction without moving product logic out of `IronDev.Api`.
 
 ## Why Tauri
 
@@ -15,11 +15,11 @@ React and TypeScript can make the cockpit UI faster to iterate, and Playwright k
 - The shell has generated OpenAPI types plus a typed HTTP facade for auth, tenants, projects, and tickets.
 - The shell renders a Tickets cockpit with selected-ticket detail, readiness refresh, and stable `data-testid` selectors.
 - Playwright can smoke-test the Vite-hosted shell surface.
-- WPF remains in place while the future shell is evaluated.
+- WPF has been retired; the future shell must stay API/OpenAPI-bound while it is evaluated.
 
 ## What This Does Not Prove
 
-- It does not replace WPF.
+- It does not own product persistence or workflow logic.
 - It does not delete WPF code.
 - It does not migrate all workspaces.
 - It does not move backend/product logic into TypeScript.
@@ -213,4 +213,4 @@ Unavailable until richer API endpoints exist:
 
 ## Migration Rule
 
-WPF remains the production desktop UI until the replacement shell proves workflow parity, API-boundary compliance, testability, packaging, auth, update behavior, and workspace-by-workspace user value.
+The replacement shell is not production until it proves workflow parity, API-boundary compliance, testability, packaging, auth, update behavior, and workspace-by-workspace user value.

@@ -109,7 +109,7 @@ public sealed class IronDevCliTests
             handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
         Assert.AreEqual("Bearer", handler.Requests[1].Headers.Authorization?.Scheme);
         Assert.AreEqual("test-token", handler.Requests[1].Headers.Authorization?.Parameter);
-        StringAssert.Contains(await handler.Requests[1].Content!.ReadAsStringAsync(), "\"type\": \"Architecture\"");
+        StringAssert.Contains(await handler.Requests[1].Content!.ReadAsStringAsync(), "\"type\":\"Architecture\"");
         StringAssert.Contains(output.ToString(), "\"id\": 123");
     }
 
@@ -172,6 +172,78 @@ public sealed class IronDevCliTests
             },
             handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
     }
+
+    [TestMethod]
+    public async Task RunsStatusAndReport_UseProductRunApiEndpoints()
+    {
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var status = await IronDevCli.RunAsync(
+            ["runs", "status", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, status, error.ToString());
+
+        var report = await IronDevCli.RunAsync(
+            ["runs", "report", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, report, error.ToString());
+
+        var stream = await IronDevCli.RunAsync(
+            ["runs", "stream", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, stream, error.ToString());
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/runs/run-123",
+                "/health",
+                "/api/runs/run-123/report",
+                "/health",
+                "/api/runs/run-123/events"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+        StringAssert.Contains(output.ToString(), "\"runId\": \"run-123\"");
+        StringAssert.Contains(output.ToString(), "RunCompleted run-123");
+    }
+
+    [TestMethod]
+    public async Task TicketBuild_UsesProductBuildRunEndpoint()
+    {
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["tickets", "build", "--project-id", "42", "--ticket-id", "123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+
+        Assert.AreEqual(0, result, error.ToString());
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/projects/42/tickets/123/build-runs"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+        StringAssert.Contains(output.ToString(), "\"runId\": \"11111111-1111-1111-1111-111111111111\"");
+    }
+
 
     [TestMethod]
     public async Task TicketsApiClient_CallsStructuredTicketEndpoints()
@@ -297,6 +369,85 @@ public sealed class IronDevCliTests
                             "status": "Draft"
                           }
                         ]
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "runId": "run-123",
+                          "project": "IronDev",
+                          "title": "Boundary hardening",
+                          "status": "Completed",
+                          "recommendation": "Review"
+                        }
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123/report")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "status": {
+                            "runId": "run-123",
+                            "project": "IronDev",
+                            "title": "Boundary hardening",
+                            "status": "Completed",
+                            "recommendation": "Review"
+                          },
+                          "report": {
+                            "runId": "run-123",
+                            "project": "IronDev",
+                            "title": "Boundary hardening",
+                            "status": "Completed",
+                            "summary": "Run completed.",
+                            "recommendation": "Review"
+                          }
+                        }
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123/events")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        event: RunStarted
+                        data: {"timestampUtc":"2026-05-26T00:00:00Z","runId":"run-123","eventType":"RunStarted","message":"Run started","payload":{}}
+
+                        event: RunCompleted
+                        data: {"timestampUtc":"2026-05-26T00:01:00Z","runId":"run-123","eventType":"RunCompleted","message":"Run completed","payload":{"status":"Completed"}}
+
+                        """,
+                        Encoding.UTF8,
+                        "text/event-stream")
+                };
+
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/projects/42/tickets/123/build-runs")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "runId": "11111111-1111-1111-1111-111111111111",
+                          "projectId": 42,
+                          "ticketId": 123,
+                          "status": "AwaitingCodeApproval",
+                          "currentNode": "RequestCodeApproval",
+                          "requiresHumanApproval": true,
+                          "message": "Review generated code proposal."
+                        }
                         """,
                         Encoding.UTF8,
                         "application/json")

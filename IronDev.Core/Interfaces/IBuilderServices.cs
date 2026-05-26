@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using IronDev.Core.Builder;
 using IronDev.Core.Models;
 
-// Note: ChatTicketContext lives in IronDev.Agent (the WPF host project).
+// Note: ChatTicketContext is a legacy UI compatibility model; forward clients use API DTOs.
 // IDraftTicketService is defined here in Core to keep the interface layer clean;
 // the concrete service in Infrastructure references the Agent assembly.
 // The ViewModel (also in Agent) depends only on this interface.

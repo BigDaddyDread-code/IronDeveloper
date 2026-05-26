@@ -21,6 +21,7 @@ public class ManualIndexingTask
     }
 
     [TestMethod]
+    [Ignore("Manual local indexing task; not part of normal validation.")]
     public async Task ReindexIronDevRepo()
     {
         var projectId = 2; // Real ID

@@ -4,7 +4,7 @@
 
 This document is the historical dogfood/replay inventory for `IronDev.ReplayRunner` and older product-shaped aliases. The current product/internal classification lives in `Docs/cli/CLI_COMMAND_INVENTORY.md`.
 
-`tools/IronDev.Cli` is the product CLI and must move to `IronDev.Client`; today it calls `IronDev.Api` directly with `HttpClient`. `tools/IronDev.ReplayRunner` is internal dogfood/replay tooling.
+`tools/IronDev.Cli` is the product CLI and current ticket commands use `IronDev.Client`; `tools/IronDev.ReplayRunner` is internal dogfood/replay tooling.
 
 The machine-readable inventory is stored at:
 
@@ -30,7 +30,7 @@ The machine-readable inventory is stored at:
 - Test commands: 1
 - Trace commands: 1
 - Replay scenario entrypoint: 1
-- Product CLI ticket commands: 4
+- Product CLI commands: 8
 
 ## Product-Ish Commands
 
@@ -38,6 +38,10 @@ The machine-readable inventory is stored at:
 - `ticket list`
 - `ticket show`
 - `ticket import-github-issue`
+- `tickets build`
+- `runs status`
+- `runs report`
+- `runs stream`
 - `memory search`
 - `memory triage`
 - `agent tester run-plan`

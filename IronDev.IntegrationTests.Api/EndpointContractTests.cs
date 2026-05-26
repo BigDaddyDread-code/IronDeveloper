@@ -29,12 +29,16 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/tickets/{ticketId}",
             "/api/projects/{projectId}/tickets/import-external",
             "/api/projects/{projectId}/tickets/generate-from-discussion",
+            "/api/projects/{projectId}/tickets/{ticketId}/build-runs",
             "/api/projects/{projectId}/documents",
             "/api/projects/{projectId}/documents/{documentId}",
             "/api/projects/{projectId}/documents/{documentId}/resolve",
             "/api/projects/{projectId}/memory/search",
             "/api/projects/{projectId}/chat/complete",
-            "/api/run-reports"
+            "/api/run-reports",
+            "/api/runs/{runId}",
+            "/api/runs/{runId}/report",
+            "/api/runs/{runId}/events"
         })
         {
             Assert.IsTrue(paths.TryGetProperty(path, out _), $"Swagger is missing {path}.");

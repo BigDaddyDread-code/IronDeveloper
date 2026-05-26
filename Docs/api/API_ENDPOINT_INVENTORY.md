@@ -11,14 +11,14 @@ This inventory lists the REST surface currently exposed by `IronDev.Api`. It sep
 | Health/diagnostics | 1 | 0 |
 | Auth/tenants | 5 | 0 |
 | Projects | 7 | 1 |
-| Tickets | 19 | 2 |
+| Tickets | 20 | 1 |
 | Documents | 13 | 2 |
 | Memory | 20 | 2 |
 | Chat | 8 | 0 |
 | Profiles | 7 | 0 |
-| Runs/reports | 4 | 3 |
+| Runs/reports | 7 | 0 |
 | Agents/build workflows | 0 | 4 |
-| **Total actual routes** | **84** | **14** |
+| **Total actual routes** | **88** | **10** |
 
 Status meanings:
 
@@ -30,14 +30,14 @@ Intended consumers:
 
 - `TauriShell`: forward product shell.
 - `Product CLI`: public command surface in `tools/IronDev.Cli`.
-- `Legacy WPF`: existing `IronDeveloper` WPF client.
+- `Legacy WPF`: retired `IronDeveloper` WPF client history. It is not an active product consumer.
 - `Dogfood Runner`: internal `tools/IronDev.ReplayRunner` and dogfood harnesses.
 
 ## Health/Diagnostics
 
 | Method | Route | Controller/action | Purpose | Status | Intended consumers | Notes/gaps |
 |---|---|---|---|---|---|---|
-| GET | `/health` | `Program.MapGet` | API health probe. | Implemented | TauriShell, Product CLI, Legacy WPF, Dogfood Runner | Product CLI currently probes this directly with `HttpClient`. |
+| GET | `/health` | `Program.MapGet` | API health probe. | Implemented | TauriShell, Product CLI, Legacy WPF, Dogfood Runner | Product CLI probes through `IIronDevApiClient`. |
 
 ## Auth/Tenants
 
@@ -66,12 +66,12 @@ Intended consumers:
 
 | Method | Route | Controller/action | Purpose | Status | Intended consumers | Notes/gaps |
 |---|---|---|---|---|---|---|
-| GET | `/api/projects/{projectId}/tickets` | `TicketsController.GetRecentTickets` | List project tickets. | Implemented | TauriShell, Product CLI, Legacy WPF | Product CLI uses direct HTTP, not `IronDev.Client`. |
+| GET | `/api/projects/{projectId}/tickets` | `TicketsController.GetRecentTickets` | List project tickets. | Implemented | TauriShell, Product CLI, Legacy WPF | Product CLI uses `IIronDevApiClient`. |
 | GET | `/api/tickets/{ticketId}` | `TicketsController.GetTicketById` | Load ticket by id. | Implemented | Legacy WPF | Absolute ticket lookup. |
-| GET | `/api/projects/{projectId}/tickets/{ticketId}` | `TicketsController.GetTicketById` | Load ticket scoped to project route. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI uses direct HTTP. |
-| POST | `/api/projects/{projectId}/tickets` | `TicketsController.CreateTicket` | Create product ticket. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI reads local JSON file then posts directly. |
+| GET | `/api/projects/{projectId}/tickets/{ticketId}` | `TicketsController.GetTicketById` | Load ticket scoped to project route. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI uses `IIronDevApiClient`. |
+| POST | `/api/projects/{projectId}/tickets` | `TicketsController.CreateTicket` | Create product ticket. | Implemented | Product CLI, TauriShell, Legacy WPF | Product CLI reads local JSON file then calls `IIronDevApiClient`. |
 | POST | `/api/projects/{projectId}/tickets/legacy` | `TicketsController.SaveLegacyTicket` | Save legacy ticket model. | Implemented | Legacy WPF | Product clients should prefer create/update product DTOs. |
-| POST | `/api/projects/{projectId}/tickets/import-external` | `TicketsController.ImportExternalTicket` | Import external issue as IronDev ticket. | Implemented | Product CLI, Legacy WPF | Product CLI reads local JSON file then posts directly. |
+| POST | `/api/projects/{projectId}/tickets/import-external` | `TicketsController.ImportExternalTicket` | Import external issue as IronDev ticket. | Implemented | Product CLI, Legacy WPF | Product CLI reads local JSON file then calls `IIronDevApiClient`. |
 | POST | `/api/projects/{projectId}/tickets/generate-from-discussion` | `TicketsController.GenerateFromDiscussion` | Generate ticket from discussion. | Implemented | Legacy WPF, TauriShell | Missing product CLI command. |
 | DELETE | `/api/tickets/{ticketId}` | `TicketsController.ArchiveTicket` | Archive ticket. | Implemented | Legacy WPF, TauriShell | Missing product CLI command. |
 | POST | `/api/projects/{projectId}/tickets/draft` | `TicketsController.GenerateDraft` | Generate draft ticket. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
@@ -85,7 +85,7 @@ Intended consumers:
 | POST | `/api/projects/{projectId}/proposal/apply` | `TicketsController.ApplyProposal` | Apply proposal. | Implemented | Legacy WPF, TauriShell | Needs run identity if promoted to long-running workflow. |
 | POST | `/api/tickets/{ticketId}/apply-and-build` | `TicketsController.ApplyAndBuild` | Apply approved ticket build. | Implemented | Legacy WPF, TauriShell | Returns immediate build result, not `/api/runs/{runId}`. |
 | POST | `/api/projects/{projectId}/proposal/validate-architecture` | `TicketsController.ValidateProposalArchitecture` | Validate proposal architecture. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
-| POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | Planned | Start durable ticket build run. | Planned | Product CLI, TauriShell | Required before CLI can return a run id for build. |
+| POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `TicketsController.StartBuildRun` | Start ticket build workflow run. | Implemented | Product CLI, TauriShell | Returns workflow run id/status from existing workflow orchestrator; run events are persisted through `SqlRunEventStore`; resumable workflow state is still planned. |
 | POST | `/api/projects/{projectId}/documents/{documentVersionId}/tickets` | Planned | Generate tickets from a document version. | Planned | Product CLI, TauriShell | Document-to-ticket smoke exists internally, product route does not. |
 
 ## Documents
@@ -168,9 +168,9 @@ Intended consumers:
 | GET | `/api/run-reports/{runId}` | `RunReportsController.GetRun` | Read one run report. | Implemented | Legacy WPF, Dogfood Runner | Route is report-shaped, not `/api/runs/{runId}`. |
 | GET | `/api/run-reports/{runId}/evidence` | `RunReportsController.GetEvidence` | List report evidence. | Implemented | Legacy WPF, Dogfood Runner | File-backed storage hidden behind API for WPF. |
 | GET | `/api/run-reports/{runId}/evidence/text` | `RunReportsController.ReadEvidenceText` | Read evidence text by path query. | Implemented | Legacy WPF, Dogfood Runner | Query still exposes evidence path concept. |
-| GET | `/api/runs/{runId}` | Planned | Durable run status. | Planned | Product CLI, TauriShell | Required for product run UX. |
-| GET | `/api/runs/{runId}/report` | Planned | Final run report by run id. | Planned | Product CLI, TauriShell | Required to hide report file details from clients. |
-| GET | `/api/runs/{runId}/events` | Planned | SSE run event stream. | Planned | Product CLI, TauriShell | Do not mark implemented; no SSE endpoint exists today. |
+| GET | `/api/runs/{runId}` | `RunsController.GetRun` | Product-shaped run status over SQL-backed event history. | Implemented | Product CLI, TauriShell | Does not infer status from file-backed reports; full workflow state/resume is still planned. |
+| GET | `/api/runs/{runId}/report` | `RunsController.GetRunReport` | Final run report by run id. | Implemented | Product CLI, TauriShell | Hides `/api/run-reports/*` from product CLI. |
+| GET | `/api/runs/{runId}/events` | `RunsController.GetRunEvents` | SSE run event stream. | Implemented | Product CLI, TauriShell | Streams live events backed by SQL event history. Does not synthesize events from file-backed reports. |
 
 ## Agents/Build Workflows
 
