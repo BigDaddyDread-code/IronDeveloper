@@ -13,6 +13,7 @@ using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Services;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -39,6 +40,16 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
+
+var environmentInfo = CreateEnvironmentInfo(builder);
+ValidateEnvironmentSafety(environmentInfo);
+Log.Information(
+    "IronDev.Api starting in {Environment} against database {Database}. WorkspaceRoot={WorkspaceRoot}; LogsRoot={LogsRoot}; DangerRealRepoWritesEnabled={DangerRealRepoWritesEnabled}",
+    environmentInfo.Environment,
+    environmentInfo.Database,
+    environmentInfo.WorkspaceRoot,
+    environmentInfo.LogsRoot,
+    environmentInfo.DangerRealRepoWritesEnabled);
 
 // ── Services ─────────────────────────────────────────────────────────────────
 
@@ -157,6 +168,10 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
    .WithName("Health")
    .AllowAnonymous();
 
+app.MapGet("/api/environment", () => Results.Ok(environmentInfo))
+   .WithName("Environment")
+   .AllowAnonymous();
+
 app.MapControllers();
 
 try
@@ -166,6 +181,69 @@ try
 finally
 {
     Log.CloseAndFlush();
+}
+
+static EnvironmentInfoDto CreateEnvironmentInfo(WebApplicationBuilder builder)
+{
+    var environmentName = builder.Environment.EnvironmentName;
+    var connectionString = builder.Configuration.GetConnectionString("IronDeveloperDb") ?? string.Empty;
+    var database = ResolveDatabaseName(connectionString);
+    var localTest = builder.Configuration.GetSection("LocalTest");
+
+    return new EnvironmentInfoDto
+    {
+        Environment = environmentName,
+        Database = database,
+        WeaviatePrefix = localTest["WeaviatePrefix"] ?? string.Empty,
+        IsTestEnvironment =
+            builder.Environment.IsEnvironment("LocalTest") ||
+            builder.Environment.IsEnvironment("Test"),
+        WorkspaceRoot = localTest["WorkspaceRoot"] ?? string.Empty,
+        LogsRoot = localTest["LogsRoot"] ?? string.Empty,
+        DangerRealRepoWritesEnabled = bool.TryParse(localTest["DangerRealRepoWritesEnabled"], out var enabled) && enabled
+    };
+}
+
+static string ResolveDatabaseName(string connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+        return string.Empty;
+
+    try
+    {
+        return new SqlConnectionStringBuilder(connectionString).InitialCatalog;
+    }
+    catch
+    {
+        return string.Empty;
+    }
+}
+
+static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
+{
+    if (!string.Equals(environmentInfo.Environment, "LocalTest", StringComparison.OrdinalIgnoreCase))
+        return;
+
+    if (string.IsNullOrWhiteSpace(environmentInfo.Database) ||
+        !environmentInfo.Database.Contains("Test", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("LocalTest must use an isolated test database whose name contains 'Test'.");
+    }
+
+    if (string.IsNullOrWhiteSpace(environmentInfo.WorkspaceRoot) ||
+        !environmentInfo.WorkspaceRoot.Contains("Test", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("LocalTest must use an isolated workspace root whose path contains 'Test'.");
+    }
+
+    if (string.IsNullOrWhiteSpace(environmentInfo.LogsRoot) ||
+        !environmentInfo.LogsRoot.Contains("Test", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("LocalTest must use an isolated logs root whose path contains 'Test'.");
+    }
+
+    if (environmentInfo.DangerRealRepoWritesEnabled)
+        throw new InvalidOperationException("LocalTest cannot enable dangerous real repo writes.");
 }
 
 // Expose Program for WebApplicationFactory in integration tests.

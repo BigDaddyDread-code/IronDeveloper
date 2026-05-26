@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
+using IronDev.Core.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -26,6 +27,19 @@ public class ApiHarnessTests : ApiTestBase
         var response = await Client.GetAsync("/api/auth/me");
 
         Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task EnvironmentEndpoint_ShouldReportIsolatedTestDatabase()
+    {
+        var response = await Client.GetAsync("/api/environment");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<EnvironmentInfoDto>();
+        Assert.IsNotNull(body);
+        Assert.AreEqual("Test", body!.Environment);
+        Assert.AreEqual("IronDeveloper_Test", body.Database);
+        Assert.IsTrue(body.IsTestEnvironment);
     }
 
     [TestMethod]

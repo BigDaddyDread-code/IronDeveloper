@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { IronDevApiError, createIronDevApiClient, getIronDevApiConfig, type IronDevApiConfig } from '../api/ironDevApi';
-import type { ApiConnectionStatus, ApiStatus, LoginRequest } from '../api/types';
+import type { ApiConnectionStatus, ApiStatus, EnvironmentInfo, LoginRequest } from '../api/types';
 
 interface SessionContextState {
   config: IronDevApiConfig;
@@ -11,6 +11,7 @@ interface SessionContextState {
   isConnectionReady: boolean;
   isTokenEditorOpen: boolean;
   apiStatus: ApiStatus;
+  environmentInfo: EnvironmentInfo | null;
   tokenDraft: string;
   email: string;
   password: string;
@@ -42,6 +43,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const config = useMemo(() => getIronDevApiConfig(), [configVersion]);
   const client = useMemo(() => createIronDevApiClient(config), [config]);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(() => createInitialStatus(config));
+  const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo | null>(null);
   const [isConnectionBusy, setIsConnectionBusy] = useState(false);
   const [isAuthBusy, setIsAuthBusy] = useState(false);
   const [isTokenEditorOpen, setTokenEditorOpen] = useState(false);
@@ -52,6 +54,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setApiStatus(createInitialStatus(config));
+    setEnvironmentInfo(null);
   }, [config.apiBaseUrl, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, config.token]);
 
   const refreshConfig = useCallback(() => {
@@ -79,6 +82,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const status = await client.checkHealth();
       setApiStatus(status);
+      if (status.status === 'connected') {
+        try {
+          setEnvironmentInfo(await client.getEnvironment());
+        } catch {
+          setEnvironmentInfo(null);
+        }
+      } else {
+        setEnvironmentInfo(null);
+      }
 
       return status;
     } finally {
@@ -122,6 +134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isConnectionReady: !isConnectionBusy && !isAuthBusy && apiStatus.status === 'connected',
       isTokenEditorOpen,
       apiStatus,
+      environmentInfo,
       tokenDraft,
       email,
       password,
@@ -143,6 +156,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       client,
       config,
       email,
+      environmentInfo,
       errorMessage,
       isAuthBusy,
       isConnectionBusy,

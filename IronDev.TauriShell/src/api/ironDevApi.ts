@@ -6,8 +6,11 @@ import type {
   RunEvidenceItem,
   RunReportDetail,
   RunReportSummary,
+  EnvironmentInfo,
   LoginRequest,
   LoginResponse,
+  ProjectDocument,
+  ProjectDocumentVersion,
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
@@ -131,6 +134,14 @@ class IronDevApiClient {
     }
   }
 
+  async getEnvironment(signal?: AbortSignal): Promise<EnvironmentInfo> {
+    return this.request<EnvironmentInfo>('/api/environment', {
+      method: 'GET',
+      signal,
+      skipAuth: true
+    });
+  }
+
   async login(request: LoginRequest, signal?: AbortSignal): Promise<LoginResponse> {
     return this.request<LoginResponse>('/api/auth/login', {
       method: 'POST',
@@ -158,6 +169,10 @@ class IronDevApiClient {
 
   async getProjects(signal?: AbortSignal): Promise<ProjectSummary[]> {
     return this.request<ProjectSummary[]>('/api/projects', { method: 'GET', signal });
+  }
+
+  async getProject(projectId: number, signal?: AbortSignal): Promise<ProjectSummary> {
+    return this.request<ProjectSummary>(`/api/projects/${projectId}`, { method: 'GET', signal });
   }
 
   async selectProject(projectId: number, signal?: AbortSignal): Promise<{ projectId: number }> {
@@ -223,6 +238,21 @@ class IronDevApiClient {
 
   async getProjectTicket(projectId: number, ticketId: number, signal?: AbortSignal): Promise<ProjectTicket> {
     return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/${ticketId}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectDocuments(projectId: number, signal?: AbortSignal): Promise<ProjectDocument[]> {
+    return this.request<ProjectDocument[]>(`/api/projects/${projectId}/documents`, { method: 'GET', signal });
+  }
+
+  async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {
+    return this.request<ProjectDocument | null>(`/api/documents/${documentId}`, { method: 'GET', signal });
+  }
+
+  async getDocumentCurrentVersion(documentId: number, signal?: AbortSignal): Promise<ProjectDocumentVersion | null> {
+    return this.request<ProjectDocumentVersion | null>(`/api/documents/${documentId}/versions/current`, {
       method: 'GET',
       signal
     });

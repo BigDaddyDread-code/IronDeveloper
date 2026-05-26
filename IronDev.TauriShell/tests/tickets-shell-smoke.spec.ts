@@ -13,6 +13,21 @@ async function mockHealthyApi(page: import('@playwright/test').Page) {
       body: JSON.stringify({ status: 'healthy' })
     });
   });
+  await page.route('**/irondev-api/api/environment', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        environment: 'LocalTest',
+        database: 'IronDeveloper_Test',
+        weaviatePrefix: 'irondev_test',
+        isTestEnvironment: true,
+        workspaceRoot: 'C:\\IronDevTestWorkspaces\\',
+        logsRoot: 'C:\\IronDevTestLogs\\',
+        dangerRealRepoWritesEnabled: false
+      })
+    });
+  });
 }
 
 async function seedToken(page: import('@playwright/test').Page) {
@@ -47,6 +62,7 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('ticket.inspector')).toBeVisible();
   await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeVisible();
   await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeVisible();
+  await expect(page.getByTestId('environment.badge')).toContainText('LocalTest');
   await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeDisabled();
   await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
   await expect(page.getByTestId('ticket.command.create')).toBeVisible();

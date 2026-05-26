@@ -249,6 +249,11 @@ p {
   text-transform: none;
 }
 
+.metadata-chip--test {
+  border-color: color-mix(in srgb, var(--color-status-info) 48%, var(--color-border-subtle));
+  color: var(--color-status-info);
+}
+
 .status-badge--connected,
 .status-badge--ready {
   border-color: color-mix(in srgb, var(--color-status-ready) 48%, var(--color-border-subtle));

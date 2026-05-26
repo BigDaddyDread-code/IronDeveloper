@@ -42,7 +42,8 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/run-reports",
             "/api/runs/{runId}",
             "/api/runs/{runId}/report",
-            "/api/runs/{runId}/events"
+            "/api/runs/{runId}/events",
+            "/api/environment"
         })
         {
             Assert.IsTrue(paths.TryGetProperty(path, out _), $"Swagger is missing {path}.");

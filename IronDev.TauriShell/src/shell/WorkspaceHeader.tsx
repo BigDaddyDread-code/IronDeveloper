@@ -1,7 +1,7 @@
 import { CommandBar } from '../design-system/CommandBar';
 import type { WorkspaceCommand } from '../app/routes';
 import { ApiStatusBadge } from '../components/ApiStatusBadge';
-import type { ApiStatus } from '../api/types';
+import type { ApiStatus, EnvironmentInfo } from '../api/types';
 
 interface HeaderSummaryChip {
   label: string;
@@ -10,6 +10,7 @@ interface HeaderSummaryChip {
 
 interface WorkspaceHeaderProps {
   apiStatus: ApiStatus;
+  environmentInfo: EnvironmentInfo | null;
   projectId: number | null;
   projectName: string | null;
   projectStatus: 'selected' | 'missing' | 'fallback';
@@ -28,6 +29,7 @@ interface WorkspaceHeaderProps {
 
 export function WorkspaceHeader({
   apiStatus,
+  environmentInfo,
   projectId,
   projectName,
   projectStatus,
@@ -68,6 +70,15 @@ export function WorkspaceHeader({
           {title ? ` · ${title}` : ''}
         </p>
         <div className="workspace-header__summary">
+          {environmentInfo ? (
+            <span
+              className={`metadata-chip ${environmentInfo.isTestEnvironment ? 'metadata-chip--test' : ''}`.trim()}
+              data-testid="environment.badge"
+              title={`Database: ${environmentInfo.database || 'unknown'}`}
+            >
+              {environmentInfo.environment}
+            </span>
+          ) : null}
           {summaryChips.map((chip, index) => (
             <span key={`${chip.label}-${index}`} className="metadata-chip" data-testid={chip.testId}>
               {chip.label}

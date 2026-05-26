@@ -21,8 +21,20 @@ export interface ApiStatus {
   message: string;
 }
 
+export interface EnvironmentInfo {
+  environment: string;
+  database: string;
+  weaviatePrefix: string;
+  isTestEnvironment: boolean;
+  workspaceRoot: string;
+  logsRoot: string;
+  dangerRealRepoWritesEnabled: boolean;
+}
+
 export type ProjectTicket = components['schemas']['ProjectTicket'];
 export type ProjectSummary = components['schemas']['Project'];
+export type ProjectDocument = components['schemas']['ProjectDocument'];
+export type ProjectDocumentVersion = components['schemas']['ProjectDocumentVersion'];
 export type BuildReadinessResult = components['schemas']['BuildReadinessResult'];
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];

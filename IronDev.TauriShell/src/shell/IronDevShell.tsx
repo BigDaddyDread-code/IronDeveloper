@@ -73,6 +73,7 @@ export function IronDevShell() {
       header={
         <WorkspaceHeader
           apiStatus={session.apiStatus}
+          environmentInfo={session.environmentInfo}
           projectId={project.selectedProjectId}
           projectName={project.selectedProjectName}
           projectStatus={projectStatus}
