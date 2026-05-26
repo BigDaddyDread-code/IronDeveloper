@@ -4,6 +4,7 @@ using System.Text.Json;
 using IronDev.Core.Auth;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 
 namespace IronDev.Client;
@@ -62,6 +63,13 @@ public sealed class IronDevApiClient : IIronDevApiClient
         ImportExternalTicketRequest request,
         CancellationToken cancellationToken = default)
         => PostAsync<ImportExternalTicketRequest, ProjectTicket>($"api/projects/{projectId}/tickets/import-external", request, cancellationToken);
+
+    public Task<TicketBuildRunDto> StartTicketBuildRunAsync(
+        int projectId,
+        long ticketId,
+        StartTicketBuildRunRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<StartTicketBuildRunRequest, TicketBuildRunDto>($"api/projects/{projectId}/tickets/{ticketId}/build-runs", request, cancellationToken);
 
     public Task<RunStatusDto> GetRunAsync(
         string runId,

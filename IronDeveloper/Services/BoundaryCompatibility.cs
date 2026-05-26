@@ -16,6 +16,7 @@ using IronDev.Core.Auth;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 
 namespace IronDev.Agent.Services;
@@ -264,6 +265,21 @@ internal static class BoundaryCompatibility
         public async Task<TicketBuildPreview> CreateBuildPreviewAsync(int projectId, long ticketId, CancellationToken cancellationToken = default) =>
             await InvokeAsync<TicketBuildPreview>(build, nameof(CreateBuildPreviewAsync), projectId, ticketId, cancellationToken).ConfigureAwait(false)
             ?? new TicketBuildPreview { TicketId = ticketId };
+
+        public async Task<TicketBuildRunDto> StartTicketBuildRunAsync(
+            int projectId,
+            long ticketId,
+            StartTicketBuildRunRequest request,
+            CancellationToken cancellationToken = default) =>
+            await InvokeAsync<TicketBuildRunDto>(build ?? ticket, nameof(StartTicketBuildRunAsync), projectId, ticketId, request, cancellationToken).ConfigureAwait(false)
+            ?? new TicketBuildRunDto
+            {
+                RunId = Guid.NewGuid().ToString("D"),
+                ProjectId = projectId,
+                TicketId = ticketId,
+                Status = "Pending",
+                CurrentNode = "BoundaryCompatibility"
+            };
 
         public async Task<TicketBuildResult> ApplyAndBuildAsync(TicketBuildApproval approval, CancellationToken cancellationToken = default) =>
             await InvokeAsync<TicketBuildResult>(build, nameof(ApplyAndBuildAsync), approval, cancellationToken).ConfigureAwait(false)

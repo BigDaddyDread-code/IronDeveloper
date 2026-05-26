@@ -219,6 +219,31 @@ public sealed class IronDevCliTests
         StringAssert.Contains(output.ToString(), "RunCompleted run-123");
     }
 
+    [TestMethod]
+    public async Task TicketBuild_UsesProductBuildRunEndpoint()
+    {
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["tickets", "build", "--project-id", "42", "--ticket-id", "123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+
+        Assert.AreEqual(0, result, error.ToString());
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/projects/42/tickets/123/build-runs"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+        StringAssert.Contains(output.ToString(), "\"runId\": \"11111111-1111-1111-1111-111111111111\"");
+    }
+
 
     [TestMethod]
     public async Task TicketsApiClient_CallsStructuredTicketEndpoints()
@@ -407,6 +432,25 @@ public sealed class IronDevCliTests
                         """,
                         Encoding.UTF8,
                         "text/event-stream")
+                };
+
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/projects/42/tickets/123/build-runs")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "runId": "11111111-1111-1111-1111-111111111111",
+                          "projectId": 42,
+                          "ticketId": 123,
+                          "status": "AwaitingCodeApproval",
+                          "currentNode": "RequestCodeApproval",
+                          "requiresHumanApproval": true,
+                          "message": "Review generated code proposal."
+                        }
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
                 };
 
             return new HttpResponseMessage(HttpStatusCode.OK)

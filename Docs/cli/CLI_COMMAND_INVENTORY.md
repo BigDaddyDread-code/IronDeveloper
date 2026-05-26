@@ -8,13 +8,13 @@ This inventory classifies the current public CLI and ReplayRunner/dogfood comman
 
 | Classification | Count | Notes |
 |---|---:|---|
-| Product | 7 | All are in `tools/IronDev.Cli`; all call API routes through `IIronDevApiClient`. |
+| Product | 8 | All are in `tools/IronDev.Cli`; all call API routes through `IIronDevApiClient`. |
 | Internal Dogfood | 50 | ReplayRunner commands for governed agents, campaigns, docs, memory diagnostics, promotion, and internal review. |
 | Smoke Test | 22 | ReplayRunner smoke commands. |
 | Replay/Test Harness | 4 | Replay plan and test plan execution commands. |
 | Deprecated | 0 | No command is explicitly deprecated in the current inventory. |
 | To Be Moved | 0 | Several commands are product-shaped but remain classified internal until a split/refactor ticket moves them. |
-| **Total** | **83** | 7 product CLI commands + 76 ReplayRunner/dogfood commands. |
+| **Total** | **84** | 8 product CLI commands + 76 ReplayRunner/dogfood commands. |
 
 ## Product CLI: `tools/IronDev.Cli`
 
@@ -26,6 +26,7 @@ These commands are product-intended and now route through `IronDev.Client` via `
 | `irondev ticket list --project-id <id>` | List project tickets. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev ticket show --project-id <id> --ticket-id <id>` | Show one ticket. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev ticket import-github-issue --project-id <id> --file <github-issue.json>` | Import external issue JSON as an IronDev ticket. | Yes | No | Reads JSON input file | No | Product | `IronDev.Cli` |
+| `irondev tickets build --project-id <id> --ticket-id <id>` | Start a product ticket build workflow run. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev runs status --run-id <id>` | Show product-shaped run status. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev runs report --run-id <id>` | Show product-shaped final run report. | Yes | No | No | No | Product | `IronDev.Cli` |
 | `irondev runs stream --run-id <id>` | Stream product-shaped run events. | Yes | No | No | No | Product | `IronDev.Cli` |
@@ -37,7 +38,7 @@ Missing product CLI commands from the intended surface:
 | `irondev projects list` | Missing | `IronDev.Cli` via `IronDev.Client` |
 | `irondev projects create` | Missing | `IronDev.Cli` via `IronDev.Client` |
 | `irondev tickets generate` | Missing | `IronDev.Cli` via `IronDev.Client` |
-| `irondev tickets build` | Missing durable run-backed endpoint/client method | `IronDev.Cli` after `/api/runs` and build-run endpoint exist |
+| `irondev tickets build` | Implemented over `/api/projects/{projectId}/tickets/{ticketId}/build-runs`; workflow persistence is still planned | `IronDev.Cli` |
 | `irondev documents list` | Missing | `IronDev.Cli` via `IronDev.Client` |
 | `irondev documents create` | Missing | `IronDev.Cli` via `IronDev.Client` |
 | `irondev documents version` | Missing | `IronDev.Cli` via `IronDev.Client` |

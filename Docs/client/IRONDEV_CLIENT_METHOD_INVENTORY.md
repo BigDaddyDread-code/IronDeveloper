@@ -10,16 +10,16 @@ TauriShell / Product CLI / Future Clients
     -> IronDev.Api
 ```
 
-Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and no `IronDev.Infrastructure` project reference, and `tools/IronDev.Cli` now routes its current product ticket and run commands through `IIronDevApiClient`. Durable run creation, document-to-ticket generation, and several product CLI commands remain missing.
+Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and no `IronDev.Infrastructure` project reference, and `tools/IronDev.Cli` now routes its current product ticket and run commands through `IIronDevApiClient`. Ticket build run starting exists through the API/client boundary, but durable run persistence, document-to-ticket generation, and several product CLI commands remain missing.
 
 ## Summary
 
 | Client area | HTTP-backed methods | Status |
 |---|---:|---|
-| Product facade `IIronDevApiClient` | 13 | Implemented for health/auth/current Product CLI ticket and run status/report/event operations; overlaps with narrower typed clients |
+| Product facade `IIronDevApiClient` | 14 | Implemented for health/auth/current Product CLI ticket/build and run status/report/event operations; overlaps with narrower typed clients |
 | Auth `IAuthApiClient` | 5 | Implemented |
 | Projects | 7 | Implemented |
-| Tickets/build/proposals | 20 | Implemented |
+| Tickets/build/proposals | 21 | Implemented |
 | Documents | 10 | Implemented, missing update/resolve wrappers |
 | Memory | 15 | Implemented |
 | Code index | 5 | Implemented |
@@ -30,7 +30,7 @@ Current evidence is mixed: `IronDev.Client` has a broad typed HTTP surface and n
 | Traces | 0 | In-memory local client, not HTTP |
 | Prompting | 3 | Client boundary adapter over chat/prompt services, not direct REST methods |
 
-HTTP-backed typed operation count, excluding the overlapping product facade: **84**.
+HTTP-backed typed operation count, excluding the overlapping product facade: **85**.
 
 ## Consumer Evidence
 
@@ -57,6 +57,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `GetTicketsAsync` | GET | `/api/projects/{projectId}/tickets?take={take}` | None | `IReadOnlyList<ProjectTicket>` | Product CLI | Implemented |
 | `GetProjectTicketAsync` | GET | `/api/projects/{projectId}/tickets/{ticketId}` | None | `ProjectTicket?` | Product CLI | Implemented |
 | `ImportExternalTicketAsync` | POST | `/api/projects/{projectId}/tickets/import-external` | `ImportExternalTicketRequest` | `ProjectTicket` | Product CLI | Implemented |
+| `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `StartTicketBuildRunRequest` | `TicketBuildRunDto` | Product CLI | Implemented |
 | `GetRunAsync` | GET | `/api/runs/{runId}` | None | `RunStatusDto` | Product CLI | Implemented |
 | `GetRunReportAsync` | GET | `/api/runs/{runId}/report` | None | `RunReportDto` | Product CLI | Implemented |
 | `StreamRunEventsAsync` | GET | `/api/runs/{runId}/events` | None | `IAsyncEnumerable<RunEventDto>` | Product CLI | Implemented; report-backed snapshot stream, not live durable event store |
@@ -107,7 +108,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `ApplyProposalAsync` | POST | `/api/projects/{projectId}/proposal/apply` | `BuilderProposal` | None | Legacy WPF | Implemented |
 | `ApplyAndBuildAsync` | POST | `/api/tickets/{ticketId}/apply-and-build` | `TicketBuildApproval` | `TicketBuildResult` | Legacy WPF | Implemented |
 | `ValidateProposalArchitectureAsync` | POST | `/api/projects/{projectId}/proposal/validate-architecture` | `BuilderProposal` | `BuildReadinessResult` | Legacy WPF | Implemented |
-| `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | Planned | Planned run DTO | Product CLI/TauriShell | Missing |
+| `StartTicketBuildRunAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `StartTicketBuildRunRequest` | `TicketBuildRunDto` | Product CLI/TauriShell | Implemented; workflow state persistence still planned |
 | `GenerateTicketsFromDocumentVersionAsync` | POST | `/api/document-versions/{versionId}/generate-tickets` | Planned | Planned ticket result DTO | Product CLI/TauriShell | Missing |
 
 ## Documents

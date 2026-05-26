@@ -29,6 +29,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/tickets/{ticketId}",
             "/api/projects/{projectId}/tickets/import-external",
             "/api/projects/{projectId}/tickets/generate-from-discussion",
+            "/api/projects/{projectId}/tickets/{ticketId}/build-runs",
             "/api/projects/{projectId}/documents",
             "/api/projects/{projectId}/documents/{documentId}",
             "/api/projects/{projectId}/documents/{documentId}/resolve",

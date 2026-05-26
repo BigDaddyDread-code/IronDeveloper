@@ -11,14 +11,14 @@ This inventory lists the REST surface currently exposed by `IronDev.Api`. It sep
 | Health/diagnostics | 1 | 0 |
 | Auth/tenants | 5 | 0 |
 | Projects | 7 | 1 |
-| Tickets | 19 | 2 |
+| Tickets | 20 | 1 |
 | Documents | 13 | 2 |
 | Memory | 20 | 2 |
 | Chat | 8 | 0 |
 | Profiles | 7 | 0 |
 | Runs/reports | 7 | 0 |
 | Agents/build workflows | 0 | 4 |
-| **Total actual routes** | **87** | **11** |
+| **Total actual routes** | **88** | **10** |
 
 Status meanings:
 
@@ -85,7 +85,7 @@ Intended consumers:
 | POST | `/api/projects/{projectId}/proposal/apply` | `TicketsController.ApplyProposal` | Apply proposal. | Implemented | Legacy WPF, TauriShell | Needs run identity if promoted to long-running workflow. |
 | POST | `/api/tickets/{ticketId}/apply-and-build` | `TicketsController.ApplyAndBuild` | Apply approved ticket build. | Implemented | Legacy WPF, TauriShell | Returns immediate build result, not `/api/runs/{runId}`. |
 | POST | `/api/projects/{projectId}/proposal/validate-architecture` | `TicketsController.ValidateProposalArchitecture` | Validate proposal architecture. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
-| POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | Planned | Start durable ticket build run. | Planned | Product CLI, TauriShell | Required before CLI can return a run id for build. |
+| POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `TicketsController.StartBuildRun` | Start ticket build workflow run. | Implemented | Product CLI, TauriShell | Returns workflow run id/status from existing workflow orchestrator; persistence/live run store is still planned. |
 | POST | `/api/projects/{projectId}/documents/{documentVersionId}/tickets` | Planned | Generate tickets from a document version. | Planned | Product CLI, TauriShell | Document-to-ticket smoke exists internally, product route does not. |
 
 ## Documents

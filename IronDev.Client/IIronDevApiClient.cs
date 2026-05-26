@@ -1,6 +1,7 @@
 using IronDev.Core.Auth;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 
 namespace IronDev.Client;
@@ -26,6 +27,8 @@ public interface IIronDevApiClient
     Task<ProjectTicket?> GetProjectTicketAsync(int projectId, long ticketId, CancellationToken cancellationToken = default);
 
     Task<ProjectTicket> ImportExternalTicketAsync(int projectId, ImportExternalTicketRequest request, CancellationToken cancellationToken = default);
+
+    Task<TicketBuildRunDto> StartTicketBuildRunAsync(int projectId, long ticketId, StartTicketBuildRunRequest request, CancellationToken cancellationToken = default);
 
     Task<RunStatusDto> GetRunAsync(string runId, CancellationToken cancellationToken = default);
 

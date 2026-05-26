@@ -2,6 +2,7 @@ using System.Text.Json;
 using IronDev.Client;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 
 namespace IronDev.Cli;
@@ -42,6 +43,8 @@ public static class IronDevCli
             return await HandleTicketShowAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "ticket", "import-github-issue"))
             return await HandleTicketImportGithubIssueAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "ticket", "build") || IsCommand(args, "tickets", "build"))
+            return await HandleTicketBuildAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "runs", "status"))
             return await HandleRunStatusAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "runs", "report"))
@@ -274,6 +277,48 @@ public static class IronDevCli
         }
     }
 
+    private static async Task<int> HandleTicketBuildAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        if (!TryGetIntOption(args, "--project-id", out var projectId))
+        {
+            error.WriteLine("Missing or invalid required option: --project-id <id>");
+            return 2;
+        }
+
+        if (!TryGetLongOption(args, "--ticket-id", out var ticketId))
+        {
+            error.WriteLine("Missing or invalid required option: --ticket-id <id>");
+            return 2;
+        }
+
+        var maxRetries = TryGetIntOption(args, "--max-retries", out var parsedMaxRetries) ? parsedMaxRetries : 3;
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        try
+        {
+            var run = await client.StartTicketBuildRunAsync(
+                projectId,
+                ticketId,
+                new StartTicketBuildRunRequest { MaxRetries = maxRetries },
+                cancellationToken);
+            await WriteJsonOrTextAsync(output, run, HasFlag(args, "--json"), FormatTicketBuildRun(run));
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("ticket build", ex, error);
+            return 1;
+        }
+    }
+
     private static async Task<int> HandleRunStatusAsync(
         string[] args,
         TextWriter output,
@@ -446,6 +491,9 @@ public static class IronDevCli
     private static string FormatRunEvent(RunEventDto runEvent) =>
         $"{runEvent.TimestampUtc:O} {runEvent.EventType} {runEvent.RunId}: {runEvent.Message}";
 
+    private static string FormatTicketBuildRun(TicketBuildRunDto run) =>
+        $"{run.RunId}: {run.Status} at {run.CurrentNode} for ticket {run.TicketId}";
+
     private static string? ResolveToken(
         string? argumentValue,
         IReadOnlyDictionary<string, string?> environment,
@@ -528,6 +576,7 @@ public static class IronDevCli
         error.WriteLine("  irondev ticket list --project-id <id> [--take 50] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket show --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket import-github-issue --project-id <id> --file <github-issue.json> [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev tickets build --project-id <id> --ticket-id <id> [--max-retries 3] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs status --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs report --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs stream --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");

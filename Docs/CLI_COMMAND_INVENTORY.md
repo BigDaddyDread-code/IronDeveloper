@@ -30,7 +30,7 @@ The machine-readable inventory is stored at:
 - Test commands: 1
 - Trace commands: 1
 - Replay scenario entrypoint: 1
-- Product CLI commands: 7
+- Product CLI commands: 8
 
 ## Product-Ish Commands
 
@@ -38,6 +38,7 @@ The machine-readable inventory is stored at:
 - `ticket list`
 - `ticket show`
 - `ticket import-github-issue`
+- `tickets build`
 - `runs status`
 - `runs report`
 - `runs stream`

@@ -1,6 +1,7 @@
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -16,6 +17,7 @@ public sealed class TicketsController : ControllerBase
     private readonly IDraftTicketService _drafts;
     private readonly ICodebaseTicketGeneratorService _generator;
     private readonly ITicketBuildOrchestrator _orchestrator;
+    private readonly ITicketBuildWorkflowOrchestrator _buildRuns;
     private readonly IBuilderReadinessService _readiness;
     private readonly IBuilderProposalService _proposals;
 
@@ -24,6 +26,7 @@ public sealed class TicketsController : ControllerBase
         IDraftTicketService drafts,
         ICodebaseTicketGeneratorService generator,
         ITicketBuildOrchestrator orchestrator,
+        ITicketBuildWorkflowOrchestrator buildRuns,
         IBuilderReadinessService readiness,
         IBuilderProposalService proposals)
     {
@@ -31,6 +34,7 @@ public sealed class TicketsController : ControllerBase
         _drafts = drafts;
         _generator = generator;
         _orchestrator = orchestrator;
+        _buildRuns = buildRuns;
         _readiness = readiness;
         _proposals = proposals;
     }
@@ -152,6 +156,24 @@ public sealed class TicketsController : ControllerBase
     public Task<TicketBuildPreview> CreateBuildPreview(int projectId, long ticketId, CancellationToken ct) =>
         _orchestrator.CreateBuildPreviewAsync(projectId, ticketId, ct);
 
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs")]
+    public async Task<ActionResult<TicketBuildRunDto>> StartBuildRun(
+        int projectId,
+        long ticketId,
+        StartTicketBuildRunRequest? request,
+        CancellationToken ct)
+    {
+        var result = await _buildRuns.StartAsync(new TicketBuildWorkflowRequest
+        {
+            WorkflowRunId = request?.WorkflowRunId,
+            ProjectId = projectId,
+            TicketId = ticketId,
+            MaxRetries = request?.MaxRetries ?? 3
+        }, ct);
+
+        return Ok(ToBuildRunDto(projectId, ticketId, result));
+    }
+
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-readiness")]
     public Task<BuildReadinessResult> EvaluateReadiness(int projectId, long ticketId, CancellationToken ct) =>
         _readiness.EvaluateReadinessAsync(projectId, ticketId, ct);
@@ -181,6 +203,20 @@ public sealed class TicketsController : ControllerBase
 
     public sealed record DraftTicketRequest(string ProjectName, string ProposedTitle, string MessageText, string? LinkedFilePaths, string? LinkedSymbols, long? SessionId);
     public sealed record ProposalRequest(string Request);
+
+    private static TicketBuildRunDto ToBuildRunDto(
+        int projectId,
+        long ticketId,
+        TicketBuildWorkflowResult result) => new()
+        {
+            RunId = result.WorkflowRunId.ToString("D"),
+            ProjectId = projectId,
+            TicketId = ticketId,
+            Status = result.Status.ToString(),
+            CurrentNode = result.CurrentNode,
+            RequiresHumanApproval = result.RequiresHumanApproval,
+            Message = result.Message
+        };
 
     private static ProjectTicket MapCreateRequest(int projectId, CreateProjectTicketRequest request)
     {
