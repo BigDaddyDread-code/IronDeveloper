@@ -4,19 +4,19 @@ Status: historical WPF note. The `IronDeveloper` WPF project has been retired; p
 
 ## Purpose
 
-This slice adds the first durable Run Reports surface over shared C# services.
+This historical slice added the first Run Reports surface over shared C# services.
 
-The WPF app reads run report files through application services. It does not shell out to `IronDev.ReplayRunner`, parse stdout, or couple the UI to CLI command names.
+The retired WPF app read run report files through application services. Current product clients should use the run APIs through `IronDev.Client` or generated OpenAPI helpers.
 
 ## Architecture
 
 Correct shape:
 
 ```text
-WPF UI
-  -> RunReportsViewModel
-  -> IRunReportService / IRunEvidenceService
-  -> file-backed run report reader
+Product client
+  -> IronDev.Client or OpenAPI helper
+  -> /api/runs/* or /api/run-reports/*
+  -> run event store / report service
 ```
 
 The CLI remains a separate front door for Codex, dogfood plans, CI-style validation, and human debugging.
@@ -38,7 +38,7 @@ Added file-backed implementation:
 
 - `FileRunReportService`
 
-Added WPF workspace:
+Historical WPF workspace:
 
 - `RunReportsViewModel`
 - `RunReportsView`
@@ -74,7 +74,7 @@ It does not:
 
 - execute BuilderAgent
 - apply patches
-- start CLI processes from WPF
+- start CLI processes from product shells
 - mutate memory
 - mutate real repository files
 - change retrieval semantics
@@ -83,17 +83,17 @@ It does not:
 
 ## What This Proves
 
-IronDev can show trace-backed dogfood/build evidence in WPF through shared C# services.
+IronDev can show trace-backed dogfood/build evidence through API-backed report services.
 
 The UI and CLI now have the right long-term relationship:
 
 ```text
-WPF UI  -> shared services
-CLI     -> shared services / command adapters
+Product client -> IronDev.Client/OpenAPI -> IronDev.Api
+Dogfood CLI    -> shared services / command adapters
 ```
 
 Not:
 
 ```text
-WPF UI -> CLI stdout parser
+Product client -> CLI stdout parser
 ```

@@ -9,7 +9,7 @@ dogfood_run_id: RunReportViewerService144
 created_utc: 2026-05-23T21:44:00Z
 primary_retrieval_questions:
   - How does the WPF Run Reports viewer read dogfood run reports?
-  - Does the WPF app shell out to the CLI for run reports?
+  - Does the product client shell out to the CLI for run reports?
   - What services back the Run Reports workspace?
   - What run report files can IronDev read?
 boundary: Read/report UI infrastructure only. WPF calls shared C# services, not CLI processes; no builder execution, patches, memory mutation, or real repo writes.
@@ -19,7 +19,7 @@ boundary: Read/report UI infrastructure only. WPF calls shared C# services, not 
 
 This slice adds the first durable Run Reports surface over shared C# services.
 
-The WPF app reads run report files through:
+Current product clients read run reports through the API/client boundary; the retired WPF app used:
 
 - `IRunReportService`
 - `IRunEvidenceService`

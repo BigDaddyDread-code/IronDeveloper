@@ -19,10 +19,29 @@ public sealed class ApiBoundaryTests
     public void RetiredWpfProject_MustNotBeInProductBuild()
     {
         var root = FindRepositoryRoot();
+        var retiredRoot = Path.Combine(root, "IronDeveloper");
 
         Assert.IsFalse(
-            File.Exists(Path.Combine(root, "IronDeveloper", "IronDev.Agent.csproj")),
+            File.Exists(Path.Combine(retiredRoot, "IronDev.Agent.csproj")),
             "WPF was retired; IronDeveloper/IronDev.Agent.csproj must not be restored as a product project.");
+
+        if (Directory.Exists(retiredRoot))
+        {
+            var sourceFiles = Directory.EnumerateFiles(retiredRoot, "*.*", SearchOption.AllDirectories)
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.vs{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                               path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase) ||
+                               path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+                .Select(path => Path.GetRelativePath(root, path))
+                .ToArray();
+
+            Assert.AreEqual(
+                0,
+                sourceFiles.Length,
+                "Retired WPF source files must not exist under IronDeveloper. Found: " + string.Join(", ", sourceFiles));
+        }
 
         var solution = File.ReadAllText(Path.Combine(root, "IronDev.slnx"));
         Assert.IsFalse(

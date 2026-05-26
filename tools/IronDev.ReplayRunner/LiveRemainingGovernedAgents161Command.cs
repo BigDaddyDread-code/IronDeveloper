@@ -232,7 +232,7 @@ public static class LiveRemainingGovernedAgents161Command
 
     private static IReadOnlyList<ModelProfile> LoadProfiles(string repoRoot)
     {
-        var configPath = Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json");
+        var configPath = Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json");
         if (!File.Exists(configPath))
             return AgentModelDefaults.CreateDefaultProfiles();
 

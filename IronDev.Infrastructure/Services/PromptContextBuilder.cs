@@ -89,7 +89,7 @@ public enum ChatIntent
     /// <summary>
     /// User is asking about saved/persisted ticket management
     /// (e.g. delete tickets, archive tickets, list tickets, ticket persistence).
-    /// These questions relate to ProjectTicket / TicketsWorkspaceViewModel —
+    /// These questions relate to ProjectTicket / TicketsWorkspace —
     /// NOT to DraftTicket / the Chat→Draft Ticket review flow.
     /// </summary>
     SavedTicketManagement,
@@ -360,12 +360,12 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
 
         if (packet.IsExternalProject)
         {
-            sb.AppendLine("INSTRUCTION: You are working on an EXTERNAL project. Do NOT apply IronDev-specific product assumptions (e.g., WPF, CommunityToolkit, specific IronDev service names) unless you see them in the retrieved snippets below.");
+            sb.AppendLine("INSTRUCTION: You are working on an EXTERNAL project. Do NOT apply IronDev-specific product assumptions (e.g., API/client/Tauri boundaries, ticket services, memory services) unless you see them in the retrieved snippets below.");
             sb.AppendLine("Focus only on the architecture and patterns present in the provided context.");
         }
         else
         {
-            sb.AppendLine("INSTRUCTION: You are working on the IronDev HOST codebase itself. Apply standard IronDev WPF/MVVM architectural rules.");
+            sb.AppendLine("INSTRUCTION: You are working on the IronDev HOST codebase itself. Apply the API/client/Core/Infrastructure boundary and the Tauri shell rules.");
         }
         sb.AppendLine();
 
@@ -392,10 +392,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         sb.AppendLine("ARCHITECTURAL CONTEXT RULE:");
         sb.AppendLine("Do not assume DraftTicket is the saved ticket model.");
         sb.AppendLine("DraftTicket is ONLY for the Chat → Draft Ticket review flow (generating draft tickets from chat).");
-        sb.AppendLine("For saved ticket management (delete, archive, list, select tickets), prefer: ProjectTicket / TicketsWorkspaceViewModel / TicketsWorkspaceView / TicketService / ticket persistence services.");
+        sb.AppendLine("For saved ticket management (delete, archive, list, select tickets), prefer: ProjectTicket / TicketsController / IronDev.Client ticket methods / TicketService / Tauri TicketsWorkspace and TicketList.");
         sb.AppendLine("Do not recommend changing DraftTicketDtos.cs or CodebaseTicketGeneratorModels.cs for saved ticket operations.");
-        sb.AppendLine("IronDev is a WPF application — do NOT mention Controllers, Repositories, TicketModel, TicketController, or ASP.NET MVC patterns.");
-        sb.AppendLine("These terms do not exist in IronDev. Using them is a grounding failure.");
+        sb.AppendLine("IronDev exposes product operations through IronDev.Api controllers and IronDev.Client; do not invent generic MVC TicketController/TicketModel classes.");
+        sb.AppendLine("If you mention repositories or storage, tie them to retrieved Core/Infrastructure evidence instead of guessing.");
         sb.AppendLine();
 
         if (isCodeQuery)
@@ -412,10 +412,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         {
             sb.AppendLine("CODEBASE ANALYSIS CONTEXT:");
             sb.AppendLine("The user is asking for a global analysis or architectural overview of the project structure.");
-            sb.AppendLine("Focus your answer on the core architecture: ShellViewModel, Workspace management, Service layer (TicketService, MemoryService), and Core interfaces.");
+            sb.AppendLine("Focus your answer on the core architecture: IronDev.Api controllers, IronDev.Client, Core models/interfaces, Infrastructure services, and the Tauri shell where relevant.");
             sb.AppendLine("Your goal is to explain HOW the system is organized, citing specific files and classes from the snippets provided below.");
-            sb.AppendLine("Avoid generic software architecture advice. If you see a specific pattern in the snippets (e.g. WPF MVVM with CommunityToolkit), mention it explicitly.");
-            sb.AppendLine("If the user's request is broad, categorize your answer into: UI/ViewModels, Services/Logic, and Data Models.");
+            sb.AppendLine("Avoid generic software architecture advice. If you see a specific pattern in the snippets, mention it explicitly.");
+            sb.AppendLine("If the user's request is broad, categorize your answer into: API/client boundary, services/workflows, shell UI, and data models.");
             sb.AppendLine();
         }
 
@@ -423,13 +423,13 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         {
             sb.AppendLine("SAVED TICKET MANAGEMENT CONTEXT:");
             sb.AppendLine("The user is asking about saved/persisted ticket management (e.g. deleting, archiving, listing tickets).");
-            sb.AppendLine("Focus your answer on: TicketsWorkspaceViewModel, TicketsWorkspaceView.xaml, ProjectTicket, TicketService, GetTickets, SaveTicket, ticket persistence.");
+            sb.AppendLine("Focus your answer on: TicketsController, IronDev.Client ticket methods, Tauri TicketsWorkspace/TicketList/TicketDetail, ProjectTicket, TicketService, GetTickets, SaveTicket, ticket persistence.");
             sb.AppendLine("For any delete/archive feature, a complete grounded answer MUST address all of:");
             sb.AppendLine("  1. Whether TicketService already has DeleteTicketAsync/ArchiveTicketAsync — say 'inspect to confirm, add if missing'.");
             sb.AppendLine("  2. A tenant/project ownership guard must be applied in TicketService before any destructive operation.");
             sb.AppendLine("  3. Prefer soft-delete (archive) before offering hard delete — explain the safety tradeoff.");
-            sb.AppendLine("  4. A UI confirmation step in TicketsWorkspaceView.xaml before the command fires.");
-            sb.AppendLine("  5. A command (e.g. ArchiveSelectedTicketCommand / DeleteSelectedTicketCommand) in TicketsWorkspaceViewModel.");
+            sb.AppendLine("  4. A UI confirmation step in the Tauri ticket detail/list flow before a destructive command fires.");
+            sb.AppendLine("  5. A Tauri action wired through the API/client boundary, not direct storage access.");
             sb.AppendLine("  6. Refresh the ticket list and clear SelectedTicket after deletion.");
             sb.AppendLine("  7. Check for linked ProjectImplementationPlans before hard delete.");
             sb.AppendLine("Do NOT use vague language like 'likely', 'usually', 'often something like'. Use 'inspect' or 'add if missing'.");
@@ -822,8 +822,10 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             // High-priority saved-ticket terms come first
             queries.AddRange(new[]
             {
-                "TicketsWorkspaceViewModel",
-                "TicketsWorkspaceView",
+                "TicketsWorkspace",
+                "TicketList",
+                "TicketDetail",
+                "TicketsController",
                 "ITicketService",
                 "TicketService",
                 "ProjectTicket",
@@ -856,11 +858,11 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             // Pull core architectural files for a codebase overview
             queries.AddRange(new[]
             {
-                "ShellViewModel",
-                "AppShell",
-                "MainViewModel",
-                "INavigationService",
-                "WorkspaceViewModel",
+                "Program.cs",
+                "IronDevApiClient",
+                "TicketsController",
+                "TicketsWorkspace",
+                "WorkspaceShell",
                 "ProjectMemoryService",
                 "IProjectMemoryService",
                 "PromptContextBuilder",
@@ -884,7 +886,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         var queries = new List<string>();
 
         // 1. Explicit filenames
-        var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".xaml") || w.EndsWith(".sql") || w.EndsWith(".js") || w.EndsWith(".ts")));
+        var fileLike = words.FirstOrDefault(w => w.Contains(".") && (w.EndsWith(".cs") || w.EndsWith(".tsx") || w.EndsWith(".ts") || w.EndsWith(".sql") || w.EndsWith(".js")));
         if (fileLike != null) queries.Add(fileLike.Trim('\'', '\"', '`'));
 
         // 2. CamelCase identifiers in the query
@@ -1017,7 +1019,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         int score = 0;
 
         // Boost core production projects
-        if (ContainsAny(path, "IronDeveloper/", "IronDev.Core/", "IronDev.Infrastructure/"))
+        if (ContainsAny(path, "IronDev.TauriShell/", "IronDev.Api/", "IronDev.Client/", "IronDev.Core/", "IronDev.Infrastructure/"))
             score += 20;
 
         // Demote test projects
@@ -1051,9 +1053,9 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         if (pathIsTicketService)   score += 110;
 
         // ── Tier 2: Primary UI/ViewModel symbols ─────────────────────────────
-        if (ContainsAny(symbol, "TicketsWorkspaceViewModel", "TicketsWorkspaceView"))
+        if (ContainsAny(symbol, "TicketsWorkspace", "TicketList", "TicketDetail", "CreateTicketPanel", "TicketsController"))
             score += 100;
-        if (ContainsAny(path, "TicketsWorkspaceView", "TicketsWorkspace"))
+        if (ContainsAny(path, "TicketsWorkspace", "TicketList", "TicketDetail", "CreateTicketPanel", "TicketsController"))
             score += 90;
 
         // ── Tier 3: Operation-specific symbols ───────────────────────────────
@@ -1063,14 +1065,12 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         if (ContainsAny(path, "ProjectTicket", "DataModels"))
             score += 60;
 
-        // ── XAML preference: prefer .xaml over .xaml.cs for UI confirmation ──
-        if (path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+        // Prefer concrete shell component files for UI confirmation context.
+        if (path.EndsWith(".tsx", StringComparison.OrdinalIgnoreCase))
             score += 30;
-        else if (path.EndsWith(".xaml.cs", StringComparison.OrdinalIgnoreCase))
-            score -= 10;
 
         // ── Production project preference ─────────────────────────────────────
-        if (ContainsAny(path, "IronDeveloper/", "IronDev.Core/", "IronDev.Infrastructure/"))
+        if (ContainsAny(path, "IronDev.TauriShell/", "IronDev.Api/", "IronDev.Client/", "IronDev.Core/", "IronDev.Infrastructure/"))
             score += 20;
 
         // ── Medium priority: persistence / DB schema ─────────────────────────

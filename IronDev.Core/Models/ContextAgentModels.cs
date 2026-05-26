@@ -194,7 +194,7 @@ public sealed class ContextAgentRequest
     // ── Intent extraction ───────────────────────────────────────────────────
     public CreateTicketIntent? CreateTicketIntent { get; init; }
 
-    // ── Conflict assessment inputs (populated by ChatWorkspaceViewModel) ────
+    // ── Conflict assessment inputs (populated by shell/API callers) ────
     /// <summary>Recent non-archived tickets for conflict detection.</summary>
     public IReadOnlyList<IronDev.Data.Models.ProjectTicket> RecentTickets { get; init; }
         = Array.Empty<IronDev.Data.Models.ProjectTicket>();

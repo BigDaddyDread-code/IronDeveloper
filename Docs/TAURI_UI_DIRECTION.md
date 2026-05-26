@@ -1,6 +1,6 @@
 # IronDev Tauri UI Direction
 
-IronDev's Tauri shell is a premium AI developer cockpit. It is not a generic dark web app, a CRUD admin panel, or a replacement for WPF yet.
+IronDev's Tauri shell is a premium AI developer cockpit. It is not a generic dark web app, a CRUD admin panel, or a finished production shell yet.
 
 ## Product Boundary
 

@@ -132,8 +132,8 @@ public static class SelfImprovementCampaign157Command
     {
         var configPaths = new[]
         {
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json"),
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.json")
         };
 
         foreach (var configPath in configPaths)

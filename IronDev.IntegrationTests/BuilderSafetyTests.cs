@@ -25,8 +25,8 @@ public class BuilderSafetyTests : IntegrationTestBase
         // Seed a project that looks like IronDev (contains 'AIDeveloper' in path)
         var projectId = await SeedProjectAsync();
         var project = await projectService.GetByIdAsync(projectId);
-        project!.LocalPath = @"C:\Users\bob\source\repos\AIDeveloper\IronDeveloper";
-        project.Name = "IronDeveloper";
+        project!.LocalPath = @"C:\Users\bob\source\repos\AIDeveloper";
+        project.Name = "IronDev";
         // We'd need to update the DB if GetByIdAsync pulls from DB, but SeedProjectAsync might already be enough if we use the right path.
         // Actually, SeedProjectAsync probably inserts into DB.
         await using var connection = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
@@ -37,7 +37,7 @@ public class BuilderSafetyTests : IntegrationTestBase
         var prompt = await promptBuilder.BuildAsync(projectId, 0, "How do I fix the shell?");
 
         StringAssert.Contains(prompt, "Host Application: IronDev");
-        StringAssert.Contains(prompt, "Active Target Project: IronDeveloper");
+        StringAssert.Contains(prompt, "Active Target Project: IronDev");
         StringAssert.Contains(prompt, "Is External Project: False");
         StringAssert.Contains(prompt, "You are working on the IronDev HOST codebase itself.");
     }
@@ -77,7 +77,7 @@ public class BuilderSafetyTests : IntegrationTestBase
         var root = @"C:\repo\BookSeller";
         var changes = new List<FileChangeProposal>
         {
-            new() { FilePath = @"..\IronDeveloper\App.xaml.cs", BeforeSnippet = "old", AfterSnippet = "new" }
+            new() { FilePath = @"..\AIDeveloper\IronDev.Api\Program.cs", BeforeSnippet = "old", AfterSnippet = "new" }
         };
 
         var result = await patchService.DryRunValidateAsync(root, changes);

@@ -330,7 +330,7 @@ public sealed class ContextAgentService : IContextAgentService
         }
 
         // ── Stage 3.5: Conflict assessment ─────────────────────────────────────
-        // Runs when the request carries recent tickets (i.e. ChatWorkspaceViewModel
+        // Runs when the request carries recent tickets (for example from a shell chat surface
         // determined this looks like a ticket-creation request) AND a conflict
         // service is wired.  Detection is deterministic — no extra LLM call.
         if (_conflictService != null &&

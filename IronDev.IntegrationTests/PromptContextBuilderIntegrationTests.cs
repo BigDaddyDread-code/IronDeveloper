@@ -34,7 +34,7 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         await memoryService.SaveSummaryAsync(new ProjectSummary
         {
             ProjectId = projectId,
-            Summary = "IronDev is a WPF-based AI development assistant."
+            Summary = "IronDev is an API-first AI development platform with a Tauri shell."
         });
 
         await memoryService.SaveDecisionAsync(new ProjectDecision
@@ -66,9 +66,15 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         var indexService = scope.ServiceProvider.GetRequiredService<ICodeIndexService>();
         await using var connection = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
         await connection.OpenAsync();
+        var appFileId = await Dapper.SqlMapper.QuerySingleAsync<long>(connection,
+            "INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content) OUTPUT inserted.Id VALUES (@TenantId, @ProjectId, @FilePath, @FileExtension, @ContentHash, @Content)",
+            new { TenantId = 1, ProjectId = projectId, FilePath = "IronDev.TauriShell/src/App.tsx", FileExtension = ".tsx", ContentHash = "XYZ", Content = "export function App() { return <main />; }" });
         await Dapper.SqlMapper.ExecuteAsync(connection,
-            "INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content) VALUES (@TenantId, @ProjectId, @FilePath, @FileExtension, @ContentHash, @Content)",
-            new { TenantId = 1, ProjectId = projectId, FilePath = "MainWindow.xaml", FileExtension = ".xaml", ContentHash = "XYZ", Content = "<Window><Grid></Grid></Window>" });
+            "INSERT INTO dbo.CodeIndexEntries (TenantId, ProjectId, FileId, SymbolName, SymbolType, ChunkText) VALUES (@TenantId, @ProjectId, @FileId, @SymbolName, @SymbolType, @ChunkText)",
+            new { TenantId = 1, ProjectId = projectId, FileId = appFileId, SymbolName = "App", SymbolType = "Function", ChunkText = "export function App() { return <main />; }" });
+        await Dapper.SqlMapper.ExecuteAsync(connection,
+            "UPDATE dbo.Projects SET IndexingStatus = 'Ready', LastIndexedUtc = SYSUTCDATETIME() WHERE Id = @ProjectId",
+            new { ProjectId = projectId });
 
         await chatHistoryService.SaveMessageAsync(new ChatMessage
         {
@@ -82,21 +88,21 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         await ticketService.SaveTicketAsync(new ProjectTicket
         {
             ProjectId = projectId,
-            Title = "Main Window",
+            Title = "Tauri App",
             TicketType = "Task",
             Status = "Draft",
-            Content = "<Window><Grid></Grid></Window>"
+            Content = "export function App() { return <main />; }"
         });
 
-        // The query "MainWindow.xaml" will trigger the file search MVP logic
-        var prompt = await promptContextBuilder.BuildAsync(projectId, sessionId, "Generate a ticket for MainWindow.xaml");
+        // The query "App.tsx" will trigger the file search MVP logic
+        var prompt = await promptContextBuilder.BuildAsync(projectId, sessionId, "Generate a ticket for App.tsx");
 
-        StringAssert.Contains(prompt, "IronDev is a WPF-based AI development assistant.");
+        StringAssert.Contains(prompt, "IronDev is an API-first AI development platform with a Tauri shell.");
         StringAssert.Contains(prompt, "Use SQL memory");
         StringAssert.Contains(prompt, "Use constructor injection");
         StringAssert.Contains(prompt, "Ticket creation");
         StringAssert.Contains(prompt, "Please create a ticket");
-        StringAssert.Contains(prompt, "Generate a ticket for MainWindow.xaml");
-        StringAssert.Contains(prompt, "<Window><Grid></Grid></Window>");
+        StringAssert.Contains(prompt, "Generate a ticket for App.tsx");
+        StringAssert.Contains(prompt, "export function App() { return <main />; }");
     }
 }

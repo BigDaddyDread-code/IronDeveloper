@@ -1160,8 +1160,8 @@ static IReadOnlyList<ModelProfile> LoadModelProfiles(string repoRoot)
 {
     var configPaths = new[]
     {
-        Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
-        Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+        Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json"),
+        Path.Combine(repoRoot, "IronDev.Api", "appsettings.json")
     };
 
     foreach (var configPath in configPaths)
@@ -2142,8 +2142,8 @@ static string ResolveIronDevConnectionString(string[] args)
     var repoRoot = FindRepositoryRoot();
     foreach (var path in new[]
     {
-        Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
-        Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+        Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json"),
+        Path.Combine(repoRoot, "IronDev.Api", "appsettings.json")
     })
     {
         var connection = TryReadConnectionString(path, "IronDeveloperDb");

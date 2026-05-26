@@ -313,8 +313,8 @@ internal static class MemorySmokeCommandSupport
         var repoRoot = FindRepositoryRoot();
         foreach (var path in new[]
         {
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json"),
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.json")
         })
         {
             var connection = TryReadConnectionString(path, "IronDeveloperDb");
@@ -334,8 +334,8 @@ internal static class MemorySmokeCommandSupport
         var repoRoot = FindRepositoryRoot();
         foreach (var path in new[]
         {
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json"),
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.json")
         })
         {
             var endpoint = TryReadNestedString(path, "Weaviate", "Endpoint");

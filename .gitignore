@@ -58,6 +58,9 @@ logs/
 ## Local IronDev runtime data
 ProjectData/
 
+## Retired WPF shell leftovers
+IronDeveloper/
+
 ## WPF designer temp artifacts (can be 10MB+)
 *_wpftmp.csproj
 *_wpftmp.zip

@@ -152,7 +152,7 @@ localStorage.setItem("irondev.tenantId", "1");
 localStorage.setItem("irondev.selectedProjectId", "1");
 ```
 
-## Remaining Before WPF Parity
+## Remaining Before Production Shell Parity
 
 - Production-safe token storage.
 - Full auth UX polish.

@@ -63,8 +63,10 @@ public static class RetrievalQualityHelpers
         "IronDev.Core/Models/DataModels.cs",
         "IronDev.Core/Models/",
         "IronDev.Core/Interfaces/",
-        "IronDeveloper/ViewModels/Workspaces/",
-        "IronDeveloper/Views/Workspaces/",
+        "IronDev.Api/Controllers/",
+        "IronDev.Client/",
+        "IronDev.TauriShell/src/features/",
+        "IronDev.TauriShell/src/components/",
     ];
 
     /// <summary>
@@ -171,8 +173,9 @@ public static class RetrievalQualityHelpers
         {
             if (path.Contains("ticketservice.cs") 
                 || path.Contains("datamodels.cs") 
-                || path.Contains("ticketsworkspaceviewmodel.cs")
-                || path.Contains("ticketsworkspaceview.xaml"))
+                || path.Contains("ticketsworkspace.tsx")
+                || path.Contains("ticketlist.tsx")
+                || path.Contains("ticketdetail.tsx"))
                 return -10;
 
             if (path.Contains("draftticketservice.cs"))
@@ -273,7 +276,7 @@ public static class RetrievalQualityHelpers
 
         // ── Ticket archive / soft delete ─────────────────────────────────────
         ("soft archive",
-         ["ArchiveTicketAsync", "IsDeleted", "GetRecentTicketsAsync", "GetTicketByIdAsync", "ProjectTicket", "TicketsWorkspaceViewModel"]),
+         ["ArchiveTicketAsync", "IsDeleted", "GetRecentTicketsAsync", "GetTicketByIdAsync", "ProjectTicket", "TicketsWorkspace", "TicketList"]),
         ("ticket archive",
          ["ArchiveTicketAsync", "IsDeleted", "GetRecentTicketsAsync", "ProjectTicket"]),
         ("archive ticket",
@@ -283,11 +286,11 @@ public static class RetrievalQualityHelpers
 
         // ── Ticket delete / hard delete ───────────────────────────────────────
         ("delete ticket",
-         ["ArchiveTicketAsync", "DeleteTicketAsync", "IsDeleted", "TicketsWorkspaceViewModel", "TicketService"]),
+         ["ArchiveTicketAsync", "DeleteTicketAsync", "IsDeleted", "TicketsWorkspace", "TicketList", "TicketService"]),
         ("deleteticket",
          ["DeleteTicketAsync", "ArchiveTicketAsync", "IsDeleted"]),
         ("fix delete",
-         ["ArchiveTicketAsync", "DeleteTicketAsync", "IsDeleted", "TicketService", "TicketsWorkspaceViewModel"]),
+         ["ArchiveTicketAsync", "DeleteTicketAsync", "IsDeleted", "TicketService", "TicketsWorkspace", "TicketList"]),
 
         // ── IsDeleted / filtering ─────────────────────────────────────────────
         ("isdeleted",

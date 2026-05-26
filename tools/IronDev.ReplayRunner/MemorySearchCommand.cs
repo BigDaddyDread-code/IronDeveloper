@@ -430,8 +430,8 @@ public static class MemorySearchCommand
 
         foreach (var path in new[]
         {
-            Path.Combine(FindRepositoryRoot(), "IronDeveloper", "appsettings.Development.json"),
-            Path.Combine(FindRepositoryRoot(), "IronDeveloper", "appsettings.json")
+            Path.Combine(FindRepositoryRoot(), "IronDev.Api", "appsettings.Development.json"),
+            Path.Combine(FindRepositoryRoot(), "IronDev.Api", "appsettings.json")
         })
         {
             var endpoint = TryReadNestedString(path, "SemanticMemory", "WeaviateEndpoint") ??
