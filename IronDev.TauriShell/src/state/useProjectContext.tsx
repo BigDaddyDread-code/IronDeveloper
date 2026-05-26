@@ -98,6 +98,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (profile.selectedTenantId !== tenantId) {
+        const response = await client.selectTenant(tenantId);
+        window.localStorage.setItem('irondev.token', response.token);
+        window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
+        if (Number.isFinite(config.fallbackProjectId)) {
+          window.localStorage.setItem('irondev.selectedProjectId', `${config.fallbackProjectId}`);
+        } else {
+          window.localStorage.removeItem('irondev.selectedProjectId');
+        }
+        refreshConfig();
+        return;
+      }
+
       const projectList = await client.getProjects();
       setProjects(projectList);
 
@@ -132,7 +145,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsRefreshing(false);
       setTokenEditorOpen(false);
     }
-  }, [checkApiConnection, clearWorkspace, client, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, setTokenEditorOpen, tokenConfigured]);
+  }, [checkApiConnection, clearWorkspace, client, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
 
   const refreshTicketsContext = useCallback(() => {
     if (accessStatus === 'ready' || accessStatus === 'emptyTickets') {

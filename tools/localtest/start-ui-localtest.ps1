@@ -15,6 +15,7 @@ if (-not (Test-Path $shellRoot)) {
 
 $env:VITE_IRONDEV_API_BASE_URL = $ApiBaseUrl
 $env:VITE_IRONDEV_PROJECT_ID = "$ProjectId"
+$env:IRONDEV_API_PROXY_TARGET = $ApiBaseUrl
 
 Write-Host "Starting IronDev Tauri shell against LocalTest API $ApiBaseUrl."
 Write-Host "Fallback project id: $ProjectId"
