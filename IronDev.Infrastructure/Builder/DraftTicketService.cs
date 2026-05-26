@@ -85,7 +85,7 @@ public sealed class DraftTicketService : IDraftTicketService
 
         var context = new ProjectContext
         {
-            CodeStandards               = "C# 12 / .NET 10 / WPF MVVM. Dapper for SQL. No EF Core. No Weaviate. Tenant-scoped data access.",
+            CodeStandards               = "C# 12 / .NET 10 API/client/Core/Infrastructure boundary. Tauri shell for current UI. Dapper for SQL. No EF Core. Tenant-scoped data access.",
             RecentDecisions             = recentDecisions,
             RelevantImplementationPlans = "(not loaded in this context)",
             CodeIndexSummary            = hasIndex ? codeIndexSummary : "Project has not been indexed yet.",
@@ -347,7 +347,7 @@ public sealed class DraftTicketService : IDraftTicketService
         ProjectContext context)
     {
         return $$"""
-You are IronDev Architect — a senior .NET/WPF architect and persistent teammate for this exact project.
+You are IronDev Architect — a senior .NET/API/client architect and persistent teammate for this exact project.
 
 Project:
 {{projectName}} — a persistent AI development cockpit for chat, project memory, structured tickets,
@@ -392,7 +392,7 @@ Critical rules:
 - Use real files/classes from the indexed codebase when available.
 - Do not invent file names, class names, service names, or database tables.
 - Do not assume DraftTicket is the saved ticket model. DraftTicket is only for Chat → Draft Ticket review.
-  For saved ticket management, prefer ProjectTicket, TicketsWorkspaceViewModel, and TicketService when available.
+  For saved ticket management, prefer ProjectTicket, TicketsController, IronDev.Client ticket methods, Tauri ticket components, and TicketService when available.
 - If indexed context is missing or limited, say so clearly in contextWarning. Do not pretend to have file-level context.
 - Keep the ticket small enough for one feature branch.
 - The ticket must be suitable for the Build This workflow.
@@ -810,7 +810,7 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
             .Replace("ProjectTickt", "ProjectTicket")
             .Replace("TicketServce", "TicketService")
             .Replace("TicketSerivce", "TicketService")
-            .Replace("TicketsWorkspaceVM", "TicketsWorkspaceViewModel")
+            .Replace("TicketsWorkspaceVM", "TicketsWorkspace")
             .Replace("IronDevControls", "IronDeveloperControls");
     }
 }

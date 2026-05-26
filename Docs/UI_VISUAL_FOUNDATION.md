@@ -12,11 +12,7 @@ The UI should not feel like a CRUD admin panel, default WPF, a noisy dashboard, 
 
 ## Token Layers
 
-The WPF app owns app-level aliases in:
-
-- `IronDeveloper/Themes/IronDevVisualTokens.xaml`
-- `IronDeveloper/Themes/IronDevComponentStyles.xaml`
-- `IronDeveloper/Themes/AppStyles.xaml`
+The retired WPF app owned app-level XAML aliases for visual tokens, component styles, and app styles. Those files are no longer part of the tracked product shell.
 
 The tokens cover:
 
@@ -47,17 +43,17 @@ Reusable component names are standardized around:
 - `WorkspaceListPane`
 - `WorkspaceListItem`
 
-The current WPF app already consumes the shared `IronDeveloperControls` library for many of these controls. This slice adds app-owned visual aliases and applies them to the Tickets workspace shell only.
+This historical slice added app-owned visual aliases and applied them to the retired Tickets workspace shell. Current visual work should implement equivalent contracts in `IronDev.TauriShell`.
 
 ## Showcase Surface
 
-The showcase surface is `TicketsWorkspaceView`.
+The historical showcase surface was `TicketsWorkspaceView`. The current shell equivalent is `IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx`.
 
 This slice proves:
 
-- app-level visual tokens can be merged through `AppStyles.xaml`
-- command buttons can use app-level style aliases
-- ticket shell controls expose stable AutomationIds
+- app-level visual tokens could be merged through `AppStyles.xaml`
+- command buttons could use app-level style aliases
+- ticket shell controls exposed stable AutomationIds
 - the existing workflow remains intact
 
 ## Rule

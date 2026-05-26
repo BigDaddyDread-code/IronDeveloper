@@ -17,7 +17,7 @@ namespace IronDev.IntegrationTests;
 /// Tests for chat grounding improvements:
 /// - Intent classification (SavedTicketManagement vs DraftTicketFlow)
 /// - Query expansion for saved ticket management
-/// - Retrieval ranking (TicketsWorkspaceViewModel before DraftTicketDtos)
+/// - Retrieval ranking (TicketsWorkspace before DraftTicketDtos)
 /// - Anti-wrong-context rule in prompt
 /// - High-confidence file section in prompt
 /// - Not-indexed project limited-context warning
@@ -106,10 +106,10 @@ public class ChatGroundingTests : IntegrationTestBase
             "delete tickets affected files",
             ChatIntent.SavedTicketManagement);
 
-        CollectionAssert.Contains(queries, "TicketsWorkspaceViewModel",
-            "Query expansion must include TicketsWorkspaceViewModel for SavedTicketManagement.");
-        CollectionAssert.Contains(queries, "TicketsWorkspaceView",
-            "Query expansion must include TicketsWorkspaceView.");
+        CollectionAssert.Contains(queries, "TicketsWorkspace",
+            "Query expansion must include TicketsWorkspace for SavedTicketManagement.");
+        CollectionAssert.Contains(queries, "TicketList",
+            "Query expansion must include TicketList.");
         CollectionAssert.Contains(queries, "ProjectTicket",
             "Query expansion must include ProjectTicket.");
         CollectionAssert.Contains(queries, "TicketService",
@@ -154,10 +154,10 @@ public class ChatGroundingTests : IntegrationTestBase
     {
         var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
         {
-            new() { Id = 1, FilePath = "IronDeveloper/Dtos/DraftTicketDtos.cs",                   SymbolName = "DraftTicketDto",              ChunkText = "class DraftTicketDto" },
-            new() { Id = 2, FilePath = "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",   SymbolName = "TicketsWorkspaceViewModel",   ChunkText = "class TicketsWorkspaceViewModel" },
+            new() { Id = 1, FilePath = "IronDev.Core/Builder/DraftTicketDtos.cs",                   SymbolName = "DraftTicketDto",              ChunkText = "class DraftTicketDto" },
+            new() { Id = 2, FilePath = "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx",   SymbolName = "TicketsWorkspace",   ChunkText = "class TicketsWorkspace" },
             new() { Id = 3, FilePath = "IronDev.Infrastructure/Models/CodebaseTicketGeneratorModels.cs", SymbolName = "CodebaseTicketGeneratorModel", ChunkText = "class CodebaseTicketGeneratorModel" },
-            new() { Id = 4, FilePath = "IronDeveloper/Views/TicketsWorkspaceView.xaml",           SymbolName = null,                          ChunkText = "<UserControl>" },
+            new() { Id = 4, FilePath = "IronDev.TauriShell/src/components/TicketList.tsx",           SymbolName = null,                          ChunkText = "<UserControl>" },
         };
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
@@ -171,19 +171,19 @@ public class ChatGroundingTests : IntegrationTestBase
             "CodebaseTicketGeneratorModels must be absent from SavedTicketManagement results (hard-excluded).");
 
         // Production saved-ticket files must still be present
-        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceViewModel", StringComparison.OrdinalIgnoreCase)),
-            "TicketsWorkspaceViewModel must be present in ranked results.");
-        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceView", StringComparison.OrdinalIgnoreCase)),
-            "TicketsWorkspaceView must be present in ranked results.");
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspace", StringComparison.OrdinalIgnoreCase)),
+            "TicketsWorkspace must be present in ranked results.");
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketList", StringComparison.OrdinalIgnoreCase)),
+            "TicketList must be present in ranked results.");
     }
 
     [TestMethod]
-    public void RankSnippets_SavedTicketManagement_TicketsWorkspaceViewAboveCodebaseGeneratorModels()
+    public void RankSnippets_SavedTicketManagement_TicketListAboveCodebaseGeneratorModels()
     {
         var snippets = new List<IronDev.Data.Models.CodeIndexEntry>
         {
             new() { Id = 1, FilePath = "IronDev.Infrastructure/Models/CodebaseTicketGeneratorModels.cs", SymbolName = "CodebaseTicketGeneratorModel", ChunkText = "class CodebaseTicketGeneratorModel" },
-            new() { Id = 2, FilePath = "IronDeveloper/Views/TicketsWorkspaceView.xaml",                  SymbolName = null,                          ChunkText = "<UserControl x:Class=\"TicketsWorkspaceView\">" },
+            new() { Id = 2, FilePath = "IronDev.TauriShell/src/components/TicketList.tsx",                  SymbolName = null,                          ChunkText = "<UserControl x:Class=\"TicketList\">" },
         };
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
@@ -194,9 +194,9 @@ public class ChatGroundingTests : IntegrationTestBase
         Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", StringComparison.OrdinalIgnoreCase)),
             "CodebaseTicketGeneratorModels must be absent from SavedTicketManagement results (hard-excluded as DraftTicket subsystem).");
 
-        // TicketsWorkspaceView must still be present
-        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceView", StringComparison.OrdinalIgnoreCase)),
-            "TicketsWorkspaceView.xaml must be present in SavedTicketManagement results.");
+        // TicketList must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketList", StringComparison.OrdinalIgnoreCase)),
+            "TicketList.tsx must be present in SavedTicketManagement results.");
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -228,8 +228,8 @@ public class ChatGroundingTests : IntegrationTestBase
 
         StringAssert.Contains(prompt, "SAVED TICKET MANAGEMENT CONTEXT",
             "Prompt must include the SAVED TICKET MANAGEMENT CONTEXT section for saved ticket queries.");
-        StringAssert.Contains(prompt, "TicketsWorkspaceViewModel",
-            "Prompt context section must mention TicketsWorkspaceViewModel.");
+        StringAssert.Contains(prompt, "TicketsWorkspace",
+            "Prompt context section must mention TicketsWorkspace.");
         StringAssert.Contains(prompt, "Create Ticket",
             "Prompt must suggest using Create Ticket for saved ticket management queries.");
     }
@@ -240,15 +240,15 @@ public class ChatGroundingTests : IntegrationTestBase
         using var scope = ServiceProvider.CreateScope();
         var projectId = await SeedProjectAsync();
 
-        // Seed a TicketsWorkspaceViewModel-like snippet directly
+        // Seed a TicketsWorkspace-like snippet directly
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
 
         var fileId = await connection.QuerySingleAsync<long>(
-            "INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content) OUTPUT inserted.Id VALUES (1, @ProjectId, 'ViewModels/TicketsWorkspaceViewModel.cs', '.cs', 'ABC', '')",
+            "INSERT INTO dbo.ProjectFiles (TenantId, ProjectId, FilePath, FileExtension, ContentHash, Content) OUTPUT inserted.Id VALUES (1, @ProjectId, 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx', '.tsx', 'ABC', '')",
             new { ProjectId = projectId });
         await connection.ExecuteAsync(
-            "INSERT INTO dbo.CodeIndexEntries (TenantId, ProjectId, FileId, SymbolName, SymbolType, ChunkText) VALUES (1, @ProjectId, @FileId, 'TicketsWorkspaceViewModel', 'Class', 'class TicketsWorkspaceViewModel { }')",
+            "INSERT INTO dbo.CodeIndexEntries (TenantId, ProjectId, FileId, SymbolName, SymbolType, ChunkText) VALUES (1, @ProjectId, @FileId, 'TicketsWorkspace', 'Function', 'export function TicketsWorkspace() { return <TicketList />; }')",
             new { ProjectId = projectId, FileId = fileId });
 
         // Mark project as Ready
@@ -261,8 +261,8 @@ public class ChatGroundingTests : IntegrationTestBase
 
         StringAssert.Contains(prompt, "## Relevant project files (high confidence):",
             "Prompt must include a high-confidence files section when snippets are present.");
-        StringAssert.Contains(prompt, "TicketsWorkspaceViewModel",
-            "High-confidence section must include TicketsWorkspaceViewModel for saved ticket query.");
+        StringAssert.Contains(prompt, "TicketsWorkspace",
+            "High-confidence section must include TicketsWorkspace for saved ticket query.");
     }
 
     // ──────────────────────────────────────────────────────────────────────────

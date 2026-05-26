@@ -22,7 +22,7 @@ namespace IronDev.IntegrationTests;
 ///   5. Filters junk memory before injecting into the prompt.
 ///   6. Includes retrieved snippets when the project is indexed.
 ///   7. Emits a LIMITED CONTEXT WARNING when no snippets are available.
-///   8. Delete-ticket prompt contains TicketService/TicketsWorkspaceViewModel.
+///   8. Delete-ticket prompt contains TicketService/TicketsWorkspace.
 ///   9. Delete-ticket prompt does not contain TicketController/TicketModel/DraftTicket.
 ///  10. Existing tests still pass (regression guard).
 /// </summary>
@@ -99,7 +99,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
     // ── T9.2: Saved-ticket query retrieves saved-ticket context ──────────────
 
     [TestMethod]
-    [Description("T9.2: Saved-ticket query retrieves TicketService/TicketsWorkspaceViewModel when indexed.")]
+    [Description("T9.2: Saved-ticket query retrieves TicketService/TicketsWorkspace when indexed.")]
     public async Task T9_2_SavedTicketQuery_RetrievesSavedTicketContext()
     {
         var projectId = await SeedProjectAsync();
@@ -113,10 +113,10 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             "IronDev.Infrastructure/Services/TicketService.cs", "ITicketService",
             "public interface ITicketService { Task DeleteTicketAsync(int projectId, long ticketId); Task<IEnumerable<ProjectTicket>> GetTicketsAsync(int projectId); }");
 
-        var fileIdVm = await SeedProjectFileAsync(conn, projectId, "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs");
+        var fileIdVm = await SeedProjectFileAsync(conn, projectId, "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx");
         await SeedCodeIndexEntryAsync(conn, projectId, fileIdVm,
-            "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs", "TicketsWorkspaceViewModel",
-            "public class TicketsWorkspaceViewModel { public IRelayCommand DeleteSelectedTicketCommand { get; } }");
+            "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx", "TicketsWorkspace",
+            "export function TicketsWorkspace() { return <TicketList onSelect={selectTicket} />; }");
 
         await conn.ExecuteAsync(
             "UPDATE dbo.Projects SET IndexingStatus='Ready', LastIndexedUtc=SYSUTCDATETIME() WHERE Id=@Id",
@@ -127,8 +127,8 @@ public class ChatGroundingQualityTests : IntegrationTestBase
 
         Assert.IsTrue(packet.MatchedFilePaths.Any(p => p.Contains("TicketService")),
             "Delete-ticket query must retrieve TicketService when indexed.");
-        Assert.IsTrue(packet.MatchedFilePaths.Any(p => p.Contains("TicketsWorkspaceViewModel")),
-            "Delete-ticket query must retrieve TicketsWorkspaceViewModel when indexed.");
+        Assert.IsTrue(packet.MatchedFilePaths.Any(p => p.Contains("TicketsWorkspace")),
+            "Delete-ticket query must retrieve TicketsWorkspace when indexed.");
     }
 
     // ── T9.3: SavedTicketManagement excludes DraftTicketService ──────────────
@@ -245,10 +245,10 @@ public class ChatGroundingQualityTests : IntegrationTestBase
         await using var conn = new SqlConnection(ConnectionString);
         await conn.OpenAsync();
 
-        var fileId = await SeedProjectFileAsync(conn, projectId, "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs");
+        var fileId = await SeedProjectFileAsync(conn, projectId, "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx");
         await SeedCodeIndexEntryAsync(conn, projectId, fileId,
-            "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs", "TicketsWorkspaceViewModel",
-            "public class TicketsWorkspaceViewModel : ObservableObject { public ObservableCollection<ProjectTicket> Tickets { get; } }");
+            "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx", "TicketsWorkspace",
+            "export function TicketsWorkspace() { return <TicketList tickets={tickets} />; }");
         await conn.ExecuteAsync(
             "UPDATE dbo.Projects SET IndexingStatus='Ready', LastIndexedUtc=SYSUTCDATETIME() WHERE Id=@Id",
             new { Id = projectId });
@@ -279,10 +279,10 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             "IsProjectNotIndexed must be true for a project with no IndexingStatus=Ready.");
     }
 
-    // ── T9.8: Delete-ticket prompt contains TicketService/TicketsWorkspaceViewModel ─
+    // ── T9.8: Delete-ticket prompt contains TicketService/TicketsWorkspace ─
 
     [TestMethod]
-    [Description("T9.8: Delete-ticket prompt (indexed) contains TicketService and TicketsWorkspaceViewModel context.")]
+    [Description("T9.8: Delete-ticket prompt (indexed) contains TicketService and TicketsWorkspace context.")]
     public async Task T9_8_DeleteTicketPrompt_ContainsTicketServiceAndViewModel()
     {
         var projectId = await SeedProjectAsync();
@@ -295,10 +295,10 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             "IronDev.Infrastructure/Services/TicketService.cs", "ITicketService",
             "public interface ITicketService { Task DeleteTicketAsync(int tenantId, int projectId, long ticketId); Task<IEnumerable<ProjectTicket>> GetTicketsAsync(int projectId); }");
 
-        var fileIdVm = await SeedProjectFileAsync(conn, projectId, "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs");
+        var fileIdVm = await SeedProjectFileAsync(conn, projectId, "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx");
         await SeedCodeIndexEntryAsync(conn, projectId, fileIdVm,
-            "IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs", "TicketsWorkspaceViewModel",
-            "public class TicketsWorkspaceViewModel { public IRelayCommand DeleteSelectedTicketCommand { get; } public ProjectTicket? SelectedTicket { get; set; } }");
+            "IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx", "TicketsWorkspace",
+            "export function TicketsWorkspace() { return <TicketDetail ticket={selectedTicket} />; }");
 
         await conn.ExecuteAsync(
             "UPDATE dbo.Projects SET IndexingStatus='Ready', LastIndexedUtc=SYSUTCDATETIME() WHERE Id=@Id",
@@ -309,8 +309,8 @@ public class ChatGroundingQualityTests : IntegrationTestBase
 
         StringAssert.Contains(packet.FormattedPrompt, "TicketService",
             "Delete-ticket prompt must mention TicketService.");
-        StringAssert.Contains(packet.FormattedPrompt, "TicketsWorkspaceViewModel",
-            "Delete-ticket prompt must mention TicketsWorkspaceViewModel.");
+        StringAssert.Contains(packet.FormattedPrompt, "TicketsWorkspace",
+            "Delete-ticket prompt must mention TicketsWorkspace.");
     }
 
     // ── T9.9: Delete-ticket prompt does NOT contain forbidden generic terms ────
@@ -367,7 +367,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
         // Also seed a saved-ticket-relevant ticket
         await SeedTicketAsync(conn, projectId,
             title: "Add delete-ticket confirmation dialog",
-            content: "TicketsWorkspaceView.xaml needs a confirmation dialog before DeleteSelectedTicketCommand fires.");
+            content: "TicketList.tsx needs a confirmation dialog before DeleteSelectedTicketCommand fires.");
 
         var builder = GetPromptBuilder();
         var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?");

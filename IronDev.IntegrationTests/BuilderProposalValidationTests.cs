@@ -26,7 +26,7 @@ public sealed class BuilderProposalValidationTests
     {
         var proposal = MakeProposal(new ProposedFileChange
         {
-            FilePath = @"..\IronDeveloper\App.xaml.cs",
+            FilePath = @"..\AIDeveloper\IronDev.Api\Program.cs",
             Description = "Unsafe host edit",
             Diff = "@@"
         });

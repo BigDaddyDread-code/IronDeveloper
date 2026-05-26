@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace IronDev.Core.Interfaces;
 
 /// <summary>
-/// Converts Markdown content to HTML for display in the WPF document viewer.
+/// Converts Markdown content to HTML for display in product document viewers.
 /// </summary>
 public interface IMarkdownRenderService
 {

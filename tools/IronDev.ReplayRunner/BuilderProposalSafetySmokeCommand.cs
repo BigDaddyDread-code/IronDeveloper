@@ -406,8 +406,8 @@ public static class BuilderProposalSafetySmokeCommand
 
         foreach (var path in new[]
         {
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.Development.json"),
-            Path.Combine(repoRoot, "IronDeveloper", "appsettings.json")
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.Development.json"),
+            Path.Combine(repoRoot, "IronDev.Api", "appsettings.json")
         })
         {
             var connection = TryReadConnectionString(path, "IronDeveloperDb");

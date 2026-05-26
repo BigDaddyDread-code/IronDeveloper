@@ -125,15 +125,6 @@ For full setup and settings, see [Docs/weaviate-local-setup.md](weaviate-local-s
 
 ## 4. Build & Launch
 
-### Controls Library
-The controls are currently source-referenced. Ensure the repo is cloned at the expected path (or update the `.slnx` if moved):
-`C:\Users\bob\source\repos\IronDeveloper.Controls`
-
-Build the controls:
-```powershell
-dotnet build ..\IronDeveloper.Controls\IronDeveloperControls\IronDeveloperControls.csproj
-```
-
 ### Main Application
 Build the solution:
 ```powershell
@@ -141,10 +132,16 @@ dotnet build IronDev.slnx
 ```
 
 ### Launch
-Run the application from Visual Studio or via CLI:
+Run the API from the repo root:
 ```powershell
-cd IronDeveloper
-dotnet run
+dotnet run --project IronDev.Api --urls http://localhost:5000
+```
+
+Run the Tauri shell in a second terminal:
+```powershell
+cd IronDev.TauriShell
+npm install
+npm run dev
 ```
 
 ---
@@ -154,8 +151,8 @@ dotnet run
 1.  **Login**:
     *   **Email**: `bob@irondev.local`
     *   **Password**: `change-me-local-only`
-2.  **Open Project**: The `IronDeveloper` project is seeded automatically.
-3.  **Index Project**: Click **Index Project** in the Hub or Ticket workspace to enable code-aware AI features.
+2.  **Open Project**: Select the seeded IronDev project.
+3.  **Index Project**: Use API-backed indexing/product commands before asking code-aware questions.
 
 ---
 

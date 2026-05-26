@@ -51,7 +51,7 @@ public sealed class DateTimeUtcStandardTests
             "DateTimeOffset" + ".Now"
         };
 
-        foreach (var relativeRoot in new[] { "IronDev.Api", "IronDev.Client", "IronDev.Core", "IronDev.Infrastructure", "IronDeveloper", "tools" })
+        foreach (var relativeRoot in new[] { "IronDev.Api", "IronDev.Client", "IronDev.Core", "IronDev.Infrastructure", "IronDev.TauriShell", "tools" })
         {
             var sourceRoot = Path.Combine(root, relativeRoot);
             if (!Directory.Exists(sourceRoot))
@@ -77,7 +77,7 @@ public sealed class DateTimeUtcStandardTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, "IronDeveloper")) &&
+            if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")) &&
                 Directory.Exists(Path.Combine(directory.FullName, "IronDev.Core")))
             {
                 return directory.FullName;

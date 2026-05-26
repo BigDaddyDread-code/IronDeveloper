@@ -25,8 +25,8 @@ public class ContextInjectionTests : IntegrationTestBase
         Directory.CreateDirectory(_testDirPath);
         
         // Seed specific files for keyword tests
-        await File.WriteAllTextAsync(Path.Combine(_testDirPath, "CodeWorkbenchWindow.xaml.cs"), "public partial class CodeWorkbenchWindow { }");
-        await File.WriteAllTextAsync(Path.Combine(_testDirPath, "MainWindow.xaml.cs"), "public partial class MainWindow { }");
+        await File.WriteAllTextAsync(Path.Combine(_testDirPath, "WorkspaceShell.tsx"), "export function WorkspaceShell() { return <main />; }");
+        await File.WriteAllTextAsync(Path.Combine(_testDirPath, "TicketsWorkspace.tsx"), "export function TicketsWorkspace() { return <section />; }");
     }
 
     [TestMethod]
@@ -41,12 +41,12 @@ public class ContextInjectionTests : IntegrationTestBase
         await indexService.IndexDirectoryAsync(projectId, _testDirPath);
 
         // 2. Build prompt with a keyword that matches
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How does the CodeWorkbenchWindow work?");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How does the WorkspaceShell work?");
 
         // 3. Verify the fragment content is in the prompt
-        StringAssert.Contains(prompt, "CodeWorkbenchWindow.xaml.cs");
-        StringAssert.Contains(prompt, "Symbol: CodeWorkbenchWindow");
-        StringAssert.Contains(prompt, "public partial class CodeWorkbenchWindow");
+        StringAssert.Contains(prompt, "WorkspaceShell.tsx");
+        StringAssert.Contains(prompt, "Symbol: WorkspaceShell");
+        StringAssert.Contains(prompt, "export function WorkspaceShell");
         StringAssert.Contains(prompt, "## Code Snippets");
     }
 

@@ -82,7 +82,7 @@ Only do this if you want to wipe the local Weaviate index.
 
 ## IronDev Settings
 
-Safe default in `IronDeveloper/appsettings.json`:
+Safe default in `IronDev.Api/appsettings.json`:
 
 ```json
 "Weaviate": {
@@ -94,7 +94,7 @@ Safe default in `IronDeveloper/appsettings.json`:
 }
 ```
 
-Local development override in `IronDeveloper/appsettings.Development.json`:
+Local development override in `IronDev.Api/appsettings.Development.json`:
 
 ```json
 "Weaviate": {

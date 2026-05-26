@@ -61,25 +61,25 @@ public class ChatGroundingSpecTests
             PromptContextBuilder.ClassifyIntent("What do I have to do to delete tickets? What files are affected?"));
 
     [TestMethod]
-    [Description("TC1-B: Expansion includes TicketsWorkspaceViewModel, ProjectTicket, TicketService, delete ticket.")]
+    [Description("TC1-B: Expansion includes TicketsWorkspace, ProjectTicket, TicketService, delete ticket.")]
     public void TC1_Expansion_DeleteTickets_IncludesHighPriorityTerms()
     {
         var q = PromptContextBuilder.ExpandSearchQueries(
             "What do I have to do to delete tickets? What files are affected?",
             ChatIntent.SavedTicketManagement);
 
-        foreach (var term in new[] { "TicketsWorkspaceViewModel", "TicketsWorkspaceView",
+        foreach (var term in new[] { "TicketsWorkspace", "TicketList",
                                      "ProjectTicket", "TicketService", "delete ticket" })
             CollectionAssert.Contains(q, term, $"TC1: expansion must include '{term}'");
     }
 
     [TestMethod]
-    [Description("TC1-C: DraftTicketDtos excluded entirely from SavedTicketManagement results; TicketsWorkspaceViewModel still present.")]
+    [Description("TC1-C: DraftTicketDtos excluded entirely from SavedTicketManagement results; TicketsWorkspace still present.")]
     public void TC1_Ranking_TicketsWorkspaceAboveDraftTicketDtos()
     {
         var snippets = MakeSnippets(
-            ("IronDeveloper/Dtos/DraftTicketDtos.cs",                         "DraftTicketDto"),
-            ("IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",         "TicketsWorkspaceViewModel"),
+            ("IronDev.Core/Builder/DraftTicketDtos.cs",                         "DraftTicketDto"),
+            ("IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx",         "TicketsWorkspace"),
             ("IronDev.Infrastructure/Models/CodebaseTicketGeneratorModels.cs","CodebaseTicketGeneratorModel"));
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
@@ -92,9 +92,9 @@ public class ChatGroundingSpecTests
         Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", System.StringComparison.OrdinalIgnoreCase)),
             "TC1: CodebaseTicketGeneratorModels must be completely absent from SavedTicketManagement ranked results.");
 
-        // TicketsWorkspaceViewModel must still be present
-        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceViewModel", System.StringComparison.OrdinalIgnoreCase)),
-            "TC1: TicketsWorkspaceViewModel must be present in ranked results.");
+        // TicketsWorkspace must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspace", System.StringComparison.OrdinalIgnoreCase)),
+            "TC1: TicketsWorkspace must be present in ranked results.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -130,23 +130,23 @@ public class ChatGroundingSpecTests
     }
 
     [TestMethod]
-    [Description("TC2-C: ChatWorkspaceViewModel ranked above DraftTicketDtos for chat deletion query.")]
+    [Description("TC2-C: ChatHistoryService ranked above DraftTicketDtos for chat deletion query.")]
     public void TC2_Ranking_ChatWorkspaceAboveDraftTicket()
     {
         var snippets = MakeSnippets(
-            ("IronDeveloper/Dtos/DraftTicketDtos.cs",                              "DraftTicketDto"),
-            ("IronDeveloper/ViewModels/Workspaces/ChatWorkspaceViewModel.cs",      "ChatWorkspaceViewModel"),
+            ("IronDev.Core/Builder/DraftTicketDtos.cs",                              "DraftTicketDto"),
+            ("IronDev.Infrastructure/Services/ChatHistoryService.cs",      "ChatHistoryService"),
             ("IronDev.Infrastructure/Services/ChatHistoryService.cs",              "ChatHistoryService"));
 
-        // Chat deletion is a general CodeQuery — no penalty on ChatWorkspaceViewModel
+        // Chat deletion is a general CodeQuery — no penalty on ChatHistoryService
         // DraftTicketDtos should still not lead (SavedTicketManagement scoring penalises it)
         var intent  = ChatIntent.CodeQuery; // as classified by TC2-A
         var ranked  = PromptContextBuilder.RankSnippetsByIntent(snippets, intent, 10);
 
         // For CodeQuery the order is stable (no rerank); just verify DraftTicket is not promoted
         var paths   = ranked.Select(r => r.FilePath ?? string.Empty).ToList();
-        var chatIdx = paths.FindIndex(p => p.Contains("ChatWorkspaceViewModel"));
-        Assert.IsTrue(chatIdx >= 0, "TC2: ChatWorkspaceViewModel must appear in ranked results.");
+        var chatIdx = paths.FindIndex(p => p.Contains("ChatHistoryService"));
+        Assert.IsTrue(chatIdx >= 0, "TC2: ChatHistoryService must appear in ranked results.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -164,24 +164,24 @@ public class ChatGroundingSpecTests
     }
 
     [TestMethod]
-    [Description("TC3-B: Expansion includes TicketsWorkspaceView and TicketsWorkspaceViewModel.")]
+    [Description("TC3-B: Expansion includes TicketList and TicketsWorkspace.")]
     public void TC3_Expansion_NoisyMarkdown_IncludesTicketsWorkspaceTerms()
     {
         var q = PromptContextBuilder.ExpandSearchQueries(
             "The ticket list shows noisy markdown fragments. What should I change?",
             ChatIntent.SavedTicketManagement);
 
-        CollectionAssert.Contains(q, "TicketsWorkspaceView");
-        CollectionAssert.Contains(q, "TicketsWorkspaceViewModel");
+        CollectionAssert.Contains(q, "TicketList");
+        CollectionAssert.Contains(q, "TicketsWorkspace");
     }
 
     [TestMethod]
-    [Description("TC3-C: CodebaseTicketGeneratorModels excluded from SavedTicketManagement; TicketsWorkspaceView present.")]
-    public void TC3_Ranking_TicketsWorkspaceViewAboveGeneratorModels()
+    [Description("TC3-C: CodebaseTicketGeneratorModels excluded from SavedTicketManagement; TicketList present.")]
+    public void TC3_Ranking_TicketListAboveGeneratorModels()
     {
         var snippets = MakeSnippets(
             ("IronDev.Infrastructure/Models/CodebaseTicketGeneratorModels.cs", "CodebaseTicketGeneratorModel"),
-            ("IronDeveloper/Views/Workspaces/TicketsWorkspaceView.xaml",       "TicketsWorkspaceView"));
+            ("IronDev.TauriShell/src/components/TicketList.tsx",       "TicketList"));
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.SavedTicketManagement, 10);
 
@@ -191,9 +191,9 @@ public class ChatGroundingSpecTests
         Assert.IsFalse(paths.Any(p => p.Contains("CodebaseTicketGeneratorModels", System.StringComparison.OrdinalIgnoreCase)),
             "TC3: CodebaseTicketGeneratorModels must be absent from SavedTicketManagement results.");
 
-        // TicketsWorkspaceView must still be present
-        Assert.IsTrue(paths.Any(p => p.Contains("TicketsWorkspaceView", System.StringComparison.OrdinalIgnoreCase)),
-            "TC3: TicketsWorkspaceView.xaml must be present in ranked results.");
+        // TicketList must still be present
+        Assert.IsTrue(paths.Any(p => p.Contains("TicketList", System.StringComparison.OrdinalIgnoreCase)),
+            "TC3: TicketList.tsx must be present in ranked results.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -256,7 +256,7 @@ public class ChatGroundingSpecTests
     public void TC5_Ranking_PromptContextBuilderAboveDraftTicketDtos()
     {
         var snippets = MakeSnippets(
-            ("IronDeveloper/Dtos/DraftTicketDtos.cs",                            "DraftTicketDto"),
+            ("IronDev.Core/Builder/DraftTicketDtos.cs",                            "DraftTicketDto"),
             ("IronDev.Infrastructure/Services/PromptContextBuilder.cs",          "PromptContextBuilder"),
             ("IronDev.Infrastructure/Services/CodeIndexService.cs",              "SqlCodeIndexService"));
 
@@ -294,17 +294,17 @@ public class ChatGroundingSpecTests
     }
 
     [TestMethod]
-    [Description("TC6-C: DraftTicketService ranked above TicketsWorkspaceViewModel for draft flow query.")]
-    public void TC6_Ranking_DraftTicketServiceAboveTicketsWorkspaceViewModel()
+    [Description("TC6-C: DraftTicketService ranked above TicketsWorkspace for draft flow query.")]
+    public void TC6_Ranking_DraftTicketServiceAboveTicketsWorkspace()
     {
         var snippets = MakeSnippets(
-            ("IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs", "TicketsWorkspaceViewModel"),
+            ("IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx", "TicketsWorkspace"),
             ("IronDev.Infrastructure/Builder/DraftTicketService.cs",             "DraftTicketService"));
 
         var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, ChatIntent.DraftTicketFlow, 10);
 
-        AssertRankedBefore(ranked, "DraftTicketService", "TicketsWorkspaceViewModel",
-            "TC6: DraftTicketService must appear before TicketsWorkspaceViewModel for draft flow.");
+        AssertRankedBefore(ranked, "DraftTicketService", "TicketsWorkspace",
+            "TC6: DraftTicketService must appear before TicketsWorkspace for draft flow.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -385,7 +385,7 @@ public class ChatGroundingSpecTests
             "How can another developer run IronDev with Ollama or a local LLM?",
             ChatIntent.CodeQuery);
 
-        var ticketLeadTerms = new[] { "TicketsWorkspaceViewModel", "DraftTicket", "ProjectTicket" };
+        var ticketLeadTerms = new[] { "TicketsWorkspace", "DraftTicket", "ProjectTicket" };
         var topSix = q.Take(6).ToList();
         var bad = topSix.Intersect(ticketLeadTerms, System.StringComparer.OrdinalIgnoreCase).ToList();
         Assert.AreEqual(0, bad.Count,
@@ -441,8 +441,8 @@ public class ChatGroundingSpecTests
         {
             var intent   = PromptContextBuilder.ClassifyIntent(q);
             var snippets = MakeSnippets(
-                ("IronDeveloper/Dtos/DraftTicketDtos.cs",                       "DraftTicketDto"),
-                ("IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",       "TicketsWorkspaceViewModel"));
+                ("IronDev.Core/Builder/DraftTicketDtos.cs",                       "DraftTicketDto"),
+                ("IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx",       "TicketsWorkspace"));
 
             var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, intent, 10);
             var first  = ranked.FirstOrDefault();
@@ -454,8 +454,8 @@ public class ChatGroundingSpecTests
     }
 
     [TestMethod]
-    [Description("Anti-pattern: DraftTicketFlow queries must not rank TicketsWorkspaceViewModel first.")]
-    public void AntiPattern_DraftTicketQuery_TicketsWorkspaceViewModel_NeverFirst()
+    [Description("Anti-pattern: DraftTicketFlow queries must not rank TicketsWorkspace first.")]
+    public void AntiPattern_DraftTicketQuery_TicketsWorkspace_NeverFirst()
     {
         var queries = new[]
         {
@@ -470,15 +470,15 @@ public class ChatGroundingSpecTests
             if (intent != ChatIntent.DraftTicketFlow) continue; // only test if classified correctly
 
             var snippets = MakeSnippets(
-                ("IronDeveloper/ViewModels/TicketsWorkspaceViewModel.cs",  "TicketsWorkspaceViewModel"),
+                ("IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx",  "TicketsWorkspace"),
                 ("IronDev.Infrastructure/Builder/DraftTicketService.cs",   "DraftTicketService"));
 
             var ranked = PromptContextBuilder.RankSnippetsByIntent(snippets, intent, 10);
             var first  = ranked.FirstOrDefault();
 
             Assert.IsFalse(
-                first?.FilePath?.Contains("TicketsWorkspaceViewModel") == true,
-                $"Anti-pattern FAIL for [{q}]: TicketsWorkspaceViewModel must not be ranked first for DraftTicketFlow.");
+                first?.FilePath?.Contains("TicketsWorkspace") == true,
+                $"Anti-pattern FAIL for [{q}]: TicketsWorkspace must not be ranked first for DraftTicketFlow.");
         }
     }
 }

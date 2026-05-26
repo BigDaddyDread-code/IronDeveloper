@@ -6,7 +6,7 @@ $sourceRoots = @(
     "IronDev.Client",
     "IronDev.Core",
     "IronDev.Infrastructure",
-    "IronDeveloper",
+    "IronDev.TauriShell",
     "tools"
 )
 

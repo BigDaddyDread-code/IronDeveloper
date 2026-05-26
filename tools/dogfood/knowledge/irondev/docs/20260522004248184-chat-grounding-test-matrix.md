@@ -38,7 +38,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 - `"Data Model"` without `DataModels.cs` / `ProjectTicket`
 - `"Service Layer"` without `TicketService.cs` / `ChatHistoryService.cs`
 - `"Database Schema"` without `Database/local_dev_setup.sql` or `rebuild_db.sql`
-- `"UI Component"` without `TicketsWorkspaceView.xaml` / `ChatWorkspaceView.xaml`
+- `"UI Component"` without `TicketList.tsx` / `WorkspaceShell.tsx`
 - `"Controller"` (there are no controllers in the WPF client)
 - `"Repository"` (pattern not used; Dapper services are used directly)
 - `"TicketService"` when no real `TicketService.cs` snippet was retrieved
@@ -74,8 +74,8 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs` |
-| High | `IronDeveloper/Views/Workspaces/TicketsWorkspaceView.xaml` |
+| High | `IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx` |
+| High | `IronDev.TauriShell/src/components/TicketList.tsx` |
 | High | `IronDev.Infrastructure/Services/TicketService.cs` |
 | High | `IronDev.Core/Models/DataModels.cs` → `ProjectTicket` |
 | Medium | `Database/local_dev_setup.sql` |
@@ -87,8 +87,8 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 **Answer must include:**
 - Explain this is about saved `ProjectTicket`, not `DraftTicket`
 - Recommend soft delete / archive before hard delete
-- Mention `DeleteSelectedTicketCommand` or `ArchiveSelectedTicketCommand` in `TicketsWorkspaceViewModel`
-- Mention UI delete/archive action with confirmation in `TicketsWorkspaceView.xaml`
+- Mention `DeleteSelectedTicketCommand` or `ArchiveSelectedTicketCommand` in `TicketsWorkspace`
+- Mention UI delete/archive action with confirmation in `TicketList.tsx`
 - Mention service method `DeleteTicketAsync` / `ArchiveTicketAsync` with tenant/project guard in `TicketService.cs`
 - Mention tests
 
@@ -103,8 +103,8 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "question": "What do I have to do to delete tickets? What files are affected?",
   "intent": "SavedTicketManagement",
   "mustIncludeAny": [
-    "TicketsWorkspaceViewModel",
-    "TicketsWorkspaceView.xaml",
+    "TicketsWorkspace",
+    "TicketList.tsx",
     "ProjectTicket",
     "TicketService"
   ],
@@ -118,7 +118,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer references real saved-ticket files/classes; explicitly avoids treating `DraftTicket` as the saved ticket model.  
+**Pass:** Answer references real saved-ticket files/classes; explicitly avoids treating `DraftTicket` as the saved ticket model.
 **Fail:** `DraftTicketDtos.cs` is the primary affected file cited.
 
 ---
@@ -134,8 +134,8 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/ViewModels/Workspaces/ChatWorkspaceViewModel.cs` |
-| High | `IronDeveloper/Views/Workspaces/ChatWorkspaceView.xaml` |
+| High | `IronDev.Infrastructure/Services/ChatHistoryService.cs` |
+| High | `IronDev.TauriShell/src/components/WorkspaceShell.tsx` |
 | High | `IronDev.Infrastructure/Services/ChatHistoryService.cs` |
 | High | `ProjectChatSessions` table (referenced in `local_dev_setup.sql`) |
 | High | `ChatMessages` table |
@@ -146,8 +146,8 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 **Answer must include:**
 - Distinguish deleting a chat session from deleting individual messages
 - Recommend archive/soft-delete before hard delete
-- Add delete/archive command in `ChatWorkspaceViewModel`
-- Add UI action in `ChatWorkspaceView.xaml`
+- Add delete/archive command in `ChatHistoryService`
+- Add UI action in `WorkspaceShell.tsx`
 - Add service method in `ChatHistoryService` with tenant/project checks
 - Handle active chat deletion safely (navigate away first)
 - Tests for tenant isolation and list refresh
@@ -163,7 +163,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "question": "What would I need to do to delete old chats from Chat History?",
   "intent": "CodeQuery",
   "mustIncludeAny": [
-    "ChatWorkspaceViewModel",
+    "ChatHistoryService",
     "ChatHistoryService",
     "ProjectChatSessions",
     "ChatMessages"
@@ -174,7 +174,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer identifies actual chat session/message persistence areas with real class names.  
+**Pass:** Answer identifies actual chat session/message persistence areas with real class names.
 **Fail:** Answer only says "update ChatService and database".
 
 ---
@@ -190,16 +190,16 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/Views/Workspaces/TicketsWorkspaceView.xaml` |
-| High | `IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs` |
+| High | `IronDev.TauriShell/src/components/TicketList.tsx` |
+| High | `IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx` |
 | High | `IronDev.Core/Models/DataModels.cs` → `ProjectTicket` |
-| Medium | `MarkdownPreviewConverter` (in `IronDeveloper/Converters/`) if indexed |
+| Medium | `ticket markdown preview helpers` (in `IronDev.TauriShell/src/components/`) if indexed |
 | Low | `WorkspaceListItem` / controls library |
 
 **Answer must include:**
-- Fix ticket list `DataTemplate` in `TicketsWorkspaceView.xaml`
+- Fix ticket list `DataTemplate` in `TicketList.tsx`
 - Identify the `ProjectTicket` field used as the preview (`Summary` or `Description`)
-- Strip or sanitise markdown fragments — e.g. via `MarkdownPreviewConverter` or inline
+- Strip or sanitise markdown fragments — e.g. via `ticket markdown preview helpers` or inline
 - One-line preview using `TextTrimming="CharacterEllipsis"`
 - Keep status/priority compact
 - Do not change database schema
@@ -216,10 +216,10 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "question": "The ticket list shows noisy markdown fragments. What should I change?",
   "intent": "SavedTicketManagement",
   "mustIncludeAny": [
-    "TicketsWorkspaceView.xaml",
-    "TicketsWorkspaceViewModel",
+    "TicketList.tsx",
+    "TicketsWorkspace",
     "ProjectTicket",
-    "MarkdownPreviewConverter",
+    "ticket markdown preview helpers",
     "DataTemplate",
     "TextTrimming"
   ],
@@ -237,7 +237,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Pass only if the answer identifies ticket row/list preview rendering as the problem and gives a concrete UI binding or converter fix (e.g. `MarkdownPreviewConverter`, `TextTrimming`, `DataTemplate` change in `TicketsWorkspaceView.xaml`).  
+**Pass:** Pass only if the answer identifies ticket row/list preview rendering as the problem and gives a concrete UI binding or converter fix (e.g. `ticket markdown preview helpers`, `TextTrimming`, `DataTemplate` change in `TicketList.tsx`).
 **Fail:** Fail if answer recommends a generic markdown parser library, markdown-to-HTML conversion, database schema change, or storage/retrieval change as the primary fix.
 
 ---
@@ -253,7 +253,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/Views/Workspaces/TicketsWorkspaceView.xaml` |
+| High | `IronDev.TauriShell/src/components/TicketList.tsx` |
 | High | `IronDeveloperControls` — `SelectionField` style/template (if used) |
 | Medium | `IronDeveloperControls` resource dictionaries / themes |
 
@@ -275,7 +275,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "question": "Status, priority and type dropdowns are clipped. What files should I fix?",
   "intent": "CodeQuery",
   "mustIncludeAny": [
-    "TicketsWorkspaceView.xaml",
+    "TicketList.tsx",
     "SelectionField",
     "MinWidth"
   ],
@@ -285,7 +285,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer points to ticket XAML / control style.  
+**Pass:** Answer points to ticket XAML / control style.
 **Fail:** Answer treats it as a data or model problem.
 
 ---
@@ -301,7 +301,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/ViewModels/Workspaces/ChatWorkspaceViewModel.cs` |
+| High | `IronDev.Infrastructure/Services/ChatHistoryService.cs` |
 | High | `IronDev.Infrastructure/Services/PromptContextBuilder.cs` |
 | High | `IronDev.Infrastructure/Services/CodeIndexService.cs` |
 | High | `IronDev.Infrastructure/Services/ProjectMemoryService.cs` |
@@ -331,7 +331,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
     "PromptContextBuilder",
     "CodeIndexService",
     "GetRelevantSnippetsAsync",
-    "ChatWorkspaceViewModel"
+    "ChatHistoryService"
   ],
   "mustNotLeadWith": ["Weaviate", "embeddings"],
   "mustMention": ["IndexingStatus", "retrieval", "prompt"],
@@ -339,7 +339,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer describes retrieval + prompt injection + index preflight.  
+**Pass:** Answer describes retrieval + prompt injection + index preflight.
 **Fail:** Answer says only "make the prompt better" or "add Weaviate".
 
 ---
@@ -359,8 +359,8 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 | High | `IronDev.Core/Builder/DraftTicketDtos.cs` |
 | High | `IronDev.Infrastructure/Services/PromptContextBuilder.cs` |
 | High | `IronDev.Infrastructure/Services/CodeIndexService.cs` |
-| Medium | `IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs` |
-| Medium | `IronDeveloper/ViewModels/Workspaces/ChatWorkspaceViewModel.cs` |
+| Medium | `IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx` |
+| Medium | `IronDev.Infrastructure/Services/ChatHistoryService.cs` |
 
 **Answer must include:**
 - Build `ProjectContext` before draft generation (decisions, summaries, code index)
@@ -385,13 +385,13 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
     "PromptContextBuilder",
     "CodeIndexService"
   ],
-  "mustNotLeadWith": ["TicketsWorkspaceViewModel delete", "schema"],
+  "mustNotLeadWith": ["TicketsWorkspace delete", "schema"],
   "mustMention": ["context", "affectedFiles", "prompt"],
   "mustNotMention": ["Weaviate", "patch validation"]
 }
 ```
 
-**Pass:** Answer focuses on `DraftTicketService` prompt/context improvement.  
+**Pass:** Answer focuses on `DraftTicketService` prompt/context improvement.
 **Fail:** Answer suggests unrelated UI changes only.
 
 ---
@@ -407,17 +407,17 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs` |
-| High | `IronDeveloper/ViewModels/Workspaces/ImplementationPlansWorkspaceViewModel.cs` |
-| High | `IronDeveloper/ViewModels/Shell/ShellViewModel.cs` |
+| High | `IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx` |
+| High | `IronDev.TauriShell/src/components/TicketDetail.tsx` |
+| High | `IronDev.TauriShell/src/components/WorkspaceShell.tsx` |
 | High | `ProjectImplementationPlan` model (`DataModels.cs`) |
-| Medium | `TicketsWorkspaceView.xaml` (button binding) |
+| Medium | `TicketList.tsx` (button binding) |
 
 **Answer must include:**
 - Snapshot draft fields *before* clearing draft state on approval
 - Ensure saved ticket `Id` is returned from `TicketService.SaveTicketAsync`
 - Pass `Title`, `Summary`, acceptance criteria, tests into plan prefill
-- Check `ShellViewModel` navigation callback wiring
+- Check `WorkspaceShell` navigation callback wiring
 - Verify plan `Title` includes ticket title
 
 **Answer must NOT include:**
@@ -431,9 +431,9 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "question": "Create Ticket + Plan opens the plan screen, but the plan fields are empty. What should we check?",
   "intent": "CodeQuery",
   "mustIncludeAny": [
-    "TicketsWorkspaceViewModel",
+    "TicketsWorkspace",
     "ImplementationPlansWorkspaceViewModel",
-    "ShellViewModel",
+    "WorkspaceShell",
     "ProjectImplementationPlan"
   ],
   "mustNotLeadWith": ["schema", "Weaviate", "LLM"],
@@ -442,7 +442,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer identifies draft state clearing / navigation callback as the risk.  
+**Pass:** Answer identifies draft state clearing / navigation callback as the risk.
 **Fail:** Answer only says "check the plan service".
 
 ---
@@ -458,9 +458,9 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 
 | Priority | File / Symbol |
 |---|---|
-| High | `IronDeveloper/ViewModels/Workspaces/TicketsWorkspaceViewModel.cs` |
-| High | `IronDeveloper/ViewModels/Shell/ShellViewModel.cs` |
-| High | `IronDeveloper/ViewModels/Workflow/ProjectOverviewViewModel.cs` |
+| High | `IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx` |
+| High | `IronDev.TauriShell/src/components/WorkspaceShell.tsx` |
+| High | `IronDev.TauriShell/src/components/AuthRequiredState.tsx` |
 | High | `IronDev.Infrastructure/Services/CodeIndexService.cs` |
 | High | `IronDev.IntegrationTests/DraftPreflightTests.cs` |
 | Medium | Index status properties / `SetIndexStatus` / `IsDraftIndexing` |
@@ -484,7 +484,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
   "question": "When I click Index Project First, indexing runs but draft is not generated after Ready. What should be fixed?",
   "intent": "DraftTicketFlow",
   "mustIncludeAny": [
-    "TicketsWorkspaceViewModel",
+    "TicketsWorkspace",
     "SetIndexStatus",
     "IsDraftIndexing",
     "ChatTicketContext"
@@ -495,7 +495,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer identifies pending context + `SetIndexStatus("Ready")` propagation as the fix.  
+**Pass:** Answer identifies pending context + `SetIndexStatus("Ready")` propagation as the fix.
 **Fail:** Answer says only "rerun indexing".
 
 ---
@@ -515,7 +515,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 | High | `IronDev.Infrastructure/Services/OpenAiLlmService.cs` |
 | High | `IronDev.Infrastructure/Services/LocalOpenAiCompatibleLlmService.cs` |
 | High | `IronDev.Infrastructure/Services/OllamaLlmService.cs` |
-| High | `IronDeveloper/App.xaml.cs` (DI provider switch) |
+| High | `IronDev.Api/Program.cs` (DI provider switch) |
 | Medium | `appsettings.Development.json` |
 | Medium | `Docs/local-development.md` |
 
@@ -549,7 +549,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer references provider files and config.  
+**Pass:** Answer references provider files and config.
 **Fail:** Answer says "set `OPENAI_API_KEY` only".
 
 ---
@@ -602,7 +602,7 @@ Flag any answer whose *primary recommendation* relies on these generic terms **w
 }
 ```
 
-**Pass:** Answer matches the local setup docs and references real scripts.  
+**Pass:** Answer matches the local setup docs and references real scripts.
 **Fail:** Answer says "manually create tables" or omits `local_dev_setup.sql`.
 
 ---

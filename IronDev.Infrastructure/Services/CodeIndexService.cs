@@ -39,12 +39,13 @@ public sealed class SqlCodeIndexService : ICodeIndexService
 
     private static readonly HashSet<string> IncludedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".cs", ".xaml", ".csproj", ".json", ".md" // V1 restricted set
+        ".cs", ".ts", ".tsx", ".xaml", ".csproj", ".json", ".md"
     };
 
     // V1 Regex for basic symbol extraction
     private static readonly Regex NamespaceRegex = new(@"namespace\s+([\w\.]+)", RegexOptions.Compiled);
     private static readonly Regex ClassRegex = new(@"class\s+(\w+)", RegexOptions.Compiled);
+    private static readonly Regex FunctionRegex = new(@"(?:export\s+)?function\s+(\w+)\s*\(", RegexOptions.Compiled);
     private static readonly Regex MethodRegex = new(@"(?:public|private|protected|internal|static|\s)+\s+[\w\<\>\[\]]+\s+(\w+)\s*\(", RegexOptions.Compiled);
 
     public SqlCodeIndexService(
@@ -230,7 +231,7 @@ public sealed class SqlCodeIndexService : ICodeIndexService
             else if (allFiles.Count == 0)
             {
                 newStatus = "Needs Index — no indexable files found";
-                result.ErrorMessage = $"No indexable files (.cs, .xaml, .json, .md) found in: {directoryPath}";
+                result.ErrorMessage = $"No indexable files (.cs, .ts, .tsx, .xaml, .json, .md) found in: {directoryPath}";
             }
             else
             {
@@ -303,6 +304,13 @@ public sealed class SqlCodeIndexService : ICodeIndexService
             if (classMatch.Success)
             {
                 AddEntry(classMatch.Groups[1].Value, "Class", i);
+                continue;
+            }
+
+            var functionMatch = FunctionRegex.Match(line);
+            if (functionMatch.Success)
+            {
+                AddEntry(functionMatch.Groups[1].Value, "Function", i);
                 continue;
             }
 

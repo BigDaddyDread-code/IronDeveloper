@@ -20,7 +20,6 @@ React and TypeScript can make the cockpit UI faster to iterate, and Playwright k
 ## What This Does Not Prove
 
 - It does not own product persistence or workflow logic.
-- It does not delete WPF code.
 - It does not migrate all workspaces.
 - It does not move backend/product logic into TypeScript.
 - It does not bypass `IronDev.Api`.

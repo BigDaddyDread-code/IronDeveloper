@@ -15,7 +15,7 @@ public sealed class CodexSnapshotBuilder : ICodexSnapshotBuilder
 {
     private static readonly HashSet<string> IncludedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".cs", ".xaml", ".csproj", ".json", ".xml", ".md", ".slnx", ".props", ".targets", ".sql"
+        ".cs", ".ts", ".tsx", ".xaml", ".csproj", ".json", ".xml", ".md", ".slnx", ".props", ".targets", ".sql"
     };
 
     private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
@@ -404,6 +404,7 @@ public sealed class CodexSnapshotBuilder : ICodexSnapshotBuilder
         return Path.GetExtension(filePath).ToLowerInvariant() switch
         {
             ".cs" => "csharp",
+            ".ts" or ".tsx" => "typescript",
             ".xaml" => "xaml",
             ".sql" => "sql",
             ".json" or ".xml" or ".csproj" or ".props" or ".targets" or ".slnx" => "config",
@@ -416,6 +417,7 @@ public sealed class CodexSnapshotBuilder : ICodexSnapshotBuilder
         => languageId switch
         {
             "csharp" => "Medium",
+            "typescript" => "Medium",
             "xaml" => "Medium",
             "config" => "Low",
             "markdown" => "Low",
@@ -427,6 +429,7 @@ public sealed class CodexSnapshotBuilder : ICodexSnapshotBuilder
         => languageId switch
         {
             "csharp" => "Roslyn semantic extraction is active with structural fallback.",
+            "typescript" => "TypeScript shell files are included for current UI context.",
             "xaml" => "Structural XAML extraction covers named elements and bindings.",
             "config" => "Config files are included as context, not deep semantic symbols.",
             "markdown" => "Markdown is included as project context.",
