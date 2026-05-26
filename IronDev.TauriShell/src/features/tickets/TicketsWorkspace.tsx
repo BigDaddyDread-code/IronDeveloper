@@ -1,7 +1,23 @@
-import type { ApiStatus, ProductAccessStatus, ProjectSummary, ProjectTicket, TenantSummary } from '../../api/types';
+import type {
+  ApiStatus,
+  BuildReadinessResult,
+  ProductAccessStatus,
+  ProjectImplementationPlan,
+  ProjectSummary,
+  ProjectTicket,
+  TicketCreateStatus,
+  TenantSummary,
+  TicketDetailLoadStatus,
+  TicketPlanStatus,
+  TicketReadinessLoadStatus,
+  TicketSaveStatus
+} from '../../api/types';
 import { AuthRequiredState } from '../../components/AuthRequiredState';
 import { ContextInspector } from '../../components/ContextInspector';
+import type { CreateTicketDraft } from '../../components/CreateTicketPanel';
+import { CreateTicketPanel } from '../../components/CreateTicketPanel';
 import { SurfacePanel } from '../../components/SurfacePanel';
+import type { TicketEditDraft } from '../../components/TicketEditForm';
 import { TicketDetail } from '../../components/TicketDetail';
 import { TicketList } from '../../components/TicketList';
 import { WorkspaceLayout } from '../../components/WorkspaceLayout';
@@ -10,7 +26,8 @@ interface TicketsWorkspaceProps {
   apiStatus: ApiStatus;
   accessStatus: ProductAccessStatus;
   apiBaseUrl: string;
-  projectId: number;
+  projectId: number | null;
+  projectStatus: 'selected' | 'missing' | 'fallback';
   tokenConfigured: boolean;
   productAccessBlocked: boolean;
   authLabel: string;
@@ -20,6 +37,27 @@ interface TicketsWorkspaceProps {
   selectedProjectId: number | null;
   tickets: ProjectTicket[];
   selectedTicket: ProjectTicket | null;
+  ticketDetailStatus: TicketDetailLoadStatus;
+  ticketDetailMessage: string;
+  readiness: BuildReadinessResult | null;
+  readinessStatus: TicketReadinessLoadStatus;
+  readinessMessage: string;
+  implementationPlan: ProjectImplementationPlan | null;
+  planStatus: TicketPlanStatus;
+  planMessage: string;
+  isEditingTicket: boolean;
+  editDraft: TicketEditDraft;
+  saveStatus: TicketSaveStatus;
+  saveMessage: string;
+  isEditDirty: boolean;
+  editValidationMessage: string | null;
+  editBlockedReason: string | null;
+  isCreatePanelOpen: boolean;
+  createDraft: CreateTicketDraft;
+  createStatus: TicketCreateStatus;
+  createMessage: string;
+  createBlockedReason: string | null;
+  createdTicketId: number | null;
   selectedTicketId: number | null;
   ticketMessage: string;
   tokenDraft: string;
@@ -29,6 +67,15 @@ interface TicketsWorkspaceProps {
   isBusy: boolean;
   errorMessage: string | null;
   onSelectTicket: (ticketId: number) => void;
+  onEditTicket: () => void;
+  onEditDraftChange: (draft: TicketEditDraft) => void;
+  onSaveTicket: () => void;
+  onCancelEditTicket: () => void;
+  onRefreshPlan: () => void;
+  onRefreshReadiness: () => void;
+  onCreateDraftChange: (draft: CreateTicketDraft) => void;
+  onSubmitCreateTicket: () => void;
+  onCancelCreateTicket: () => void;
   onConfigureToken: () => void;
   onRetry: () => void;
   onTokenDraftChange: (value: string) => void;
@@ -45,6 +92,7 @@ export function TicketsWorkspace({
   accessStatus,
   apiBaseUrl,
   projectId,
+  projectStatus,
   tokenConfigured,
   productAccessBlocked,
   authLabel,
@@ -54,6 +102,27 @@ export function TicketsWorkspace({
   selectedProjectId,
   tickets,
   selectedTicket,
+  ticketDetailStatus,
+  ticketDetailMessage,
+  readiness,
+  readinessStatus,
+  readinessMessage,
+  implementationPlan,
+  planStatus,
+  planMessage,
+  isEditingTicket,
+  editDraft,
+  saveStatus,
+  saveMessage,
+  isEditDirty,
+  editValidationMessage,
+  editBlockedReason,
+  isCreatePanelOpen,
+  createDraft,
+  createStatus,
+  createMessage,
+  createBlockedReason,
+  createdTicketId,
   selectedTicketId,
   ticketMessage,
   tokenDraft,
@@ -63,6 +132,15 @@ export function TicketsWorkspace({
   isBusy,
   errorMessage,
   onSelectTicket,
+  onEditTicket,
+  onEditDraftChange,
+  onSaveTicket,
+  onCancelEditTicket,
+  onRefreshPlan,
+  onRefreshReadiness,
+  onCreateDraftChange,
+  onSubmitCreateTicket,
+  onCancelCreateTicket,
   onConfigureToken,
   onRetry,
   onTokenDraftChange,
@@ -86,7 +164,21 @@ export function TicketsWorkspace({
           />
         }
         center={
-          productAccessBlocked ? (
+          isCreatePanelOpen ? (
+            <CreateTicketPanel
+              projectId={selectedProjectId}
+              projectName={projects.find((project) => project.id === selectedProjectId)?.name ?? null}
+              projectStatus={projectStatus}
+              draft={createDraft}
+              status={createStatus}
+              message={createMessage}
+              blockedReason={createBlockedReason}
+              createdTicketId={createdTicketId}
+              onChange={onCreateDraftChange}
+              onSubmit={onSubmitCreateTicket}
+              onCancel={onCancelCreateTicket}
+            />
+          ) : productAccessBlocked ? (
             <SurfacePanel className="ticket-detail ticket-detail--auth" testId="ticket.detail">
               <AuthRequiredState
                 apiStatus={apiStatus}
@@ -114,14 +206,40 @@ export function TicketsWorkspace({
               />
             </SurfacePanel>
           ) : (
-            <TicketDetail ticket={selectedTicket} isLoading={accessStatus === 'loadingTickets'} />
+            <TicketDetail
+              ticket={selectedTicket}
+              detailStatus={accessStatus === 'loadingTickets' ? 'loading' : ticketDetailStatus}
+              detailMessage={ticketDetailMessage}
+              readiness={readiness}
+              readinessStatus={readinessStatus}
+              readinessMessage={readinessMessage}
+              implementationPlan={implementationPlan}
+              planStatus={planStatus}
+              planMessage={planMessage}
+              isEditing={isEditingTicket}
+              editDraft={editDraft}
+              saveStatus={saveStatus}
+              saveMessage={saveMessage}
+              isEditDirty={isEditDirty}
+              editValidationMessage={editValidationMessage}
+              editBlockedReason={editBlockedReason}
+              onEdit={onEditTicket}
+              onEditDraftChange={onEditDraftChange}
+              onSave={onSaveTicket}
+              onCancelEdit={onCancelEditTicket}
+              onRefreshPlan={onRefreshPlan}
+              onRefreshReadiness={onRefreshReadiness}
+            />
           )
         }
         right={
           <ContextInspector
             ticket={selectedTicket}
+            readiness={readiness}
+            readinessStatus={readinessStatus}
             apiBaseUrl={apiBaseUrl}
             projectId={projectId}
+            projectStatus={projectStatus}
             tokenConfigured={tokenConfigured}
           />
         }

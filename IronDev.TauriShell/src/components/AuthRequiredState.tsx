@@ -139,9 +139,11 @@ export function AuthRequiredState({
             />
           </label>
           <div className="auth-required-state__actions">
-            <CommandButton variant="primary" testId="auth.submit" type="submit" disabled={isBusy}>
-              {isBusy ? 'Signing in...' : 'Sign in'}
-            </CommandButton>
+            <span data-testid="auth.signIn">
+              <CommandButton variant="primary" testId="auth.submit" type="submit" disabled={isBusy}>
+                {isBusy ? 'Signing in...' : 'Sign in'}
+              </CommandButton>
+            </span>
             <CommandButton variant="secondary" testId="app.authState.retry" type="button" onClick={onRetry}>
               Retry connection
             </CommandButton>

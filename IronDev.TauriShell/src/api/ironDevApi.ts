@@ -1,8 +1,11 @@
 import type {
   ApiConnectionStatus,
   ApiStatus,
+  BuildReadinessResult,
+  CreateProjectTicketRequest,
   LoginRequest,
   LoginResponse,
+  ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
   TenantSummary,
@@ -81,7 +84,15 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
     };
   }
 
-  return createIronDevApiClient(config).getProjectTickets(config.selectedProjectId ?? config.fallbackProjectId, signal);
+  if (!config.selectedProjectId) {
+    return {
+      tickets: [],
+      status: 'error',
+      message: 'Select a project before loading tickets.'
+    };
+  }
+
+  return createIronDevApiClient(config).getProjectTickets(config.selectedProjectId, signal);
 }
 
 class IronDevApiClient {
@@ -181,6 +192,51 @@ class IronDevApiClient {
         message: 'Ticket request could not reach IronDev.Api.'
       };
     }
+  }
+
+  async createProjectTicket(
+    projectId: number,
+    request: CreateProjectTicketRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectTicket> {
+    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async saveProjectTicket(projectId: number, ticket: ProjectTicket, signal?: AbortSignal): Promise<ProjectTicket> {
+    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/legacy`, {
+      method: 'POST',
+      body: ticket,
+      signal
+    });
+  }
+
+  async getProjectTicket(projectId: number, ticketId: number, signal?: AbortSignal): Promise<ProjectTicket> {
+    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/${ticketId}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getTicketImplementationPlan(ticketId: number, signal?: AbortSignal): Promise<ProjectImplementationPlan> {
+    return this.request<ProjectImplementationPlan>(`/api/tickets/${ticketId}/implementation-plan`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getTicketBuildReadiness(
+    projectId: number,
+    ticketId: number,
+    signal?: AbortSignal
+  ): Promise<BuildReadinessResult> {
+    return this.request<BuildReadinessResult>(`/api/projects/${projectId}/tickets/${ticketId}/build-readiness`, {
+      method: 'GET',
+      signal
+    });
   }
 
   private async request<T>(path: string, options: RequestOptions): Promise<T> {

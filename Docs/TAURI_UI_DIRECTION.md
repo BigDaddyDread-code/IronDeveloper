@@ -119,6 +119,14 @@ Required API/auth states:
 - Project required
 - Loading
 - Error
+- Selected ticket loading
+- Readiness loading
+- Readiness unavailable
+- Missing context/evidence
+
+Ticket actions must separate safe creation/edit/review from destructive or repository-changing work. Create, edit, save, refresh readiness, and refresh plan can appear in the cockpit command area when API/auth/tenant/project/ticket state is valid. Archive, delete, apply, build, promotion approval, and repository mutation actions must not appear until their API path, validation, and confirmation model are explicit.
+
+Editing is local draft state until the user saves through `IronDev.Api`. The UI may track dirty state, validation state, save state, and blocked reasons, but the backend remains the source of persistence truth. Dirty drafts should block ticket selection changes unless the user saves or cancels.
 
 Auth-required copy should explain that `IronDev.Api` is reachable or expected locally, but product data needs a token. Use calm badges and clear actions:
 
@@ -138,6 +146,9 @@ Tenant and project states are first-class product states. Do not hide them as ge
 - `Tenant required`: show `tenant.selector`.
 - `Project required`: show `project.selector` and `project.status.missing`.
 - `Project selected`: show `project.status.selected`.
+- `Fallback project`: show `project.status.fallback` and label it as fallback, not selected.
+
+Fallback project context is allowed only as an explicit read context. It must not be displayed as a selected project, and it must not enable write actions. Ticket creation requires API connected, valid auth, tenant selected, and explicit project selected.
 
 ## Responsive Behaviour
 
@@ -188,13 +199,60 @@ Current required selectors:
 - `ticket.list`
 - `ticket.row`
 - `ticket.detail`
+- `ticket.detail.header`
+- `ticket.detail.brief`
+- `ticket.detail.plan`
+- `ticket.detail.context`
+- `ticket.detail.tests`
+- `ticket.detail.build`
+- `ticket.detail.acceptanceCriteria`
+- `ticket.detail.readiness`
 - `ticket.inspector`
+- `ticket.inspector.evidence`
+- `ticket.inspector.linkedDocuments`
+- `ticket.inspector.decisions`
+- `ticket.inspector.affectedFiles`
+- `ticket.inspector.affectedSymbols`
+- `ticket.inspector.buildReadiness`
+- `ticket.inspector.warnings`
+- `ticket.inspector.traceLinks`
 - `ticket.command.refresh`
+- `ticket.command.refreshReadiness`
+- `ticket.command.generatePlan`
+- `ticket.command.create`
+- `ticket.command.edit`
+- `ticket.command.save`
+- `ticket.command.cancel`
+- `ticket.create.panel`
+- `ticket.create.title`
+- `ticket.create.summary`
+- `ticket.create.type`
+- `ticket.create.priority`
+- `ticket.create.acceptanceCriteria`
+- `ticket.create.submit`
+- `ticket.create.cancel`
+- `ticket.create.success`
+- `ticket.create.error`
+- `ticket.edit.form`
+- `ticket.edit.title`
+- `ticket.edit.summary`
+- `ticket.edit.problem`
+- `ticket.edit.proposedChange`
+- `ticket.edit.type`
+- `ticket.edit.priority`
+- `ticket.edit.acceptanceCriteria`
+- `ticket.edit.technicalNotes`
+- `ticket.edit.dirtyState`
+- `ticket.edit.validation`
+- `ticket.edit.success`
+- `ticket.edit.error`
 - `api.status.connected`
 - `api.status.disconnected`
 - `api.status.authRequired`
 - `project.status.selected`
 - `project.status.missing`
+- `project.status.fallback`
+- `ticket.create.blockedReason`
 
 ## What Not To Do
 

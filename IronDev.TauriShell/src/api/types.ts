@@ -23,6 +23,14 @@ export interface ApiStatus {
 
 export type ProjectTicket = components['schemas']['ProjectTicket'];
 export type ProjectSummary = components['schemas']['Project'];
+export type BuildReadinessResult = components['schemas']['BuildReadinessResult'];
+export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
+export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
+export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
+export type TicketReadinessLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
+export type TicketCreateStatus = 'idle' | 'validating' | 'submitting' | 'success' | 'error';
+export type TicketSaveStatus = 'idle' | 'editing' | 'dirty' | 'saving' | 'saved' | 'error' | 'validation';
+export type TicketPlanStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
 
 export interface LoginRequest {
   email: string;
@@ -60,5 +68,5 @@ export interface ProjectContextState {
   selectedTenantId: number | null;
   selectedProjectId: number | null;
   selectedProjectName: string | null;
-  projectSelectionMode: 'api' | 'fallback-config';
+  projectSelectionMode: 'api' | 'fallback-config' | 'missing';
 }
