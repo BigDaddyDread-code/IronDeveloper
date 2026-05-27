@@ -18,7 +18,7 @@ public sealed class TicketsController : ControllerBase
     private readonly IDraftTicketService _drafts;
     private readonly ICodebaseTicketGeneratorService _generator;
     private readonly ITicketBuildOrchestrator _orchestrator;
-    private readonly ITicketBuildWorkflowOrchestrator _buildRuns;
+    private readonly ITicketBuildRunService _buildRuns;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -29,7 +29,7 @@ public sealed class TicketsController : ControllerBase
         IDraftTicketService drafts,
         ICodebaseTicketGeneratorService generator,
         ITicketBuildOrchestrator orchestrator,
-        ITicketBuildWorkflowOrchestrator buildRuns,
+        ITicketBuildRunService buildRuns,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -55,6 +55,9 @@ public sealed class TicketsController : ControllerBase
     public async Task<ActionResult<ProjectTicket>> GetTicket(long ticketId, CancellationToken ct, int? projectId = null)
     {
         var ticket = await _tickets.GetTicketByIdAsync(ticketId, ct);
+        if (ticket is not null && projectId.HasValue && ticket.ProjectId != projectId.Value)
+            return NotFound();
+
         return ticket is null ? NotFound() : Ok(ticket);
     }
 
@@ -72,6 +75,19 @@ public sealed class TicketsController : ControllerBase
     [HttpPost("api/projects/{projectId:int}/tickets/legacy")]
     public async Task<ActionResult<ProjectTicket>> SaveLegacyTicket(int projectId, ProjectTicket ticket, CancellationToken ct)
     {
+        ticket.ProjectId = projectId;
+        ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
+        return Ok(ticket);
+    }
+
+    [HttpPatch("api/projects/{projectId:int}/tickets/{ticketId:long}")]
+    public async Task<ActionResult<ProjectTicket>> UpdateTicket(int projectId, long ticketId, ProjectTicket ticket, CancellationToken ct)
+    {
+        var existing = await _tickets.GetTicketByIdAsync(ticketId, ct);
+        if (existing is null || existing.ProjectId != projectId)
+            return NotFound();
+
+        ticket.Id = ticketId;
         ticket.ProjectId = projectId;
         ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
         return Ok(ticket);
@@ -143,6 +159,17 @@ public sealed class TicketsController : ControllerBase
         return ok ? NoContent() : NotFound();
     }
 
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/archive")]
+    public async Task<IActionResult> ArchiveProjectTicket(int projectId, long ticketId, CancellationToken ct)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, ct);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return NotFound();
+
+        var ok = await _tickets.ArchiveTicketAsync(ticketId, ct);
+        return ok ? NoContent() : NotFound();
+    }
+
     [HttpPost("api/projects/{projectId:int}/tickets/draft")]
     public Task<DraftTicket> GenerateDraft(int projectId, DraftTicketRequest request, CancellationToken ct) =>
         _drafts.GenerateDraftAsync(projectId, request.ProjectName, request.ProposedTitle, request.MessageText, request.LinkedFilePaths, request.LinkedSymbols, request.SessionId, ct);
@@ -164,21 +191,37 @@ public sealed class TicketsController : ControllerBase
         _orchestrator.CreateBuildPreviewAsync(projectId, ticketId, ct);
 
     [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs")]
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs/disposable")]
     public async Task<ActionResult<TicketBuildRunDto>> StartBuildRun(
         int projectId,
         long ticketId,
         StartTicketBuildRunRequest? request,
         CancellationToken ct)
     {
-        var result = await _buildRuns.StartAsync(new TicketBuildWorkflowRequest
-        {
-            WorkflowRunId = request?.WorkflowRunId,
-            ProjectId = projectId,
-            TicketId = ticketId,
-            MaxRetries = request?.MaxRetries ?? 3
-        }, ct);
+        var result = await _buildRuns.StartDisposableAsync(projectId, ticketId, request, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
 
-        return Ok(ToBuildRunDto(projectId, ticketId, result));
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs")]
+    public async Task<ActionResult<IReadOnlyList<TicketBuildRunSummaryDto>>> GetBuildRuns(
+        int projectId,
+        long ticketId,
+        [FromQuery] int take = 50,
+        CancellationToken ct = default)
+    {
+        var runs = await _buildRuns.GetRunsAsync(projectId, ticketId, take, ct);
+        return runs is null ? NotFound() : Ok(runs);
+    }
+
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs/{runId}")]
+    public async Task<ActionResult<TicketBuildRunDetailDto>> GetBuildRun(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var run = await _buildRuns.GetRunAsync(projectId, ticketId, runId, ct);
+        return run is null ? NotFound() : Ok(run);
     }
 
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-readiness")]
@@ -224,20 +267,6 @@ public sealed class TicketsController : ControllerBase
 
     public sealed record DraftTicketRequest(string ProjectName, string ProposedTitle, string MessageText, string? LinkedFilePaths, string? LinkedSymbols, long? SessionId);
     public sealed record ProposalRequest(string Request);
-
-    private static TicketBuildRunDto ToBuildRunDto(
-        int projectId,
-        long ticketId,
-        TicketBuildWorkflowResult result) => new()
-        {
-            RunId = result.WorkflowRunId.ToString("D"),
-            ProjectId = projectId,
-            TicketId = ticketId,
-            Status = result.Status.ToString(),
-            CurrentNode = result.CurrentNode,
-            RequiresHumanApproval = result.RequiresHumanApproval,
-            Message = result.Message
-        };
 
     private static ProjectTicket MapCreateRequest(int projectId, CreateProjectTicketRequest request)
     {

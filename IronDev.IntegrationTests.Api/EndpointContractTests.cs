@@ -29,14 +29,20 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}",
             "/api/projects/{projectId}/tickets",
             "/api/projects/{projectId}/tickets/{ticketId}",
+            "/api/projects/{projectId}/tickets/{ticketId}/archive",
             "/api/projects/{projectId}/tickets/import-external",
             "/api/projects/{projectId}/tickets/generate-from-discussion",
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs",
+            "/api/projects/{projectId}/tickets/{ticketId}/build-runs/disposable",
+            "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}",
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review",
             "/api/projects/{projectId}/tickets/{ticketId}/evidence-summary",
             "/api/projects/{projectId}/documents",
             "/api/projects/{projectId}/documents/{documentId}",
+            "/api/projects/{projectId}/documents/{documentId}/archive",
             "/api/projects/{projectId}/documents/{documentId}/resolve",
+            "/api/projects/{projectId}/documents/{documentId}/versions",
+            "/api/projects/{projectId}/documents/{documentId}/versions/current",
             "/api/projects/{projectId}/memory/search",
             "/api/projects/{projectId}/chat/complete",
             "/api/run-reports",
@@ -89,6 +95,12 @@ public sealed class EndpointContractTests : ApiTestBase
         var projects = await client.GetFromJsonAsync<Project[]>("/api/projects");
         Assert.IsTrue(projects?.Any(p => p.Id == project.Id) == true);
 
+        project.Description = "Updated by API endpoint contract test.";
+        var updateProject = await client.PatchAsJsonAsync($"/api/projects/{project.Id}", project);
+        Assert.AreEqual(HttpStatusCode.OK, updateProject.StatusCode);
+        var updatedProject = await updateProject.Content.ReadFromJsonAsync<Project>();
+        Assert.AreEqual("Updated by API endpoint contract test.", updatedProject?.Description);
+
         var saveTicket = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
         {
             Title = "Exercise API ticket boundary",
@@ -106,6 +118,12 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, getTicket.StatusCode);
         var fetchedTicket = await getTicket.Content.ReadFromJsonAsync<ProjectTicket>();
         Assert.AreEqual("Exercise API ticket boundary", fetchedTicket?.Title);
+
+        fetchedTicket!.Title = "Exercise API ticket boundary update";
+        var updateTicket = await client.PatchAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}", fetchedTicket);
+        Assert.AreEqual(HttpStatusCode.OK, updateTicket.StatusCode);
+        var updatedTicket = await updateTicket.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.AreEqual("Exercise API ticket boundary update", updatedTicket?.Title);
 
         var saveSummary = await client.PostAsJsonAsync($"/api/projects/{project.Id}/memory/summary", new ProjectSummary
         {
@@ -127,6 +145,37 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, chat.StatusCode);
         using var chatBody = JsonDocument.Parse(await chat.Content.ReadAsStringAsync());
         Assert.IsFalse(string.IsNullOrWhiteSpace(chatBody.RootElement.GetProperty("response").GetString()));
+    }
+
+    [TestMethod]
+    public async Task ProjectScopedTicketDetailAndArchive_ShouldNotLeakAcrossProjects()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Ticket Scope Owner Project");
+        var otherProject = await CreateProjectAsync(client, "Ticket Scope Other Project");
+        var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Project scoped ticket",
+            Summary = "Ticket reads and archive actions must enforce the route project.",
+            Priority = "Medium",
+            Type = "Task"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var ticket = await createResponse.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var wrongProjectRead = await client.GetAsync($"/api/projects/{otherProject.Id}/tickets/{ticket!.Id}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectRead.StatusCode);
+
+        var wrongProjectArchive = await client.PostAsync($"/api/projects/{otherProject.Id}/tickets/{ticket.Id}/archive", null);
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectArchive.StatusCode);
+
+        var archive = await client.PostAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/archive", null);
+        Assert.AreEqual(HttpStatusCode.NoContent, archive.StatusCode);
     }
 
     [TestMethod]
@@ -211,6 +260,144 @@ public sealed class EndpointContractTests : ApiTestBase
         var discussionTicket = await discussionResponse.Content.ReadFromJsonAsync<ProjectTicket>();
         Assert.IsNotNull(discussionTicket);
         Assert.AreEqual("Dogfood discussion should become an IronDev ticket.", discussionTicket!.Title);
+    }
+
+    [TestMethod]
+    public async Task ProjectScopedDocuments_ShouldCreateReadVersionAndArchiveWithoutCrossProjectLeak()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Document Scope Owner Project");
+        var otherProject = await CreateProjectAsync(client, "Document Scope Other Project");
+
+        var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/documents", new CreateProjectDocumentRequest
+        {
+            Title = "Alpha API document",
+            DocumentType = "Architecture",
+            ContentMarkdown = "# Alpha API document",
+            ChangeSummary = "Initial document",
+            CreatedBy = "EndpointContractTests"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var document = await createResponse.Content.ReadFromJsonAsync<ProjectDocument>();
+        Assert.IsNotNull(document);
+        Assert.AreEqual(project.Id, document!.ProjectId);
+        Assert.IsTrue(document.CurrentVersionId.HasValue);
+
+        var wrongProjectRead = await client.GetAsync($"/api/projects/{otherProject.Id}/documents/{document.Id}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectRead.StatusCode);
+
+        var currentVersion = await client.GetAsync($"/api/projects/{project.Id}/documents/{document.Id}/versions/current");
+        Assert.AreEqual(HttpStatusCode.OK, currentVersion.StatusCode);
+
+        var versions = await client.GetAsync($"/api/projects/{project.Id}/documents/{document.Id}/versions");
+        Assert.AreEqual(HttpStatusCode.OK, versions.StatusCode);
+        var versionList = await versions.Content.ReadFromJsonAsync<ProjectDocumentVersion[]>();
+        Assert.IsNotNull(versionList);
+        Assert.AreEqual(1, versionList!.Length);
+
+        var wrongProjectArchive = await client.PostAsync($"/api/projects/{otherProject.Id}/documents/{document.Id}/archive", null);
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectArchive.StatusCode);
+
+        var archive = await client.PostAsync($"/api/projects/{project.Id}/documents/{document.Id}/archive", null);
+        Assert.AreEqual(HttpStatusCode.NoContent, archive.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task TicketBuildRuns_ProjectScopedEndpoints_ShouldStartListAndReturnRunDetails()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Ticket Build Runs API Project");
+        var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Expose project-scoped disposable run endpoints",
+            Summary = "The alpha cockpit should never use a global run endpoint for ticket work.",
+            Priority = "High",
+            Type = "Workflow"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var ticket = await createResponse.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var startResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tickets/{ticket!.Id}/build-runs/disposable",
+            new StartTicketBuildRunRequest { MaxRetries = 1 });
+        Assert.AreEqual(HttpStatusCode.OK, startResponse.StatusCode);
+
+        var started = await startResponse.Content.ReadFromJsonAsync<TicketBuildRunDto>();
+        Assert.IsNotNull(started);
+        Assert.AreEqual(project.Id, started!.ProjectId);
+        Assert.AreEqual(ticket.Id, started.TicketId);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(started.RunId));
+
+        var listResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs");
+        Assert.AreEqual(HttpStatusCode.OK, listResponse.StatusCode);
+        var runs = await listResponse.Content.ReadFromJsonAsync<TicketBuildRunSummaryDto[]>();
+        Assert.IsNotNull(runs);
+        Assert.AreEqual(1, runs!.Length);
+        Assert.AreEqual(started.RunId, runs[0].RunId);
+        Assert.IsTrue(runs[0].IsDisposable);
+
+        var detailResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/{started.RunId}");
+        Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<TicketBuildRunDetailDto>();
+        Assert.IsNotNull(detail);
+        Assert.AreEqual(started.RunId, detail!.RunId);
+        Assert.AreEqual(project.Id, detail.ProjectId);
+        Assert.AreEqual(ticket.Id, detail.TicketId);
+        Assert.IsTrue(detail.IsDisposable);
+        Assert.IsTrue(detail.Events.Count > 0);
+    }
+
+    [TestMethod]
+    public async Task TicketBuildRuns_WrongProjectWrongTicketOrMissingRun_ShouldReturnNotFound()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Ticket Build Runs Owner Project");
+        var otherProject = await CreateProjectAsync(client, "Ticket Build Runs Other Project");
+        var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Protect build run boundaries",
+            Summary = "Run details must remain scoped to the project and ticket route.",
+            Priority = "Medium",
+            Type = "Workflow"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var ticket = await createResponse.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var startResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tickets/{ticket!.Id}/build-runs/disposable",
+            new StartTicketBuildRunRequest { MaxRetries = 1 });
+        Assert.AreEqual(HttpStatusCode.OK, startResponse.StatusCode);
+
+        var started = await startResponse.Content.ReadFromJsonAsync<TicketBuildRunDto>();
+        Assert.IsNotNull(started);
+
+        var wrongProjectStart = await client.PostAsJsonAsync(
+            $"/api/projects/{otherProject.Id}/tickets/{ticket.Id}/build-runs/disposable",
+            new StartTicketBuildRunRequest { MaxRetries = 1 });
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectStart.StatusCode);
+
+        var wrongProjectList = await client.GetAsync($"/api/projects/{otherProject.Id}/tickets/{ticket.Id}/build-runs");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectList.StatusCode);
+
+        var wrongTicketDetail = await client.GetAsync($"/api/projects/{project.Id}/tickets/987654321/build-runs/{started!.RunId}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongTicketDetail.StatusCode);
+
+        var missingRun = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/missing-run");
+        Assert.AreEqual(HttpStatusCode.NotFound, missingRun.StatusCode);
     }
 
     [TestMethod]
