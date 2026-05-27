@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core.Builder;
 using IronDev.Core.KnowledgeCompiler;
+using IronDev.Core.RunReports;
 
 namespace IronDev.Core.Workflow;
 
@@ -60,6 +61,41 @@ public sealed record TicketBuildRunDto
     public string CurrentNode { get; init; } = string.Empty;
     public bool RequiresHumanApproval { get; init; }
     public string? Message { get; init; }
+}
+
+public sealed record TicketBuildRunSummaryDto
+{
+    public string RunId { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public long TicketId { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string CurrentNode { get; init; } = string.Empty;
+    public bool RequiresHumanApproval { get; init; }
+    public bool IsDisposable { get; init; }
+    public DateTimeOffset? StartedUtc { get; init; }
+    public DateTimeOffset? CompletedUtc { get; init; }
+    public string Summary { get; init; } = string.Empty;
+    public string? FailureReason { get; init; }
+}
+
+public sealed record TicketBuildRunDetailDto
+{
+    public string RunId { get; init; } = string.Empty;
+    public int ProjectId { get; init; }
+    public long TicketId { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string CurrentNode { get; init; } = string.Empty;
+    public bool RequiresHumanApproval { get; init; }
+    public bool IsDisposable { get; init; }
+    public DateTimeOffset? StartedUtc { get; init; }
+    public DateTimeOffset? CompletedUtc { get; init; }
+    public string Summary { get; init; } = string.Empty;
+    public string? FailureReason { get; init; }
+    public string? ReportPath { get; init; }
+    public string? TracePath { get; init; }
+    public string? LogPath { get; init; }
+    public IReadOnlyList<RunEventDto> Events { get; init; } = [];
+    public IReadOnlyList<RunEvidenceItem> Evidence { get; init; } = [];
 }
 
 public sealed class TicketBuildWorkflowResult

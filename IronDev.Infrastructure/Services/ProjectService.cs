@@ -13,6 +13,7 @@ public interface IProjectService
     Task<int> CreateProjectAsync(Project project, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken cancellationToken = default);
     Task<Project?> GetByIdAsync(int projectId, CancellationToken cancellationToken = default);
+    Task<Project?> UpdateProjectAsync(int projectId, Project project, CancellationToken cancellationToken = default);
     Task UpdateLocalPathAsync(int projectId, string localPath, CancellationToken cancellationToken = default);
     Task MarkIndexStaleAsync(int projectId, string reason, CancellationToken cancellationToken = default);
 }
@@ -77,6 +78,34 @@ public sealed class ProjectService : IProjectService
             sql,
             new { ProjectId = projectId, TenantId = _tenant.TenantId },
             cancellationToken: cancellationToken));
+    }
+
+    public async Task<Project?> UpdateProjectAsync(int projectId, Project project, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE dbo.Projects
+            SET Name = @Name,
+                Description = @Description,
+                LocalPath = @LocalPath,
+                UpdatedDate = SYSUTCDATETIME()
+            WHERE Id = @ProjectId
+              AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new
+            {
+                ProjectId = projectId,
+                TenantId = _tenant.TenantId,
+                project.Name,
+                project.Description,
+                project.LocalPath
+            },
+            cancellationToken: cancellationToken));
+
+        return rows == 0 ? null : await GetByIdAsync(projectId, cancellationToken);
     }
 
     public async Task UpdateLocalPathAsync(int projectId, string localPath, CancellationToken cancellationToken = default)

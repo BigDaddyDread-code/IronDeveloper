@@ -38,6 +38,16 @@ public sealed class ProjectsController : ControllerBase
         return CreatedAtAction(nameof(GetProject), new { projectId = id }, project);
     }
 
+    [HttpPatch("{projectId:int}")]
+    public async Task<ActionResult<Project>> UpdateProject(int projectId, Project project, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(project.Name))
+            return BadRequest(new { error = "Project name is required." });
+
+        var updated = await _projects.UpdateProjectAsync(projectId, project, ct);
+        return updated is null ? NotFound() : Ok(updated);
+    }
+
     [HttpPost("{projectId:int}/select")]
     public IActionResult SelectProject(int projectId) => Ok(new { projectId });
 
