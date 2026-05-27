@@ -81,6 +81,35 @@ function Start-BrowserShell {
     Wait-HttpOk -Uri "http://127.0.0.1:$Port/"
 }
 
+function Get-TauriDesktopProcesses {
+    @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -eq "irondev-tauri-shell.exe" })
+}
+
+function Stop-TauriDesktopProcesses {
+    $desktopProcesses = Get-TauriDesktopProcesses
+    if ($desktopProcesses.Count -eq 0) {
+        return
+    }
+
+    Write-Host "Stopping existing LocalTest Tauri desktop shell"
+    Write-Host "  ProcessId: $($desktopProcesses.ProcessId -join ', ')"
+    foreach ($process in $desktopProcesses) {
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 500
+        $remaining = Get-TauriDesktopProcesses
+        if ($remaining.Count -eq 0) {
+            return
+        }
+    } while ((Get-Date) -lt $deadline)
+
+    throw "Existing Tauri desktop shell is still running. Close it and rerun LocalTest startup."
+}
+
 if ($Reset) {
     & (Join-Path $PSScriptRoot "reset-localtest-data.ps1")
 }
@@ -137,6 +166,7 @@ $tauriLocalTestConfig = Join-Path $env:TEMP "irondev-tauri-localtest.conf.json"
     }
 } | ConvertTo-Json -Depth 4 | Set-Content -Path $tauriLocalTestConfig -Encoding UTF8
 
+Stop-TauriDesktopProcesses
 Start-BrowserShell -Port $UiPort
 Write-Host "PASS LocalTest browser shell started"
 Write-Host "  UI: http://127.0.0.1:$UiPort/"
@@ -144,6 +174,8 @@ Write-Host ""
 
 Push-Location $shellRoot
 try {
+    $existingDesktopProcessIds = @(Get-TauriDesktopProcesses | Select-Object -ExpandProperty ProcessId)
+
     $tauriProcess = Start-Process -FilePath $node `
         -ArgumentList @($tauriCli, "dev", "--config", $tauriLocalTestConfig, "--no-dev-server-wait") `
         -WorkingDirectory $shellRoot `
@@ -152,6 +184,19 @@ try {
         -Wait
 
     if ($tauriProcess.ExitCode -ne 0) {
+        $desktopProcess = Get-TauriDesktopProcesses |
+            Where-Object { $existingDesktopProcessIds -notcontains $_.ProcessId } |
+            Select-Object -First 1
+
+        if ($desktopProcess) {
+            Write-Host "PASS LocalTest Tauri desktop shell started"
+            Write-Host "  ProcessId: $($desktopProcess.ProcessId)"
+            Write-Host "  Tauri CLI exited with code $($tauriProcess.ExitCode) after launching the desktop process."
+            Write-Host "  Waiting for the desktop shell to close."
+            Wait-Process -Id $desktopProcess.ProcessId
+            return
+        }
+
         throw "Tauri desktop shell exited with code $($tauriProcess.ExitCode)."
     }
 }
