@@ -50,14 +50,17 @@ Durable run state is the source of truth for ticket build runs. Run events are c
 
 Disposable ticket build execution is backend-owned. Clients may request "start a disposable run for this ticket"; they must not supply source repository paths, workspace roots, command lists, cleanup policy, timeout policy, or evidence retention policy. The backend resolves those from trusted project/configuration state, creates the durable run, creates the disposable workspace, executes the allowed command profile, persists command stdout/stderr evidence, and preserves failed workspaces or failure bundles for debugging.
 
-### Alpha Discussion-To-Code Loop
+### Discussion-To-Code Proposal Loop
 
 - `POST /api/projects/{projectId}/discussions`
-- `POST /api/documents/{documentVersionId}/tickets`
-- `POST /api/tickets/{ticketId}/debate`
-- `POST /api/tickets/{ticketId}/alpha-disposable-code-runs`
+- `POST /api/projects/{projectId}/documents/{documentVersionId}/tickets`
+- `POST /api/projects/{projectId}/tickets/{ticketId}/review`
+- `POST /api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs`
+- `GET /api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review-package`
 
-This is an Alpha-only backend proof path. It may use deterministic discussion-to-ticket generation, deterministic four-role debate, and a tiny Hello World C# generator. It must still use real persistence, project/ticket ownership checks, durable runs, disposable workspace generation, `dotnet build`, `dotnet run`, persisted events, persisted evidence, and `PausedForApproval` as the successful final state. It must not mutate the real repository or apply generated code.
+This is the backend proposal/run/review-package spine. `ICodeProposalGenerator` creates a `CodeProposal` with generated files, expected output, and a backend-owned build/run profile. `IDisposableCodeRunService` executes that proposal in a disposable workspace. `IRunReviewPackageService` assembles review evidence from run state, persisted events, generated files, command logs, code standards output, and output verification.
+
+The Hello World flow is a deterministic scenario fixture that uses the same generic pipeline. It is not an Alpha-specific product service, it is not agent debate, and it must not mutate or apply generated code to the real repository. Successful execution ends in `PausedForApproval`.
 
 ### Documents
 

@@ -39,9 +39,10 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}",
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review",
             "/api/projects/{projectId}/discussions",
-            "/api/documents/{documentVersionId}/tickets",
-            "/api/tickets/{ticketId}/debate",
-            "/api/tickets/{ticketId}/alpha-disposable-code-runs",
+            "/api/projects/{projectId}/documents/{documentVersionId}/tickets",
+            "/api/projects/{projectId}/tickets/{ticketId}/review",
+            "/api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs",
+            "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review-package",
             "/api/projects/{projectId}/tickets/{ticketId}/evidence-summary",
             "/api/projects/{projectId}/documents",
             "/api/projects/{projectId}/documents/{documentId}",
@@ -775,7 +776,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task AlphaDiscussionCodeLoop_ShouldSaveDiscussionCreateTicketDebateRunAndExposeReviewEvidence()
+    public async Task DiscussionCodeLoop_ShouldUseGenericProposalRunAndReviewPackagePipeline()
     {
         var baseToken = await LoginAsync();
         var tenantToken = await SelectTenantAsync(baseToken);
@@ -793,7 +794,7 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsTrue(discussionBody!.DocumentId > 0);
         Assert.IsTrue(discussionBody.DocumentVersionId > 0);
 
-        var ticketResponse = await client.PostAsJsonAsync($"/api/documents/{discussionBody.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        var ticketResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/documents/{discussionBody.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
         Assert.AreEqual(HttpStatusCode.OK, ticketResponse.StatusCode);
         var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
         Assert.IsNotNull(ticketBody);
@@ -804,21 +805,21 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual("Build Hello World Console App", ticket!.Title);
         Assert.AreEqual(discussionBody.DocumentVersionId, ticket.SourceDocumentVersionId);
 
-        var debateResponse = await client.PostAsJsonAsync($"/api/tickets/{ticket.Id}/debate", new RunTicketDebateRequest());
-        Assert.AreEqual(HttpStatusCode.OK, debateResponse.StatusCode);
-        var debate = await debateResponse.Content.ReadFromJsonAsync<RunTicketDebateResponse>();
-        Assert.IsNotNull(debate);
-        Assert.IsTrue(debate!.Result.Decision.Proceed);
+        var reviewResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/review", new RunTicketReviewRequest());
+        Assert.AreEqual(HttpStatusCode.OK, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<RunTicketReviewResponse>();
+        Assert.IsNotNull(review);
+        Assert.IsTrue(review!.Result.Decision.Proceed);
         CollectionAssert.AreEquivalent(
             new[] { "Planner", "Builder", "Tester", "Critic" },
-            debate.Result.Contributions.Select(item => item.Role).ToArray());
+            review.Result.Contributions.Select(item => item.Role).ToArray());
 
-        var runResponse = await client.PostAsJsonAsync($"/api/tickets/{ticket.Id}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        var runResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/disposable-code-runs", new StartDisposableCodeRunRequest
         {
-            DebateId = debate.DebateId
+            ReviewId = review.ReviewId
         });
         Assert.AreEqual(HttpStatusCode.OK, runResponse.StatusCode);
-        var run = await runResponse.Content.ReadFromJsonAsync<StartAlphaDisposableCodeRunResponse>();
+        var run = await runResponse.Content.ReadFromJsonAsync<StartDisposableCodeRunResponse>();
         Assert.IsNotNull(run);
         Assert.AreEqual("PausedForApproval", run!.State);
         Assert.IsTrue(run.IsDisposable);
@@ -835,7 +836,7 @@ public sealed class EndpointContractTests : ApiTestBase
         foreach (var expected in new[]
         {
             "RunCreated",
-            "DebateLinked",
+            "ReviewLinked",
             "WorkspacePreparing",
             "WorkspaceReady",
             "CodeGenerationStarted",
@@ -871,10 +872,28 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsTrue(workspaceEvent.Payload.TryGetValue("workspacePath", out var workspacePath));
         Assert.IsTrue(workspacePath!.Contains("IronDevTestWorkspaces", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(workspacePath.StartsWith(AppContext.BaseDirectory, StringComparison.OrdinalIgnoreCase));
+
+        var packageResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/{run.RunId}/review-package");
+        Assert.AreEqual(HttpStatusCode.OK, packageResponse.StatusCode);
+        var package = await packageResponse.Content.ReadFromJsonAsync<RunReviewPackage>();
+        Assert.IsNotNull(package);
+        Assert.AreEqual("PausedForApproval", package!.State);
+        Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet build", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.OutputVerification.Verified);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(package.CodeStandards.Summary));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(package.FileSetHash));
+        Assert.IsTrue(package.Risks.Count > 0);
+        Assert.IsTrue(package.HumanReviewChecklist.Count > 0);
+
+        var otherProject = await CreateProjectAsync(client, "Wrong Project Review Package Guard");
+        var wrongProjectPackage = await client.GetAsync($"/api/projects/{otherProject.Id}/tickets/{ticket.Id}/build-runs/{run.RunId}/review-package");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectPackage.StatusCode);
     }
 
     [TestMethod]
-    public async Task AlphaDiscussionCodeLoop_ShouldRejectRunWithoutDebateOrProceedDecision()
+    public async Task DiscussionCodeLoop_ShouldRejectRunWithoutReviewOrProceedDecision()
     {
         var baseToken = await LoginAsync();
         var tenantToken = await SelectTenantAsync(baseToken);
@@ -890,32 +909,45 @@ public sealed class EndpointContractTests : ApiTestBase
         var discussionBody = await discussion.Content.ReadFromJsonAsync<SaveDiscussionResponse>();
         Assert.IsNotNull(discussionBody);
 
-        var ticketResponse = await client.PostAsJsonAsync($"/api/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        var ticketResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
         Assert.AreEqual(HttpStatusCode.OK, ticketResponse.StatusCode);
         var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
         Assert.IsNotNull(ticketBody);
 
-        var missingDebateRun = await client.PostAsJsonAsync($"/api/tickets/{ticketBody!.TicketId}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        var wrongProject = await CreateProjectAsync(client, "Wrong Project Discussion Code Guard");
+        var wrongProjectReview = await client.PostAsJsonAsync($"/api/projects/{wrongProject.Id}/tickets/{ticketBody!.TicketId}/review", new RunTicketReviewRequest());
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectReview.StatusCode);
+
+        var wrongProjectRun = await client.PostAsJsonAsync($"/api/projects/{wrongProject.Id}/tickets/{ticketBody.TicketId}/disposable-code-runs", new StartDisposableCodeRunRequest
         {
-            DebateId = "missing-debate"
+            ReviewId = "missing-review"
         });
-        Assert.AreEqual(HttpStatusCode.NotFound, missingDebateRun.StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectRun.StatusCode);
 
-        var debateResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketBody.TicketId}/debate", new RunTicketDebateRequest());
-        Assert.AreEqual(HttpStatusCode.OK, debateResponse.StatusCode);
-        var debate = await debateResponse.Content.ReadFromJsonAsync<RunTicketDebateResponse>();
-        Assert.IsNotNull(debate);
-        Assert.IsFalse(debate!.Result.Decision.Proceed);
-
-        var blockedRun = await client.PostAsJsonAsync($"/api/tickets/{ticketBody.TicketId}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        var missingReviewRun = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticketBody!.TicketId}/disposable-code-runs", new StartDisposableCodeRunRequest
         {
-            DebateId = debate.DebateId
+            ReviewId = "missing-review"
+        });
+        Assert.AreEqual(HttpStatusCode.NotFound, missingReviewRun.StatusCode);
+
+        var reviewResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticketBody.TicketId}/review", new RunTicketReviewRequest());
+        Assert.AreEqual(HttpStatusCode.OK, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<RunTicketReviewResponse>();
+        Assert.IsNotNull(review);
+        Assert.IsFalse(review!.Result.Decision.Proceed);
+
+        var blockedRun = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticketBody.TicketId}/disposable-code-runs", new StartDisposableCodeRunRequest
+        {
+            ReviewId = review.ReviewId
         });
         Assert.AreEqual(HttpStatusCode.BadRequest, blockedRun.StatusCode);
+
+        var wrongProjectTicket = await client.PostAsJsonAsync($"/api/projects/{wrongProject.Id}/documents/{discussionBody.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectTicket.StatusCode);
     }
 
     [TestMethod]
-    public async Task AlphaDiscussionCodeLoop_FailedCommand_ShouldPersistFailedRunAndEvidence()
+    public async Task DiscussionCodeLoop_FailedCommand_ShouldPersistFailedRunAndEvidence()
     {
         var baseToken = await LoginAsync();
         var tenantToken = await SelectTenantAsync(baseToken);
@@ -929,20 +961,20 @@ public sealed class EndpointContractTests : ApiTestBase
         });
         var discussionBody = await discussion.Content.ReadFromJsonAsync<SaveDiscussionResponse>();
         Assert.IsNotNull(discussionBody);
-        var ticketResponse = await client.PostAsJsonAsync($"/api/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        var ticketResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
         var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
         Assert.IsNotNull(ticketBody);
-        var debateResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketBody!.TicketId}/debate", new RunTicketDebateRequest());
-        var debate = await debateResponse.Content.ReadFromJsonAsync<RunTicketDebateResponse>();
-        Assert.IsNotNull(debate);
+        var reviewResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticketBody!.TicketId}/review", new RunTicketReviewRequest());
+        var review = await reviewResponse.Content.ReadFromJsonAsync<RunTicketReviewResponse>();
+        Assert.IsNotNull(review);
 
-        var runResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketBody.TicketId}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        var runResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticketBody.TicketId}/disposable-code-runs", new StartDisposableCodeRunRequest
         {
-            DebateId = debate!.DebateId,
+            ReviewId = review!.ReviewId,
             ExpectedOutput = "Hello from IronDev Alpha\r\nthis breaks generated C#"
         });
         Assert.AreEqual(HttpStatusCode.OK, runResponse.StatusCode);
-        var run = await runResponse.Content.ReadFromJsonAsync<StartAlphaDisposableCodeRunResponse>();
+        var run = await runResponse.Content.ReadFromJsonAsync<StartDisposableCodeRunResponse>();
         Assert.IsNotNull(run);
         Assert.AreEqual("Failed", run!.State);
 
@@ -955,6 +987,13 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsTrue(detail.Events.Any(item => item.EventType == "RunFailed"));
         Assert.IsTrue(detail.Events.Any(item => item.EventType == "CommandCompleted"));
         Assert.IsTrue(detail.Evidence.Any(item => item.Path.EndsWith("dotnet-build.stderr.log", StringComparison.OrdinalIgnoreCase)));
+
+        var packageResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticketBody.TicketId}/build-runs/{run.RunId}/review-package");
+        Assert.AreEqual(HttpStatusCode.OK, packageResponse.StatusCode);
+        var package = await packageResponse.Content.ReadFromJsonAsync<RunReviewPackage>();
+        Assert.IsNotNull(package);
+        Assert.AreEqual("Failed", package!.State);
+        Assert.IsTrue(package.Risks.Any(item => item.Contains("failed", StringComparison.OrdinalIgnoreCase)));
     }
 
     private static async Task<Project> CreateProjectAsync(HttpClient client, string name, string? localPath = null)

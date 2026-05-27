@@ -11,19 +11,22 @@ public sealed class AlphaDiscussionCodeLoopController : ControllerBase
 {
     private readonly IDiscussionDocumentService _discussionDocuments;
     private readonly ITicketFromDocumentService _ticketFromDocument;
-    private readonly ITicketDebateService _debates;
-    private readonly IAlphaHelloWorldCodeRunService _codeRuns;
+    private readonly ITicketReviewService _reviews;
+    private readonly IDisposableCodeRunService _codeRuns;
+    private readonly IRunReviewPackageService _reviewPackages;
 
     public AlphaDiscussionCodeLoopController(
         IDiscussionDocumentService discussionDocuments,
         ITicketFromDocumentService ticketFromDocument,
-        ITicketDebateService debates,
-        IAlphaHelloWorldCodeRunService codeRuns)
+        ITicketReviewService reviews,
+        IDisposableCodeRunService codeRuns,
+        IRunReviewPackageService reviewPackages)
     {
         _discussionDocuments = discussionDocuments;
         _ticketFromDocument = ticketFromDocument;
-        _debates = debates;
+        _reviews = reviews;
         _codeRuns = codeRuns;
+        _reviewPackages = reviewPackages;
     }
 
     [HttpPost("api/projects/{projectId:int}/discussions")]
@@ -40,48 +43,62 @@ public sealed class AlphaDiscussionCodeLoopController : ControllerBase
         return Ok(await _discussionDocuments.SaveDiscussionAsync(projectId, request, ct));
     }
 
-    [HttpPost("api/documents/{documentVersionId:long}/tickets")]
+    [HttpPost("api/projects/{projectId:int}/documents/{documentVersionId:long}/tickets")]
     public async Task<ActionResult<CreateTicketFromDocumentResponse>> CreateTicketFromDocument(
+        int projectId,
         long documentVersionId,
         CreateTicketFromDocumentRequest request,
         CancellationToken ct)
     {
-        var result = await _ticketFromDocument.CreateTicketAsync(documentVersionId, request, ct);
+        var result = await _ticketFromDocument.CreateTicketAsync(projectId, documentVersionId, request, ct);
         return result is null ? NotFound() : Ok(result);
     }
 
-    [HttpPost("api/tickets/{ticketId:long}/debate")]
-    public async Task<ActionResult<RunTicketDebateResponse>> RunDebate(
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/review")]
+    public async Task<ActionResult<RunTicketReviewResponse>> ReviewTicket(
+        int projectId,
         long ticketId,
-        RunTicketDebateRequest request,
+        RunTicketReviewRequest request,
         CancellationToken ct)
     {
         if (request.UseLiveModel)
-            return BadRequest(new { error = "Live model debate is not enabled for the Alpha discussion-to-code loop." });
+            return BadRequest(new { error = "Live model ticket review is not enabled for this deterministic scenario." });
 
-        var result = await _debates.RunDebateAsync(ticketId, request, ct);
+        var result = await _reviews.ReviewAsync(projectId, ticketId, request, ct);
         return result is null
             ? NotFound()
-            : Ok(new RunTicketDebateResponse { DebateId = result.DebateId, Result = result });
+            : Ok(new RunTicketReviewResponse { ReviewId = result.ReviewId, Result = result });
     }
 
-    [HttpPost("api/tickets/{ticketId:long}/alpha-disposable-code-runs")]
-    public async Task<ActionResult<StartAlphaDisposableCodeRunResponse>> StartAlphaDisposableCodeRun(
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/disposable-code-runs")]
+    public async Task<ActionResult<StartDisposableCodeRunResponse>> StartDisposableCodeRun(
+        int projectId,
         long ticketId,
-        StartAlphaDisposableCodeRunRequest request,
+        StartDisposableCodeRunRequest request,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.DebateId))
-            return BadRequest(new { error = "DebateId is required." });
+        if (string.IsNullOrWhiteSpace(request.ReviewId))
+            return BadRequest(new { error = "ReviewId is required." });
 
         try
         {
-            var result = await _codeRuns.StartAsync(ticketId, request, ct);
+            var result = await _codeRuns.StartAsync(projectId, ticketId, request, ct);
             return result is null ? NotFound() : Ok(result);
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs/{runId}/review-package")]
+    public async Task<ActionResult<RunReviewPackage>> GetReviewPackage(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var result = await _reviewPackages.GetReviewPackageAsync(projectId, ticketId, runId, ct);
+        return result is null ? NotFound() : Ok(result);
     }
 }

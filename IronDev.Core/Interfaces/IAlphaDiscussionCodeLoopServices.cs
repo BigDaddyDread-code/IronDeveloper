@@ -13,36 +13,49 @@ public interface IDiscussionDocumentService
 public interface ITicketFromDocumentService
 {
     Task<CreateTicketFromDocumentResponse?> CreateTicketAsync(
+        int projectId,
         long documentVersionId,
         CreateTicketFromDocumentRequest request,
         CancellationToken cancellationToken = default);
 }
 
-public interface ITicketDebateService
+public interface ITicketReviewService
 {
-    Task<AgentDebateResult?> RunDebateAsync(
+    Task<TicketReviewResult?> ReviewAsync(
+        int projectId,
         long ticketId,
-        RunTicketDebateRequest request,
+        RunTicketReviewRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<AgentDebateResult?> GetDebateAsync(
+    Task<TicketReviewResult?> GetReviewAsync(
+        int projectId,
         long ticketId,
-        string debateId,
+        string reviewId,
         CancellationToken cancellationToken = default);
 }
 
-public interface IAlphaConsoleProjectGenerator
+public interface ICodeProposalGenerator
 {
-    Task<GeneratedAlphaProject> GenerateAsync(
-        string workspacePath,
+    Task<CodeProposal> GenerateAsync(
+        TicketReviewResult review,
         string expectedOutput,
         CancellationToken cancellationToken = default);
 }
 
-public interface IAlphaHelloWorldCodeRunService
+public interface IDisposableCodeRunService
 {
-    Task<StartAlphaDisposableCodeRunResponse?> StartAsync(
+    Task<StartDisposableCodeRunResponse?> StartAsync(
+        int projectId,
         long ticketId,
-        StartAlphaDisposableCodeRunRequest request,
+        StartDisposableCodeRunRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IRunReviewPackageService
+{
+    Task<RunReviewPackage?> GetReviewPackageAsync(
+        int projectId,
+        long ticketId,
+        string runId,
         CancellationToken cancellationToken = default);
 }
