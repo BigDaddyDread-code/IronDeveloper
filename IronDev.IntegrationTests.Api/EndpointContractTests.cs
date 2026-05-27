@@ -43,7 +43,14 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/documents/{documentId}/resolve",
             "/api/projects/{projectId}/documents/{documentId}/versions",
             "/api/projects/{projectId}/documents/{documentId}/versions/current",
+            "/api/projects/{projectId}/decisions",
+            "/api/projects/{projectId}/decisions/{decisionId}",
+            "/api/projects/{projectId}/decisions/{decisionId}/supersede",
+            "/api/projects/{projectId}/decisions/{decisionId}/archive",
             "/api/projects/{projectId}/memory/search",
+            "/api/projects/{projectId}/memory/status",
+            "/api/projects/{projectId}/memory/reindex",
+            "/api/projects/{projectId}/services/status",
             "/api/projects/{projectId}/chat/complete",
             "/api/run-reports",
             "/api/runs/{runId}",
@@ -260,6 +267,104 @@ public sealed class EndpointContractTests : ApiTestBase
         var discussionTicket = await discussionResponse.Content.ReadFromJsonAsync<ProjectTicket>();
         Assert.IsNotNull(discussionTicket);
         Assert.AreEqual("Dogfood discussion should become an IronDev ticket.", discussionTicket!.Title);
+    }
+
+    [TestMethod]
+    public async Task ProjectScopedDecisions_ShouldCreateUpdateSupersedeAndArchiveWithoutCrossProjectLeak()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Decision Scope Owner Project");
+        var otherProject = await CreateProjectAsync(client, "Decision Scope Other Project");
+
+        var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/decisions", new ProjectDecision
+        {
+            Title = "Use project-scoped API routes",
+            Detail = "Cockpit data must be loaded through project-scoped endpoints.",
+            Reason = "Avoid cross-project leakage.",
+            Category = "Architecture",
+            Status = "Accepted"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var decision = await createResponse.Content.ReadFromJsonAsync<ProjectDecision>();
+        Assert.IsNotNull(decision);
+        Assert.AreEqual(project.Id, decision!.ProjectId);
+
+        var list = await client.GetFromJsonAsync<ProjectDecision[]>($"/api/projects/{project.Id}/decisions");
+        Assert.IsTrue(list?.Any(item => item.Id == decision.Id) == true);
+
+        var wrongProjectRead = await client.GetAsync($"/api/projects/{otherProject.Id}/decisions/{decision.Id}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectRead.StatusCode);
+
+        decision.Detail = "Updated through the project-scoped decisions API.";
+        var update = await client.PatchAsJsonAsync($"/api/projects/{project.Id}/decisions/{decision.Id}", decision);
+        Assert.AreEqual(HttpStatusCode.OK, update.StatusCode);
+        var updated = await update.Content.ReadFromJsonAsync<ProjectDecision>();
+        Assert.AreEqual("Updated through the project-scoped decisions API.", updated?.Detail);
+
+        var supersede = await client.PostAsJsonAsync($"/api/projects/{project.Id}/decisions/{decision.Id}/supersede", new SupersedeDecisionRequest
+        {
+            Replacement = new ProjectDecision
+            {
+                Title = "Use project-scoped API routes v2",
+                Detail = "Superseding decisions should preserve project ownership.",
+                Category = "Architecture",
+                Status = "Accepted"
+            }
+        });
+        Assert.AreEqual(HttpStatusCode.OK, supersede.StatusCode);
+        var replacement = await supersede.Content.ReadFromJsonAsync<ProjectDecision>();
+        Assert.IsNotNull(replacement);
+        Assert.AreEqual(project.Id, replacement!.ProjectId);
+        StringAssert.Contains(replacement.Reason, $"Supersedes decision {decision.Id}.");
+
+        var archivedWrongProject = await client.PostAsync($"/api/projects/{otherProject.Id}/decisions/{replacement.Id}/archive", null);
+        Assert.AreEqual(HttpStatusCode.NotFound, archivedWrongProject.StatusCode);
+
+        var archive = await client.PostAsync($"/api/projects/{project.Id}/decisions/{replacement.Id}/archive", null);
+        Assert.AreEqual(HttpStatusCode.NoContent, archive.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task MemoryAndServiceStatus_ProjectScopedEndpoints_ShouldReturnRealStatus()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Memory Status Project");
+
+        var search = await client.PostAsJsonAsync($"/api/projects/{project.Id}/memory/search", new MemorySearchRequest
+        {
+            Query = "architecture decision",
+            Take = 5
+        });
+        Assert.AreEqual(HttpStatusCode.OK, search.StatusCode);
+        var searchBody = await search.Content.ReadFromJsonAsync<MemorySearchResponseDto>();
+        Assert.IsNotNull(searchBody);
+        Assert.AreEqual(project.Id, searchBody!.ProjectId);
+        Assert.AreEqual("architecture decision", searchBody.Query);
+        Assert.AreNotEqual(Guid.Empty, searchBody.TraceId);
+
+        var memoryStatus = await client.GetAsync($"/api/projects/{project.Id}/memory/status");
+        Assert.AreEqual(HttpStatusCode.OK, memoryStatus.StatusCode);
+        var memoryBody = await memoryStatus.Content.ReadFromJsonAsync<MemoryStatusDto>();
+        Assert.IsNotNull(memoryBody);
+        Assert.AreEqual(project.Id, memoryBody!.ProjectId);
+
+        var services = await client.GetAsync($"/api/projects/{project.Id}/services/status");
+        Assert.AreEqual(HttpStatusCode.OK, services.StatusCode);
+        var servicesBody = await services.Content.ReadFromJsonAsync<ProjectServicesStatusDto>();
+        Assert.IsNotNull(servicesBody);
+        Assert.AreEqual(project.Id, servicesBody!.ProjectId);
+        Assert.AreEqual("healthy", servicesBody.ApiStatus);
+        Assert.AreEqual("healthy", servicesBody.DatabaseStatus);
+
+        var missingServices = await client.GetAsync("/api/projects/987654321/services/status");
+        Assert.AreEqual(HttpStatusCode.NotFound, missingServices.StatusCode);
     }
 
     [TestMethod]

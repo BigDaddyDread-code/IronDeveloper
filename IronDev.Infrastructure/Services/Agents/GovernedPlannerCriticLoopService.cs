@@ -42,14 +42,14 @@ public sealed class GovernedPlannerCriticLoopService
         var evidenceValidation = _evidenceValidation.Validate(results, requiredEvidence);
         stages.Add(Stage("EvidenceValidation", evidenceValidation.Status, $"Evidence validation {evidenceValidation.Status}."));
 
-        var criticReview = BuildCriticReview(goal, results, evidenceValidation);
-        stages.Add(Stage("CriticReview", "Succeeded", "CriticAgent reviewed evidence sufficiency, blast radius, and fake-confidence risk."));
+        var evidenceReview = BuildEvidenceReview(goal, results, evidenceValidation);
+        stages.Add(Stage("EvidenceReview", "Succeeded", "Deterministic evidence review checked evidence sufficiency, blast radius, and fake-confidence risk."));
 
         var escalation = BuildEscalation(evidenceValidation, requests);
         stages.Add(Stage("HumanEscalationGate", escalation.Decision, escalation.Reason));
 
         var revisedPlan = BuildRevisedPlan(project, goal, runtime, results, evidenceValidation, escalation);
-        stages.Add(Stage("PlannerRevision", "Succeeded", "PlannerAgent revised the plan from tool evidence and CriticAgent review."));
+        stages.Add(Stage("PlannerRevision", "Succeeded", "PlannerAgent revised the plan from tool evidence and deterministic evidence review."));
 
         var trace = new AgentLoopTrace
         {
@@ -79,11 +79,11 @@ public sealed class GovernedPlannerCriticLoopService
             Project = project,
             Goal = goal,
             Summary = status == "Succeeded"
-                ? "Planner/Critic governed loop produced an evidence-backed revised plan."
-                : "Planner/Critic governed loop stopped for missing evidence.",
+                ? "Planner governed tool loop produced an evidence-backed revised plan."
+                : "Planner governed tool loop stopped for missing evidence.",
             Trace = trace,
             PlannerDraft = plannerDraft,
-            CriticReview = criticReview,
+            CriticReview = evidenceReview,
             RevisedPlan = revisedPlan,
             EvidenceRefs = results.SelectMany(result => result.EvidenceRefs).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             Recommendation = status == "Succeeded" ? "ReadyForHumanReview" : "CollectMissingEvidence"
@@ -103,8 +103,8 @@ public sealed class GovernedPlannerCriticLoopService
     [
         Request("tool-001-memory", "PlannerAgent", "memory.search", project, goal, "Find accepted project memory before planning.", runtime, new Dictionary<string, string> { ["query"] = goal }),
         Request("tool-002-code", "PlannerAgent", "code.search", project, goal, "Find nearby code/docs vocabulary before planning.", runtime, new Dictionary<string, string> { ["query"] = goal }),
-        Request("tool-003-trace", "CriticAgent", "trace.read", project, goal, "Check recent run evidence for repeated failures.", runtime, new Dictionary<string, string>()),
-        Request("tool-004-failure", "CriticAgent", "failure.latest", project, goal, "Check whether a recent failure package should shape the plan.", runtime, new Dictionary<string, string>()),
+        Request("tool-003-trace", "EvidenceValidator", "trace.read", project, goal, "Check recent run evidence for repeated failures.", runtime, new Dictionary<string, string>()),
+        Request("tool-004-failure", "EvidenceValidator", "failure.latest", project, goal, "Check whether a recent failure package should shape the plan.", runtime, new Dictionary<string, string>()),
         Request("tool-005-quality", "QualityAgent", "quality.run-gate", project, goal, "Run deterministic quality evidence before recommending a branch.", runtime, new Dictionary<string, string>
         {
             ["plan_path"] = "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
@@ -158,12 +158,13 @@ public sealed class GovernedPlannerCriticLoopService
             boundary = "Planner draft does not execute commands, write files, create tickets, or mutate memory."
         };
 
-    private static object BuildCriticReview(
+    private static object BuildEvidenceReview(
         string goal,
         IReadOnlyList<AgentToolResult> results,
         EvidenceValidationResult validation) =>
         new
         {
+            reviewer = "DeterministicEvidenceReview",
             goal,
             evidenceStatus = validation.Status,
             failedTools = results.Where(result => !string.Equals(result.Status, "Succeeded", StringComparison.OrdinalIgnoreCase)).Select(result => result.ToolName),
@@ -172,7 +173,7 @@ public sealed class GovernedPlannerCriticLoopService
                 : "Low: required evidence was collected, but human review remains required before writes.",
             blastRadiusReview = "Read/test/report-only loop. No files, tickets, memory, or patches were mutated.",
             recommendation = validation.Status == "Passed" ? "revise_plan_with_evidence" : "collect_missing_evidence",
-            boundary = "CriticAgent reviews evidence only. It does not patch or approve writes."
+            boundary = "Deterministic evidence review is a validator/service, not a passive agent. It does not patch or approve writes."
         };
 
     private static object BuildRevisedPlan(

@@ -18,6 +18,10 @@ public sealed class CodeStandardsAnalysisTool :
         AllowedCallers = ["BuilderAgent", "TestingAgent", "TesterAgent"],
         MutatesState = false,
         AllowsNestedCalls = false,
+        AllowsFileWrites = false,
+        AllowsProcessExecution = false,
+        AllowsNetworkAccess = false,
+        AllowsWorkspaceMutation = false,
         EvidenceKinds = ["CodeStandardsFinding"],
         Boundary = ToolBoundary
     };

@@ -1,3 +1,5 @@
+using IronDev.Core.KnowledgeCompiler;
+using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,10 +12,12 @@ namespace IronDev.Api.Controllers;
 public sealed class MemoryController : ControllerBase
 {
     private readonly IProjectMemoryService _memory;
+    private readonly ISemanticMemoryService _semanticMemory;
 
-    public MemoryController(IProjectMemoryService memory)
+    public MemoryController(IProjectMemoryService memory, ISemanticMemoryService semanticMemory)
     {
         _memory = memory;
+        _semanticMemory = semanticMemory;
     }
 
     [HttpGet("api/projects/{projectId:int}/memory/summary")]
@@ -45,6 +49,82 @@ public sealed class MemoryController : ControllerBase
     [HttpGet("api/projects/{projectId:int}/memory/search")]
     public Task<IReadOnlyList<ProjectContextDocument>> Search(int projectId, [FromQuery] string q, [FromQuery] int take = 20, CancellationToken ct = default) =>
         _memory.GetRelevantContextDocumentsAsync(projectId, q, take, ct);
+
+    [HttpPost("api/projects/{projectId:int}/memory/search")]
+    public async Task<ActionResult<MemorySearchResponseDto>> SearchMemory(
+        int projectId,
+        MemorySearchRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Query))
+            return BadRequest(new { error = "Search query is required." });
+
+        var traceId = Guid.NewGuid();
+        var results = await _semanticMemory.SearchAsync(new SemanticSearchQuery
+        {
+            ProjectId = projectId,
+            QueryText = request.Query,
+            Limit = request.Take <= 0 ? 20 : request.Take,
+            IncludeStale = request.IncludeStale,
+            Consumer = "AlphaCockpitApi"
+        }, ct);
+
+        return Ok(new MemorySearchResponseDto
+        {
+            ProjectId = projectId,
+            Query = request.Query,
+            TraceId = traceId,
+            Results = results
+                .Select((result, index) => new MemorySearchResultDto
+                {
+                    ResultId = result.ChunkId == Guid.Empty ? result.Document.Id.ToString() : result.ChunkId.ToString("D"),
+                    SourceType = string.IsNullOrWhiteSpace(result.SourceEntityType)
+                        ? result.ArtefactType
+                        : result.SourceEntityType,
+                    SourceId = string.IsNullOrWhiteSpace(result.SourceEntityId)
+                        ? result.Document.Id.ToString()
+                        : result.SourceEntityId,
+                    Title = string.IsNullOrWhiteSpace(result.Title) ? result.Document.Title : result.Title,
+                    Excerpt = result.Snippet,
+                    Score = result.FinalScore,
+                    AuthorityScore = result.AuthorityBoost,
+                    RawVectorRank = index + 1,
+                    FinalRank = index + 1,
+                    MatchReason = result.MatchReason,
+                    TraceId = traceId
+                })
+                .ToArray()
+        });
+    }
+
+    [HttpGet("api/projects/{projectId:int}/memory/status")]
+    public async Task<MemoryStatusDto> GetMemoryStatus(int projectId, CancellationToken ct)
+    {
+        var health = await _semanticMemory.GetHealthAsync(projectId, ct);
+        return new MemoryStatusDto
+        {
+            ProjectId = health.ProjectId,
+            ProviderName = health.ProviderName,
+            ProviderStatus = health.ProviderStatus,
+            DocumentCount = health.DocumentCount,
+            EmbeddedCount = health.EmbeddedCount,
+            StaleEmbeddingCount = health.StaleEmbeddingCount,
+            LastEmbeddedAtUtc = health.LastEmbeddedAtUtc,
+            LastRebuildAtUtc = health.LastRebuildAtUtc
+        };
+    }
+
+    [HttpPost("api/projects/{projectId:int}/memory/reindex")]
+    public async Task<MemoryReindexResponseDto> ReindexMemory(int projectId, CancellationToken ct)
+    {
+        await _semanticMemory.RebuildProjectAsync(projectId, ct);
+        return new MemoryReindexResponseDto
+        {
+            ProjectId = projectId,
+            Status = "completed",
+            Message = "Project memory reindex completed."
+        };
+    }
 
     [HttpGet("api/memory/documents/{documentId:long}")]
     public Task<ProjectContextDocument?> GetDocument(long documentId, CancellationToken ct) =>

@@ -58,21 +58,28 @@ The `/disposable` route is the alpha cockpit route. The older `POST .../build-ru
 
 ### Decisions
 
-Project-scoped decision endpoints are planned. Existing memory decision APIs should not be expanded as a substitute for the cockpit decision contract.
+- `GET /api/projects/{projectId}/decisions`
+- `GET /api/projects/{projectId}/decisions/{decisionId}`
+- `POST /api/projects/{projectId}/decisions`
+- `PATCH /api/projects/{projectId}/decisions/{decisionId}`
+- `POST /api/projects/{projectId}/decisions/{decisionId}/supersede`
+- `POST /api/projects/{projectId}/decisions/{decisionId}/archive`
+
+Decision endpoints enforce the route project before returning, updating, superseding, or archiving a decision.
 
 ### Memory And Retrieval
 
 - `GET /api/projects/{projectId}/memory/search` exists
-- `POST /api/projects/{projectId}/memory/search` planned
+- `POST /api/projects/{projectId}/memory/search`
 - `GET /api/projects/{projectId}/memory/traces/{traceId}` planned
-- `POST /api/projects/{projectId}/memory/reindex` planned
-- `GET /api/projects/{projectId}/memory/status` planned
+- `POST /api/projects/{projectId}/memory/reindex`
+- `GET /api/projects/{projectId}/memory/status`
 
 ### Health And Environment
 
 - `GET /health`
 - `GET /api/environment`
-- `GET /api/projects/{projectId}/services/status` planned
+- `GET /api/projects/{projectId}/services/status`
 
 ## Legacy Surfaces
 

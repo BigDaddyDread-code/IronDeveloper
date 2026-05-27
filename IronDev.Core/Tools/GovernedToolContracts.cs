@@ -16,6 +16,10 @@ public sealed record GovernedToolDefinition
     public IReadOnlyList<string> AllowedCallers { get; init; } = [];
     public bool MutatesState { get; init; }
     public bool AllowsNestedCalls { get; init; }
+    public bool AllowsFileWrites { get; init; }
+    public bool AllowsProcessExecution { get; init; }
+    public bool AllowsNetworkAccess { get; init; }
+    public bool AllowsWorkspaceMutation { get; init; }
     public IReadOnlyList<string> EvidenceKinds { get; init; } = [];
     public string Boundary { get; init; } = string.Empty;
 }
@@ -44,6 +48,7 @@ public sealed record GovernedToolResult<TOutput>
     public IReadOnlyList<string> BlockedActions { get; init; } = [];
     public DateTimeOffset StartedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset CompletedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+    public double ExecutionDurationMs => Math.Max(0, (CompletedAtUtc - StartedAtUtc).TotalMilliseconds);
     public string Boundary { get; init; } = string.Empty;
 
     public static GovernedToolResult<TOutput> Rejected(
@@ -61,6 +66,24 @@ public sealed record GovernedToolResult<TOutput>
             StartedAtUtc = startedAtUtc ?? DateTimeOffset.UtcNow,
             CompletedAtUtc = DateTimeOffset.UtcNow,
             Boundary = "Governed tool execution failed closed before any tool body ran."
+        };
+
+    public static GovernedToolResult<TOutput> Failed(
+        GovernedToolRequestMarker request,
+        string summary,
+        IReadOnlyList<string>? blockedActions = null,
+        DateTimeOffset? startedAtUtc = null,
+        string? boundary = null) =>
+        new()
+        {
+            RequestId = request.RequestId,
+            ToolName = request.ToolName,
+            Status = GovernedToolStatus.Failed,
+            Summary = summary,
+            BlockedActions = blockedActions ?? [summary],
+            StartedAtUtc = startedAtUtc ?? DateTimeOffset.UtcNow,
+            CompletedAtUtc = DateTimeOffset.UtcNow,
+            Boundary = boundary ?? "Governed tool execution failed after policy allowed the request."
         };
 }
 
@@ -95,4 +118,26 @@ public interface IGovernedToolRegistry
         GovernedToolRequest<TInput> request,
         CancellationToken cancellationToken = default)
         where TInput : notnull;
+}
+
+public sealed record GovernedToolThoughtLedgerEntry
+{
+    public required string RequestId { get; init; }
+    public required string ToolName { get; init; }
+    public required string RequestedBy { get; init; }
+    public required GovernedToolStatus Status { get; init; }
+    public required string Summary { get; init; }
+    public IReadOnlyList<string> EvidenceRefs { get; init; } = [];
+    public IReadOnlyList<string> BlockedActions { get; init; } = [];
+    public DateTimeOffset StartedAtUtc { get; init; }
+    public DateTimeOffset CompletedAtUtc { get; init; }
+    public double ExecutionDurationMs { get; init; }
+    public string Boundary { get; init; } = string.Empty;
+}
+
+public interface IGovernedToolThoughtLedger
+{
+    Task RecordAsync(
+        GovernedToolThoughtLedgerEntry entry,
+        CancellationToken cancellationToken = default);
 }
