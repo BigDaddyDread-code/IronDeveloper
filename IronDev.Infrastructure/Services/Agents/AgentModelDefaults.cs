@@ -96,14 +96,14 @@ public static class AgentModelDefaults
             Name = "BuilderAgent",
             Purpose = "Create traceable implementation proposals and disposable-workspace build attempts from grounded context.",
             DefaultModelProfile = "code-builder",
-            AllowedTools = ["repo.read", "disposable.workspace.write", "build.run", "test.run", "trace.write"]
+            AllowedTools = ["repo.read", "disposable.workspace.write", "build.run", "test.run", "trace.write", "code_standards.analyse_patch"]
         },
         new()
         {
             Name = "TesterAgent",
             Purpose = "Execute structured test plans and return compact evidence reports.",
             DefaultModelProfile = "cheap-runner",
-            AllowedTools = ["cli.run", "test.plan", "logs.read"]
+            AllowedTools = ["cli.run", "test.plan", "logs.read", "code_standards.analyse_patch"]
         },
         new()
         {

@@ -269,3 +269,19 @@ Live provider calls are traced through the agent output and fall back to determi
 The governed tool loop allows PlannerAgent to request named capabilities, the tool registry to check capability boundaries and runtime profiles, safe tools to collect evidence, CriticAgent to review evidence, PlannerAgent to revise the plan, and a human escalation gate to record whether review or more evidence is required.
 
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked unless the reviewed promotion path supplies trace, promotion package, proposed change, approval, build/test/quality, ConscienceAgent, and ThoughtLedger evidence.
+
+## Governed Tools
+
+Governed tools are typed, deterministic capabilities behind `IGovernedToolRegistry`. They are not agents, and they are not generic wrappers around agent behaviour.
+
+Rules:
+
+- Tool requests use `GovernedToolRequest<TInput>` with a concrete input type.
+- Tools return `GovernedToolResult<TOutput>` with structured output.
+- Tool policy is evaluated by `GovernedToolPolicyEvaluator` before the tool body runs.
+- Unknown tools, disallowed callers, mutation-capable tools, and nested tool calls fail closed.
+- Individual tools must not call agents or other tools.
+- Review/check behaviour defaults to a governed tool or service, not a new passive agent.
+- Passive agents are not added without an ADR.
+
+The first governed tool is `code_standards.analyse_patch`. It is a read-only Code Standards tool, not a `CodeStandardsAgent`. BuilderAgent and TesterAgent may request it through the registry. The tool does not write files, run commands, mutate tickets, mutate memory, use the network, approve changes, or execute nested tool calls.
