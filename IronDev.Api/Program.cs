@@ -5,6 +5,7 @@ using IronDev.Core;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Promotion;
 using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
@@ -14,6 +15,7 @@ using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
+using IronDev.Infrastructure.Services.Promotion;
 using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Services;
@@ -103,6 +105,11 @@ builder.Services.AddSingleton<IRunEvidenceService>(sp => (IRunEvidenceService)sp
 builder.Services.AddSingleton<IRunStore, SqlRunStore>();
 builder.Services.AddSingleton<IRunEventStore, SqlRunEventStore>();
 builder.Services.AddScoped<IDisposableWorkspaceExecutionService, DisposableWorkspaceExecutionService>();
+builder.Services.AddSingleton<ILanguageRuntimeRegistry, LanguageRuntimeRegistry>();
+builder.Services.AddScoped<IPatchProposalService, PatchProposalService>();
+builder.Services.AddScoped<IPromotionPackageService, PromotionPackageService>();
+builder.Services.AddScoped<IControlledWriteApprovalService, ControlledWriteApprovalService>();
+builder.Services.AddScoped<IControlledWorktreeApplyService, ControlledWorktreeApplyService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))

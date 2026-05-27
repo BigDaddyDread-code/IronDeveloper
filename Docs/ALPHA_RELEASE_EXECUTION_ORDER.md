@@ -124,7 +124,16 @@ Do not let an LLM generate code until this loop is stable.
 
 ### IRONDEV-021 - Patch Generation + Validation in Disposable Context
 
+Status: done in current branch after `ab62032`; validate in PR before merge.
+
 Goal: generate the first reviewable patch inside the safe disposable loop.
+
+Implementation notes:
+
+- `PatchProposalService` packages a `CodeChangeProposal` as an exact unified diff with SHA-256 identity.
+- `code_standards.analyse_patch` runs through the governed tool registry before promotion packaging.
+- Build/test/validation evidence is carried with the proposal.
+- This slice does not allow repository writes or UI-side fake success states.
 
 Acceptance criteria:
 
@@ -138,7 +147,15 @@ Hard rule: patch proposal is evidence-first, not model-confidence-first.
 
 ### IRONDEV-022 - Promotion Package + Human Approval
 
+Status: done in current branch after `ab62032`; validate in PR before merge.
+
 Goal: separate "valid patch exists" from "patch may be applied."
+
+Implementation notes:
+
+- `PromotionPackageService` creates a review package with patch hash, unified diff, evidence, files to promote, blocked files, checklist, and risk summary.
+- `ControlledWriteApprovalService` creates durable approval/rejection records scoped to one exact package and patch hash.
+- Approval remains scoped to controlled worktree apply; it does not approve direct real-repo writes.
 
 Acceptance criteria:
 
@@ -152,7 +169,15 @@ Hard rule: no approval, no apply.
 
 ### IRONDEV-023 - Controlled Worktree Apply
 
+Status: done in current branch after `ab62032`; validate in PR before merge.
+
 Goal: apply only approved patches, safely.
+
+Implementation notes:
+
+- `ControlledWorktreeApplyService` blocks missing/rejected approvals, mismatched patch hashes, blocked files, unsafe branches, dirty active repos, and target paths inside the active repo.
+- Apply uses a fresh Git worktree, runs `git apply --check` first, then applies only to the target worktree.
+- Run events capture completed/blocked controlled apply attempts with package, approval, patch hash, and target branch/worktree metadata.
 
 Acceptance criteria:
 

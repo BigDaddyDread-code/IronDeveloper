@@ -1,4 +1,5 @@
 using IronDev.Core.Agents;
+using IronDev.Core.Builder;
 
 namespace IronDev.Core.Promotion;
 
@@ -48,6 +49,7 @@ public sealed record ProposedChange
     public string? PromotionPackageId { get; init; }
     public string? IsolatedApplyRunId { get; init; }
     public string? PullRequestUrl { get; init; }
+    public string PatchSha256 { get; init; } = string.Empty;
     public IReadOnlyList<string> Risks { get; init; } = [];
     public IReadOnlyList<string> EvidenceRefs { get; init; } = [];
     public required string Recommendation { get; init; }
@@ -62,6 +64,8 @@ public sealed record PromotionPackage
     public required string SourceRunId { get; init; }
     public required string SourceTraceId { get; init; }
     public required string Project { get; init; }
+    public required string PatchSha256 { get; init; }
+    public required string UnifiedDiff { get; init; }
     public required LanguageRuntimeProfile RuntimeProfile { get; init; }
     public IReadOnlyList<PromotableFile> FilesToPromote { get; init; } = [];
     public IReadOnlyList<BlockedFile> FilesBlocked { get; init; } = [];
@@ -254,6 +258,7 @@ public sealed record ControlledWriteApprovalRecord
     public required string ProposedChangeId { get; init; }
     public required string SourceRunId { get; init; }
     public required string SourceTraceId { get; init; }
+    public required string PatchSha256 { get; init; }
     public required string ApprovedBy { get; init; }
     public required string ApprovalRole { get; init; }
     public required string ApprovalScope { get; init; }
@@ -279,6 +284,7 @@ public sealed record ControlledWorktreeDryRunReport
     public required string PackageId { get; init; }
     public required string ProposedChangeId { get; init; }
     public required string ApprovalId { get; init; }
+    public string PatchSha256 { get; init; } = string.Empty;
     public required string TargetWorktreePath { get; init; }
     public required string TargetBranchName { get; init; }
     public required bool TargetPathExplicit { get; init; }
@@ -297,4 +303,93 @@ public sealed record ControlledWorktreeDryRunReport
     public required string Recommendation { get; init; }
     public required string Boundary { get; init; }
     public required string ReproCommand { get; init; }
+}
+
+public sealed record PatchProposal
+{
+    public required string RunId { get; init; }
+    public required long TicketId { get; init; }
+    public required string PatchProposalId { get; init; }
+    public required string UnifiedDiff { get; init; }
+    public required string PatchSha256 { get; init; }
+    public IReadOnlyList<string> ChangedFiles { get; init; } = [];
+    public required string CodeStandardsStatus { get; init; }
+    public required string CodeStandardsSummary { get; init; }
+    public int CodeStandardsFindingCount { get; init; }
+    public int CodeStandardsBlockingFindingCount { get; init; }
+    public required PatchValidationResult PatchValidation { get; init; }
+    public required RuntimeCommandEvidence BuildResult { get; init; }
+    public required RuntimeCommandEvidence TestResult { get; init; }
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public IReadOnlyList<PromotionEvidenceRef> EvidenceLinks { get; init; } = [];
+    public string RiskSummary { get; init; } = string.Empty;
+    public string Boundary { get; init; } = "Patch proposal is evidence-first. It does not grant apply authority.";
+}
+
+public sealed record PatchProposalRequest
+{
+    public required string RunId { get; init; }
+    public required long TicketId { get; init; }
+    public required CodeChangeProposal Proposal { get; init; }
+    public required PatchValidationResult PatchValidation { get; init; }
+    public required RuntimeCommandEvidence BuildResult { get; init; }
+    public required RuntimeCommandEvidence TestResult { get; init; }
+    public string RequestedBy { get; init; } = "BuilderAgent";
+}
+
+public sealed record PromotionPackageRequest
+{
+    public required string Project { get; init; }
+    public required string SourceTraceId { get; init; }
+    public required PatchProposal PatchProposal { get; init; }
+    public required LanguageRuntimeProfile RuntimeProfile { get; init; }
+}
+
+public sealed record ControlledWriteApprovalRequest
+{
+    public required string RunId { get; init; }
+    public required string TraceId { get; init; }
+    public required string Project { get; init; }
+    public required PromotionPackage Package { get; init; }
+    public required string ApprovedBy { get; init; }
+    public required string ApprovalRole { get; init; }
+    public required string ApprovalPhrase { get; init; }
+    public DateTimeOffset CreatedUtc { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public sealed record ControlledWorktreeApplyRequest
+{
+    public required string RunId { get; init; }
+    public required string TraceId { get; init; }
+    public required string ActiveRepoPath { get; init; }
+    public required string TargetWorktreePath { get; init; }
+    public required string TargetBranchName { get; init; }
+    public required PromotionPackage Package { get; init; }
+    public required ControlledWriteApprovalRecord Approval { get; init; }
+    public ControlledWriteEffectivePolicy? PolicySnapshot { get; init; }
+    public bool ForceDirtyActiveRepo { get; init; }
+}
+
+public interface IPatchProposalService
+{
+    Task<PatchProposal> CreateAsync(
+        PatchProposalRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IPromotionPackageService
+{
+    PromotionPackage CreatePackage(PromotionPackageRequest request);
+}
+
+public interface IControlledWriteApprovalService
+{
+    ControlledWriteApprovalRecord ApproveForControlledWorktreeApply(ControlledWriteApprovalRequest request);
+}
+
+public interface IControlledWorktreeApplyService
+{
+    Task<ControlledWorktreeDryRunReport> ApplyAsync(
+        ControlledWorktreeApplyRequest request,
+        CancellationToken cancellationToken = default);
 }
