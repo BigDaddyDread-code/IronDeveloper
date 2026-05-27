@@ -49,6 +49,16 @@ test.describe('LocalTest manual cockpit smoke', () => {
     await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
     notes.push('Unlinked seeded ticket shows honest empty evidence and keeps Review Latest Run disabled.');
 
+    await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeEnabled();
+    await page.getByTestId('ticket.command.startDisposableRun').click();
+    await expect(page.getByTestId('ticket.runReview')).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByTestId('ticket.runReview.disposable')).toContainText('Disposable run');
+    await expect(page.getByTestId('ticket.runReview.events')).toContainText(/DisposableCommandCompleted|DisposableCommandFailed/, {
+      timeout: 120_000
+    });
+    await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeEnabled();
+    notes.push('Start Disposable Run created a real backend-owned run and opened the in-ticket review panel.');
+
     await page.getByRole('button', { name: /Wire Start Disposable Run/ }).click();
     await expect(page.getByTestId('ticket.detail.header')).toContainText('Wire Start Disposable Run');
     await expect(page.getByTestId('ticket.evidence.latestRun')).toContainText('localtest-run-ticket-3002', { timeout: 15_000 });

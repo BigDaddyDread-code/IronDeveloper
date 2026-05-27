@@ -16,6 +16,7 @@ $jsonReportPath = Join-Path $reportRoot "latest-localtest-report.json"
 $markdownReportPath = Join-Path $reportRoot "latest-localtest-report.md"
 $playwrightJsonPath = Join-Path $shellRoot "reports\playwright-report.json"
 $startedPorts = New-Object System.Collections.Generic.List[int]
+$apiPort = ([Uri]$ApiBaseUrl).Port
 
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
 
@@ -31,7 +32,12 @@ function Stop-Listener {
 
     foreach ($processId in $listeners) {
         if ($processId -and $processId -ne 0) {
-            Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+            try {
+                Stop-Process -Id $processId -Force -ErrorAction Stop
+            }
+            catch {
+                Write-Warning "Could not stop process $processId on port ${Port}: $($_.Exception.Message)"
+            }
         }
     }
 }
@@ -123,7 +129,10 @@ SELECT
   (SELECT COUNT(*) FROM dbo.Projects WHERE Name = 'IronDev Local Test Project') AS Projects,
   (SELECT COUNT(*) FROM dbo.ProjectDocuments WHERE Title IN ('Alpha UI Manual Test Notes','Code Standards Draft','Test Agent Direction')) AS Documents,
   (SELECT COUNT(*) FROM dbo.ProjectTickets WHERE Title IN ('Add Governed Tool Architecture','Wire Start Disposable Run','Improve Ticket Workspace UI')) AS Tickets,
-  (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId = 'localtest-run-ticket-3002') AS RunEvents;
+  (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId = 'localtest-run-ticket-3002') AS RunEvents,
+  (SELECT COUNT(*) FROM dbo.Runs WHERE ProjectId = 1 AND TicketId IS NOT NULL AND IsDisposable = 1) AS DisposableRuns,
+  (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType IN ('DisposableCommandCompleted','DisposableCommandFailed')) AS DisposableCommandEvents,
+  (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType = 'DisposableWorkspaceCreated') AS DisposableWorkspaceEvents;
 "@
 
     try {
@@ -146,7 +155,7 @@ SELECT
         }
 
         $parts = $line -split ","
-        if ($parts.Count -lt 4) {
+        if ($parts.Count -lt 7) {
             return [ordered]@{ available = $false; reason = "seed count query returned unexpected output" }
         }
 
@@ -156,6 +165,9 @@ SELECT
             documents = [int]$parts[1]
             tickets = [int]$parts[2]
             runEvents = [int]$parts[3]
+            disposableRuns = [int]$parts[4]
+            disposableCommandEvents = [int]$parts[5]
+            disposableWorkspaceEvents = [int]$parts[6]
         }
     }
     catch {
@@ -227,26 +239,33 @@ try {
     }
 
     if ($StartServices) {
-        Stop-Listener -Port 5000
+        Stop-Listener -Port $apiPort
         Stop-Listener -Port $UiPort
 
         $apiOut = Join-Path $env:TEMP "irondev-localtest-api.out.log"
         $apiErr = Join-Path $env:TEMP "irondev-localtest-api.err.log"
-        Start-Process -FilePath dotnet `
-            -ArgumentList @("run", "--launch-profile", "LocalTest", "--project", "IronDev.Api\IronDev.Api.csproj") `
-            -WorkingDirectory $repoRoot `
-            -PassThru `
-            -WindowStyle Hidden `
-            -RedirectStandardOutput $apiOut `
-            -RedirectStandardError $apiErr | Out-Null
-        $startedPorts.Add(5000)
+        $previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
+        $env:ASPNETCORE_ENVIRONMENT = "LocalTest"
+        try {
+            Start-Process -FilePath dotnet `
+                -ArgumentList @("run", "-c", "Release", "--no-launch-profile", "--project", "IronDev.Api\IronDev.Api.csproj", "--urls", $ApiBaseUrl) `
+                -WorkingDirectory $repoRoot `
+                -PassThru `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $apiOut `
+                -RedirectStandardError $apiErr | Out-Null
+        }
+        finally {
+            $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment
+        }
+        $startedPorts.Add($apiPort)
 
         Wait-HttpOk -Uri "$ApiBaseUrl/health"
 
         $node = Get-NodeCommand
         $uiOut = Join-Path $env:TEMP "irondev-localtest-ui.out.log"
         $uiErr = Join-Path $env:TEMP "irondev-localtest-ui.err.log"
-        $env:VITE_IRONDEV_API_BASE_URL = $ApiBaseUrl
+        $env:VITE_IRONDEV_API_BASE_URL = "/irondev-api"
         $env:VITE_IRONDEV_PROJECT_ID = "1"
         $env:IRONDEV_API_PROXY_TARGET = $ApiBaseUrl
 
@@ -315,6 +334,22 @@ try {
     }
 
     $checks.Add([ordered]@{ name = "Playwright/manual smoke"; status = "PASS"; detail = "Live LocalTest cockpit flow passed" })
+
+    $localTestCounts = Get-SeedCounts `
+        -SqlServer $connectionInfo.server `
+        -DatabaseName $environment.database `
+        -IntegratedSecurity $connectionInfo.integratedSecurity `
+        -UserId $connectionInfo.userId `
+        -Password $connectionInfo.password
+
+    if (-not $localTestCounts.available) {
+        throw "Could not verify disposable run SQL evidence: $($localTestCounts.reason)"
+    }
+    if ($localTestCounts.disposableRuns -lt 1 -or $localTestCounts.disposableCommandEvents -lt 1 -or $localTestCounts.disposableWorkspaceEvents -lt 1) {
+        throw "Disposable run SQL proof failed. Runs=$($localTestCounts.disposableRuns), commandEvents=$($localTestCounts.disposableCommandEvents), workspaceEvents=$($localTestCounts.disposableWorkspaceEvents)."
+    }
+
+    $checks.Add([ordered]@{ name = "Disposable run SQL proof"; status = "PASS"; detail = "Runs=$($localTestCounts.disposableRuns), command events=$($localTestCounts.disposableCommandEvents), workspace events=$($localTestCounts.disposableWorkspaceEvents)" })
     $passed = $true
 }
 catch {

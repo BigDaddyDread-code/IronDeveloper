@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Dapper;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -462,6 +464,116 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task TicketBuildRuns_DisposableEndpoint_ShouldExecuteBackendOwnedCommandsAndPersistEvidence()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var fixture = CreateDotNetProjectFixture(broken: false);
+
+        try
+        {
+            var project = await CreateProjectAsync(client, "Disposable Ticket Build E2E Project", fixture.SourcePath);
+            var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
+            {
+                Title = "Prove disposable ticket build run",
+                Summary = "The endpoint should create a durable run, execute backend-owned commands, and persist evidence.",
+                Priority = "High",
+                Type = "Workflow"
+            });
+            Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+            var ticket = await createResponse.Content.ReadFromJsonAsync<ProjectTicket>();
+            Assert.IsNotNull(ticket);
+
+            var startResponse = await client.PostAsJsonAsync(
+                $"/api/projects/{project.Id}/tickets/{ticket!.Id}/build-runs/disposable",
+                new StartTicketBuildRunRequest { MaxRetries = 1 });
+            Assert.AreEqual(HttpStatusCode.OK, startResponse.StatusCode);
+
+            var started = await startResponse.Content.ReadFromJsonAsync<TicketBuildRunDto>();
+            Assert.IsNotNull(started);
+            Assert.AreEqual("Completed", started!.Status);
+
+            await using var connection = new SqlConnection(ConnectionString);
+            var runCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(1) FROM dbo.Runs WHERE RunId = @RunId AND ProjectId = @ProjectId AND TicketId = @TicketId AND IsDisposable = 1",
+                new { started.RunId, ProjectId = project.Id, TicketId = ticket.Id });
+            Assert.AreEqual(1, runCount);
+
+            var eventTypes = (await connection.QueryAsync<string>(
+                "SELECT EventType FROM dbo.RunEvents WHERE RunId = @RunId ORDER BY TimestampUtc, Id",
+                new { started.RunId })).ToArray();
+            CollectionAssert.Contains(eventTypes, "CodeStandardsCompleted");
+            CollectionAssert.Contains(eventTypes, "DisposableWorkspaceCreated");
+            CollectionAssert.Contains(eventTypes, "DisposableCommandStarted");
+            CollectionAssert.Contains(eventTypes, "DisposableCommandCompleted");
+            CollectionAssert.Contains(eventTypes, "RunCompleted");
+
+            var detailResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/{started.RunId}");
+            Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+            var detail = await detailResponse.Content.ReadFromJsonAsync<TicketBuildRunDetailDto>();
+            Assert.IsNotNull(detail);
+            Assert.IsTrue(detail!.Evidence.Any(item => item.Path.EndsWith(".stdout.log", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(detail.Evidence.Any(item => item.Path.EndsWith("code-standards.json", StringComparison.OrdinalIgnoreCase)));
+        }
+        finally
+        {
+            DeleteIfExists(fixture.RootPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task TicketBuildRuns_FailedDisposableEndpoint_ShouldPreserveWorkspaceAndEvidence()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var fixture = CreateDotNetProjectFixture(broken: true);
+
+        try
+        {
+            var project = await CreateProjectAsync(client, "Disposable Ticket Build Failure Project", fixture.SourcePath);
+            var createResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new CreateProjectTicketRequest
+            {
+                Title = "Prove disposable failure evidence",
+                Summary = "The endpoint should preserve the failed disposable workspace and command logs.",
+                Priority = "High",
+                Type = "Workflow"
+            });
+            Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+            var ticket = await createResponse.Content.ReadFromJsonAsync<ProjectTicket>();
+            Assert.IsNotNull(ticket);
+
+            var startResponse = await client.PostAsJsonAsync(
+                $"/api/projects/{project.Id}/tickets/{ticket!.Id}/build-runs/disposable",
+                new StartTicketBuildRunRequest { MaxRetries = 1 });
+            Assert.AreEqual(HttpStatusCode.OK, startResponse.StatusCode);
+
+            var started = await startResponse.Content.ReadFromJsonAsync<TicketBuildRunDto>();
+            Assert.IsNotNull(started);
+            Assert.AreEqual("Failed", started!.Status);
+
+            var detailResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/{started.RunId}");
+            Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+            var detail = await detailResponse.Content.ReadFromJsonAsync<TicketBuildRunDetailDto>();
+            Assert.IsNotNull(detail);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(detail!.FailureReason));
+            Assert.IsTrue(detail.Evidence.Any(item => item.Path.EndsWith(".stderr.log", StringComparison.OrdinalIgnoreCase)));
+
+            var preserved = detail.Events.FirstOrDefault(runEvent => runEvent.EventType == "DisposableWorkspacePreserved");
+            Assert.IsNotNull(preserved);
+            Assert.IsTrue(preserved!.Payload.TryGetValue("workspacePath", out var workspacePath));
+            Assert.IsTrue(Directory.Exists(workspacePath), "Failed disposable workspace should be preserved for debugging.");
+        }
+        finally
+        {
+            DeleteIfExists(fixture.RootPath);
+        }
+    }
+
+    [TestMethod]
     public async Task TicketBuildRuns_WrongProjectWrongTicketOrMissingRun_ShouldReturnNotFound()
     {
         var baseToken = await LoginAsync();
@@ -658,13 +770,13 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.NotFound, wrongTicket.StatusCode);
     }
 
-    private static async Task<Project> CreateProjectAsync(HttpClient client, string name)
+    private static async Task<Project> CreateProjectAsync(HttpClient client, string name, string? localPath = null)
     {
         var response = await client.PostAsJsonAsync("/api/projects", new Project
         {
             Name = name,
             Description = "Created by API endpoint contract test.",
-            LocalPath = $@"C:\Temp\{name.Replace(' ', '_')}"
+            LocalPath = localPath ?? $@"C:\Temp\{name.Replace(' ', '_')}"
         });
 
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
@@ -672,4 +784,31 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsNotNull(project);
         return project!;
     }
+
+    private static DisposableProjectFixture CreateDotNetProjectFixture(bool broken)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"irondev-api-disposable-{Guid.NewGuid():N}");
+        var source = Path.Combine(root, "source");
+        Directory.CreateDirectory(source);
+        File.WriteAllText(Path.Combine(source, "DisposableFixture.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(Path.Combine(source, "FixtureMarker.cs"), broken
+            ? "namespace DisposableFixture; public static class FixtureMarker { public static string Broken() => "
+            : "namespace DisposableFixture; public static class FixtureMarker { public static string Ready() => \"ready\"; }");
+        return new DisposableProjectFixture(root, source);
+    }
+
+    private static void DeleteIfExists(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
+    }
+
+    private sealed record DisposableProjectFixture(string RootPath, string SourcePath);
 }

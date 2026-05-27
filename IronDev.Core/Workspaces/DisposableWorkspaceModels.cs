@@ -13,6 +13,10 @@ public sealed record DisposableWorkspaceRunRequest
     public required string RunId { get; init; }
     public required string SourcePath { get; init; }
     public required string WorkspaceRoot { get; init; }
+    public string? EvidenceRoot { get; init; }
+    public bool CleanWorkspaceOnSuccess { get; init; } = true;
+    public bool PreserveWorkspaceOnFailure { get; init; } = true;
+    public bool PreserveWorkspaceOnCancellation { get; init; } = true;
     public IReadOnlyList<DisposableWorkspaceCommand> Commands { get; init; } = [];
 }
 
@@ -24,8 +28,12 @@ public sealed record DisposableWorkspaceCommandResult
     public int ExitCode { get; init; }
     public string StandardOutput { get; init; } = string.Empty;
     public string StandardError { get; init; } = string.Empty;
+    public string? StandardOutputPath { get; init; }
+    public string? StandardErrorPath { get; init; }
     public DateTimeOffset StartedUtc { get; init; }
     public DateTimeOffset CompletedUtc { get; init; }
+    public long DurationMs { get; init; }
+    public bool TimedOut { get; init; }
 }
 
 public sealed record DisposableWorkspaceRunResult
@@ -35,7 +43,10 @@ public sealed record DisposableWorkspaceRunResult
     public bool Succeeded { get; init; }
     public bool UsedGitWorktree { get; init; }
     public bool CleanedUp { get; init; }
+    public bool WorkspacePreserved { get; init; }
+    public bool Cancelled { get; init; }
     public string Summary { get; init; } = string.Empty;
+    public string EvidencePath { get; init; } = string.Empty;
     public IReadOnlyList<DisposableWorkspaceCommandResult> Commands { get; init; } = [];
 }
 

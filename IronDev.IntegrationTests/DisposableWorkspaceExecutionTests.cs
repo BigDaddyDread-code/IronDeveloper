@@ -37,7 +37,7 @@ public sealed class DisposableWorkspaceExecutionTests
                     new DisposableWorkspaceCommand
                     {
                         FileName = "cmd.exe",
-                        Arguments = ["/c", "echo workspace-only> generated.txt"],
+                        Arguments = ["/c", "echo workspace-only && echo workspace-only> generated.txt"],
                         DisplayName = "write synthetic output",
                         Timeout = TimeSpan.FromSeconds(20)
                     }
@@ -46,8 +46,13 @@ public sealed class DisposableWorkspaceExecutionTests
 
             Assert.IsTrue(result.Succeeded);
             Assert.IsTrue(result.CleanedUp);
+            Assert.IsFalse(result.WorkspacePreserved);
             Assert.IsFalse(File.Exists(Path.Combine(source, "generated.txt")));
             Assert.IsFalse(Directory.Exists(result.WorkspacePath));
+            Assert.IsTrue(Directory.Exists(result.EvidencePath));
+            Assert.IsTrue(result.Commands.Count == 1);
+            Assert.IsTrue(File.Exists(result.Commands[0].StandardOutputPath));
+            StringAssert.Contains(File.ReadAllText(result.Commands[0].StandardOutputPath!), "workspace-only");
 
             var finalRun = await runs.GetAsync(run.RunId);
             Assert.IsNotNull(finalRun);
@@ -67,7 +72,7 @@ public sealed class DisposableWorkspaceExecutionTests
     }
 
     [TestMethod]
-    public async Task RunAsync_CleansDisposableWorkspaceAfterCommandFailure()
+    public async Task RunAsync_PreservesDisposableWorkspaceAndEvidenceAfterCommandFailure()
     {
         var (source, workspaceRoot) = CreateWorkspaceFixture();
         try
@@ -100,9 +105,15 @@ public sealed class DisposableWorkspaceExecutionTests
             });
 
             Assert.IsFalse(result.Succeeded);
-            Assert.IsTrue(result.CleanedUp);
+            Assert.IsFalse(result.CleanedUp);
+            Assert.IsTrue(result.WorkspacePreserved);
             Assert.IsFalse(File.Exists(Path.Combine(source, "generated.txt")));
-            Assert.IsFalse(Directory.Exists(result.WorkspacePath));
+            Assert.IsTrue(Directory.Exists(result.WorkspacePath));
+            Assert.IsTrue(File.Exists(Path.Combine(result.WorkspacePath, "generated.txt")));
+            Assert.IsTrue(Directory.Exists(result.EvidencePath));
+            Assert.IsTrue(result.Commands.Count == 1);
+            Assert.IsTrue(File.Exists(result.Commands[0].StandardOutputPath));
+            Assert.IsTrue(File.Exists(result.Commands[0].StandardErrorPath));
 
             var finalRun = await runs.GetAsync(run.RunId);
             Assert.IsNotNull(finalRun);
@@ -111,8 +122,56 @@ public sealed class DisposableWorkspaceExecutionTests
 
             var runEvents = await events.GetEventsAsync(run.RunId);
             Assert.IsTrue(runEvents.Any(e => e.EventType == "DisposableCommandFailed"));
-            Assert.IsTrue(runEvents.Any(e => e.EventType == "DisposableWorkspaceCleaned"));
+            Assert.IsTrue(runEvents.Any(e => e.EventType == "DisposableWorkspacePreserved"));
             Assert.IsTrue(runEvents.Any(e => e.EventType == "RunFailed"));
+        }
+        finally
+        {
+            DeleteIfExists(source);
+            DeleteIfExists(workspaceRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RejectsNonAllowListedCommand()
+    {
+        var (source, workspaceRoot) = CreateWorkspaceFixture();
+        try
+        {
+            var runs = new InMemoryRunStore();
+            var events = new InMemoryRunEventStore();
+            var run = await runs.CreateAsync(new CreateRunRequest
+            {
+                RunId = "disposable-rejected-command",
+                IsDisposable = true,
+                Summary = "Synthetic disposable command guard test."
+            });
+            var service = new DisposableWorkspaceExecutionService(runs, events);
+
+            try
+            {
+                await service.RunAsync(new DisposableWorkspaceRunRequest
+                {
+                    RunId = run.RunId,
+                    SourcePath = source,
+                    WorkspaceRoot = workspaceRoot,
+                    Commands =
+                    [
+                        new DisposableWorkspaceCommand
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = ["-NoProfile", "-Command", "Write-Host blocked"],
+                            DisplayName = "blocked shell",
+                            Timeout = TimeSpan.FromSeconds(20)
+                        }
+                    ]
+                });
+                Assert.Fail("Expected the disposable workspace service to reject a non-allow-listed command.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                StringAssert.Contains(ex.Message, "not allow-listed");
+            }
         }
         finally
         {

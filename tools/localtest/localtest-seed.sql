@@ -30,6 +30,30 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('dbo.Runs', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Runs
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        RunId NVARCHAR(100) NOT NULL,
+        ProjectId INT NULL,
+        TicketId BIGINT NULL,
+        State NVARCHAR(50) NOT NULL,
+        IsDisposable BIT NOT NULL CONSTRAINT DF_Runs_IsDisposable DEFAULT 0,
+        Summary NVARCHAR(MAX) NOT NULL CONSTRAINT DF_Runs_Summary DEFAULT '',
+        FailureReason NVARCHAR(MAX) NULL,
+        WorkspacePath NVARCHAR(1000) NULL,
+        CreatedUtc DATETIME2 NOT NULL,
+        UpdatedUtc DATETIME2 NOT NULL,
+        StartedUtc DATETIME2 NULL,
+        CompletedUtc DATETIME2 NULL
+    );
+
+    CREATE UNIQUE INDEX UX_Runs_RunId ON dbo.Runs(RunId);
+    CREATE INDEX IX_Runs_ProjectTicketUpdated ON dbo.Runs(ProjectId, TicketId, UpdatedUtc DESC);
+END
+GO
+
 IF COL_LENGTH('dbo.ProjectTickets', 'SourceDocumentVersionId') IS NULL
 BEGIN
     ALTER TABLE dbo.ProjectTickets ADD SourceDocumentVersionId BIGINT NULL;
@@ -41,6 +65,7 @@ IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.Projec
 IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
 IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
 IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
+IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
 IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
 IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
 IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
@@ -308,6 +333,25 @@ VALUES
     (1, 1, 'Ticket', 3001, 'ProjectDocumentVersion', 2002, 'CreatedFrom', 'Ticket was seeded from Code Standards Draft.', 1, 'localtest-seed'),
     (1, 1, 'Ticket', 3002, 'ProjectDocumentVersion', 2001, 'CreatedFrom', 'Ticket was seeded from Alpha UI Manual Test Notes.', 1, 'localtest-seed'),
     (1, 1, 'Ticket', 3003, 'ProjectDocumentVersion', 2003, 'CreatedFrom', 'Ticket was seeded from Test Agent Direction.', 1, 'localtest-seed');
+GO
+
+INSERT INTO dbo.Runs
+    (RunId, ProjectId, TicketId, State, IsDisposable, Summary, FailureReason, WorkspacePath, CreatedUtc, UpdatedUtc, StartedUtc, CompletedUtc)
+VALUES
+(
+    'localtest-run-ticket-3002',
+    1,
+    3002,
+    'Completed',
+    1,
+    'Seeded disposable run completed for manual review.',
+    NULL,
+    NULL,
+    DATEADD(minute, -8, SYSUTCDATETIME()),
+    DATEADD(minute, -5, SYSUTCDATETIME()),
+    DATEADD(minute, -8, SYSUTCDATETIME()),
+    DATEADD(minute, -5, SYSUTCDATETIME())
+);
 GO
 
 INSERT INTO dbo.RunEvents (EventId, RunId, TimestampUtc, EventType, Message, PayloadJson)

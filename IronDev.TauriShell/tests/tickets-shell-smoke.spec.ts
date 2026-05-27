@@ -710,7 +710,7 @@ test('ticket start disposable run links a real run review without enabling revie
       body: JSON.stringify(runStarted ? ticketEvidenceSummaryWithLinkedRun : ticketEvidenceSummaryNoLinkedRun)
     });
   });
-  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs', async (route) => {
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs/disposable', async (route) => {
     runStarted = true;
     await route.fulfill({
       status: 200,
@@ -776,7 +776,7 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/projects/7/tickets/102/evidence-summary', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...ticketEvidenceSummaryNoLinkedRun, ticketId: 102 }) });
   });
-  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs', async (route) => {
+  await page.route('**/irondev-api/api/projects/7/tickets/101/build-runs/disposable', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

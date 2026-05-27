@@ -1,0 +1,34 @@
+{
+  "id": "irondev-disposable-ticket-build-run-smoke",
+  "title": "LocalTest disposable ticket build run smoke",
+  "purpose": "Prove the alpha cockpit can start a real project-scoped disposable build run for a selected ticket and preserve durable SQL/events/evidence.",
+  "command": "powershell -ExecutionPolicy Bypass -File tools/localtest/Invoke-LocalTestSmoke.ps1 -Reset -StartServices",
+  "environment": "LocalTest",
+  "requiredProof": [
+    "LocalTest API starts and reports an isolated test database.",
+    "Tauri browser shell starts against the LocalTest API.",
+    "A selected ticket starts a disposable run through POST /api/projects/{projectId}/tickets/{ticketId}/build-runs/disposable.",
+    "dbo.Runs contains a disposable run row with project and ticket ids.",
+    "dbo.RunEvents contains disposable workspace and command events.",
+    "A disposable workspace is created.",
+    "At least one backend-owned dotnet command executes.",
+    "Run success or failure is visible through the project-scoped ticket build run API.",
+    "The Tauri ticket workspace shows the run review state.",
+    "Failed runs preserve workspace/log evidence for debugging."
+  ],
+  "forbiddenInputs": [
+    "UI-supplied source repository path",
+    "UI-supplied workspace root",
+    "UI-supplied command list"
+  ],
+  "passCriteria": [
+    "Invoke-LocalTestSmoke.ps1 exits 0.",
+    "latest-localtest-report.json has passed=true.",
+    "Disposable run SQL proof check passes.",
+    "Normal development database probe does not find LocalTest seed rows."
+  ],
+  "reportOutputs": [
+    "tools/localtest/reports/latest-localtest-report.json",
+    "tools/localtest/reports/latest-localtest-report.md"
+  ]
+}

@@ -48,6 +48,8 @@ The `/disposable` route is the alpha cockpit route. The older `POST .../build-ru
 
 Durable run state is the source of truth for ticket build runs. Run events are child evidence records tied to the run id. File-backed run reports remain readable as projections/evidence, not the canonical lifecycle record.
 
+Disposable ticket build execution is backend-owned. Clients may request "start a disposable run for this ticket"; they must not supply source repository paths, workspace roots, command lists, cleanup policy, timeout policy, or evidence retention policy. The backend resolves those from trusted project/configuration state, creates the durable run, creates the disposable workspace, executes the allowed command profile, persists command stdout/stderr evidence, and preserves failed workspaces or failure bundles for debugging.
+
 ### Documents
 
 - `GET /api/projects/{projectId}/documents`

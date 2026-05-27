@@ -293,7 +293,7 @@ class IronDevApiClient {
     request: StartTicketBuildRunRequest = {},
     signal?: AbortSignal
   ): Promise<TicketBuildRunDto> {
-    return this.request<TicketBuildRunDto>(`/api/projects/${projectId}/tickets/${ticketId}/build-runs`, {
+    return this.request<TicketBuildRunDto>(`/api/projects/${projectId}/tickets/${ticketId}/build-runs/disposable`, {
       method: 'POST',
       body: request,
       signal

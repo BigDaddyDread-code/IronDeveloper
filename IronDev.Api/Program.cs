@@ -100,7 +100,7 @@ builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<IDotNetBuildService, DotNetRunnerService>();
 builder.Services.AddScoped<IDotNetTestService, DotNetRunnerService>();
-builder.Services.AddSingleton<IRunReportService, FileRunReportService>();
+builder.Services.AddSingleton<IRunReportService>(_ => CreateRunReportService(builder.Configuration));
 builder.Services.AddSingleton<IRunEvidenceService>(sp => (IRunEvidenceService)sp.GetRequiredService<IRunReportService>());
 builder.Services.AddSingleton<IRunStore, SqlRunStore>();
 builder.Services.AddSingleton<IRunEventStore, SqlRunEventStore>();
@@ -259,6 +259,17 @@ static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
 
     if (environmentInfo.DangerRealRepoWritesEnabled)
         throw new InvalidOperationException("LocalTest cannot enable dangerous real repo writes.");
+}
+
+static IRunReportService CreateRunReportService(IConfiguration configuration)
+{
+    var configuredRoot =
+        configuration["DisposableBuild:EvidenceRoot"] ??
+        configuration["LocalTest:LogsRoot"];
+
+    return string.IsNullOrWhiteSpace(configuredRoot)
+        ? new FileRunReportService()
+        : new FileRunReportService(Path.Combine(configuredRoot, "runs"));
 }
 
 // Expose Program for WebApplicationFactory in integration tests.

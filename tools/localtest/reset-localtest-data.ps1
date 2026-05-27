@@ -47,6 +47,30 @@ if ([string]::IsNullOrWhiteSpace($logsRoot) -or $logsRoot -notmatch "Test") {
 
 New-Item -ItemType Directory -Force -Path $workspaceRoot, $logsRoot | Out-Null
 
+$localTestProjectPath = Join-Path $workspaceRoot "IronDevLocalTestProject"
+if (Test-Path $localTestProjectPath) {
+    Remove-Item -LiteralPath $localTestProjectPath -Recurse -Force
+}
+
+New-Item -ItemType Directory -Force -Path $localTestProjectPath | Out-Null
+@"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+"@ | Set-Content -Path (Join-Path $localTestProjectPath "IronDevLocalTestProject.csproj") -Encoding UTF8
+
+@"
+namespace IronDevLocalTestProject;
+
+public static class LocalTestMarker
+{
+    public static string Describe() => "LocalTest disposable build marker";
+}
+"@ | Set-Content -Path (Join-Path $localTestProjectPath "LocalTestMarker.cs") -Encoding UTF8
+
 $sqlcmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
 if ($null -eq $sqlcmd) {
     throw "sqlcmd was not found. Install SQL Server command-line tools, then rerun this LocalTest reset."
