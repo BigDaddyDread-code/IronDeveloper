@@ -6,9 +6,11 @@ using System.Threading.Tasks;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.KnowledgeCompiler;
+using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
+using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Workflow;
 using IronDev.Services;
@@ -134,10 +136,45 @@ public sealed class TicketBuildWorkflowTests
         Assert.IsTrue(runEvents.Any(e => e.EventType == "ApprovalRequired"));
     }
 
+    [TestMethod]
+    public async Task StartAsync_ShouldCreateDurableRunBeforeWorkflowEvents()
+    {
+        var ticket = new ProjectTicket
+        {
+            Id = 42,
+            ProjectId = 7,
+            Title = "Create durable run",
+            Summary = "Build workflow must create durable run state before publishing events."
+        };
+        var runs = new InMemoryRunStore();
+        var events = new InMemoryRunEventStore();
+        var orchestrator = CreateOrchestrator(ticket, new SemanticWorkflowContext(), events, runs);
+
+        var result = await orchestrator.StartAsync(new TicketBuildWorkflowRequest
+        {
+            WorkflowRunId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            ProjectId = 7,
+            TicketId = 42
+        });
+
+        var run = await runs.GetAsync("22222222-2222-2222-2222-222222222222");
+        Assert.IsNotNull(run);
+        Assert.AreEqual(result.WorkflowRunId.ToString("D"), run.RunId);
+        Assert.AreEqual(7, run.ProjectId);
+        Assert.AreEqual(42, run.TicketId);
+        Assert.AreEqual(RunLifecycleState.PausedForApproval, run.State);
+        Assert.IsTrue(run.IsDisposable);
+        Assert.IsNotNull(run.StartedUtc);
+        Assert.IsNull(run.CompletedUtc);
+        Assert.IsTrue((await events.GetEventsAsync(run.RunId)).All(runEvent =>
+            string.Equals(runEvent.RunId, run.RunId, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private static TicketBuildWorkflowOrchestrator CreateOrchestrator(
         ProjectTicket ticket,
         SemanticWorkflowContext memoryContext,
-        IRunEventStore? events = null)
+        IRunEventStore? events = null,
+        IRunStore? runs = null)
     {
         IWorkflowNode<TicketBuildWorkflowState>[] nodes =
         [
@@ -152,7 +189,7 @@ public sealed class TicketBuildWorkflowTests
             new RequestPlanApprovalNode()
         ];
 
-        return new TicketBuildWorkflowOrchestrator(nodes, events);
+        return new TicketBuildWorkflowOrchestrator(nodes, runs, events);
     }
 
     private sealed class StubTicketService : ITicketService

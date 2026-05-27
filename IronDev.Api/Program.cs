@@ -5,12 +5,16 @@ using IronDev.Core;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
+using IronDev.Core.Workspaces;
 using IronDev.Data;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Infrastructure.Services;
+using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
+using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
@@ -96,7 +100,9 @@ builder.Services.AddScoped<IDotNetBuildService, DotNetRunnerService>();
 builder.Services.AddScoped<IDotNetTestService, DotNetRunnerService>();
 builder.Services.AddSingleton<IRunReportService, FileRunReportService>();
 builder.Services.AddSingleton<IRunEvidenceService>(sp => (IRunEvidenceService)sp.GetRequiredService<IRunReportService>());
+builder.Services.AddSingleton<IRunStore, SqlRunStore>();
 builder.Services.AddSingleton<IRunEventStore, SqlRunEventStore>();
+builder.Services.AddScoped<IDisposableWorkspaceExecutionService, DisposableWorkspaceExecutionService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))

@@ -2,18 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
+using IronDev.Infrastructure.Services.Runs;
 
 namespace IronDev.Infrastructure.Workflow;
 
 public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrchestrator
 {
     private readonly IReadOnlyDictionary<string, IWorkflowNode<TicketBuildWorkflowState>> _nodes;
+    private readonly IRunStore _runs;
     private readonly IRunEventStore _events;
 
     public TicketBuildWorkflowOrchestrator(
         IEnumerable<IWorkflowNode<TicketBuildWorkflowState>> nodes,
+        IRunStore? runs = null,
         IRunEventStore? events = null)
     {
         var map = new Dictionary<string, IWorkflowNode<TicketBuildWorkflowState>>(StringComparer.OrdinalIgnoreCase);
@@ -21,6 +25,7 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
             map[node.Name] = node;
 
         _nodes = map;
+        _runs = runs ?? new InMemoryRunStore();
         _events = events ?? NullRunEventStore.Instance;
     }
 
@@ -37,6 +42,21 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
             CurrentNode = TicketBuildWorkflowNodes.LoadTicket,
             Status = TicketBuildWorkflowStatus.Running
         };
+
+        await _runs.CreateAsync(new CreateRunRequest
+        {
+            RunId = state.WorkflowRunId.ToString("D"),
+            ProjectId = state.ProjectId,
+            TicketId = state.TicketId,
+            IsDisposable = true,
+            Summary = $"Ticket build run created for ticket {state.TicketId}."
+        }, cancellationToken);
+        await _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = state.WorkflowRunId.ToString("D"),
+            State = RunLifecycleState.Running,
+            Summary = $"Ticket build run started for ticket {state.TicketId}."
+        }, cancellationToken);
 
         await PublishAsync(
             state,
@@ -87,6 +107,7 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
                 message = $"Workflow node '{state.CurrentNode}' is not registered.";
                 state.TraceMessages.Add(message);
                 await PublishAsync(state, "Error", message, cancellationToken);
+                await TransitionRunAsync(state, RunLifecycleState.Failed, message, cancellationToken);
                 break;
             }
 
@@ -111,6 +132,7 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
                     ["node"] = node.Name,
                     ["exceptionType"] = ex.GetType().Name
                 });
+                await TransitionRunAsync(state, RunLifecycleState.Failed, ex.Message, cancellationToken);
                 break;
             }
 
@@ -135,6 +157,11 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
                     ["node"] = state.CurrentNode,
                     ["status"] = state.Status.ToString()
                 });
+                await TransitionRunAsync(
+                    state,
+                    RunLifecycleState.PausedForApproval,
+                    message ?? "Workflow requires human approval.",
+                    cancellationToken);
                 break;
             }
 
@@ -156,6 +183,11 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
                     ["status"] = state.Status.ToString(),
                     ["currentNode"] = state.CurrentNode
                 });
+            await TransitionRunAsync(
+                state,
+                state.Status == TicketBuildWorkflowStatus.Failed ? RunLifecycleState.Failed : RunLifecycleState.Completed,
+                message ?? $"Ticket build run finished with status {state.Status}.",
+                cancellationToken);
         }
 
         return new TicketBuildWorkflowResult
@@ -168,6 +200,19 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
             State = state
         };
     }
+
+    private Task TransitionRunAsync(
+        TicketBuildWorkflowState state,
+        RunLifecycleState runState,
+        string summary,
+        CancellationToken cancellationToken) =>
+        _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = state.WorkflowRunId.ToString("D"),
+            State = runState,
+            Summary = summary,
+            FailureReason = runState == RunLifecycleState.Failed ? summary : null
+        }, cancellationToken);
 
     private async Task PublishToolEventsAsync(
         TicketBuildWorkflowState state,
