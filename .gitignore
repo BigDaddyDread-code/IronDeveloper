@@ -44,6 +44,7 @@ TestResults/
 *.trx
 *.coverage
 *.coveragexml
+tools/localtest/reports/
 
 ## Temp / scratch
 rebuild_test.sql

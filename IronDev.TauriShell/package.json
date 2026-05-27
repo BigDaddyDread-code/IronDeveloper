@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test",
+    "test:localtest": "playwright test tests/localtest-manual-smoke.spec.ts",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "api:fetch-openapi": "node scripts/fetch-openapi-spec.mjs",
