@@ -1,4 +1,5 @@
 using IronDev.Core.Interfaces;
+using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
 using IronDev.Services;
@@ -9,6 +10,7 @@ public sealed class TicketBuildRunService : ITicketBuildRunService
 {
     private readonly ITicketService _tickets;
     private readonly ITicketBuildWorkflowOrchestrator _workflow;
+    private readonly IRunStore _runs;
     private readonly IRunEventStore _events;
     private readonly IRunReportService _reports;
     private readonly IRunEvidenceService _evidence;
@@ -16,12 +18,14 @@ public sealed class TicketBuildRunService : ITicketBuildRunService
     public TicketBuildRunService(
         ITicketService tickets,
         ITicketBuildWorkflowOrchestrator workflow,
+        IRunStore runs,
         IRunEventStore events,
         IRunReportService reports,
         IRunEvidenceService evidence)
     {
         _tickets = tickets;
         _workflow = workflow;
+        _runs = runs;
         _events = events;
         _reports = reports;
         _evidence = evidence;
@@ -65,16 +69,14 @@ public sealed class TicketBuildRunService : ITicketBuildRunService
         if (!await TicketBelongsToProjectAsync(projectId, ticketId, cancellationToken).ConfigureAwait(false))
             return null;
 
-        var runIds = await _events.GetRecentRunIdsAsync(take <= 0 ? 50 : take, cancellationToken).ConfigureAwait(false);
         var runs = new List<TicketBuildRunSummaryDto>();
-
-        foreach (var runId in runIds)
+        var durableRuns = await _runs.GetRecentAsync(take <= 0 ? 50 : take, cancellationToken).ConfigureAwait(false);
+        foreach (var run in durableRuns.Where(run =>
+            run.ProjectId == projectId &&
+            run.TicketId == ticketId))
         {
-            var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
-            if (!BelongsToTicket(events, projectId, ticketId))
-                continue;
-
-            runs.Add(ToSummary(runId, projectId, ticketId, events));
+            var events = await _events.GetEventsAsync(run.RunId, cancellationToken).ConfigureAwait(false);
+            runs.Add(ToSummary(run, events));
         }
 
         return runs;
@@ -92,11 +94,12 @@ public sealed class TicketBuildRunService : ITicketBuildRunService
         if (!await TicketBelongsToProjectAsync(projectId, ticketId, cancellationToken).ConfigureAwait(false))
             return null;
 
-        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
-        if (!BelongsToTicket(events, projectId, ticketId))
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
             return null;
 
-        var summary = ToSummary(runId, projectId, ticketId, events);
+        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var summary = ToSummary(run, events);
         var report = await _reports.GetRunAsync(runId, cancellationToken).ConfigureAwait(false);
         var evidence = report?.Evidence;
         if (evidence is null || evidence.Count == 0)
@@ -133,32 +136,31 @@ public sealed class TicketBuildRunService : ITicketBuildRunService
     }
 
     private static TicketBuildRunSummaryDto ToSummary(
-        string runId,
-        int projectId,
-        long ticketId,
+        RunRecord run,
         IReadOnlyList<RunEventDto> events)
     {
-        var first = events[0];
-        var last = events[^1];
-        var status = ReadPayload(last, "status") ?? last.EventType;
-        var currentNode = ReadPayload(last, "currentNode") ?? ReadPayload(last, "node") ?? string.Empty;
+        var first = events.FirstOrDefault();
+        var last = events.LastOrDefault();
+        var status = last is null ? run.State.ToString() : ReadPayload(last, "status") ?? last.EventType;
+        var currentNode = last is null ? string.Empty : ReadPayload(last, "currentNode") ?? ReadPayload(last, "node") ?? string.Empty;
         var failure = events.LastOrDefault(IsFailureEvent)?.Message;
 
         return new TicketBuildRunSummaryDto
         {
-            RunId = runId,
-            ProjectId = projectId,
-            TicketId = ticketId,
+            RunId = run.RunId,
+            ProjectId = run.ProjectId ?? 0,
+            TicketId = run.TicketId ?? 0,
             Status = status,
             CurrentNode = currentNode,
-            RequiresHumanApproval = string.Equals(last.EventType, "ApprovalRequired", StringComparison.OrdinalIgnoreCase),
-            IsDisposable = events.Any(IsDisposableRunEvent),
-            StartedUtc = first.TimestampUtc,
-            CompletedUtc = IsTerminal(last.EventType) ? last.TimestampUtc : null,
-            Summary = string.IsNullOrWhiteSpace(last.Message)
-                ? $"Run {runId} is {status}."
-                : last.Message,
-            FailureReason = failure
+            RequiresHumanApproval = string.Equals(last?.EventType, "ApprovalRequired", StringComparison.OrdinalIgnoreCase) ||
+                                    run.State == RunLifecycleState.PausedForApproval,
+            IsDisposable = run.IsDisposable || events.Any(IsDisposableRunEvent),
+            StartedUtc = run.StartedUtc ?? first?.TimestampUtc,
+            CompletedUtc = run.CompletedUtc ?? (last is not null && IsTerminal(last.EventType) ? last.TimestampUtc : null),
+            Summary = !string.IsNullOrWhiteSpace(last?.Message)
+                ? last.Message
+                : string.IsNullOrWhiteSpace(run.Summary) ? $"Run {run.RunId} is {status}." : run.Summary,
+            FailureReason = run.FailureReason ?? failure
         };
     }
 

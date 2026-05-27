@@ -19,6 +19,8 @@ This document is the working order for the Alpha runway. Keep it updated when a 
 
 ### IRONDEV-017 - Harden first governed tool: `code_standards.analyse_patch`
 
+Status: done in `87bda94`.
+
 Goal: prove the first governed tool is genuinely read-only and auditable.
 
 Scope:
@@ -42,6 +44,8 @@ Hard rule: Killjoy can analyse the patch. Killjoy cannot touch the steering whee
 
 ### IRONDEV-018 - Ruthlessly reduce passive agents
 
+Status: done in `87bda94`.
+
 Goal: stop agent sprawl before it becomes permanent architecture debt.
 
 Scope:
@@ -62,6 +66,8 @@ Acceptance criteria:
 Hard rule: no "agent" should exist just because the concept sounds cool.
 
 ### IRONDEV-019 - Durable Run State
+
+Status: done in current branch after `87bda94`; validate in PR before merge.
 
 Goal: replace RunReport as the real source of truth.
 
@@ -87,6 +93,8 @@ Acceptance criteria:
 Hard rule: if it did not create a Run, it did not happen.
 
 ### IRONDEV-020 - Safe Disposable Workspace Execution
+
+Status: done in current branch after `87bda94`; validate in PR before merge.
 
 Goal: prove IronDev can build/test without touching the user's active working tree.
 

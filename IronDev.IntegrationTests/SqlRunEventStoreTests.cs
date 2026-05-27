@@ -1,5 +1,7 @@
 using IronDev.Core.RunReports;
+using IronDev.Core.Runs;
 using IronDev.Data;
+using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -9,6 +11,51 @@ namespace IronDev.IntegrationTests;
 [TestClass]
 public sealed class SqlRunEventStoreTests : IntegrationTestBase
 {
+    [TestMethod]
+    public async Task SqlRunStore_PersistsRunLifecycleAcrossStoreInstances()
+    {
+        var connectionFactory = ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+        var store = new SqlRunStore(connectionFactory);
+
+        var created = await store.CreateAsync(new CreateRunRequest
+        {
+            RunId = "durable-run-state-1",
+            ProjectId = 7,
+            TicketId = 42,
+            IsDisposable = true,
+            Summary = "Run created."
+        });
+
+        Assert.AreEqual(RunLifecycleState.Created, created.State);
+
+        await store.TransitionAsync(new RunStateTransition
+        {
+            RunId = created.RunId,
+            State = RunLifecycleState.Running,
+            Summary = "Run started."
+        });
+
+        await store.TransitionAsync(new RunStateTransition
+        {
+            RunId = created.RunId,
+            State = RunLifecycleState.Failed,
+            Summary = "Run failed.",
+            FailureReason = "Build failed."
+        });
+
+        var restartedStore = new SqlRunStore(connectionFactory);
+        var run = await restartedStore.GetAsync(created.RunId);
+
+        Assert.IsNotNull(run);
+        Assert.AreEqual(7, run.ProjectId);
+        Assert.AreEqual(42, run.TicketId);
+        Assert.AreEqual(RunLifecycleState.Failed, run.State);
+        Assert.IsTrue(run.IsDisposable);
+        Assert.AreEqual("Build failed.", run.FailureReason);
+        Assert.IsNotNull(run.StartedUtc);
+        Assert.IsNotNull(run.CompletedUtc);
+    }
+
     [TestMethod]
     public async Task PublishAsync_PersistsEventsAcrossStoreInstances()
     {

@@ -1,3 +1,4 @@
+using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,18 +13,24 @@ public sealed class RunsController : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IRunReportService _reports;
+    private readonly IRunStore _runs;
     private readonly IRunEventStore _events;
 
-    public RunsController(IRunReportService reports, IRunEventStore events)
+    public RunsController(IRunReportService reports, IRunStore runs, IRunEventStore events)
     {
         _reports = reports;
+        _runs = runs;
         _events = events;
     }
 
     [HttpGet("{runId}")]
     public async Task<ActionResult<RunStatusDto>> GetRun(string runId, CancellationToken ct)
     {
+        var run = await _runs.GetAsync(runId, ct);
         var events = await _events.GetEventsAsync(runId, ct);
+        if (run is not null)
+            return Ok(ToStatus(run, events));
+
         if (events.Count > 0)
             return Ok(ToStatus(runId, events));
 
@@ -77,6 +84,26 @@ public sealed class RunsController : ControllerBase
         RealRepoMutationCount = report.RealRepoMutationCount,
         DisposableFilesChanged = report.DisposableFilesChanged
     };
+
+    private static RunStatusDto ToStatus(RunRecord run, IReadOnlyList<RunEventDto> events)
+    {
+        var last = events.LastOrDefault();
+        var first = events.FirstOrDefault();
+        var status = last?.Payload.TryGetValue("status", out var eventStatus) == true && !string.IsNullOrWhiteSpace(eventStatus)
+            ? eventStatus
+            : run.State.ToString();
+
+        return new RunStatusDto
+        {
+            RunId = run.RunId,
+            Project = run.ProjectId?.ToString() ?? string.Empty,
+            Title = string.IsNullOrWhiteSpace(run.Summary) ? first?.Message ?? string.Empty : run.Summary,
+            Status = status,
+            Recommendation = run.State == RunLifecycleState.PausedForApproval ? "Approval required" : string.Empty,
+            StartedUtc = run.StartedUtc ?? first?.TimestampUtc,
+            CompletedUtc = run.CompletedUtc ?? (last is not null && IsTerminalEvent(last.EventType) ? last.TimestampUtc : null)
+        };
+    }
 
     private static RunStatusDto ToStatus(string runId, IReadOnlyList<RunEventDto> events)
     {

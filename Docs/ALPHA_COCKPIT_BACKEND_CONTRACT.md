@@ -46,6 +46,8 @@ Evidence summary is backend-backed and links runs only from trusted persisted ru
 
 The `/disposable` route is the alpha cockpit route. The older `POST .../build-runs` route remains as a compatibility alias for existing clients.
 
+Durable run state is the source of truth for ticket build runs. Run events are child evidence records tied to the run id. File-backed run reports remain readable as projections/evidence, not the canonical lifecycle record.
+
 ### Documents
 
 - `GET /api/projects/{projectId}/documents`

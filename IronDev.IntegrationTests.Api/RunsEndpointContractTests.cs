@@ -1,8 +1,10 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using IronDev.Core.Runs;
 using IronDev.Api.Controllers;
 using IronDev.Core.RunReports;
+using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -32,7 +34,20 @@ public sealed class RunsEndpointContractTests
             }
         });
 
-        var controller = new RunsController(new StubRunReportService(), events);
+        var runs = new InMemoryRunStore();
+        await runs.CreateAsync(new CreateRunRequest
+        {
+            RunId = "run-123",
+            IsDisposable = true,
+            Summary = "Boundary hardening"
+        });
+        await runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = "run-123",
+            State = RunLifecycleState.Completed,
+            Summary = "Run completed."
+        });
+        var controller = new RunsController(new StubRunReportService(), runs, events);
 
         var statusResult = await controller.GetRun("run-123", CancellationToken.None);
         var status = ((OkObjectResult)statusResult.Result!).Value as RunStatusDto;
@@ -50,7 +65,7 @@ public sealed class RunsEndpointContractTests
     [TestMethod]
     public async Task RunsController_ReturnsNotFoundForMissingRun()
     {
-        var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
+        var controller = new RunsController(new StubRunReportService(), new InMemoryRunStore(), new InMemoryRunEventStore());
 
         var status = await controller.GetRun("missing", CancellationToken.None);
         var report = await controller.GetRunReport("missing", CancellationToken.None);
@@ -62,7 +77,7 @@ public sealed class RunsEndpointContractTests
     [TestMethod]
     public async Task RunsController_ReturnsNotFoundWhenRunHasOnlyFileBackedReport()
     {
-        var controller = new RunsController(new StubRunReportService(), new InMemoryRunEventStore());
+        var controller = new RunsController(new StubRunReportService(), new InMemoryRunStore(), new InMemoryRunEventStore());
         await using var body = new MemoryStream();
         controller.ControllerContext = new ControllerContext
         {
@@ -103,7 +118,7 @@ public sealed class RunsEndpointContractTests
             }
         });
 
-        var controller = new RunsController(new StubRunReportService(), events);
+        var controller = new RunsController(new StubRunReportService(), new InMemoryRunStore(), events);
         await using var body = new MemoryStream();
         controller.ControllerContext = new ControllerContext
         {
