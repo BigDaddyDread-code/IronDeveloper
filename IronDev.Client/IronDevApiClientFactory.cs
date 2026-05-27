@@ -14,7 +14,7 @@ public static class IronDevApiClientFactory
             : new HttpClient(handler, disposeHandler: false);
 
         http.BaseAddress = new Uri(NormalizeBaseUrl(apiBaseUrl) + "/");
-        http.Timeout = TimeSpan.FromSeconds(15);
+        http.Timeout = TimeSpan.FromMinutes(5);
 
         if (!string.IsNullOrWhiteSpace(token))
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

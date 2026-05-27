@@ -71,6 +71,40 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => PostAsync<StartTicketBuildRunRequest, TicketBuildRunDto>($"api/projects/{projectId}/tickets/{ticketId}/build-runs", request, cancellationToken);
 
+    public Task<SaveDiscussionResponse> SaveDiscussionAsync(
+        int projectId,
+        SaveDiscussionRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<SaveDiscussionRequest, SaveDiscussionResponse>($"api/projects/{projectId}/discussions", request, cancellationToken);
+
+    public Task<CreateTicketFromDocumentResponse> CreateTicketFromDocumentAsync(
+        int projectId,
+        long documentVersionId,
+        CreateTicketFromDocumentRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<CreateTicketFromDocumentRequest, CreateTicketFromDocumentResponse>($"api/projects/{projectId}/documents/{documentVersionId}/tickets", request, cancellationToken);
+
+    public Task<RunTicketReviewResponse> ReviewTicketAsync(
+        int projectId,
+        long ticketId,
+        RunTicketReviewRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<RunTicketReviewRequest, RunTicketReviewResponse>($"api/projects/{projectId}/tickets/{ticketId}/review", request, cancellationToken);
+
+    public Task<StartDisposableCodeRunResponse> StartDisposableCodeRunAsync(
+        int projectId,
+        long ticketId,
+        StartDisposableCodeRunRequest request,
+        CancellationToken cancellationToken = default)
+        => PostAsync<StartDisposableCodeRunRequest, StartDisposableCodeRunResponse>($"api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs", request, cancellationToken);
+
+    public Task<RunReviewPackage> GetRunReviewPackageAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken cancellationToken = default)
+        => GetAsync<RunReviewPackage>($"api/projects/{projectId}/tickets/{ticketId}/build-runs/{Uri.EscapeDataString(runId)}/review-package", cancellationToken);
+
     public Task<RunStatusDto> GetRunAsync(
         string runId,
         CancellationToken cancellationToken = default)

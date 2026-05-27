@@ -244,6 +244,52 @@ public sealed class IronDevCliTests
         StringAssert.Contains(output.ToString(), "\"runId\": \"11111111-1111-1111-1111-111111111111\"");
     }
 
+    [TestMethod]
+    public async Task ExerciseChatToBuild_DrivesReusableSpineAndWritesProofReport()
+    {
+        var reportDir = Path.Combine(Path.GetTempPath(), $"irondev-process-proof-{Guid.NewGuid():N}");
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "exercise", "chat-to-build",
+                "--project-id", "42",
+                "--input", "Create a tiny C# console application that prints \"Hello from IronDev Alpha\".",
+                "--title", "Hello World proof",
+                "--report-dir", reportDir,
+                "--api-base-url", "http://localhost:5000",
+                "--token", "test-token"
+            ],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+
+        Assert.AreEqual(0, result, error.ToString());
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/projects/42/discussions",
+                "/api/projects/42/documents/1001/tickets",
+                "/api/projects/42/tickets/123/review",
+                "/api/projects/42/tickets/123/disposable-code-runs",
+                "/api/runs/run-proof-1",
+                "/api/projects/42/tickets/123/build-runs/run-proof-1/review-package"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+
+        StringAssert.Contains(output.ToString(), "PASS chat-to-build process exercise");
+        StringAssert.Contains(output.ToString(), "Run: run-proof-1 state=PausedForApproval");
+
+        var jsonReport = Directory.EnumerateFiles(reportDir, "report.json", SearchOption.AllDirectories).Single();
+        var markdownReport = Directory.EnumerateFiles(reportDir, "report.md", SearchOption.AllDirectories).Single();
+        StringAssert.Contains(await File.ReadAllTextAsync(jsonReport), "\"reviewPackageAvailable\": true");
+        StringAssert.Contains(await File.ReadAllTextAsync(markdownReport), "IronDev Chat-To-Build Proof Report");
+    }
+
 
     [TestMethod]
     public async Task TicketsApiClient_CallsStructuredTicketEndpoints()
@@ -391,6 +437,23 @@ public sealed class IronDevCliTests
                         "application/json")
                 };
 
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-proof-1")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                          "runId": "run-proof-1",
+                          "project": "42",
+                          "title": "Hello World proof",
+                          "status": "PausedForApproval",
+                          "recommendation": "Approval required"
+                        }
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
             if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123/report")
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
@@ -453,6 +516,118 @@ public sealed class IronDevCliTests
                         "application/json")
                 };
 
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/projects/42/discussions")
+                return JsonResponse(
+                    """
+                    {
+                      "documentId": 1000,
+                      "documentVersionId": 1001
+                    }
+                    """);
+
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/projects/42/documents/1001/tickets")
+                return JsonResponse(
+                    """
+                    {
+                      "ticketId": 123,
+                      "sourceDocumentVersionId": 1001
+                    }
+                    """);
+
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/projects/42/tickets/123/review")
+                return JsonResponse(
+                    """
+                    {
+                      "reviewId": "review-proof-1",
+                      "result": {
+                        "reviewId": "review-proof-1",
+                        "projectId": 42,
+                        "ticketId": 123,
+                        "scenarioId": "console.hello-world",
+                        "createdUtc": "2026-05-26T00:00:00Z",
+                        "contributions": [
+                          {
+                            "role": "Planner",
+                            "summary": "Build the smallest console app.",
+                            "concerns": [],
+                            "recommendations": ["Use a disposable workspace."]
+                          }
+                        ],
+                        "decision": {
+                          "proceed": true,
+                          "recommendedNextStep": "Start disposable code run.",
+                          "guardrails": ["Do not mutate the real repo."]
+                        }
+                      }
+                    }
+                    """);
+
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/projects/42/tickets/123/disposable-code-runs")
+                return JsonResponse(
+                    """
+                    {
+                      "runId": "run-proof-1",
+                      "state": "PausedForApproval",
+                      "isDisposable": true
+                    }
+                    """);
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/projects/42/tickets/123/build-runs/run-proof-1/review-package")
+                return JsonResponse(
+                    """
+                    {
+                      "runId": "run-proof-1",
+                      "projectId": 42,
+                      "ticketId": 123,
+                      "state": "PausedForApproval",
+                      "generatedFiles": [
+                        {
+                          "relativePath": "HelloWorldAlpha/Program.cs",
+                          "content": "Console.WriteLine(\"Hello from IronDev Alpha\");",
+                          "sha256": "abc"
+                        }
+                      ],
+                      "commandEvidence": [
+                        {
+                          "command": "dotnet build",
+                          "exitCode": "0",
+                          "stdoutPath": "build.stdout.log",
+                          "stderrPath": "build.stderr.log",
+                          "durationMs": "1200"
+                        }
+                      ],
+                      "outputVerification": {
+                        "expected": "Hello from IronDev Alpha",
+                        "actual": "Hello from IronDev Alpha",
+                        "verified": true,
+                        "evidencePath": "output-verification.json"
+                      },
+                      "outputVerifications": [
+                        {
+                          "expected": "Hello from IronDev Alpha",
+                          "actual": "Hello from IronDev Alpha",
+                          "verified": true,
+                          "evidencePath": "output-verification.json"
+                        }
+                      ],
+                      "codeStandards": {
+                        "status": "Passed",
+                        "summary": "No blocking standards findings.",
+                        "evidencePath": "code-standards.json"
+                      },
+                      "fileSetHash": "fileset",
+                      "risks": ["Generated code requires human review."],
+                      "humanReviewChecklist": ["Confirm generated files match the ticket."],
+                      "events": [
+                        {
+                          "eventType": "RunPausedForApproval",
+                          "message": "Run paused for approval.",
+                          "timestampUtc": "2026-05-26T00:01:00Z"
+                        }
+                      ]
+                    }
+                    """);
+
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
@@ -470,6 +645,12 @@ public sealed class IronDevCliTests
                     "application/json")
             };
         }
+
+        private static HttpResponseMessage JsonResponse(string json) =>
+            new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
 
         private static async Task<HttpRequestMessage> CloneAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {

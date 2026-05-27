@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using IronDev.Client;
 using IronDev.Core.Models;
@@ -51,6 +54,8 @@ public static class IronDevCli
             return await HandleRunReportAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "runs", "stream"))
             return await HandleRunStreamAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "exercise", "chat-to-build"))
+            return await HandleExerciseChatToBuildAsync(args, output, error, handler, cancellationToken);
 
         error.WriteLine($"Unknown command: {string.Join(' ', args)}");
         PrintUsage(error);
@@ -418,6 +423,187 @@ public static class IronDevCli
         }
     }
 
+    private static async Task<int> HandleExerciseChatToBuildAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        if (!TryGetIntOption(args, "--project-id", out var projectId))
+        {
+            error.WriteLine("Missing or invalid required option: --project-id <id>");
+            return 2;
+        }
+
+        string? input;
+        try
+        {
+            input = await ResolveExerciseInputAsync(args, cancellationToken);
+        }
+        catch (FileNotFoundException ex)
+        {
+            error.WriteLine(ex.Message);
+            return 2;
+        }
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            error.WriteLine("Missing required option: --input <text> or --file <path>");
+            return 2;
+        }
+
+        var title = GetOption(args, "--title");
+        if (string.IsNullOrWhiteSpace(title))
+            title = "CLI chat-to-build exercise";
+
+        var scenarioId = GetOption(args, "--scenario-id") ?? string.Empty;
+        var expectedOutput = GetOption(args, "--expected-output") ?? string.Empty;
+        var reportRoot = GetOption(args, "--report-dir") ?? Path.Combine(Path.GetTempPath(), "IronDev", "process-proof");
+        var reportDirectory = Path.Combine(reportRoot, DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(reportDirectory);
+
+        var repoRoot = ResolveRepoRoot(GetOption(args, "--repo-root"));
+        var beforeStatus = repoRoot is null ? null : await ReadGitStatusAsync(repoRoot, cancellationToken);
+        var problems = new List<string>();
+        var startedUtc = DateTimeOffset.UtcNow;
+
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        SaveDiscussionResponse? discussion = null;
+        CreateTicketFromDocumentResponse? ticket = null;
+        RunTicketReviewResponse? review = null;
+        StartDisposableCodeRunResponse? run = null;
+        RunStatusDto? runStatus = null;
+        RunReviewPackage? reviewPackage = null;
+
+        try
+        {
+            discussion = await client.SaveDiscussionAsync(
+                projectId,
+                new SaveDiscussionRequest { Title = title, Content = input },
+                cancellationToken);
+
+            ticket = await client.CreateTicketFromDocumentAsync(
+                projectId,
+                discussion.DocumentVersionId,
+                new CreateTicketFromDocumentRequest(),
+                cancellationToken);
+
+            review = await client.ReviewTicketAsync(
+                projectId,
+                ticket.TicketId,
+                new RunTicketReviewRequest { UseLiveModel = false },
+                cancellationToken);
+
+            run = await client.StartDisposableCodeRunAsync(
+                projectId,
+                ticket.TicketId,
+                new StartDisposableCodeRunRequest
+                {
+                    ReviewId = review.ReviewId,
+                    ScenarioId = string.IsNullOrWhiteSpace(scenarioId) ? review.Result.ScenarioId : scenarioId,
+                    ExpectedOutput = expectedOutput
+                },
+                cancellationToken);
+
+            runStatus = await client.GetRunAsync(run.RunId, cancellationToken);
+            reviewPackage = await client.GetRunReviewPackageAsync(projectId, ticket.TicketId, run.RunId, cancellationToken);
+        }
+        catch (IronDevApiException ex)
+        {
+            problems.Add($"IronDev.Api request failed: {(int)ex.StatusCode} {ex.StatusCode}");
+            if (!string.IsNullOrWhiteSpace(ex.ResponseBody))
+                problems.Add(ex.ResponseBody);
+        }
+        catch (HttpRequestException ex)
+        {
+            problems.Add($"HTTP request failed: {ex.Message}");
+        }
+        catch (TaskCanceledException ex)
+        {
+            problems.Add($"Request timed out or was cancelled: {ex.Message}");
+        }
+
+        var afterStatus = repoRoot is null ? null : await ReadGitStatusAsync(repoRoot, cancellationToken);
+        var mutationCheck = BuildRepoMutationCheck(repoRoot, beforeStatus, afterStatus);
+        if (mutationCheck.Checked && !mutationCheck.Passed)
+            problems.Add("Active repository status changed during the exercise.");
+
+        if (review is not null && !review.Result.Decision.Proceed)
+            problems.Add("Ticket review did not approve proceeding.");
+        if (run is not null && !string.Equals(run.State, "PausedForApproval", StringComparison.OrdinalIgnoreCase))
+            problems.Add($"Disposable run ended in state '{run.State}', not PausedForApproval.");
+        if (reviewPackage is null)
+            problems.Add("Run review package was not fetched.");
+        else
+        {
+            if (reviewPackage.GeneratedFiles.Count == 0)
+                problems.Add("Review package did not include generated files.");
+            if (reviewPackage.CommandEvidence.Count == 0)
+                problems.Add("Review package did not include command evidence.");
+            if (reviewPackage.OutputVerifications.Count == 0 && !reviewPackage.OutputVerification.Verified)
+                problems.Add("Review package did not include a verified output check.");
+            if (reviewPackage.OutputVerifications.Count > 0 && reviewPackage.OutputVerifications.Any(verification => !verification.Verified))
+                problems.Add("One or more output verifications failed.");
+        }
+
+        var report = new ChatToBuildProofReport
+        {
+            StartedUtc = startedUtc,
+            CompletedUtc = DateTimeOffset.UtcNow,
+            ApiBaseUrl = apiBaseUrl,
+            ProjectId = projectId,
+            Input = input,
+            DiscussionTitle = title,
+            DocumentId = discussion?.DocumentId,
+            DocumentVersionId = discussion?.DocumentVersionId,
+            TicketId = ticket?.TicketId,
+            SourceDocumentVersionId = ticket?.SourceDocumentVersionId,
+            ReviewId = review?.ReviewId,
+            ScenarioId = review?.Result.ScenarioId ?? scenarioId,
+            ReviewProceed = review?.Result.Decision.Proceed,
+            ReviewRecommendedNextStep = review?.Result.Decision.RecommendedNextStep,
+            RunId = run?.RunId,
+            RunState = run?.State,
+            RunStatus = runStatus?.Status,
+            ReviewPackageAvailable = reviewPackage is not null,
+            GeneratedFileCount = reviewPackage?.GeneratedFiles.Count ?? 0,
+            CommandEvidenceCount = reviewPackage?.CommandEvidence.Count ?? 0,
+            OutputVerificationCount = reviewPackage?.OutputVerifications.Count > 0
+                ? reviewPackage.OutputVerifications.Count
+                : reviewPackage?.OutputVerification.Verified == true ? 1 : 0,
+            AllOutputVerified = reviewPackage is null
+                ? false
+                : reviewPackage.OutputVerifications.Count > 0
+                    ? reviewPackage.OutputVerifications.All(verification => verification.Verified)
+                    : reviewPackage.OutputVerification.Verified,
+            CodeStandardsStatus = reviewPackage?.CodeStandards.Status,
+            FileSetHash = reviewPackage?.FileSetHash,
+            EventCount = reviewPackage?.Events.Count ?? 0,
+            MutationCheck = mutationCheck,
+            Problems = problems
+        };
+
+        var jsonPath = Path.Combine(reportDirectory, "report.json");
+        var markdownPath = Path.Combine(reportDirectory, "report.md");
+        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(report, JsonOptions), cancellationToken);
+        await File.WriteAllTextAsync(markdownPath, BuildMarkdownReport(report), cancellationToken);
+
+        if (HasFlag(args, "--json"))
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(report, JsonOptions));
+        }
+        else
+        {
+            await output.WriteLineAsync(FormatExerciseReport(report, reportDirectory));
+        }
+
+        return problems.Count == 0 ? 0 : 1;
+    }
+
     private static async Task<IIronDevApiClient?> CreateReadyApiClientAsync(
         string[] args,
         string apiBaseUrl,
@@ -493,6 +679,190 @@ public static class IronDevCli
 
     private static string FormatTicketBuildRun(TicketBuildRunDto run) =>
         $"{run.RunId}: {run.Status} at {run.CurrentNode} for ticket {run.TicketId}";
+
+    private static string FormatExerciseReport(ChatToBuildProofReport report, string reportDirectory)
+    {
+        var status = report.Problems.Count == 0 ? "PASS" : "FAIL";
+        var builder = new StringBuilder();
+        builder.AppendLine($"{status} chat-to-build process exercise");
+        builder.AppendLine($"  Project: {report.ProjectId}");
+        builder.AppendLine($"  Document: {report.DocumentId?.ToString() ?? "n/a"} / version {report.DocumentVersionId?.ToString() ?? "n/a"}");
+        builder.AppendLine($"  Ticket: {report.TicketId?.ToString() ?? "n/a"}");
+        builder.AppendLine($"  Review: {report.ReviewId ?? "n/a"} proceed={report.ReviewProceed?.ToString() ?? "n/a"}");
+        builder.AppendLine($"  Scenario: {report.ScenarioId ?? "n/a"}");
+        builder.AppendLine($"  Run: {report.RunId ?? "n/a"} state={report.RunState ?? "n/a"} status={report.RunStatus ?? "n/a"}");
+        builder.AppendLine($"  Evidence: files={report.GeneratedFileCount}, commands={report.CommandEvidenceCount}, verifications={report.OutputVerificationCount}, events={report.EventCount}");
+        builder.AppendLine($"  Repo untouched: {(report.MutationCheck.Checked ? report.MutationCheck.Passed.ToString() : "not checked")}");
+        builder.AppendLine($"  Report: {reportDirectory}");
+
+        if (report.Problems.Count > 0)
+        {
+            builder.AppendLine("  Problems:");
+            foreach (var problem in report.Problems)
+                builder.AppendLine($"    - {problem}");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private static string BuildMarkdownReport(ChatToBuildProofReport report)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("# IronDev Chat-To-Build Proof Report");
+        builder.AppendLine();
+        builder.AppendLine($"**Result:** {(report.Problems.Count == 0 ? "PASS" : "FAIL")}");
+        builder.AppendLine();
+        builder.AppendLine("## Input");
+        builder.AppendLine();
+        builder.AppendLine($"- Project: `{report.ProjectId}`");
+        builder.AppendLine($"- Title: {report.DiscussionTitle}");
+        builder.AppendLine($"- Scenario: `{report.ScenarioId ?? "n/a"}`");
+        builder.AppendLine();
+        builder.AppendLine("```text");
+        builder.AppendLine(report.Input.Trim());
+        builder.AppendLine("```");
+        builder.AppendLine();
+        builder.AppendLine("## Created");
+        builder.AppendLine();
+        builder.AppendLine($"- Document: `{report.DocumentId?.ToString() ?? "n/a"}`");
+        builder.AppendLine($"- Document version: `{report.DocumentVersionId?.ToString() ?? "n/a"}`");
+        builder.AppendLine($"- Ticket: `{report.TicketId?.ToString() ?? "n/a"}`");
+        builder.AppendLine($"- Review: `{report.ReviewId ?? "n/a"}`");
+        builder.AppendLine($"- Run: `{report.RunId ?? "n/a"}`");
+        builder.AppendLine();
+        builder.AppendLine("## Plan");
+        builder.AppendLine();
+        builder.AppendLine($"- Proceed: `{report.ReviewProceed?.ToString() ?? "n/a"}`");
+        builder.AppendLine($"- Recommended next step: {report.ReviewRecommendedNextStep ?? "n/a"}");
+        builder.AppendLine();
+        builder.AppendLine("## Execution");
+        builder.AppendLine();
+        builder.AppendLine($"- Run state: `{report.RunState ?? "n/a"}`");
+        builder.AppendLine($"- Run status: `{report.RunStatus ?? "n/a"}`");
+        builder.AppendLine($"- Generated files: `{report.GeneratedFileCount}`");
+        builder.AppendLine($"- Command evidence: `{report.CommandEvidenceCount}`");
+        builder.AppendLine($"- Output verifications: `{report.OutputVerificationCount}`");
+        builder.AppendLine($"- All output verified: `{report.AllOutputVerified}`");
+        builder.AppendLine($"- Code standards: `{report.CodeStandardsStatus ?? "n/a"}`");
+        builder.AppendLine($"- Events: `{report.EventCount}`");
+        builder.AppendLine();
+        builder.AppendLine("## Safety");
+        builder.AppendLine();
+        builder.AppendLine($"- Repo mutation check: `{(report.MutationCheck.Checked ? report.MutationCheck.Passed ? "passed" : "failed" : "not checked")}`");
+        builder.AppendLine($"- Repo root: `{report.MutationCheck.RepositoryRoot ?? "n/a"}`");
+        builder.AppendLine($"- Mutation note: {report.MutationCheck.Message}");
+        builder.AppendLine();
+        builder.AppendLine("## Problems Found");
+        builder.AppendLine();
+        if (report.Problems.Count == 0)
+        {
+            builder.AppendLine("- none");
+        }
+        else
+        {
+            foreach (var problem in report.Problems)
+                builder.AppendLine($"- {problem}");
+        }
+
+        return builder.ToString();
+    }
+
+    private static async Task<string?> ResolveExerciseInputAsync(string[] args, CancellationToken cancellationToken)
+    {
+        var input = GetOption(args, "--input");
+        if (!string.IsNullOrWhiteSpace(input))
+            return input;
+
+        var file = GetOption(args, "--file");
+        if (string.IsNullOrWhiteSpace(file))
+            return null;
+
+        return File.Exists(file)
+            ? await File.ReadAllTextAsync(file, cancellationToken)
+            : throw new FileNotFoundException($"Exercise input file was not found: {file}", file);
+    }
+
+    private static string? ResolveRepoRoot(string? requestedRoot)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedRoot))
+            return Directory.Exists(requestedRoot) ? Path.GetFullPath(requestedRoot) : null;
+
+        var directory = new DirectoryInfo(Environment.CurrentDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    private static async Task<string?> ReadGitStatusAsync(string repoRoot, CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = repoRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("status");
+        startInfo.ArgumentList.Add("--porcelain");
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+                return null;
+
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            return process.ExitCode == 0 ? await stdoutTask : null;
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or TaskCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private static RepoMutationCheck BuildRepoMutationCheck(string? repoRoot, string? beforeStatus, string? afterStatus)
+    {
+        if (repoRoot is null)
+        {
+            return new RepoMutationCheck
+            {
+                Checked = false,
+                Passed = false,
+                Message = "No Git repository root was found from the current directory. Use --repo-root to enable this check."
+            };
+        }
+
+        if (beforeStatus is null || afterStatus is null)
+        {
+            return new RepoMutationCheck
+            {
+                Checked = false,
+                Passed = false,
+                RepositoryRoot = repoRoot,
+                Message = "Git status could not be read before and after the exercise."
+            };
+        }
+
+        var passed = string.Equals(beforeStatus, afterStatus, StringComparison.Ordinal);
+        return new RepoMutationCheck
+        {
+            Checked = true,
+            Passed = passed,
+            RepositoryRoot = repoRoot,
+            BeforeStatus = beforeStatus,
+            AfterStatus = afterStatus,
+            Message = passed
+                ? "Git status was unchanged during the exercise."
+                : "Git status changed during the exercise."
+        };
+    }
 
     private static string? ResolveToken(
         string? argumentValue,
@@ -580,9 +950,51 @@ public static class IronDevCli
         error.WriteLine("  irondev runs status --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs report --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs stream --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev exercise chat-to-build --project-id <id> (--input <text> | --file <path>) [--title <title>] [--scenario-id <id>] [--expected-output <text>] [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine();
         error.WriteLine("Default API base URL: http://localhost:5000");
         error.WriteLine("Overrides: --api-base-url, IRONDEV_API_BASE_URL, irondev.cli.json");
+    }
+
+    private sealed record ChatToBuildProofReport
+    {
+        public required DateTimeOffset StartedUtc { get; init; }
+        public required DateTimeOffset CompletedUtc { get; init; }
+        public required string ApiBaseUrl { get; init; }
+        public required int ProjectId { get; init; }
+        public required string Input { get; init; }
+        public required string DiscussionTitle { get; init; }
+        public long? DocumentId { get; init; }
+        public long? DocumentVersionId { get; init; }
+        public long? TicketId { get; init; }
+        public long? SourceDocumentVersionId { get; init; }
+        public string? ReviewId { get; init; }
+        public string? ScenarioId { get; init; }
+        public bool? ReviewProceed { get; init; }
+        public string? ReviewRecommendedNextStep { get; init; }
+        public string? RunId { get; init; }
+        public string? RunState { get; init; }
+        public string? RunStatus { get; init; }
+        public bool ReviewPackageAvailable { get; init; }
+        public int GeneratedFileCount { get; init; }
+        public int CommandEvidenceCount { get; init; }
+        public int OutputVerificationCount { get; init; }
+        public bool AllOutputVerified { get; init; }
+        public string? CodeStandardsStatus { get; init; }
+        public string? FileSetHash { get; init; }
+        public int EventCount { get; init; }
+        public required RepoMutationCheck MutationCheck { get; init; }
+        public IReadOnlyList<string> Problems { get; init; } = [];
+    }
+
+    private sealed record RepoMutationCheck
+    {
+        public bool Checked { get; init; }
+        public bool Passed { get; init; }
+        public string? RepositoryRoot { get; init; }
+        public string? BeforeStatus { get; init; }
+        public string? AfterStatus { get; init; }
+        public string Message { get; init; } = string.Empty;
     }
 
     private sealed class IronDevCliConfig

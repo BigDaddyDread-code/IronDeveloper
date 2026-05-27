@@ -30,6 +30,16 @@ public interface IIronDevApiClient
 
     Task<TicketBuildRunDto> StartTicketBuildRunAsync(int projectId, long ticketId, StartTicketBuildRunRequest request, CancellationToken cancellationToken = default);
 
+    Task<SaveDiscussionResponse> SaveDiscussionAsync(int projectId, SaveDiscussionRequest request, CancellationToken cancellationToken = default);
+
+    Task<CreateTicketFromDocumentResponse> CreateTicketFromDocumentAsync(int projectId, long documentVersionId, CreateTicketFromDocumentRequest request, CancellationToken cancellationToken = default);
+
+    Task<RunTicketReviewResponse> ReviewTicketAsync(int projectId, long ticketId, RunTicketReviewRequest request, CancellationToken cancellationToken = default);
+
+    Task<StartDisposableCodeRunResponse> StartDisposableCodeRunAsync(int projectId, long ticketId, StartDisposableCodeRunRequest request, CancellationToken cancellationToken = default);
+
+    Task<RunReviewPackage> GetRunReviewPackageAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
+
     Task<RunStatusDto> GetRunAsync(string runId, CancellationToken cancellationToken = default);
 
     Task<RunReportDto> GetRunReportAsync(string runId, CancellationToken cancellationToken = default);
