@@ -106,6 +106,118 @@ export interface TicketBuildRunDto {
   message?: string | null;
 }
 
+export interface SaveDiscussionRequest {
+  title: string;
+  content: string;
+}
+
+export interface SaveDiscussionResponse {
+  documentId: number;
+  documentVersionId: number;
+}
+
+export interface CreateTicketFromDocumentRequest {
+  requestedTitle?: string | null;
+}
+
+export interface CreateTicketFromDocumentResponse {
+  ticketId: number;
+  sourceDocumentVersionId: number;
+}
+
+export interface RunTicketReviewRequest {
+  useLiveModel: boolean;
+}
+
+export interface TicketReviewContribution {
+  role: string;
+  summary: string;
+  concerns: string[];
+  recommendations: string[];
+}
+
+export interface TicketReviewDecision {
+  proceed: boolean;
+  recommendedNextStep: string;
+  guardrails: string[];
+}
+
+export interface TicketReviewResult {
+  reviewId: string;
+  projectId: number;
+  ticketId: number;
+  scenarioId: string;
+  contributions: TicketReviewContribution[];
+  decision: TicketReviewDecision;
+  createdUtc: string;
+}
+
+export interface RunTicketReviewResponse {
+  reviewId: string;
+  result: TicketReviewResult;
+}
+
+export interface StartDisposableCodeRunRequest {
+  reviewId: string;
+  scenarioId?: string;
+  expectedOutput?: string;
+}
+
+export interface StartDisposableCodeRunResponse {
+  runId: string;
+  state: string;
+  isDisposable: boolean;
+}
+
+export interface GeneratedCodeFile {
+  relativePath: string;
+  content: string;
+  sha256: string;
+}
+
+export interface CommandEvidence {
+  command: string;
+  exitCode?: string | null;
+  stdoutPath?: string | null;
+  stderrPath?: string | null;
+  durationMs?: string | null;
+}
+
+export interface OutputVerificationEvidence {
+  expected: string;
+  actual: string;
+  verified: boolean;
+  evidencePath?: string | null;
+}
+
+export interface CodeStandardsEvidence {
+  status: string;
+  summary: string;
+  evidencePath?: string | null;
+}
+
+export interface RunEventSummary {
+  eventType: string;
+  message: string;
+  timestampUtc: string;
+}
+
+export interface RunReviewPackage {
+  runId: string;
+  projectId: number;
+  ticketId: number;
+  state: string;
+  generatedFiles: GeneratedCodeFile[];
+  commandEvidence: CommandEvidence[];
+  outputVerification: OutputVerificationEvidence;
+  outputVerifications: OutputVerificationEvidence[];
+  codeStandards: CodeStandardsEvidence;
+  fileSetHash: string;
+  risks: string[];
+  humanReviewChecklist: string[];
+  events: RunEventSummary[];
+}
+
 export interface RunEventDto {
   eventId?: string | null;
   timestampUtc?: string | null;

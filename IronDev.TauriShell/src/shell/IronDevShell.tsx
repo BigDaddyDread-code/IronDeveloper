@@ -7,6 +7,7 @@ import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
 import { PromotionReviewRoute } from '../features/runReports/PromotionReviewRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
+import { ChatToBuildPage } from '../features/chatToBuild/ChatToBuildPage';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceNav } from './WorkspaceNav';
 import { StatusFooter } from './StatusFooter';
@@ -39,6 +40,8 @@ export function IronDevShell() {
   const activeRoute = useMemo(() => routeForId(navigation.activeRouteId), [navigation.activeRouteId]);
   const routeWorkspace = useMemo(() => {
     switch (activeRoute.id) {
+      case 'chat-to-build':
+        return <ChatToBuildPage route={activeRoute} onRouteReady={onRouteReady} />;
       case 'run-reports':
         return <RunReportsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'promotion-review':

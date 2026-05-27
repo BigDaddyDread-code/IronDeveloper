@@ -742,6 +742,156 @@ test('ticket start disposable run links a real run review without enabling revie
   await expectNoHorizontalOverflow(page);
 });
 
+test('chat-to-build route runs the reusable discussion-to-code spine', async ({ page }) => {
+  await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/discussions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ documentId: 222, documentVersionId: 333 })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/documents/333/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ticketId: 444, sourceDocumentVersionId: 333 })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/444/review', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reviewId: 'review-444',
+        result: {
+          reviewId: 'review-444',
+          projectId: 7,
+          ticketId: 444,
+          scenarioId: 'console.generic',
+          createdUtc: '2026-05-28T01:02:03Z',
+          contributions: [
+            {
+              role: 'Planner',
+              summary: 'Plan the smallest disposable code proposal.',
+              concerns: [],
+              recommendations: ['Generate only inside the disposable workspace.']
+            },
+            {
+              role: 'Tester',
+              summary: 'Verify output through persisted command evidence.',
+              concerns: [],
+              recommendations: ['Run build and runtime verification.']
+            }
+          ],
+          decision: {
+            proceed: true,
+            recommendedNextStep: 'Start disposable code run.',
+            guardrails: ['Do not apply generated code to the real repository.']
+          }
+        }
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/444/disposable-code-runs', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ runId: 'run-444', state: 'PausedForApproval', isDisposable: true })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets/444/build-runs/run-444/review-package', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        runId: 'run-444',
+        projectId: 7,
+        ticketId: 444,
+        state: 'PausedForApproval',
+        generatedFiles: [
+          {
+            relativePath: 'GeneratedApp/Program.cs',
+            content: 'Console.WriteLine("Hello from a reusable spine");',
+            sha256: 'abcdef1234567890'
+          }
+        ],
+        commandEvidence: [
+          {
+            command: 'dotnet build',
+            exitCode: '0',
+            stdoutPath: 'evidence/build.stdout.log',
+            stderrPath: 'evidence/build.stderr.log',
+            durationMs: '1234'
+          },
+          {
+            command: 'dotnet run',
+            exitCode: '0',
+            stdoutPath: 'evidence/run.stdout.log',
+            stderrPath: 'evidence/run.stderr.log',
+            durationMs: '234'
+          }
+        ],
+        outputVerification: {
+          expected: 'Hello from a reusable spine',
+          actual: 'Hello from a reusable spine',
+          verified: true,
+          evidencePath: 'evidence/output.json'
+        },
+        outputVerifications: [
+          {
+            expected: 'Hello from a reusable spine',
+            actual: 'Hello from a reusable spine',
+            verified: true,
+            evidencePath: 'evidence/output.json'
+          }
+        ],
+        codeStandards: {
+          status: 'Passed',
+          summary: 'Read-only standards check passed.',
+          evidencePath: 'evidence/code-standards.json'
+        },
+        fileSetHash: 'fileset-444',
+        risks: ['Review generated code before approval.'],
+        humanReviewChecklist: ['Confirm the generated files match the ticket intent.'],
+        events: [
+          {
+            eventType: 'RunCreated',
+            message: 'Run was created.',
+            timestampUtc: '2026-05-28T01:02:04Z'
+          },
+          {
+            eventType: 'RunPausedForApproval',
+            message: 'Run paused for human review.',
+            timestampUtc: '2026-05-28T01:02:08Z'
+          }
+        ]
+      })
+    });
+  });
+
+  await page.goto('/');
+  await page.getByTestId('shell.nav.chat-to-build').click();
+  await expect(page.getByTestId('chat-build.workspace')).toBeVisible();
+  await page.getByTestId('chat-build.discussion.content').fill('Create a small console app that proves the reusable spine.');
+  await page.getByTestId('chat-build.command.saveDiscussion').click();
+  await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
+  await page.getByTestId('chat-build.command.createTicket').click();
+  await expect(page.getByTestId('chat-build.generatedTicket')).toContainText('444');
+  await page.getByTestId('chat-build.command.reviewTicket').click();
+  await expect(page.getByTestId('chat-build.ticketReview')).toContainText('review-444');
+  await page.getByTestId('chat-build.command.startDisposableRun').click();
+  await expect(page.getByTestId('chat-build.disposableRun')).toContainText('PausedForApproval');
+  await expect(page.getByTestId('chat-build.reviewPackage')).toContainText('fileset-444');
+  await expect(page.getByTestId('chat-build.generatedFiles')).toContainText('GeneratedApp/Program.cs');
+  await expect(page.getByTestId('chat-build.commandEvidence')).toContainText('dotnet build');
+  await expect(page.getByTestId('chat-build.commandEvidence')).toContainText('dotnet run');
+  await expect(page.getByTestId('chat-build.outputVerification')).toContainText('Verified');
+  await expect(page.getByTestId('chat-build.humanReviewChecklist')).toContainText('Confirm the generated files');
+  await expect(page.getByTestId('chat-build.runEventTimeline')).toContainText('RunPausedForApproval');
+  await expectNoHorizontalOverflow(page);
+});
+
 async function mockTicketProject(page: import('@playwright/test').Page) {
   await seedToken(page);
   await seedSelectedProject(page, 7);

@@ -28,7 +28,7 @@ export interface WorkspaceRouteMeta {
 }
 
 export interface WorkspaceRoute {
-  id: 'tickets' | 'run-reports' | 'promotion-review';
+  id: 'tickets' | 'chat-to-build' | 'run-reports' | 'promotion-review';
   label: string;
   route: string;
   maturity: 'spike' | 'alpha';
@@ -46,6 +46,17 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     parityNotes: [
       'Ticket lifecycle and project context are wired end-to-end.',
       'Evidence and run review surfaces are still alpha targets.'
+    ]
+  },
+  {
+    id: 'chat-to-build',
+    label: 'Chat to Build',
+    route: 'chat-to-build',
+    maturity: 'alpha',
+    parityStatus: 'alpha',
+    parityNotes: [
+      'Manual dogfood surface for the reusable discussion-to-code spine.',
+      'Runs project-scoped backend endpoints only; no command, path, or apply controls.'
     ]
   },
   {
