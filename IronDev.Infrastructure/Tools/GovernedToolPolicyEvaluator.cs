@@ -21,6 +21,30 @@ public sealed class GovernedToolPolicyEvaluator
                 $"Tool '{definition.Name}' is mutation-capable and cannot run in the governed read-only tool path.");
         }
 
+        if (definition.AllowsFileWrites)
+        {
+            return GovernedToolPolicyDecision.Rejected(
+                $"Tool '{definition.Name}' allows file writes and cannot run in the governed read-only tool path.");
+        }
+
+        if (definition.AllowsProcessExecution)
+        {
+            return GovernedToolPolicyDecision.Rejected(
+                $"Tool '{definition.Name}' allows process execution and cannot run in the governed read-only tool path.");
+        }
+
+        if (definition.AllowsNetworkAccess)
+        {
+            return GovernedToolPolicyDecision.Rejected(
+                $"Tool '{definition.Name}' allows network access and cannot run in the governed read-only tool path.");
+        }
+
+        if (definition.AllowsWorkspaceMutation)
+        {
+            return GovernedToolPolicyDecision.Rejected(
+                $"Tool '{definition.Name}' allows workspace mutation and cannot run in the governed read-only tool path.");
+        }
+
         if (!definition.AllowedCallers.Contains(request.RequestedBy, StringComparer.OrdinalIgnoreCase))
         {
             return GovernedToolPolicyDecision.Rejected(

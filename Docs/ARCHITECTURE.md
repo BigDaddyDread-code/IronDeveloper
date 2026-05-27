@@ -266,7 +266,7 @@ IronDev's agent layer is governed autonomy, not free autonomy.
 
 Live provider calls are traced through the agent output and fall back to deterministic behaviour when unavailable. This does not grant write authority, memory mutation, ticket creation, patch apply, ranking override, quality override, governance bypass, or self-approval.
 
-The governed tool loop allows PlannerAgent to request named capabilities, the tool registry to check capability boundaries and runtime profiles, safe tools to collect evidence, CriticAgent to review evidence, PlannerAgent to revise the plan, and a human escalation gate to record whether review or more evidence is required.
+The governed tool loop allows PlannerAgent to request named capabilities, the tool registry to check capability boundaries and runtime profiles, safe tools to collect evidence, deterministic validators to review evidence sufficiency, PlannerAgent to revise the plan, and a human escalation gate to record whether review or more evidence is required. Passive review agents are not on this path unless an ADR explicitly justifies them.
 
 BuilderAgent remains caged. It may write only inside explicit disposable workspaces with evidence. Real repository writes remain blocked unless the reviewed promotion path supplies trace, promotion package, proposed change, approval, build/test/quality, ConscienceAgent, and ThoughtLedger evidence.
 
@@ -285,3 +285,5 @@ Rules:
 - Passive agents are not added without an ADR.
 
 The first governed tool is `code_standards.analyse_patch`. It is a read-only Code Standards tool, not a `CodeStandardsAgent`. BuilderAgent and TesterAgent may request it through the registry. The tool does not write files, run commands, mutate tickets, mutate memory, use the network, approve changes, or execute nested tool calls.
+
+The active Alpha execution order is tracked in [ALPHA_RELEASE_EXECUTION_ORDER.md](ALPHA_RELEASE_EXECUTION_ORDER.md). Passive-agent containment for the governed tool path is recorded in [ADR_018_PASSIVE_AGENT_CONTAINMENT.md](ADR_018_PASSIVE_AGENT_CONTAINMENT.md).

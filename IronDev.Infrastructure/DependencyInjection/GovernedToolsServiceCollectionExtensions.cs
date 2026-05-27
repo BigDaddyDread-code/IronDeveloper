@@ -10,6 +10,7 @@ public static class GovernedToolsServiceCollectionExtensions
     public static IServiceCollection AddGovernedTools(this IServiceCollection services)
     {
         services.AddSingleton<GovernedToolPolicyEvaluator>();
+        services.AddSingleton<IGovernedToolThoughtLedger, InMemoryGovernedToolThoughtLedger>();
         services.AddSingleton<CodeStandardsAnalysisTool>();
         services.AddSingleton<IGovernedTool<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>>(sp =>
             sp.GetRequiredService<CodeStandardsAnalysisTool>());

@@ -1,3 +1,4 @@
+using IronDev.Core.Agents;
 using IronDev.Core.Tools;
 using IronDev.Infrastructure.Services.Agents;
 using IronDev.Infrastructure.Tools;
@@ -98,6 +99,52 @@ public sealed class GovernedToolArchitectureTests
     }
 
     [TestMethod]
+    public async Task Registry_RejectsReadOnlyBoundaryViolationsBeforeToolBodyRuns()
+    {
+        var tool = new BoundaryViolationTool(new GovernedToolDefinition
+        {
+            Name = BoundaryViolationTool.ToolName,
+            Description = "Test-only tool that violates the read-only boundary.",
+            InputType = typeof(CodeStandardsAnalysisInput),
+            OutputType = typeof(CodeStandardsAnalysisResult),
+            AllowedCallers = ["BuilderAgent"],
+            MutatesState = false,
+            AllowsNestedCalls = false,
+            AllowsFileWrites = true,
+            AllowsProcessExecution = true,
+            AllowsNetworkAccess = true,
+            AllowsWorkspaceMutation = true,
+            Boundary = "Test-only boundary violation."
+        });
+        var registry = new GovernedToolRegistry([tool], new GovernedToolPolicyEvaluator());
+
+        var result = await registry.RunAsync<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>(
+            Request("BuilderAgent", Patch("src/Safe.cs", "+ var now = DateTimeOffset.UtcNow;")) with
+            {
+                ToolName = BoundaryViolationTool.ToolName
+            });
+
+        Assert.AreEqual(GovernedToolStatus.Rejected, result.Status);
+        Assert.IsFalse(tool.WasExecuted);
+        StringAssert.Contains(result.Summary, "file writes");
+    }
+
+    [TestMethod]
+    public async Task Registry_RecordsRejectedToolRequestsInThoughtLedger()
+    {
+        var ledger = new InMemoryGovernedToolThoughtLedger();
+        var registry = CreateRegistry(ledger);
+
+        var result = await registry.RunAsync<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>(
+            Request("ConscienceAgent", Patch("src/Safe.cs", "+ var now = DateTimeOffset.UtcNow;")));
+
+        Assert.AreEqual(GovernedToolStatus.Rejected, result.Status);
+        Assert.AreEqual(1, ledger.Entries.Count);
+        Assert.AreEqual(GovernedToolStatus.Rejected, ledger.Entries[0].Status);
+        StringAssert.Contains(ledger.Entries[0].Summary, "not allowed");
+    }
+
+    [TestMethod]
     public async Task CodeStandardsTool_ReturnsStructuredFindings()
     {
         var registry = CreateRegistry();
@@ -108,6 +155,8 @@ public sealed class GovernedToolArchitectureTests
             + var wrapper = "AgentCapabilityTool";
             + File.WriteAllText(path, value);
             + Process.Start("dotnet");
+            + var client = new HttpClient();
+            + IGovernedToolRegistry registry = default!;
             """);
 
         var result = await registry.RunAsync<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>(
@@ -117,7 +166,7 @@ public sealed class GovernedToolArchitectureTests
         Assert.IsNotNull(result.Output);
         Assert.IsTrue(result.Output.HasBlockingFindings);
         CollectionAssert.IsSubsetOf(
-            new[] { "CS001", "CS002", "CS020", "CS021" },
+            new[] { "CS001", "CS002", "CS020", "CS021", "CS030", "CS040" },
             result.Output.Findings.Select(finding => finding.RuleId).ToArray());
         Assert.IsTrue(result.Output.Findings.All(finding => !string.IsNullOrWhiteSpace(finding.Message)));
         Assert.IsTrue(result.Output.Findings.All(finding => !string.IsNullOrWhiteSpace(finding.Recommendation)));
@@ -164,8 +213,80 @@ public sealed class GovernedToolArchitectureTests
         Assert.AreEqual(0, typeof(CodeStandardsAnalysisTool).GetConstructors().Single().GetParameters().Length);
         Assert.IsFalse(tool.Definition.MutatesState);
         Assert.IsFalse(tool.Definition.AllowsNestedCalls);
+        Assert.IsFalse(tool.Definition.AllowsFileWrites);
+        Assert.IsFalse(tool.Definition.AllowsProcessExecution);
+        Assert.IsFalse(tool.Definition.AllowsNetworkAccess);
+        Assert.IsFalse(tool.Definition.AllowsWorkspaceMutation);
         Assert.IsFalse(typeof(CodeStandardsAnalysisTool).GetInterfaces().Any(type =>
             type.Name.Contains("Agent", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [TestMethod]
+    public void CodeStandardsTool_HasNoRuntimeMutationServiceHandles()
+    {
+        var fields = typeof(CodeStandardsAnalysisTool).GetFields(
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.Public);
+        var fieldTypes = fields.Select(field => field.FieldType.FullName ?? field.FieldType.Name).ToArray();
+
+        Assert.IsFalse(fieldTypes.Any(type => type.Contains("File", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(fieldTypes.Any(type => type.Contains("Process", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(fieldTypes.Any(type => type.Contains("HttpClient", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(fieldTypes.Any(type => type.Contains(nameof(IGovernedToolRegistry), StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [TestMethod]
+    public async Task CodeStandardsTool_RecordsThoughtLedgerEntry()
+    {
+        var ledger = new InMemoryGovernedToolThoughtLedger();
+        var registry = CreateRegistry(ledger);
+
+        var result = await registry.RunAsync<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>(
+            Request("BuilderAgent", Patch("src/Safe.cs", "+ var now = DateTimeOffset.UtcNow;")));
+
+        Assert.AreEqual(GovernedToolStatus.Succeeded, result.Status);
+        Assert.AreEqual(1, ledger.Entries.Count);
+        var entry = ledger.Entries[0];
+        Assert.AreEqual(result.RequestId, entry.RequestId);
+        Assert.AreEqual(CodeStandardsAnalysisTool.ToolName, entry.ToolName);
+        Assert.AreEqual("BuilderAgent", entry.RequestedBy);
+        Assert.AreEqual(GovernedToolStatus.Succeeded, entry.Status);
+        StringAssert.Contains(entry.Boundary, "read-only");
+    }
+
+    [TestMethod]
+    public async Task CodeStandardsTool_NormalPatchCompletesUnderEightSeconds()
+    {
+        var registry = CreateRegistry();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var result = await registry.RunAsync<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>(
+            Request("BuilderAgent", Patch("src/Safe.cs", "+ var now = DateTimeOffset.UtcNow;")));
+
+        stopwatch.Stop();
+
+        Assert.AreEqual(GovernedToolStatus.Succeeded, result.Status);
+        Assert.IsTrue(stopwatch.Elapsed < TimeSpan.FromSeconds(8), $"Code standards analysis took {stopwatch.Elapsed}.");
+        Assert.IsTrue(result.ExecutionDurationMs < 8000);
+    }
+
+    [TestMethod]
+    public void GovernedPlannerToolLoop_DoesNotRouteToolRequestsThroughPassiveCriticAgent()
+    {
+        var method = typeof(GovernedPlannerCriticLoopService).GetMethod(
+            "BuildPlannerToolRequests",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.IsNotNull(method);
+
+        var requests = (IReadOnlyList<AgentToolRequest>)method.Invoke(
+            null,
+            ["IronDev", "Review governed tool path", "test-run", "dotnet"])!;
+
+        Assert.IsFalse(requests.Any(request =>
+            string.Equals(request.RequestedBy, "CriticAgent", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(requests.Where(request => request.ToolName is "trace.read" or "failure.latest").All(request =>
+            string.Equals(request.RequestedBy, "EvidenceValidator", StringComparison.OrdinalIgnoreCase)));
     }
 
     [TestMethod]
@@ -179,10 +300,10 @@ public sealed class GovernedToolArchitectureTests
         Assert.IsTrue(definitions.Single(definition => definition.Name == "TesterAgent").AllowedTools.Contains(CodeStandardsAnalysisTool.ToolName));
     }
 
-    private static IGovernedToolRegistry CreateRegistry()
+    private static IGovernedToolRegistry CreateRegistry(InMemoryGovernedToolThoughtLedger? ledger = null)
     {
         var tool = new CodeStandardsAnalysisTool();
-        return new GovernedToolRegistry([tool], new GovernedToolPolicyEvaluator());
+        return new GovernedToolRegistry([tool], new GovernedToolPolicyEvaluator(), ledger);
     }
 
     private static GovernedToolRequest<CodeStandardsAnalysisInput> Request(
@@ -210,4 +331,35 @@ public sealed class GovernedToolArchitectureTests
                 }
             ]
         };
+
+    private sealed class BoundaryViolationTool :
+        IGovernedTool<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>,
+        IGovernedToolRegistration
+    {
+        public const string ToolName = "test.boundary_violation";
+
+        public BoundaryViolationTool(GovernedToolDefinition definition)
+        {
+            Definition = definition;
+        }
+
+        public GovernedToolDefinition Definition { get; }
+
+        public bool WasExecuted { get; private set; }
+
+        public Task<GovernedToolResult<CodeStandardsAnalysisResult>> ExecuteAsync(
+            GovernedToolRequest<CodeStandardsAnalysisInput> request,
+            CancellationToken cancellationToken = default)
+        {
+            WasExecuted = true;
+            return Task.FromResult(new GovernedToolResult<CodeStandardsAnalysisResult>
+            {
+                RequestId = request.RequestId,
+                ToolName = request.ToolName,
+                Status = GovernedToolStatus.Succeeded,
+                Summary = "This test tool should not execute.",
+                Output = new CodeStandardsAnalysisResult { Status = "Passed", Summary = "Executed." }
+            });
+        }
+    }
 }
