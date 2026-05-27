@@ -963,7 +963,10 @@ public sealed class EndpointContractTests : ApiTestBase
             ReviewId = review.ReviewId,
             ExpectedOutput = "mutate calculator output"
         });
-        Assert.AreEqual(HttpStatusCode.BadRequest, overrideRun.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, overrideRun.StatusCode);
+        var rejectedRun = await overrideRun.Content.ReadFromJsonAsync<StartDisposableCodeRunResponse>();
+        Assert.IsNotNull(rejectedRun);
+        Assert.AreEqual("Failed", rejectedRun!.State);
     }
 
     [TestMethod]

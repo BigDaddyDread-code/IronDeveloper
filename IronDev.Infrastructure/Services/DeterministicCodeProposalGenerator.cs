@@ -19,10 +19,14 @@ namespace IronDev.Infrastructure.Services;
 public sealed class DeterministicCodeProposalGenerator : ICodeProposalGenerator
 {
     private readonly DiscussionCodeScenarioCatalog _scenarios;
+    private readonly ICodeRunProfileCatalog _profiles;
 
-    public DeterministicCodeProposalGenerator(DiscussionCodeScenarioCatalog scenarios)
+    public DeterministicCodeProposalGenerator(
+        DiscussionCodeScenarioCatalog scenarios,
+        ICodeRunProfileCatalog profiles)
     {
         _scenarios = scenarios;
+        _profiles = profiles;
     }
 
     public Task<CodeProposal> GenerateAsync(
@@ -33,6 +37,8 @@ public sealed class DeterministicCodeProposalGenerator : ICodeProposalGenerator
         var scenario = _scenarios.Get(review.ScenarioId);
         if (scenario is null)
             throw new InvalidOperationException($"No deterministic code proposal scenario is registered for '{review.ScenarioId}'.");
+        var profile = _profiles.GetProfile(scenario.Scenario.RuntimeProfileId)
+            ?? throw new InvalidOperationException($"No runtime profile is registered for '{scenario.Scenario.RuntimeProfileId}'.");
 
         var defaultOutput = TryGetFirstExpectedOutput(scenario.Scenario.Verifications);
         if (!string.IsNullOrWhiteSpace(expectedOutput) &&
@@ -75,10 +81,10 @@ public sealed class DeterministicCodeProposalGenerator : ICodeProposalGenerator
             ],
             RunProfile = new CodeRunProfile
             {
-                RuntimeProfileId = scenario.Scenario.RuntimeProfileId,
+                RuntimeProfileId = profile.RuntimeProfileId,
                 WorkingDirectory = scenario.ProjectDirectory,
-                BuildCommand = "dotnet build --nologo",
-                RunCommand = "dotnet run --no-build --nologo"
+                BuildCommand = profile.BuildCommand,
+                RunCommand = profile.RunCommand
             },
             Verifications = verifications
         });

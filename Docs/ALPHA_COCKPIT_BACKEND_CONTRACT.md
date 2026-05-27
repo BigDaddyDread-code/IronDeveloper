@@ -61,6 +61,18 @@ Disposable ticket build execution is backend-owned. Clients may request "start a
 
 This is the backend proposal/run/review-package spine. `ICodeProposalGenerator` creates a `CodeProposal` with generated files, expected output, and a backend-owned build/run profile. `IDisposableCodeRunService` executes that proposal in a disposable workspace. `IRunReviewPackageService` assembles review evidence from run state, persisted events, generated files, command logs, code standards output, and output verification.
 
+Proposal generation is configurable:
+
+- `CodeProposal:Mode=Deterministic` keeps LocalTest and repeatable scenario smoke runs stable.
+- `CodeProposal:Mode=ModelAssisted` uses `ModelAssistedCodeProposalGenerator` behind the same `ICodeProposalGenerator` contract.
+
+Model-assisted output is not trusted. It must deserialize into `CodeProposal`, use an allow-listed runtime profile, pass `ICodeProposalValidator`, and then execute through the same disposable run service. The model cannot supply arbitrary commands, absolute paths, workspace roots, cleanup policy, or apply behavior. Invalid model output creates a durable failed run with persisted validation evidence.
+
+Backend-owned runtime profiles currently include:
+
+- `dotnet.console`: allows `StdoutContains` and `CommandExitZero` verification.
+- `dotnet.aspnet`: allows `HttpGetEquals` verification.
+
 #### No More Fake Shit Rule
 
 A scenario only counts if it proves the reusable spine:

@@ -26,15 +26,18 @@ public sealed class TicketReviewService : ITicketReviewService
     private readonly ITicketService _tickets;
     private readonly IProjectDocumentService _documents;
     private readonly DiscussionCodeScenarioCatalog _scenarios;
+    private readonly IConfiguration _configuration;
 
     public TicketReviewService(
         ITicketService tickets,
         IProjectDocumentService documents,
-        DiscussionCodeScenarioCatalog scenarios)
+        DiscussionCodeScenarioCatalog scenarios,
+        IConfiguration configuration)
     {
         _tickets = tickets;
         _documents = documents;
         _scenarios = scenarios;
+        _configuration = configuration;
     }
 
     public async Task<TicketReviewResult?> ReviewAsync(
@@ -109,12 +112,14 @@ public sealed class TicketReviewService : ITicketReviewService
     {
         var reviewId = $"ticket-review-{ticket.Id}-{Guid.NewGuid():N}";
         var scenario = _scenarios.Match($"{ticket.Title} {ticket.Summary} {ticket.AcceptanceCriteria}");
+        var modelAssisted = IsModelAssistedProposalMode();
+        var canProceed = scenario is not null || modelAssisted;
         return new TicketReviewResult
         {
             ReviewId = reviewId,
             ProjectId = ticket.ProjectId,
             TicketId = ticket.Id,
-            ScenarioId = scenario?.Scenario.ScenarioId ?? "none",
+            ScenarioId = scenario?.Scenario.ScenarioId ?? (modelAssisted ? "model.assisted" : "none"),
             Contributions =
             [
                 new TicketReviewContribution
@@ -146,8 +151,8 @@ public sealed class TicketReviewService : ITicketReviewService
             ],
             Decision = new TicketReviewDecision
             {
-                Proceed = scenario is not null,
-                RecommendedNextStep = scenario is not null
+                Proceed = canProceed,
+                RecommendedNextStep = canProceed
                     ? "Start disposable code run from a generated code proposal."
                     : "Refine the ticket before disposable code execution.",
                 Guardrails =
@@ -160,5 +165,8 @@ public sealed class TicketReviewService : ITicketReviewService
             }
         };
     }
+
+    private bool IsModelAssistedProposalMode() =>
+        string.Equals(_configuration["CodeProposal:Mode"], "ModelAssisted", StringComparison.OrdinalIgnoreCase);
 }
 

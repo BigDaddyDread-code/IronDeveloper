@@ -21,6 +21,7 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
     private readonly ITicketService _tickets;
     private readonly ITicketReviewService _reviews;
     private readonly ICodeProposalGenerator _proposalGenerator;
+    private readonly ICodeProposalValidator _proposalValidator;
     private readonly IGovernedToolRegistry _tools;
     private readonly IRunStore _runs;
     private readonly IRunEventStore _events;
@@ -30,6 +31,7 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
         ITicketService tickets,
         ITicketReviewService reviews,
         ICodeProposalGenerator proposalGenerator,
+        ICodeProposalValidator proposalValidator,
         IGovernedToolRegistry tools,
         IRunStore runs,
         IRunEventStore events,
@@ -38,6 +40,7 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
         _tickets = tickets;
         _reviews = reviews;
         _proposalGenerator = proposalGenerator;
+        _proposalValidator = proposalValidator;
         _tools = tools;
         _runs = runs;
         _events = events;
@@ -60,13 +63,6 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
         if (!review.Decision.Proceed)
             throw new InvalidOperationException("Ticket review decision does not allow disposable code execution.");
 
-        var proposal = await _proposalGenerator.GenerateAsync(review, request.ExpectedOutput, cancellationToken).ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(request.ScenarioId) &&
-            !string.Equals(proposal.ScenarioId, request.ScenarioId, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Code proposal scenario does not match the requested scenario.");
-        }
-
         var run = await _runs.CreateAsync(new CreateRunRequest
         {
             ProjectId = ticket.ProjectId,
@@ -81,12 +77,10 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
         Directory.CreateDirectory(evidenceDirectory);
 
         await WriteEvidenceAsync(evidenceDirectory, "ticket-review.json", JsonSerializer.Serialize(review, JsonOptions), cancellationToken).ConfigureAwait(false);
-        await WriteEvidenceAsync(evidenceDirectory, "code-proposal.json", JsonSerializer.Serialize(proposal, JsonOptions), cancellationToken).ConfigureAwait(false);
         await PublishAsync(run.RunId, "RunCreated", "Disposable code run created.", ticket, new Dictionary<string, string>
         {
             ["status"] = RunLifecycleState.Created.ToString(),
-            ["currentNode"] = "Created",
-            ["proposalId"] = proposal.ProposalId
+            ["currentNode"] = "Created"
         }, cancellationToken).ConfigureAwait(false);
 
         try
@@ -104,6 +98,33 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
                 ["status"] = RunLifecycleState.Running.ToString(),
                 ["currentNode"] = "ReviewLinked"
             }, cancellationToken).ConfigureAwait(false);
+
+            await PublishAsync(run.RunId, "CodeProposalStarted", "Generating code proposal.", ticket, new Dictionary<string, string>
+            {
+                ["reviewId"] = review.ReviewId,
+                ["currentNode"] = "CodeProposal"
+            }, cancellationToken).ConfigureAwait(false);
+
+            var proposal = await _proposalGenerator.GenerateAsync(review, request.ExpectedOutput, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(request.ScenarioId) &&
+                !string.Equals(proposal.ScenarioId, request.ScenarioId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Code proposal scenario does not match the requested scenario.");
+            }
+
+            var validation = _proposalValidator.Validate(proposal);
+            await WriteEvidenceAsync(evidenceDirectory, "code-proposal.json", JsonSerializer.Serialize(proposal, JsonOptions), cancellationToken).ConfigureAwait(false);
+            await WriteEvidenceAsync(evidenceDirectory, "code-proposal-validation.json", JsonSerializer.Serialize(validation, JsonOptions), cancellationToken).ConfigureAwait(false);
+            await PublishAsync(run.RunId, validation.IsValid ? "CodeProposalValidated" : "CodeProposalRejected", validation.IsValid ? "Code proposal passed validation." : "Code proposal failed validation.", ticket, new Dictionary<string, string>
+            {
+                ["proposalId"] = proposal.ProposalId,
+                ["runtimeProfileId"] = proposal.RunProfile.RuntimeProfileId,
+                ["errorCount"] = validation.Errors.Count.ToString(),
+                ["warningCount"] = validation.Warnings.Count.ToString(),
+                ["currentNode"] = "CodeProposal"
+            }, cancellationToken).ConfigureAwait(false);
+            if (!validation.IsValid)
+                throw new InvalidOperationException($"Code proposal failed validation: {string.Join("; ", validation.Errors)}");
 
             var workspacePath = ResolveWorkspacePath(run.RunId);
             ValidateWorkspacePath(workspacePath);
