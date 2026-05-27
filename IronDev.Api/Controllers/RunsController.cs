@@ -89,16 +89,12 @@ public sealed class RunsController : ControllerBase
     {
         var last = events.LastOrDefault();
         var first = events.FirstOrDefault();
-        var status = last?.Payload.TryGetValue("status", out var eventStatus) == true && !string.IsNullOrWhiteSpace(eventStatus)
-            ? eventStatus
-            : run.State.ToString();
-
         return new RunStatusDto
         {
             RunId = run.RunId,
             Project = run.ProjectId?.ToString() ?? string.Empty,
             Title = string.IsNullOrWhiteSpace(run.Summary) ? first?.Message ?? string.Empty : run.Summary,
-            Status = status,
+            Status = run.State.ToString(),
             Recommendation = run.State == RunLifecycleState.PausedForApproval ? "Approval required" : string.Empty,
             StartedUtc = run.StartedUtc ?? first?.TimestampUtc,
             CompletedUtc = run.CompletedUtc ?? (last is not null && IsTerminalEvent(last.EventType) ? last.TimestampUtc : null)

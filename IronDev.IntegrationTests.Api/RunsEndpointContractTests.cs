@@ -44,6 +44,12 @@ public sealed class RunsEndpointContractTests
         await runs.TransitionAsync(new RunStateTransition
         {
             RunId = "run-123",
+            State = RunLifecycleState.Running,
+            Summary = "Run started."
+        });
+        await runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = "run-123",
             State = RunLifecycleState.Completed,
             Summary = "Run completed."
         });
@@ -72,6 +78,44 @@ public sealed class RunsEndpointContractTests
 
         Assert.IsInstanceOfType<NotFoundResult>(status.Result);
         Assert.IsInstanceOfType<NotFoundResult>(report.Result);
+    }
+
+    [TestMethod]
+    public async Task RunsController_UsesDurableRunStateBeforeEventPayloadStatus()
+    {
+        var events = new InMemoryRunEventStore();
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = "durable-before-events",
+            EventType = "RunCompleted",
+            Message = "Legacy event projection says completed.",
+            Payload = new Dictionary<string, string>
+            {
+                ["status"] = "Completed"
+            }
+        });
+
+        var runs = new InMemoryRunStore();
+        await runs.CreateAsync(new CreateRunRequest
+        {
+            RunId = "durable-before-events",
+            Summary = "Durable state wins."
+        });
+        await runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = "durable-before-events",
+            State = RunLifecycleState.Running,
+            Summary = "Still running."
+        });
+
+        var controller = new RunsController(new StubRunReportService(), runs, events);
+
+        var statusResult = await controller.GetRun("durable-before-events", CancellationToken.None);
+        var status = ((OkObjectResult)statusResult.Result!).Value as RunStatusDto;
+
+        Assert.IsNotNull(status);
+        Assert.AreEqual("Running", status.Status);
+        Assert.AreEqual("Still running.", status.Title);
     }
 
     [TestMethod]

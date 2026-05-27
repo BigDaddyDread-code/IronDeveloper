@@ -19,10 +19,15 @@ public sealed class SqlRunStore : IRunStore
         CancellationToken cancellationToken = default)
     {
         await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
+        var runId = string.IsNullOrWhiteSpace(request.RunId) ? Guid.NewGuid().ToString("D") : request.RunId;
+        var existing = await GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
+            return existing;
+
         var now = DateTimeOffset.UtcNow;
         var run = new RunRecord
         {
-            RunId = string.IsNullOrWhiteSpace(request.RunId) ? Guid.NewGuid().ToString("D") : request.RunId,
+            RunId = runId,
             ProjectId = request.ProjectId,
             TicketId = request.TicketId,
             State = RunLifecycleState.Created,
@@ -35,46 +40,32 @@ public sealed class SqlRunStore : IRunStore
 
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
-            MERGE dbo.Runs AS target
-            USING (SELECT @RunId AS RunId) AS source
-                ON target.RunId = source.RunId
-            WHEN MATCHED THEN
-                UPDATE SET
-                    ProjectId = @ProjectId,
-                    TicketId = @TicketId,
-                    State = @State,
-                    IsDisposable = @IsDisposable,
-                    Summary = @Summary,
-                    FailureReason = @FailureReason,
-                    WorkspacePath = @WorkspacePath,
-                    UpdatedUtc = @UpdatedUtc
-            WHEN NOT MATCHED THEN
-                INSERT
-                (
-                    RunId,
-                    ProjectId,
-                    TicketId,
-                    State,
-                    IsDisposable,
-                    Summary,
-                    FailureReason,
-                    WorkspacePath,
-                    CreatedUtc,
-                    UpdatedUtc
-                )
-                VALUES
-                (
-                    @RunId,
-                    @ProjectId,
-                    @TicketId,
-                    @State,
-                    @IsDisposable,
-                    @Summary,
-                    @FailureReason,
-                    @WorkspacePath,
-                    @CreatedUtc,
-                    @UpdatedUtc
-                );
+            INSERT INTO dbo.Runs
+            (
+                RunId,
+                ProjectId,
+                TicketId,
+                State,
+                IsDisposable,
+                Summary,
+                FailureReason,
+                WorkspacePath,
+                CreatedUtc,
+                UpdatedUtc
+            )
+            VALUES
+            (
+                @RunId,
+                @ProjectId,
+                @TicketId,
+                @State,
+                @IsDisposable,
+                @Summary,
+                @FailureReason,
+                @WorkspacePath,
+                @CreatedUtc,
+                @UpdatedUtc
+            );
             """;
 
         await connection.ExecuteAsync(new CommandDefinition(sql, ToRow(run), cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -153,6 +144,7 @@ public sealed class SqlRunStore : IRunStore
         if (existing is null)
             return null;
 
+        RunLifecycle.ThrowIfTransitionBlocked(existing.State, transition.State, transition.RunId);
         var now = transition.TimestampUtc ?? DateTimeOffset.UtcNow;
         var run = existing with
         {
@@ -164,7 +156,9 @@ public sealed class SqlRunStore : IRunStore
             StartedUtc = transition.State == RunLifecycleState.Running && existing.StartedUtc is null
                 ? now
                 : existing.StartedUtc,
-            CompletedUtc = IsTerminal(transition.State) ? now : existing.CompletedUtc
+            CompletedUtc = transition.State is RunLifecycleState.Completed || RunLifecycle.IsTerminal(transition.State)
+                ? existing.CompletedUtc ?? now
+                : existing.CompletedUtc
         };
 
         using var connection = _connectionFactory.CreateConnection();
@@ -256,13 +250,6 @@ public sealed class SqlRunStore : IRunStore
 
     private static DateTimeOffset ToUtc(DateTime value) =>
         new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
-
-    private static bool IsTerminal(RunLifecycleState state) =>
-        state is RunLifecycleState.Failed
-            or RunLifecycleState.Cancelled
-            or RunLifecycleState.Completed
-            or RunLifecycleState.Promoted
-            or RunLifecycleState.Applied;
 
     private sealed class RunRow
     {

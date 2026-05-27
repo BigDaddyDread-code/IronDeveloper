@@ -12,6 +12,43 @@ public enum RunLifecycleState
     Applied
 }
 
+public static class RunLifecycle
+{
+    public static bool IsTerminal(RunLifecycleState state) =>
+        state is RunLifecycleState.Failed
+            or RunLifecycleState.Cancelled
+            or RunLifecycleState.Applied;
+
+    public static bool IsTransitionAllowed(RunLifecycleState from, RunLifecycleState to) =>
+        from == to ||
+        from switch
+        {
+            RunLifecycleState.Created => to is RunLifecycleState.Running
+                or RunLifecycleState.Failed
+                or RunLifecycleState.Cancelled,
+            RunLifecycleState.Running => to is RunLifecycleState.PausedForApproval
+                or RunLifecycleState.Completed
+                or RunLifecycleState.Failed
+                or RunLifecycleState.Cancelled,
+            RunLifecycleState.PausedForApproval => to is RunLifecycleState.Running
+                or RunLifecycleState.Completed
+                or RunLifecycleState.Failed
+                or RunLifecycleState.Cancelled,
+            RunLifecycleState.Completed => to is RunLifecycleState.Promoted,
+            RunLifecycleState.Promoted => to is RunLifecycleState.Applied,
+            RunLifecycleState.Failed
+                or RunLifecycleState.Cancelled
+                or RunLifecycleState.Applied => false,
+            _ => false
+        };
+
+    public static void ThrowIfTransitionBlocked(RunLifecycleState from, RunLifecycleState to, string runId)
+    {
+        if (!IsTransitionAllowed(from, to))
+            throw new InvalidOperationException($"Run '{runId}' cannot transition from {from} to {to}.");
+    }
+}
+
 public sealed record RunRecord
 {
     public required string RunId { get; init; }

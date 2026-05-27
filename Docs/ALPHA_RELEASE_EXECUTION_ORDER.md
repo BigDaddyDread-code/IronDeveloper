@@ -15,6 +15,97 @@ This document is the working order for the Alpha runway. Keep it updated when a 
 - The active working tree is sacred.
 - Human approval is mandatory before any real apply.
 
+## Stabilisation Before More Feature Work
+
+Status: active after IRONDEV-021 through IRONDEV-023 landed.
+
+The Alpha core moved quickly. Consolidate the execution spine before adding more cockpit surface area, endpoints, or agent behavior.
+
+### Day 1 - Run Lifecycle Hardening
+
+Status: done in current branch after `dfcff23`; validate in PR before merge.
+
+Focus:
+
+- RunRecord lifecycle transitions.
+- Created -> Running -> PausedForApproval -> Completed/Failed/Cancelled.
+- Terminal-state protection.
+- Retry behavior.
+- Missing run behavior.
+- Event ordering.
+
+Acceptance:
+
+- Completed runs cannot move back to Running.
+- Failed runs record a failure reason.
+- Run status uses durable state before report/event projection.
+- Run events remain child evidence, not lifecycle source of truth.
+- Missing runs return an honest 404.
+
+### Day 2 - Disposable Workspace Safety
+
+Focus:
+
+- Path safety.
+- Command allow-listing.
+- Timeout behavior.
+- Cleanup behavior.
+- Failure evidence.
+- No active repository mutation.
+
+Acceptance:
+
+- Reject workspace roots outside approved temp/test roots.
+- Reject unsafe source/target path combinations.
+- Reject non-allowlisted commands.
+- Timeout records failed run evidence.
+- Cleanup failure is visible.
+- Disposable runs never apply changes to the active repo.
+
+### Day 3 - Governed Tool Regression Guards
+
+Focus:
+
+- `code_standards.analyse_patch` remains read-only.
+- No nested tool calls.
+- No direct agent-to-agent call path.
+- Passive-agent containment remains enforced.
+
+Acceptance:
+
+- Disallowed caller rejected.
+- Nested call rejected.
+- Tool cannot write tickets, documents, memory, files, or workspaces.
+- No `CodeStandardsAgent` type exists.
+- No governed tool invokes another governed tool.
+
+### Day 4 - API/Client Slimming
+
+Focus:
+
+- Separate real Alpha endpoints from compatibility and legacy/report endpoints.
+- Mark compatibility aliases clearly.
+- Ensure Tauri uses product-shaped APIs rather than legacy report-shaped APIs.
+
+Deliverable:
+
+- `Docs/API_ALPHA_CONTRACT.md`.
+- Endpoint inventory marked canonical, compatibility, legacy, and internal.
+
+### Day 5 - LocalTest Full Smoke
+
+Focus:
+
+- Reset LocalTest.
+- Start API.
+- Start Tauri shell.
+- Log in.
+- Select tenant/project.
+- Start disposable run if endpoint is exposed.
+- Watch persisted events.
+- Review run.
+- Confirm no real repo or dev database mutation.
+
 ## Locked Execution Order
 
 ### IRONDEV-017 - Harden first governed tool: `code_standards.analyse_patch`

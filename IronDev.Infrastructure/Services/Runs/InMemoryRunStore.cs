@@ -13,9 +13,13 @@ public sealed class InMemoryRunStore : IRunStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         var now = DateTimeOffset.UtcNow;
+        var runId = string.IsNullOrWhiteSpace(request.RunId) ? Guid.NewGuid().ToString("D") : request.RunId;
+        if (_runs.TryGetValue(runId, out var existing))
+            return Task.FromResult(existing);
+
         var run = new RunRecord
         {
-            RunId = string.IsNullOrWhiteSpace(request.RunId) ? Guid.NewGuid().ToString("D") : request.RunId,
+            RunId = runId,
             ProjectId = request.ProjectId,
             TicketId = request.TicketId,
             State = RunLifecycleState.Created,
@@ -56,6 +60,7 @@ public sealed class InMemoryRunStore : IRunStore
         if (!_runs.TryGetValue(transition.RunId, out var existing))
             return Task.FromResult<RunRecord?>(null);
 
+        RunLifecycle.ThrowIfTransitionBlocked(existing.State, transition.State, transition.RunId);
         var now = transition.TimestampUtc ?? DateTimeOffset.UtcNow;
         var run = existing with
         {
@@ -67,17 +72,13 @@ public sealed class InMemoryRunStore : IRunStore
             StartedUtc = transition.State == RunLifecycleState.Running && existing.StartedUtc is null
                 ? now
                 : existing.StartedUtc,
-            CompletedUtc = IsTerminal(transition.State) ? now : existing.CompletedUtc
+            CompletedUtc = transition.State is RunLifecycleState.Completed || RunLifecycle.IsTerminal(transition.State)
+                ? existing.CompletedUtc ?? now
+                : existing.CompletedUtc
         };
 
         _runs[transition.RunId] = run;
         return Task.FromResult<RunRecord?>(run);
     }
 
-    private static bool IsTerminal(RunLifecycleState state) =>
-        state is RunLifecycleState.Failed
-            or RunLifecycleState.Cancelled
-            or RunLifecycleState.Completed
-            or RunLifecycleState.Promoted
-            or RunLifecycleState.Applied;
 }

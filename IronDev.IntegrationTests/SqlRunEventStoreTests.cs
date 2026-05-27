@@ -57,6 +57,128 @@ public sealed class SqlRunEventStoreTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task SqlRunStore_DoesNotOverwriteExistingRunOnDuplicateCreate()
+    {
+        var connectionFactory = ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+        var store = new SqlRunStore(connectionFactory);
+        var runId = $"durable-run-duplicate-{Guid.NewGuid():N}";
+
+        var created = await store.CreateAsync(new CreateRunRequest
+        {
+            RunId = runId,
+            ProjectId = 7,
+            TicketId = 42,
+            IsDisposable = true,
+            Summary = "Original run."
+        });
+
+        await store.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.Running,
+            Summary = "Run started."
+        });
+
+        var duplicate = await store.CreateAsync(new CreateRunRequest
+        {
+            RunId = runId,
+            ProjectId = 99,
+            TicketId = 100,
+            IsDisposable = false,
+            Summary = "Should not overwrite."
+        });
+
+        Assert.AreEqual(created.RunId, duplicate.RunId);
+        Assert.AreEqual(RunLifecycleState.Running, duplicate.State);
+        Assert.AreEqual(7, duplicate.ProjectId);
+        Assert.AreEqual(42, duplicate.TicketId);
+        Assert.IsTrue(duplicate.IsDisposable);
+        Assert.AreEqual("Run started.", duplicate.Summary);
+    }
+
+    [TestMethod]
+    public async Task SqlRunStore_BlocksCompletedRunFromReturningToRunning()
+    {
+        var connectionFactory = ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+        var store = new SqlRunStore(connectionFactory);
+        var runId = $"durable-run-terminal-{Guid.NewGuid():N}";
+
+        await store.CreateAsync(new CreateRunRequest
+        {
+            RunId = runId,
+            Summary = "Terminal protection."
+        });
+        await store.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.Running
+        });
+        await store.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.Completed,
+            Summary = "Run completed."
+        });
+
+        try
+        {
+            await store.TransitionAsync(new RunStateTransition
+            {
+                RunId = runId,
+                State = RunLifecycleState.Running,
+                Summary = "Illegal retry."
+            });
+            Assert.Fail("Completed runs must not transition back to Running.");
+        }
+        catch (InvalidOperationException)
+        {
+            // Expected.
+        }
+
+        var run = await store.GetAsync(runId);
+        Assert.IsNotNull(run);
+        Assert.AreEqual(RunLifecycleState.Completed, run.State);
+        Assert.AreEqual("Run completed.", run.Summary);
+    }
+
+    [TestMethod]
+    public async Task InMemoryRunStore_UsesSameLifecycleGuardsAsSqlStore()
+    {
+        var store = new InMemoryRunStore();
+        var run = await store.CreateAsync(new CreateRunRequest
+        {
+            RunId = "in-memory-terminal",
+            Summary = "Terminal protection."
+        });
+
+        await store.TransitionAsync(new RunStateTransition
+        {
+            RunId = run.RunId,
+            State = RunLifecycleState.Failed,
+            FailureReason = "Build failed."
+        });
+
+        try
+        {
+            await store.TransitionAsync(new RunStateTransition
+            {
+                RunId = run.RunId,
+                State = RunLifecycleState.Running
+            });
+            Assert.Fail("Failed runs must not transition back to Running.");
+        }
+        catch (InvalidOperationException)
+        {
+            // Expected.
+        }
+
+        var failed = await store.GetAsync(run.RunId);
+        Assert.IsNotNull(failed);
+        Assert.AreEqual(RunLifecycleState.Failed, failed.State);
+        Assert.AreEqual("Build failed.", failed.FailureReason);
+    }
+
+    [TestMethod]
     public async Task PublishAsync_PersistsEventsAcrossStoreInstances()
     {
         var connectionFactory = ServiceProvider.GetRequiredService<IDbConnectionFactory>();
