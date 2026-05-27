@@ -60,7 +60,7 @@ Disposable ticket build execution is backend-owned. Clients may request "start a
 
 This is the backend proposal/run/review-package spine. `ICodeProposalGenerator` creates a `CodeProposal` with generated files, expected output, and a backend-owned build/run profile. `IDisposableCodeRunService` executes that proposal in a disposable workspace. `IRunReviewPackageService` assembles review evidence from run state, persisted events, generated files, command logs, code standards output, and output verification.
 
-The Hello World flow is a deterministic scenario fixture that uses the same generic pipeline. It is not an Alpha-specific product service, it is not agent debate, and it must not mutate or apply generated code to the real repository. Successful execution ends in `PausedForApproval`.
+Hello World is scenario fixture 1. Calculator console app is scenario fixture 2. Both use the same generic pipeline and the same product services. They are not Alpha-specific product services, they are not agent debate, and they must not mutate or apply generated code to the real repository. Successful execution ends in `PausedForApproval`.
 
 ### Documents
 

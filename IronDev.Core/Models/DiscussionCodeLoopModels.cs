@@ -89,8 +89,8 @@ public sealed record CodeRunProfile
 public sealed record StartDisposableCodeRunRequest
 {
     public required string ReviewId { get; init; }
-    public string ScenarioId { get; init; } = "hello-world-alpha";
-    public string ExpectedOutput { get; init; } = "Hello from IronDev Alpha";
+    public string ScenarioId { get; init; } = string.Empty;
+    public string ExpectedOutput { get; init; } = string.Empty;
 }
 
 public sealed record StartDisposableCodeRunResponse

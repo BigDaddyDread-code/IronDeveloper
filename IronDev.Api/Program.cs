@@ -101,7 +101,7 @@ builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
 builder.Services.AddScoped<ITicketFromDocumentService, TicketFromDocumentService>();
 builder.Services.AddScoped<ITicketReviewService, TicketReviewService>();
-builder.Services.AddScoped<ICodeProposalGenerator, HelloWorldCodeProposalGenerator>();
+builder.Services.AddScoped<ICodeProposalGenerator, DeterministicCodeProposalGenerator>();
 builder.Services.AddScoped<IDisposableCodeRunService, DisposableCodeRunService>();
 builder.Services.AddScoped<IRunReviewPackageService, RunReviewPackageService>();
 builder.Services.AddScoped<IDotNetBuildService, DotNetRunnerService>();

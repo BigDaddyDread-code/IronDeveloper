@@ -7,7 +7,7 @@ namespace IronDev.Api.Controllers;
 
 [ApiController]
 [Authorize]
-public sealed class AlphaDiscussionCodeLoopController : ControllerBase
+public sealed class DiscussionCodeLoopController : ControllerBase
 {
     private readonly IDiscussionDocumentService _discussionDocuments;
     private readonly ITicketFromDocumentService _ticketFromDocument;
@@ -15,7 +15,7 @@ public sealed class AlphaDiscussionCodeLoopController : ControllerBase
     private readonly IDisposableCodeRunService _codeRuns;
     private readonly IRunReviewPackageService _reviewPackages;
 
-    public AlphaDiscussionCodeLoopController(
+    public DiscussionCodeLoopController(
         IDiscussionDocumentService discussionDocuments,
         ITicketFromDocumentService ticketFromDocument,
         ITicketReviewService reviews,

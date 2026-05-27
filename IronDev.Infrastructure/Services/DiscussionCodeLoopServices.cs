@@ -54,9 +54,83 @@ public sealed class DiscussionDocumentService : IDiscussionDocumentService
     }
 }
 
+internal sealed record ScenarioDefinition(
+    string Id,
+    string Title,
+    string Summary,
+    string Problem,
+    string ExpectedOutput,
+    string ProjectDirectory,
+    string ProjectFileName,
+    string ProgramText,
+    IReadOnlyList<string> AcceptanceCriteria,
+    IReadOnlyList<string> MatchTerms);
+
+internal static class DiscussionCodeScenarioCatalog
+{
+    public static ScenarioDefinition? Match(string text)
+    {
+        foreach (var scenario in All)
+        {
+            if (scenario.MatchTerms.All(term => text.Contains(term, StringComparison.OrdinalIgnoreCase)))
+                return scenario;
+        }
+
+        return null;
+    }
+
+    public static ScenarioDefinition? Get(string scenarioId) =>
+        All.FirstOrDefault(item => string.Equals(item.Id, scenarioId, StringComparison.OrdinalIgnoreCase));
+
+    public static readonly IReadOnlyList<ScenarioDefinition> All =
+    [
+        new ScenarioDefinition(
+            Id: "hello-world-alpha",
+            Title: "Build Hello World Console App",
+            Summary: "Create a tiny C# console app that prints \"Hello from IronDev Alpha\".",
+            Problem: "The backend discussion-to-code loop needs a real disposable code generation proof.",
+            ExpectedOutput: "Hello from IronDev Alpha",
+            ProjectDirectory: "HelloWorldAlpha",
+            ProjectFileName: "HelloWorldAlpha.csproj",
+            ProgramText: "Console.WriteLine(\"Hello from IronDev Alpha\");" + Environment.NewLine,
+            AcceptanceCriteria:
+            [
+                "- Disposable C# console project is generated.",
+                "- dotnet build succeeds.",
+                "- dotnet run prints \"Hello from IronDev Alpha\".",
+                "- Real repository is untouched.",
+                "- Run events are persisted.",
+                "- Result is reviewable."
+            ],
+            MatchTerms: ["Hello from IronDev Alpha"]),
+        new ScenarioDefinition(
+            Id: "calculator-console",
+            Title: "Build Calculator Console App",
+            Summary: "Create a tiny C# console app that adds two numbers and prints the result.",
+            Problem: "The reusable chat-to-build spine needs a second deterministic scenario without a new product service.",
+            ExpectedOutput: "2 + 3 = 5",
+            ProjectDirectory: "CalculatorConsole",
+            ProjectFileName: "CalculatorConsole.csproj",
+            ProgramText: """
+                var left = 2;
+                var right = 3;
+                Console.WriteLine($"{left} + {right} = {left + right}");
+                """,
+            AcceptanceCriteria:
+            [
+                "- Disposable C# console project is generated.",
+                "- dotnet build succeeds.",
+                "- dotnet run prints \"2 + 3 = 5\".",
+                "- Real repository is untouched.",
+                "- Run events are persisted.",
+                "- Result is reviewable."
+            ],
+            MatchTerms: ["calculator", "console"])
+    ];
+}
+
 public sealed class TicketFromDocumentService : ITicketFromDocumentService
 {
-    private const string ExpectedOutput = "Hello from IronDev Alpha";
     private readonly IProjectDocumentService _documents;
     private readonly ITicketService _tickets;
 
@@ -82,15 +156,15 @@ public sealed class TicketFromDocumentService : ITicketFromDocumentService
         if (document is null || document.ProjectId != projectId)
             return null;
 
-        var deterministicHelloWorld = version.ContentMarkdown.Contains(ExpectedOutput, StringComparison.OrdinalIgnoreCase);
+        var scenario = DiscussionCodeScenarioCatalog.Match(version.ContentMarkdown);
         var title = !string.IsNullOrWhiteSpace(request.RequestedTitle)
             ? request.RequestedTitle.Trim()
-            : deterministicHelloWorld
-                ? "Build Hello World Console App"
+            : scenario is not null
+                ? scenario.Title
                 : $"Implement discussion: {document.Title}";
 
-        var ticket = deterministicHelloWorld
-            ? BuildHelloWorldTicket(document.ProjectId, documentVersionId, title)
+        var ticket = scenario is not null
+            ? BuildScenarioTicket(document.ProjectId, documentVersionId, title, scenario)
             : BuildDiscussionTicket(document.ProjectId, documentVersionId, title, version.ContentMarkdown);
 
         ticket.Id = await _tickets.SaveTicketAsync(ticket, cancellationToken).ConfigureAwait(false);
@@ -111,28 +185,25 @@ public sealed class TicketFromDocumentService : ITicketFromDocumentService
         };
     }
 
-    private static ProjectTicket BuildHelloWorldTicket(int projectId, long documentVersionId, string title) => new()
+    private static ProjectTicket BuildScenarioTicket(
+        int projectId,
+        long documentVersionId,
+        string title,
+        ScenarioDefinition scenario) => new()
     {
         ProjectId = projectId,
         SessionId = Guid.NewGuid(),
         Title = title,
         TicketType = "Scenario",
         Priority = "High",
-        Summary = "Create a tiny C# console app that prints \"Hello from IronDev Alpha\".",
-        Problem = "The backend discussion-to-code loop needs a real disposable code generation proof.",
-        AcceptanceCriteria = string.Join(Environment.NewLine, [
-            "- Disposable C# console project is generated.",
-            "- dotnet build succeeds.",
-            "- dotnet run prints \"Hello from IronDev Alpha\".",
-            "- Real repository is untouched.",
-            "- Run events are persisted.",
-            "- Result is reviewable."
-        ]),
-        TechnicalNotes = "Generated deterministically from a discussion document using the Hello World scenario fixture.",
+        Summary = scenario.Summary,
+        Problem = scenario.Problem,
+        AcceptanceCriteria = string.Join(Environment.NewLine, scenario.AcceptanceCriteria),
+        TechnicalNotes = $"Generated deterministically from a discussion document using scenario fixture '{scenario.Id}'.",
         Status = "Draft",
-        Content = "Hello World disposable code generation proof.",
+        Content = scenario.Summary,
         IsGenerated = true,
-        GenerationNote = "Source: Discussion document. Deterministic Hello World scenario fixture.",
+        GenerationNote = $"Source: Discussion document. Deterministic scenario fixture: {scenario.Id}.",
         SourceDocumentVersionId = documentVersionId
     };
 
@@ -244,37 +315,37 @@ public sealed class TicketReviewService : ITicketReviewService
     private static TicketReviewResult CreateDeterministicReview(ProjectTicket ticket)
     {
         var reviewId = $"ticket-review-{ticket.Id}-{Guid.NewGuid():N}";
-        var helloWorld = IsHelloWorldTicket(ticket);
+        var scenario = DiscussionCodeScenarioCatalog.Match($"{ticket.Title} {ticket.Summary} {ticket.AcceptanceCriteria}");
         return new TicketReviewResult
         {
             ReviewId = reviewId,
             ProjectId = ticket.ProjectId,
             TicketId = ticket.Id,
-            ScenarioId = helloWorld ? "hello-world-alpha" : "none",
+            ScenarioId = scenario?.Id ?? "none",
             Contributions =
             [
                 new TicketReviewContribution
                 {
-                    Role = "Planner",
+                    Role = "Plan",
                     Summary = "Use the smallest deterministic code proposal that proves the disposable backend path.",
-                    Recommendations = ["Generate only Program.cs and a minimal SDK-style csproj for the scenario."]
+                    Recommendations = ["Generate only the scenario files and a minimal SDK-style csproj."]
                 },
                 new TicketReviewContribution
                 {
-                    Role = "Builder",
+                    Role = "Proposal",
                     Summary = "Create generated files in the backend-owned disposable workspace only.",
                     Concerns = ["No real repository mutation is allowed."],
                     Recommendations = ["Use a code proposal and backend-owned command profile."]
                 },
                 new TicketReviewContribution
                 {
-                    Role = "Tester",
+                    Role = "Validation",
                     Summary = "Run dotnet build and dotnet run, then verify the expected output.",
                     Recommendations = ["Persist stdout and stderr logs as evidence."]
                 },
                 new TicketReviewContribution
                 {
-                    Role = "Critic",
+                    Role = "Governance",
                     Summary = "Proceed only if the run stays disposable and pauses for human review.",
                     Concerns = ["Do not apply generated code to the real repository."],
                     Recommendations = ["End successful execution in PausedForApproval."]
@@ -282,8 +353,8 @@ public sealed class TicketReviewService : ITicketReviewService
             ],
             Decision = new TicketReviewDecision
             {
-                Proceed = helloWorld,
-                RecommendedNextStep = helloWorld
+                Proceed = scenario is not null,
+                RecommendedNextStep = scenario is not null
                     ? "Start disposable code run from a generated code proposal."
                     : "Refine the ticket before disposable code execution.",
                 Guardrails =
@@ -296,25 +367,23 @@ public sealed class TicketReviewService : ITicketReviewService
             }
         };
     }
-
-    private static bool IsHelloWorldTicket(ProjectTicket ticket) =>
-        ($"{ticket.Title} {ticket.Summary} {ticket.AcceptanceCriteria}")
-            .Contains("Hello from IronDev Alpha", StringComparison.OrdinalIgnoreCase);
 }
 
-public sealed class HelloWorldCodeProposalGenerator : ICodeProposalGenerator
+public sealed class DeterministicCodeProposalGenerator : ICodeProposalGenerator
 {
     public Task<CodeProposal> GenerateAsync(
         TicketReviewResult review,
         string expectedOutput,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(review.ScenarioId, "hello-world-alpha", StringComparison.OrdinalIgnoreCase))
+        var scenario = DiscussionCodeScenarioCatalog.Get(review.ScenarioId);
+        if (scenario is null)
             throw new InvalidOperationException($"No deterministic code proposal scenario is registered for '{review.ScenarioId}'.");
 
-        var escapedOutput = expectedOutput.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
-        var programText = $"Console.WriteLine(\"{escapedOutput}\");{Environment.NewLine}";
+        var output = string.IsNullOrWhiteSpace(expectedOutput) ? scenario.ExpectedOutput : expectedOutput;
+        var programText = string.Equals(output, scenario.ExpectedOutput, StringComparison.Ordinal)
+            ? scenario.ProgramText
+            : BuildSingleWriteLineProgram(output);
         var csprojText = """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -333,19 +402,26 @@ public sealed class HelloWorldCodeProposalGenerator : ICodeProposalGenerator
             TicketId = review.TicketId,
             ReviewId = review.ReviewId,
             ScenarioId = review.ScenarioId,
-            ExpectedOutput = expectedOutput,
+            ExpectedOutput = output,
             Files =
             [
-                CreateFile("HelloWorldAlpha/Program.cs", programText),
-                CreateFile("HelloWorldAlpha/HelloWorldAlpha.csproj", csprojText)
+                CreateFile($"{scenario.ProjectDirectory}/Program.cs", programText),
+                CreateFile($"{scenario.ProjectDirectory}/{scenario.ProjectFileName}", csprojText)
             ],
             RunProfile = new CodeRunProfile
             {
-                WorkingDirectory = "HelloWorldAlpha",
+                WorkingDirectory = scenario.ProjectDirectory,
                 BuildCommand = "dotnet build --nologo",
                 RunCommand = "dotnet run --no-build --nologo"
             }
         });
+    }
+
+    private static string BuildSingleWriteLineProgram(string expectedOutput)
+    {
+        var escapedOutput = expectedOutput.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+        return $"Console.WriteLine(\"{escapedOutput}\");{Environment.NewLine}";
     }
 
     private static GeneratedCodeFile CreateFile(string relativePath, string content) => new()
@@ -407,8 +483,11 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
             throw new InvalidOperationException("Ticket review decision does not allow disposable code execution.");
 
         var proposal = await _proposalGenerator.GenerateAsync(review, request.ExpectedOutput, cancellationToken).ConfigureAwait(false);
-        if (!string.Equals(proposal.ScenarioId, request.ScenarioId, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(request.ScenarioId) &&
+            !string.Equals(proposal.ScenarioId, request.ScenarioId, StringComparison.OrdinalIgnoreCase))
+        {
             throw new InvalidOperationException("Code proposal scenario does not match the requested scenario.");
+        }
 
         var run = await _runs.CreateAsync(new CreateRunRequest
         {
@@ -927,7 +1006,7 @@ public sealed class RunReviewPackageService : IRunReviewPackageService
     {
         var risks = new List<string>
         {
-            "This is a deterministic Hello World scenario fixture, not a general code generation engine.",
+            "This is a deterministic scenario fixture running through the reusable code proposal pipeline.",
             "Generated code remains in a disposable workspace until a separate human-approved apply path exists."
         };
         if (run.State == RunLifecycleState.Failed)
