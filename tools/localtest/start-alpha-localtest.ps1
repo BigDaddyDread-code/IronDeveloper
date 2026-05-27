@@ -9,8 +9,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$shellRoot = Join-Path $repoRoot "IronDev.TauriShell"
 $apiOut = Join-Path $env:TEMP "irondev-localtest-api.out.log"
 $apiErr = Join-Path $env:TEMP "irondev-localtest-api.err.log"
+$uiOut = Join-Path $env:TEMP "irondev-localtest-ui.out.log"
+$uiErr = Join-Path $env:TEMP "irondev-localtest-ui.err.log"
 
 function Stop-Listener {
     param([int]$Port)
@@ -47,6 +50,37 @@ function Wait-HttpOk {
     throw "Timed out waiting for $Uri."
 }
 
+function Get-NodeCommand {
+    $bundled = "C:\Users\bob\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+    if (Test-Path $bundled) {
+        return $bundled
+    }
+
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($null -eq $node) {
+        throw "node was not found. Install Node.js or use the bundled Codex runtime."
+    }
+
+    return $node.Source
+}
+
+function Start-BrowserShell {
+    param([int]$Port)
+
+    Stop-Listener -Port $Port
+    $node = Get-NodeCommand
+
+    Start-Process -FilePath $node `
+        -ArgumentList @("node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", "$Port", "--mode", "localtest") `
+        -WorkingDirectory $shellRoot `
+        -PassThru `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $uiOut `
+        -RedirectStandardError $uiErr | Out-Null
+
+    Wait-HttpOk -Uri "http://127.0.0.1:$Port/"
+}
+
 if ($Reset) {
     & (Join-Path $PSScriptRoot "reset-localtest-data.ps1")
 }
@@ -80,33 +114,7 @@ Write-Host "  Workspace: $($environment.workspaceRoot)"
 Write-Host ""
 
 if ($BrowserOnly) {
-    Stop-Listener -Port $UiPort
-    $node = "C:\Users\bob\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
-    $vite = "node_modules/vite/bin/vite.js"
-    $shellRoot = Join-Path $repoRoot "IronDev.TauriShell"
-    $uiOut = Join-Path $env:TEMP "irondev-localtest-ui.out.log"
-    $uiErr = Join-Path $env:TEMP "irondev-localtest-ui.err.log"
-
-    if (Test-Path $node) {
-        Start-Process -FilePath $node `
-            -ArgumentList @($vite, "--host", "127.0.0.1", "--port", "$UiPort", "--mode", "localtest") `
-            -WorkingDirectory $shellRoot `
-            -PassThru `
-            -WindowStyle Hidden `
-            -RedirectStandardOutput $uiOut `
-            -RedirectStandardError $uiErr | Out-Null
-    }
-    else {
-        Start-Process -FilePath npm `
-            -ArgumentList @("run", "dev:localtest", "--", "--port", "$UiPort") `
-            -WorkingDirectory $shellRoot `
-            -PassThru `
-            -WindowStyle Hidden `
-            -RedirectStandardOutput $uiOut `
-            -RedirectStandardError $uiErr | Out-Null
-    }
-
-    Wait-HttpOk -Uri "http://127.0.0.1:$UiPort/"
+    Start-BrowserShell -Port $UiPort
     Write-Host "PASS LocalTest browser shell started"
     Write-Host "  UI: http://127.0.0.1:$UiPort/"
     Write-Host ""
@@ -115,10 +123,30 @@ if ($BrowserOnly) {
 }
 
 Write-Host "Starting Tauri desktop shell. Close the desktop window or stop this command when finished."
-Push-Location (Join-Path $repoRoot "IronDev.TauriShell")
+$node = Get-NodeCommand
+$tauriCli = Join-Path $shellRoot "node_modules\@tauri-apps\cli\tauri.js"
+if (-not (Test-Path $tauriCli)) {
+    throw "Tauri CLI was not found at $tauriCli. Restore IronDev.TauriShell dependencies first."
+}
+
+$tauriLocalTestConfig = Join-Path $env:TEMP "irondev-tauri-localtest.conf.json"
+@{
+    build = @{
+        beforeDevCommand = ""
+        devUrl = "http://127.0.0.1:$UiPort"
+    }
+} | ConvertTo-Json -Depth 4 | Set-Content -Path $tauriLocalTestConfig -Encoding UTF8
+
+Start-BrowserShell -Port $UiPort
+Write-Host "PASS LocalTest browser shell started"
+Write-Host "  UI: http://127.0.0.1:$UiPort/"
+Write-Host ""
+
+Push-Location $shellRoot
 try {
-    npm run tauri:dev
+    & $node $tauriCli dev --config $tauriLocalTestConfig --no-dev-server-wait
 }
 finally {
     Pop-Location
+    Stop-Listener -Port $UiPort
 }
