@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type CommandButtonVariant = 'primary' | 'secondary' | 'subtle';
+type CommandButtonVariant = 'primary' | 'secondary' | 'subtle' | 'danger';
 
 interface CommandButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;

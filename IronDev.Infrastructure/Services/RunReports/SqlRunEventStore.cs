@@ -88,6 +88,26 @@ public sealed class SqlRunEventStore : IRunEventStore
         return rows.Select(ToDto).ToArray();
     }
 
+    public async Task<IReadOnlyList<string>> GetRecentRunIdsAsync(int limit = 50, CancellationToken cancellationToken = default)
+    {
+        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
+        using var connection = _connectionFactory.CreateConnection();
+
+        const string sql = """
+            SELECT TOP (@Limit) RunId
+            FROM dbo.RunEvents
+            GROUP BY RunId
+            ORDER BY MAX(TimestampUtc) DESC;
+            """;
+
+        var rows = await connection.QueryAsync<string>(new CommandDefinition(
+            sql,
+            new { Limit = limit <= 0 ? 50 : limit },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return rows.ToArray();
+    }
+
     public async IAsyncEnumerable<RunEventDto> StreamEventsAsync(
         string runId,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)

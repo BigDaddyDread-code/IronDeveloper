@@ -6,6 +6,8 @@ public interface IRunEventStore
 
     Task<IReadOnlyList<RunEventDto>> GetEventsAsync(string runId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<string>> GetRecentRunIdsAsync(int limit = 50, CancellationToken cancellationToken = default);
+
     IAsyncEnumerable<RunEventDto> StreamEventsAsync(string runId, CancellationToken cancellationToken = default);
 }
 
@@ -22,6 +24,9 @@ public sealed class NullRunEventStore : IRunEventStore
 
     public Task<IReadOnlyList<RunEventDto>> GetEventsAsync(string runId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<RunEventDto>>([]);
+
+    public Task<IReadOnlyList<string>> GetRecentRunIdsAsync(int limit = 50, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>([]);
 
     public async IAsyncEnumerable<RunEventDto> StreamEventsAsync(
         string runId,

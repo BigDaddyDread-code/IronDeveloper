@@ -5,6 +5,9 @@ import type {
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
+  TicketEvidenceLoadStatus,
+  TicketEvidenceSummary,
+  TicketRunReview,
   TicketCreateStatus,
   TenantSummary,
   TicketDetailLoadStatus,
@@ -20,6 +23,7 @@ import { SurfacePanel } from '../../components/SurfacePanel';
 import type { TicketEditDraft } from '../../components/TicketEditForm';
 import { TicketDetail } from '../../components/TicketDetail';
 import { TicketList } from '../../components/TicketList';
+import { TicketRunReviewPanel } from '../../components/TicketRunReviewPanel';
 import { WorkspaceLayout } from '../../components/WorkspaceLayout';
 
 interface TicketsWorkspaceProps {
@@ -42,6 +46,13 @@ interface TicketsWorkspaceProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   readinessMessage: string;
+  evidenceSummary: TicketEvidenceSummary | null;
+  evidenceStatus: TicketEvidenceLoadStatus;
+  evidenceMessage: string;
+  runReview: TicketRunReview | null;
+  runReviewStatus: TicketEvidenceLoadStatus;
+  runReviewMessage: string;
+  isRunReviewOpen: boolean;
   implementationPlan: ProjectImplementationPlan | null;
   planStatus: TicketPlanStatus;
   planMessage: string;
@@ -73,6 +84,11 @@ interface TicketsWorkspaceProps {
   onCancelEditTicket: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
+  onRefreshEvidence: () => void;
+  onReviewLatestRun: () => void;
+  onRefreshRunReview: () => void;
+  onDismissRunReview: () => void;
+  onOpenPromotionReview: () => void;
   onCreateDraftChange: (draft: CreateTicketDraft) => void;
   onSubmitCreateTicket: () => void;
   onCancelCreateTicket: () => void;
@@ -107,6 +123,13 @@ export function TicketsWorkspace({
   readiness,
   readinessStatus,
   readinessMessage,
+  evidenceSummary,
+  evidenceStatus,
+  evidenceMessage,
+  runReview,
+  runReviewStatus,
+  runReviewMessage,
+  isRunReviewOpen,
   implementationPlan,
   planStatus,
   planMessage,
@@ -138,6 +161,11 @@ export function TicketsWorkspace({
   onCancelEditTicket,
   onRefreshPlan,
   onRefreshReadiness,
+  onRefreshEvidence,
+  onReviewLatestRun,
+  onRefreshRunReview,
+  onDismissRunReview,
+  onOpenPromotionReview,
   onCreateDraftChange,
   onSubmitCreateTicket,
   onCancelCreateTicket,
@@ -206,41 +234,63 @@ export function TicketsWorkspace({
               />
             </SurfacePanel>
           ) : (
-            <TicketDetail
-              ticket={selectedTicket}
-              detailStatus={accessStatus === 'loadingTickets' ? 'loading' : ticketDetailStatus}
-              detailMessage={ticketDetailMessage}
-              readiness={readiness}
-              readinessStatus={readinessStatus}
-              readinessMessage={readinessMessage}
-              implementationPlan={implementationPlan}
-              planStatus={planStatus}
-              planMessage={planMessage}
-              isEditing={isEditingTicket}
-              editDraft={editDraft}
-              saveStatus={saveStatus}
-              saveMessage={saveMessage}
-              isEditDirty={isEditDirty}
-              editValidationMessage={editValidationMessage}
-              editBlockedReason={editBlockedReason}
-              onEdit={onEditTicket}
-              onEditDraftChange={onEditDraftChange}
-              onSave={onSaveTicket}
-              onCancelEdit={onCancelEditTicket}
-              onRefreshPlan={onRefreshPlan}
-              onRefreshReadiness={onRefreshReadiness}
-            />
+            <div className="tickets-workspace__main-stack">
+              <TicketDetail
+                ticket={selectedTicket}
+                detailStatus={accessStatus === 'loadingTickets' ? 'loading' : ticketDetailStatus}
+                detailMessage={ticketDetailMessage}
+                readiness={readiness}
+                readinessStatus={readinessStatus}
+                readinessMessage={readinessMessage}
+                evidenceSummary={evidenceSummary}
+                evidenceStatus={evidenceStatus}
+                evidenceMessage={evidenceMessage}
+                implementationPlan={implementationPlan}
+                planStatus={planStatus}
+                planMessage={planMessage}
+                isEditing={isEditingTicket}
+                editDraft={editDraft}
+                saveStatus={saveStatus}
+                saveMessage={saveMessage}
+                isEditDirty={isEditDirty}
+                editValidationMessage={editValidationMessage}
+                editBlockedReason={editBlockedReason}
+                onEdit={onEditTicket}
+                onEditDraftChange={onEditDraftChange}
+                onSave={onSaveTicket}
+                onCancelEdit={onCancelEditTicket}
+                onRefreshPlan={onRefreshPlan}
+                onRefreshReadiness={onRefreshReadiness}
+                onRefreshEvidence={onRefreshEvidence}
+                onReviewLatestRun={onReviewLatestRun}
+                onOpenPromotionReview={onOpenPromotionReview}
+              />
+              {isRunReviewOpen ? (
+                <TicketRunReviewPanel
+                  review={runReview}
+                  status={runReviewStatus}
+                  message={runReviewMessage}
+                  onRefresh={onRefreshRunReview}
+                  onDismiss={onDismissRunReview}
+                />
+              ) : null}
+            </div>
           )
         }
         right={
           <ContextInspector
             ticket={selectedTicket}
+            evidenceSummary={evidenceSummary}
+            evidenceStatus={evidenceStatus}
+            evidenceMessage={evidenceMessage}
             readiness={readiness}
             readinessStatus={readinessStatus}
             apiBaseUrl={apiBaseUrl}
             projectId={projectId}
             projectStatus={projectStatus}
             tokenConfigured={tokenConfigured}
+            onReviewLatestRun={onReviewLatestRun}
+            onOpenPromotionReview={onOpenPromotionReview}
           />
         }
       />

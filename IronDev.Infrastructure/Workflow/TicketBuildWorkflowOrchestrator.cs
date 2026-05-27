@@ -38,7 +38,15 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
             Status = TicketBuildWorkflowStatus.Running
         };
 
-        await PublishAsync(state, "RunStarted", $"Ticket build run started for ticket {state.TicketId}.", cancellationToken);
+        await PublishAsync(
+            state,
+            "RunStarted",
+            $"Ticket build run started for ticket {state.TicketId}.",
+            cancellationToken,
+            new Dictionary<string, string>
+            {
+                ["status"] = state.Status.ToString()
+            });
         return await RunAsync(state, cancellationToken);
     }
 
@@ -185,13 +193,30 @@ public sealed class TicketBuildWorkflowOrchestrator : ITicketBuildWorkflowOrches
         string eventType,
         string message,
         CancellationToken cancellationToken,
-        IReadOnlyDictionary<string, string>? payload = null) =>
-        _events.PublishAsync(new RunEventDto
+        IReadOnlyDictionary<string, string>? payload = null)
+    {
+        var mergedPayload = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["projectId"] = state.ProjectId.ToString(),
+            ["ticketId"] = state.TicketId.ToString(),
+            ["disposableRun"] = "true",
+            ["currentNode"] = state.CurrentNode,
+            ["status"] = state.Status.ToString()
+        };
+
+        if (payload is not null)
+        {
+            foreach (var pair in payload)
+                mergedPayload[pair.Key] = pair.Value;
+        }
+
+        return _events.PublishAsync(new RunEventDto
         {
             TimestampUtc = DateTimeOffset.UtcNow,
             RunId = state.WorkflowRunId.ToString("D"),
             EventType = eventType,
             Message = message,
-            Payload = payload ?? new Dictionary<string, string>()
+            Payload = mergedPayload
         }, cancellationToken);
+    }
 }

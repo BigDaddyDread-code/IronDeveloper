@@ -32,6 +32,23 @@ public sealed class InMemoryRunEventStore : IRunEventStore
         return Task.FromResult<IReadOnlyList<RunEventDto>>(buffer.Snapshot());
     }
 
+    public Task<IReadOnlyList<string>> GetRecentRunIdsAsync(int limit = 50, CancellationToken cancellationToken = default)
+    {
+        var take = limit <= 0 ? 50 : limit;
+        var runIds = _runs
+            .Select(pair => new
+            {
+                RunId = pair.Key,
+                LastTimestamp = pair.Value.LastTimestamp()
+            })
+            .OrderByDescending(row => row.LastTimestamp)
+            .Take(take)
+            .Select(row => row.RunId)
+            .ToArray();
+
+        return Task.FromResult<IReadOnlyList<string>>(runIds);
+    }
+
     public async IAsyncEnumerable<RunEventDto> StreamEventsAsync(
         string runId,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -88,6 +105,14 @@ public sealed class InMemoryRunEventStore : IRunEventStore
             lock (_gate)
             {
                 return _events.ToArray();
+            }
+        }
+
+        public DateTimeOffset LastTimestamp()
+        {
+            lock (_gate)
+            {
+                return _events.Count == 0 ? DateTimeOffset.MinValue : _events[^1].TimestampUtc;
             }
         }
 

@@ -2,6 +2,8 @@ import type {
   BuildReadinessResult,
   ProjectImplementationPlan,
   ProjectTicket,
+  TicketEvidenceLoadStatus,
+  TicketEvidenceSummary,
   TicketDetailLoadStatus,
   TicketPlanStatus,
   TicketReadinessLoadStatus,
@@ -22,6 +24,9 @@ interface TicketDetailProps {
   readiness: BuildReadinessResult | null;
   readinessStatus: TicketReadinessLoadStatus;
   readinessMessage: string;
+  evidenceSummary: TicketEvidenceSummary | null;
+  evidenceStatus: TicketEvidenceLoadStatus;
+  evidenceMessage: string;
   implementationPlan: ProjectImplementationPlan | null;
   planStatus: TicketPlanStatus;
   planMessage: string;
@@ -38,6 +43,9 @@ interface TicketDetailProps {
   onCancelEdit: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
+  onRefreshEvidence: () => void;
+  onReviewLatestRun: () => void;
+  onOpenPromotionReview: () => void;
 }
 
 export function TicketDetail({
@@ -47,6 +55,9 @@ export function TicketDetail({
   readiness,
   readinessStatus,
   readinessMessage,
+  evidenceSummary,
+  evidenceStatus,
+  evidenceMessage,
   implementationPlan,
   planStatus,
   planMessage,
@@ -62,7 +73,10 @@ export function TicketDetail({
   onSave,
   onCancelEdit,
   onRefreshPlan,
-  onRefreshReadiness
+  onRefreshReadiness,
+  onRefreshEvidence,
+  onReviewLatestRun,
+  onOpenPromotionReview
 }: TicketDetailProps) {
   if (detailStatus === 'loading') {
     return (
@@ -174,6 +188,87 @@ export function TicketDetail({
             <p className="state-muted">Acceptance criteria unavailable.</p>
           )}
         </div>
+      </section>
+
+      <section className="workflow-section workflow-section--wide" data-testid="ticket.detail.executionEvidence">
+        <div className="workflow-section__header">
+          <h3>Execution Evidence</h3>
+          <StatusBadge status={evidenceSummary ? (evidenceSummary.hasBlockingWarnings ? 'warning' : 'ready') : 'neutral'}>
+            {evidenceStatus === 'loaded'
+              ? evidenceSummary?.hasBlockingWarnings
+                ? 'Requires follow-up'
+                : 'Evidence available'
+              : evidenceStatus === 'loading'
+                ? 'Loading'
+                : 'Not loaded'}
+          </StatusBadge>
+        </div>
+        {evidenceStatus === 'loading' ? (
+          <p>Loading execution evidence...</p>
+        ) : !evidenceSummary ? (
+          <p data-testid="ticket.evidence.empty">{evidenceMessage}</p>
+        ) : evidenceSummary.latestRun || evidenceSummary.latestPromotionPackage ? (
+          <>
+            {evidenceSummary.latestRun ? (
+              <div data-testid="ticket.evidence.latestRun" className="detail-panel">
+                <p className="section-subtitle">Latest run</p>
+                <MetadataRow label="Run ID" value={evidenceSummary.latestRun.runId} />
+                <MetadataRow label="Status" value={evidenceSummary.latestRun.status} />
+                <MetadataRow label="Recommendation" value={evidenceSummary.latestRun.recommendation ?? 'No recommendation exposed.'} />
+                <MetadataRow label="Trace ID" value={evidenceSummary.latestRun.traceId ?? 'No trace id exposed.'} />
+                <CommandButton type="button" variant="secondary" onClick={onReviewLatestRun}>
+                  Review latest run
+                </CommandButton>
+              </div>
+            ) : (
+              <p data-testid="ticket.evidence.empty">{evidenceMessage}</p>
+            )}
+            {evidenceSummary.latestPromotionPackage ? (
+              <div data-testid="ticket.evidence.latestPromotionPackage" className="detail-panel">
+                <p className="section-subtitle">Latest promotion package</p>
+                <MetadataRow label="Package" value={evidenceSummary.latestPromotionPackage.packageId ?? 'Unavailable'} />
+                <MetadataRow
+                  label="Files to promote / blocked"
+                  value={`${evidenceSummary.latestPromotionPackage.filesToPromoteCount ?? 0} / ${evidenceSummary.latestPromotionPackage.filesBlockedCount ?? 0}`}
+                />
+                <MetadataRow label="Approval state" value={evidenceSummary.latestPromotionPackage.approvalState ?? 'Unavailable'} />
+                <MetadataRow label="Recommendation" value={evidenceSummary.latestPromotionPackage.recommendation ?? 'No recommendation exposed.'} />
+                <CommandButton type="button" variant="secondary" onClick={onOpenPromotionReview}>
+                  Open promotion review
+                </CommandButton>
+              </div>
+            ) : null}
+            <MetadataRow label="Linked documents" value={`${evidenceSummary.linkedDocumentCount}`} />
+            <MetadataRow label="Linked traces" value={`${evidenceSummary.linkedTraceCount}`} />
+            <MetadataRow label="Linked decisions" value={`${evidenceSummary.linkedDecisionCount}`} />
+            <MetadataRow label="Linked runs" value={`${evidenceSummary.linkedRunCount}`} />
+            <div className="workflow-section__meta" data-testid="ticket.evidence.blockedActions">
+              <p>Blocked actions</p>
+              {evidenceSummary.blockedActions.length > 0 ? (
+                <ul className="detail-list">
+                  {evidenceSummary.blockedActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="state-muted">No blocked actions.</p>
+              )}
+            </div>
+            <MetadataRow
+              label="Next safe action"
+              value={evidenceSummary.nextSafeAction ?? 'Refresh readiness'}
+            />
+          </>
+        ) : (
+          <div data-testid="ticket.evidence.empty">
+            <p>No execution evidence yet. Start a disposable run to produce trace, build/test output, and promotion review data.</p>
+            <p>{evidenceMessage}</p>
+          </div>
+        )}
+
+        <CommandButton type="button" variant="subtle" onClick={onRefreshEvidence} testId="ticket.command.refreshEvidence">
+          Refresh evidence
+        </CommandButton>
       </section>
 
       <div className="detail-grid detail-grid--workflow">

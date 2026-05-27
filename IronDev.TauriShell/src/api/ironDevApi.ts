@@ -3,13 +3,23 @@ import type {
   ApiStatus,
   BuildReadinessResult,
   CreateProjectTicketRequest,
+  RunEvidenceItem,
+  RunReportDetail,
+  RunReportSummary,
+  EnvironmentInfo,
   LoginRequest,
   LoginResponse,
+  ProjectDocument,
+  ProjectDocumentVersion,
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
+  StartTicketBuildRunRequest,
   TenantSummary,
+  TicketBuildRunDto,
+  TicketEvidenceSummary,
   TicketLoadResult,
+  TicketRunReview,
   UserProfile
 } from './types';
 
@@ -124,6 +134,14 @@ class IronDevApiClient {
     }
   }
 
+  async getEnvironment(signal?: AbortSignal): Promise<EnvironmentInfo> {
+    return this.request<EnvironmentInfo>('/api/environment', {
+      method: 'GET',
+      signal,
+      skipAuth: true
+    });
+  }
+
   async login(request: LoginRequest, signal?: AbortSignal): Promise<LoginResponse> {
     return this.request<LoginResponse>('/api/auth/login', {
       method: 'POST',
@@ -151,6 +169,10 @@ class IronDevApiClient {
 
   async getProjects(signal?: AbortSignal): Promise<ProjectSummary[]> {
     return this.request<ProjectSummary[]>('/api/projects', { method: 'GET', signal });
+  }
+
+  async getProject(projectId: number, signal?: AbortSignal): Promise<ProjectSummary> {
+    return this.request<ProjectSummary>(`/api/projects/${projectId}`, { method: 'GET', signal });
   }
 
   async selectProject(projectId: number, signal?: AbortSignal): Promise<{ projectId: number }> {
@@ -221,6 +243,21 @@ class IronDevApiClient {
     });
   }
 
+  async getProjectDocuments(projectId: number, signal?: AbortSignal): Promise<ProjectDocument[]> {
+    return this.request<ProjectDocument[]>(`/api/projects/${projectId}/documents`, { method: 'GET', signal });
+  }
+
+  async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {
+    return this.request<ProjectDocument | null>(`/api/documents/${documentId}`, { method: 'GET', signal });
+  }
+
+  async getDocumentCurrentVersion(documentId: number, signal?: AbortSignal): Promise<ProjectDocumentVersion | null> {
+    return this.request<ProjectDocumentVersion | null>(`/api/documents/${documentId}/versions/current`, {
+      method: 'GET',
+      signal
+    });
+  }
+
   async getTicketImplementationPlan(ticketId: number, signal?: AbortSignal): Promise<ProjectImplementationPlan> {
     return this.request<ProjectImplementationPlan>(`/api/tickets/${ticketId}/implementation-plan`, {
       method: 'GET',
@@ -234,6 +271,63 @@ class IronDevApiClient {
     signal?: AbortSignal
   ): Promise<BuildReadinessResult> {
     return this.request<BuildReadinessResult>(`/api/projects/${projectId}/tickets/${ticketId}/build-readiness`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getTicketEvidenceSummary(
+    projectId: number,
+    ticketId: number,
+    signal?: AbortSignal
+  ): Promise<TicketEvidenceSummary> {
+    return this.request<TicketEvidenceSummary>(`/api/projects/${projectId}/tickets/${ticketId}/evidence-summary`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async startTicketBuildRun(
+    projectId: number,
+    ticketId: number,
+    request: StartTicketBuildRunRequest = {},
+    signal?: AbortSignal
+  ): Promise<TicketBuildRunDto> {
+    return this.request<TicketBuildRunDto>(`/api/projects/${projectId}/tickets/${ticketId}/build-runs`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async getTicketRunReview(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<TicketRunReview> {
+    return this.request<TicketRunReview>(
+      `/api/projects/${projectId}/tickets/${ticketId}/build-runs/${encodeURIComponent(runId)}/review`,
+      {
+        method: 'GET',
+        signal
+      }
+    );
+  }
+
+  async getRunReports(signal?: AbortSignal): Promise<RunReportSummary[]> {
+    return this.request<RunReportSummary[]>('/api/run-reports', { method: 'GET', signal });
+  }
+
+  async getRunReport(runId: string, signal?: AbortSignal): Promise<RunReportDetail> {
+    return this.request<RunReportDetail>(`/api/run-reports/${encodeURIComponent(runId)}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getRunReportEvidence(runId: string, signal?: AbortSignal): Promise<RunEvidenceItem[]> {
+    return this.request<RunEvidenceItem[]>(`/api/run-reports/${encodeURIComponent(runId)}/evidence`, {
       method: 'GET',
       signal
     });
