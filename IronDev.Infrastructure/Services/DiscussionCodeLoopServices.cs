@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -55,14 +58,14 @@ public sealed class DiscussionDocumentService : IDiscussionDocumentService
 }
 
 internal sealed record ScenarioDefinition(
-    string Id,
+    BuildScenario Scenario,
     string Title,
     string Summary,
     string Problem,
-    string ExpectedOutput,
     string ProjectDirectory,
     string ProjectFileName,
     string ProgramText,
+    string ProjectFileText,
     IReadOnlyList<string> AcceptanceCriteria,
     IReadOnlyList<string> MatchTerms);
 
@@ -80,19 +83,37 @@ internal static class DiscussionCodeScenarioCatalog
     }
 
     public static ScenarioDefinition? Get(string scenarioId) =>
-        All.FirstOrDefault(item => string.Equals(item.Id, scenarioId, StringComparison.OrdinalIgnoreCase));
+        All.FirstOrDefault(item => string.Equals(item.Scenario.ScenarioId, scenarioId, StringComparison.OrdinalIgnoreCase));
 
     public static readonly IReadOnlyList<ScenarioDefinition> All =
     [
         new ScenarioDefinition(
-            Id: "hello-world-alpha",
+            Scenario: new BuildScenario
+            {
+                ScenarioId = "console.hello-world",
+                Name = "Hello World console",
+                DiscussionText = "Create a tiny C# console application that prints \"Hello from IronDev Alpha\".",
+                RuntimeProfileId = "dotnet.console",
+                Verifications =
+                [
+                    new ScenarioVerification
+                    {
+                        Kind = "StdoutContains",
+                        Description = "Output contains expected greeting.",
+                        Parameters = new Dictionary<string, string>
+                        {
+                            ["expected"] = "Hello from IronDev Alpha"
+                        }
+                    }
+                ]
+            },
             Title: "Build Hello World Console App",
             Summary: "Create a tiny C# console app that prints \"Hello from IronDev Alpha\".",
             Problem: "The backend discussion-to-code loop needs a real disposable code generation proof.",
-            ExpectedOutput: "Hello from IronDev Alpha",
             ProjectDirectory: "HelloWorldAlpha",
             ProjectFileName: "HelloWorldAlpha.csproj",
             ProgramText: "Console.WriteLine(\"Hello from IronDev Alpha\");" + Environment.NewLine,
+            ProjectFileText: DotNetConsoleProjectFile,
             AcceptanceCriteria:
             [
                 "- Disposable C# console project is generated.",
@@ -104,29 +125,145 @@ internal static class DiscussionCodeScenarioCatalog
             ],
             MatchTerms: ["Hello from IronDev Alpha"]),
         new ScenarioDefinition(
-            Id: "calculator-console",
+            Scenario: new BuildScenario
+            {
+                ScenarioId = "console.calculator",
+                Name = "Calculator console",
+                DiscussionText = """
+                    Create a C# console calculator that supports add and subtract commands.
+
+                    Examples:
+                    calc add 2 3 should print 5
+                    calc subtract 10 4 should print 6
+                    """,
+                RuntimeProfileId = "dotnet.console",
+                Verifications =
+                [
+                    new ScenarioVerification
+                    {
+                        Kind = "StdoutContains",
+                        Description = "Add command prints 5.",
+                        Parameters = new Dictionary<string, string>
+                        {
+                            ["arguments"] = "add 2 3",
+                            ["expected"] = "5"
+                        }
+                    },
+                    new ScenarioVerification
+                    {
+                        Kind = "StdoutContains",
+                        Description = "Subtract command prints 6.",
+                        Parameters = new Dictionary<string, string>
+                        {
+                            ["arguments"] = "subtract 10 4",
+                            ["expected"] = "6"
+                        }
+                    }
+                ]
+            },
             Title: "Build Calculator Console App",
-            Summary: "Create a tiny C# console app that adds two numbers and prints the result.",
+            Summary: "Create a C# console calculator that supports add and subtract commands.",
             Problem: "The reusable chat-to-build spine needs a second deterministic scenario without a new product service.",
-            ExpectedOutput: "2 + 3 = 5",
             ProjectDirectory: "CalculatorConsole",
             ProjectFileName: "CalculatorConsole.csproj",
             ProgramText: """
-                var left = 2;
-                var right = 3;
-                Console.WriteLine($"{left} + {right} = {left + right}");
+                if (args.Length != 3)
+                {
+                    Console.Error.WriteLine("Usage: calc add|subtract <left> <right>");
+                    Environment.Exit(2);
+                }
+
+                var command = args[0].ToLowerInvariant();
+                var left = int.Parse(args[1]);
+                var right = int.Parse(args[2]);
+
+                var result = command switch
+                {
+                    "add" => left + right,
+                    "subtract" => left - right,
+                    _ => throw new InvalidOperationException($"Unknown command: {command}")
+                };
+
+                Console.WriteLine(result);
                 """,
+            ProjectFileText: DotNetConsoleProjectFile,
             AcceptanceCriteria:
             [
                 "- Disposable C# console project is generated.",
                 "- dotnet build succeeds.",
-                "- dotnet run prints \"2 + 3 = 5\".",
+                "- dotnet run -- add 2 3 prints 5.",
+                "- dotnet run -- subtract 10 4 prints 6.",
                 "- Real repository is untouched.",
                 "- Run events are persisted.",
                 "- Result is reviewable."
             ],
-            MatchTerms: ["calculator", "console"])
+            MatchTerms: ["calculator", "console"]),
+        new ScenarioDefinition(
+            Scenario: new BuildScenario
+            {
+                ScenarioId = "aspnet.health-api",
+                Name = "Tiny ASP.NET health API",
+                DiscussionText = "Create a minimal ASP.NET Core API with a GET /health endpoint that returns \"healthy\".",
+                RuntimeProfileId = "dotnet.web",
+                Verifications =
+                [
+                    new ScenarioVerification
+                    {
+                        Kind = "HttpGetEquals",
+                        Description = "GET /health returns healthy.",
+                        Parameters = new Dictionary<string, string>
+                        {
+                            ["path"] = "/health",
+                            ["expected"] = "healthy"
+                        }
+                    }
+                ]
+            },
+            Title: "Build Tiny ASP.NET Health API",
+            Summary: "Create a minimal ASP.NET Core API with a GET /health endpoint that returns \"healthy\".",
+            Problem: "The reusable chat-to-build spine needs to prove long-running process handling and HTTP verification.",
+            ProjectDirectory: "HealthApi",
+            ProjectFileName: "HealthApi.csproj",
+            ProgramText: """
+                var builder = WebApplication.CreateBuilder(args);
+                var app = builder.Build();
+
+                app.MapGet("/health", () => Results.Text("healthy", "text/plain"));
+
+                app.Run();
+                """,
+            ProjectFileText: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """,
+            AcceptanceCriteria:
+            [
+                "- Generated ASP.NET Core project is created.",
+                "- dotnet build succeeds.",
+                "- Server starts in the disposable workspace.",
+                "- GET /health returns healthy.",
+                "- Server process is stopped cleanly.",
+                "- Run events and HTTP verification evidence are persisted.",
+                "- Result is reviewable."
+            ],
+            MatchTerms: ["ASP.NET", "health"])
     ];
+
+    private const string DotNetConsoleProjectFile = """
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <OutputType>Exe</OutputType>
+            <TargetFramework>net10.0</TargetFramework>
+            <ImplicitUsings>enable</ImplicitUsings>
+            <Nullable>enable</Nullable>
+          </PropertyGroup>
+        </Project>
+        """;
 }
 
 public sealed class TicketFromDocumentService : ITicketFromDocumentService
@@ -199,11 +336,11 @@ public sealed class TicketFromDocumentService : ITicketFromDocumentService
         Summary = scenario.Summary,
         Problem = scenario.Problem,
         AcceptanceCriteria = string.Join(Environment.NewLine, scenario.AcceptanceCriteria),
-        TechnicalNotes = $"Generated deterministically from a discussion document using scenario fixture '{scenario.Id}'.",
+        TechnicalNotes = $"Generated deterministically from a discussion document using scenario fixture '{scenario.Scenario.ScenarioId}'.",
         Status = "Draft",
         Content = scenario.Summary,
         IsGenerated = true,
-        GenerationNote = $"Source: Discussion document. Deterministic scenario fixture: {scenario.Id}.",
+        GenerationNote = $"Source: Discussion document. Deterministic scenario fixture: {scenario.Scenario.ScenarioId}.",
         SourceDocumentVersionId = documentVersionId
     };
 
@@ -321,7 +458,7 @@ public sealed class TicketReviewService : ITicketReviewService
             ReviewId = reviewId,
             ProjectId = ticket.ProjectId,
             TicketId = ticket.Id,
-            ScenarioId = scenario?.Id ?? "none",
+            ScenarioId = scenario?.Scenario.ScenarioId ?? "none",
             Contributions =
             [
                 new TicketReviewContribution
@@ -380,20 +517,25 @@ public sealed class DeterministicCodeProposalGenerator : ICodeProposalGenerator
         if (scenario is null)
             throw new InvalidOperationException($"No deterministic code proposal scenario is registered for '{review.ScenarioId}'.");
 
-        var output = string.IsNullOrWhiteSpace(expectedOutput) ? scenario.ExpectedOutput : expectedOutput;
-        var programText = string.Equals(output, scenario.ExpectedOutput, StringComparison.Ordinal)
+        var defaultOutput = TryGetFirstExpectedOutput(scenario.Scenario.Verifications);
+        var output = string.IsNullOrWhiteSpace(expectedOutput) ? defaultOutput : expectedOutput;
+        var programText = string.Equals(output, defaultOutput, StringComparison.Ordinal)
             ? scenario.ProgramText
             : BuildSingleWriteLineProgram(output);
-        var csprojText = """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <OutputType>Exe</OutputType>
-                <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
-                <Nullable>enable</Nullable>
-              </PropertyGroup>
-            </Project>
-            """;
+        var verifications = string.IsNullOrWhiteSpace(expectedOutput)
+            ? scenario.Scenario.Verifications
+            :
+            [
+                new ScenarioVerification
+                {
+                    Kind = "StdoutContains",
+                    Description = "Output contains requested text.",
+                    Parameters = new Dictionary<string, string>
+                    {
+                        ["expected"] = output
+                    }
+                }
+            ];
 
         return Task.FromResult(new CodeProposal
         {
@@ -406,16 +548,24 @@ public sealed class DeterministicCodeProposalGenerator : ICodeProposalGenerator
             Files =
             [
                 CreateFile($"{scenario.ProjectDirectory}/Program.cs", programText),
-                CreateFile($"{scenario.ProjectDirectory}/{scenario.ProjectFileName}", csprojText)
+                CreateFile($"{scenario.ProjectDirectory}/{scenario.ProjectFileName}", scenario.ProjectFileText)
             ],
             RunProfile = new CodeRunProfile
             {
+                RuntimeProfileId = scenario.Scenario.RuntimeProfileId,
                 WorkingDirectory = scenario.ProjectDirectory,
                 BuildCommand = "dotnet build --nologo",
                 RunCommand = "dotnet run --no-build --nologo"
-            }
+            },
+            Verifications = verifications
         });
     }
+
+    private static string TryGetFirstExpectedOutput(IReadOnlyList<ScenarioVerification> verifications) =>
+        verifications
+            .Select(item => item.Parameters.TryGetValue("expected", out var expected) ? expected : null)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+        ?? string.Empty;
 
     private static string BuildSingleWriteLineProgram(string expectedOutput)
     {
@@ -563,25 +713,18 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
             if (build.ExitCode != 0)
                 throw new InvalidOperationException("dotnet build failed.");
 
-            var runCommand = await RunDotNetCommandAsync(run.RunId, ticket, projectPath, "dotnet run", ["run", "--no-build", "--nologo"], evidenceDirectory, cancellationToken).ConfigureAwait(false);
-            if (runCommand.ExitCode != 0)
-                throw new InvalidOperationException("dotnet run failed.");
+            var verificationResults = await RunScenarioVerificationsAsync(
+                run.RunId,
+                ticket,
+                proposal,
+                projectPath,
+                evidenceDirectory,
+                cancellationToken).ConfigureAwait(false);
+            await WriteEvidenceAsync(evidenceDirectory, "output-verification.json", JsonSerializer.Serialize(verificationResults, JsonOptions), cancellationToken).ConfigureAwait(false);
 
-            var outputVerified = runCommand.StandardOutput.Contains(proposal.ExpectedOutput, StringComparison.Ordinal);
-            await WriteEvidenceAsync(evidenceDirectory, "output-verification.json", JsonSerializer.Serialize(new
-            {
-                expected = proposal.ExpectedOutput,
-                actual = runCommand.StandardOutput,
-                verified = outputVerified
-            }, JsonOptions), cancellationToken).ConfigureAwait(false);
-            if (!outputVerified)
-                throw new InvalidOperationException("dotnet run output did not contain the expected text.");
-
-            await PublishAsync(run.RunId, "OutputVerified", $"Verified output contains '{proposal.ExpectedOutput}'.", ticket, new Dictionary<string, string>
-            {
-                ["expectedOutput"] = proposal.ExpectedOutput,
-                ["currentNode"] = "OutputVerification"
-            }, cancellationToken).ConfigureAwait(false);
+            var failedVerification = verificationResults.FirstOrDefault(item => !item.Verified);
+            if (failedVerification is not null)
+                throw new InvalidOperationException($"Scenario verification failed: {failedVerification.Description}");
 
             await RunCodeStandardsAsync(run.RunId, ticket, proposal, materializedFiles, evidenceDirectory, cancellationToken).ConfigureAwait(false);
 
@@ -645,6 +788,235 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
         }
 
         return proposal.Files;
+    }
+
+    private async Task<IReadOnlyList<ScenarioVerificationCapture>> RunScenarioVerificationsAsync(
+        string runId,
+        ProjectTicket ticket,
+        CodeProposal proposal,
+        string projectPath,
+        string evidenceDirectory,
+        CancellationToken cancellationToken)
+    {
+        var verifications = proposal.Verifications.Count > 0
+            ? proposal.Verifications
+            :
+            [
+                new ScenarioVerification
+                {
+                    Kind = "StdoutContains",
+                    Description = "Output contains expected text.",
+                    Parameters = new Dictionary<string, string>
+                    {
+                        ["expected"] = proposal.ExpectedOutput
+                    }
+                }
+            ];
+
+        var results = new List<ScenarioVerificationCapture>();
+        foreach (var verification in verifications)
+        {
+            var result = verification.Kind switch
+            {
+                "StdoutContains" => await RunStdoutContainsVerificationAsync(runId, ticket, projectPath, verification, evidenceDirectory, cancellationToken).ConfigureAwait(false),
+                "CommandExitZero" => await RunCommandExitZeroVerificationAsync(runId, ticket, projectPath, verification, evidenceDirectory, cancellationToken).ConfigureAwait(false),
+                "HttpGetEquals" => await RunHttpGetEqualsVerificationAsync(runId, ticket, projectPath, verification, evidenceDirectory, cancellationToken).ConfigureAwait(false),
+                _ => throw new InvalidOperationException($"Unsupported scenario verification kind: {verification.Kind}.")
+            };
+
+            results.Add(result);
+            await PublishAsync(runId, result.Verified ? "OutputVerified" : "OutputVerificationFailed", result.Description, ticket, new Dictionary<string, string>
+            {
+                ["verificationKind"] = result.Kind,
+                ["expectedOutput"] = result.Expected,
+                ["verified"] = result.Verified.ToString().ToLowerInvariant(),
+                ["currentNode"] = "OutputVerification"
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        return results;
+    }
+
+    private async Task<ScenarioVerificationCapture> RunStdoutContainsVerificationAsync(
+        string runId,
+        ProjectTicket ticket,
+        string projectPath,
+        ScenarioVerification verification,
+        string evidenceDirectory,
+        CancellationToken cancellationToken)
+    {
+        var expected = RequiredParameter(verification, "expected");
+        var commandArguments = SplitArguments(OptionalParameter(verification, "arguments"));
+        var arguments = new List<string> { "run", "--no-build" };
+        if (commandArguments.Count > 0)
+        {
+            arguments.Add("--");
+            arguments.AddRange(commandArguments);
+        }
+
+        var displayName = commandArguments.Count == 0
+            ? "dotnet run"
+            : $"dotnet run -- {string.Join(' ', commandArguments)}";
+        var runCommand = await RunDotNetCommandAsync(runId, ticket, projectPath, displayName, arguments, evidenceDirectory, cancellationToken).ConfigureAwait(false);
+        var verified = runCommand.ExitCode == 0 &&
+                       runCommand.StandardOutput.Contains(expected, StringComparison.Ordinal);
+        return new ScenarioVerificationCapture(
+            verification.Kind,
+            verification.Description,
+            expected,
+            runCommand.StandardOutput,
+            verified,
+            runCommand.ExitCode);
+    }
+
+    private async Task<ScenarioVerificationCapture> RunCommandExitZeroVerificationAsync(
+        string runId,
+        ProjectTicket ticket,
+        string projectPath,
+        ScenarioVerification verification,
+        string evidenceDirectory,
+        CancellationToken cancellationToken)
+    {
+        var commandArguments = SplitArguments(OptionalParameter(verification, "arguments"));
+        var arguments = new List<string> { "run", "--no-build" };
+        if (commandArguments.Count > 0)
+        {
+            arguments.Add("--");
+            arguments.AddRange(commandArguments);
+        }
+
+        var displayName = commandArguments.Count == 0
+            ? "dotnet run"
+            : $"dotnet run -- {string.Join(' ', commandArguments)}";
+        var runCommand = await RunDotNetCommandAsync(runId, ticket, projectPath, displayName, arguments, evidenceDirectory, cancellationToken).ConfigureAwait(false);
+        return new ScenarioVerificationCapture(
+            verification.Kind,
+            verification.Description,
+            "exit code 0",
+            runCommand.StandardOutput,
+            runCommand.ExitCode == 0,
+            runCommand.ExitCode);
+    }
+
+    private async Task<ScenarioVerificationCapture> RunHttpGetEqualsVerificationAsync(
+        string runId,
+        ProjectTicket ticket,
+        string projectPath,
+        ScenarioVerification verification,
+        string evidenceDirectory,
+        CancellationToken cancellationToken)
+    {
+        var path = RequiredParameter(verification, "path");
+        var expected = RequiredParameter(verification, "expected");
+        var port = GetFreeTcpPort();
+        var url = $"http://127.0.0.1:{port}";
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(ReadTimeoutSeconds("WebTimeoutSeconds", 30)));
+
+        await PublishAsync(runId, "CommandStarted", $"CommandStarted: dotnet run web {url}", ticket, new Dictionary<string, string>
+        {
+            ["command"] = "dotnet run web",
+            ["fileName"] = "dotnet",
+            ["url"] = url,
+            ["currentNode"] = "HttpVerification"
+        }, cancellationToken).ConfigureAwait(false);
+
+        var started = DateTimeOffset.UtcNow;
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo("dotnet")
+            {
+                WorkingDirectory = projectPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            }
+        };
+        foreach (var argument in new[] { "run", "--no-build", "--no-launch-profile", "--urls", url })
+            process.StartInfo.ArgumentList.Add(argument);
+
+        process.OutputDataReceived += (_, e) => { if (e.Data is not null) stdout.AppendLine(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderr.AppendLine(e.Data); };
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        string actual = string.Empty;
+        var verified = false;
+        var exitCode = -1;
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            var target = new Uri(new Uri(url), path);
+            for (var attempt = 0; attempt < 30 && !timeout.IsCancellationRequested; attempt++)
+            {
+                try
+                {
+                    actual = await http.GetStringAsync(target, timeout.Token).ConfigureAwait(false);
+                    verified = string.Equals(actual.Trim(), expected, StringComparison.Ordinal);
+                    if (verified)
+                        break;
+                }
+                catch when (!timeout.IsCancellationRequested)
+                {
+                    await Task.Delay(500, timeout.Token).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                }
+            }
+
+            try
+            {
+                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                exitCode = process.ExitCode;
+            }
+            catch
+            {
+            }
+        }
+
+        var completed = DateTimeOffset.UtcNow;
+        var stdoutPath = await WriteEvidenceAsync(evidenceDirectory, "dotnet-run-web.stdout.log", stdout.ToString(), CancellationToken.None).ConfigureAwait(false);
+        var stderrPath = await WriteEvidenceAsync(evidenceDirectory, "dotnet-run-web.stderr.log", stderr.ToString(), CancellationToken.None).ConfigureAwait(false);
+        await WriteEvidenceAsync(evidenceDirectory, "http-verification.json", JsonSerializer.Serialize(new
+        {
+            url = $"{url}{path}",
+            expected,
+            actual,
+            verified
+        }, JsonOptions), CancellationToken.None).ConfigureAwait(false);
+
+        await PublishAsync(runId, "CommandCompleted", $"CommandCompleted: dotnet run web verification stopped with code {exitCode}.", ticket, new Dictionary<string, string>
+        {
+            ["command"] = "dotnet run web",
+            ["fileName"] = "dotnet",
+            ["exitCode"] = exitCode.ToString(),
+            ["durationMs"] = ((long)(completed - started).TotalMilliseconds).ToString(),
+            ["stdoutPath"] = stdoutPath,
+            ["stderrPath"] = stderrPath,
+            ["currentNode"] = "HttpVerification"
+        }, CancellationToken.None).ConfigureAwait(false);
+
+        return new ScenarioVerificationCapture(
+            verification.Kind,
+            verification.Description,
+            expected,
+            actual,
+            verified,
+            exitCode);
     }
 
     private async Task RunCodeStandardsAsync(
@@ -773,6 +1145,37 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
         return new CommandCapture(exitCode, stdout.ToString(), stderrText);
     }
 
+    private static string RequiredParameter(ScenarioVerification verification, string name)
+    {
+        var value = OptionalParameter(verification, name);
+        if (string.IsNullOrWhiteSpace(value))
+            throw new InvalidOperationException($"Scenario verification '{verification.Description}' is missing required parameter '{name}'.");
+
+        return value;
+    }
+
+    private static string? OptionalParameter(ScenarioVerification verification, string name) =>
+        verification.Parameters.TryGetValue(name, out var value) ? value : null;
+
+    private static IReadOnlyList<string> SplitArguments(string? arguments) =>
+        string.IsNullOrWhiteSpace(arguments)
+            ? []
+            : arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private string ResolveWorkspacePath(string runId)
     {
         var configured = _configuration["DisposableCodeRun:WorkspaceRoot"] ??
@@ -859,6 +1262,14 @@ public sealed class DisposableCodeRunService : IDisposableCodeRunService
     };
 
     private sealed record CommandCapture(int ExitCode, string StandardOutput, string StandardError);
+
+    private sealed record ScenarioVerificationCapture(
+        string Kind,
+        string Description,
+        string Expected,
+        string Actual,
+        bool Verified,
+        int ExitCode);
 }
 
 public sealed class RunReviewPackageService : IRunReviewPackageService
@@ -902,7 +1313,9 @@ public sealed class RunReviewPackageService : IRunReviewPackageService
             })
             .ToArray();
 
-        var outputVerification = await LoadOutputVerificationAsync(runId, evidence, cancellationToken).ConfigureAwait(false);
+        var outputVerifications = await LoadOutputVerificationsAsync(runId, evidence, cancellationToken).ConfigureAwait(false);
+        var outputVerification = outputVerifications.FirstOrDefault()
+                                 ?? new OutputVerificationEvidence { Expected = string.Empty, Verified = false };
         var codeStandards = await LoadCodeStandardsAsync(runId, evidence, cancellationToken).ConfigureAwait(false);
 
         return new RunReviewPackage
@@ -914,9 +1327,10 @@ public sealed class RunReviewPackageService : IRunReviewPackageService
             GeneratedFiles = generatedFiles,
             CommandEvidence = commandEvidence,
             OutputVerification = outputVerification,
+            OutputVerifications = outputVerifications,
             CodeStandards = codeStandards,
             FileSetHash = ComputeFileSetHash(generatedFiles),
-            Risks = BuildRisks(run, codeStandards, outputVerification),
+            Risks = BuildRisks(run, codeStandards, outputVerifications),
             HumanReviewChecklist =
             [
                 "Inspect generated files and file hashes.",
@@ -956,27 +1370,34 @@ public sealed class RunReviewPackageService : IRunReviewPackageService
         return generated;
     }
 
-    private async Task<OutputVerificationEvidence> LoadOutputVerificationAsync(
+    private async Task<IReadOnlyList<OutputVerificationEvidence>> LoadOutputVerificationsAsync(
         string runId,
         IReadOnlyList<RunEvidenceItem> evidence,
         CancellationToken cancellationToken)
     {
         var item = evidence.FirstOrDefault(item => item.Path.EndsWith("output-verification.json", StringComparison.OrdinalIgnoreCase));
         if (item is null)
-            return new OutputVerificationEvidence { Expected = string.Empty, Verified = false };
+            return [];
 
         var text = await _evidence.ReadEvidenceTextAsync(runId, item.Path, cancellationToken).ConfigureAwait(false)
                    ?? await File.ReadAllTextAsync(item.Path, cancellationToken).ConfigureAwait(false);
         using var document = JsonDocument.Parse(text);
         var root = document.RootElement;
-        return new OutputVerificationEvidence
+        if (root.ValueKind == JsonValueKind.Array)
         {
-            Expected = root.TryGetProperty("expected", out var expected) ? expected.GetString() ?? string.Empty : string.Empty,
-            Actual = root.TryGetProperty("actual", out var actual) ? actual.GetString() ?? string.Empty : string.Empty,
-            Verified = root.TryGetProperty("verified", out var verified) && verified.GetBoolean(),
-            EvidencePath = item.Path
-        };
+            return root.EnumerateArray().Select(element => MapOutputVerification(element, item.Path)).ToArray();
+        }
+
+        return [MapOutputVerification(root, item.Path)];
     }
+
+    private static OutputVerificationEvidence MapOutputVerification(JsonElement root, string evidencePath) => new()
+    {
+        Expected = root.TryGetProperty("expected", out var expected) ? expected.GetString() ?? string.Empty : string.Empty,
+        Actual = root.TryGetProperty("actual", out var actual) ? actual.GetString() ?? string.Empty : string.Empty,
+        Verified = root.TryGetProperty("verified", out var verified) && verified.GetBoolean(),
+        EvidencePath = evidencePath
+    };
 
     private async Task<CodeStandardsEvidence> LoadCodeStandardsAsync(
         string runId,
@@ -1002,7 +1423,7 @@ public sealed class RunReviewPackageService : IRunReviewPackageService
     private static IReadOnlyList<string> BuildRisks(
         RunRecord run,
         CodeStandardsEvidence codeStandards,
-        OutputVerificationEvidence outputVerification)
+        IReadOnlyList<OutputVerificationEvidence> outputVerifications)
     {
         var risks = new List<string>
         {
@@ -1011,7 +1432,7 @@ public sealed class RunReviewPackageService : IRunReviewPackageService
         };
         if (run.State == RunLifecycleState.Failed)
             risks.Add(run.FailureReason ?? "The disposable run failed.");
-        if (!outputVerification.Verified)
+        if (outputVerifications.Count == 0 || outputVerifications.Any(item => !item.Verified))
             risks.Add("Expected output was not verified.");
         if (!string.Equals(codeStandards.Status, "Succeeded", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(codeStandards.Status, "Passed", StringComparison.OrdinalIgnoreCase))

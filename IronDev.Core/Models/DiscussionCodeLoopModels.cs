@@ -70,6 +70,7 @@ public sealed record CodeProposal
     public required string ExpectedOutput { get; init; }
     public required IReadOnlyList<GeneratedCodeFile> Files { get; init; }
     public required CodeRunProfile RunProfile { get; init; }
+    public IReadOnlyList<ScenarioVerification> Verifications { get; init; } = [];
 }
 
 public sealed record GeneratedCodeFile
@@ -81,9 +82,26 @@ public sealed record GeneratedCodeFile
 
 public sealed record CodeRunProfile
 {
+    public string RuntimeProfileId { get; init; } = "dotnet.console";
     public required string WorkingDirectory { get; init; }
     public required string BuildCommand { get; init; }
     public required string RunCommand { get; init; }
+}
+
+public sealed record BuildScenario
+{
+    public required string ScenarioId { get; init; }
+    public required string Name { get; init; }
+    public required string DiscussionText { get; init; }
+    public required string RuntimeProfileId { get; init; }
+    public IReadOnlyList<ScenarioVerification> Verifications { get; init; } = [];
+}
+
+public sealed record ScenarioVerification
+{
+    public required string Kind { get; init; }
+    public required string Description { get; init; }
+    public IReadOnlyDictionary<string, string> Parameters { get; init; } = new Dictionary<string, string>();
 }
 
 public sealed record StartDisposableCodeRunRequest
@@ -109,6 +127,7 @@ public sealed record RunReviewPackage
     public required IReadOnlyList<GeneratedCodeFile> GeneratedFiles { get; init; }
     public required IReadOnlyList<CommandEvidence> CommandEvidence { get; init; }
     public required OutputVerificationEvidence OutputVerification { get; init; }
+    public IReadOnlyList<OutputVerificationEvidence> OutputVerifications { get; init; } = [];
     public required CodeStandardsEvidence CodeStandards { get; init; }
     public required string FileSetHash { get; init; }
     public required IReadOnlyList<string> Risks { get; init; }

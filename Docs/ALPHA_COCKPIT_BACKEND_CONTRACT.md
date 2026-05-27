@@ -60,7 +60,23 @@ Disposable ticket build execution is backend-owned. Clients may request "start a
 
 This is the backend proposal/run/review-package spine. `ICodeProposalGenerator` creates a `CodeProposal` with generated files, expected output, and a backend-owned build/run profile. `IDisposableCodeRunService` executes that proposal in a disposable workspace. `IRunReviewPackageService` assembles review evidence from run state, persisted events, generated files, command logs, code standards output, and output verification.
 
-Hello World is scenario fixture 1. Calculator console app is scenario fixture 2. Both use the same generic pipeline and the same product services. They are not Alpha-specific product services, they are not agent debate, and they must not mutate or apply generated code to the real repository. Successful execution ends in `PausedForApproval`.
+#### No More Fake Shit Rule
+
+A scenario only counts if it proves the reusable spine:
+
+`discussion/chat -> document -> ticket -> review/plan -> code proposal -> disposable workspace -> build/run/test -> evidence -> review package -> PausedForApproval`
+
+Scenario-specific services, endpoints, or orchestrators are not allowed. If a scenario requires `HelloWorldCodeRunService`, `CalculatorCodeRunService`, or `HealthApiCodeRunService`, the design is failing.
+
+The only acceptable scenario-specific parts are discussion text, runtime profile, verification rules, expected output, acceptance checks, and seed files. Everything else must use the same product spine.
+
+Current scenario fixtures:
+
+- `console.hello-world`: builds and runs a tiny console app, verifies stdout contains `Hello from IronDev Alpha`.
+- `console.calculator`: builds and runs one console app, verifies `add 2 3` prints `5` and `subtract 10 4` prints `6`.
+- `aspnet.health-api`: builds an ASP.NET Core app, starts a disposable server process, verifies `GET /health` returns `healthy`, and stops the process.
+
+These scenarios are not Alpha-specific product services, they are not agent debate, and they must not mutate or apply generated code to the real repository. Successful execution ends in `PausedForApproval`.
 
 ### Documents
 

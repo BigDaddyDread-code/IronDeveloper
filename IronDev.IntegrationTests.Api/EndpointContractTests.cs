@@ -922,7 +922,7 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, reviewResponse.StatusCode);
         var review = await reviewResponse.Content.ReadFromJsonAsync<RunTicketReviewResponse>();
         Assert.IsNotNull(review);
-        Assert.AreEqual("calculator-console", review!.Result.ScenarioId);
+        Assert.AreEqual("console.calculator", review!.Result.ScenarioId);
         Assert.IsTrue(review.Result.Decision.Proceed);
 
         var runResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/disposable-code-runs", new StartDisposableCodeRunRequest
@@ -941,10 +941,70 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual("PausedForApproval", package!.State);
         Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(package.OutputVerification.Verified);
-        Assert.AreEqual("2 + 3 = 5", package.OutputVerification.Expected);
-        StringAssert.Contains(package.OutputVerification.Actual, "2 + 3 = 5");
+        Assert.AreEqual(2, package.OutputVerifications.Count);
+        Assert.IsTrue(package.OutputVerifications.All(item => item.Verified));
+        Assert.IsTrue(package.OutputVerifications.Any(item => item.Expected == "5" && item.Actual.Contains("5", StringComparison.Ordinal)));
+        Assert.IsTrue(package.OutputVerifications.Any(item => item.Expected == "6" && item.Actual.Contains("6", StringComparison.Ordinal)));
         Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet build", StringComparison.OrdinalIgnoreCase)));
-        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run -- add 2 3", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run -- subtract 10 4", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [TestMethod]
+    public async Task DiscussionCodeLoop_HealthApiScenario_ShouldUseSameProposalRunPipeline()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Health API Scenario Project");
+        var discussion = await client.PostAsJsonAsync($"/api/projects/{project.Id}/discussions", new SaveDiscussionRequest
+        {
+            Title = "Tiny ASP.NET health API discussion",
+            Content = "Create a minimal ASP.NET Core API with a GET /health endpoint that returns healthy."
+        });
+        Assert.AreEqual(HttpStatusCode.OK, discussion.StatusCode);
+        var discussionBody = await discussion.Content.ReadFromJsonAsync<SaveDiscussionResponse>();
+        Assert.IsNotNull(discussionBody);
+
+        var ticketResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        Assert.AreEqual(HttpStatusCode.OK, ticketResponse.StatusCode);
+        var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
+        Assert.IsNotNull(ticketBody);
+
+        var ticket = await client.GetFromJsonAsync<ProjectTicket>($"/api/projects/{project.Id}/tickets/{ticketBody!.TicketId}");
+        Assert.IsNotNull(ticket);
+        Assert.AreEqual("Build Tiny ASP.NET Health API", ticket!.Title);
+
+        var reviewResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/review", new RunTicketReviewRequest());
+        Assert.AreEqual(HttpStatusCode.OK, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<RunTicketReviewResponse>();
+        Assert.IsNotNull(review);
+        Assert.AreEqual("aspnet.health-api", review!.Result.ScenarioId);
+        Assert.IsTrue(review.Result.Decision.Proceed);
+
+        var runResponse = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/disposable-code-runs", new StartDisposableCodeRunRequest
+        {
+            ReviewId = review.ReviewId
+        });
+        Assert.AreEqual(HttpStatusCode.OK, runResponse.StatusCode);
+        var run = await runResponse.Content.ReadFromJsonAsync<StartDisposableCodeRunResponse>();
+        Assert.IsNotNull(run);
+        Assert.AreEqual("PausedForApproval", run!.State);
+
+        var packageResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/{run.RunId}/review-package");
+        Assert.AreEqual(HttpStatusCode.OK, packageResponse.StatusCode);
+        var package = await packageResponse.Content.ReadFromJsonAsync<RunReviewPackage>();
+        Assert.IsNotNull(package);
+        Assert.AreEqual("PausedForApproval", package!.State);
+        Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)));
+        Assert.AreEqual(1, package.OutputVerifications.Count);
+        Assert.IsTrue(package.OutputVerifications[0].Verified);
+        Assert.AreEqual("healthy", package.OutputVerifications[0].Expected);
+        Assert.AreEqual("healthy", package.OutputVerifications[0].Actual.Trim());
+        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet build", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run web", StringComparison.OrdinalIgnoreCase)));
     }
 
     [TestMethod]
