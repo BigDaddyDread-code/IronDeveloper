@@ -78,6 +78,7 @@ builder.Services.AddScoped<global::IronDev.Infrastructure.Services.IDeepCodeLook
 builder.Services.AddSingleton<ILlmTraceService, LlmTraceService>();
 builder.Services.AddSingleton<IMarkdownRenderService, MarkdownRenderService>();
 builder.Services.AddCodeIntelligenceServices();
+builder.Services.AddGovernedTools();
 builder.Services.AddScoped<IBuilderContextService, BuilderContextService>();
 builder.Services.AddScoped<ICodeChangeProposalService, CodeChangeProposalService>();
 builder.Services.AddScoped<ICodePatchService, CodePatchService>();
