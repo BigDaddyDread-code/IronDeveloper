@@ -59,3 +59,10 @@ public interface IRunReviewPackageService
         string runId,
         CancellationToken cancellationToken = default);
 }
+
+public interface IBuildScenarioCatalog
+{
+    Task<IReadOnlyList<BuildScenario>> GetScenariosAsync(
+        int projectId,
+        CancellationToken cancellationToken = default);
+}

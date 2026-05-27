@@ -290,6 +290,59 @@ public sealed class IronDevCliTests
         StringAssert.Contains(await File.ReadAllTextAsync(markdownReport), "IronDev Chat-To-Build Proof Report");
     }
 
+    [TestMethod]
+    public async Task ScenarioCommands_UseScenarioCatalogAndProjectScopedReviewPackage()
+    {
+        var reportDir = Path.Combine(Path.GetTempPath(), $"irondev-scenario-proof-{Guid.NewGuid():N}");
+        var handler = new RecordingHandler();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var list = await IronDevCli.RunAsync(
+            ["scenario", "list", "--project-id", "42", "--api-base-url", "http://localhost:5000", "--token", "test-token"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, list, error.ToString());
+        StringAssert.Contains(output.ToString(), "console.hello-world");
+
+        var run = await IronDevCli.RunAsync(
+            ["scenario", "run", "console.hello-world", "--project-id", "42", "--report-dir", reportDir, "--api-base-url", "http://localhost:5000", "--token", "test-token"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, run, error.ToString());
+
+        var report = await IronDevCli.RunAsync(
+            ["scenario", "report", "run-proof-1", "--project-id", "42", "--ticket-id", "123", "--api-base-url", "http://localhost:5000", "--token", "test-token"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+        Assert.AreEqual(0, report, error.ToString());
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "/health",
+                "/api/projects/42/code-scenarios",
+                "/health",
+                "/api/projects/42/code-scenarios",
+                "/health",
+                "/api/projects/42/discussions",
+                "/api/projects/42/documents/1001/tickets",
+                "/api/projects/42/tickets/123/review",
+                "/api/projects/42/tickets/123/disposable-code-runs",
+                "/api/runs/run-proof-1",
+                "/api/projects/42/tickets/123/build-runs/run-proof-1/review-package",
+                "/health",
+                "/api/projects/42/tickets/123/build-runs/run-proof-1/review-package"
+            },
+            handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
+    }
+
 
     [TestMethod]
     public async Task TicketsApiClient_CallsStructuredTicketEndpoints()
@@ -453,6 +506,28 @@ public sealed class IronDevCliTests
                         Encoding.UTF8,
                         "application/json")
                 };
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/projects/42/code-scenarios")
+                return JsonResponse(
+                    """
+                    [
+                      {
+                        "scenarioId": "console.hello-world",
+                        "name": "Hello World console",
+                        "discussionText": "Create a tiny C# console application that prints \"Hello from IronDev Alpha\".",
+                        "runtimeProfileId": "dotnet.console",
+                        "verifications": [
+                          {
+                            "kind": "StdoutContains",
+                            "description": "Output contains expected greeting.",
+                            "parameters": {
+                              "expected": "Hello from IronDev Alpha"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                    """);
 
             if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-123/report")
                 return new HttpResponseMessage(HttpStatusCode.OK)

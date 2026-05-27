@@ -99,6 +99,8 @@ builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryS
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
+builder.Services.AddSingleton<DiscussionCodeScenarioCatalog>();
+builder.Services.AddSingleton<IBuildScenarioCatalog>(sp => sp.GetRequiredService<DiscussionCodeScenarioCatalog>());
 builder.Services.AddScoped<ITicketFromDocumentService, TicketFromDocumentService>();
 builder.Services.AddScoped<ITicketReviewService, TicketReviewService>();
 builder.Services.AddScoped<ICodeProposalGenerator, DeterministicCodeProposalGenerator>();

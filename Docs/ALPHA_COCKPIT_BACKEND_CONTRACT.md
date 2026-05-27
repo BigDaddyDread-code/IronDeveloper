@@ -57,6 +57,7 @@ Disposable ticket build execution is backend-owned. Clients may request "start a
 - `POST /api/projects/{projectId}/tickets/{ticketId}/review`
 - `POST /api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs`
 - `GET /api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review-package`
+- `GET /api/projects/{projectId}/code-scenarios`
 
 This is the backend proposal/run/review-package spine. `ICodeProposalGenerator` creates a `CodeProposal` with generated files, expected output, and a backend-owned build/run profile. `IDisposableCodeRunService` executes that proposal in a disposable workspace. `IRunReviewPackageService` assembles review evidence from run state, persisted events, generated files, command logs, code standards output, and output verification.
 
@@ -77,6 +78,14 @@ Current scenario fixtures:
 - `aspnet.health-api`: builds an ASP.NET Core app, starts a disposable server process, verifies `GET /health` returns `healthy`, and stops the process.
 
 These scenarios are not Alpha-specific product services, they are not agent debate, and they must not mutate or apply generated code to the real repository. Successful execution ends in `PausedForApproval`.
+
+The CLI scenario runner must use the same project-scoped spine:
+
+- `irondev scenario list --project-id <id>`
+- `irondev scenario run <scenario-id> --project-id <id>`
+- `irondev scenario report <run-id> --project-id <id> --ticket-id <id>`
+
+`scenario run` is a convenience wrapper over the real discussion/document/ticket/review/proposal/disposable-run/review-package path. It must not call scenario-specific services.
 
 ### Documents
 

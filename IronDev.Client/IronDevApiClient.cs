@@ -77,6 +77,11 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => PostAsync<SaveDiscussionRequest, SaveDiscussionResponse>($"api/projects/{projectId}/discussions", request, cancellationToken);
 
+    public Task<IReadOnlyList<BuildScenario>> GetBuildScenariosAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
+        => GetAsync<IReadOnlyList<BuildScenario>>($"api/projects/{projectId}/code-scenarios", cancellationToken);
+
     public Task<CreateTicketFromDocumentResponse> CreateTicketFromDocumentAsync(
         int projectId,
         long documentVersionId,
