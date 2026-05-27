@@ -32,6 +32,8 @@ public interface IIronDevApiClient
 
     Task<SaveDiscussionResponse> SaveDiscussionAsync(int projectId, SaveDiscussionRequest request, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<BuildScenario>> GetBuildScenariosAsync(int projectId, CancellationToken cancellationToken = default);
+
     Task<CreateTicketFromDocumentResponse> CreateTicketFromDocumentAsync(int projectId, long documentVersionId, CreateTicketFromDocumentRequest request, CancellationToken cancellationToken = default);
 
     Task<RunTicketReviewResponse> ReviewTicketAsync(int projectId, long ticketId, RunTicketReviewRequest request, CancellationToken cancellationToken = default);

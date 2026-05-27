@@ -783,6 +783,14 @@ public sealed class EndpointContractTests : ApiTestBase
         using var client = GetAuthedClient(tenantToken);
 
         var project = await CreateProjectAsync(client, "Alpha Discussion To Code Project");
+        var scenariosResponse = await client.GetAsync($"/api/projects/{project.Id}/code-scenarios");
+        Assert.AreEqual(HttpStatusCode.OK, scenariosResponse.StatusCode);
+        var scenarios = await scenariosResponse.Content.ReadFromJsonAsync<IReadOnlyList<BuildScenario>>();
+        Assert.IsNotNull(scenarios);
+        CollectionAssert.IsSubsetOf(
+            new[] { "console.hello-world", "console.calculator", "aspnet.health-api" },
+            scenarios!.Select(item => item.ScenarioId).ToArray());
+
         var discussion = await client.PostAsJsonAsync($"/api/projects/{project.Id}/discussions", new SaveDiscussionRequest
         {
             Title = "Hello World Alpha discussion",
@@ -878,7 +886,8 @@ public sealed class EndpointContractTests : ApiTestBase
         var package = await packageResponse.Content.ReadFromJsonAsync<RunReviewPackage>();
         Assert.IsNotNull(package);
         Assert.AreEqual("PausedForApproval", package!.State);
-        Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath == "HelloWorldAlpha/Program.cs"));
+        Assert.IsTrue(package.GeneratedFiles.Any(item => item.RelativePath == "HelloWorldAlpha/HelloWorldAlpha.csproj"));
         Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet build", StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run", StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(package.OutputVerification.Verified);
@@ -948,6 +957,13 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet build", StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run -- add 2 3", StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(package.CommandEvidence.Any(item => string.Equals(item.Command, "dotnet run -- subtract 10 4", StringComparison.OrdinalIgnoreCase)));
+
+        var overrideRun = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/disposable-code-runs", new StartDisposableCodeRunRequest
+        {
+            ReviewId = review.ReviewId,
+            ExpectedOutput = "mutate calculator output"
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, overrideRun.StatusCode);
     }
 
     [TestMethod]

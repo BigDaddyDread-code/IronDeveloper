@@ -14,20 +14,29 @@ public sealed class DiscussionCodeLoopController : ControllerBase
     private readonly ITicketReviewService _reviews;
     private readonly IDisposableCodeRunService _codeRuns;
     private readonly IRunReviewPackageService _reviewPackages;
+    private readonly IBuildScenarioCatalog _scenarios;
 
     public DiscussionCodeLoopController(
         IDiscussionDocumentService discussionDocuments,
         ITicketFromDocumentService ticketFromDocument,
         ITicketReviewService reviews,
         IDisposableCodeRunService codeRuns,
-        IRunReviewPackageService reviewPackages)
+        IRunReviewPackageService reviewPackages,
+        IBuildScenarioCatalog scenarios)
     {
         _discussionDocuments = discussionDocuments;
         _ticketFromDocument = ticketFromDocument;
         _reviews = reviews;
         _codeRuns = codeRuns;
         _reviewPackages = reviewPackages;
+        _scenarios = scenarios;
     }
+
+    [HttpGet("api/projects/{projectId:int}/code-scenarios")]
+    public async Task<ActionResult<IReadOnlyList<BuildScenario>>> GetScenarios(
+        int projectId,
+        CancellationToken ct) =>
+        Ok(await _scenarios.GetScenariosAsync(projectId, ct));
 
     [HttpPost("api/projects/{projectId:int}/discussions")]
     public async Task<ActionResult<SaveDiscussionResponse>> SaveDiscussion(

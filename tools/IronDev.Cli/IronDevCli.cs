@@ -56,6 +56,12 @@ public static class IronDevCli
             return await HandleRunStreamAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "exercise", "chat-to-build"))
             return await HandleExerciseChatToBuildAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "scenario", "list"))
+            return await HandleScenarioListAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "scenario", "run"))
+            return await HandleScenarioRunAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "scenario", "report"))
+            return await HandleScenarioReportAsync(args, output, error, handler, cancellationToken);
 
         error.WriteLine($"Unknown command: {string.Join(' ', args)}");
         PrintUsage(error);
@@ -604,6 +610,141 @@ public static class IronDevCli
         return problems.Count == 0 ? 0 : 1;
     }
 
+    private static async Task<int> HandleScenarioListAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        if (!TryGetIntOption(args, "--project-id", out var projectId))
+        {
+            error.WriteLine("Missing or invalid required option: --project-id <id>");
+            return 2;
+        }
+
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        try
+        {
+            var scenarios = await client.GetBuildScenariosAsync(projectId, cancellationToken);
+            if (HasFlag(args, "--json"))
+            {
+                await output.WriteLineAsync(JsonSerializer.Serialize(scenarios, JsonOptions));
+            }
+            else
+            {
+                foreach (var scenario in scenarios.OrderBy(item => item.ScenarioId, StringComparer.OrdinalIgnoreCase))
+                    await output.WriteLineAsync($"{scenario.ScenarioId}: {scenario.Name} ({scenario.RuntimeProfileId})");
+            }
+
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("scenario list", ex, error);
+            return 1;
+        }
+    }
+
+    private static async Task<int> HandleScenarioRunAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        if (!TryGetIntOption(args, "--project-id", out var projectId))
+        {
+            error.WriteLine("Missing or invalid required option: --project-id <id>");
+            return 2;
+        }
+
+        var scenarioId = GetScenarioIdArgument(args);
+        if (string.IsNullOrWhiteSpace(scenarioId))
+        {
+            error.WriteLine("Missing required scenario id: irondev scenario run <scenario-id> --project-id <id>");
+            return 2;
+        }
+
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        BuildScenario? scenario;
+        try
+        {
+            var scenarios = await client.GetBuildScenariosAsync(projectId, cancellationToken);
+            scenario = scenarios.FirstOrDefault(item => string.Equals(item.ScenarioId, scenarioId, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("scenario run", ex, error);
+            return 1;
+        }
+
+        if (scenario is null)
+        {
+            error.WriteLine($"Unknown scenario id: {scenarioId}");
+            return 2;
+        }
+
+        var forwarded = BuildScenarioExerciseArgs(args, projectId, apiBaseUrl, scenario);
+        return await HandleExerciseChatToBuildAsync(forwarded, output, error, handler, cancellationToken);
+    }
+
+    private static async Task<int> HandleScenarioReportAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        if (!TryGetIntOption(args, "--project-id", out var projectId))
+        {
+            error.WriteLine("Missing or invalid required option: --project-id <id>");
+            return 2;
+        }
+
+        if (!TryGetLongOption(args, "--ticket-id", out var ticketId))
+        {
+            error.WriteLine("Missing or invalid required option: --ticket-id <id>");
+            return 2;
+        }
+
+        var runId = GetRunIdArgument(args);
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            error.WriteLine("Missing required run id: irondev scenario report <run-id> --project-id <id> --ticket-id <id>");
+            return 2;
+        }
+
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
+            return 1;
+
+        try
+        {
+            var package = await client.GetRunReviewPackageAsync(projectId, ticketId, runId, cancellationToken);
+            await WriteJsonOrTextAsync(
+                output,
+                package,
+                HasFlag(args, "--json"),
+                $"{package.RunId}: {package.State}; files={package.GeneratedFiles.Count}; commands={package.CommandEvidence.Count}; verifications={package.OutputVerifications.Count}");
+            return 0;
+        }
+        catch (IronDevApiException ex)
+        {
+            WriteApiError("scenario report", ex, error);
+            return 1;
+        }
+    }
+
     private static async Task<IIronDevApiClient?> CreateReadyApiClientAsync(
         string[] args,
         string apiBaseUrl,
@@ -782,6 +923,54 @@ public static class IronDevCli
             : throw new FileNotFoundException($"Exercise input file was not found: {file}", file);
     }
 
+    private static string? GetScenarioIdArgument(string[] args) =>
+        args.Length >= 3 && !args[2].StartsWith("--", StringComparison.Ordinal)
+            ? args[2]
+            : GetOption(args, "--scenario-id");
+
+    private static string? GetRunIdArgument(string[] args) =>
+        args.Length >= 3 && !args[2].StartsWith("--", StringComparison.Ordinal)
+            ? args[2]
+            : GetOption(args, "--run-id");
+
+    private static string[] BuildScenarioExerciseArgs(
+        string[] originalArgs,
+        int projectId,
+        string apiBaseUrl,
+        BuildScenario scenario)
+    {
+        var forwarded = new List<string>
+        {
+            "exercise",
+            "chat-to-build",
+            "--project-id",
+            projectId.ToString(),
+            "--input",
+            scenario.DiscussionText,
+            "--title",
+            $"{scenario.Name} {DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
+            "--scenario-id",
+            scenario.ScenarioId,
+            "--api-base-url",
+            apiBaseUrl
+        };
+
+        foreach (var option in new[] { "--token", "--config", "--report-dir", "--repo-root" })
+        {
+            var value = GetOption(originalArgs, option);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                forwarded.Add(option);
+                forwarded.Add(value);
+            }
+        }
+
+        if (HasFlag(originalArgs, "--json"))
+            forwarded.Add("--json");
+
+        return forwarded.ToArray();
+    }
+
     private static string? ResolveRepoRoot(string? requestedRoot)
     {
         if (!string.IsNullOrWhiteSpace(requestedRoot))
@@ -951,6 +1140,9 @@ public static class IronDevCli
         error.WriteLine("  irondev runs report --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs stream --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev exercise chat-to-build --project-id <id> (--input <text> | --file <path>) [--title <title>] [--scenario-id <id>] [--expected-output <text>] [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev scenario list --project-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev scenario run <scenario-id> --project-id <id> [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev scenario report <run-id> --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine();
         error.WriteLine("Default API base URL: http://localhost:5000");
         error.WriteLine("Overrides: --api-base-url, IRONDEV_API_BASE_URL, irondev.cli.json");
