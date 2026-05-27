@@ -144,7 +144,16 @@ Write-Host ""
 
 Push-Location $shellRoot
 try {
-    & $node $tauriCli dev --config $tauriLocalTestConfig --no-dev-server-wait
+    $tauriProcess = Start-Process -FilePath $node `
+        -ArgumentList @($tauriCli, "dev", "--config", $tauriLocalTestConfig, "--no-dev-server-wait") `
+        -WorkingDirectory $shellRoot `
+        -NoNewWindow `
+        -PassThru `
+        -Wait
+
+    if ($tauriProcess.ExitCode -ne 0) {
+        throw "Tauri desktop shell exited with code $($tauriProcess.ExitCode)."
+    }
 }
 finally {
     Pop-Location
