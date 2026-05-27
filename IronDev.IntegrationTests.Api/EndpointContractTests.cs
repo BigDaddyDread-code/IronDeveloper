@@ -38,6 +38,10 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/disposable",
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}",
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review",
+            "/api/projects/{projectId}/discussions",
+            "/api/documents/{documentVersionId}/tickets",
+            "/api/tickets/{ticketId}/debate",
+            "/api/tickets/{ticketId}/alpha-disposable-code-runs",
             "/api/projects/{projectId}/tickets/{ticketId}/evidence-summary",
             "/api/projects/{projectId}/documents",
             "/api/projects/{projectId}/documents/{documentId}",
@@ -768,6 +772,189 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var wrongTicket = await client.GetAsync($"/api/projects/{project.Id}/tickets/987654321/build-runs/{run.RunId}/review");
         Assert.AreEqual(HttpStatusCode.NotFound, wrongTicket.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task AlphaDiscussionCodeLoop_ShouldSaveDiscussionCreateTicketDebateRunAndExposeReviewEvidence()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Alpha Discussion To Code Project");
+        var discussion = await client.PostAsJsonAsync($"/api/projects/{project.Id}/discussions", new SaveDiscussionRequest
+        {
+            Title = "Hello World Alpha discussion",
+            Content = "Create a tiny C# console app that prints Hello from IronDev Alpha."
+        });
+        Assert.AreEqual(HttpStatusCode.OK, discussion.StatusCode);
+        var discussionBody = await discussion.Content.ReadFromJsonAsync<SaveDiscussionResponse>();
+        Assert.IsNotNull(discussionBody);
+        Assert.IsTrue(discussionBody!.DocumentId > 0);
+        Assert.IsTrue(discussionBody.DocumentVersionId > 0);
+
+        var ticketResponse = await client.PostAsJsonAsync($"/api/documents/{discussionBody.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        Assert.AreEqual(HttpStatusCode.OK, ticketResponse.StatusCode);
+        var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
+        Assert.IsNotNull(ticketBody);
+        Assert.AreEqual(discussionBody.DocumentVersionId, ticketBody!.SourceDocumentVersionId);
+
+        var ticket = await client.GetFromJsonAsync<ProjectTicket>($"/api/projects/{project.Id}/tickets/{ticketBody.TicketId}");
+        Assert.IsNotNull(ticket);
+        Assert.AreEqual("Build Hello World Console App", ticket!.Title);
+        Assert.AreEqual(discussionBody.DocumentVersionId, ticket.SourceDocumentVersionId);
+
+        var debateResponse = await client.PostAsJsonAsync($"/api/tickets/{ticket.Id}/debate", new RunTicketDebateRequest());
+        Assert.AreEqual(HttpStatusCode.OK, debateResponse.StatusCode);
+        var debate = await debateResponse.Content.ReadFromJsonAsync<RunTicketDebateResponse>();
+        Assert.IsNotNull(debate);
+        Assert.IsTrue(debate!.Result.Decision.Proceed);
+        CollectionAssert.AreEquivalent(
+            new[] { "Planner", "Builder", "Tester", "Critic" },
+            debate.Result.Contributions.Select(item => item.Role).ToArray());
+
+        var runResponse = await client.PostAsJsonAsync($"/api/tickets/{ticket.Id}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        {
+            DebateId = debate.DebateId
+        });
+        Assert.AreEqual(HttpStatusCode.OK, runResponse.StatusCode);
+        var run = await runResponse.Content.ReadFromJsonAsync<StartAlphaDisposableCodeRunResponse>();
+        Assert.IsNotNull(run);
+        Assert.AreEqual("PausedForApproval", run!.State);
+        Assert.IsTrue(run.IsDisposable);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var durableRunCount = await connection.QuerySingleAsync<int>(
+            "SELECT COUNT(1) FROM dbo.Runs WHERE RunId = @RunId AND ProjectId = @ProjectId AND TicketId = @TicketId AND State = 'PausedForApproval' AND IsDisposable = 1",
+            new { run.RunId, ProjectId = project.Id, TicketId = ticket.Id });
+        Assert.AreEqual(1, durableRunCount);
+
+        var events = (await connection.QueryAsync<string>(
+            "SELECT EventType FROM dbo.RunEvents WHERE RunId = @RunId ORDER BY TimestampUtc, Id",
+            new { run.RunId })).ToArray();
+        foreach (var expected in new[]
+        {
+            "RunCreated",
+            "DebateLinked",
+            "WorkspacePreparing",
+            "WorkspaceReady",
+            "CodeGenerationStarted",
+            "CodeGenerationCompleted",
+            "CommandStarted",
+            "CommandCompleted",
+            "OutputVerified",
+            "CodeStandardsStarted",
+            "CodeStandardsCompleted",
+            "RunPausedForApproval"
+        })
+        {
+            CollectionAssert.Contains(events, expected);
+        }
+
+        var detailResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticket.Id}/build-runs/{run.RunId}");
+        Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<TicketBuildRunDetailDto>();
+        Assert.IsNotNull(detail);
+        Assert.AreEqual("PausedForApproval", detail!.Status);
+        Assert.IsTrue(detail.RequiresHumanApproval);
+        Assert.IsTrue(detail.Evidence.Any(item => item.Path.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(detail.Evidence.Any(item => item.Path.EndsWith("dotnet-run.stdout.log", StringComparison.OrdinalIgnoreCase)));
+
+        var programEvidence = detail.Evidence.First(item => item.Path.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase));
+        var programText = await File.ReadAllTextAsync(programEvidence.Path);
+        StringAssert.Contains(programText, "Hello from IronDev Alpha");
+
+        var runOutput = await File.ReadAllTextAsync(detail.Evidence.First(item => item.Path.EndsWith("dotnet-run.stdout.log", StringComparison.OrdinalIgnoreCase)).Path);
+        StringAssert.Contains(runOutput, "Hello from IronDev Alpha");
+
+        var workspaceEvent = detail.Events.First(item => item.EventType == "WorkspaceReady");
+        Assert.IsTrue(workspaceEvent.Payload.TryGetValue("workspacePath", out var workspacePath));
+        Assert.IsTrue(workspacePath!.Contains("IronDevTestWorkspaces", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(workspacePath.StartsWith(AppContext.BaseDirectory, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public async Task AlphaDiscussionCodeLoop_ShouldRejectRunWithoutDebateOrProceedDecision()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Alpha Debate Guard Project");
+        var discussion = await client.PostAsJsonAsync($"/api/projects/{project.Id}/discussions", new SaveDiscussionRequest
+        {
+            Title = "Non hello discussion",
+            Content = "Create a broad undefined feature."
+        });
+        Assert.AreEqual(HttpStatusCode.OK, discussion.StatusCode);
+        var discussionBody = await discussion.Content.ReadFromJsonAsync<SaveDiscussionResponse>();
+        Assert.IsNotNull(discussionBody);
+
+        var ticketResponse = await client.PostAsJsonAsync($"/api/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        Assert.AreEqual(HttpStatusCode.OK, ticketResponse.StatusCode);
+        var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
+        Assert.IsNotNull(ticketBody);
+
+        var missingDebateRun = await client.PostAsJsonAsync($"/api/tickets/{ticketBody!.TicketId}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        {
+            DebateId = "missing-debate"
+        });
+        Assert.AreEqual(HttpStatusCode.NotFound, missingDebateRun.StatusCode);
+
+        var debateResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketBody.TicketId}/debate", new RunTicketDebateRequest());
+        Assert.AreEqual(HttpStatusCode.OK, debateResponse.StatusCode);
+        var debate = await debateResponse.Content.ReadFromJsonAsync<RunTicketDebateResponse>();
+        Assert.IsNotNull(debate);
+        Assert.IsFalse(debate!.Result.Decision.Proceed);
+
+        var blockedRun = await client.PostAsJsonAsync($"/api/tickets/{ticketBody.TicketId}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        {
+            DebateId = debate.DebateId
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, blockedRun.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task AlphaDiscussionCodeLoop_FailedCommand_ShouldPersistFailedRunAndEvidence()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var project = await CreateProjectAsync(client, "Alpha Failed Command Project");
+        var discussion = await client.PostAsJsonAsync($"/api/projects/{project.Id}/discussions", new SaveDiscussionRequest
+        {
+            Title = "Hello World Alpha discussion",
+            Content = "Create a tiny C# console app that prints Hello from IronDev Alpha."
+        });
+        var discussionBody = await discussion.Content.ReadFromJsonAsync<SaveDiscussionResponse>();
+        Assert.IsNotNull(discussionBody);
+        var ticketResponse = await client.PostAsJsonAsync($"/api/documents/{discussionBody!.DocumentVersionId}/tickets", new CreateTicketFromDocumentRequest());
+        var ticketBody = await ticketResponse.Content.ReadFromJsonAsync<CreateTicketFromDocumentResponse>();
+        Assert.IsNotNull(ticketBody);
+        var debateResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketBody!.TicketId}/debate", new RunTicketDebateRequest());
+        var debate = await debateResponse.Content.ReadFromJsonAsync<RunTicketDebateResponse>();
+        Assert.IsNotNull(debate);
+
+        var runResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketBody.TicketId}/alpha-disposable-code-runs", new StartAlphaDisposableCodeRunRequest
+        {
+            DebateId = debate!.DebateId,
+            ExpectedOutput = "Hello from IronDev Alpha\r\nthis breaks generated C#"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, runResponse.StatusCode);
+        var run = await runResponse.Content.ReadFromJsonAsync<StartAlphaDisposableCodeRunResponse>();
+        Assert.IsNotNull(run);
+        Assert.AreEqual("Failed", run!.State);
+
+        var detailResponse = await client.GetAsync($"/api/projects/{project.Id}/tickets/{ticketBody.TicketId}/build-runs/{run.RunId}");
+        Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<TicketBuildRunDetailDto>();
+        Assert.IsNotNull(detail);
+        Assert.AreEqual("Failed", detail!.Status);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(detail.FailureReason));
+        Assert.IsTrue(detail.Events.Any(item => item.EventType == "RunFailed"));
+        Assert.IsTrue(detail.Events.Any(item => item.EventType == "CommandCompleted"));
+        Assert.IsTrue(detail.Evidence.Any(item => item.Path.EndsWith("dotnet-build.stderr.log", StringComparison.OrdinalIgnoreCase)));
     }
 
     private static async Task<Project> CreateProjectAsync(HttpClient client, string name, string? localPath = null)

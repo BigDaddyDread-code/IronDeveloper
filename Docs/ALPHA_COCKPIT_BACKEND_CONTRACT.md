@@ -50,6 +50,15 @@ Durable run state is the source of truth for ticket build runs. Run events are c
 
 Disposable ticket build execution is backend-owned. Clients may request "start a disposable run for this ticket"; they must not supply source repository paths, workspace roots, command lists, cleanup policy, timeout policy, or evidence retention policy. The backend resolves those from trusted project/configuration state, creates the durable run, creates the disposable workspace, executes the allowed command profile, persists command stdout/stderr evidence, and preserves failed workspaces or failure bundles for debugging.
 
+### Alpha Discussion-To-Code Loop
+
+- `POST /api/projects/{projectId}/discussions`
+- `POST /api/documents/{documentVersionId}/tickets`
+- `POST /api/tickets/{ticketId}/debate`
+- `POST /api/tickets/{ticketId}/alpha-disposable-code-runs`
+
+This is an Alpha-only backend proof path. It may use deterministic discussion-to-ticket generation, deterministic four-role debate, and a tiny Hello World C# generator. It must still use real persistence, project/ticket ownership checks, durable runs, disposable workspace generation, `dotnet build`, `dotnet run`, persisted events, persisted evidence, and `PausedForApproval` as the successful final state. It must not mutate the real repository or apply generated code.
+
 ### Documents
 
 - `GET /api/projects/{projectId}/documents`
