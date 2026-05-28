@@ -140,7 +140,7 @@ function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null
   }
 
   if (!projectId) {
-    return 'Select a project before sending chat messages.';
+    return 'Select a project before reviewing project state.';
   }
 
   if (apiStatus === 'loading') {

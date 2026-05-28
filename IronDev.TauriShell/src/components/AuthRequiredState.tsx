@@ -2,6 +2,7 @@ import type { ApiStatus, ProductAccessStatus, ProjectSummary, TenantSummary } fr
 import { ApiStatusBadge } from './ApiStatusBadge';
 import { CommandButton } from './CommandButton';
 import { MetadataRow } from './MetadataRow';
+import { ProjectSelector } from './ProjectSelector';
 import { StatusBadge } from './StatusBadge';
 
 interface AuthRequiredStateProps {
@@ -174,22 +175,12 @@ export function AuthRequiredState({
       ) : null}
 
       {isProjectRequired ? (
-        <label className="context-select">
-          <span>Project</span>
-          <select
-            data-testid="project.selector"
-            value={selectedProjectId ?? ''}
-            onChange={(event) => onSelectProject(Number.parseInt(event.target.value, 10))}
-            disabled={isBusy || projects.length === 0}
-          >
-            <option value="">Select project</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id} data-testid="project.option">
-                {project.name ?? `Project ${project.id}`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ProjectSelector
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          isBusy={isBusy}
+          onSelectProject={onSelectProject}
+        />
       ) : null}
 
       {!isAuthRequired ? (

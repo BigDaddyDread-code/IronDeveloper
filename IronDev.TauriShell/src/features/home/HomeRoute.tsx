@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
+import { CommandButton } from '../../components/CommandButton';
+import { ProjectSelector } from '../../components/ProjectSelector';
 import { Surface } from '../../design-system/Surface';
 import { MetadataGrid } from '../../design-system/metadata/MetadataGrid';
 import { useProjectContext } from '../../state/useProjectContext';
@@ -13,6 +15,7 @@ interface HomeRouteProps {
 export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
+  const canUseLocalTestSession = Boolean(session.environmentInfo?.isTestEnvironment) && !session.tokenConfigured;
 
   const projectLabel = project.selectedProjectName ?? (project.selectedProjectId ? `Project ${project.selectedProjectId}` : 'Project required');
   const readinessLabel =
@@ -60,6 +63,36 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               { label: 'Tenant', value: project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? 'Not selected' }
             ]}
           />
+          {!project.selectedProjectId && session.tokenConfigured ? (
+            <div className="home-project-picker" data-testid="home.projectSelector">
+              <div>
+                <h3>Select a project to continue</h3>
+                <p className="state-muted">Project-scoped workspaces use this selected project for Chat, Build, Tickets, Knowledge, and Runs.</p>
+              </div>
+              <ProjectSelector
+                projects={project.projects}
+                selectedProjectId={project.selectedProjectId}
+                isBusy={project.isRefreshing}
+                onSelectProject={project.selectProjectContext}
+              />
+            </div>
+          ) : null}
+          {canUseLocalTestSession ? (
+            <div className="home-localtest-session" data-testid="home.localtestSession">
+              <h3>Use LocalTest Session</h3>
+              <p className="state-muted">Sign in with seeded LocalTest credentials so you can select a project and exercise the workspace flow.</p>
+              <CommandButton
+                type="button"
+                variant="primary"
+                testId="home.localtestSession.use"
+                disabled={session.isAuthBusy}
+                onClick={() => void session.signIn({ email: 'localtest@irondev.local', password: 'change-me-local-only' })}
+              >
+                {session.isAuthBusy ? 'Starting session...' : 'Use LocalTest Session'}
+              </CommandButton>
+              {session.errorMessage ? <p className="state-error">{session.errorMessage}</p> : null}
+            </div>
+          ) : null}
         </Surface>
 
         <Surface testId="home.systemReadiness">

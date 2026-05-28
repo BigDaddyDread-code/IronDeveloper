@@ -183,12 +183,136 @@ test('tickets shell shows project required state when no projects are available'
 
   await expect(page.getByRole('heading', { name: 'Project required' })).toBeVisible();
   await expect(page.getByTestId('project.selector')).toBeVisible();
+  await expect(page.getByTestId('project.selector.empty')).toContainText('No projects found');
   await expect(page.getByTestId('app.header').getByTestId('project.status.missing')).toBeVisible();
   expect(await page.getByTestId('project.status.selected').count()).toBe(0);
   expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
   await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Project required');
   await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
   await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Select a project');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('home project selector persists selection and unblocks project workspaces', async ({ page }) => {
+  await seedToken(page);
+  await mockHealthyApi(page);
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 8,
+          tenantId: 3,
+          name: 'Selectable Project',
+          description: 'Project chosen from Home',
+          localPath: 'C:\\IronDevTestWorkspaces\\SelectableProject'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: 'Project state: Selectable Project is ready.',
+        contextSummary: 'Context used: selected project.',
+        linkedFilePaths: '',
+        linkedSymbols: '',
+        traceId: null
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 801,
+          projectId: 8,
+          title: 'Selected project ticket',
+          summary: 'Loaded after selecting the project.',
+          status: 'Open',
+          priority: 'Medium',
+          type: 'Task',
+          description: 'Project-scoped ticket.',
+          acceptanceCriteria: '- Loads from project 8',
+          createdAt: '2026-05-28T00:00:00Z',
+          updatedAt: '2026-05-28T00:00:00Z'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 801,
+        projectId: 8,
+        title: 'Selected project ticket',
+        summary: 'Loaded after selecting the project.',
+        status: 'Open',
+        priority: 'Medium',
+        type: 'Task',
+        description: 'Project-scoped ticket.',
+        acceptanceCriteria: '- Loads from project 8',
+        createdAt: '2026-05-28T00:00:00Z',
+        updatedAt: '2026-05-28T00:00:00Z'
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/build-readiness', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No readiness yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/implementation-plan', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No plan yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/evidence-summary', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No evidence yet.' }) });
+  });
+
+  await page.goto('/');
+  await expect(page.getByTestId('home.workspace')).toBeVisible();
+  await expect(page.getByTestId('project.status.missing')).toBeVisible();
+  await expect(page.getByTestId('home.projectSelector')).toBeVisible();
+  await expect(page.getByTestId('project.option')).toContainText('Selectable Project');
+
+  await page.getByTestId('project.option.select.8').click();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.reload();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.chat').click();
+  await expect(page.getByTestId('chat.command.reviewProjectState')).toBeEnabled();
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: Selectable Project is ready.');
+
+  await page.getByTestId('shell.nav.build').click();
+  await expect(page.getByTestId('build.summary.project')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('ticket.list')).toContainText('Selected project ticket');
   await expectNoHorizontalOverflow(page);
 });
 
