@@ -29,6 +29,8 @@ interface SessionContextState {
 
 const SessionContext = createContext<SessionContextState | null>(null);
 const initialApiStatusStatus: ApiConnectionStatus = 'loading';
+const localTestEmail = 'localtest@irondev.local';
+const localTestPassword = 'change-me-local-only';
 
 function createInitialStatus(config: IronDevApiConfig): ApiStatus {
   return {
@@ -56,6 +58,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setApiStatus(createInitialStatus(config));
     setEnvironmentInfo(null);
   }, [config.apiBaseUrl, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, config.token]);
+
+  useEffect(() => {
+    if (environmentInfo?.isTestEnvironment) {
+      setEmail((value) => value || localTestEmail);
+      setPassword((value) => value || localTestPassword);
+      return;
+    }
+
+    setEmail((value) => (value === localTestEmail ? '' : value));
+    setPassword((value) => (value === localTestPassword ? '' : value));
+  }, [environmentInfo?.isTestEnvironment]);
 
   const refreshConfig = useCallback(() => {
     setConfigVersion((value) => value + 1);
@@ -111,15 +124,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         refreshConfig();
       } catch (error) {
         if (error instanceof IronDevApiError) {
-          setErrorMessage('Sign in failed. Check credentials and retry.');
+          if (environmentInfo?.isTestEnvironment) {
+            setErrorMessage(
+              'LocalTest sign in failed. Expected localtest@irondev.local / change-me-local-only. The LocalTest seed data may not match this database; run tools/localtest/reset-localtest-data.ps1 and retry.'
+            );
+          } else {
+            setErrorMessage('Sign in failed. Check credentials and retry.');
+          }
         } else {
-          setErrorMessage('Sign in failed.');
+          setErrorMessage(
+            environmentInfo?.isTestEnvironment
+              ? 'LocalTest sign in failed. Expected localtest@irondev.local / change-me-local-only. Check that the LocalTest API is running against the seeded test database.'
+              : 'Sign in failed.'
+          );
         }
       } finally {
         setIsAuthBusy(false);
       }
     },
-    [client, refreshConfig]
+    [client, environmentInfo?.isTestEnvironment, refreshConfig]
   );
 
   const tokenConfigured = Boolean(config.token);

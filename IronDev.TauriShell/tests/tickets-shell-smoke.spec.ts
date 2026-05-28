@@ -10,7 +10,8 @@ async function openTickets(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('tickets.workspace')).toBeVisible();
 }
 
-async function mockHealthyApi(page: import('@playwright/test').Page) {
+async function mockHealthyApi(page: import('@playwright/test').Page, options: { isTestEnvironment?: boolean } = {}) {
+  const isTestEnvironment = options.isTestEnvironment ?? true;
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({
       status: 200,
@@ -23,10 +24,10 @@ async function mockHealthyApi(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        environment: 'LocalTest',
-        database: 'IronDeveloper_Test',
-        weaviatePrefix: 'irondev_test',
-        isTestEnvironment: true,
+        environment: isTestEnvironment ? 'LocalTest' : 'LocalDev',
+        database: isTestEnvironment ? 'IronDeveloper_Test' : 'IronDeveloper_Dev',
+        weaviatePrefix: isTestEnvironment ? 'irondev_test' : 'irondev_dev',
+        isTestEnvironment,
         workspaceRoot: 'C:\\IronDevTestWorkspaces\\',
         logsRoot: 'C:\\IronDevTestLogs\\',
         dangerRealRepoWritesEnabled: false
@@ -86,7 +87,11 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('auth.signIn')).toBeVisible();
   await expect(page.getByTestId('auth.email')).toBeVisible();
   await expect(page.getByTestId('auth.password')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('auth.submit')).toBeVisible();
+  await expect(page.getByTestId('home.localtestSession')).toHaveCount(0);
   await expect(page.getByTestId('app.authState.configureToken')).toBeVisible();
   await expect(page.getByTestId('app.authState.retry')).toBeVisible();
   await expect(page.getByTestId('api.status.authRequired')).toBeVisible();
@@ -99,6 +104,103 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await page.getByTestId('app.authState.configureToken').click();
   await expect(page.getByTestId('auth.tokenInput')).toBeVisible();
   await expect(page.getByTestId('auth.saveToken')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('LocalTest login uses the normal auth form and continues to project selection', async ({ page }) => {
+  await mockHealthyApi(page);
+  let loginBody: unknown = null;
+
+  await page.route('**/irondev-api/api/auth/login', async (route) => {
+    loginBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ token: 'localtest-token' })
+    });
+  });
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'localtest@irondev.local', displayName: 'LocalTest User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 8,
+          tenantId: 3,
+          name: 'Selectable Project',
+          description: 'Project chosen from Home',
+          localPath: 'C:\\IronDevTestWorkspaces\\SelectableProject'
+        }
+      ])
+    });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
+  await expect(page.getByTestId('home.localtestSession')).toHaveCount(0);
+
+  await page.getByTestId('auth.submit').click();
+
+  expect(loginBody).toEqual({
+    email: 'localtest@irondev.local',
+    password: 'change-me-local-only'
+  });
+  await expect(page.getByTestId('home.projectSelector')).toBeVisible();
+  await expect(page.getByTestId('project.option')).toContainText('Selectable Project');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('failed LocalTest login gives seeded credential recovery guidance', async ({ page }) => {
+  await mockHealthyApi(page);
+  await page.route('**/irondev-api/api/auth/login', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Invalid credentials.' })
+    });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await page.getByTestId('auth.submit').click();
+
+  await expect(page.getByText('LocalTest sign in failed')).toBeVisible();
+  await expect(page.getByText('localtest@irondev.local / change-me-local-only')).toBeVisible();
+  await expect(page.getByText('tools/localtest/reset-localtest-data.ps1')).toBeVisible();
+  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('LocalTest credentials are not exposed outside LocalTest', async ({ page }) => {
+  await mockHealthyApi(page, { isTestEnvironment: false });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toHaveCount(0);
+  await expect(page.getByTestId('auth.email')).toHaveValue('');
+  await expect(page.getByTestId('auth.password')).toHaveValue('');
+  await expect(page.getByText('change-me-local-only')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 

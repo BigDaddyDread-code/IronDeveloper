@@ -13,6 +13,7 @@ interface AuthRequiredStateProps {
   email: string;
   password: string;
   isConfigOpen: boolean;
+  isLocalTestEnvironment?: boolean;
   tenants: TenantSummary[];
   projects: ProjectSummary[];
   selectedTenantId: number | null;
@@ -38,6 +39,7 @@ export function AuthRequiredState({
   email,
   password,
   isConfigOpen,
+  isLocalTestEnvironment = false,
   tenants,
   projects,
   selectedTenantId,
@@ -119,6 +121,21 @@ export function AuthRequiredState({
             onSignIn();
           }}
         >
+          {isLocalTestEnvironment ? (
+            <div className="auth-form__localtest" data-testid="auth.localtestCredentials">
+              <p>LocalTest credentials are prefilled for this isolated environment.</p>
+              <dl>
+                <dt>Email</dt>
+                <dd>
+                  <code data-testid="auth.localtest.email">localtest@irondev.local</code>
+                </dd>
+                <dt>Password</dt>
+                <dd>
+                  <code data-testid="auth.localtest.password">change-me-local-only</code>
+                </dd>
+              </dl>
+            </div>
+          ) : null}
           <label>
             <span>Email</span>
             <input

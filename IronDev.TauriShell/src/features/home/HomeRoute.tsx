@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
-import { CommandButton } from '../../components/CommandButton';
+import { AuthRequiredState } from '../../components/AuthRequiredState';
 import { ProjectSelector } from '../../components/ProjectSelector';
 import { Surface } from '../../design-system/Surface';
 import { MetadataGrid } from '../../design-system/metadata/MetadataGrid';
@@ -15,7 +15,8 @@ interface HomeRouteProps {
 export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
-  const canUseLocalTestSession = Boolean(session.environmentInfo?.isTestEnvironment) && !session.tokenConfigured;
+  const shouldShowAuthForm =
+    !session.tokenConfigured && (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
 
   const projectLabel = project.selectedProjectName ?? (project.selectedProjectId ? `Project ${project.selectedProjectId}` : 'Project required');
   const readinessLabel =
@@ -41,6 +42,11 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
     });
   }, [onRouteReady, routeSummary]);
 
+  const signIn = useCallback(async () => {
+    await session.signIn({ email: session.email.trim(), password: session.password });
+    await project.refreshProjectContext();
+  }, [project, session]);
+
   return (
     <main className="product-workspace product-workspace--home" data-testid="home.workspace" aria-label={route.label}>
       <section className="workspace-page-heading">
@@ -63,6 +69,40 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               { label: 'Tenant', value: project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? 'Not selected' }
             ]}
           />
+          {shouldShowAuthForm ? (
+            <div className="home-auth-state" data-testid="home.authState">
+              <AuthRequiredState
+                apiStatus={session.apiStatus}
+                accessStatus={project.accessStatus}
+                authLabel={session.tokenConfigured ? 'Token rejected' : 'Missing token'}
+                tokenDraft={session.tokenDraft}
+                email={session.email}
+                password={session.password}
+                isConfigOpen={session.isTokenEditorOpen}
+                isLocalTestEnvironment={Boolean(session.environmentInfo?.isTestEnvironment)}
+                tenants={project.tenants}
+                projects={project.projects}
+                selectedTenantId={project.selectedTenantId}
+                selectedProjectId={project.selectedProjectId}
+                isBusy={session.isAuthBusy || project.isRefreshing}
+                errorMessage={session.errorMessage}
+                onConfigureToken={() => session.setTokenEditorOpen(!session.isTokenEditorOpen)}
+                onRetry={() => void project.refreshProjectContext()}
+                onTokenDraftChange={session.setTokenDraft}
+                onEmailChange={session.setEmail}
+                onPasswordChange={session.setPassword}
+                onSaveToken={() => {
+                  session.saveToken();
+                  if (session.tokenDraft.length === 0) {
+                    project.setProjectAccessStatus('authRequired');
+                  }
+                }}
+                onSignIn={() => void signIn()}
+                onSelectTenant={project.selectTenantContext}
+                onSelectProject={project.selectProjectContext}
+              />
+            </div>
+          ) : null}
           {!project.selectedProjectId && session.tokenConfigured ? (
             <div className="home-project-picker" data-testid="home.projectSelector">
               <div>
@@ -75,22 +115,6 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
                 isBusy={project.isRefreshing}
                 onSelectProject={project.selectProjectContext}
               />
-            </div>
-          ) : null}
-          {canUseLocalTestSession ? (
-            <div className="home-localtest-session" data-testid="home.localtestSession">
-              <h3>Use LocalTest Session</h3>
-              <p className="state-muted">Sign in with seeded LocalTest credentials so you can select a project and exercise the workspace flow.</p>
-              <CommandButton
-                type="button"
-                variant="primary"
-                testId="home.localtestSession.use"
-                disabled={session.isAuthBusy}
-                onClick={() => void session.signIn({ email: 'localtest@irondev.local', password: 'change-me-local-only' })}
-              >
-                {session.isAuthBusy ? 'Starting session...' : 'Use LocalTest Session'}
-              </CommandButton>
-              {session.errorMessage ? <p className="state-error">{session.errorMessage}</p> : null}
             </div>
           ) : null}
         </Surface>

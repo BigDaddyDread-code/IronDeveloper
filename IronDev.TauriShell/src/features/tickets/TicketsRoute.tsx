@@ -162,6 +162,7 @@ function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel, commands: Wo
     email: state.email,
     password: state.password,
     isTokenConfigOpen: state.isTokenConfigOpen,
+    isLocalTestEnvironment: state.isLocalTestEnvironment,
     isBusy: state.isBusy,
     errorMessage: state.errorMessage,
     onSelectTicket: state.actions.onSelectTicket,

@@ -82,6 +82,7 @@ interface TicketsWorkspaceProps {
   email: string;
   password: string;
   isTokenConfigOpen: boolean;
+  isLocalTestEnvironment: boolean;
   isBusy: boolean;
   errorMessage: string | null;
   onSelectTicket: (ticketId: number) => void;
@@ -160,6 +161,7 @@ export function TicketsWorkspace({
   email,
   password,
   isTokenConfigOpen,
+  isLocalTestEnvironment,
   isBusy,
   errorMessage,
   onSelectTicket,
@@ -261,6 +263,7 @@ export function TicketsWorkspace({
                 email={email}
                 password={password}
                 isConfigOpen={isTokenConfigOpen}
+                isLocalTestEnvironment={isLocalTestEnvironment}
                 tenants={tenants}
                 projects={projects}
                 selectedTenantId={selectedTenantId}
