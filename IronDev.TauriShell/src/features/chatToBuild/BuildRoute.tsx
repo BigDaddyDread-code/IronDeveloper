@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WorkspaceCommand, WorkspaceRoute, WorkspaceRouteMeta, WorkspaceSummaryChip } from '../../app/routes';
 import { IronDevApiError } from '../../api/ironDevApi';
 import type {
-  ChatCompletionResponse,
   CreateTicketFromDocumentResponse,
   ProjectTicket,
   RunReviewPackage,
@@ -21,25 +20,17 @@ import { FlowStageRail, type FlowStageItem } from './FlowStageRail';
 import { GeneratedTicketPanel } from './GeneratedTicketPanel';
 import { RunReviewPackagePanel } from './RunReviewPackagePanel';
 import { TicketReviewPanel } from './TicketReviewPanel';
-import { ChatWorkspace } from './ChatWorkspace';
-import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 type ChatBuildBusyState = 'saveDiscussion' | 'createTicket' | 'reviewTicket' | 'startRun' | 'loadPackage' | null;
 
-interface ChatToBuildPageProps {
+interface BuildRouteProps {
   route: WorkspaceRoute;
-  surface?: 'chat' | 'build';
   onRouteReady?: (state: WorkspaceRouteMeta) => void;
 }
 
 const defaultTitle = 'Project build request';
-const projectReviewPrompt = [
-  'Review the current project state for this project.',
-  'Include current project state, recent tickets, recent decisions, recent runs, risks or blockers, and recommended next actions.',
-  'Use grounded project context and call out missing context clearly.'
-].join('\n');
 
-export function ChatToBuildPage({ route, surface = 'build', onRouteReady }: ChatToBuildPageProps) {
+export function BuildRoute({ route, onRouteReady }: BuildRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
   const [title, setTitle] = useState(defaultTitle);
@@ -53,16 +44,10 @@ export function ChatToBuildPage({ route, surface = 'build', onRouteReady }: Chat
   const [busyState, setBusyState] = useState<ChatBuildBusyState>(null);
   const [statusMessage, setStatusMessage] = useState('Ready.');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatWorkspaceMessage[]>([]);
-  const [chatDraft, setChatDraft] = useState('');
-  const [isChatSending, setChatSending] = useState(false);
-  const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
 
   const projectId = project.selectedProjectId;
   const isBusy = busyState !== null;
   const accessBlockedReason = getAccessBlockedReason(session.tokenConfigured, projectId, project.accessStatus);
-  const chatBlockedReason = getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus);
-  const chatSendBlockedReason = chatBlockedReason ?? getChatSendBlockedReason(chatDraft, isChatSending);
   const discussionBlockedReason = accessBlockedReason ?? getDiscussionBlockedReason(title, content);
   const ticketBlockedReason = accessBlockedReason ?? (!document ? 'Save a discussion document first.' : null);
   const reviewBlockedReason = accessBlockedReason ?? (!ticket ? 'Create a ticket first.' : null);
@@ -92,65 +77,6 @@ export function ChatToBuildPage({ route, surface = 'build', onRouteReady }: Chat
     setStatusMessage('Ready.');
     setErrorMessage(null);
   }, []);
-
-  const sendChatMessage = useCallback(
-    async (request?: ChatSendRequest) => {
-      const prompt = (request?.prompt ?? chatDraft).trim();
-      const displayText = request?.displayText ?? prompt;
-      const disabledReason = chatBlockedReason ?? (request ? (isChatSending ? 'Chat request is already sending.' : null) : getChatSendBlockedReason(chatDraft, isChatSending));
-
-      if (!projectId || disabledReason || !prompt) {
-        return;
-      }
-
-      const userMessage: ChatWorkspaceMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: displayText,
-        createdUtc: new Date().toISOString()
-      };
-
-      setChatMessages((current) => [...current, userMessage]);
-      setChatSending(true);
-      setChatErrorMessage(null);
-
-      try {
-        const response = await session.client.completeChat(projectId, {
-          projectId,
-          prompt,
-          sessionId: null,
-          activeModel: null
-        });
-
-        const assistantMessage: ChatWorkspaceMessage = {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: response.response?.trim() || 'IronDev.Api returned an empty response.',
-          response,
-          createdUtc: new Date().toISOString()
-        };
-
-        setChatMessages((current) => [...current, assistantMessage]);
-        setStatusMessage(request?.mode === 'project-review' ? 'Project state review returned.' : 'Chat response returned.');
-        if (!request) {
-          setChatDraft('');
-        }
-      } catch (error) {
-        setChatErrorMessage(describeApiError(error, 'Send failed.'));
-      } finally {
-        setChatSending(false);
-      }
-    },
-    [chatBlockedReason, chatDraft, isChatSending, projectId, session.client]
-  );
-
-  const reviewProjectState = useCallback(() => {
-    void sendChatMessage({
-      prompt: projectReviewPrompt,
-      displayText: 'Review Project State',
-      mode: 'project-review'
-    });
-  }, [sendChatMessage]);
 
   const saveDiscussion = useCallback(async () => {
     if (!projectId || discussionBlockedReason) {
@@ -347,62 +273,21 @@ export function ChatToBuildPage({ route, surface = 'build', onRouteReady }: Chat
   );
 
   const routeSummary: WorkspaceSummaryChip[] = useMemo(
-    () =>
-      surface === 'chat'
-        ? [
-            { label: project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required'), testId: 'chat.summary.project' },
-            { label: chatMessages.length > 0 ? `${chatMessages.length} message(s)` : 'Conversation ready', testId: 'chat.summary.messages' }
-          ]
-        : [
-            { label: project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required'), testId: 'build.summary.project' },
-            { label: currentStage ? `${currentStage.label}: ${currentStage.detail}` : 'Flow ready', testId: 'build.summary.stage' }
-          ],
-    [chatMessages.length, currentStage, project.selectedProjectName, projectId, surface]
-  );
-
-  const latestChatResponse = useMemo(
-    () => [...chatMessages].reverse().find((message) => message.role === 'assistant' && message.response)?.response ?? null,
-    [chatMessages]
-  );
-  const latestChatResponseText = useMemo(
-    () => [...chatMessages].reverse().find((message) => message.role === 'assistant')?.content ?? null,
-    [chatMessages]
+    () => [
+      { label: project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required'), testId: 'build.summary.project' },
+      { label: currentStage ? `${currentStage.label}: ${currentStage.detail}` : 'Flow ready', testId: 'build.summary.stage' }
+    ],
+    [currentStage, project.selectedProjectName, projectId]
   );
 
   useEffect(() => {
     onRouteReady?.({
-      workspaceCommands: surface === 'chat' ? [] : commands,
-      workspaceBlockReason: surface === 'chat' ? chatBlockedReason : accessBlockedReason,
+      workspaceCommands: commands,
+      workspaceBlockReason: accessBlockedReason,
       workspaceSummaryChips: routeSummary,
-      blockReasonTestId: surface === 'chat' ? (chatBlockedReason ? 'chat.blockedReason' : undefined) : accessBlockedReason ? 'build.blockedReason' : undefined
+      blockReasonTestId: accessBlockedReason ? 'build.blockedReason' : undefined
     });
-  }, [accessBlockedReason, chatBlockedReason, commands, onRouteReady, routeSummary, surface]);
-
-  if (surface === 'chat') {
-    return (
-      <main className="chat-route-workspace" data-testid="chat.route" aria-label={route.label}>
-        <div className="workspace-page-heading">
-          <p className="eyebrow">Project conversation</p>
-          <h2>Chat</h2>
-          <p>Ask IronDev about the selected project, then inspect the context and sources used in the answer.</p>
-        </div>
-        <ChatWorkspace
-          messages={chatMessages}
-          composerValue={chatDraft}
-          isSending={isChatSending}
-          disabledReason={chatBlockedReason}
-          sendDisabledReason={chatSendBlockedReason}
-          errorMessage={chatErrorMessage}
-          latestResponse={latestChatResponse}
-          latestResponseText={latestChatResponseText}
-          projectLabel={project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required')}
-          onComposerChange={setChatDraft}
-          onSend={sendChatMessage}
-          onReviewProjectState={reviewProjectState}
-        />
-      </main>
-    );
-  }
+  }, [accessBlockedReason, commands, onRouteReady, routeSummary]);
 
   return (
     <main className="chat-build-workspace" data-testid="build.workspace" aria-label={route.label}>
@@ -578,42 +463,6 @@ function getAccessBlockedReason(tokenConfigured: boolean, projectId: number | nu
 
   if (accessStatus === 'authInvalid') {
     return 'Authentication is invalid.';
-  }
-
-  return null;
-}
-
-function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null, apiStatus: string, accessStatus: string) {
-  if (!tokenConfigured) {
-    return 'Authentication is required before chat can use project context.';
-  }
-
-  if (!projectId) {
-    return 'Select a project before sending chat messages.';
-  }
-
-  if (apiStatus === 'loading') {
-    return 'IronDev.Api connection is still being checked.';
-  }
-
-  if (apiStatus === 'disconnected' || apiStatus === 'error' || accessStatus === 'apiOffline') {
-    return 'Backend chat service is unavailable.';
-  }
-
-  if (accessStatus === 'authInvalid') {
-    return 'Authentication is invalid.';
-  }
-
-  return null;
-}
-
-function getChatSendBlockedReason(value: string, isSending: boolean) {
-  if (isSending) {
-    return 'Chat request is already sending.';
-  }
-
-  if (!value.trim()) {
-    return 'Enter a message before sending.';
   }
 
   return null;

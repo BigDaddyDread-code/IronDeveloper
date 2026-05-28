@@ -6,7 +6,8 @@ import { useSessionContext } from '../state/useSessionContext';
 import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
-import { ChatToBuildPage } from '../features/chatToBuild/ChatToBuildPage';
+import { BuildRoute } from '../features/chatToBuild/BuildRoute';
+import { ChatRoute } from '../features/chatToBuild/ChatRoute';
 import { HomeRoute } from '../features/home/HomeRoute';
 import { KnowledgeRoute } from '../features/knowledge/KnowledgeRoute';
 import { SettingsRoute } from '../features/settings/SettingsRoute';
@@ -45,9 +46,9 @@ export function IronDevShell() {
       case 'home':
         return <HomeRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'chat':
-        return <ChatToBuildPage route={activeRoute} surface="chat" onRouteReady={onRouteReady} />;
+        return <ChatRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'build':
-        return <ChatToBuildPage route={activeRoute} surface="build" onRouteReady={onRouteReady} />;
+        return <BuildRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'knowledge':
         return <KnowledgeRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'runs':
