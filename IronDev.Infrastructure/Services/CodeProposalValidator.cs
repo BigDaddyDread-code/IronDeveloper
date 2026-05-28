@@ -69,6 +69,12 @@ public sealed class CodeProposalValidator : ICodeProposalValidator
 
         foreach (var verification in proposal.Verifications)
         {
+            if (string.IsNullOrWhiteSpace(verification.Kind))
+            {
+                errors.Add("Verification kind is required.");
+                continue;
+            }
+
             if (profile is not null && !profile.AllowedVerificationKinds.Contains(verification.Kind, StringComparer.OrdinalIgnoreCase))
             {
                 errors.Add($"Verification kind '{verification.Kind}' is not allowed for runtime profile '{profile.RuntimeProfileId}'.");
@@ -79,6 +85,8 @@ public sealed class CodeProposalValidator : ICodeProposalValidator
                 if (parameter.Value.Length > 2_000)
                     errors.Add($"Verification parameter '{parameter.Key}' is too large.");
             }
+
+            ValidateVerificationParameters(verification, errors);
         }
 
         return new CodeProposalValidationResult
@@ -87,6 +95,58 @@ public sealed class CodeProposalValidator : ICodeProposalValidator
             Warnings = warnings,
             RuntimeProfile = profile
         };
+    }
+
+    private static void ValidateVerificationParameters(ScenarioVerification verification, ICollection<string> errors)
+    {
+        if (string.Equals(verification.Kind, "StdoutContains", StringComparison.OrdinalIgnoreCase))
+        {
+            RequireParameter(verification, "expected", errors);
+            return;
+        }
+
+        if (string.Equals(verification.Kind, "CommandExitZero", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (string.Equals(verification.Kind, "HttpGetEquals", StringComparison.OrdinalIgnoreCase))
+        {
+            var path = RequireParameter(verification, "path", errors);
+            RequireParameter(verification, "expected", errors);
+            if (!string.IsNullOrWhiteSpace(path))
+                ValidateLocalHttpPath(path, errors);
+        }
+    }
+
+    private static string? RequireParameter(ScenarioVerification verification, string name, ICollection<string> errors)
+    {
+        if (!verification.Parameters.TryGetValue(name, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add($"Verification '{verification.Kind}' requires parameter '{name}'.");
+            return null;
+        }
+
+        return value;
+    }
+
+    private static void ValidateLocalHttpPath(string path, ICollection<string> errors)
+    {
+        if (!path.StartsWith("/", StringComparison.Ordinal))
+        {
+            errors.Add("HttpGetEquals path must start with '/'.");
+            return;
+        }
+
+        if (path.StartsWith("//", StringComparison.Ordinal))
+            errors.Add("HttpGetEquals path must not be a scheme-relative URL.");
+
+        if (path.Contains("\\", StringComparison.Ordinal))
+            errors.Add("HttpGetEquals path must not contain backslashes.");
+
+        if (path.Contains('#', StringComparison.Ordinal))
+            errors.Add("HttpGetEquals path must not contain a fragment.");
+
+        if (Uri.TryCreate(path, UriKind.Absolute, out _))
+            errors.Add("HttpGetEquals path must not contain a URI scheme or host.");
     }
 
     private static void ValidateRelativePath(string value, string label, ICollection<string> errors)

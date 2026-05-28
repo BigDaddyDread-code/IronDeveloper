@@ -16,8 +16,8 @@ export function ChatThread({ messages, isSending }: ChatThreadProps) {
       </div>
       {messages.length === 0 ? (
         <EmptyState
-          title="Start with a project question"
-          body="Ask about the current project, or use Review Project State to get a grounded summary from IronDev.Api."
+          title="Start a project state review"
+          body="Send notes for review, or use Review Project State to get a grounded summary from IronDev.Api."
         />
       ) : (
         <div className="chat-thread__messages">

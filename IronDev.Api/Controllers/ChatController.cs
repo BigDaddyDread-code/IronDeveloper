@@ -73,6 +73,12 @@ public sealed class ChatController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Prompt))
             return BadRequest(new { message = "Prompt is required." });
 
+        var mode = string.IsNullOrWhiteSpace(request.Mode)
+            ? "projectStateReview"
+            : request.Mode.Trim();
+        if (!string.Equals(mode, "projectStateReview", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Only projectStateReview mode is available for this endpoint." });
+
         var project = await _projects.GetByIdAsync(projectId, ct);
         if (project is null)
             return NotFound();
@@ -113,7 +119,7 @@ public sealed class ChatController : ControllerBase
             null));
     }
 
-    public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel);
+    public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);
     public sealed record ChatCompletionResponse(string Response, string? ContextSummary, string? LinkedFilePaths, string? LinkedSymbols, long? TraceId);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]

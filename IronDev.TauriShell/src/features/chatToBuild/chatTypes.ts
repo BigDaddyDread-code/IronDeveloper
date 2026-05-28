@@ -1,7 +1,7 @@
 import type { ChatCompletionResponse } from '../../api/types';
 
 export type ChatMessageRole = 'user' | 'assistant';
-export type ChatSendMode = 'message' | 'project-review';
+export type ChatSendMode = 'projectStateReview';
 
 export interface ChatWorkspaceMessage {
   id: string;

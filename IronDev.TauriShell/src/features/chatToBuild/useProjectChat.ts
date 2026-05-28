@@ -50,7 +50,8 @@ export function useProjectChat() {
           projectId,
           prompt,
           sessionId: null,
-          activeModel: null
+          activeModel: null,
+          mode: request?.mode ?? 'projectStateReview'
         });
 
         const assistantMessage: ChatWorkspaceMessage = {
@@ -78,7 +79,7 @@ export function useProjectChat() {
     void sendMessage({
       prompt: projectReviewPrompt,
       displayText: 'Review Project State',
-      mode: 'project-review'
+      mode: 'projectStateReview'
     });
   }, [sendMessage]);
 

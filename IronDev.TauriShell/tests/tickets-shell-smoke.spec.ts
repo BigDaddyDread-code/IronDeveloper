@@ -767,10 +767,12 @@ test('ticket start disposable run links a real run review without enabling revie
 
 test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
   let lastPrompt = '';
+  let lastMode = '';
   await mockTicketProject(page);
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
-    const body = route.request().postDataJSON() as { prompt?: string };
+    const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
     lastPrompt = body.prompt ?? '';
+    lastMode = body.mode ?? '';
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -810,6 +812,7 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   expect(lastPrompt).toContain('recent tickets');
   expect(lastPrompt).toContain('recent decisions');
   expect(lastPrompt).toContain('recent runs');
+  expect(lastMode).toBe('projectStateReview');
   await expectNoHorizontalOverflow(page);
 });
 

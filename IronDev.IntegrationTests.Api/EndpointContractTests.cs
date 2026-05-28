@@ -154,7 +154,8 @@ public sealed class EndpointContractTests : ApiTestBase
             projectId = project.Id,
             sessionId = (long?)null,
             prompt = "hello",
-            activeModel = "test"
+            activeModel = "test",
+            mode = "projectStateReview"
         });
         Assert.AreEqual(HttpStatusCode.OK, chat.StatusCode);
         using var chatBody = JsonDocument.Parse(await chat.Content.ReadAsStringAsync());
@@ -175,6 +176,16 @@ public sealed class EndpointContractTests : ApiTestBase
             activeModel = "test"
         });
         Assert.AreEqual(HttpStatusCode.BadRequest, wrongProjectChat.StatusCode);
+
+        var unsupportedChatMode = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
+        {
+            projectId = project.Id,
+            sessionId = (long?)null,
+            prompt = "hello",
+            activeModel = "test",
+            mode = "generalProjectQuestion"
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, unsupportedChatMode.StatusCode);
     }
 
     [TestMethod]

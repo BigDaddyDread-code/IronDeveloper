@@ -3182,6 +3182,7 @@ export interface components {
             sessionId?: number | null;
             prompt?: string | null;
             activeModel?: string | null;
+            mode?: string | null;
         };
         ChatCompletionResponse: {
             response?: string | null;

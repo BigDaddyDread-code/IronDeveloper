@@ -4221,6 +4221,10 @@
           "activeModel": {
             "type": "string",
             "nullable": true
+          },
+          "mode": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

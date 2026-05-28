@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\IronDev.Api\IronDev.Api.csproj" />
     <ProjectReference Include="..\IronDev.Core\IronDev.Core.csproj" />
+    <ProjectReference Include="..\IronDev.Infrastructure\IronDev.Infrastructure.csproj" />
   </ItemGroup>
 
   <!-- Copy test appsettings alongside the test binary -->
