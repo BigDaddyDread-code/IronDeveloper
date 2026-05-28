@@ -4,7 +4,7 @@ import { CommandButton } from './CommandButton';
 import { EmptyState } from './EmptyState';
 import { MetadataRow } from './MetadataRow';
 import { StatusBadge } from './StatusBadge';
-import { SurfacePanel } from './SurfacePanel';
+import { ReviewPanel } from '../design-system/panels/ReviewPanel';
 
 interface TicketRunReviewPanelProps {
   review: TicketRunReview | null;
@@ -22,35 +22,35 @@ export function TicketRunReviewPanel({
   onDismiss
 }: TicketRunReviewPanelProps) {
   return (
-    <SurfacePanel className="ticket-run-review" testId="ticket.runReview">
-      <div className="workflow-section__header">
-        <div>
-          <p className="eyebrow">Run review</p>
-          <h3>Latest disposable run</h3>
-        </div>
-        <div className="ticket-detail__badges">
+    <ReviewPanel
+      className="ticket-run-review"
+      testId="ticket.runReview"
+      title="Run Review"
+      actions={
+        <>
           <CommandButton type="button" variant="secondary" onClick={onRefresh} disabled={status === 'loading'} testId="ticket.runReview.refresh">
             {status === 'loading' ? 'Loading run' : 'Refresh run'}
           </CommandButton>
           <CommandButton type="button" variant="subtle" onClick={onDismiss} testId="ticket.runReview.dismiss">
             Close
           </CommandButton>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {status === 'loading' ? (
         <EmptyState title="Loading run review" body="IronDev.Api is loading ticket-scoped run evidence." />
       ) : status === 'error' || status === 'unavailable' ? (
-        <EmptyState title="Run review unavailable" body={message} action={<StatusBadge status="warning">No data fabricated</StatusBadge>} />
+        <EmptyState title="Run review unavailable" body={message} action={<StatusBadge status="warning">Evidence unavailable</StatusBadge>} />
       ) : !review ? (
-        <EmptyState title="No run selected" body="Review Latest Run opens after execution evidence links a real run to this ticket." />
+        <EmptyState title="No run selected" body="Review Run opens after evidence links a real run to this ticket." />
       ) : (
         <div className="ticket-run-review__content">
           <div className="ticket-run-review__summary" data-testid="ticket.runReview.summary">
             <StatusBadge status={badgeStatus(review.status)} data-testid="ticket.runReview.status">
               {review.status || 'Unknown'}
             </StatusBadge>
-            {review.isDisposableRun ? <StatusBadge status="info" data-testid="ticket.runReview.disposable">Disposable run</StatusBadge> : null}
+            {review.isDisposableRun ? <StatusBadge status="info" data-testid="ticket.runReview.disposable">Sandbox run</StatusBadge> : null}
             <MetadataRow label="Run ID" value={review.runId} />
             <MetadataRow label="Ticket" value={`#${review.ticketId} - ${review.ticketTitle}`} />
             <MetadataRow label="Started UTC" value={formatDate(review.startedUtc)} />
@@ -62,10 +62,10 @@ export function TicketRunReviewPanel({
 
           <section className="workflow-section" data-testid="ticket.runReview.links">
             <div className="workflow-section__header">
-              <h4>Trace and report links</h4>
+              <h4>Context and report links</h4>
             </div>
-            <MetadataRow label="Trace ID" value={review.traceId ?? 'Trace id unavailable'} />
-            <MetadataRow label="Trace" value={review.tracePath ?? 'Trace link unavailable'} />
+            <MetadataRow label="Context trace" value={review.traceId ?? 'Context trace unavailable'} />
+            <MetadataRow label="Trace link" value={review.tracePath ?? 'Context trace link unavailable'} />
             <MetadataRow label="Report" value={review.reportPath ?? 'Report link unavailable'} />
             <MetadataRow label="Log" value={review.logPath ?? 'Log link unavailable'} />
           </section>
@@ -107,7 +107,7 @@ export function TicketRunReviewPanel({
           </section>
         </div>
       )}
-    </SurfacePanel>
+    </ReviewPanel>
   );
 }
 

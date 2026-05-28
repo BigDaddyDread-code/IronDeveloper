@@ -71,6 +71,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
+builder.Services.AddScoped<IProjectStateReviewService, ProjectStateReviewService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
 builder.Services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
 builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
@@ -101,9 +102,17 @@ builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
 builder.Services.AddSingleton<DiscussionCodeScenarioCatalog>();
 builder.Services.AddSingleton<IBuildScenarioCatalog>(sp => sp.GetRequiredService<DiscussionCodeScenarioCatalog>());
+builder.Services.AddSingleton<ICodeRunProfileCatalog, CodeRunProfileCatalog>();
+builder.Services.AddScoped<ICodeProposalValidator, CodeProposalValidator>();
 builder.Services.AddScoped<ITicketFromDocumentService, TicketFromDocumentService>();
 builder.Services.AddScoped<ITicketReviewService, TicketReviewService>();
-builder.Services.AddScoped<ICodeProposalGenerator, DeterministicCodeProposalGenerator>();
+builder.Services.AddScoped<ICodeProposalGenerator>(sp =>
+{
+    var mode = builder.Configuration["CodeProposal:Mode"];
+    return string.Equals(mode, "ModelAssisted", StringComparison.OrdinalIgnoreCase)
+        ? ActivatorUtilities.CreateInstance<ModelAssistedCodeProposalGenerator>(sp)
+        : ActivatorUtilities.CreateInstance<DeterministicCodeProposalGenerator>(sp);
+});
 builder.Services.AddScoped<IDisposableCodeRunService, DisposableCodeRunService>();
 builder.Services.AddScoped<IRunReviewPackageService, RunReviewPackageService>();
 builder.Services.AddScoped<IDotNetBuildService, DotNetRunnerService>();

@@ -91,7 +91,7 @@ export function RunReportsRoute({ route, onRouteReady }: RunReportsRouteProps) {
   );
 
   const summaryChips = useMemo(() => {
-    const chips = [`${state.filteredRuns.length} report(s)`];
+    const chips = [`${state.filteredRuns.length} run(s)`];
 
     if (selectedRun?.runId) {
       chips.push(`Trace ${selectedRun.traceId ?? 'Unavailable'}`);
@@ -121,7 +121,7 @@ export function RunReportsRoute({ route, onRouteReady }: RunReportsRouteProps) {
     <main className="run-reports-workspace" data-testid="run-reports.workspace">
       <SplitWorkspace
         left={
-          <WorkspaceListPane eyebrow="Run reports" title="Run reports" testId="run-reports.list">
+          <WorkspaceListPane eyebrow="Runs" title="Execution history" testId="run-reports.list">
             <div className="run-reports-filters" data-testid="run-reports.filters">
               {state.defaultFilters.map((filter) => (
                 <button
@@ -137,10 +137,10 @@ export function RunReportsRoute({ route, onRouteReady }: RunReportsRouteProps) {
             </div>
 
             {state.runListStatus === 'loading' ? (
-              <EmptyState title="Loading run reports" body={state.runListMessage} />
+              <EmptyState title="Loading runs" body={state.runListMessage} />
             ) : state.filteredRuns.length === 0 ? (
               <EmptyState
-                title={state.runListStatus === 'error' ? 'Run reports unavailable' : 'No run reports match this filter'}
+                title={state.runListStatus === 'error' ? 'Runs unavailable' : 'No runs match this filter'}
                 body={state.runListMessage}
               />
             ) : (
@@ -177,7 +177,7 @@ export function RunReportsRoute({ route, onRouteReady }: RunReportsRouteProps) {
         }
         right={
           <Surface testId="run-reports.inspector">
-            <InspectorSection title="Governance trace" testId="run-reports.governance">
+            <InspectorSection title="Context trace" testId="run-reports.governance">
               <MetadataRow label="Trace" value={selectedTrace ?? 'Unavailable'} />
               <MetadataRow label="Recommendation" value={selectedRecommendation} />
               <MetadataRow label="Policy snapshot" value={selectedPolicyId} />
@@ -305,7 +305,7 @@ function RunReportSummaryPanel({
         <div className="workflow-section workflow-section--wide">
         <h3>Signals</h3>
         <RunReportTimeline run={run} />
-        <MetadataRow label="Mutations" value={`${run.realRepoMutationCount ?? 0} real, ${run.disposableFilesChanged ?? 0} disposable`} />
+        <MetadataRow label="Mutations" value={`${run.realRepoMutationCount ?? 0} real, ${run.disposableFilesChanged ?? 0} sandbox`} />
         <MetadataRow label="Policy profile" value={policy?.policyId ?? run.status ?? 'Default policy'} />
         <MetadataRow
           label="Policy settings"

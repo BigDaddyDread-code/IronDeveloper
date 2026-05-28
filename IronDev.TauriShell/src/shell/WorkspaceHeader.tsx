@@ -23,8 +23,6 @@ interface WorkspaceHeaderProps {
   blockedReason: string | null;
   blockedReasonTestId?: string;
   projectLabel: string;
-  routeParity: 'spike' | 'alpha';
-  routeMaturity: 'spike' | 'alpha';
 }
 
 export function WorkspaceHeader({
@@ -41,15 +39,9 @@ export function WorkspaceHeader({
   commands,
   blockedReason,
   blockedReasonTestId,
-  projectLabel,
-  routeParity,
-  routeMaturity
+  projectLabel
 }: WorkspaceHeaderProps) {
   const summaryChips: HeaderSummaryChip[] = [
-    { label: `${projectLabel ? 'Token profile ' : 'Project'} ${projectStatus === 'selected' ? 'selected' : projectStatus === 'fallback' ? 'fallback' : 'missing'}` },
-    { label: workspaceLabel, testId: 'workspace.header.label' },
-    { label: `Parity ${routeParity}`, testId: 'workspace.header.parity' },
-    { label: `Maturity ${routeMaturity}`, testId: 'workspace.header.maturity' },
     ...workspaceSummaryChips
   ];
 
@@ -63,11 +55,11 @@ export function WorkspaceHeader({
   return (
     <header className="workspace-header" data-testid="app.header">
       <div className="workspace-header__identity">
-        <p className="eyebrow">IRONDEV COCKPIT</p>
+        <p className="eyebrow">IronDev</p>
         <h1>{workspaceLabel}</h1>
         <p className="workspace-header__subtitle">
-          Alpha UI for governed AI workstream control
-          {title ? ` · ${title}` : ''}
+          Project-aware software work, sandbox execution, and traceable review
+          {title ? ` - ${title}` : ''}
         </p>
         <div className="workspace-header__summary">
           {environmentInfo ? (

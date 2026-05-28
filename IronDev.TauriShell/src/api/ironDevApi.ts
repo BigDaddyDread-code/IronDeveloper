@@ -2,6 +2,10 @@ import type {
   ApiConnectionStatus,
   ApiStatus,
   BuildReadinessResult,
+  ChatCompletionRequest,
+  ChatCompletionResponse,
+  CreateTicketFromDocumentRequest,
+  CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
   RunEvidenceItem,
   RunReportDetail,
@@ -14,6 +18,13 @@ import type {
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
+  RunReviewPackage,
+  RunTicketReviewRequest,
+  RunTicketReviewResponse,
+  SaveDiscussionRequest,
+  SaveDiscussionResponse,
+  StartDisposableCodeRunRequest,
+  StartDisposableCodeRunResponse,
   StartTicketBuildRunRequest,
   TenantSummary,
   TicketBuildRunDto,
@@ -313,6 +324,90 @@ class IronDevApiClient {
         signal
       }
     );
+  }
+
+  async saveDiscussion(
+    projectId: number,
+    request: SaveDiscussionRequest,
+    signal?: AbortSignal
+  ): Promise<SaveDiscussionResponse> {
+    return this.request<SaveDiscussionResponse>(`/api/projects/${projectId}/discussions`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async createTicketFromDocument(
+    projectId: number,
+    documentVersionId: number,
+    request: CreateTicketFromDocumentRequest = {},
+    signal?: AbortSignal
+  ): Promise<CreateTicketFromDocumentResponse> {
+    return this.request<CreateTicketFromDocumentResponse>(
+      `/api/projects/${projectId}/documents/${documentVersionId}/tickets`,
+      {
+        method: 'POST',
+        body: request,
+        signal
+      }
+    );
+  }
+
+  async reviewTicket(
+    projectId: number,
+    ticketId: number,
+    request: RunTicketReviewRequest = { useLiveModel: false },
+    signal?: AbortSignal
+  ): Promise<RunTicketReviewResponse> {
+    return this.request<RunTicketReviewResponse>(`/api/projects/${projectId}/tickets/${ticketId}/review`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async startDisposableCodeRun(
+    projectId: number,
+    ticketId: number,
+    request: StartDisposableCodeRunRequest,
+    signal?: AbortSignal
+  ): Promise<StartDisposableCodeRunResponse> {
+    return this.request<StartDisposableCodeRunResponse>(
+      `/api/projects/${projectId}/tickets/${ticketId}/disposable-code-runs`,
+      {
+        method: 'POST',
+        body: request,
+        signal
+      }
+    );
+  }
+
+  async getRunReviewPackage(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<RunReviewPackage> {
+    return this.request<RunReviewPackage>(
+      `/api/projects/${projectId}/tickets/${ticketId}/build-runs/${encodeURIComponent(runId)}/review-package`,
+      {
+        method: 'GET',
+        signal
+      }
+    );
+  }
+
+  async completeChat(
+    projectId: number,
+    request: ChatCompletionRequest,
+    signal?: AbortSignal
+  ): Promise<ChatCompletionResponse> {
+    return this.request<ChatCompletionResponse>(`/api/projects/${projectId}/chat/complete`, {
+      method: 'POST',
+      body: { ...request, projectId },
+      signal
+    });
   }
 
   async getRunReports(signal?: AbortSignal): Promise<RunReportSummary[]> {

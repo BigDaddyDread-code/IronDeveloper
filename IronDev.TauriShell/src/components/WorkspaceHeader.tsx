@@ -41,9 +41,9 @@ export function WorkspaceHeader({
   return (
     <header className="workspace-header" data-testid="app.header">
       <div className="workspace-header__identity">
-        <p className="eyebrow">IRONDEV COCKPIT</p>
+        <p className="eyebrow">IRONDEV WORKSPACE</p>
         <h1>IronDev</h1>
-        <p className="workspace-header__subtitle">Tauri + React shell proving the API-backed cockpit model.</p>
+        <p className="workspace-header__subtitle">Governed AI workstream control.</p>
         <div className="workspace-header__summary">
           <span className="metadata-chip" data-testid="tickets.header">Workspace Tickets</span>
           <span className="metadata-chip">Tickets {ticketCount}</span>

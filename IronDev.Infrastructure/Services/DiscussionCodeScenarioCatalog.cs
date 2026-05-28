@@ -168,7 +168,7 @@ public sealed class DiscussionCodeScenarioCatalog : IBuildScenarioCatalog
                 ScenarioId = "aspnet.health-api",
                 Name = "Tiny ASP.NET health API",
                 DiscussionText = "Create a minimal ASP.NET Core API with a GET /health endpoint that returns \"healthy\".",
-                RuntimeProfileId = "dotnet.web",
+                RuntimeProfileId = "dotnet.aspnet",
                 Verifications =
                 [
                     new ScenarioVerification

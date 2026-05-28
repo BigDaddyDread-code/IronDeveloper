@@ -42,6 +42,17 @@ public interface ICodeProposalGenerator
         CancellationToken cancellationToken = default);
 }
 
+public interface ICodeProposalValidator
+{
+    CodeProposalValidationResult Validate(CodeProposal proposal);
+}
+
+public interface ICodeRunProfileCatalog
+{
+    CodeRunProfileDefinition? GetProfile(string runtimeProfileId);
+    IReadOnlyList<CodeRunProfileDefinition> GetProfiles();
+}
+
 public interface IDisposableCodeRunService
 {
     Task<StartDisposableCodeRunResponse?> StartAsync(

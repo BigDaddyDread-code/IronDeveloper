@@ -1,0 +1,89 @@
+import { CommandButton } from '../../components/CommandButton';
+
+interface ChatComposerProps {
+  value: string;
+  isSending: boolean;
+  disabledReason: string | null;
+  sendDisabledReason: string | null;
+  buildBridgeDisabledReason: string | null;
+  onChange: (value: string) => void;
+  onSend: () => void;
+  onReviewProjectState: () => void;
+  onContinueInBuild: () => void;
+}
+
+export function ChatComposer({
+  value,
+  isSending,
+  disabledReason,
+  sendDisabledReason,
+  buildBridgeDisabledReason,
+  onChange,
+  onSend,
+  onReviewProjectState,
+  onContinueInBuild
+}: ChatComposerProps) {
+  const sendBlockedReason = sendDisabledReason ?? disabledReason;
+
+  return (
+    <section className="chat-composer" data-testid="chat.composer">
+      <div className="chat-composer__header">
+        <div>
+          <p className="eyebrow">Project review</p>
+          <h3>Review project state</h3>
+        </div>
+        <CommandButton
+          type="button"
+          variant="secondary"
+          onClick={onReviewProjectState}
+          disabled={Boolean(disabledReason || isSending)}
+          title={disabledReason ?? undefined}
+          testId="chat.command.reviewProjectState"
+        >
+          Review Project State
+        </CommandButton>
+        <CommandButton
+          type="button"
+          variant="secondary"
+          onClick={onContinueInBuild}
+          disabled={Boolean(buildBridgeDisabledReason || isSending)}
+          title={buildBridgeDisabledReason ?? undefined}
+          testId="chat.command.continueInBuild"
+        >
+          Continue in Build
+        </CommandButton>
+      </div>
+      <label className="chat-composer__field">
+        <span>Message</span>
+        <textarea
+          value={value}
+          placeholder="Add notes or questions to include in the project-state review."
+          disabled={Boolean(disabledReason)}
+          data-testid="chat.composer.input"
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) {
+              return;
+            }
+
+            event.preventDefault();
+            onSend();
+          }}
+        />
+      </label>
+      <div className="chat-composer__actions">
+        <p data-testid="chat.composer.disabledReason">{sendBlockedReason ?? 'Ready to send. Shift+Enter inserts a new line.'}</p>
+        <CommandButton
+          type="button"
+          variant="primary"
+          onClick={onSend}
+          disabled={Boolean(sendBlockedReason)}
+          title={sendBlockedReason ?? undefined}
+          testId="chat.command.send"
+        >
+          {isSending ? 'Sending' : 'Send'}
+        </CommandButton>
+      </div>
+    </section>
+  );
+}

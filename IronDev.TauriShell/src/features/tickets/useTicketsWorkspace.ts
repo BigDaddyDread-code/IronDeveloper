@@ -151,6 +151,7 @@ export function useTicketsWorkspace() {
   const project = useProjectContext();
   const navigation = useWorkspaceNavigation();
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
+  const [lastTicketLoadProjectId, setLastTicketLoadProjectId] = useState<number | null>(null);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [selectedTicketDetail, setSelectedTicketDetail] = useState<ProjectTicket | null>(null);
   const [ticketDetailStatus, setTicketDetailStatus] = useState<TicketDetailLoadStatus>('idle');
@@ -163,7 +164,7 @@ export function useTicketsWorkspace() {
   const [planMessage, setPlanMessage] = useState('Plan has not been refreshed for this ticket.');
   const [evidenceSummary, setEvidenceSummary] = useState<TicketEvidenceSummary | null>(null);
   const [evidenceStatus, setEvidenceStatus] = useState<TicketEvidenceLoadStatus>('idle');
-  const [evidenceMessage, setEvidenceMessage] = useState('Execution evidence has not been loaded for this ticket.');
+  const [evidenceMessage, setEvidenceMessage] = useState('Evidence has not been loaded for this ticket.');
   const [runReview, setRunReview] = useState<TicketRunReview | null>(null);
   const [runReviewStatus, setRunReviewStatus] = useState<TicketEvidenceLoadStatus>('idle');
   const [runReviewMessage, setRunReviewMessage] = useState('No run review has been opened for this ticket.');
@@ -212,7 +213,7 @@ export function useTicketsWorkspace() {
     }
 
     if (readinessStatus === 'loaded' && readiness && !readiness.isReady) {
-      return readiness.message ?? readiness.blockingIssues?.[0] ?? 'Resolve build readiness blockers before starting a disposable run.';
+      return readiness.message ?? readiness.blockingIssues?.[0] ?? 'Resolve build readiness blockers before starting a sandbox run.';
     }
 
     return null;
@@ -226,7 +227,7 @@ export function useTicketsWorkspace() {
     }
 
     if (!evidenceSummary) {
-      return 'Execution evidence has not been loaded for this ticket.';
+      return 'Evidence has not been loaded for this ticket.';
     }
 
     if (evidenceSummary.latestRun) {
@@ -251,7 +252,7 @@ export function useTicketsWorkspace() {
     setReadinessStatus('idle');
     setEvidenceSummary(null);
     setEvidenceStatus('idle');
-    setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
+    setEvidenceMessage('Evidence has not been loaded for this ticket.');
     setRunReview(null);
     setRunReviewStatus('idle');
     setRunReviewMessage('No run review has been opened for this ticket.');
@@ -265,6 +266,7 @@ export function useTicketsWorkspace() {
       setTicketMessage(status === 'authInvalid' ? 'Sign in session expired.' : 'Ticket workflow is currently blocked.');
       setTickets([]);
       setSelectedTicketId(null);
+      setLastTicketLoadProjectId(null);
       resetTicketWorkflowState();
     },
     [project, resetTicketWorkflowState]
@@ -282,6 +284,7 @@ export function useTicketsWorkspace() {
       const ticketResult = await session.client.getProjectTickets(selectedProjectId);
 
       setTickets(ticketResult.tickets);
+      setLastTicketLoadProjectId(selectedProjectId);
       setTicketMessage(ticketResult.message);
       setSelectedTicketId((current) => {
         const nextSelected = current && ticketResult.tickets.some((ticket) => ticket.id === current);
@@ -321,12 +324,18 @@ export function useTicketsWorkspace() {
       return;
     }
 
+    if (!productAccessBlocked && selectedProjectId && lastTicketLoadProjectId !== selectedProjectId) {
+      void loadTickets();
+      return;
+    }
+
     if (productAccessBlocked) {
       setTickets([]);
       setSelectedTicketId(null);
+      setLastTicketLoadProjectId(null);
       resetTicketWorkflowState();
     }
-  }, [accessStatus, loadTickets, productAccessBlocked, resetTicketWorkflowState]);
+  }, [accessStatus, lastTicketLoadProjectId, loadTickets, productAccessBlocked, resetTicketWorkflowState, selectedProjectId]);
 
   useEffect(() => {
     if (productAccessBlocked || selectedTicketId || tickets.length === 0) {
@@ -343,7 +352,7 @@ export function useTicketsWorkspace() {
       setTicketDetailMessage('Select a ticket to load detail.');
       setEvidenceSummary(null);
       setEvidenceStatus('idle');
-      setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
+      setEvidenceMessage('Evidence has not been loaded for this ticket.');
       setRunReview(null);
       setRunReviewStatus('idle');
       setRunReviewMessage('No run review has been opened for this ticket.');
@@ -362,7 +371,7 @@ export function useTicketsWorkspace() {
     setPlanMessage('Plan has not been refreshed for this ticket.');
     setEvidenceSummary(null);
     setEvidenceStatus('loading');
-    setEvidenceMessage('Execution evidence is being resolved from available run reports.');
+    setEvidenceMessage('Evidence is being resolved from available run reports.');
     setRunReview(null);
     setRunReviewStatus('idle');
     setRunReviewMessage('No run review has been opened for this ticket.');
@@ -408,7 +417,7 @@ export function useTicketsWorkspace() {
           nextSafeAction: 'Review readiness'
         });
         setEvidenceStatus('error');
-        setEvidenceMessage('Could not refresh execution evidence because ticket detail failed to load.');
+        setEvidenceMessage('Could not refresh evidence because ticket detail failed to load.');
       });
 
     return () => controller.abort();
@@ -480,7 +489,7 @@ export function useTicketsWorkspace() {
       provenance: {
         source: 'tauri-shell',
         createdBy: project.userProfile?.displayName ?? 'tauri-shell',
-        notes: 'Created from the Tauri Tickets cockpit.'
+        notes: 'Created from the Tauri Tickets workspace.'
       }
     };
 
@@ -639,16 +648,16 @@ export function useTicketsWorkspace() {
     if (!selectedTicket) {
       setEvidenceSummary(null);
       setEvidenceStatus('unavailable');
-      setEvidenceMessage('Select a ticket to load execution evidence.');
+      setEvidenceMessage('Select a ticket to load evidence.');
       return;
     }
 
     setEvidenceStatus('loading');
-    setEvidenceMessage('Loading execution evidence...');
+    setEvidenceMessage('Loading evidence...');
 
     try {
       if (!selectedProjectId || !selectedTicket.id) {
-        throw new IronDevApiError('Ticket evidence requires a selected project and ticket.', 400);
+        throw new IronDevApiError('Evidence requires a selected project and ticket.', 400);
       }
 
       const summary = await session.client.getTicketEvidenceSummary(selectedProjectId, selectedTicket.id);
@@ -660,7 +669,7 @@ export function useTicketsWorkspace() {
         setEvidenceSummary({
           ticketId: selectedTicket.id ?? 0,
           status: 'error',
-          message: `Execution evidence failed with HTTP ${error.status}.`,
+          message: `Evidence failed with HTTP ${error.status}.`,
           latestRun: null,
           latestPromotionPackage: null,
           linkedTraceCount: getLinkedTraceCount(selectedTicket),
@@ -668,11 +677,11 @@ export function useTicketsWorkspace() {
           linkedDecisionCount: 0,
           linkedRunCount: 0,
           hasBlockingWarnings: true,
-          blockedActions: ['Execution evidence could not be loaded at this time.'],
-          nextSafeAction: readiness?.isReady ? 'Start disposable run' : 'Refresh build readiness'
+          blockedActions: ['Evidence could not be loaded at this time.'],
+          nextSafeAction: readiness?.isReady ? 'Start sandbox run' : 'Refresh build readiness'
         });
         setEvidenceStatus('error');
-        setEvidenceMessage(`Execution evidence failed with HTTP ${error.status}.`);
+        setEvidenceMessage(`Evidence failed with HTTP ${error.status}.`);
         return;
       }
 
@@ -733,7 +742,7 @@ export function useTicketsWorkspace() {
         setEvidenceSummary({
           ticketId: selectedTicket.id ?? 0,
           status: 'error',
-          message: 'Execution evidence could not be loaded.',
+          message: 'Evidence could not be loaded.',
           latestRun: null,
           latestPromotionPackage: null,
           linkedTraceCount: getLinkedTraceCount(selectedTicket),
@@ -741,11 +750,11 @@ export function useTicketsWorkspace() {
           linkedDecisionCount: 0,
           linkedRunCount: 0,
           hasBlockingWarnings: true,
-          blockedActions: ['Execution evidence could not be loaded at this time.'],
-          nextSafeAction: readiness?.isReady ? 'Start disposable run' : 'Refresh build readiness'
+          blockedActions: ['Evidence could not be loaded at this time.'],
+          nextSafeAction: readiness?.isReady ? 'Start sandbox run' : 'Refresh build readiness'
         });
         setEvidenceStatus('error');
-        setEvidenceMessage('Execution evidence could not be loaded.');
+        setEvidenceMessage('Evidence could not be loaded.');
       }
     }
   }, [readiness, readinessStatus, selectedProjectId, selectedTicket, session.client]);
@@ -865,12 +874,12 @@ export function useTicketsWorkspace() {
     }
 
     if (!selectedProjectId || !selectedTicketIdForList) {
-      setEvidenceMessage('Select a project ticket before starting a disposable run.');
+      setEvidenceMessage('Select a project ticket before starting a sandbox run.');
       return;
     }
 
     setEvidenceStatus('loading');
-    setEvidenceMessage('Starting disposable run through IronDev.Api...');
+    setEvidenceMessage('Starting sandbox run through IronDev.Api...');
 
     try {
       const result = await session.client.startTicketBuildRun(selectedProjectId, selectedTicketIdForList, {});
@@ -878,7 +887,7 @@ export function useTicketsWorkspace() {
         navigation.setSelectedRunId(result.runId);
       }
 
-      setEvidenceMessage(result.message ?? `Disposable run ${result.runId} started.`);
+      setEvidenceMessage(toProductRunMessage(result.message) ?? `Sandbox run ${result.runId} started.`);
       await refreshEvidence();
       if (result.runId) {
         await loadRunReview(result.runId);
@@ -886,8 +895,8 @@ export function useTicketsWorkspace() {
     } catch (error) {
       const message =
         error instanceof IronDevApiError
-          ? `Disposable run start failed with HTTP ${error.status}.`
-          : 'Disposable run start could not reach IronDev.Api.';
+          ? `Sandbox run start failed with HTTP ${error.status}.`
+          : 'Sandbox run start could not reach IronDev.Api.';
       setEvidenceSummary((current) =>
         current
           ? {
@@ -932,7 +941,7 @@ export function useTicketsWorkspace() {
     }
 
     navigation.setSelectedRunId(latestRunId);
-    navigation.navigateToWorkspace('promotion-review');
+    navigation.navigateToWorkspace('runs');
   }, [evidenceSummary?.latestPromotionPackage, evidenceSummary?.latestRun?.runId, navigation]);
 
   useEffect(() => {
@@ -941,7 +950,7 @@ export function useTicketsWorkspace() {
     } else {
       setEvidenceSummary(null);
       setEvidenceStatus('idle');
-      setEvidenceMessage('Execution evidence has not been loaded for this ticket.');
+      setEvidenceMessage('Evidence has not been loaded for this ticket.');
     }
   }, [refreshEvidence, selectedTicket?.id]);
 
@@ -1257,7 +1266,7 @@ function buildTicketEvidenceSummary(args: {
   return {
     ticketId: args.ticket.id ?? 0,
     status: 'loaded',
-    message: args.latestRelatedRun ? 'Execution evidence is available for this ticket.' : 'No linked execution evidence is available yet.',
+    message: args.latestRelatedRun ? 'Evidence is available for this ticket.' : 'No linked build evidence is available yet.',
     linkedTraceCount,
     linkedDocumentCount,
     linkedDecisionCount: 0,
@@ -1265,9 +1274,9 @@ function buildTicketEvidenceSummary(args: {
     hasBlockingWarnings: blockedActions.length > 0,
     blockedActions,
     nextSafeAction: args.latestRelatedRun
-      ? 'Review latest run'
+      ? 'Review run'
       : args.readiness?.isReady
-        ? 'Start disposable run'
+        ? 'Start sandbox run'
         : 'Refresh build readiness'
   };
 }
@@ -1352,6 +1361,13 @@ function nullIfBlank(value: string) {
   const trimmed = value.trim();
 
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function toProductRunMessage(message?: string | null) {
+  return message
+    ?.replace(/disposable build run/gi, 'sandbox build run')
+    .replace(/disposable run/gi, 'sandbox run')
+    .replace(/execution evidence/gi, 'evidence') ?? null;
 }
 
 function splitAcceptanceCriteria(value: string) {

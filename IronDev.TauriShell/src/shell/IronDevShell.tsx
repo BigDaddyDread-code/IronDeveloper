@@ -5,8 +5,12 @@ import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
-import { PromotionReviewRoute } from '../features/runReports/PromotionReviewRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
+import { BuildRoute } from '../features/chatToBuild/BuildRoute';
+import { ChatRoute } from '../features/chatToBuild/ChatRoute';
+import { HomeRoute } from '../features/home/HomeRoute';
+import { KnowledgeRoute } from '../features/knowledge/KnowledgeRoute';
+import { SettingsRoute } from '../features/settings/SettingsRoute';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceNav } from './WorkspaceNav';
 import { StatusFooter } from './StatusFooter';
@@ -39,10 +43,18 @@ export function IronDevShell() {
   const activeRoute = useMemo(() => routeForId(navigation.activeRouteId), [navigation.activeRouteId]);
   const routeWorkspace = useMemo(() => {
     switch (activeRoute.id) {
-      case 'run-reports':
+      case 'home':
+        return <HomeRoute route={activeRoute} onRouteReady={onRouteReady} />;
+      case 'chat':
+        return <ChatRoute route={activeRoute} onRouteReady={onRouteReady} />;
+      case 'build':
+        return <BuildRoute route={activeRoute} onRouteReady={onRouteReady} />;
+      case 'knowledge':
+        return <KnowledgeRoute route={activeRoute} onRouteReady={onRouteReady} />;
+      case 'runs':
         return <RunReportsRoute route={activeRoute} onRouteReady={onRouteReady} />;
-      case 'promotion-review':
-        return <PromotionReviewRoute route={activeRoute} onRouteReady={onRouteReady} />;
+      case 'settings':
+        return <SettingsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       default:
         return <TicketsRoute route={activeRoute} onRouteReady={onRouteReady} />;
     }
@@ -62,10 +74,6 @@ export function IronDevShell() {
         ? `Fallback project ${project.selectedProjectId}`
         : 'Project required';
 
-  const headerSummary = useMemo<WorkspaceRouteMeta['workspaceSummaryChips']>(() => {
-    return routeMeta.workspaceSummaryChips.length > 0 ? routeMeta.workspaceSummaryChips : [{ label: `${activeRoute.label} context` }];
-  }, [activeRoute.label, routeMeta.workspaceSummaryChips]);
-
   const safeCommands = routeMeta.workspaceCommands ?? [];
 
   return (
@@ -78,10 +86,7 @@ export function IronDevShell() {
           projectName={project.selectedProjectName}
           projectStatus={projectStatus}
           workspaceLabel={activeRoute.label}
-          workspaceSummaryChips={[
-            { label: `Route ${activeRoute.label} (${activeRoute.maturity})`, testId: 'workspace.summary.route' },
-            ...headerSummary
-          ]}
+          workspaceSummaryChips={routeMeta.workspaceSummaryChips}
           userDisplayName={project.userProfile?.displayName ?? null}
           tokenConfigured={session.tokenConfigured}
           tenantName={project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? null}
@@ -89,8 +94,6 @@ export function IronDevShell() {
           blockedReason={routeMeta.workspaceBlockReason}
           blockedReasonTestId={routeMeta.blockReasonTestId}
           projectLabel={projectLabel}
-          routeParity={activeRoute.parityStatus}
-          routeMaturity={activeRoute.maturity}
         />
       }
       navigation={

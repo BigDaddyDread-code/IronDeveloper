@@ -1,4 +1,5 @@
 using IronDev.Data.Models;
+using IronDev.Infrastructure.Services;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +12,16 @@ public sealed class ChatController : ControllerBase
 {
     private readonly IChatHistoryService _chat;
     private readonly IChatFeedbackService _feedback;
+    private readonly IProjectStateReviewService _projectStateReview;
 
-    public ChatController(IChatHistoryService chat, IChatFeedbackService feedback)
+    public ChatController(
+        IChatHistoryService chat,
+        IChatFeedbackService feedback,
+        IProjectStateReviewService projectStateReview)
     {
         _chat = chat;
         _feedback = feedback;
+        _projectStateReview = projectStateReview;
     }
 
     [HttpGet("api/projects/{projectId:int}/chat/sessions")]
@@ -46,15 +52,36 @@ public sealed class ChatController : ControllerBase
         _chat.SaveMessageAsync(message, ct);
 
     [HttpPost("api/projects/{projectId:int}/chat/complete")]
-    public ActionResult<ChatCompletionResponse> Complete(ChatCompletionRequest request) =>
-        Ok(new ChatCompletionResponse(
-            "Chat completion is routed through the API boundary. Full agent execution will be enabled as the chat workflow migration is completed.",
-            "API boundary placeholder",
-            null,
-            null,
-            null));
+    public async Task<ActionResult<ChatCompletionResponse>> Complete(
+        int projectId,
+        ChatCompletionRequest request,
+        CancellationToken ct)
+    {
+        if (request.ProjectId != 0 && request.ProjectId != projectId)
+            return BadRequest(new { message = "Request project id must match the route project id." });
 
-    public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel);
+        if (string.IsNullOrWhiteSpace(request.Prompt))
+            return BadRequest(new { message = "Prompt is required." });
+
+        var mode = string.IsNullOrWhiteSpace(request.Mode)
+            ? "projectStateReview"
+            : request.Mode.Trim();
+        if (!string.Equals(mode, "projectStateReview", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Only projectStateReview mode is available for this endpoint." });
+
+        var review = await _projectStateReview.ReviewAsync(projectId, ct);
+        if (review is null)
+            return NotFound();
+
+        return Ok(new ChatCompletionResponse(
+            review.Response,
+            review.ContextSummary,
+            review.LinkedFilePaths,
+            review.LinkedSymbols,
+            null));
+    }
+
+    public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);
     public sealed record ChatCompletionResponse(string Response, string? ContextSummary, string? LinkedFilePaths, string? LinkedSymbols, long? TraceId);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]

@@ -15,7 +15,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
     () => [
       {
         id: 'ticket.startDisposableRun',
-        label: 'Start Disposable Run',
+        label: 'Start Sandbox Run',
         intent: 'primary',
         onExecute: state.actions.onStartDisposableRun,
         disabled: Boolean(state.startDisposableRunBlockedReason),
@@ -24,7 +24,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
       },
       {
         id: 'ticket.reviewLatestRun',
-        label: 'Review Latest Run',
+        label: 'Review Run',
         intent: 'secondary',
         onExecute: state.actions.onReviewLatestRun,
         disabled: Boolean(state.reviewLatestRunBlockedReason),
@@ -94,7 +94,7 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
 
   const routeState: WorkspaceRouteMeta = useMemo(
     () => ({
-      workspaceCommands: commands,
+      workspaceCommands: [],
       workspaceBlockReason: state.createBlockedReason,
       workspaceSummaryChips: routeSummary,
       blockReasonTestId: state.createBlockedReason ? 'ticket.create.blockedReason' : undefined
@@ -108,11 +108,12 @@ export function TicketsRoute({ route, onRouteReady }: TicketsRouteProps) {
     }
   }, [onRouteReady, routeState]);
 
-  return <TicketsWorkspace {...mapTicketsPropsFromState(state)} />;
+  return <TicketsWorkspace {...mapTicketsPropsFromState(state, commands)} />;
 }
 
-function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel) {
+function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel, commands: WorkspaceCommand[]) {
   return {
+    commands,
     apiStatus: state.apiStatus,
     accessStatus: state.accessStatus,
     apiBaseUrl: state.apiBaseUrl,

@@ -10,7 +10,7 @@ import { EvidenceCard } from './EvidenceCard';
 import { InspectorSection } from './InspectorSection';
 import { MetadataRow } from './MetadataRow';
 import { StatusBadge } from './StatusBadge';
-import { SurfacePanel } from './SurfacePanel';
+import { ContextPanel } from '../design-system/panels/ContextPanel';
 
 interface ContextInspectorProps {
   ticket: ProjectTicket | null;
@@ -62,12 +62,7 @@ export function ContextInspector({
         : 'Project required';
 
   return (
-    <SurfacePanel className="context-inspector" testId="ticket.inspector">
-      <div className="section-heading">
-        <p className="eyebrow">Context inspector</p>
-        <h2>Evidence</h2>
-      </div>
-
+    <ContextPanel className="context-inspector" testId="ticket.inspector" title="Build Readiness">
       <InspectorSection title="Boundary" testId="ticket.inspector.evidence">
         <MetadataRow label="API" value={<code>{apiBaseUrl}</code>} />
         <MetadataRow label="Project" value={projectLabel} />
@@ -96,9 +91,9 @@ export function ContextInspector({
             <MetadataRow label="Run" value={latestRun.runId} />
             <MetadataRow label="Status" value={latestRun.status} />
             <MetadataRow label="Recommendation" value={latestRun.recommendation ?? 'No recommendation exposed.'} />
-            <MetadataRow label="Trace" value={latestRun.traceId ?? 'No trace id exposed.'} />
+            <MetadataRow label="Context trace" value={latestRun.traceId ?? 'No context trace exposed.'} />
             <CommandButton type="button" variant="secondary" onClick={onReviewLatestRun} disabled={!latestRun}>
-              Review latest run
+              Review run
             </CommandButton>
           </>
         ) : (
@@ -128,7 +123,7 @@ export function ContextInspector({
         )}
       </InspectorSection>
 
-      <InspectorSection title="Related decisions" testId="ticket.inspector.decisions">
+      <InspectorSection title="Linked decisions" testId="ticket.inspector.decisions">
         <p className="state-muted">Decision links are not exposed by the current ticket detail endpoint.</p>
       </InspectorSection>
 
@@ -161,7 +156,7 @@ export function ContextInspector({
         <p>{nextSafeAction ?? 'No explicit next action yet.'}</p>
       </InspectorSection>
 
-      <EvidenceCard title="Trace links">
+      <EvidenceCard title="Source Trace">
         <div data-testid="ticket.inspector.traceLinks">
           {ticket?.sourceChatSessionId || ticket?.sourceChatMessageId ? (
             <>
@@ -169,11 +164,11 @@ export function ContextInspector({
               <MetadataRow label="Chat message" value={ticket.sourceChatMessageId ?? 'Unavailable'} />
             </>
           ) : (
-            <p className="state-muted">Trace links are not exposed for this ticket yet.</p>
+            <p className="state-muted">Context trace links are not exposed for this ticket yet.</p>
           )}
         </div>
       </EvidenceCard>
-    </SurfacePanel>
+    </ContextPanel>
   );
 }
 

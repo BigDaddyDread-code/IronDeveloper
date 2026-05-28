@@ -16,6 +16,8 @@ import { MetadataRow } from './MetadataRow';
 import { StatusBadge } from './StatusBadge';
 import { SurfacePanel } from './SurfacePanel';
 import { TicketEditForm, type TicketEditDraft } from './TicketEditForm';
+import { ErrorState } from '../design-system/state/ErrorState';
+import { LoadingState } from '../design-system/state/LoadingState';
 
 interface TicketDetailProps {
   ticket: ProjectTicket | null;
@@ -81,7 +83,7 @@ export function TicketDetail({
   if (detailStatus === 'loading') {
     return (
       <SurfacePanel className="ticket-detail ticket-detail--empty" testId="ticket.detail">
-        <EmptyState title="Loading selected ticket" body="IronDev is loading the selected ticket detail through the API." />
+        <LoadingState title="Loading selected ticket" body="IronDev is loading the selected ticket detail through the API." />
       </SurfacePanel>
     );
   }
@@ -89,7 +91,7 @@ export function TicketDetail({
   if (detailStatus === 'error') {
     return (
       <SurfacePanel className="ticket-detail ticket-detail--empty" testId="ticket.detail">
-        <EmptyState title="Ticket detail unavailable" body={detailMessage} action={<StatusBadge status="warning">Retry from queue</StatusBadge>} />
+        <ErrorState title="Ticket detail unavailable" body={detailMessage} action={<StatusBadge status="warning">Retry from tickets</StatusBadge>} />
       </SurfacePanel>
     );
   }
@@ -99,7 +101,7 @@ export function TicketDetail({
       <SurfacePanel className="ticket-detail ticket-detail--empty" testId="ticket.detail">
         <EmptyState
           title="No ticket selected"
-          body="Select a ticket from the queue to inspect the workflow detail, readiness, and evidence context."
+          body="Select a ticket to inspect the workflow detail, build readiness, and context linked to this ticket."
         />
       </SurfacePanel>
     );
@@ -171,7 +173,7 @@ export function TicketDetail({
       <section className="workflow-section workflow-section--wide" data-testid="ticket.detail.brief">
         <div className="workflow-section__header">
           <h3>Brief</h3>
-          <StatusBadge status="info">API-backed</StatusBadge>
+          <StatusBadge status="info">Project data</StatusBadge>
         </div>
         <MetadataRow label="Summary" value={ticket.summary ?? 'No summary captured.'} />
         <MetadataRow label="Problem" value={ticket.problem ?? 'No problem statement captured.'} />
@@ -192,7 +194,7 @@ export function TicketDetail({
 
       <section className="workflow-section workflow-section--wide" data-testid="ticket.detail.executionEvidence">
         <div className="workflow-section__header">
-          <h3>Execution Evidence</h3>
+          <h3>Evidence</h3>
           <StatusBadge status={evidenceSummary ? (evidenceSummary.hasBlockingWarnings ? 'warning' : 'ready') : 'neutral'}>
             {evidenceStatus === 'loaded'
               ? evidenceSummary?.hasBlockingWarnings
@@ -204,20 +206,20 @@ export function TicketDetail({
           </StatusBadge>
         </div>
         {evidenceStatus === 'loading' ? (
-          <p>Loading execution evidence...</p>
+          <p>Loading evidence...</p>
         ) : !evidenceSummary ? (
           <p data-testid="ticket.evidence.empty">{evidenceMessage}</p>
         ) : evidenceSummary.latestRun || evidenceSummary.latestPromotionPackage ? (
           <>
             {evidenceSummary.latestRun ? (
               <div data-testid="ticket.evidence.latestRun" className="detail-panel">
-                <p className="section-subtitle">Latest run</p>
+                <p className="section-subtitle">Linked run</p>
                 <MetadataRow label="Run ID" value={evidenceSummary.latestRun.runId} />
                 <MetadataRow label="Status" value={evidenceSummary.latestRun.status} />
                 <MetadataRow label="Recommendation" value={evidenceSummary.latestRun.recommendation ?? 'No recommendation exposed.'} />
-                <MetadataRow label="Trace ID" value={evidenceSummary.latestRun.traceId ?? 'No trace id exposed.'} />
+                <MetadataRow label="Context trace" value={evidenceSummary.latestRun.traceId ?? 'No context trace exposed.'} />
                 <CommandButton type="button" variant="secondary" onClick={onReviewLatestRun}>
-                  Review latest run
+                  Review run
                 </CommandButton>
               </div>
             ) : (
@@ -239,7 +241,7 @@ export function TicketDetail({
               </div>
             ) : null}
             <MetadataRow label="Linked documents" value={`${evidenceSummary.linkedDocumentCount}`} />
-            <MetadataRow label="Linked traces" value={`${evidenceSummary.linkedTraceCount}`} />
+            <MetadataRow label="Context traces" value={`${evidenceSummary.linkedTraceCount}`} />
             <MetadataRow label="Linked decisions" value={`${evidenceSummary.linkedDecisionCount}`} />
             <MetadataRow label="Linked runs" value={`${evidenceSummary.linkedRunCount}`} />
             <div className="workflow-section__meta" data-testid="ticket.evidence.blockedActions">
@@ -261,7 +263,7 @@ export function TicketDetail({
           </>
         ) : (
           <div data-testid="ticket.evidence.empty">
-            <p>No execution evidence yet. Start a disposable run to produce trace, build/test output, and promotion review data.</p>
+            <p>No build evidence yet. Start a sandbox run to produce context trace, build output, and review data.</p>
             <p>{evidenceMessage}</p>
           </div>
         )}

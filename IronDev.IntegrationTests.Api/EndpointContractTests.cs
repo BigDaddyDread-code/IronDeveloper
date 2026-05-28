@@ -154,11 +154,38 @@ public sealed class EndpointContractTests : ApiTestBase
             projectId = project.Id,
             sessionId = (long?)null,
             prompt = "hello",
-            activeModel = "test"
+            activeModel = "test",
+            mode = "projectStateReview"
         });
         Assert.AreEqual(HttpStatusCode.OK, chat.StatusCode);
         using var chatBody = JsonDocument.Parse(await chat.Content.ReadAsStringAsync());
-        Assert.IsFalse(string.IsNullOrWhiteSpace(chatBody.RootElement.GetProperty("response").GetString()));
+        var chatResponse = chatBody.RootElement.GetProperty("response").GetString();
+        Assert.IsFalse(string.IsNullOrWhiteSpace(chatResponse));
+        Assert.IsFalse(chatResponse!.Contains("placeholder", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(chatResponse.Contains("Exercise API ticket boundary update", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(chatResponse.Contains("Recommended next actions", StringComparison.OrdinalIgnoreCase));
+
+        var chatContext = chatBody.RootElement.GetProperty("contextSummary").GetString();
+        Assert.IsTrue(chatContext?.Contains("ticket", StringComparison.OrdinalIgnoreCase) == true);
+
+        var wrongProjectChat = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
+        {
+            projectId = project.Id + 999,
+            sessionId = (long?)null,
+            prompt = "hello",
+            activeModel = "test"
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, wrongProjectChat.StatusCode);
+
+        var unsupportedChatMode = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
+        {
+            projectId = project.Id,
+            sessionId = (long?)null,
+            prompt = "hello",
+            activeModel = "test",
+            mode = "generalProjectQuestion"
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, unsupportedChatMode.StatusCode);
     }
 
     [TestMethod]
@@ -963,7 +990,10 @@ public sealed class EndpointContractTests : ApiTestBase
             ReviewId = review.ReviewId,
             ExpectedOutput = "mutate calculator output"
         });
-        Assert.AreEqual(HttpStatusCode.BadRequest, overrideRun.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, overrideRun.StatusCode);
+        var rejectedRun = await overrideRun.Content.ReadFromJsonAsync<StartDisposableCodeRunResponse>();
+        Assert.IsNotNull(rejectedRun);
+        Assert.AreEqual("Failed", rejectedRun!.State);
     }
 
     [TestMethod]

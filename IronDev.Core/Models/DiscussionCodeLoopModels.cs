@@ -88,6 +88,26 @@ public sealed record CodeRunProfile
     public required string RunCommand { get; init; }
 }
 
+public sealed record CodeRunProfileDefinition
+{
+    public required string RuntimeProfileId { get; init; }
+    public required string DisplayName { get; init; }
+    public required string BuildCommand { get; init; }
+    public required string RunCommand { get; init; }
+    public int TimeoutSeconds { get; init; } = 120;
+    public int MaxFileCount { get; init; } = 12;
+    public int MaxFileBytes { get; init; } = 64_000;
+    public IReadOnlyList<string> AllowedVerificationKinds { get; init; } = [];
+}
+
+public sealed record CodeProposalValidationResult
+{
+    public bool IsValid => Errors.Count == 0;
+    public IReadOnlyList<string> Errors { get; init; } = [];
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public CodeRunProfileDefinition? RuntimeProfile { get; init; }
+}
+
 public sealed record BuildScenario
 {
     public required string ScenarioId { get; init; }
