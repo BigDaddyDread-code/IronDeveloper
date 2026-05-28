@@ -795,10 +795,12 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toHaveCount(0);
   await expect(page.getByTestId('chat.command.send')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
   await expect(page.getByTestId('chat.composer.disabledReason')).toContainText('Enter a message before sending.');
 
   await page.getByTestId('chat.composer.input').fill('Where should I start?');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toBeEnabled();
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
   await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
@@ -963,10 +965,12 @@ test('build route runs the reusable discussion-to-code spine', async ({ page }) 
 
   await page.goto('/');
   await openTickets(page);
-  await page.getByTestId('shell.nav.build').click();
+  await page.getByTestId('shell.nav.chat').click();
+  await page.getByTestId('chat.composer.input').fill('Create a small console app that proves the reusable spine.');
+  await page.getByTestId('chat.command.continueInBuild').click();
   await expect(page.getByTestId('build.workspace')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toBeVisible();
-  await page.getByTestId('chat-build.discussion.content').fill('Create a small console app that proves the reusable spine.');
+  await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue('Create a small console app that proves the reusable spine.');
   await page.getByTestId('chat-build.command.saveDiscussion').click();
   await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
   await page.getByTestId('chat-build.command.createTicket').click();

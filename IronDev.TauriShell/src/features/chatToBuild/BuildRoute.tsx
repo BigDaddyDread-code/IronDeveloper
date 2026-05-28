@@ -13,6 +13,7 @@ import { Surface } from '../../design-system/Surface';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 import { DiscussionComposer } from './DiscussionComposer';
 import { DiscussionDocumentCard } from './DiscussionDocumentCard';
 import { DisposableRunPanel } from './DisposableRunPanel';
@@ -33,6 +34,7 @@ const defaultTitle = 'Project build request';
 export function BuildRoute({ route, onRouteReady }: BuildRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
+  const navigation = useWorkspaceNavigation();
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState('');
   const [document, setDocument] = useState<SaveDiscussionResponse | null>(null);
@@ -63,6 +65,18 @@ export function BuildRoute({ route, onRouteReady }: BuildRouteProps) {
     setRun(null);
     setReviewPackage(null);
   }, []);
+
+  useEffect(() => {
+    const draft = navigation.buildDiscussionDraft;
+    if (!draft || document || ticket || review || run || reviewPackage) {
+      return;
+    }
+
+    setTitle(draft.title || defaultTitle);
+    setContent(draft.content);
+    setStatusMessage('Discussion imported from Chat.');
+    navigation.consumeBuildDiscussionDraft();
+  }, [document, navigation, review, reviewPackage, run, ticket]);
 
   const resetAll = useCallback(() => {
     setTitle(defaultTitle);

@@ -3,6 +3,7 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { ChatCompletionResponse } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 const projectReviewPrompt = [
@@ -14,6 +15,7 @@ const projectReviewPrompt = [
 export function useProjectChat() {
   const session = useSessionContext();
   const project = useProjectContext();
+  const navigation = useWorkspaceNavigation();
   const [messages, setMessages] = useState<ChatWorkspaceMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setSending] = useState(false);
@@ -22,6 +24,12 @@ export function useProjectChat() {
   const projectId = project.selectedProjectId;
   const disabledReason = getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus);
   const sendDisabledReason = disabledReason ?? getChatSendBlockedReason(draft, isSending);
+  const latestUserMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === 'user')?.content ?? '',
+    [messages]
+  );
+  const buildBridgeContent = draft.trim() || latestUserMessage.trim();
+  const buildBridgeDisabledReason = disabledReason ?? (buildBridgeContent ? null : 'Enter or send discussion text before continuing to Build.');
   const projectLabel = project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required');
 
   const sendMessage = useCallback(
@@ -83,6 +91,21 @@ export function useProjectChat() {
     });
   }, [sendMessage]);
 
+  const continueInBuild = useCallback(() => {
+    const content = buildBridgeContent.trim();
+    if (!content || disabledReason) {
+      return;
+    }
+
+    navigation.setBuildDiscussionDraft({
+      title: 'Project discussion',
+      content,
+      source: 'chat',
+      createdUtc: new Date().toISOString()
+    });
+    navigation.navigateToWorkspace('build');
+  }, [buildBridgeContent, disabledReason, navigation]);
+
   const latestResponse = useMemo(
     () => [...messages].reverse().find((message) => message.role === 'assistant' && message.response)?.response ?? null,
     [messages]
@@ -99,13 +122,15 @@ export function useProjectChat() {
     isSending,
     disabledReason,
     sendDisabledReason,
+    buildBridgeDisabledReason,
     errorMessage,
     latestResponse: latestResponse as ChatCompletionResponse | null,
     latestResponseText,
     projectLabel,
     setDraft,
     sendMessage,
-    reviewProjectState
+    reviewProjectState,
+    continueInBuild
   };
 }
 

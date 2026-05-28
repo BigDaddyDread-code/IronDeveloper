@@ -11,6 +11,7 @@ interface ChatWorkspaceProps {
   isSending: boolean;
   disabledReason: string | null;
   sendDisabledReason: string | null;
+  buildBridgeDisabledReason: string | null;
   errorMessage: string | null;
   latestResponse: ChatCompletionResponse | null;
   latestResponseText: string | null;
@@ -18,6 +19,7 @@ interface ChatWorkspaceProps {
   onComposerChange: (value: string) => void;
   onSend: (request?: ChatSendRequest) => void;
   onReviewProjectState: () => void;
+  onContinueInBuild: () => void;
 }
 
 export function ChatWorkspace({
@@ -26,13 +28,15 @@ export function ChatWorkspace({
   isSending,
   disabledReason,
   sendDisabledReason,
+  buildBridgeDisabledReason,
   errorMessage,
   latestResponse,
   latestResponseText,
   projectLabel,
   onComposerChange,
   onSend,
-  onReviewProjectState
+  onReviewProjectState,
+  onContinueInBuild
 }: ChatWorkspaceProps) {
   return (
     <Surface className="chat-workspace-panel" testId="chat.workspace">
@@ -55,6 +59,8 @@ export function ChatWorkspace({
             onChange={onComposerChange}
             onSend={() => onSend()}
             onReviewProjectState={onReviewProjectState}
+            onContinueInBuild={onContinueInBuild}
+            buildBridgeDisabledReason={buildBridgeDisabledReason}
           />
         </div>
         <ChatContextPanel latestResponse={latestResponse} latestResponseText={latestResponseText} projectLabel={projectLabel} />
