@@ -136,7 +136,7 @@ export function PromotionReviewRoute({ route, onRouteReady }: PromotionReviewRou
             </div>
 
             {state.filteredRuns.length === 0 ? (
-              <EmptyState title="No matching runs" body="Generate disposable runs and promotion packages to review them here." />
+              <EmptyState title="No matching runs" body="Generate sandbox runs and promotion packages to review them here." />
             ) : (
               <div className="workspace-list-pane__items" data-testid="promotion-review.rows">
                 {state.filteredRuns.map((run) => (

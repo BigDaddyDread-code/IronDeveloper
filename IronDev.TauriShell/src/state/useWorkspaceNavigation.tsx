@@ -11,7 +11,7 @@ interface WorkspaceNavigationContextValue {
 const WorkspaceNavigationContext = createContext<WorkspaceNavigationContextValue | null>(null);
 
 export function WorkspaceNavigationProvider({ children }: { children: ReactNode }) {
-  const [activeRouteId, setActiveRouteId] = useState<WorkspaceRoute['id']>('tickets');
+  const [activeRouteId, setActiveRouteId] = useState<WorkspaceRoute['id']>('home');
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const navigateToWorkspace = useCallback((routeId: WorkspaceRoute['id']) => {
     setActiveRouteId(routeId);

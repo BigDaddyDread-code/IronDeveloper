@@ -1,4 +1,7 @@
 import type {
+  WorkspaceCommand
+} from '../../app/routes';
+import type {
   ApiStatus,
   BuildReadinessResult,
   ProductAccessStatus,
@@ -24,9 +27,13 @@ import type { TicketEditDraft } from '../../components/TicketEditForm';
 import { TicketDetail } from '../../components/TicketDetail';
 import { TicketList } from '../../components/TicketList';
 import { TicketRunReviewPanel } from '../../components/TicketRunReviewPanel';
-import { WorkspaceLayout } from '../../components/WorkspaceLayout';
+import { StatusBadge } from '../../components/StatusBadge';
+import { MetadataGrid } from '../../design-system/metadata/MetadataGrid';
+import { WorkspaceFrame } from '../../design-system/workspace/WorkspaceFrame';
+import { WorkspaceSplitPane } from '../../design-system/workspace/WorkspaceSplitPane';
 
 interface TicketsWorkspaceProps {
+  commands: WorkspaceCommand[];
   apiStatus: ApiStatus;
   accessStatus: ProductAccessStatus;
   apiBaseUrl: string;
@@ -104,6 +111,7 @@ interface TicketsWorkspaceProps {
 }
 
 export function TicketsWorkspace({
+  commands,
   apiStatus,
   accessStatus,
   apiBaseUrl,
@@ -179,23 +187,60 @@ export function TicketsWorkspace({
   onSelectTenant,
   onSelectProject
 }: TicketsWorkspaceProps) {
+  const projectName = projects.find((project) => project.id === selectedProjectId)?.name ?? null;
+  const linkedRun = evidenceSummary?.latestRun ?? null;
+  const workspaceMetadata = (
+    <MetadataGrid
+      items={[
+        { label: 'Project', value: projectName ?? (selectedProjectId ? `Project ${selectedProjectId}` : 'Project required') },
+        { label: 'Tickets', value: `${tickets.length}` },
+        {
+          label: 'Selection',
+          value: selectedTicket ? `#${selectedTicket.id}` : 'No ticket selected'
+        },
+        {
+          label: 'Run',
+          value: linkedRun ? linkedRun.status : 'No reviewed run linked'
+        }
+      ]}
+    />
+  );
+
   return (
-    <main className="tickets-workspace" data-testid="tickets.workspace">
-      <WorkspaceLayout
-        left={
+    <WorkspaceFrame
+      title="Tickets"
+      description="Select project work, check build readiness, run safely in a sandbox, and review traceable execution output."
+      metadata={workspaceMetadata}
+      commands={commands}
+      reviewPanel={
+        isRunReviewOpen ? (
+          <TicketRunReviewPanel
+            review={runReview}
+            status={runReviewStatus}
+            message={runReviewMessage}
+            onRefresh={onRefreshRunReview}
+            onDismiss={onDismissRunReview}
+          />
+        ) : null
+      }
+      testId="tickets.workspace"
+    >
+      <WorkspaceSplitPane
+        list={
           <TicketList
             tickets={tickets}
+            evidenceSummary={evidenceSummary}
             selectedTicketId={selectedTicketId}
             message={ticketMessage}
             isLoading={accessStatus === 'loadingTickets' || accessStatus === 'loading'}
             onSelect={onSelectTicket}
           />
         }
-        center={
+        detail={
           isCreatePanelOpen ? (
             <CreateTicketPanel
               projectId={selectedProjectId}
-              projectName={projects.find((project) => project.id === selectedProjectId)?.name ?? null}
+              projectName={projectName}
               projectStatus={projectStatus}
               draft={createDraft}
               status={createStatus}
@@ -235,6 +280,14 @@ export function TicketsWorkspace({
             </SurfacePanel>
           ) : (
             <div className="tickets-workspace__main-stack">
+              <div className="tickets-workspace__detail-strip">
+                <StatusBadge status={selectedTicket ? 'info' : 'neutral'}>
+                  {selectedTicket ? 'Selected ticket detail' : 'No ticket selected'}
+                </StatusBadge>
+                <StatusBadge status={linkedRun ? 'ready' : 'neutral'}>
+                  {linkedRun ? 'Run review linked' : 'No reviewed run linked'}
+                </StatusBadge>
+              </div>
               <TicketDetail
                 ticket={selectedTicket}
                 detailStatus={accessStatus === 'loadingTickets' ? 'loading' : ticketDetailStatus}
@@ -265,19 +318,10 @@ export function TicketsWorkspace({
                 onReviewLatestRun={onReviewLatestRun}
                 onOpenPromotionReview={onOpenPromotionReview}
               />
-              {isRunReviewOpen ? (
-                <TicketRunReviewPanel
-                  review={runReview}
-                  status={runReviewStatus}
-                  message={runReviewMessage}
-                  onRefresh={onRefreshRunReview}
-                  onDismiss={onDismissRunReview}
-                />
-              ) : null}
             </div>
           )
         }
-        right={
+        context={
           <ContextInspector
             ticket={selectedTicket}
             evidenceSummary={evidenceSummary}
@@ -294,6 +338,6 @@ export function TicketsWorkspace({
           />
         }
       />
-    </main>
+    </WorkspaceFrame>
   );
 }

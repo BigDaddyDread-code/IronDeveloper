@@ -127,8 +127,8 @@ function Get-SeedCounts {
 SET NOCOUNT ON;
 SELECT
   (SELECT COUNT(*) FROM dbo.Projects WHERE Name = 'IronDev Local Test Project') AS Projects,
-  (SELECT COUNT(*) FROM dbo.ProjectDocuments WHERE Title IN ('Alpha UI Manual Test Notes','Code Standards Draft','Test Agent Direction')) AS Documents,
-  (SELECT COUNT(*) FROM dbo.ProjectTickets WHERE Title IN ('Add Governed Tool Architecture','Wire Start Disposable Run','Improve Ticket Workspace UI')) AS Tickets,
+  (SELECT COUNT(*) FROM dbo.ProjectDocuments WHERE Title IN ('Workspace Manual Test Notes','Code Standards Draft','Testing Companion Direction')) AS Documents,
+  (SELECT COUNT(*) FROM dbo.ProjectTickets WHERE Title IN ('Add Governed Tool Architecture','Wire Start Sandbox Run','Improve Ticket Workspace UI')) AS Tickets,
   (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId = 'localtest-run-ticket-3002') AS RunEvents,
   (SELECT COUNT(*) FROM dbo.Runs WHERE ProjectId = 1 AND TicketId IS NOT NULL AND IsDisposable = 1) AS DisposableRuns,
   (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType IN ('DisposableCommandCompleted','DisposableCommandFailed')) AS DisposableCommandEvents,
@@ -184,7 +184,7 @@ function Write-Reports {
 
     $status = if ($Report.passed) { "PASS" } else { "FAIL" }
     $lines = @(
-        "# LocalTest Alpha Cockpit Report",
+        "# LocalTest Workspace Report",
         "",
         "- Status: $status",
         "- Generated UTC: $($Report.generatedUtc)",
@@ -385,13 +385,13 @@ finally {
 
     if ($passed) {
         Write-Host ""
-        Write-Host "PASS LocalTest Alpha cockpit smoke passed"
+        Write-Host "PASS LocalTest workspace smoke passed"
         Write-Host "Report: $markdownReportPath"
         exit 0
     }
 
     Write-Host ""
-    Write-Host "FAIL LocalTest Alpha cockpit smoke failed"
+    Write-Host "FAIL LocalTest workspace smoke failed"
     Write-Host "Report: $markdownReportPath"
     exit 1
 }

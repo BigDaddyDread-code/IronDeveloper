@@ -2,6 +2,8 @@ import type {
   ApiConnectionStatus,
   ApiStatus,
   BuildReadinessResult,
+  ChatCompletionRequest,
+  ChatCompletionResponse,
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
@@ -394,6 +396,18 @@ class IronDevApiClient {
         signal
       }
     );
+  }
+
+  async completeChat(
+    projectId: number,
+    request: ChatCompletionRequest,
+    signal?: AbortSignal
+  ): Promise<ChatCompletionResponse> {
+    return this.request<ChatCompletionResponse>(`/api/projects/${projectId}/chat/complete`, {
+      method: 'POST',
+      body: { ...request, projectId },
+      signal
+    });
   }
 
   async getRunReports(signal?: AbortSignal): Promise<RunReportSummary[]> {

@@ -1,8 +1,16 @@
 import type { RunEventSummary } from '../../api/types';
 
-export function RunEventTimeline({ events }: { events: RunEventSummary[] }) {
+export function RunEventTimeline({
+  events,
+  compact = false,
+  testId = 'chat-build.runEventTimeline'
+}: {
+  events: RunEventSummary[];
+  compact?: boolean;
+  testId?: string;
+}) {
   return (
-    <section className="chat-build-timeline" data-testid="chat-build.runEventTimeline">
+    <section className={`chat-build-timeline${compact ? ' chat-build-timeline--compact' : ''}`} data-testid={testId}>
       <div className="section-heading">
         <p className="eyebrow">Events</p>
         <h2>Run timeline</h2>

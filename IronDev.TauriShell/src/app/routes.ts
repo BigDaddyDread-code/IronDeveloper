@@ -27,59 +27,57 @@ export interface WorkspaceRouteMeta {
   blockReasonTestId?: string;
 }
 
+export type WorkspaceRouteId = 'home' | 'chat' | 'build' | 'tickets' | 'knowledge' | 'runs' | 'settings';
+
 export interface WorkspaceRoute {
-  id: 'tickets' | 'chat-to-build' | 'run-reports' | 'promotion-review';
+  id: WorkspaceRouteId;
   label: string;
   route: string;
-  maturity: 'spike' | 'alpha';
-  parityStatus: 'spike' | 'alpha';
-  parityNotes: string[];
+  description: string;
 }
 
 export const workspaceRoutes: WorkspaceRoute[] = [
   {
+    id: 'home',
+    label: 'Home',
+    route: '/',
+    description: 'Project state, readiness, and suggested next actions.'
+  },
+  {
+    id: 'chat',
+    label: 'Chat',
+    route: '/chat',
+    description: 'Ask project-aware questions and inspect context used.'
+  },
+  {
+    id: 'build',
+    label: 'Build',
+    route: '/build',
+    description: 'Move discussion into review-only sandbox code runs and evidence.'
+  },
+  {
     id: 'tickets',
     label: 'Tickets',
-    route: 'tickets',
-    maturity: 'spike',
-    parityStatus: 'spike',
-    parityNotes: [
-      'Ticket lifecycle and project context are wired end-to-end.',
-      'Evidence and run review surfaces are still alpha targets.'
-    ]
+    route: '/tickets',
+    description: 'Plan, select, and inspect project work.'
   },
   {
-    id: 'chat-to-build',
-    label: 'Chat to Build',
-    route: 'chat-to-build',
-    maturity: 'alpha',
-    parityStatus: 'alpha',
-    parityNotes: [
-      'Manual dogfood surface for the reusable discussion-to-code spine.',
-      'Runs project-scoped backend endpoints only; no command, path, or apply controls.'
-    ]
+    id: 'knowledge',
+    label: 'Knowledge',
+    route: '/knowledge',
+    description: 'Documents, discussions, plans, decisions, and retrieval status.'
   },
   {
-    id: 'run-reports',
-    label: 'Run Reports',
-    route: 'run-reports',
-    maturity: 'alpha',
-    parityStatus: 'alpha',
-    parityNotes: [
-      'Primary evidence cockpit for governed runs.',
-      'Shows timeline, evidence, and policy-aware inspection.'
-    ]
+    id: 'runs',
+    label: 'Runs',
+    route: '/runs',
+    description: 'Execution history, evidence, failures, and review packages.'
   },
   {
-    id: 'promotion-review',
-    label: 'Promotion Review',
-    route: 'promotion-review',
-    maturity: 'alpha',
-    parityStatus: 'alpha',
-    parityNotes: [
-      'Shows promotable vs blocked file groups.',
-      'Exposes approval state and blocked action reasons before write operations.'
-    ]
+    id: 'settings',
+    label: 'Settings',
+    route: '/settings',
+    description: 'Environment, API, service health, and local configuration.'
   }
 ];
 

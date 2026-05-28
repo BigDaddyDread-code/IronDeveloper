@@ -151,9 +151,9 @@ SET IDENTITY_INSERT dbo.ProjectDocuments ON;
 INSERT INTO dbo.ProjectDocuments
     (Id, TenantId, ProjectId, Title, Slug, DocumentType, CurrentVersionId, Status, CreatedBy, UpdatedBy)
 VALUES
-    (1001, 1, 1, 'Alpha UI Manual Test Notes', 'alpha-ui-manual-test-notes', 'DiscussionSummary', 2001, 'Active', 'localtest-seed', 'localtest-seed'),
+    (1001, 1, 1, 'Workspace Manual Test Notes', 'workspace-manual-test-notes', 'DiscussionSummary', 2001, 'Active', 'localtest-seed', 'localtest-seed'),
     (1002, 1, 1, 'Code Standards Draft', 'code-standards-draft', 'Architecture', 2002, 'Active', 'localtest-seed', 'localtest-seed'),
-    (1003, 1, 1, 'Test Agent Direction', 'test-agent-direction', 'BuildPlan', 2003, 'Active', 'localtest-seed', 'localtest-seed');
+    (1003, 1, 1, 'Testing Companion Direction', 'testing-companion-direction', 'BuildPlan', 2003, 'Active', 'localtest-seed', 'localtest-seed');
 SET IDENTITY_INSERT dbo.ProjectDocuments OFF;
 GO
 
@@ -166,7 +166,7 @@ VALUES
     1001,
     0,
     1,
-    '# Alpha UI Manual Test Notes
+    '# Workspace Manual Test Notes
 
 Use this seeded project to verify the LocalTest badge, ticket list, document list, execution evidence, and honest disabled states.',
     'Initial LocalTest manual notes.',
@@ -192,7 +192,7 @@ Use this seeded project to verify the LocalTest badge, ticket list, document lis
     1003,
     0,
     1,
-    '# Test Agent Direction
+    '# Testing Companion Direction
 
 Manual UI testing should use resettable LocalTest data and should never depend on real development project rows.',
     'Initial LocalTest test-agent direction.',
@@ -266,7 +266,7 @@ VALUES
     1,
     1,
     NEWID(),
-    'Wire Start Disposable Run',
+    'Wire Start Sandbox Run',
     'Feature',
     'High',
     'Wire the ticket cockpit to the real disposable build-run backend.',
@@ -275,7 +275,7 @@ VALUES
     'Start run calls the backend; evidence links by project/ticket payload; Review Latest Run opens only for linked runs.',
     'Seeded LocalTest ticket includes a linked run event for review-panel testing.',
     'In Review',
-    'Connect Start Disposable Run to the backend and surface the linked run review panel.',
+    'Connect Start Sandbox Run to the backend and surface the linked run review panel.',
     '["IronDev.Api/Controllers/TicketsController.cs","IronDev.TauriShell/src/features/tickets"]',
     '["TicketRunReviewDto","TicketEvidenceSummaryDto"]',
     'Service tests cover no linked run and linked run states.',
@@ -310,7 +310,7 @@ VALUES
     'Playwright smoke validates the core loop.',
     'Use the LocalTest manual checklist.',
     'npm run build; npm run test',
-    'Linked to LocalTest test-agent direction.',
+    'Linked to LocalTest testing companion direction.',
     0,
     NULL,
     NULL,
@@ -331,8 +331,8 @@ INSERT INTO dbo.ArtifactSourceReferences
     (TenantId, ProjectId, ArtifactType, ArtifactId, SourceType, SourceId, ReferenceType, Summary, IsRequired, CreatedBy)
 VALUES
     (1, 1, 'Ticket', 3001, 'ProjectDocumentVersion', 2002, 'CreatedFrom', 'Ticket was seeded from Code Standards Draft.', 1, 'localtest-seed'),
-    (1, 1, 'Ticket', 3002, 'ProjectDocumentVersion', 2001, 'CreatedFrom', 'Ticket was seeded from Alpha UI Manual Test Notes.', 1, 'localtest-seed'),
-    (1, 1, 'Ticket', 3003, 'ProjectDocumentVersion', 2003, 'CreatedFrom', 'Ticket was seeded from Test Agent Direction.', 1, 'localtest-seed');
+    (1, 1, 'Ticket', 3002, 'ProjectDocumentVersion', 2001, 'CreatedFrom', 'Ticket was seeded from Workspace Manual Test Notes.', 1, 'localtest-seed'),
+    (1, 1, 'Ticket', 3003, 'ProjectDocumentVersion', 2003, 'CreatedFrom', 'Ticket was seeded from Testing Companion Direction.', 1, 'localtest-seed');
 GO
 
 INSERT INTO dbo.Runs
@@ -344,7 +344,7 @@ VALUES
     3002,
     'Completed',
     1,
-    'Seeded disposable run completed for manual review.',
+    'Seeded sandbox run completed for manual review.',
     NULL,
     NULL,
     DATEADD(minute, -8, SYSUTCDATETIME()),

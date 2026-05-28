@@ -5,6 +5,11 @@ async function expectNoHorizontalOverflow(page: import('@playwright/test').Page)
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+async function openTickets(page: import('@playwright/test').Page) {
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('tickets.workspace')).toBeVisible();
+}
+
 async function mockHealthyApi(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({
@@ -54,7 +59,15 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.shell')).toBeVisible();
   await expect(page.getByTestId('app.header')).toBeVisible();
   await expect(page.getByTestId('app.apiStatus')).toBeVisible();
+  await expect(page.getByTestId('home.workspace')).toBeVisible();
+  for (const route of ['home', 'chat', 'build', 'tickets', 'knowledge', 'runs', 'settings']) {
+    await expect(page.getByTestId(`shell.nav.${route}`)).toBeVisible();
+  }
+  await expect(page.getByText('Chat to Build', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Run Reports', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Promotion Review', { exact: true })).toHaveCount(0);
   await expect(page.getByTestId('shell.nav.tickets')).toBeVisible();
+  await openTickets(page);
   await expect(page.getByTestId('tickets.workspace')).toBeVisible();
   await expect(page.getByTestId('tickets.header')).toBeVisible();
   await expect(page.getByTestId('ticket.list')).toBeVisible();
@@ -96,6 +109,7 @@ test('tickets shell shows offline state and does not overflow in a narrow deskto
 
   await page.setViewportSize({ width: 920, height: 760 });
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByTestId('app.shell')).toBeVisible();
   await expect(page.getByTestId('tickets.workspace')).toBeVisible();
@@ -132,6 +146,7 @@ test('tickets shell shows tenant required state after token auth', async ({ page
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByRole('heading', { name: 'Tenant required' })).toBeVisible();
   await expect(page.getByTestId('tenant.selector')).toBeVisible();
@@ -164,6 +179,7 @@ test('tickets shell shows project required state when no projects are available'
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByRole('heading', { name: 'Project required' })).toBeVisible();
   await expect(page.getByTestId('project.selector')).toBeVisible();
@@ -208,6 +224,7 @@ test('tickets shell labels fallback project context without treating it as selec
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByTestId('project.status.fallback')).toContainText('Fallback project 1');
   expect(await page.getByTestId('project.status.selected').count()).toBe(0);
@@ -323,6 +340,7 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByTestId('project.status.selected')).toBeVisible();
   await expect(page.getByTestId('ticket.command.create')).toBeEnabled();
@@ -334,7 +352,7 @@ test('tickets shell loads mocked project ticket data', async ({ page }) => {
   await expect(page.getByTestId('ticket.detail.header')).toBeVisible();
   await expect(page.getByTestId('ticket.detail.executionEvidence')).toBeVisible();
   await expect(page.getByTestId('ticket.evidence.empty')).toBeVisible();
-  await expect(page.getByTestId('ticket.evidence.empty')).toContainText('No execution evidence yet');
+  await expect(page.getByTestId('ticket.evidence.empty')).toContainText('No build evidence yet');
   await expect(page.getByTestId('ticket.detail.brief')).toBeVisible();
   await expect(page.getByTestId('ticket.detail.plan')).toBeVisible();
   await expect(page.getByTestId('ticket.detail.context')).toBeVisible();
@@ -369,6 +387,7 @@ test('tickets shell changes selected ticket detail through the API facade', asyn
   await mockTicketProject(page);
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByTestId('ticket.detail.header')).toContainText('Make tickets cockpit real');
   await page.getByText('Add project selection', { exact: true }).click();
@@ -386,6 +405,7 @@ test('tickets shell handles readiness loading and unavailable state', async ({ p
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await page.getByTestId('ticket.detail.build').getByTestId('ticket.command.refreshReadiness').click();
   await expect(page.getByTestId('ticket.detail.build').getByTestId('ticket.command.refreshReadiness')).toContainText('Checking readiness');
@@ -398,6 +418,7 @@ test('tickets shell opens edit mode, validates title, and cancels dirty changes'
   await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
 
   await page.goto('/');
+  await openTickets(page);
 
   await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await expect(page.getByTestId('ticket.edit.form')).toBeVisible();
@@ -429,6 +450,7 @@ test('tickets shell saves edited ticket through the API and clears dirty state',
   });
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await page.getByTestId('ticket.edit.title').fill('Saved Tauri workflow title');
   await page.getByTestId('ticket.edit.summary').fill('Saved through the ticket workflow parity form.');
@@ -452,6 +474,7 @@ test('tickets shell shows product error when ticket save API fails', async ({ pa
   });
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await page.getByTestId('ticket.edit.title').fill('Save failure title');
   await page.getByTestId('ticket.command.save').click();
@@ -465,6 +488,7 @@ test('tickets shell blocks selection changes while edit form is dirty', async ({
   await mockTicketProjectForEdit(page, async (request) => request.postDataJSON() as Record<string, unknown>);
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('workspace.commands').getByTestId('ticket.command.edit').click();
   await page.getByTestId('ticket.edit.title').fill('Dirty title that should block selection');
   await page.getByText('Add project selection', { exact: true }).click();
@@ -498,6 +522,7 @@ test('tickets shell refreshes implementation plan through the API', async ({ pag
   });
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('workspace.commands').getByTestId('ticket.command.generatePlan').click();
 
   await expect(page.getByTestId('ticket.detail.plan')).toContainText('Prove safe edit and review workflow parity.');
@@ -512,6 +537,7 @@ test('tickets shell shows unavailable plan state when plan endpoint has no data'
   });
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('workspace.commands').getByTestId('ticket.command.generatePlan').click();
 
   await expect(page.getByTestId('ticket.detail.plan')).toContainText('Plan not available yet.');
@@ -521,6 +547,7 @@ test('tickets shell shows unavailable plan state when plan endpoint has no data'
 test('tickets shell opens create panel and validates required title', async ({ page }) => {
   await mockTicketProject(page);
   await page.goto('/');
+  await openTickets(page);
 
   await page.getByTestId('ticket.command.create').click();
 
@@ -558,6 +585,7 @@ test('tickets shell creates a ticket through the API and selects the result', as
   });
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('ticket.command.create').click();
   await page.getByTestId('ticket.create.title').fill('Create safe Tauri ticket action');
   await page.getByTestId('ticket.create.summary').fill('Prove ticket creation through IronDev.Api.');
@@ -586,6 +614,7 @@ test('tickets shell shows product error when ticket create API fails', async ({ 
   });
 
   await page.goto('/');
+  await openTickets(page);
   await page.getByTestId('ticket.command.create').click();
   await page.getByTestId('ticket.create.title').fill('Create should fail cleanly');
   await page.getByTestId('ticket.create.summary').fill('The API mock returns a server error.');
@@ -613,8 +642,9 @@ test('run reports cockpit shows summaries, timeline, and evidence', async ({ pag
   });
 
   await page.goto('/');
+  await openTickets(page);
 
-  await page.getByTestId('shell.nav.run-reports').click();
+  await page.getByTestId('shell.nav.runs').click();
   await expect(page.getByTestId('run-reports.workspace')).toBeVisible();
   await expect(page.getByTestId('run-reports.list')).toBeVisible();
   await expect(page.getByTestId('run-reports.summary')).toBeVisible();
@@ -635,7 +665,7 @@ test('run reports cockpit shows summaries, timeline, and evidence', async ({ pag
   await expectNoHorizontalOverflow(page);
 });
 
-test('promotion review cockpit shows promotable and blocked files with next action guidance', async ({ page }) => {
+test('product navigation does not expose promotion review as a main workspace', async ({ page }) => {
   await mockTicketProject(page);
   await mockRunReportWorkspace(page, {
     runs: [runReportSummaryForPromotion],
@@ -648,20 +678,11 @@ test('promotion review cockpit shows promotable and blocked files with next acti
   });
 
   await page.goto('/');
-  await page.getByTestId('shell.nav.promotion-review').click();
-
-  await expect(page.getByTestId('promotion-review.workspace')).toBeVisible();
-  await expect(page.getByTestId('promotion-review.list')).toBeVisible();
-  await expect(page.getByTestId('promotion-review.summary')).toBeVisible();
-  await expect(page.getByTestId('promotion-review.inspector')).toBeVisible();
-  await expect(page.getByTestId('promotion-review.detail')).toBeVisible();
-  await expect(page.getByTestId('promotion-review.detail')).toContainText('pkg-run-901');
-  await expect(page.getByTestId('promotion-review.detail')).toContainText('src/App.Feature.cs');
-  await expect(page.getByTestId('promotion-review.detail')).toContainText('src/App.Blocked.cs');
-  await expect(page.getByTestId('promotion-review.blockedActions.empty')).toHaveCount(0);
-  await expect(page.getByTestId('promotion-review.nextAction')).toContainText('Address blocked actions');
-  await expect(page.getByTestId('promotion-review.command.refresh')).toBeVisible();
-  await expect(page.getByTestId('promotion-review.filter.needsHumanReview')).toBeVisible();
+  await openTickets(page);
+  await expect(page.getByTestId('shell.nav.promotion-review')).toHaveCount(0);
+  await page.getByTestId('shell.nav.runs').click();
+  await expect(page.getByTestId('run-reports.workspace')).toBeVisible();
+  await expect(page.getByTestId('run-reports.summary')).toContainText('run-901');
   await expectNoHorizontalOverflow(page);
 });
 
@@ -684,6 +705,7 @@ test('ticket evidence links open run report and promotion context', async ({ pag
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByTestId('ticket.evidence.latestRun')).toBeVisible();
   await expect(page.getByTestId('ticket.evidence.latestPromotionPackage')).toBeVisible();
@@ -731,6 +753,7 @@ test('ticket start disposable run links a real run review without enabling revie
   });
 
   await page.goto('/');
+  await openTickets(page);
 
   await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
   await page.getByTestId('ticket.command.startDisposableRun').click();
@@ -742,7 +765,72 @@ test('ticket start disposable run links a real run review without enabling revie
   await expectNoHorizontalOverflow(page);
 });
 
-test('chat-to-build route runs the reusable discussion-to-code spine', async ({ page }) => {
+test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
+  let lastPrompt = '';
+  await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
+    const body = route.request().postDataJSON() as { prompt?: string };
+    lastPrompt = body.prompt ?? '';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: lastPrompt.includes('recent tickets')
+          ? 'Project state: tickets are ready for review. Recommended next action: inspect build readiness.'
+          : 'Use the Tickets workspace to review build readiness.',
+        contextSummary: 'Context used: tickets, recent runs, and decisions.',
+        linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
+        linkedSymbols: 'TicketsWorkspace',
+        traceId: 909
+      })
+    });
+  });
+
+  await page.goto('/');
+  await openTickets(page);
+  await page.getByTestId('shell.nav.chat').click();
+
+  await expect(page.getByTestId('chat.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat-build.stageRail')).toHaveCount(0);
+  await expect(page.getByTestId('chat.command.send')).toBeDisabled();
+  await expect(page.getByTestId('chat.composer.disabledReason')).toContainText('Enter a message before sending.');
+
+  await page.getByTestId('chat.composer.input').fill('Where should I start?');
+  await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await page.getByTestId('chat.command.send').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
+  await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
+  await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
+  await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
+
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Review Project State');
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: tickets are ready for review.');
+  expect(lastPrompt).toContain('recent tickets');
+  expect(lastPrompt).toContain('recent decisions');
+  expect(lastPrompt).toContain('recent runs');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('chat workspace keeps typed text visible when send fails', async ({ page }) => {
+  await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
+    await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Chat unavailable' }) });
+  });
+
+  await page.goto('/');
+  await openTickets(page);
+  await page.getByTestId('shell.nav.chat').click();
+
+  await page.getByTestId('chat.composer.input').fill('Please summarize the current risks.');
+  await page.getByTestId('chat.command.send').click();
+  await expect(page.getByTestId('chat.error')).toContainText('Send failed. Chat unavailable');
+  await expect(page.getByTestId('chat.composer.input')).toHaveValue('Please summarize the current risks.');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('build route runs the reusable discussion-to-code spine', async ({ page }) => {
   await mockTicketProject(page);
   await page.route('**/irondev-api/api/projects/7/discussions', async (route) => {
     await route.fulfill({
@@ -871,8 +959,10 @@ test('chat-to-build route runs the reusable discussion-to-code spine', async ({ 
   });
 
   await page.goto('/');
-  await page.getByTestId('shell.nav.chat-to-build').click();
-  await expect(page.getByTestId('chat-build.workspace')).toBeVisible();
+  await openTickets(page);
+  await page.getByTestId('shell.nav.build').click();
+  await expect(page.getByTestId('build.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat-build.stageRail')).toBeVisible();
   await page.getByTestId('chat-build.discussion.content').fill('Create a small console app that proves the reusable spine.');
   await page.getByTestId('chat-build.command.saveDiscussion').click();
   await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
@@ -1205,7 +1295,7 @@ const ticketEvidenceSummaryWithLinkedRun = {
   linkedRunCount: 1,
   hasBlockingWarnings: false,
   blockedActions: [],
-  nextSafeAction: 'Review latest run'
+  nextSafeAction: 'Review run'
 };
 
 const ticketRunReviewForPromotion = {
