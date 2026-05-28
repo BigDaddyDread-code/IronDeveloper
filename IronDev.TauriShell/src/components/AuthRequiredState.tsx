@@ -121,20 +121,13 @@ export function AuthRequiredState({
             onSignIn();
           }}
         >
+          <p className="auth-form__flow" data-testid="auth.flowHint">
+            Sign in, then select a project to continue.
+          </p>
           {isLocalTestEnvironment ? (
-            <div className="auth-form__localtest" data-testid="auth.localtestCredentials">
-              <p>LocalTest credentials are prefilled for this isolated environment.</p>
-              <dl>
-                <dt>Email</dt>
-                <dd>
-                  <code data-testid="auth.localtest.email">localtest@irondev.local</code>
-                </dd>
-                <dt>Password</dt>
-                <dd>
-                  <code data-testid="auth.localtest.password">change-me-local-only</code>
-                </dd>
-              </dl>
-            </div>
+            <p className="auth-form__localtest" data-testid="auth.localtestCredentials">
+              LocalTest credentials are prefilled for this environment.
+            </p>
           ) : null}
           <label>
             <span>Email</span>

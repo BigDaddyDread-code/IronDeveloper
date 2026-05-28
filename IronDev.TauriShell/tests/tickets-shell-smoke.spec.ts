@@ -88,6 +88,8 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('auth.email')).toBeVisible();
   await expect(page.getByTestId('auth.password')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toHaveText('LocalTest credentials are prefilled for this environment.');
+  await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
   await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
   await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('auth.submit')).toBeVisible();
@@ -148,15 +150,84 @@ test('LocalTest login uses the normal auth form and continues to project selecti
       ])
     });
   });
+  await page.route('**/irondev-api/api/projects/8/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: 'Project state: Selectable Project is ready.',
+        contextSummary: 'Context used: selected project.',
+        linkedFilePaths: '',
+        linkedSymbols: '',
+        traceId: null
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 801,
+          projectId: 8,
+          title: 'Selected project ticket',
+          summary: 'Loaded after selecting the project.',
+          status: 'Open',
+          priority: 'Medium',
+          type: 'Task',
+          description: 'Project-scoped ticket.',
+          acceptanceCriteria: '- Loads from project 8',
+          createdAt: '2026-05-28T00:00:00Z',
+          updatedAt: '2026-05-28T00:00:00Z'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 801,
+        projectId: 8,
+        title: 'Selected project ticket',
+        summary: 'Loaded after selecting the project.',
+        status: 'Open',
+        priority: 'Medium',
+        type: 'Task',
+        description: 'Project-scoped ticket.',
+        acceptanceCriteria: '- Loads from project 8',
+        createdAt: '2026-05-28T00:00:00Z',
+        updatedAt: '2026-05-28T00:00:00Z'
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/build-readiness', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No readiness yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/implementation-plan', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No plan yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/evidence-summary', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No evidence yet.' }) });
+  });
 
   await page.goto('/');
 
   await expect(page.getByTestId('home.authState')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toHaveText('LocalTest credentials are prefilled for this environment.');
+  await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
   await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
   await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('home.localtestSession')).toHaveCount(0);
 
+  await page.getByTestId('auth.email').fill('localtest@irondev.local');
+  await page.getByTestId('auth.password').fill('change-me-local-only');
   await page.getByTestId('auth.submit').click();
 
   expect(loginBody).toEqual({
@@ -165,6 +236,23 @@ test('LocalTest login uses the normal auth form and continues to project selecti
   });
   await expect(page.getByTestId('home.projectSelector')).toBeVisible();
   await expect(page.getByTestId('project.option')).toContainText('Selectable Project');
+
+  await page.getByTestId('project.option.select.8').click();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.reload();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.chat').click();
+  await expect(page.getByTestId('chat.command.reviewProjectState')).toBeEnabled();
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: Selectable Project is ready.');
+
+  await page.getByTestId('shell.nav.build').click();
+  await expect(page.getByTestId('build.summary.project')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('ticket.list')).toContainText('Selected project ticket');
   await expectNoHorizontalOverflow(page);
 });
 
@@ -183,8 +271,8 @@ test('failed LocalTest login gives seeded credential recovery guidance', async (
   await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
   await page.getByTestId('auth.submit').click();
 
-  await expect(page.getByText('LocalTest sign in failed')).toBeVisible();
-  await expect(page.getByText('localtest@irondev.local / change-me-local-only')).toBeVisible();
+  await expect(page.getByText('LocalTest sign-in failed')).toBeVisible();
+  await expect(page.getByText('The seed data may not match this database.')).toBeVisible();
   await expect(page.getByText('tools/localtest/reset-localtest-data.ps1')).toBeVisible();
   await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
   await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');

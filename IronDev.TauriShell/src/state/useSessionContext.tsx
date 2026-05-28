@@ -126,7 +126,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (error instanceof IronDevApiError) {
           if (environmentInfo?.isTestEnvironment) {
             setErrorMessage(
-              'LocalTest sign in failed. Expected localtest@irondev.local / change-me-local-only. The LocalTest seed data may not match this database; run tools/localtest/reset-localtest-data.ps1 and retry.'
+              'LocalTest sign-in failed. The seed data may not match this database. Run tools/localtest/reset-localtest-data.ps1 and retry.'
             );
           } else {
             setErrorMessage('Sign in failed. Check credentials and retry.');
@@ -134,7 +134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } else {
           setErrorMessage(
             environmentInfo?.isTestEnvironment
-              ? 'LocalTest sign in failed. Expected localtest@irondev.local / change-me-local-only. Check that the LocalTest API is running against the seeded test database.'
+              ? 'LocalTest sign-in failed. The seed data may not match this database. Run tools/localtest/reset-localtest-data.ps1 and retry.'
               : 'Sign in failed.'
           );
         }
