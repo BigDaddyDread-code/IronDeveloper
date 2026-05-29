@@ -24,11 +24,11 @@ export function useProjectChat() {
   const projectId = project.selectedProjectId;
   const disabledReason = getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus);
   const sendDisabledReason = disabledReason ?? getChatSendBlockedReason(draft, isSending);
-  const latestUserMessage = useMemo(
-    () => [...messages].reverse().find((message) => message.role === 'user')?.content ?? '',
+  const latestBuildableUserMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === 'user' && message.canContinueInBuild)?.content ?? '',
     [messages]
   );
-  const buildBridgeContent = draft.trim() || latestUserMessage.trim();
+  const buildBridgeContent = draft.trim() || latestBuildableUserMessage.trim();
   const buildBridgeDisabledReason = disabledReason ?? (buildBridgeContent ? null : 'Enter or send discussion text before continuing to Build.');
   const projectLabel = project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required');
 
@@ -46,6 +46,7 @@ export function useProjectChat() {
         id: `user-${Date.now()}`,
         role: 'user',
         content: displayText,
+        canContinueInBuild: request?.canContinueInBuild ?? true,
         createdUtc: new Date().toISOString()
       };
 
@@ -87,7 +88,8 @@ export function useProjectChat() {
     void sendMessage({
       prompt: projectReviewPrompt,
       displayText: 'Review Project State',
-      mode: 'projectStateReview'
+      mode: 'projectStateReview',
+      canContinueInBuild: false
     });
   }, [sendMessage]);
 

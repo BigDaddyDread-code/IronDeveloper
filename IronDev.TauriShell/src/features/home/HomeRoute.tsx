@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
 import { AuthRequiredState } from '../../components/AuthRequiredState';
+import { CommandButton } from '../../components/CommandButton';
 import { ProjectSelector } from '../../components/ProjectSelector';
 import { Surface } from '../../design-system/Surface';
 import { MetadataGrid } from '../../design-system/metadata/MetadataGrid';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 
 interface HomeRouteProps {
   route: WorkspaceRoute;
@@ -15,6 +17,7 @@ interface HomeRouteProps {
 export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
+  const navigation = useWorkspaceNavigation();
   const shouldShowAuthForm =
     !session.tokenConfigured && (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
 
@@ -46,6 +49,8 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
     await session.signIn({ email: session.email.trim(), password: session.password });
     await project.refreshProjectContext();
   }, [project, session]);
+
+  const projectActionBlockedReason = project.selectedProjectId ? null : 'Select a project before starting the primary flow.';
 
   return (
     <main className="product-workspace product-workspace--home" data-testid="home.workspace" aria-label={route.label}>
@@ -136,11 +141,41 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
             <p className="eyebrow">Suggested next actions</p>
             <h3>Move work forward safely</h3>
           </div>
-          <ul className="product-action-list">
-            <li>Review open work in Tickets.</li>
-            <li>Ask Chat for current risks and context.</li>
-            <li>Use Build only when the work is ready for sandbox execution.</li>
-          </ul>
+          <div className="home-flow-actions" data-testid="home.flowActions">
+            <CommandButton
+              type="button"
+              variant="primary"
+              testId="home.action.reviewProjectState"
+              disabled={Boolean(projectActionBlockedReason)}
+              title={projectActionBlockedReason ?? undefined}
+              onClick={() => navigation.navigateToWorkspace('chat')}
+            >
+              Review Project State
+            </CommandButton>
+            <CommandButton
+              type="button"
+              variant="secondary"
+              testId="home.action.continueBuild"
+              disabled={Boolean(projectActionBlockedReason)}
+              title={projectActionBlockedReason ?? undefined}
+              onClick={() => navigation.navigateToWorkspace('build')}
+            >
+              Continue in Build
+            </CommandButton>
+            <CommandButton
+              type="button"
+              variant="secondary"
+              testId="home.action.openTickets"
+              disabled={Boolean(projectActionBlockedReason)}
+              title={projectActionBlockedReason ?? undefined}
+              onClick={() => navigation.navigateToWorkspace('tickets')}
+            >
+              Open Tickets
+            </CommandButton>
+          </div>
+          <p className="state-muted" data-testid="home.flowActions.hint">
+            {projectActionBlockedReason ?? 'Start with Chat, continue the discussion into Build, then review the sandbox evidence before approval.'}
+          </p>
         </Surface>
       </div>
     </main>

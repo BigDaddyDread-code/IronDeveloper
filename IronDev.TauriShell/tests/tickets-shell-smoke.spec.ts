@@ -1177,8 +1177,21 @@ test('chat workspace keeps typed text visible when send fails', async ({ page })
   await expectNoHorizontalOverflow(page);
 });
 
-test('build route runs the reusable discussion-to-code spine', async ({ page }) => {
+test('primary usage flow moves from Home to Chat to Build review package', async ({ page }) => {
   await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: 'Project state: IronDeveloper has ready ticket work and no blocking sandbox failures.',
+        contextSummary: 'Context used: project summary, recent tickets, recent runs.',
+        linkedFilePaths: 'IronDev.TauriShell/src/features/chatToBuild/BuildRoute.tsx',
+        linkedSymbols: 'BuildRoute',
+        traceId: 'trace-primary-flow'
+      })
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/discussions', async (route) => {
     await route.fulfill({
       status: 200,
@@ -1306,8 +1319,20 @@ test('build route runs the reusable discussion-to-code spine', async ({ page }) 
   });
 
   await page.goto('/');
-  await openTickets(page);
-  await page.getByTestId('shell.nav.chat').click();
+  await expect(page.getByTestId('home.workspace')).toBeVisible();
+  await expect(page.getByTestId('home.flowActions')).toBeVisible();
+  await expect(page.getByTestId('home.action.reviewProjectState')).toBeEnabled();
+  await expect(page.getByTestId('home.action.continueBuild')).toBeEnabled();
+  await expect(page.getByTestId('home.action.openTickets')).toBeEnabled();
+
+  await page.getByTestId('home.action.reviewProjectState').click();
+  await expect(page.getByTestId('chat.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: IronDeveloper');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: project summary');
+  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+
   await page.getByTestId('chat.composer.input').fill('Create a small console app that proves the reusable spine.');
   await page.getByTestId('chat.command.continueInBuild').click();
   await expect(page.getByTestId('build.workspace')).toBeVisible();

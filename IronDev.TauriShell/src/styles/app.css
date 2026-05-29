@@ -222,6 +222,13 @@ p {
   color: var(--color-text-secondary);
 }
 
+.home-flow-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .tickets-workspace {
   min-width: 0;
   min-height: 0;
