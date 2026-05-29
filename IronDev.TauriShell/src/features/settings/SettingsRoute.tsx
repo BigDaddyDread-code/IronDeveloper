@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
+import { uiBuildInfo } from '../../app/buildInfo';
 import { Surface } from '../../design-system/Surface';
 import { MetadataGrid } from '../../design-system/metadata/MetadataGrid';
 import { useProjectContext } from '../../state/useProjectContext';
@@ -38,6 +39,20 @@ export function SettingsRoute({ route, onRouteReady }: SettingsRouteProps) {
         <p>Verify the local API, project path, service health, model profile state, and test environment state.</p>
       </section>
       <div className="product-grid">
+        <Surface testId="settings.uiBuild">
+          <div className="section-heading">
+            <p className="eyebrow">UI build</p>
+            <h3>Version identity</h3>
+          </div>
+          <MetadataGrid
+            items={[
+              { label: 'UI version', value: uiBuildInfo.version },
+              { label: 'UI branch', value: uiBuildInfo.branch },
+              { label: 'UI commit', value: uiBuildInfo.commit },
+              { label: 'Build time UTC', value: uiBuildInfo.buildTimeUtc }
+            ]}
+          />
+        </Surface>
         <Surface testId="settings.api">
           <div className="section-heading">
             <p className="eyebrow">API</p>
@@ -59,7 +74,9 @@ export function SettingsRoute({ route, onRouteReady }: SettingsRouteProps) {
           <MetadataGrid
             items={[
               { label: 'Database', value: session.environmentInfo?.database ?? 'Unknown' },
+              { label: 'Weaviate prefix', value: session.environmentInfo?.weaviatePrefix ?? 'Unknown' },
               { label: 'Workspace root', value: session.environmentInfo?.workspaceRoot ?? 'Unknown' },
+              { label: 'Logs root', value: session.environmentInfo?.logsRoot ?? 'Unknown' },
               { label: 'Test mode', value: session.environmentInfo?.isTestEnvironment ? 'Yes' : 'No' }
             ]}
           />

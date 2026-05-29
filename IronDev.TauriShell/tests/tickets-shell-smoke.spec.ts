@@ -60,6 +60,13 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.shell')).toBeVisible();
   await expect(page.getByTestId('app.header')).toBeVisible();
   await expect(page.getByTestId('app.apiStatus')).toBeVisible();
+  await expect(page.getByTestId('app.versionStrip')).toBeVisible();
+  await expect(page.getByTestId('app.version.environment')).toContainText('LocalTest');
+  await expect(page.getByTestId('app.version.ui')).toContainText('UI unknown');
+  await expect(page.getByTestId('app.version.branch')).toContainText('unknown');
+  await expect(page.getByTestId('app.version.commit')).toContainText('commit unknown');
+  await expect(page.getByTestId('app.version.api')).toContainText('API connected');
+  await expect(page.getByTestId('app.version.apiHost')).toContainText('localhost:5000');
   await expect(page.getByTestId('home.workspace')).toBeVisible();
   for (const route of ['home', 'chat', 'build', 'tickets', 'knowledge', 'runs', 'settings']) {
     await expect(page.getByTestId(`shell.nav.${route}`)).toBeVisible();
@@ -106,6 +113,27 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await page.getByTestId('app.authState.configureToken').click();
   await expect(page.getByTestId('auth.tokenInput')).toBeVisible();
   await expect(page.getByTestId('auth.saveToken')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('settings shows UI build identity and API environment details', async ({ page }) => {
+  await mockHealthyApi(page);
+
+  await page.goto('/');
+  await page.getByTestId('shell.nav.settings').click();
+
+  await expect(page.getByTestId('settings.workspace')).toBeVisible();
+  await expect(page.getByTestId('settings.uiBuild')).toContainText('UI version');
+  await expect(page.getByTestId('settings.uiBuild')).toContainText('unknown');
+  await expect(page.getByTestId('settings.api')).toContainText('Base URL');
+  await expect(page.getByTestId('settings.environment')).toContainText('LocalTest');
+  await expect(page.getByTestId('settings.environment')).toContainText('IronDeveloper_Test');
+  await expect(page.getByTestId('settings.environment')).toContainText('irondev_test');
+  await expect(page.getByTestId('settings.environment')).toContainText('C:\\IronDevTestWorkspaces\\');
+  await expect(page.getByTestId('settings.environment')).toContainText('C:\\IronDevTestLogs\\');
+  await expect(page.getByTestId('app.versionStrip')).toContainText('LocalTest');
+  await expect(page.getByTestId('app.versionStrip')).toContainText('UI unknown');
+  await expect(page.getByTestId('app.versionStrip')).toContainText('commit unknown');
   await expectNoHorizontalOverflow(page);
 });
 
