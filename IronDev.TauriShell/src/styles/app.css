@@ -500,9 +500,15 @@ p {
 }
 
 .command-button--primary {
-  border-color: color-mix(in srgb, var(--color-accent-primary) 58%, var(--color-border-subtle));
-  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 70%, var(--color-border-strong));
+  background: color-mix(in srgb, var(--color-accent-soft) 75%, var(--color-bg-surface-raised));
   color: var(--color-accent-strong);
+}
+
+.command-button--primary:hover {
+  border-color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent-soft) 60%, var(--color-bg-surface-hover));
+  color: var(--color-text-primary);
 }
 
 .command-button--danger {
@@ -1061,7 +1067,7 @@ p {
 }
 
 .state-error {
-  color: var(--color-status-danger);
+  color: var(--color-danger);
 }
 
 .state-success {
