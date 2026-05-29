@@ -12,15 +12,17 @@ export function StatusFooter({ apiStatus, environmentInfo }: StatusFooterProps) 
   const apiHost = getApiHost(apiStatus.baseUrl);
 
   return (
-    <footer className="shell-footer" data-testid="app.versionStrip">
-      <ApiStatusBadge status={apiStatus.status} withTestId={false} />
+    <div className="shell-footer shell-footer--header" data-testid="app.versionStrip" aria-label="UI build and environment identity">
+      <span className="api-status" data-testid="app.apiStatus">
+        <ApiStatusBadge status={apiStatus.status} />
+      </span>
       <span data-testid="app.version.environment">{environment}</span>
       <span data-testid="app.version.ui">UI {uiBuildInfo.version}</span>
       <span data-testid="app.version.branch">{uiBuildInfo.branch}</span>
       <span data-testid="app.version.commit">commit {uiBuildInfo.commitShort}</span>
       <span data-testid="app.version.api">API {apiStatus.status}</span>
       <code data-testid="app.version.apiHost">{apiHost}</code>
-    </footer>
+    </div>
   );
 }
 

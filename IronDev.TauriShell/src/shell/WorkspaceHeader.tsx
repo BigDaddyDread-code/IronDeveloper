@@ -1,7 +1,7 @@
 import { CommandBar } from '../design-system/CommandBar';
 import type { WorkspaceCommand } from '../app/routes';
-import { ApiStatusBadge } from '../components/ApiStatusBadge';
 import type { ApiStatus, EnvironmentInfo } from '../api/types';
+import { StatusFooter } from './StatusFooter';
 
 interface HeaderSummaryChip {
   label: string;
@@ -80,10 +80,7 @@ export function WorkspaceHeader({
       </div>
 
       <div className="workspace-header__meta">
-        <div className="api-status" data-testid="app.apiStatus">
-          <ApiStatusBadge status={apiStatus.status} />
-          <span>{apiStatus.baseUrl}</span>
-        </div>
+        <StatusFooter apiStatus={apiStatus} environmentInfo={environmentInfo} />
         <span
           className="project-pill"
           data-testid={

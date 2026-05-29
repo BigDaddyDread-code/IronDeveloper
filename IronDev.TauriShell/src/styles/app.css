@@ -138,6 +138,13 @@ p {
   min-width: 16rem;
 }
 
+.workspace-header__meta .shell-footer {
+  flex: 1 1 100%;
+  justify-content: flex-end;
+  border-top: 0;
+  padding-top: 0;
+}
+
 .command-blocked-reason {
   flex-basis: 100%;
   color: var(--color-text-muted);
@@ -1091,6 +1098,11 @@ p {
   flex-wrap: wrap;
   padding-top: var(--space-2);
   border-top: var(--border-subtle);
+}
+
+.shell-footer--header {
+  min-height: 0;
+  font-size: var(--font-size-caption);
 }
 
 @media (max-width: 1180px) {

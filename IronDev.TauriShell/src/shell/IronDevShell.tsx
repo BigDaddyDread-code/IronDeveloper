@@ -13,7 +13,6 @@ import { KnowledgeRoute } from '../features/knowledge/KnowledgeRoute';
 import { SettingsRoute } from '../features/settings/SettingsRoute';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceNav } from './WorkspaceNav';
-import { StatusFooter } from './StatusFooter';
 
 const defaultWorkspaceRouteMeta: WorkspaceRouteMeta = {
   workspaceCommands: [],
@@ -102,7 +101,6 @@ export function IronDevShell() {
           onSelect={onWorkspaceNavigate}
         />
       }
-      footer={<StatusFooter apiStatus={session.apiStatus} environmentInfo={session.environmentInfo} />}
     >
       {routeWorkspace}
     </AppShell>
