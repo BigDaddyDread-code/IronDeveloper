@@ -102,7 +102,7 @@ export function IronDevShell() {
           onSelect={onWorkspaceNavigate}
         />
       }
-      footer={<StatusFooter apiStatus={session.apiStatus} />}
+      footer={<StatusFooter apiStatus={session.apiStatus} environmentInfo={session.environmentInfo} />}
     >
       {routeWorkspace}
     </AppShell>

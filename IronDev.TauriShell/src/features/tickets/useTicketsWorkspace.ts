@@ -105,6 +105,7 @@ interface TicketsWorkspaceState {
   email: string;
   password: string;
   isTokenConfigOpen: boolean;
+  isLocalTestEnvironment: boolean;
   isBusy: boolean;
   errorMessage: string | null;
 }
@@ -1011,6 +1012,7 @@ export function useTicketsWorkspace() {
     email: session.email,
     password: session.password,
     isTokenConfigOpen: session.isTokenEditorOpen,
+    isLocalTestEnvironment: Boolean(session.environmentInfo?.isTestEnvironment),
     isBusy,
     errorMessage: session.errorMessage
   };

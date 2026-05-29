@@ -10,7 +10,8 @@ async function openTickets(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('tickets.workspace')).toBeVisible();
 }
 
-async function mockHealthyApi(page: import('@playwright/test').Page) {
+async function mockHealthyApi(page: import('@playwright/test').Page, options: { isTestEnvironment?: boolean } = {}) {
+  const isTestEnvironment = options.isTestEnvironment ?? true;
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({
       status: 200,
@@ -23,10 +24,10 @@ async function mockHealthyApi(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        environment: 'LocalTest',
-        database: 'IronDeveloper_Test',
-        weaviatePrefix: 'irondev_test',
-        isTestEnvironment: true,
+        environment: isTestEnvironment ? 'LocalTest' : 'LocalDev',
+        database: isTestEnvironment ? 'IronDeveloper_Test' : 'IronDeveloper_Dev',
+        weaviatePrefix: isTestEnvironment ? 'irondev_test' : 'irondev_dev',
+        isTestEnvironment,
         workspaceRoot: 'C:\\IronDevTestWorkspaces\\',
         logsRoot: 'C:\\IronDevTestLogs\\',
         dangerRealRepoWritesEnabled: false
@@ -59,6 +60,13 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.shell')).toBeVisible();
   await expect(page.getByTestId('app.header')).toBeVisible();
   await expect(page.getByTestId('app.apiStatus')).toBeVisible();
+  await expect(page.getByTestId('app.versionStrip')).toBeVisible();
+  await expect(page.getByTestId('app.version.environment')).toContainText('LocalTest');
+  await expect(page.getByTestId('app.version.ui')).toContainText('UI unknown');
+  await expect(page.getByTestId('app.version.branch')).toContainText('unknown');
+  await expect(page.getByTestId('app.version.commit')).toContainText('commit unknown');
+  await expect(page.getByTestId('app.version.api')).toContainText('API connected');
+  await expect(page.getByTestId('app.version.apiHost')).toContainText('localhost:5000');
   await expect(page.getByTestId('home.workspace')).toBeVisible();
   for (const route of ['home', 'chat', 'build', 'tickets', 'knowledge', 'runs', 'settings']) {
     await expect(page.getByTestId(`shell.nav.${route}`)).toBeVisible();
@@ -86,7 +94,13 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('auth.signIn')).toBeVisible();
   await expect(page.getByTestId('auth.email')).toBeVisible();
   await expect(page.getByTestId('auth.password')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toHaveText('LocalTest credentials are prefilled for this environment.');
+  await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
+  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('auth.submit')).toBeVisible();
+  await expect(page.getByTestId('home.localtestSession')).toHaveCount(0);
   await expect(page.getByTestId('app.authState.configureToken')).toBeVisible();
   await expect(page.getByTestId('app.authState.retry')).toBeVisible();
   await expect(page.getByTestId('api.status.authRequired')).toBeVisible();
@@ -99,6 +113,210 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await page.getByTestId('app.authState.configureToken').click();
   await expect(page.getByTestId('auth.tokenInput')).toBeVisible();
   await expect(page.getByTestId('auth.saveToken')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('settings shows UI build identity and API environment details', async ({ page }) => {
+  await mockHealthyApi(page);
+
+  await page.goto('/');
+  await page.getByTestId('shell.nav.settings').click();
+
+  await expect(page.getByTestId('settings.workspace')).toBeVisible();
+  await expect(page.getByTestId('settings.uiBuild')).toContainText('UI version');
+  await expect(page.getByTestId('settings.uiBuild')).toContainText('unknown');
+  await expect(page.getByTestId('settings.api')).toContainText('Base URL');
+  await expect(page.getByTestId('settings.environment')).toContainText('LocalTest');
+  await expect(page.getByTestId('settings.environment')).toContainText('IronDeveloper_Test');
+  await expect(page.getByTestId('settings.environment')).toContainText('irondev_test');
+  await expect(page.getByTestId('settings.environment')).toContainText('C:\\IronDevTestWorkspaces\\');
+  await expect(page.getByTestId('settings.environment')).toContainText('C:\\IronDevTestLogs\\');
+  await expect(page.getByTestId('app.versionStrip')).toContainText('LocalTest');
+  await expect(page.getByTestId('app.versionStrip')).toContainText('UI unknown');
+  await expect(page.getByTestId('app.versionStrip')).toContainText('commit unknown');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('LocalTest login uses the normal auth form and continues to project selection', async ({ page }) => {
+  await mockHealthyApi(page);
+  let loginBody: unknown = null;
+
+  await page.route('**/irondev-api/api/auth/login', async (route) => {
+    loginBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ token: 'localtest-token' })
+    });
+  });
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'localtest@irondev.local', displayName: 'LocalTest User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 8,
+          tenantId: 3,
+          name: 'Selectable Project',
+          description: 'Project chosen from Home',
+          localPath: 'C:\\IronDevTestWorkspaces\\SelectableProject'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: 'Project state: Selectable Project is ready.',
+        contextSummary: 'Context used: selected project.',
+        linkedFilePaths: '',
+        linkedSymbols: '',
+        traceId: null
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 801,
+          projectId: 8,
+          title: 'Selected project ticket',
+          summary: 'Loaded after selecting the project.',
+          status: 'Open',
+          priority: 'Medium',
+          type: 'Task',
+          description: 'Project-scoped ticket.',
+          acceptanceCriteria: '- Loads from project 8',
+          createdAt: '2026-05-28T00:00:00Z',
+          updatedAt: '2026-05-28T00:00:00Z'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 801,
+        projectId: 8,
+        title: 'Selected project ticket',
+        summary: 'Loaded after selecting the project.',
+        status: 'Open',
+        priority: 'Medium',
+        type: 'Task',
+        description: 'Project-scoped ticket.',
+        acceptanceCriteria: '- Loads from project 8',
+        createdAt: '2026-05-28T00:00:00Z',
+        updatedAt: '2026-05-28T00:00:00Z'
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/build-readiness', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No readiness yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/implementation-plan', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No plan yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/evidence-summary', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No evidence yet.' }) });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toHaveText('LocalTest credentials are prefilled for this environment.');
+  await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
+  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
+  await expect(page.getByTestId('home.localtestSession')).toHaveCount(0);
+
+  await page.getByTestId('auth.email').fill('localtest@irondev.local');
+  await page.getByTestId('auth.password').fill('change-me-local-only');
+  await page.getByTestId('auth.submit').click();
+
+  expect(loginBody).toEqual({
+    email: 'localtest@irondev.local',
+    password: 'change-me-local-only'
+  });
+  await expect(page.getByTestId('home.projectSelector')).toBeVisible();
+  await expect(page.getByTestId('project.option')).toContainText('Selectable Project');
+
+  await page.getByTestId('project.option.select.8').click();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.reload();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.chat').click();
+  await expect(page.getByTestId('chat.command.reviewProjectState')).toBeEnabled();
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: Selectable Project is ready.');
+
+  await page.getByTestId('shell.nav.build').click();
+  await expect(page.getByTestId('build.summary.project')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('ticket.list')).toContainText('Selected project ticket');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('failed LocalTest login gives seeded credential recovery guidance', async ({ page }) => {
+  await mockHealthyApi(page);
+  await page.route('**/irondev-api/api/auth/login', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Invalid credentials.' })
+    });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
+  await page.getByTestId('auth.submit').click();
+
+  await expect(page.getByText('LocalTest sign-in failed')).toBeVisible();
+  await expect(page.getByText('The seed data may not match this database.')).toBeVisible();
+  await expect(page.getByText('tools/localtest/reset-localtest-data.ps1')).toBeVisible();
+  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('LocalTest credentials are not exposed outside LocalTest', async ({ page }) => {
+  await mockHealthyApi(page, { isTestEnvironment: false });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.localtestCredentials')).toHaveCount(0);
+  await expect(page.getByTestId('auth.email')).toHaveValue('');
+  await expect(page.getByTestId('auth.password')).toHaveValue('');
+  await expect(page.getByText('change-me-local-only')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 
@@ -183,12 +401,136 @@ test('tickets shell shows project required state when no projects are available'
 
   await expect(page.getByRole('heading', { name: 'Project required' })).toBeVisible();
   await expect(page.getByTestId('project.selector')).toBeVisible();
+  await expect(page.getByTestId('project.selector.empty')).toContainText('No projects found');
   await expect(page.getByTestId('app.header').getByTestId('project.status.missing')).toBeVisible();
   expect(await page.getByTestId('project.status.selected').count()).toBe(0);
   expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
   await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Project required');
   await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
   await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Select a project');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('home project selector persists selection and unblocks project workspaces', async ({ page }) => {
+  await seedToken(page);
+  await mockHealthyApi(page);
+  await page.route('**/irondev-api/api/auth/me**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ userId: 7, email: 'dev@iron.dev', displayName: 'Dev User', selectedTenantId: 3 })
+    });
+  });
+  await page.route('**/irondev-api/api/tenants**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }])
+    });
+  });
+  await page.route('**/irondev-api/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 8,
+          tenantId: 3,
+          name: 'Selectable Project',
+          description: 'Project chosen from Home',
+          localPath: 'C:\\IronDevTestWorkspaces\\SelectableProject'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/select', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: 'Project state: Selectable Project is ready.',
+        contextSummary: 'Context used: selected project.',
+        linkedFilePaths: '',
+        linkedSymbols: '',
+        traceId: null
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 801,
+          projectId: 8,
+          title: 'Selected project ticket',
+          summary: 'Loaded after selecting the project.',
+          status: 'Open',
+          priority: 'Medium',
+          type: 'Task',
+          description: 'Project-scoped ticket.',
+          acceptanceCriteria: '- Loads from project 8',
+          createdAt: '2026-05-28T00:00:00Z',
+          updatedAt: '2026-05-28T00:00:00Z'
+        }
+      ])
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 801,
+        projectId: 8,
+        title: 'Selected project ticket',
+        summary: 'Loaded after selecting the project.',
+        status: 'Open',
+        priority: 'Medium',
+        type: 'Task',
+        description: 'Project-scoped ticket.',
+        acceptanceCriteria: '- Loads from project 8',
+        createdAt: '2026-05-28T00:00:00Z',
+        updatedAt: '2026-05-28T00:00:00Z'
+      })
+    });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/build-readiness', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No readiness yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/implementation-plan', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No plan yet.' }) });
+  });
+  await page.route('**/irondev-api/api/projects/8/tickets/801/evidence-summary', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No evidence yet.' }) });
+  });
+
+  await page.goto('/');
+  await expect(page.getByTestId('home.workspace')).toBeVisible();
+  await expect(page.getByTestId('project.status.missing')).toBeVisible();
+  await expect(page.getByTestId('home.projectSelector')).toBeVisible();
+  await expect(page.getByTestId('project.option')).toContainText('Selectable Project');
+
+  await page.getByTestId('project.option.select.8').click();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.reload();
+  await expect(page.getByTestId('project.status.selected')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.chat').click();
+  await expect(page.getByTestId('chat.command.reviewProjectState')).toBeEnabled();
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: Selectable Project is ready.');
+
+  await page.getByTestId('shell.nav.build').click();
+  await expect(page.getByTestId('build.summary.project')).toContainText('Selectable Project');
+
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('ticket.list')).toContainText('Selected project ticket');
   await expectNoHorizontalOverflow(page);
 });
 
@@ -768,6 +1110,21 @@ test('ticket start disposable run links a real run review without enabling revie
 test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
   let lastPrompt = '';
   let lastMode = '';
+  const markdownResponse = [
+    '# Project state',
+    '',
+    '- Tickets are ready for review.',
+    '- Build readiness should be checked before sandbox work.',
+    '',
+    '1. Inspect build readiness.',
+    '2. Continue the discussion into Build.',
+    '',
+    '```ts',
+    'const nextAction = "Review build readiness";',
+    '```',
+    '',
+    '<script>window.__irondevUnsafeMarkdown = true</script>'
+  ].join('\n');
   await mockTicketProject(page);
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
@@ -778,8 +1135,8 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       contentType: 'application/json',
       body: JSON.stringify({
         response: lastPrompt.includes('recent tickets')
-          ? 'Project state: tickets are ready for review. Recommended next action: inspect build readiness.'
-          : 'Use the Tickets workspace to review build readiness.',
+          ? markdownResponse
+          : '## Tickets workspace\n\nUse the Tickets workspace to review `build readiness`.',
         contextSummary: 'Context used: tickets, recent runs, and decisions.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
@@ -804,13 +1161,21 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
   await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
+  await expect(page.getByRole('heading', { name: 'Tickets workspace' })).toBeVisible();
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
 
   await page.getByTestId('chat.command.reviewProjectState').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Review Project State');
-  await expect(page.getByTestId('chat.thread')).toContainText('Project state: tickets are ready for review.');
+  await expect(page.getByTestId('chat.thread').getByRole('heading', { name: 'Project state' })).toBeVisible();
+  await expect(page.getByText('Tickets are ready for review.')).toBeVisible();
+  await expect(page.getByText('Inspect build readiness.')).toBeVisible();
+  await expect(page.getByTestId('markdown.codeBlock')).toContainText('const nextAction');
+  await expect(page.getByTestId('markdown.code.copy')).toBeVisible();
+  await expect(page.getByText('<script>window.__irondevUnsafeMarkdown = true</script>')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as Window & { __irondevUnsafeMarkdown?: boolean }).__irondevUnsafeMarkdown)).toBeUndefined();
   expect(lastPrompt).toContain('recent tickets');
   expect(lastPrompt).toContain('recent decisions');
   expect(lastPrompt).toContain('recent runs');
@@ -835,8 +1200,31 @@ test('chat workspace keeps typed text visible when send fails', async ({ page })
   await expectNoHorizontalOverflow(page);
 });
 
-test('build route runs the reusable discussion-to-code spine', async ({ page }) => {
+test('primary usage flow moves from Home to Chat to Build review package', async ({ page }) => {
+  const buildDiscussionMarkdown = [
+    '## Build request',
+    '',
+    '- Create a small console app that proves the reusable spine.',
+    '- Keep generated code sandbox-only.',
+    '',
+    '```csharp',
+    'Console.WriteLine("Hello from IronDev");',
+    '```'
+  ].join('\n');
   await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        response: 'Project state: IronDeveloper has ready ticket work and no blocking sandbox failures.',
+        contextSummary: 'Context used: project summary, recent tickets, recent runs.',
+        linkedFilePaths: 'IronDev.TauriShell/src/features/chatToBuild/BuildRoute.tsx',
+        linkedSymbols: 'BuildRoute',
+        traceId: 'trace-primary-flow'
+      })
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/discussions', async (route) => {
     await route.fulfill({
       status: 200,
@@ -964,13 +1352,27 @@ test('build route runs the reusable discussion-to-code spine', async ({ page }) 
   });
 
   await page.goto('/');
-  await openTickets(page);
-  await page.getByTestId('shell.nav.chat').click();
-  await page.getByTestId('chat.composer.input').fill('Create a small console app that proves the reusable spine.');
+  await expect(page.getByTestId('home.workspace')).toBeVisible();
+  await expect(page.getByTestId('home.flowActions')).toBeVisible();
+  await expect(page.getByTestId('home.action.reviewProjectState')).toHaveText('Open Chat');
+  await expect(page.getByTestId('home.action.continueBuild')).toHaveText('Open Build');
+  await expect(page.getByTestId('home.action.reviewProjectState')).toBeEnabled();
+  await expect(page.getByTestId('home.action.continueBuild')).toBeEnabled();
+  await expect(page.getByTestId('home.action.openTickets')).toBeEnabled();
+
+  await page.getByTestId('home.action.reviewProjectState').click();
+  await expect(page.getByTestId('chat.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await page.getByTestId('chat.command.reviewProjectState').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('Project state: IronDeveloper');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: project summary');
+  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+
+  await page.getByTestId('chat.composer.input').fill(buildDiscussionMarkdown);
   await page.getByTestId('chat.command.continueInBuild').click();
   await expect(page.getByTestId('build.workspace')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toBeVisible();
-  await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue('Create a small console app that proves the reusable spine.');
+  await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue(buildDiscussionMarkdown);
   await page.getByTestId('chat-build.command.saveDiscussion').click();
   await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
   await page.getByTestId('chat-build.command.createTicket').click();

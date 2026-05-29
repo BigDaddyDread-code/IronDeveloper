@@ -8,6 +8,7 @@ export interface ChatWorkspaceMessage {
   role: ChatMessageRole;
   content: string;
   createdUtc: string;
+  canContinueInBuild?: boolean;
   response?: ChatCompletionResponse | null;
 }
 
@@ -15,4 +16,5 @@ export interface ChatSendRequest {
   prompt: string;
   displayText?: string;
   mode?: ChatSendMode;
+  canContinueInBuild?: boolean;
 }

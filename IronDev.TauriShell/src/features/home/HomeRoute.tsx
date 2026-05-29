@@ -1,9 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
+import { AuthRequiredState } from '../../components/AuthRequiredState';
+import { CommandButton } from '../../components/CommandButton';
+import { ProjectSelector } from '../../components/ProjectSelector';
 import { Surface } from '../../design-system/Surface';
 import { MetadataGrid } from '../../design-system/metadata/MetadataGrid';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 
 interface HomeRouteProps {
   route: WorkspaceRoute;
@@ -13,6 +17,9 @@ interface HomeRouteProps {
 export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
+  const navigation = useWorkspaceNavigation();
+  const shouldShowAuthForm =
+    !session.tokenConfigured && (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
 
   const projectLabel = project.selectedProjectName ?? (project.selectedProjectId ? `Project ${project.selectedProjectId}` : 'Project required');
   const readinessLabel =
@@ -38,6 +45,13 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
     });
   }, [onRouteReady, routeSummary]);
 
+  const signIn = useCallback(async () => {
+    await session.signIn({ email: session.email.trim(), password: session.password });
+    await project.refreshProjectContext();
+  }, [project, session]);
+
+  const projectActionBlockedReason = project.selectedProjectId ? null : 'Select a project before starting the primary flow.';
+
   return (
     <main className="product-workspace product-workspace--home" data-testid="home.workspace" aria-label={route.label}>
       <section className="workspace-page-heading">
@@ -60,6 +74,54 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               { label: 'Tenant', value: project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? 'Not selected' }
             ]}
           />
+          {shouldShowAuthForm ? (
+            <div className="home-auth-state" data-testid="home.authState">
+              <AuthRequiredState
+                apiStatus={session.apiStatus}
+                accessStatus={project.accessStatus}
+                authLabel={session.tokenConfigured ? 'Token rejected' : 'Missing token'}
+                tokenDraft={session.tokenDraft}
+                email={session.email}
+                password={session.password}
+                isConfigOpen={session.isTokenEditorOpen}
+                isLocalTestEnvironment={Boolean(session.environmentInfo?.isTestEnvironment)}
+                tenants={project.tenants}
+                projects={project.projects}
+                selectedTenantId={project.selectedTenantId}
+                selectedProjectId={project.selectedProjectId}
+                isBusy={session.isAuthBusy || project.isRefreshing}
+                errorMessage={session.errorMessage}
+                onConfigureToken={() => session.setTokenEditorOpen(!session.isTokenEditorOpen)}
+                onRetry={() => void project.refreshProjectContext()}
+                onTokenDraftChange={session.setTokenDraft}
+                onEmailChange={session.setEmail}
+                onPasswordChange={session.setPassword}
+                onSaveToken={() => {
+                  session.saveToken();
+                  if (session.tokenDraft.length === 0) {
+                    project.setProjectAccessStatus('authRequired');
+                  }
+                }}
+                onSignIn={() => void signIn()}
+                onSelectTenant={project.selectTenantContext}
+                onSelectProject={project.selectProjectContext}
+              />
+            </div>
+          ) : null}
+          {!project.selectedProjectId && session.tokenConfigured ? (
+            <div className="home-project-picker" data-testid="home.projectSelector">
+              <div>
+                <h3>Select a project to continue</h3>
+                <p className="state-muted">Project-scoped workspaces use this selected project for Chat, Build, Tickets, Knowledge, and Runs.</p>
+              </div>
+              <ProjectSelector
+                projects={project.projects}
+                selectedProjectId={project.selectedProjectId}
+                isBusy={project.isRefreshing}
+                onSelectProject={project.selectProjectContext}
+              />
+            </div>
+          ) : null}
         </Surface>
 
         <Surface testId="home.systemReadiness">
@@ -79,11 +141,41 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
             <p className="eyebrow">Suggested next actions</p>
             <h3>Move work forward safely</h3>
           </div>
-          <ul className="product-action-list">
-            <li>Review open work in Tickets.</li>
-            <li>Ask Chat for current risks and context.</li>
-            <li>Use Build only when the work is ready for sandbox execution.</li>
-          </ul>
+          <div className="home-flow-actions" data-testid="home.flowActions">
+            <CommandButton
+              type="button"
+              variant="primary"
+              testId="home.action.reviewProjectState"
+              disabled={Boolean(projectActionBlockedReason)}
+              title={projectActionBlockedReason ?? undefined}
+              onClick={() => navigation.navigateToWorkspace('chat')}
+            >
+              Open Chat
+            </CommandButton>
+            <CommandButton
+              type="button"
+              variant="secondary"
+              testId="home.action.continueBuild"
+              disabled={Boolean(projectActionBlockedReason)}
+              title={projectActionBlockedReason ?? undefined}
+              onClick={() => navigation.navigateToWorkspace('build')}
+            >
+              Open Build
+            </CommandButton>
+            <CommandButton
+              type="button"
+              variant="secondary"
+              testId="home.action.openTickets"
+              disabled={Boolean(projectActionBlockedReason)}
+              title={projectActionBlockedReason ?? undefined}
+              onClick={() => navigation.navigateToWorkspace('tickets')}
+            >
+              Open Tickets
+            </CommandButton>
+          </div>
+          <p className="state-muted" data-testid="home.flowActions.hint">
+            {projectActionBlockedReason ?? 'Start with Chat, continue the discussion into Build, then review the sandbox evidence before approval.'}
+          </p>
         </Surface>
       </div>
     </main>

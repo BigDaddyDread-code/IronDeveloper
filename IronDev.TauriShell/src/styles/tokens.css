@@ -1,41 +1,41 @@
 :root {
   color-scheme: dark;
 
-  --color-bg-app: #080c10;
-  --color-bg-shell: #0b1117;
-  --color-bg-surface: #101720;
-  --color-bg-surface-subtle: #0d131a;
-  --color-bg-surface-muted: #0d131a;
-  --color-bg-surface-raised: #131c25;
-  --color-bg-surface-hover: #172230;
-  --color-bg-surface-selected: #182936;
-  --color-bg-input: #0a1016;
+  --color-bg-app: #050607;
+  --color-bg-shell: #080a0d;
+  --color-bg-surface: #0d1014;
+  --color-bg-surface-subtle: #11151a;
+  --color-bg-surface-muted: #14191f;
+  --color-bg-surface-raised: #181e25;
+  --color-bg-surface-hover: #1d242c;
+  --color-bg-surface-selected: #241f16;
+  --color-bg-input: #080b0f;
 
-  --color-border-subtle: #22303c;
-  --color-border-strong: #35495a;
-  --color-border-accent: #4f8f89;
+  --color-border-subtle: #242b33;
+  --color-border-strong: #36414c;
+  --color-border-accent: #b88945;
 
-  --color-text-primary: #edf3f8;
-  --color-text-secondary: #aab7c3;
-  --color-text-muted: #748390;
-  --color-text-disabled: #53616d;
-  --color-text-inverse: #071012;
+  --color-text-primary: #f3f4f1;
+  --color-text-secondary: #b5b9b2;
+  --color-text-muted: #7d857d;
+  --color-text-disabled: #555e58;
+  --color-text-inverse: #090a08;
 
-  --color-accent-primary: #5fb3a8;
-  --color-accent: #5fb3a8;
-  --color-accent-strong: #8fd8ce;
-  --color-accent-hover: #8fd8ce;
-  --color-accent-soft: #142e31;
+  --color-accent-primary: #c8914b;
+  --color-accent: #c8914b;
+  --color-accent-strong: #e0b56f;
+  --color-accent-hover: #d9a85f;
+  --color-accent-soft: #22190f;
 
-  --color-status-ready: #82c77b;
-  --color-success: #82c77b;
-  --color-status-warning: #d8b35f;
-  --color-warning: #d8b35f;
-  --color-status-danger: #e06c75;
-  --color-danger: #e06c75;
-  --color-status-info: #6da9d8;
-  --color-info: #6da9d8;
-  --color-status-neutral: #9aa8b4;
+  --color-status-ready: #7fb069;
+  --color-success: #7fb069;
+  --color-status-warning: #d2a84d;
+  --color-warning: #d2a84d;
+  --color-status-danger: #d06b63;
+  --color-danger: #d06b63;
+  --color-status-info: #8aa0b2;
+  --color-info: #8aa0b2;
+  --color-status-neutral: #9a9f99;
 
   --space-0: 0;
   --space-1: 0.25rem;
@@ -82,7 +82,7 @@
   --shadow-surface: 0 18px 50px rgb(0 0 0 / 0.24);
   --shadow-subtle: 0 10px 28px rgb(0 0 0 / 0.18);
   --shadow-panel: 0 18px 50px rgb(0 0 0 / 0.24);
-  --shadow-focus: 0 0 0 3px rgb(95 179 168 / 0.22);
+  --shadow-focus: 0 0 0 3px rgb(200 145 75 / 0.22);
   --opacity-disabled: 0.5;
   --opacity-muted: 0.72;
 

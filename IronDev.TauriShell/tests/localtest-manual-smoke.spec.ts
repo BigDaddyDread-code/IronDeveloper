@@ -30,7 +30,7 @@ test.describe('LocalTest manual cockpit smoke', () => {
     }
 
     if (await page.getByTestId('project.selector').isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await page.getByTestId('project.selector').selectOption('1');
+      await page.getByTestId('project.option.select.1').click();
       notes.push('Project selector shown and IronDev Local Test Project selected.');
     } else {
       notes.push('Project selected from configured LocalTest project id 1.');

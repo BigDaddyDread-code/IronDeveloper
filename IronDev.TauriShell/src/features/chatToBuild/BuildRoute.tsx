@@ -468,7 +468,7 @@ function getAccessBlockedReason(tokenConfigured: boolean, projectId: number | nu
   }
 
   if (!projectId) {
-    return 'Select a project first.';
+    return 'Select a project before saving a discussion.';
   }
 
   if (accessStatus === 'apiOffline') {
