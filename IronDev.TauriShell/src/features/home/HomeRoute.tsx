@@ -150,7 +150,7 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               title={projectActionBlockedReason ?? undefined}
               onClick={() => navigation.navigateToWorkspace('chat')}
             >
-              Review Project State
+              Open Chat
             </CommandButton>
             <CommandButton
               type="button"
@@ -160,7 +160,7 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               title={projectActionBlockedReason ?? undefined}
               onClick={() => navigation.navigateToWorkspace('build')}
             >
-              Continue in Build
+              Open Build
             </CommandButton>
             <CommandButton
               type="button"

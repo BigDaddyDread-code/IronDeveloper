@@ -1321,6 +1321,8 @@ test('primary usage flow moves from Home to Chat to Build review package', async
   await page.goto('/');
   await expect(page.getByTestId('home.workspace')).toBeVisible();
   await expect(page.getByTestId('home.flowActions')).toBeVisible();
+  await expect(page.getByTestId('home.action.reviewProjectState')).toHaveText('Open Chat');
+  await expect(page.getByTestId('home.action.continueBuild')).toHaveText('Open Build');
   await expect(page.getByTestId('home.action.reviewProjectState')).toBeEnabled();
   await expect(page.getByTestId('home.action.continueBuild')).toBeEnabled();
   await expect(page.getByTestId('home.action.openTickets')).toBeEnabled();
