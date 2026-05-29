@@ -1110,6 +1110,21 @@ test('ticket start disposable run links a real run review without enabling revie
 test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
   let lastPrompt = '';
   let lastMode = '';
+  const markdownResponse = [
+    '# Project state',
+    '',
+    '- Tickets are ready for review.',
+    '- Build readiness should be checked before sandbox work.',
+    '',
+    '1. Inspect build readiness.',
+    '2. Continue the discussion into Build.',
+    '',
+    '```ts',
+    'const nextAction = "Review build readiness";',
+    '```',
+    '',
+    '<script>window.__irondevUnsafeMarkdown = true</script>'
+  ].join('\n');
   await mockTicketProject(page);
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
@@ -1120,8 +1135,8 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       contentType: 'application/json',
       body: JSON.stringify({
         response: lastPrompt.includes('recent tickets')
-          ? 'Project state: tickets are ready for review. Recommended next action: inspect build readiness.'
-          : 'Use the Tickets workspace to review build readiness.',
+          ? markdownResponse
+          : '## Tickets workspace\n\nUse the Tickets workspace to review `build readiness`.',
         contextSummary: 'Context used: tickets, recent runs, and decisions.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
@@ -1146,13 +1161,21 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
   await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
+  await expect(page.getByRole('heading', { name: 'Tickets workspace' })).toBeVisible();
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
 
   await page.getByTestId('chat.command.reviewProjectState').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Review Project State');
-  await expect(page.getByTestId('chat.thread')).toContainText('Project state: tickets are ready for review.');
+  await expect(page.getByTestId('chat.thread').getByRole('heading', { name: 'Project state' })).toBeVisible();
+  await expect(page.getByText('Tickets are ready for review.')).toBeVisible();
+  await expect(page.getByText('Inspect build readiness.')).toBeVisible();
+  await expect(page.getByTestId('markdown.codeBlock')).toContainText('const nextAction');
+  await expect(page.getByTestId('markdown.code.copy')).toBeVisible();
+  await expect(page.getByText('<script>window.__irondevUnsafeMarkdown = true</script>')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as Window & { __irondevUnsafeMarkdown?: boolean }).__irondevUnsafeMarkdown)).toBeUndefined();
   expect(lastPrompt).toContain('recent tickets');
   expect(lastPrompt).toContain('recent decisions');
   expect(lastPrompt).toContain('recent runs');
@@ -1178,6 +1201,16 @@ test('chat workspace keeps typed text visible when send fails', async ({ page })
 });
 
 test('primary usage flow moves from Home to Chat to Build review package', async ({ page }) => {
+  const buildDiscussionMarkdown = [
+    '## Build request',
+    '',
+    '- Create a small console app that proves the reusable spine.',
+    '- Keep generated code sandbox-only.',
+    '',
+    '```csharp',
+    'Console.WriteLine("Hello from IronDev");',
+    '```'
+  ].join('\n');
   await mockTicketProject(page);
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     await route.fulfill({
@@ -1335,11 +1368,11 @@ test('primary usage flow moves from Home to Chat to Build review package', async
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: project summary');
   await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
 
-  await page.getByTestId('chat.composer.input').fill('Create a small console app that proves the reusable spine.');
+  await page.getByTestId('chat.composer.input').fill(buildDiscussionMarkdown);
   await page.getByTestId('chat.command.continueInBuild').click();
   await expect(page.getByTestId('build.workspace')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toBeVisible();
-  await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue('Create a small console app that proves the reusable spine.');
+  await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue(buildDiscussionMarkdown);
   await page.getByTestId('chat-build.command.saveDiscussion').click();
   await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
   await page.getByTestId('chat-build.command.createTicket').click();
