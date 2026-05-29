@@ -4,7 +4,7 @@ interface AppShellProps {
   header: ReactNode;
   navigation: ReactNode;
   children: ReactNode;
-  footer: ReactNode;
+  footer?: ReactNode;
 }
 
 export function AppShell({ header, navigation, children, footer }: AppShellProps) {
@@ -19,7 +19,7 @@ export function AppShell({ header, navigation, children, footer }: AppShellProps
         <div className="app-shell__content" data-testid="app.routeOutlet">
           {children}
         </div>
-        {footer}
+        {footer ?? null}
       </div>
     </div>
   );

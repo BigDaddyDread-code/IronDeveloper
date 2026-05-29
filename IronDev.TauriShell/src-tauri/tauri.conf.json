@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "IronDev Shell Spike",
+  "productName": "IronDev",
   "version": "0.1.0",
   "identifier": "com.irondeveloper.shellspike",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "IronDev Shell Spike",
+        "title": "IronDev",
         "width": 1280,
         "height": 820,
         "minWidth": 1080,
