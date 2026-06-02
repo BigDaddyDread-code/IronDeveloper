@@ -40,6 +40,27 @@ export type CreateProjectTicketRequest = components['schemas']['CreateProjectTic
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
 export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'];
 export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'];
+export type ProjectChatSession = components['schemas']['ProjectChatSession'];
+export type ChatMessage = components['schemas']['ChatMessage'];
+
+export interface SaveProjectChatSessionRequest {
+  id?: number;
+  projectId: number;
+  title?: string;
+  summary?: string | null;
+}
+
+export interface SaveProjectChatMessageRequest {
+  projectId: number;
+  chatSessionId: number;
+  role: 'user' | 'assistant';
+  message: string;
+  tags?: string | null;
+  contextSummary?: string | null;
+  linkedFilePaths?: string | null;
+  linkedSymbols?: string | null;
+}
+
 export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
 export type TicketReadinessLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
 export type TicketCreateStatus = 'idle' | 'validating' | 'submitting' | 'success' | 'error';

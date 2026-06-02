@@ -49,6 +49,41 @@ async function seedSelectedProject(page: import('@playwright/test').Page, projec
   }, projectId);
 }
 
+async function mockChatPersistence(page: import('@playwright/test').Page, projectId: number) {
+  const savedSessions: unknown[] = [];
+  const savedMessages: unknown[] = [];
+  let nextSessionId = 9000 + projectId;
+  let nextMessageId = 9100 + projectId;
+
+  await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return;
+    }
+
+    savedSessions.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nextSessionId) });
+  });
+
+  await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions/*/messages`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return;
+    }
+
+    savedMessages.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nextMessageId++) });
+  });
+
+  return {
+    savedSessions,
+    savedMessages,
+    get currentSessionId() {
+      return nextSessionId;
+    }
+  };
+}
+
 function isTicketListRoute(url: string) {
   return new URL(url).pathname === '/irondev-api/api/projects/7/tickets';
 }
@@ -164,6 +199,7 @@ test('LocalTest login uses the normal auth form and continues to project selecti
   await page.route('**/irondev-api/api/projects/8/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
   });
+  await mockChatPersistence(page, 8);
   await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
     await route.fulfill({
       status: 200,
@@ -429,6 +465,7 @@ test('home project selector persists selection and unblocks project workspaces',
   await page.route('**/irondev-api/api/projects/8/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
   });
+  await mockChatPersistence(page, 8);
   await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
     await route.fulfill({
       status: 200,
@@ -1108,7 +1145,7 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     '',
     '<script>window.__irondevUnsafeMarkdown = true</script>'
   ].join('\n');
-  await mockTicketProject(page);
+  const chatPersistence = await mockTicketProject(page);
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
     lastPrompt = body.prompt ?? '';
@@ -1151,6 +1188,18 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
   await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
+  expect(chatPersistence.savedSessions).toHaveLength(1);
+  expect(chatPersistence.savedMessages).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ role: 'user', message: 'Where should I start?', projectId: 7, chatSessionId: 9007 }),
+      expect.objectContaining({
+        role: 'assistant',
+        projectId: 7,
+        chatSessionId: 9007,
+        contextSummary: 'Context used: tickets, recent runs, and decisions.'
+      })
+    ])
+  );
   await expect(page.getByRole('heading', { name: 'Tickets workspace' })).toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
@@ -1409,6 +1458,7 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
+  const chatPersistence = await mockChatPersistence(page, 7);
   await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryNoLinkedRun) });
   });
@@ -1472,6 +1522,8 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
       body: JSON.stringify([])
     });
   });
+
+  return chatPersistence;
 }
 
 async function mockRunReportWorkspace(

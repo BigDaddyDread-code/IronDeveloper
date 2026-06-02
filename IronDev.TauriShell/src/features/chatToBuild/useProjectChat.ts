@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ChatCompletionResponse } from '../../api/types';
+import type { ChatCompletionResponse, ChatMessage } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
@@ -19,10 +19,14 @@ export function useProjectChat() {
   const [messages, setMessages] = useState<ChatWorkspaceMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setSending] = useState(false);
+  const [isHistoryLoading, setHistoryLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const projectId = project.selectedProjectId;
-  const disabledReason = getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus);
+  const disabledReason =
+    getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus) ??
+    (isHistoryLoading ? 'Chat history is loading.' : null);
   const sendDisabledReason = disabledReason ?? getChatSendBlockedReason(draft, isSending);
   const latestBuildableUserMessage = useMemo(
     () => [...messages].reverse().find((message) => message.role === 'user' && message.canContinueInBuild)?.content ?? '',
@@ -31,6 +35,79 @@ export function useProjectChat() {
   const buildBridgeContent = draft.trim() || latestBuildableUserMessage.trim();
   const buildBridgeDisabledReason = disabledReason ?? (buildBridgeContent ? null : 'Enter or send discussion text before continuing to Build.');
   const projectLabel = project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required');
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadProjectChat() {
+      if (!projectId || !session.tokenConfigured || session.apiStatus.status !== 'connected') {
+        setMessages([]);
+        setSessionId(null);
+        setHistoryLoading(false);
+        return;
+      }
+
+      setHistoryLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const sessions = await session.client.getProjectChatSessions(projectId);
+        const latestSession = sessions.find((item) => Number.isFinite(item.id));
+
+        if (!latestSession?.id) {
+          if (!isCancelled) {
+            setMessages([]);
+            setSessionId(null);
+          }
+          return;
+        }
+
+        const history = await session.client.getProjectChatMessages(projectId, latestSession.id);
+        if (!isCancelled) {
+          setSessionId(latestSession.id);
+          setMessages(history.map(mapApiMessage).filter(Boolean));
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setMessages([]);
+          setSessionId(null);
+          setErrorMessage(describeApiError(error, 'Chat history failed to load.'));
+        }
+      } finally {
+        if (!isCancelled) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    void loadProjectChat();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [projectId, session.apiStatus.status, session.client, session.tokenConfigured]);
+
+  const ensureChatSession = useCallback(
+    async (prompt: string) => {
+      if (!projectId) {
+        throw new Error('Project is required before creating a chat session.');
+      }
+
+      if (sessionId) {
+        return sessionId;
+      }
+
+      const title = createSessionTitle(prompt);
+      const createdSessionId = await session.client.saveProjectChatSession(projectId, {
+        projectId,
+        title,
+        summary: 'Project conversation'
+      });
+      setSessionId(createdSessionId);
+      return createdSessionId;
+    },
+    [projectId, session.client, sessionId]
+  );
 
   const sendMessage = useCallback(
     async (request?: ChatSendRequest) => {
@@ -55,16 +132,44 @@ export function useProjectChat() {
       setErrorMessage(null);
 
       try {
+        const activeSessionId = await ensureChatSession(prompt);
+        const savedUserMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
+          projectId,
+          chatSessionId: activeSessionId,
+          role: 'user',
+          message: displayText,
+          tags: request?.mode ?? 'projectQuestion'
+        });
+
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === userMessage.id
+              ? { ...message, id: `user-${savedUserMessageId}` }
+              : message
+          )
+        );
+
         const response = await session.client.completeChat(projectId, {
           projectId,
           prompt,
-          sessionId: null,
+          sessionId: activeSessionId,
           activeModel: null,
           mode: request?.mode ?? 'projectStateReview'
         });
 
+        const savedAssistantMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
+          projectId,
+          chatSessionId: activeSessionId,
+          role: 'assistant',
+          message: response.response?.trim() || 'IronDev.Api returned an empty response.',
+          tags: request?.mode ?? 'projectStateReview',
+          contextSummary: response.contextSummary ?? null,
+          linkedFilePaths: response.linkedFilePaths ?? null,
+          linkedSymbols: response.linkedSymbols ?? null
+        });
+
         const assistantMessage: ChatWorkspaceMessage = {
-          id: `assistant-${Date.now()}`,
+          id: `assistant-${savedAssistantMessageId}`,
           role: 'assistant',
           content: response.response?.trim() || 'IronDev.Api returned an empty response.',
           response,
@@ -81,7 +186,7 @@ export function useProjectChat() {
         setSending(false);
       }
     },
-    [disabledReason, draft, isSending, projectId, session.client]
+    [disabledReason, draft, ensureChatSession, isSending, projectId, session.client]
   );
 
   const reviewProjectState = useCallback(() => {
@@ -134,6 +239,38 @@ export function useProjectChat() {
     reviewProjectState,
     continueInBuild
   };
+}
+
+function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
+  const role = message.role === 'assistant' ? 'assistant' : 'user';
+  const content = message.message?.trim() || '';
+
+  return {
+    id: `${role}-${message.id ?? `${message.chatSessionId ?? 'local'}-${Date.now()}`}`,
+    role,
+    content,
+    canContinueInBuild: role === 'user',
+    createdUtc: message.createdDate ?? new Date().toISOString(),
+    response:
+      role === 'assistant'
+        ? {
+            response: content,
+            contextSummary: message.contextSummary ?? null,
+            linkedFilePaths: message.linkedFilePaths ?? null,
+            linkedSymbols: message.linkedSymbols ?? null,
+            traceId: null
+          }
+        : null
+  };
+}
+
+function createSessionTitle(prompt: string) {
+  const normalized = prompt.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return 'Project conversation';
+  }
+
+  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
 }
 
 function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null, apiStatus: string, accessStatus: string) {
