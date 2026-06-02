@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { AuthRequiredState } from '../../components/AuthRequiredState';
+import { StatusFooter } from '../../shell/StatusFooter';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 
@@ -14,6 +15,14 @@ export function SignInRoute() {
 
   return (
     <main className="auth-route" data-testid="auth.route" aria-label="Sign in">
+      <div className="auth-route__brand">
+        <div>
+          <p className="eyebrow">IronDev</p>
+          <h1>Sign in</h1>
+          <p>Sign in, then select a project to continue.</p>
+        </div>
+        <StatusFooter apiStatus={session.apiStatus} environmentInfo={session.environmentInfo} />
+      </div>
       <AuthRequiredState
         apiStatus={session.apiStatus}
         accessStatus={project.accessStatus}

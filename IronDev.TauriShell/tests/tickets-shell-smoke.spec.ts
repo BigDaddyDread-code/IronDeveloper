@@ -53,13 +53,13 @@ function isTicketListRoute(url: string) {
   return new URL(url).pathname === '/irondev-api/api/projects/7/tickets';
 }
 
-test('shell exposes product navigation and normal sign-in state', async ({ page }) => {
+test('normal sign-in appears before the product workspace shell', async ({ page }) => {
   await mockHealthyApi(page);
   await page.goto('/');
 
-  await expect(page.getByTestId('app.shell')).toBeVisible();
-  await expect(page.getByTestId('app.header')).toBeVisible();
-  await expect(page.getByTestId('app.apiStatus')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
+  await expect(page.getByTestId('app.shell')).toHaveCount(0);
+  await expect(page.getByTestId('app.header')).toHaveCount(0);
   await expect(page.getByTestId('app.versionStrip')).toBeVisible();
   await expect(page.getByTestId('app.version.environment')).toContainText('LocalTest');
   await expect(page.getByTestId('app.version.ui')).toContainText('UI unknown');
@@ -67,18 +67,13 @@ test('shell exposes product navigation and normal sign-in state', async ({ page 
   await expect(page.getByTestId('app.version.commit')).toContainText('commit unknown');
   await expect(page.getByTestId('app.version.api')).toContainText('API connected');
   await expect(page.getByTestId('app.version.apiHost')).toContainText('localhost:5000');
-  await expect(page.getByTestId('auth.route')).toBeVisible();
   for (const route of ['home', 'chat', 'build', 'tickets', 'knowledge', 'runs', 'settings']) {
-    await expect(page.getByTestId(`shell.nav.${route}`)).toBeVisible();
+    await expect(page.getByTestId(`shell.nav.${route}`)).toHaveCount(0);
   }
   await expect(page.getByText('Chat to Build', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Run Reports', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Promotion Review', { exact: true })).toHaveCount(0);
-  await expect(page.getByTestId('shell.nav.tickets')).toBeVisible();
-  await page.getByTestId('shell.nav.tickets').click();
-  await expect(page.getByTestId('auth.route')).toBeVisible();
   await expect(page.getByTestId('tickets.workspace')).toHaveCount(0);
-  await expect(page.getByTestId('environment.badge')).toContainText('LocalTest');
   await expect(page.getByTestId('app.authState')).toBeVisible();
   await expect(page.getByTestId('auth.form')).toBeVisible();
   await expect(page.getByTestId('auth.signIn')).toBeVisible();
@@ -95,7 +90,6 @@ test('shell exposes product navigation and normal sign-in state', async ({ page 
   await expect(page.getByTestId('app.authState.retry')).toBeVisible();
   await expect(page.getByTestId('api.status.authRequired')).toBeVisible();
   await expect(page.getByTestId('api.status.connected')).toBeVisible();
-  await expect(page.getByTestId('project.status.missing')).toBeVisible();
   expect(await page.getByTestId('project.status.selected').count()).toBe(0);
   expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
 
@@ -106,7 +100,7 @@ test('shell exposes product navigation and normal sign-in state', async ({ page 
 });
 
 test('settings shows UI build identity and API environment details', async ({ page }) => {
-  await mockHealthyApi(page);
+  await mockTicketProject(page);
 
   await page.goto('/');
   await page.getByTestId('shell.nav.settings').click();
