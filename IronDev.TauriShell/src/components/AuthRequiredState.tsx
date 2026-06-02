@@ -66,7 +66,7 @@ export function AuthRequiredState({
   return (
     <div className="auth-required-state" data-testid="app.authState">
       <div className="auth-required-state__header">
-        <p className="eyebrow">Product access</p>
+        <p className="eyebrow">{isAuthRequired ? 'Sign in' : 'Product access'}</p>
         <h2>{title}</h2>
         {isApiOffline ? (
           <>
@@ -82,34 +82,6 @@ export function AuthRequiredState({
         ) : (
           <p>IronDev.Api is reachable, but ticket data requires a signed-in API session.</p>
         )}
-      </div>
-
-      <div className="auth-required-state__metadata">
-        <MetadataRow label="API" value={<code>{apiStatus.baseUrl}</code>} />
-        <MetadataRow label="Status" value={<ApiStatusBadge status={apiStatus.status} withTestId={false} />} />
-        {isAuthRequired ? (
-          <MetadataRow
-            label="Auth"
-            value={
-              <StatusBadge status="authRequired" data-testid="api.status.authRequired">
-                {authLabel}
-              </StatusBadge>
-            }
-          />
-        ) : null}
-        {isTenantRequired ? (
-          <MetadataRow label="Tenant" value={<StatusBadge status="warning">Required</StatusBadge>} />
-        ) : null}
-        {isProjectRequired ? (
-          <MetadataRow
-            label="Project"
-            value={
-              <StatusBadge status="warning" data-testid="project.status.missing">
-                Required
-              </StatusBadge>
-            }
-          />
-        ) : null}
       </div>
 
       {isAuthRequired ? (
@@ -164,6 +136,34 @@ export function AuthRequiredState({
           </div>
         </form>
       ) : null}
+
+      <div className={`auth-required-state__metadata ${isAuthRequired ? 'auth-required-state__metadata--secondary' : ''}`.trim()}>
+        <MetadataRow label="API" value={<code>{apiStatus.baseUrl}</code>} />
+        <MetadataRow label="Status" value={<ApiStatusBadge status={apiStatus.status} withTestId={false} />} />
+        {isAuthRequired ? (
+          <MetadataRow
+            label="Auth"
+            value={
+              <StatusBadge status="authRequired" data-testid="api.status.authRequired">
+                {authLabel}
+              </StatusBadge>
+            }
+          />
+        ) : null}
+        {isTenantRequired ? (
+          <MetadataRow label="Tenant" value={<StatusBadge status="warning">Required</StatusBadge>} />
+        ) : null}
+        {isProjectRequired ? (
+          <MetadataRow
+            label="Project"
+            value={
+              <StatusBadge status="warning" data-testid="project.status.missing">
+                Required
+              </StatusBadge>
+            }
+          />
+        ) : null}
+      </div>
 
       {isTenantRequired ? (
         <label className="context-select">
@@ -240,6 +240,6 @@ function getTitle(status: ProductAccessStatus) {
     case 'projectRequired':
       return 'Project required';
     default:
-      return 'Authentication required';
+      return 'Sign in to IronDev';
   }
 }
