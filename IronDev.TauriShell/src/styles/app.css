@@ -38,6 +38,7 @@ select:focus-visible {
 h1,
 h2,
 h3,
+h4,
 p {
   margin: 0;
 }
@@ -420,11 +421,23 @@ p {
   line-height: var(--line-height-tight);
 }
 
+.section-heading h3,
+.section-heading h4,
+.workflow-section__header h3,
+.workflow-section__header h4,
+.chat-composer__header h3 {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: 0;
+  line-height: var(--line-height-tight);
+}
+
 .eyebrow {
   color: var(--color-text-muted);
   font-size: var(--font-size-eyebrow);
-  font-weight: var(--font-weight-strong);
-  letter-spacing: 0.08em;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
