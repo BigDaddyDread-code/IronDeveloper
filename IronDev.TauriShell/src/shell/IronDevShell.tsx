@@ -11,6 +11,7 @@ import { ChatRoute } from '../features/chatToBuild/ChatRoute';
 import { HomeRoute } from '../features/home/HomeRoute';
 import { KnowledgeRoute } from '../features/knowledge/KnowledgeRoute';
 import { SettingsRoute } from '../features/settings/SettingsRoute';
+import { SignInRoute } from '../features/auth/SignInRoute';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceNav } from './WorkspaceNav';
 
@@ -40,7 +41,14 @@ export function IronDevShell() {
   }, [navigation]);
 
   const activeRoute = useMemo(() => routeForId(navigation.activeRouteId), [navigation.activeRouteId]);
+  const shouldShowSignIn =
+    activeRoute.id !== 'settings' &&
+    (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
   const routeWorkspace = useMemo(() => {
+    if (shouldShowSignIn) {
+      return <SignInRoute />;
+    }
+
     switch (activeRoute.id) {
       case 'home':
         return <HomeRoute route={activeRoute} onRouteReady={onRouteReady} />;
@@ -57,7 +65,7 @@ export function IronDevShell() {
       default:
         return <TicketsRoute route={activeRoute} onRouteReady={onRouteReady} />;
     }
-  }, [activeRoute, onRouteReady]);
+  }, [activeRoute, onRouteReady, shouldShowSignIn]);
 
   const projectStatus =
     project.projectSelectionMode === 'api'
@@ -74,6 +82,9 @@ export function IronDevShell() {
         : 'Project required';
 
   const safeCommands = routeMeta.workspaceCommands ?? [];
+  const visibleWorkspaceLabel = shouldShowSignIn ? 'Sign in' : activeRoute.label;
+  const visibleRouteMeta = shouldShowSignIn ? defaultWorkspaceRouteMeta : routeMeta;
+  const visibleCommands = visibleRouteMeta.workspaceCommands ?? [];
 
   return (
     <AppShell
@@ -84,14 +95,14 @@ export function IronDevShell() {
           projectId={project.selectedProjectId}
           projectName={project.selectedProjectName}
           projectStatus={projectStatus}
-          workspaceLabel={activeRoute.label}
-          workspaceSummaryChips={routeMeta.workspaceSummaryChips}
+          workspaceLabel={visibleWorkspaceLabel}
+          workspaceSummaryChips={visibleRouteMeta.workspaceSummaryChips}
           userDisplayName={project.userProfile?.displayName ?? null}
           tokenConfigured={session.tokenConfigured}
           tenantName={project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? null}
-          commands={safeCommands}
-          blockedReason={routeMeta.workspaceBlockReason}
-          blockedReasonTestId={routeMeta.blockReasonTestId}
+          commands={shouldShowSignIn ? visibleCommands : safeCommands}
+          blockedReason={visibleRouteMeta.workspaceBlockReason}
+          blockedReasonTestId={visibleRouteMeta.blockReasonTestId}
           projectLabel={projectLabel}
         />
       }

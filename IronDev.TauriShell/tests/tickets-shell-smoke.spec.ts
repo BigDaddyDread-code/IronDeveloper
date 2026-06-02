@@ -53,7 +53,7 @@ function isTicketListRoute(url: string) {
   return new URL(url).pathname === '/irondev-api/api/projects/7/tickets';
 }
 
-test('tickets shell exposes cockpit regions and auth state', async ({ page }) => {
+test('shell exposes product navigation and normal sign-in state', async ({ page }) => {
   await mockHealthyApi(page);
   await page.goto('/');
 
@@ -67,7 +67,7 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.version.commit')).toContainText('commit unknown');
   await expect(page.getByTestId('app.version.api')).toContainText('API connected');
   await expect(page.getByTestId('app.version.apiHost')).toContainText('localhost:5000');
-  await expect(page.getByTestId('home.workspace')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
   for (const route of ['home', 'chat', 'build', 'tickets', 'knowledge', 'runs', 'settings']) {
     await expect(page.getByTestId(`shell.nav.${route}`)).toBeVisible();
   }
@@ -75,20 +75,10 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByText('Run Reports', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Promotion Review', { exact: true })).toHaveCount(0);
   await expect(page.getByTestId('shell.nav.tickets')).toBeVisible();
-  await openTickets(page);
-  await expect(page.getByTestId('tickets.workspace')).toBeVisible();
-  await expect(page.getByTestId('tickets.header')).toBeVisible();
-  await expect(page.getByTestId('ticket.list')).toBeVisible();
-  await expect(page.getByTestId('ticket.detail')).toBeVisible();
-  await expect(page.getByTestId('ticket.inspector')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeVisible();
+  await page.getByTestId('shell.nav.tickets').click();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
+  await expect(page.getByTestId('tickets.workspace')).toHaveCount(0);
   await expect(page.getByTestId('environment.badge')).toContainText('LocalTest');
-  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeDisabled();
-  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
-  await expect(page.getByTestId('ticket.command.create')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
-  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Sign in or configure a valid token');
   await expect(page.getByTestId('app.authState')).toBeVisible();
   await expect(page.getByTestId('auth.form')).toBeVisible();
   await expect(page.getByTestId('auth.signIn')).toBeVisible();
@@ -108,7 +98,6 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('project.status.missing')).toBeVisible();
   expect(await page.getByTestId('project.status.selected').count()).toBe(0);
   expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
-  await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Project required');
 
   await page.getByTestId('app.authState.configureToken').click();
   await expect(page.getByTestId('auth.tokenInput')).toBeVisible();
@@ -246,7 +235,7 @@ test('LocalTest login uses the normal auth form and continues to project selecti
 
   await page.goto('/');
 
-  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toHaveText('LocalTest credentials are prefilled for this environment.');
   await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
@@ -312,7 +301,7 @@ test('LocalTest credentials are not exposed outside LocalTest', async ({ page })
 
   await page.goto('/');
 
-  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toHaveCount(0);
   await expect(page.getByTestId('auth.email')).toHaveValue('');
   await expect(page.getByTestId('auth.password')).toHaveValue('');
