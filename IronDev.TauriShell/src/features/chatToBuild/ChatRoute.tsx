@@ -31,9 +31,9 @@ export function ChatRoute({ route, onRouteReady }: ChatRouteProps) {
   return (
     <main className="chat-route-workspace" data-testid="chat.route" aria-label={route.label}>
       <div className="workspace-page-heading">
-        <p className="eyebrow">Project state review</p>
+        <p className="eyebrow">Project conversation</p>
         <h2>Chat</h2>
-        <p>Send notes for a grounded project-state review, then inspect the context and sources used in the response.</p>
+        <p>Ask IronDev about the selected project, then inspect the context and sources used in the response.</p>
       </div>
       <ChatWorkspace
         messages={chat.messages}

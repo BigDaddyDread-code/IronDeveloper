@@ -1150,6 +1150,13 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await page.getByTestId('shell.nav.chat').click();
 
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat.sessions')).toHaveCount(0);
+  await expect(page.getByTestId('chat.composer')).toBeVisible();
+  await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
+  await page.getByTestId('chat.contextPanel.toggle').click();
+  await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
+  await page.getByTestId('chat.contextPanel.show').click();
+  await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toHaveCount(0);
   await expect(page.getByTestId('chat.command.send')).toBeDisabled();
   await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();

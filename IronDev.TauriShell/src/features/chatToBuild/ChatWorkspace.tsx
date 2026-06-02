@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { ChatCompletionResponse } from '../../api/types';
+import { CommandButton } from '../../components/CommandButton';
 import { Surface } from '../../design-system/Surface';
 import { ChatComposer } from './ChatComposer';
 import { ChatContextPanel } from './ChatContextPanel';
@@ -38,16 +40,11 @@ export function ChatWorkspace({
   onReviewProjectState,
   onContinueInBuild
 }: ChatWorkspaceProps) {
+  const [isContextOpen, setIsContextOpen] = useState(true);
+
   return (
     <Surface className="chat-workspace-panel" testId="chat.workspace">
-      <div className="chat-workspace-layout">
-        <aside className="chat-sessions" data-testid="chat.sessions">
-          <div className="section-heading">
-            <p className="eyebrow">Conversations</p>
-            <h3>Current thread</h3>
-          </div>
-          <p className="state-muted">Project-scoped chat for the selected workspace.</p>
-        </aside>
+      <div className={`chat-workspace-layout ${isContextOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
         <div className="chat-workspace-layout__thread">
           <ChatThread messages={messages} isSending={isSending} />
           {errorMessage ? <p className="state-error" data-testid="chat.error">{errorMessage}</p> : null}
@@ -63,7 +60,23 @@ export function ChatWorkspace({
             buildBridgeDisabledReason={buildBridgeDisabledReason}
           />
         </div>
-        <ChatContextPanel latestResponse={latestResponse} latestResponseText={latestResponseText} projectLabel={projectLabel} />
+        <ChatContextPanel
+          latestResponse={latestResponse}
+          latestResponseText={latestResponseText}
+          projectLabel={projectLabel}
+          isCollapsed={!isContextOpen}
+          onToggleCollapsed={() => setIsContextOpen((current) => !current)}
+        />
+        {!isContextOpen ? (
+          <CommandButton
+            type="button"
+            variant="secondary"
+            testId="chat.contextPanel.show"
+            onClick={() => setIsContextOpen(true)}
+          >
+            Show Context
+          </CommandButton>
+        ) : null}
       </div>
     </Surface>
   );

@@ -10,14 +10,10 @@ interface ChatThreadProps {
 export function ChatThread({ messages, isSending }: ChatThreadProps) {
   return (
     <section className="chat-thread" data-testid="chat.thread">
-      <div className="section-heading">
-        <p className="eyebrow">Conversation</p>
-        <h3>Active project thread</h3>
-      </div>
       {messages.length === 0 ? (
         <EmptyState
-          title="Start a project state review"
-          body="Send notes for review, or use Review Project State to get a grounded summary from IronDev.Api."
+          title="Start a conversation with IronDev"
+          body="Ask about the selected project, review project state, or draft work to continue into Build."
         />
       ) : (
         <div className="chat-thread__messages">
