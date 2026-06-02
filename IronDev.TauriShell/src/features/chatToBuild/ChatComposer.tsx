@@ -29,8 +29,8 @@ export function ChatComposer({
     <section className="chat-composer" data-testid="chat.composer">
       <div className="chat-composer__header">
         <div>
-          <p className="eyebrow">Project review</p>
-          <h3>Review project state</h3>
+          <p className="eyebrow">Message</p>
+          <h3>Ask IronDev</h3>
         </div>
         <CommandButton
           type="button"
@@ -54,10 +54,10 @@ export function ChatComposer({
         </CommandButton>
       </div>
       <label className="chat-composer__field">
-        <span>Message</span>
+        <span>Ask about this project</span>
         <textarea
           value={value}
-          placeholder="Add notes or questions to include in the project-state review."
+          placeholder="Ask IronDev about this project, or draft work to continue into Build."
           disabled={Boolean(disabledReason)}
           data-testid="chat.composer.input"
           onChange={(event) => onChange(event.target.value)}

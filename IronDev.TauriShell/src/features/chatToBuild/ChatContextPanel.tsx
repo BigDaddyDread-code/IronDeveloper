@@ -1,4 +1,5 @@
 import type { ChatCompletionResponse } from '../../api/types';
+import { CommandButton } from '../../components/CommandButton';
 import { MetadataRow } from '../../components/MetadataRow';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ChatSourceList } from './ChatSourceList';
@@ -8,14 +9,36 @@ interface ChatContextPanelProps {
   latestResponse: ChatCompletionResponse | null;
   latestResponseText: string | null;
   projectLabel: string;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
-export function ChatContextPanel({ latestResponse, latestResponseText, projectLabel }: ChatContextPanelProps) {
+export function ChatContextPanel({
+  latestResponse,
+  latestResponseText,
+  projectLabel,
+  isCollapsed,
+  onToggleCollapsed
+}: ChatContextPanelProps) {
+  if (isCollapsed) {
+    return null;
+  }
+
   return (
     <aside className="chat-context-panel" data-testid="chat.contextPanel">
-      <div className="section-heading">
-        <p className="eyebrow">Context Used</p>
-        <h3>Project signal</h3>
+      <div className="chat-context-panel__header">
+        <div className="section-heading">
+          <p className="eyebrow">Context</p>
+          <h3>Sources and actions</h3>
+        </div>
+        <CommandButton
+          type="button"
+          variant="subtle"
+          testId="chat.contextPanel.toggle"
+          onClick={onToggleCollapsed}
+        >
+          Hide
+        </CommandButton>
       </div>
       <section className="workflow-section">
         <MetadataRow label="Project" value={projectLabel} />
