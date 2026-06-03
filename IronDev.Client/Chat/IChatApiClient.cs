@@ -18,7 +18,8 @@ public sealed record ChatCompletionRequest(
     int ProjectId,
     long? SessionId,
     string Prompt,
-    string? ActiveModel);
+    string? ActiveModel,
+    string? Mode = null);
 
 public sealed record ChatCompletionResponse(
     string Response,

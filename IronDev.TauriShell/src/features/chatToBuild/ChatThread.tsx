@@ -15,7 +15,7 @@ export function ChatThread({ messages, isSending, onSaveDiscussion, onViewSource
       {messages.length === 0 ? (
         <EmptyState
           title="Start a conversation with IronDev"
-          body="Ask about the selected project, review project state, or draft work to continue into Build."
+          body="Ask about the selected project, shape an idea, or save useful responses as project discussions."
         />
       ) : (
         <div className="chat-thread__messages">

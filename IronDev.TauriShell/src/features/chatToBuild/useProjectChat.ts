@@ -146,7 +146,7 @@ export function useProjectChat() {
           prompt,
           sessionId: activeSessionId,
           activeModel: null,
-          mode: request?.mode ?? 'projectStateReview'
+          mode: request?.mode ?? 'projectQuestion'
         });
 
         const savedAssistantMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
@@ -154,7 +154,7 @@ export function useProjectChat() {
           chatSessionId: activeSessionId,
           role: 'assistant',
           message: response.response?.trim() || 'IronDev.Api returned an empty response.',
-          tags: request?.mode ?? 'projectStateReview',
+          tags: request?.mode ?? 'projectQuestion',
           contextSummary: response.contextSummary ?? null,
           linkedFilePaths: response.linkedFilePaths ?? null,
           linkedSymbols: response.linkedSymbols ?? null
@@ -312,7 +312,7 @@ function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null
   }
 
   if (!projectId) {
-    return 'Select a project before reviewing project state.';
+    return 'Select a project before chatting with IronDev.';
   }
 
   if (apiStatus === 'loading') {

@@ -1130,6 +1130,8 @@ test('ticket start disposable run links a real run review without enabling revie
 test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
   let lastPrompt = '';
   let lastMode = '';
+  let freeformPrompt = '';
+  let freeformMode = '';
   let savedDiscussionBody: { title?: string; content?: string } = {};
   const markdownResponse = [
     '# Project state',
@@ -1159,13 +1161,27 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
     lastPrompt = body.prompt ?? '';
     lastMode = body.mode ?? '';
+    const isProjectStateReview = body.mode === 'projectStateReview';
+    if (!isProjectStateReview) {
+      freeformPrompt = body.prompt ?? '';
+      freeformMode = body.mode ?? '';
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        response: lastPrompt.includes('recent tickets')
+        response: isProjectStateReview
           ? markdownResponse
-          : '## Tickets workspace\n\nUse the Tickets workspace to review `build readiness`.',
+          : [
+              '## I can turn this into buildable work',
+              '',
+              'Suggested first slice:',
+              '- Create a basic Minesweeper game with a grid, mine placement, reveal logic, flagging, win/loss detection, and a simple UI.',
+              '',
+              'Next useful actions:',
+              '- Save this as a Discussion.',
+              '- Create a Ticket when you are happy with the slice.'
+            ].join('\n'),
         contextSummary: 'Context used: tickets, recent runs, and decisions.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
@@ -1191,30 +1207,35 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await expect(page.getByTestId('chat.composer.disabledReason')).toContainText('Enter a message before sending.');
 
-  await page.getByTestId('chat.composer.input').fill('Where should I start?');
+  await page.getByTestId('chat.composer.input').fill('build me minesweeper');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.send').click();
-  await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
-  await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
+  await expect(page.getByTestId('chat.thread')).toContainText('build me minesweeper');
+  await expect(page.getByTestId('chat.thread')).toContainText('I can turn this into buildable work');
+  await expect(page.getByTestId('chat.thread')).toContainText('Minesweeper game');
+  await expect(page.getByTestId('chat.thread')).not.toContainText('Recent tickets');
+  expect(freeformPrompt).toBe('build me minesweeper');
+  expect(freeformMode).toBe('projectQuestion');
   expect(chatPersistence.savedSessions).toHaveLength(1);
   expect(chatPersistence.savedMessages).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ role: 'user', message: 'Where should I start?', projectId: 7, chatSessionId: 9007 }),
+      expect.objectContaining({ role: 'user', message: 'build me minesweeper', projectId: 7, chatSessionId: 9007, tags: 'projectQuestion' }),
       expect.objectContaining({
         role: 'assistant',
         projectId: 7,
         chatSessionId: 9007,
+        tags: 'projectQuestion',
         contextSummary: 'Context used: tickets, recent runs, and decisions.'
       })
     ])
   );
-  await expect(page.getByRole('heading', { name: 'Tickets workspace' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'I can turn this into buildable work' })).toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
   await expect(page.getByTestId('chat.message.saveDiscussion')).toBeVisible();
   await page.getByTestId('chat.message.saveDiscussion').click();
   await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
-  expect(savedDiscussionBody.content).toContain('Use the Tickets workspace to review `build readiness`.');
+  expect(savedDiscussionBody.content).toContain('Create a basic Minesweeper game');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');

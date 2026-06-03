@@ -12,15 +12,18 @@ public sealed class ChatController : ControllerBase
 {
     private readonly IChatHistoryService _chat;
     private readonly IChatFeedbackService _feedback;
+    private readonly IProjectChatResponseService _projectChat;
     private readonly IProjectStateReviewService _projectStateReview;
 
     public ChatController(
         IChatHistoryService chat,
         IChatFeedbackService feedback,
+        IProjectChatResponseService projectChat,
         IProjectStateReviewService projectStateReview)
     {
         _chat = chat;
         _feedback = feedback;
+        _projectChat = projectChat;
         _projectStateReview = projectStateReview;
     }
 
@@ -64,21 +67,38 @@ public sealed class ChatController : ControllerBase
             return BadRequest(new { message = "Prompt is required." });
 
         var mode = string.IsNullOrWhiteSpace(request.Mode)
-            ? "projectStateReview"
+            ? "projectQuestion"
             : request.Mode.Trim();
-        if (!string.Equals(mode, "projectStateReview", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { message = "Only projectStateReview mode is available for this endpoint." });
 
-        var review = await _projectStateReview.ReviewAsync(projectId, ct);
-        if (review is null)
-            return NotFound();
+        if (string.Equals(mode, "projectStateReview", StringComparison.OrdinalIgnoreCase))
+        {
+            var review = await _projectStateReview.ReviewAsync(projectId, ct);
+            if (review is null)
+                return NotFound();
 
-        return Ok(new ChatCompletionResponse(
-            review.Response,
-            review.ContextSummary,
-            review.LinkedFilePaths,
-            review.LinkedSymbols,
-            null));
+            return Ok(new ChatCompletionResponse(
+                review.Response,
+                review.ContextSummary,
+                review.LinkedFilePaths,
+                review.LinkedSymbols,
+                null));
+        }
+
+        if (string.Equals(mode, "projectQuestion", StringComparison.OrdinalIgnoreCase))
+        {
+            var answer = await _projectChat.RespondAsync(projectId, request.Prompt, ct);
+            if (answer is null)
+                return NotFound();
+
+            return Ok(new ChatCompletionResponse(
+                answer.Response,
+                answer.ContextSummary,
+                answer.LinkedFilePaths,
+                answer.LinkedSymbols,
+                null));
+        }
+
+        return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion or projectStateReview." });
     }
 
     public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);
