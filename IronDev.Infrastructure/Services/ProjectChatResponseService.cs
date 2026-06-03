@@ -7,14 +7,34 @@ namespace IronDev.Infrastructure.Services;
 
 public interface IProjectChatResponseService
 {
-    Task<ProjectChatResponseResult?> RespondAsync(int projectId, string prompt, CancellationToken cancellationToken = default);
+    Task<ProjectChatResponseResult?> RespondAsync(
+        int projectId,
+        string prompt,
+        ProjectConversationMode mode = ProjectConversationMode.Exploration,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record ProjectChatResponseResult(
     string Response,
     string ContextSummary,
     string LinkedFilePaths,
-    string LinkedSymbols);
+    string LinkedSymbols,
+    string Mode,
+    bool ShowGovernanceActions,
+    IReadOnlyList<string> GovernanceActions,
+    IReadOnlyList<string> ReasoningTrace,
+    string? DisambiguationQuestion,
+    string? ReasoningSummary,
+    string? DogfoodTraceId = null,
+    string? DogfoodTracePath = null,
+    long? TraceId = null);
+
+public enum ProjectConversationMode
+{
+    Exploration,
+    Formalization,
+    Confirmation
+}
 
 public sealed class ProjectChatResponseService : IProjectChatResponseService
 {
@@ -38,6 +58,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     public async Task<ProjectChatResponseResult?> RespondAsync(
         int projectId,
         string prompt,
+        ProjectConversationMode mode = ProjectConversationMode.Exploration,
         CancellationToken cancellationToken = default)
     {
         var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
@@ -53,72 +74,109 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             .Take(5)
             .ToList();
 
-        var response = BuildResponse(project, prompt, tickets, decisions, documents, runs);
-        var contextSummary = $"Answered from prompt plus project context: {tickets.Count} ticket(s), {decisions.Count} decision(s), {documents.Count} knowledge document(s), {runs.Count} run(s).";
+        var normalizedPrompt = prompt.ReplaceLineEndings(" ").Trim();
+        var response = BuildResponse(project, normalizedPrompt, mode, tickets, decisions, documents, runs);
+        var contextSummary =
+            $"Answered from prompt plus project context: {tickets.Count} ticket(s), {decisions.Count} decision(s), {documents.Count} knowledge document(s), {runs.Count} run(s).";
         var linkedFiles = DistinctDelimited(tickets.Select(t => t.LinkedFilePaths).Concat(decisions.Select(d => d.LinkedFilePaths)));
         var linkedSymbols = DistinctDelimited(tickets.Select(t => t.LinkedSymbols).Concat(decisions.Select(d => d.LinkedSymbols)));
+        var reasoningTrace = BuildReasoningTrace(mode, normalizedPrompt, project, tickets, decisions, documents, runs);
+
+        var governanceActions = mode == ProjectConversationMode.Formalization
+            ? new[]
+            {
+                "Save this response as a Discussion.",
+                "Create a Ticket from the saved Discussion."
+            }
+            : Array.Empty<string>();
+
+        var disambiguationQuestion = mode == ProjectConversationMode.Confirmation
+            ? "That mixes exploration and commitment language. Do you want exploration reasoning or formalization handoff first?"
+            : null;
 
         return new ProjectChatResponseResult(
             response,
             contextSummary,
             string.Join(Environment.NewLine, linkedFiles),
-            string.Join(Environment.NewLine, linkedSymbols));
+            string.Join(Environment.NewLine, linkedSymbols),
+            mode.ToString(),
+            mode == ProjectConversationMode.Formalization,
+            governanceActions,
+            reasoningTrace,
+            disambiguationQuestion,
+            BuildReasoningSummary(mode, reasoningTrace));
     }
 
     private static string BuildResponse(
         Project project,
         string prompt,
+        ProjectConversationMode mode,
         IReadOnlyList<ProjectTicket> tickets,
         IReadOnlyList<ProjectDecision> decisions,
         IReadOnlyList<ProjectContextDocument> documents,
         IReadOnlyList<RunRecord> runs)
     {
-        var normalized = prompt.ReplaceLineEndings(" ").Trim();
-        var lower = normalized.ToLowerInvariant();
+        var lower = prompt.ToLowerInvariant();
         var sb = new StringBuilder();
 
-        if (ContainsAny(lower, "minesweeper", "mine sweeper"))
+        if (mode == ProjectConversationMode.Formalization)
         {
-            sb.AppendLine("I can turn this into buildable work.");
+            sb.AppendLine("## Formalization mode");
             sb.AppendLine();
-            sb.AppendLine("Suggested first slice:");
-            sb.AppendLine("- Create a basic Minesweeper game with a grid, mine placement, reveal logic, flagging, win/loss detection, and a simple UI.");
+            sb.AppendLine($"Objective draft: {prompt}");
             sb.AppendLine();
-            sb.AppendLine("Acceptance shape:");
-            sb.AppendLine("- The game creates a minefield with a predictable width, height, and mine count.");
-            sb.AppendLine("- A player can reveal cells and flag suspected mines.");
-            sb.AppendLine("- Revealing a mine ends the game.");
-            sb.AppendLine("- Revealing all safe cells wins the game.");
-            sb.AppendLine("- The first implementation should stay small enough for a sandbox run and review package.");
+            sb.AppendLine("Delivery-first framing:");
+            sb.AppendLine("- Keep scope to one verifiable behavior slice.");
+            sb.AppendLine("- Define acceptance criteria before build.");
+            sb.AppendLine("- Include failure and verification intent, not only happy-path behavior.");
             sb.AppendLine();
-            sb.AppendLine("Next useful actions:");
-            sb.AppendLine("- Save this as a Discussion.");
-            sb.AppendLine("- Create a Ticket from the saved discussion when you are happy with the slice.");
-            sb.AppendLine("- Use Build only after there is a ticket or buildable plan.");
+            sb.AppendLine("Suggested handoff artifacts:");
+            sb.AppendLine("- Save this response as a Discussion.");
+            sb.AppendLine("- Create a Ticket from the Discussion.");
+            sb.AppendLine("- Move into Build only after Build Readiness indicates green review gates.");
         }
-        else if (ContainsAny(lower, "build me", "create", "make", "implement", "add"))
+        else if (mode == ProjectConversationMode.Confirmation)
         {
-            sb.AppendLine("I can shape this into buildable work.");
+            sb.AppendLine("## Clarification gate");
             sb.AppendLine();
-            sb.AppendLine($"Discussion summary: {normalized}");
+            sb.AppendLine($"You asked: {prompt}");
             sb.AppendLine();
-            sb.AppendLine("Suggested first slice:");
-            sb.AppendLine("- Define the smallest useful behaviour.");
-            sb.AppendLine("- Capture acceptance criteria before starting execution.");
-            sb.AppendLine("- Keep the first sandbox run narrow enough to review clearly.");
+            sb.AppendLine("You are currently sending both exploration and commitment signals.");
+            sb.AppendLine("- Exploration lane: unpack assumptions, options, trade-offs, risks.");
+            sb.AppendLine("- Formalization lane: capture a handoff-ready plan and handoff actions.");
             sb.AppendLine();
-            sb.AppendLine("Next useful actions:");
-            sb.AppendLine("- Save this as a Discussion.");
-            sb.AppendLine("- Create a Ticket from the saved discussion.");
-            sb.AppendLine("- Review Build Readiness before starting a sandbox run.");
+            sb.AppendLine("Tell me the lane you want me to lock into.");
         }
         else
         {
-            sb.AppendLine("I can help shape that into project work.");
+            sb.AppendLine("## Exploration mode");
             sb.AppendLine();
-            sb.AppendLine($"You asked: {normalized}");
+            sb.AppendLine($"You asked: {prompt}");
             sb.AppendLine();
-            sb.AppendLine("A good next step is to turn the idea into a saved Discussion, then decide whether it should become a Ticket, Document, or Decision.");
+            sb.AppendLine("I am treating this as open reasoning mode and will keep the chain explicit.");
+            sb.AppendLine();
+            sb.AppendLine("### Inferred options");
+            sb.AppendLine("- Option A: clarify scope and constraints first.");
+            sb.AppendLine("- Option B: compare implementation approaches.");
+            sb.AppendLine("- Option C: keep it lightweight and run only after a readiness gate.");
+
+            if (ContainsAny(lower, "minesweeper", "mine sweeper"))
+            {
+                sb.AppendLine();
+                sb.AppendLine("Minesweeper-specific angles:");
+                sb.AppendLine("- Rule semantics (first-click behavior, win/lose condition, deterministic state transitions).");
+                sb.AppendLine("- UX edge cases (reveal propagation, flag interactions, repeated clicks).");
+                sb.AppendLine("- Boundary risk (performance on large boards, local deterministic randomness).");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("### Risks / assumptions surfaced");
+            sb.AppendLine("- Storage model and persistence assumptions are not selected yet.");
+            sb.AppendLine("- Testability strategy and failure expectations are not yet fixed.");
+            sb.AppendLine("- Build command profile is not selected until this is formalized.");
+            sb.AppendLine();
+            sb.AppendLine("### Next choice");
+            sb.AppendLine("- If you want an explicit handoff, say \"make this a ticket\".");
         }
 
         sb.AppendLine();
@@ -160,4 +218,56 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             .SelectMany(value => value!.Split(['\r', '\n', ';', '|', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private static IReadOnlyList<string> BuildReasoningTrace(
+        ProjectConversationMode mode,
+        string prompt,
+        Project project,
+        IReadOnlyList<ProjectTicket> tickets,
+        IReadOnlyList<ProjectDecision> decisions,
+        IReadOnlyList<ProjectContextDocument> documents,
+        IReadOnlyList<RunRecord> runs)
+    {
+        var trace = new List<string>
+        {
+            "Prompt normalized and mode selected.",
+            $"Project: {project.Name}.",
+            $"Context: tickets={tickets.Count}, decisions={decisions.Count}, documents={documents.Count}, runs={runs.Count}.",
+            $"Prompt length: {prompt.Length} chars."
+        };
+
+        if (mode == ProjectConversationMode.Formalization)
+        {
+            trace.Add("Formalization selected: returning handoff-friendly text and Governance action suggestions.");
+        }
+        else if (mode == ProjectConversationMode.Confirmation)
+        {
+            trace.Add("Mixed intent detected: confirmation prompt requires one explicit lane.");
+            trace.Add("No governance action is auto-enabled before user confirms lane.");
+        }
+        else
+        {
+            trace.Add("Exploration selected: no direct governance actions are surfaced yet.");
+        }
+
+        if (ContainsAny(project.Description, "risk", "regulatory", "security", "safety"))
+            trace.Add("Project description includes safety-risk vocabulary; conservative posture retained.");
+
+        if (decisions.Count == 0)
+            trace.Add("No recent project decisions were found to lock policy constraints.");
+
+        return trace;
+    }
+
+    private static string BuildReasoningSummary(ProjectConversationMode mode, IReadOnlyList<string> trace)
+    {
+        var reason = mode switch
+        {
+            ProjectConversationMode.Formalization => "Formalization selected; handoff actions are available.",
+            ProjectConversationMode.Confirmation => "Intent ambiguous; user confirmation required before governance actions.",
+            _ => "Exploration selected; reasoning stays open and no governance actions are auto-exposed."
+        };
+
+        return $"{reason} Trace entries: {trace.Count}.";
+    }
 }

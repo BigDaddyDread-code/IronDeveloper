@@ -39,9 +39,12 @@ Chat
 ## UI Rules
 
 - The Chat composer only supports message entry and sending.
-- Chat response actions may include Copy Markdown, Save Discussion, View Sources, and later Create Ticket when backed by a real draft flow.
+- Chat response actions are mode-gated.
+- Exploration responses expose only low-friction actions and reasoning inspection.
+- Formalization responses expose governance actions (Save Discussion / handoff controls) from backend-provided governance payload.
+- Mixed/ambiguous prompts surface a user decision point before forcing handoff mode.
 - Permanent Build controls must not appear beside the Chat input.
-- Build handoff appears only after a Ticket or valid buildable plan exists.
+- Build handoff appears only after Discussion/Document/Ticket handoff has an explicit formalization response.
 - Context and sources in Chat are secondary and collapsible.
 - Build owns sandbox execution, command evidence, run review, and approval boundaries.
 

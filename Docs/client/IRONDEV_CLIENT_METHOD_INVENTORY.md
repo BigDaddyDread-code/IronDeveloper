@@ -163,13 +163,14 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | Client method | HTTP method | API route | Request DTO | Response DTO | Current consumers | Status |
 |---|---|---|---|---|---|---|
 | `GetRecentSessionsAsync` | GET | `/api/projects/{projectId}/chat/sessions?take={take}` | None | `IReadOnlyList<ProjectChatSession>` | Retired WPF history / TauriShell | Implemented |
-| `GetSessionByIdAsync` | GET | `/api/chat/sessions/{sessionId}` | None | `ProjectChatSession?` | Retired WPF history / TauriShell | Implemented |
+| `GetSessionByIdAsync` | GET | `/api/projects/{projectId}/chat/sessions/{sessionId}` | None | `ProjectChatSession?` | Retired WPF history / TauriShell | Implemented |
 | `SaveSessionAsync` | POST | `/api/projects/{projectId}/chat/sessions` | `ProjectChatSession` | `long` | Retired WPF history / TauriShell | Implemented |
-| `DeleteSessionAsync` | DELETE | `/api/chat/sessions/{sessionId}` | None | None | Retired WPF history / TauriShell | Implemented |
+| `DeleteSessionAsync` | DELETE | `/api/projects/{projectId}/chat/sessions/{sessionId}` | None | None | Retired WPF history / TauriShell | Implemented |
 | `SaveMessageAsync` | POST | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages` | `ChatMessage` | `long` | Retired WPF history / TauriShell | Implemented |
 | `SaveFeedbackAsync` | POST | `/api/projects/{projectId}/chat/feedback` | `ChatMessageFeedback` | `long` | Retired WPF history / TauriShell | Implemented |
 | `GetRecentMessagesAsync` | GET | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages?take={take}` | None | `IReadOnlyList<ChatMessage>` | Retired WPF history / TauriShell | Implemented |
 | `CompleteAsync` | POST | `/api/projects/{projectId}/chat/complete` | `ChatCompletionRequest` | `ChatCompletionResponse` | Retired WPF history / TauriShell | Implemented |
+| *(payload extension)* | `mode`/`showGovernanceActions`/`governanceActions`/`reasoningTrace`/`reasoningSummary` | n/a | n/a | `ChatCompletionResponse` | n/a | Implemented |
 
 ## Profiles
 

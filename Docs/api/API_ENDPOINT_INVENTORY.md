@@ -1,6 +1,6 @@
 # IronDev.Api Endpoint Inventory
 
-Last reviewed: 2026-05-26
+Last reviewed: 2026-06-02
 
 This inventory lists the REST surface currently exposed by `IronDev.Api`. It separates routes that exist today from planned product workflow routes that are still gaps.
 
@@ -86,6 +86,7 @@ Intended consumers:
 | POST | `/api/tickets/{ticketId}/apply-and-build` | `TicketsController.ApplyAndBuild` | Apply approved ticket build. | Implemented | Legacy WPF, TauriShell | Returns immediate build result, not `/api/runs/{runId}`. |
 | POST | `/api/projects/{projectId}/proposal/validate-architecture` | `TicketsController.ValidateProposalArchitecture` | Validate proposal architecture. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
 | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-runs` | `TicketsController.StartBuildRun` | Start ticket build workflow run. | Implemented | Product CLI, TauriShell | Returns workflow run id/status from existing workflow orchestrator; run events are persisted through `SqlRunEventStore`; resumable workflow state is still planned. |
+| POST | `/api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs` | `DiscussionCodeLoopController.StartDisposableCodeRun` | Start discussion-to-code proposal run for a ticket. | Implemented | Product CLI, TauriShell | Creates durable run, validates proposals via `CodeProposalValidator` before executing commands, and persists proposal/evidence records before fail transitions. |
 | POST | `/api/projects/{projectId}/documents/{documentVersionId}/tickets` | Planned | Generate tickets from a document version. | Planned | Product CLI, TauriShell | Document-to-ticket smoke exists internally, product route does not. |
 
 ## Documents
@@ -140,12 +141,12 @@ Intended consumers:
 | Method | Route | Controller/action | Purpose | Status | Intended consumers | Notes/gaps |
 |---|---|---|---|---|---|---|
 | GET | `/api/projects/{projectId}/chat/sessions` | `ChatController.GetRecentSessions` | List chat sessions. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
-| GET | `/api/chat/sessions/{sessionId}` | `ChatController.GetSessionById` | Load session. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
+| GET | `/api/projects/{projectId}/chat/sessions/{sessionId}` | `ChatController.GetSessionById` | Load session. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 | POST | `/api/projects/{projectId}/chat/sessions` | `ChatController.SaveSession` | Save session. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
-| DELETE | `/api/chat/sessions/{sessionId}` | `ChatController.DeleteSession` | Delete session. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
+| DELETE | `/api/projects/{projectId}/chat/sessions/{sessionId}` | `ChatController.DeleteSession` | Delete session. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 | GET | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages` | `ChatController.GetRecentMessages` | List messages. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 | POST | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages` | `ChatController.SaveMessage` | Save message. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
-| POST | `/api/projects/{projectId}/chat/complete` | `ChatController.Complete` | Run chat completion. | Implemented | TauriShell, Legacy WPF | Long-running behavior is not represented as `/api/runs`. |
+| POST | `/api/projects/{projectId}/chat/complete` | `ChatController.Complete` | Run chat completion with explicit mode (`projectQuestion`, `projectStateReview`, `exploration`, `formalization`, `confirmation`). | Implemented | TauriShell, Legacy WPF | Returns `mode`, `showGovernanceActions`, `governanceActions`, `reasoningTrace`, and `reasoningSummary`. |
 | POST | `/api/projects/{projectId}/chat/feedback` | `ChatController.SaveFeedback` | Save message feedback. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 
 ## Profiles

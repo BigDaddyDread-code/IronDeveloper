@@ -10,12 +10,17 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMessageProps) {
+  const mode = message.response?.mode;
+  const isFormalizationMode = mode === 'Formalization';
+  const showGovernanceActions = Boolean(message.response?.showGovernanceActions);
   const hasSources = Boolean(
     message.response?.contextSummary ||
     message.response?.linkedFilePaths ||
     message.response?.linkedSymbols ||
     message.response?.traceId
   );
+  const reasoningTrace = message.response?.reasoningTrace ?? [];
+  const disambiguationQuestion = message.response?.disambiguationQuestion;
 
   return (
     <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
@@ -26,6 +31,26 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
         </div>
       </header>
       <MarkdownRenderer markdown={message.content} testId={`chat.message.${message.role}.markdown`} />
+      {disambiguationQuestion ? (
+        <div className="chat-message__disambiguation" data-testid="chat.message.disambiguation">
+          <strong>Clarify:</strong> {disambiguationQuestion}
+        </div>
+      ) : null}
+      {reasoningTrace.length > 0 ? (
+        <details className="chat-message__reasoning" data-testid="chat.message.reasoning">
+          <summary>View reasoning trace</summary>
+          <ul>
+            {reasoningTrace.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {message.response?.reasoningSummary ? (
+        <p className="chat-message__reasoningSummary" data-testid="chat.message.reasoningSummary">
+          {message.response.reasoningSummary}
+        </p>
+      ) : null}
       {message.role === 'assistant' ? (
         <div className="chat-message__actions" data-testid="chat.message.actions">
           <CommandButton
@@ -36,7 +61,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
           >
             Copy Markdown
           </CommandButton>
-          {onSaveDiscussion ? (
+          {showGovernanceActions && onSaveDiscussion ? (
             <CommandButton
               type="button"
               variant="secondary"
@@ -47,7 +72,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
               {message.discussionSaveStatus === 'saving' ? 'Saving Discussion' : 'Save Discussion'}
             </CommandButton>
           ) : null}
-          {hasSources && onViewSources ? (
+          {isFormalizationMode && hasSources && onViewSources ? (
             <CommandButton
               type="button"
               variant="subtle"
@@ -61,17 +86,11 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
       ) : null}
       {message.savedDiscussion ? (
         <div className="chat-message__saved-discussion" data-testid="chat.message.savedDiscussion">
-          Discussion saved · Document {message.savedDiscussion.documentId} · Version {message.savedDiscussion.documentVersionId}
+          Discussion saved - Document {message.savedDiscussion.documentId} - Version {message.savedDiscussion.documentVersionId}
         </div>
       ) : null}
       {message.discussionSaveStatus === 'error' && message.discussionSaveError ? (
         <p className="state-error" data-testid="chat.message.saveDiscussionError">{message.discussionSaveError}</p>
-      ) : null}
-      {message.response?.contextSummary ? (
-        <div className="chat-message__context">
-          <strong>Context Used</strong>
-          <span>{message.response.contextSummary}</span>
-        </div>
       ) : null}
     </article>
   );

@@ -6,6 +6,11 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
 
 - Prefer `/api/projects/{projectId}/...` routes for cockpit workflows.
 - Do not use global run identifiers as sufficient authorization or ownership proof.
+- Run proposals must be validated first: `CodeProposalValidator` must pass before any disposable run executes build/run commands.
+- Chat completion is mode-aware:
+  - `projectQuestion` defaults to inference-based `Exploration`, `Formalization`, or `Confirmation`.
+  - `projectStateReview` remains explicit project-review behavior.
+  - Formalization mode may return governance affordances; exploration must not.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;
   - the ticket belongs to the route project;
@@ -60,6 +65,13 @@ Disposable ticket build execution is backend-owned. Clients may request "start a
 - `GET /api/projects/{projectId}/code-scenarios`
 
 This is the backend proposal/run/review-package spine. `ICodeProposalGenerator` creates a `CodeProposal` with generated files, expected output, and a backend-owned build/run profile. `IDisposableCodeRunService` executes that proposal in a disposable workspace. `IRunReviewPackageService` assembles review evidence from run state, persisted events, generated files, command logs, code standards output, and output verification.
+
+Hardening rule:
+
+- Proposal and proposal-evidence gates are first-class behavior:
+  - `IDisposableCodeRunService` must persist `ticket-review.json`, `code-proposal.json`, `code-proposal-validation.json` before executing any build command.
+  - A proposal that fails `ICodeProposalValidator` must emit `CodeProposalRejected`, transition the run to `Failed`, and never run `dotnet` commands or governed code standards checks.
+  - Evidence evidence should remain in the durable run evidence root for failed runs; this is the source of truth for hardening and audit.
 
 Proposal generation is configurable:
 

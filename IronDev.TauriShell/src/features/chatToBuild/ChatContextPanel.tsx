@@ -42,6 +42,14 @@ export function ChatContextPanel({
       </div>
       <section className="workflow-section">
         <MetadataRow label="Project" value={projectLabel} />
+        <MetadataRow
+          label="Mode"
+          value={
+            <StatusBadge status={latestResponse?.mode === 'Formalization' ? 'ready' : 'neutral'}>
+              {latestResponse?.mode ?? 'Exploration'}
+            </StatusBadge>
+          }
+        />
         <MetadataRow label="Trace" value={latestResponse?.traceId ? `#${latestResponse.traceId}` : 'No trace yet'} />
         <MetadataRow
           label="Context"
@@ -52,9 +60,25 @@ export function ChatContextPanel({
           }
         />
         <p>{latestResponse?.contextSummary ?? 'Context summary will appear after the backend returns a grounded response.'}</p>
+        {latestResponse?.reasoningSummary ? <p>{latestResponse.reasoningSummary}</p> : null}
+        {latestResponse?.disambiguationQuestion ? (
+          <p>
+            <strong>Next choice:</strong> {latestResponse.disambiguationQuestion}
+          </p>
+        ) : null}
+        <p>
+          <strong>Dogfood trace:</strong>{' '}
+          {latestResponse?.dogfoodTraceId ? `#${latestResponse.dogfoodTraceId}` : 'None'}
+          {latestResponse?.dogfoodTracePath ? ` (${latestResponse.dogfoodTracePath})` : ''}
+        </p>
       </section>
       <ChatSourceList response={latestResponse} />
-      <ChatSuggestedActions hasResponse={Boolean(latestResponse)} responseText={latestResponseText} />
+      <ChatSuggestedActions
+        hasResponse={Boolean(latestResponse)}
+        responseText={latestResponseText}
+        governanceActions={latestResponse?.governanceActions ?? []}
+        hasGovernanceActions={Boolean(latestResponse?.showGovernanceActions)}
+      />
     </aside>
   );
 }

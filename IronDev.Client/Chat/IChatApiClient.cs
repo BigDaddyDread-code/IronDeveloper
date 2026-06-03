@@ -26,4 +26,12 @@ public sealed record ChatCompletionResponse(
     string? ContextSummary,
     string? LinkedFilePaths,
     string? LinkedSymbols,
-    long? TraceId);
+    long? TraceId,
+    string? Mode = null,
+    bool? ShowGovernanceActions = null,
+    IReadOnlyList<string>? GovernanceActions = null,
+    IReadOnlyList<string>? ReasoningTrace = null,
+    string? DisambiguationQuestion = null,
+    string? ReasoningSummary = null,
+    string? DogfoodTraceId = null,
+    string? DogfoodTracePath = null);

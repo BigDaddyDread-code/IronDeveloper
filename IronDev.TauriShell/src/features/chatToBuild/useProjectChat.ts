@@ -164,7 +164,10 @@ export function useProjectChat() {
           id: `assistant-${savedAssistantMessageId}`,
           role: 'assistant',
           content: response.response?.trim() || 'IronDev.Api returned an empty response.',
-          response,
+          response: {
+            ...response,
+            response: response.response?.trim() || 'IronDev.Api returned an empty response.'
+          },
           createdUtc: new Date().toISOString()
         };
 
@@ -284,16 +287,24 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
     content,
     canContinueInBuild: role === 'user',
     createdUtc: message.createdDate ?? new Date().toISOString(),
-    response:
-      role === 'assistant'
-        ? {
-            response: content,
-            contextSummary: message.contextSummary ?? null,
-            linkedFilePaths: message.linkedFilePaths ?? null,
-            linkedSymbols: message.linkedSymbols ?? null,
-            traceId: null
-          }
-        : null
+        response:
+          role === 'assistant'
+            ? {
+                response: content,
+                contextSummary: message.contextSummary ?? null,
+                linkedFilePaths: message.linkedFilePaths ?? null,
+                linkedSymbols: message.linkedSymbols ?? null,
+                traceId: null,
+                mode: null,
+                showGovernanceActions: false,
+                governanceActions: null,
+                reasoningTrace: null,
+                disambiguationQuestion: null,
+                reasoningSummary: null,
+                dogfoodTraceId: null,
+                dogfoodTracePath: null
+              }
+            : null
   };
 }
 

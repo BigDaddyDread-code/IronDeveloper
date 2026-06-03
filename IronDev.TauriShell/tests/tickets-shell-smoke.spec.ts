@@ -1162,6 +1162,37 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     lastPrompt = body.prompt ?? '';
     lastMode = body.mode ?? '';
     const isProjectStateReview = body.mode === 'projectStateReview';
+    const normalizedPrompt = (body.prompt ?? '').toLowerCase();
+    const isFormalizationPrompt = normalizedPrompt.includes('make this a ticket') || normalizedPrompt.includes('save this as');
+    const isFormalization = !isProjectStateReview && isFormalizationPrompt;
+    const responseText = isProjectStateReview
+      ? markdownResponse
+      : isFormalization
+        ? [
+            '## Formalization mode',
+            '',
+            `Objective draft: ${body.prompt}`,
+            '',
+            '### Handoff intent',
+            '- Keep scope to one verifiable behavior slice.',
+            '- Define acceptance criteria before start.',
+            '- Include verification intent, not only happy-path behavior.'
+          ].join('\n')
+        : [
+            '## Exploration mode',
+            '',
+            `You asked: ${body.prompt}`,
+            '',
+            '### Inferred options',
+            '- Option A: clarify scope and constraints first.',
+            '- Option B: compare implementation approaches.',
+            '- Option C: keep it lightweight and run only after a readiness gate.',
+            '',
+            '### Risks / assumptions surfaced',
+            '- Storage model and persistence assumptions are not selected yet.',
+            '- Testability strategy and failure expectations are not yet fixed.',
+            '- Build command profile is not selected until this is formalized.'
+          ].join('\n');
     if (!isProjectStateReview) {
       freeformPrompt = body.prompt ?? '';
       freeformMode = body.mode ?? '';
@@ -1170,22 +1201,21 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        response: isProjectStateReview
-          ? markdownResponse
-          : [
-              '## I can turn this into buildable work',
-              '',
-              'Suggested first slice:',
-              '- Create a basic Minesweeper game with a grid, mine placement, reveal logic, flagging, win/loss detection, and a simple UI.',
-              '',
-              'Next useful actions:',
-              '- Save this as a Discussion.',
-              '- Create a Ticket when you are happy with the slice.'
-            ].join('\n'),
+        response: responseText,
+        mode: isFormalization ? 'Formalization' : 'Exploration',
+        showGovernanceActions: isFormalization,
+        governanceActions: isFormalization ? ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'] : [],
         contextSummary: 'Context used: tickets, recent runs, and decisions.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
-        traceId: 909
+        traceId: isFormalization ? 1001 : 909,
+        reasoningTrace: isFormalization
+          ? ['Prompt classified as formalization.', 'Handoff actions have been exposed.']
+          : ['Prompt normalized and mode selected.', 'Project context loaded.', 'Exploration selected: open reasoning is returned.'],
+        reasoningSummary: isFormalization
+          ? 'Formalization selected; handoff actions are available. Trace entries: 2.'
+          : 'Exploration selected; reasoning stays open and no governance actions are auto-exposed. Trace entries: 3.',
+        disambiguationQuestion: null
       })
     });
   });
@@ -1212,8 +1242,8 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('build me minesweeper');
-  await expect(page.getByTestId('chat.thread')).toContainText('I can turn this into buildable work');
-  await expect(page.getByTestId('chat.thread')).toContainText('Minesweeper game');
+  await expect(page.getByTestId('chat.thread')).toContainText('## Exploration mode');
+  await expect(page.getByTestId('chat.thread')).toContainText('Inferred options');
   await expect(page.getByTestId('chat.thread')).not.toContainText('Recent tickets');
   expect(freeformPrompt).toBe('build me minesweeper');
   expect(freeformMode).toBe('projectQuestion');
@@ -1230,12 +1260,22 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       })
     ])
   );
-  await expect(page.getByRole('heading', { name: 'I can turn this into buildable work' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Exploration mode' })).toBeVisible();
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(0);
+  await expect(page.getByTestId('chat.message.reasoning')).toBeVisible();
+
+  await page.getByTestId('chat.composer.input').fill('make this a ticket: build me minesweeper');
+  await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await page.getByTestId('chat.command.send').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('## Formalization mode');
+  await expect(page.getByTestId('chat.thread')).toContainText('Handoff intent');
+  await expect(page.getByRole('heading', { name: 'Formalization mode' })).toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
   await expect(page.getByTestId('chat.message.saveDiscussion')).toBeVisible();
   await page.getByTestId('chat.message.saveDiscussion').click();
   await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
-  expect(savedDiscussionBody.content).toContain('Create a basic Minesweeper game');
+  expect(savedDiscussionBody.content).toContain('build me minesweeper');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
