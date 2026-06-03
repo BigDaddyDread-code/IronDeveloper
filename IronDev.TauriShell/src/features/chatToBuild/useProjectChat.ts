@@ -3,7 +3,6 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { ChatCompletionResponse, ChatMessage } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
-import { useWorkspaceNavigation } from '../../state/useWorkspaceNavigation';
 import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 const projectReviewPrompt = [
@@ -15,7 +14,6 @@ const projectReviewPrompt = [
 export function useProjectChat() {
   const session = useSessionContext();
   const project = useProjectContext();
-  const navigation = useWorkspaceNavigation();
   const [messages, setMessages] = useState<ChatWorkspaceMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setSending] = useState(false);
@@ -28,12 +26,6 @@ export function useProjectChat() {
     getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus) ??
     (isHistoryLoading ? 'Chat history is loading.' : null);
   const sendDisabledReason = disabledReason ?? getChatSendBlockedReason(draft, isSending);
-  const latestBuildableUserMessage = useMemo(
-    () => [...messages].reverse().find((message) => message.role === 'user' && message.canContinueInBuild)?.content ?? '',
-    [messages]
-  );
-  const buildBridgeContent = draft.trim() || latestBuildableUserMessage.trim();
-  const buildBridgeDisabledReason = disabledReason ?? (buildBridgeContent ? null : 'Enter or send discussion text before continuing to Build.');
   const projectLabel = project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required');
 
   useEffect(() => {
@@ -198,20 +190,62 @@ export function useProjectChat() {
     });
   }, [sendMessage]);
 
-  const continueInBuild = useCallback(() => {
-    const content = buildBridgeContent.trim();
-    if (!content || disabledReason) {
-      return;
-    }
+  const saveDiscussionFromMessage = useCallback(
+    async (messageId: string) => {
+      if (!projectId || disabledReason) {
+        return;
+      }
 
-    navigation.setBuildDiscussionDraft({
-      title: 'Project discussion',
-      content,
-      source: 'chat',
-      createdUtc: new Date().toISOString()
-    });
-    navigation.navigateToWorkspace('build');
-  }, [buildBridgeContent, disabledReason, navigation]);
+      const message = messages.find((item) => item.id === messageId);
+      if (!message || message.role !== 'assistant' || !message.content.trim()) {
+        return;
+      }
+
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === messageId
+            ? { ...item, discussionSaveStatus: 'saving', discussionSaveError: null }
+            : item
+        )
+      );
+
+      try {
+        const response = await session.client.saveDiscussion(projectId, {
+          title: createSessionTitle(message.content),
+          content: message.content
+        });
+
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === messageId
+              ? {
+                  ...item,
+                  discussionSaveStatus: 'saved',
+                  discussionSaveError: null,
+                  savedDiscussion: {
+                    documentId: response.documentId,
+                    documentVersionId: response.documentVersionId
+                  }
+                }
+              : item
+          )
+        );
+      } catch (error) {
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === messageId
+              ? {
+                  ...item,
+                  discussionSaveStatus: 'error',
+                  discussionSaveError: describeApiError(error, 'Save Discussion failed.')
+                }
+              : item
+          )
+        );
+      }
+    },
+    [disabledReason, messages, projectId, session.client]
+  );
 
   const latestResponse = useMemo(
     () => [...messages].reverse().find((message) => message.role === 'assistant' && message.response)?.response ?? null,
@@ -229,7 +263,6 @@ export function useProjectChat() {
     isSending,
     disabledReason,
     sendDisabledReason,
-    buildBridgeDisabledReason,
     errorMessage,
     latestResponse: latestResponse as ChatCompletionResponse | null,
     latestResponseText,
@@ -237,7 +270,7 @@ export function useProjectChat() {
     setDraft,
     sendMessage,
     reviewProjectState,
-    continueInBuild
+    saveDiscussionFromMessage
   };
 }
 

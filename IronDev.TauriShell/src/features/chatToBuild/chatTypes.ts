@@ -10,6 +10,12 @@ export interface ChatWorkspaceMessage {
   createdUtc: string;
   canContinueInBuild?: boolean;
   response?: ChatCompletionResponse | null;
+  discussionSaveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  discussionSaveError?: string | null;
+  savedDiscussion?: {
+    documentId: number;
+    documentVersionId: number;
+  } | null;
 }
 
 export interface ChatSendRequest {

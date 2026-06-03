@@ -36,7 +36,6 @@ export function ChatRoute({ route, onRouteReady }: ChatRouteProps) {
         isSending={chat.isSending}
         disabledReason={chat.disabledReason}
         sendDisabledReason={chat.sendDisabledReason}
-        buildBridgeDisabledReason={chat.buildBridgeDisabledReason}
         errorMessage={chat.errorMessage}
         latestResponse={chat.latestResponse}
         latestResponseText={chat.latestResponseText}
@@ -44,7 +43,7 @@ export function ChatRoute({ route, onRouteReady }: ChatRouteProps) {
         onComposerChange={chat.setDraft}
         onSend={chat.sendMessage}
         onReviewProjectState={chat.reviewProjectState}
-        onContinueInBuild={chat.continueInBuild}
+        onSaveDiscussion={chat.saveDiscussionFromMessage}
       />
     </main>
   );

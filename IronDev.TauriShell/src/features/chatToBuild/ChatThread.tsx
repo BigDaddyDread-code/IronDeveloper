@@ -5,9 +5,11 @@ import { ChatMessage } from './ChatMessage';
 interface ChatThreadProps {
   messages: ChatWorkspaceMessage[];
   isSending: boolean;
+  onSaveDiscussion?: (messageId: string) => void;
+  onViewSources?: (messageId: string) => void;
 }
 
-export function ChatThread({ messages, isSending }: ChatThreadProps) {
+export function ChatThread({ messages, isSending, onSaveDiscussion, onViewSources }: ChatThreadProps) {
   return (
     <section className="chat-thread" data-testid="chat.thread">
       {messages.length === 0 ? (
@@ -18,7 +20,12 @@ export function ChatThread({ messages, isSending }: ChatThreadProps) {
       ) : (
         <div className="chat-thread__messages">
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage
+              key={message.id}
+              message={message}
+              onSaveDiscussion={onSaveDiscussion}
+              onViewSources={onViewSources}
+            />
           ))}
         </div>
       )}

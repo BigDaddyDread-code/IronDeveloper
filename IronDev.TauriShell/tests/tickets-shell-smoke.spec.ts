@@ -1130,6 +1130,7 @@ test('ticket start disposable run links a real run review without enabling revie
 test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
   let lastPrompt = '';
   let lastMode = '';
+  let savedDiscussionBody: { title?: string; content?: string } = {};
   const markdownResponse = [
     '# Project state',
     '',
@@ -1146,6 +1147,14 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     '<script>window.__irondevUnsafeMarkdown = true</script>'
   ].join('\n');
   const chatPersistence = await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/discussions', async (route) => {
+    savedDiscussionBody = route.request().postDataJSON() as { title?: string; content?: string };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ documentId: 222, documentVersionId: 333 })
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
     lastPrompt = body.prompt ?? '';
@@ -1179,12 +1188,12 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toHaveCount(0);
   await expect(page.getByTestId('chat.command.send')).toBeDisabled();
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await expect(page.getByTestId('chat.composer.disabledReason')).toContainText('Enter a message before sending.');
 
   await page.getByTestId('chat.composer.input').fill('Where should I start?');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeEnabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
   await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
@@ -1202,6 +1211,10 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   );
   await expect(page.getByRole('heading', { name: 'Tickets workspace' })).toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toBeVisible();
+  await page.getByTestId('chat.message.saveDiscussion').click();
+  await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
+  expect(savedDiscussionBody.content).toContain('Use the Tickets workspace to review `build readiness`.');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
@@ -1401,16 +1414,16 @@ test('primary usage flow moves from Home to Chat to Build review package', async
 
   await page.getByTestId('home.action.reviewProjectState').click();
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.reviewProjectState').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Project state: IronDeveloper');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: project summary');
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
 
-  await page.getByTestId('chat.composer.input').fill(buildDiscussionMarkdown);
-  await page.getByTestId('chat.command.continueInBuild').click();
+  await page.getByTestId('shell.nav.build').click();
   await expect(page.getByTestId('build.workspace')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toBeVisible();
+  await page.getByTestId('chat-build.discussion.content').fill(buildDiscussionMarkdown);
   await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue(buildDiscussionMarkdown);
   await page.getByTestId('chat-build.command.saveDiscussion').click();
   await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
