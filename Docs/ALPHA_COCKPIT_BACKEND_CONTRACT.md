@@ -9,8 +9,11 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
 - Run proposals must be validated first: `CodeProposalValidator` must pass before any disposable run executes build/run commands.
 - Chat completion is mode-aware:
   - `projectQuestion` defaults to classifier-based `Exploration`, `Formalization`, or `Confirmation`.
+  - The controller accepts only `projectQuestion` and `projectStateReview`; explicit governance modes are not API request kinds.
   - Context routing runs through `IContextAgentRouteJudge` and `IContextAgentService` for hints, evidence, and trace diagnostics only.
   - `LlmChatModeClassifier` is the single authority for the final governance mode.
+  - Slice 1 uses prompt-constrained classifier JSON with strict validation, not provider-enforced structured output.
+  - Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001` tracks replacing brace-extracted JSON with provider-enforced JSON/schema output when `ILLMService` supports it.
   - `ChatClarificationState` is passive evidence only and must not force `Confirmation`.
   - `ProjectChatResponseService` composes the answer using the classifier-selected mode and must not let the composer reclassify the turn.
   - `ChatGovernanceGate` is the single source for UI permissions.

@@ -30,20 +30,12 @@ public sealed class ChatClarificationMapper : IChatClarificationMapper
     private static bool LooksLikeProductScope(string userMessage)
     {
         var lower = userMessage.ToLowerInvariant();
-        var asksToCreate = lower.Contains("build", StringComparison.Ordinal) ||
+        return lower.Contains("build", StringComparison.Ordinal) ||
             lower.Contains("make", StringComparison.Ordinal) ||
             lower.Contains("create", StringComparison.Ordinal) ||
-            lower.Contains("write", StringComparison.Ordinal);
-        var productNoun = lower.Contains("game", StringComparison.Ordinal) ||
-            lower.Contains("app", StringComparison.Ordinal) ||
-            lower.Contains("site", StringComparison.Ordinal) ||
-            lower.Contains("system", StringComparison.Ordinal) ||
-            lower.Contains("tool", StringComparison.Ordinal) ||
-            lower.Contains("monopoly", StringComparison.Ordinal) ||
-            lower.Contains("minesweeper", StringComparison.Ordinal) ||
-            lower.Contains("naughts", StringComparison.Ordinal) ||
-            lower.Contains("crosses", StringComparison.Ordinal);
-
-        return asksToCreate && productNoun;
+            lower.Contains("write", StringComparison.Ordinal) ||
+            lower.Contains("design", StringComparison.Ordinal) ||
+            lower.StartsWith("i want ", StringComparison.Ordinal) ||
+            lower.Contains(" i want ", StringComparison.Ordinal);
     }
 }

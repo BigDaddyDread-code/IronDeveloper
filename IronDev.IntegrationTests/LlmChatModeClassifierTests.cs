@@ -9,7 +9,7 @@ namespace IronDev.IntegrationTests;
 public sealed class LlmChatModeClassifierTests
 {
     [TestMethod]
-    public async Task ClassifyAsync_ReturnsStructuredModeDecision()
+    public async Task ClassifyAsync_ReturnsPromptConstrainedJsonDecision()
     {
         var llm = new StubLlmService("""
             {
@@ -25,6 +25,7 @@ public sealed class LlmChatModeClassifierTests
         Assert.AreEqual(ChatGovernanceMode.Exploration, decision.Mode);
         Assert.AreEqual(0.91, decision.Confidence);
         Assert.AreEqual("The user is asking questions and has not requested a durable artifact.", decision.Reason);
+        StringAssert.Contains(llm.ReceivedPrompts.Single(), "prompt-constrained JSON");
     }
 
     [TestMethod]

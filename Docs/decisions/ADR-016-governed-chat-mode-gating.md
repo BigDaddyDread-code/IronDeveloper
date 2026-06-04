@@ -18,9 +18,9 @@ Product integrity requires explicit, inspectable transitions between these modes
 
 `POST /api/projects/{projectId}/chat/complete` must operate as a mode-aware contract:
 
-1. `projectQuestion` (default) and `projectStateReview` remain supported for existing clients.
-2. New explicit modes `exploration`, `formalization`, and `confirmation` are accepted.
-3. `projectQuestion` remains the default, but route/context output is only a hint.
+1. `projectQuestion` (default) and `projectStateReview` remain the only accepted chat completion request kinds.
+2. Explicit governance modes `exploration`, `formalization`, and `confirmation` are removed from the API boundary.
+3. Any future explicit governance intent may be classifier evidence only; it must never become a controller bypass.
 4. `IChatModeClassifier` is the only authority that selects `Exploration`, `Formalization`, or `Confirmation`.
 5. `Formalization` responses surface governance affordances through `ChatGovernanceGate`, while `Exploration` and `Confirmation` do not.
 6. `Confirmation` requires user confirmation text before escalating to governance actions.
@@ -35,6 +35,7 @@ Product integrity requires explicit, inspectable transitions between these modes
    - Missing mode or legacy history tags must not be treated as an affirmative governance signal.
    - Context clarification does not force `Confirmation`; product-scope vagueness remains `Exploration` with passive clarification evidence.
 10. The response composer receives the selected mode and must not reclassify the turn while generating content.
+11. The Slice 1 classifier boundary is prompt-constrained JSON with strict validation. It is not provider-enforced structured output.
 
 ## Reasoning
 
@@ -47,5 +48,6 @@ The goal is not to stop governance; it is to delay governance controls until int
 - `IronDev.TauriShell` consumes the expanded chat payload and hides save/view/copy actions unless the gate allows them.
 - Tests must assert mode-shape differences rather than a single hard-coded template.
 - Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode`, `clarification`, and `gate` instead of defaulting to opaque templates.
+- Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001`: replace prompt-constrained classifier JSON with provider-enforced JSON/schema output once `ILLMService` exposes that capability. Removal condition: classifier parse recovery no longer needs brace extraction.
 - `Docs/ARCHITECTURE.md`, `Docs/AGENTS.md`, `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`, and boundary docs must reference the cockpit mode contract.
 - `ApiBoundaryTests` must validate that chat ownership remains context-only and that stage ownership remains explicit.

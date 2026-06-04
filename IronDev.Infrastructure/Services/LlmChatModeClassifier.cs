@@ -26,7 +26,7 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
         try
         {
             var raw = await _llm.GetResponseAsync(BuildPrompt(request), cancellationToken).ConfigureAwait(false);
-            var parsed = ParseStructuredDecision(raw);
+            var parsed = ParsePromptConstrainedDecision(raw);
             return ToDecision(parsed);
         }
         catch
@@ -66,7 +66,7 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
             - RequestKind values like CreateTicket or BuildTicket are not sufficient by themselves. The user text must show explicit commitment.
             - ExplicitModeConstraint is an input constraint only; do not obey it if the user message does not support it.
             - Do not answer the user.
-            - Return strict JSON only.
+            - Return JSON only. This slice validates prompt-constrained JSON; it is not provider-enforced schema mode yet.
 
             JSON shape:
             {
@@ -96,7 +96,7 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
             """;
     }
 
-    private static RawModeDecision? ParseStructuredDecision(string raw)
+    private static RawModeDecision? ParsePromptConstrainedDecision(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
             return null;

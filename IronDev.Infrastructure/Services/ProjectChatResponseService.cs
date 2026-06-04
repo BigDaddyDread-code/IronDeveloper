@@ -135,7 +135,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
                 correlationId);
         var tracingSummary = BuildReasoningSummary(contextAgentResult, responseMode, reasoningTrace);
 
-        var disambiguationQuestion = contextAgentResult.IsClarificationRequired
+        var disambiguationQuestion = clarification.Required
             ? BuildDisambiguationQuestion(clarification.Questions)
             : null;
 
@@ -399,17 +399,18 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         ChatClarificationState clarification)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Yes. I would treat this as Exploration, not a commitment lane.");
+        if (clarification.Kind == ChatClarificationKind.ProductScope)
+        {
+            sb.AppendLine("Nice. This is a bigger build, so the first useful step is choosing a small playable slice.");
+            sb.AppendLine();
+            sb.AppendLine("What do you want to shape first?");
+            sb.Append(BuildClarificationQuestionBullets(clarification.Questions));
+            return sb.ToString().Trim();
+        }
+
+        sb.AppendLine("I can keep going, but one missing detail would make the answer more useful.");
         sb.AppendLine();
-        sb.AppendLine($"Project: {projectName}");
-        sb.AppendLine($"Idea: {prompt}");
-        sb.AppendLine();
-        sb.AppendLine(clarification.Kind == ChatClarificationKind.ProductScope
-            ? "What I need is product shape, not governance ceremony:"
-            : "The missing detail is still lightweight enough to ask directly:");
         sb.Append(BuildClarificationQuestionBullets(clarification.Questions));
-        sb.AppendLine();
-        sb.AppendLine("Until you ask to save, ticket, or build it, I will keep this exploratory.");
         return sb.ToString().Trim();
     }
 

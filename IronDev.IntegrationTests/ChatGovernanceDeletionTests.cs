@@ -27,6 +27,30 @@ public sealed class ChatGovernanceDeletionTests
             "Context retrieval requires clarification before governance actions can be exposed.");
 
         AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
+            "monopoly");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
+            "minesweeper");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
+            "naughts");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
+            "crosses");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseService.cs"),
+            "governance ceremony");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseService.cs"),
+            "commitment lane");
+
+        AssertFileDoesNotContain(
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "ChatContextPanel.tsx"),
             "mode === 'Formalization'");
 
