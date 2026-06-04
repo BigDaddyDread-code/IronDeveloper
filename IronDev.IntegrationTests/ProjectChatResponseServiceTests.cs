@@ -52,6 +52,32 @@ public sealed class ProjectChatResponseServiceTests
         StringAssert.Contains(source, "_clarificationClassifier.ClassifyAsync");
     }
 
+    [TestMethod]
+    public void ProjectChatContextPipeline_NamesBroadAgentContextAndSummaryContextSeparately()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatContextPipeline.cs"));
+
+        StringAssert.Contains(source, "contextAgentTickets");
+        StringAssert.Contains(source, "contextAgentDecisions");
+        StringAssert.Contains(source, "summaryTickets");
+        StringAssert.Contains(source, "summaryDecisions");
+        StringAssert.Contains(source, "RecentTickets = contextAgentTickets");
+        StringAssert.Contains(source, "RecentDecisions = contextAgentDecisions");
+    }
+
+    [TestMethod]
+    public void ProjectChatResponseComposer_ForbidsInternalGovernanceLeakage()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseComposer.cs"));
+
+        StringAssert.Contains(source, "Do not mention governance modes");
+        StringAssert.Contains(source, "classifier names");
+        StringAssert.Contains(source, "route hints");
+        StringAssert.Contains(source, "Translate the selected mode into natural user-facing language.");
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = AppContext.BaseDirectory;

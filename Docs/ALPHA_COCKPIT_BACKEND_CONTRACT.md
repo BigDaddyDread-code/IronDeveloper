@@ -17,7 +17,8 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
   - Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001` tracks replacing brace-extracted JSON with provider-enforced JSON/schema output when `ILLMService` supports it.
   - Clarification is separate from governance mode and must not force `Confirmation`.
   - `ProjectChatResponseService` is the orchestration spine only: context lookup/routing lives in `ProjectChatContextPipeline`, answer text lives in `ProjectChatResponseComposer`, and trace/context projection lives in `ProjectChatResponseMetadataBuilder`.
-  - `ProjectChatResponseComposer` composes the answer using the classifier-selected mode and must not reclassify the turn.
+  - `ProjectChatContextPipeline` keeps the broad context-agent slice separate from the smaller response-summary slice; duplicate context fetches should not hide inside collaborator methods.
+  - `ProjectChatResponseComposer` composes the answer using the classifier-selected mode and must not reclassify the turn or leak internal governance/classifier details into user-facing prose unless explicitly asked.
   - `ChatGovernanceGate` is the single source for UI permissions.
   - `projectStateReview` remains explicit project-review behavior.
   - Backend returns full response metadata in `ChatCompletionResponse` for persisted reconstruction and UI replay:

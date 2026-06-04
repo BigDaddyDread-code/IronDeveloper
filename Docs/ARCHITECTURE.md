@@ -117,8 +117,8 @@ Allowed responsibilities:
 
 - `IContextAgentRouteJudge` may emit request kind, confidence, evidence, risk, and `ContextModeHint` as a route hint.
 - `IProjectChatResponseService` is the chat governance spine. It may validate mode classifier output by failing closed to `Confirmation`, run clarification classification, call the gate, call the composer, and attach metadata; it must not own context retrieval, LLM response composition, or trace formatting details.
-- `ProjectChatContextPipeline` owns project/context lookup, route judging, context-agent execution, and route-signal assembly.
-- `ProjectChatResponseComposer` owns LLM composition, mode instruction injection, non-prose fallback text, and natural exploration clarification responses.
+- `ProjectChatContextPipeline` owns project/context lookup, route judging, context-agent execution, and route-signal assembly. It may fetch a broader context-agent slice and expose a smaller summary slice, but that split must be named and explicit.
+- `ProjectChatResponseComposer` owns LLM composition, mode instruction injection, non-prose fallback text, and natural exploration clarification responses. It may pass selected mode instructions into the model, but the prompt must forbid leaking classifier names, confidence, route hints, gates, or internal policy machinery to the user unless explicitly asked.
 - `ProjectChatResponseMetadataBuilder` owns context summaries, linked source projection, reasoning trace lines, reasoning summaries, and disambiguation text.
 - Clarification fallback must be conservative: preserve explicit context questions as `GeneralScope`, return `None` when no clarification evidence exists, and use `GovernanceIntent` only when the selected mode has already failed closed to `Confirmation`.
 - Clarification fallback must mark its reason as fallback evidence and must not mutate the selected governance mode or `ChatGovernanceGate`.

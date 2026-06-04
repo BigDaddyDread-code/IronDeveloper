@@ -62,6 +62,8 @@ public sealed class ProjectChatResponseComposer
 
             You are the response composer.
             Use the selected mode. Do not reclassify the mode. Do not output JSON.
+            Do not mention governance modes, classifier names, classifier confidence, route hints, gates, or internal policy machinery to the user unless the user explicitly asks how the cockpit made the decision.
+            Translate the selected mode into natural user-facing language.
 
             Context-built answer prompt:
             {finalPrompt}

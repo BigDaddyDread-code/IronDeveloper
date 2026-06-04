@@ -42,6 +42,7 @@ Product integrity requires explicit, inspectable transitions between these modes
 15. Assistant message insert, session timestamp update, and normalized turn persistence share one transaction.
 16. Clarification fallback preserves evidence conservatively and must not mutate mode or gate.
 17. `ProjectChatResponseService` remains an orchestration spine only. Context pipeline, response composition, and response metadata formatting live in separate named collaborators.
+18. The context pipeline keeps broad context-agent input separate from smaller response-summary context, and the composer must not leak internal classifier/governance machinery into user-facing prose unless explicitly asked.
 
 ## Reasoning
 

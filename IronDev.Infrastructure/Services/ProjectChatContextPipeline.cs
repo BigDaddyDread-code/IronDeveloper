@@ -49,8 +49,10 @@ public sealed class ProjectChatContextPipeline
         if (project is null)
             return null;
 
-        var tickets = await _tickets.GetRecentTicketsAsync(projectId, 5, cancellationToken).ConfigureAwait(false);
-        var decisions = await _memory.GetRecentDecisionsAsync(projectId, 5, cancellationToken).ConfigureAwait(false);
+        var contextAgentTickets = await _tickets.GetRecentTicketsAsync(projectId, 20, cancellationToken).ConfigureAwait(false);
+        var contextAgentDecisions = await _memory.GetRecentDecisionsAsync(projectId, 20, cancellationToken).ConfigureAwait(false);
+        var summaryTickets = contextAgentTickets.Take(5).ToList();
+        var summaryDecisions = contextAgentDecisions.Take(5).ToList();
         var rules = await _memory.GetProjectRulesAsync(projectId, cancellationToken).ConfigureAwait(false);
         var documents = await _memory.GetContextDocumentsAsync(projectId, status: "Active", take: 5, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -70,12 +72,15 @@ public sealed class ProjectChatContextPipeline
             prompt,
             recentConversationSummary,
             traceGroupId,
+            contextAgentTickets,
+            contextAgentDecisions,
+            rules,
             cancellationToken).ConfigureAwait(false);
 
         return new ProjectChatContextPipelineResult(
             project,
-            tickets,
-            decisions,
+            summaryTickets,
+            summaryDecisions,
             rules,
             documents,
             routeDecision,
@@ -108,6 +113,9 @@ public sealed class ProjectChatContextPipeline
         string prompt,
         string recentConversationSummary,
         string traceGroupId,
+        IReadOnlyList<ProjectTicket> contextAgentTickets,
+        IReadOnlyList<ProjectDecision> contextAgentDecisions,
+        IReadOnlyList<ProjectRule> rules,
         CancellationToken cancellationToken)
     {
         try
@@ -119,9 +127,9 @@ public sealed class ProjectChatContextPipeline
                 TraceGroupId = traceGroupId,
                 UserRequest = prompt,
                 RecentConversationSummary = recentConversationSummary,
-                RecentTickets = await _tickets.GetRecentTicketsAsync(projectId, 20, cancellationToken).ConfigureAwait(false),
-                RecentDecisions = await _memory.GetRecentDecisionsAsync(projectId, 20, cancellationToken).ConfigureAwait(false),
-                ProjectRules = await _memory.GetProjectRulesAsync(projectId, cancellationToken).ConfigureAwait(false),
+                RecentTickets = contextAgentTickets,
+                RecentDecisions = contextAgentDecisions,
+                ProjectRules = rules,
             }, cancellationToken).ConfigureAwait(false);
         }
         catch

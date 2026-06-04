@@ -70,6 +70,8 @@ Mandatory checks before merge:
   - `LlmChatClarificationClassifier` is the only clarification authority; clarification must not force or mutate `Confirmation`.
   - `ChatGovernanceGate` remains the single rule for showing `Copy Markdown`, `Save Discussion`, `Create Ticket`, and `View Sources`.
   - `ProjectChatResponseService` must remain a governance spine only. Context lookup belongs in `ProjectChatContextPipeline`, prose generation belongs in `ProjectChatResponseComposer`, and trace/context metadata belongs in `ProjectChatResponseMetadataBuilder`.
+  - `ProjectChatContextPipeline` must keep broad context-agent input separate from smaller response-summary context instead of hiding duplicate fetches.
+  - `ProjectChatResponseComposer` must not leak classifier names, confidence, route hints, gates, or internal governance machinery into the answer unless the user asks how the cockpit decided.
 - Chat replay and persistence changes must also update the persisted `ChatMessage.Tags` schema and normalized turn tables:
   - Persisted assistant responses must include a versioned envelope (`v:1`) with mode + clarification + gate + trace metadata.
   - UI mapping code must read this envelope when restoring messages and must not infer modes from empty defaults.
