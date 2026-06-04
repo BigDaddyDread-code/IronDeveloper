@@ -7,6 +7,11 @@ namespace IronDev.Infrastructure.Services;
 
 public sealed class LlmChatModeClassifier : IChatModeClassifier
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly ILLMService _llm;
 
     public LlmChatModeClassifier(ILLMService llm)
@@ -21,7 +26,8 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
         try
         {
             var raw = await _llm.GetResponseAsync(BuildPrompt(request), cancellationToken).ConfigureAwait(false);
-            return Validate(Parse(raw));
+            var parsed = ParseStructuredDecision(raw);
+            return ToDecision(parsed);
         }
         catch
         {
@@ -90,7 +96,7 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
             """;
     }
 
-    private static ChatModeDecision? Parse(string raw)
+    private static RawModeDecision? ParseStructuredDecision(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
             return null;
@@ -99,40 +105,26 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
         if (string.IsNullOrWhiteSpace(candidate))
             return null;
 
-        using var document = JsonDocument.Parse(candidate);
-        var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object)
-            return null;
-
-        if (!root.TryGetProperty("mode", out var modeEl) ||
-            !root.TryGetProperty("confidence", out var confidenceEl) ||
-            !root.TryGetProperty("reason", out var reasonEl))
-        {
-            return null;
-        }
-
-        var modeText = modeEl.ValueKind == JsonValueKind.String ? modeEl.GetString() : null;
-        var reason = reasonEl.ValueKind == JsonValueKind.String ? reasonEl.GetString() : null;
-        var confidence = ParseConfidence(confidenceEl);
-
-        if (!TryParseMode(modeText, out var mode) || confidence is null)
-            return null;
-
-        return new ChatModeDecision(mode, confidence.Value, reason ?? string.Empty);
+        return JsonSerializer.Deserialize<RawModeDecision>(candidate, JsonOptions);
     }
 
-    private static ChatModeDecision Validate(ChatModeDecision? decision)
+    private static ChatModeDecision ToDecision(RawModeDecision? raw)
     {
-        if (decision is null)
+        if (raw is null)
             return FailClosed("Classifier did not return parseable mode JSON.");
 
-        if (decision.Confidence is < 0 or > 1 || double.IsNaN(decision.Confidence))
+        if (!TryParseMode(raw.Mode, out var mode))
+            return FailClosed("Classifier returned an unknown mode.");
+
+        var confidence = ParseConfidence(raw.Confidence);
+        if (confidence is null)
             return FailClosed("Classifier returned invalid confidence.");
 
-        if (string.IsNullOrWhiteSpace(decision.Reason))
-            return decision with { Reason = "Classifier did not provide a reason." };
+        var reason = string.IsNullOrWhiteSpace(raw.Reason)
+            ? "Classifier did not provide a reason."
+            : raw.Reason.Trim();
 
-        return decision with { Confidence = Math.Round(decision.Confidence, 2) };
+        return new ChatModeDecision(mode, Math.Round(confidence.Value, 2), reason);
     }
 
     private static ChatModeDecision FailClosed(string reason) =>
@@ -192,4 +184,9 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
 
         return raw is >= 0 and <= 1 ? raw : null;
     }
+
+    private sealed record RawModeDecision(
+        string? Mode,
+        JsonElement Confidence,
+        string? Reason);
 }
