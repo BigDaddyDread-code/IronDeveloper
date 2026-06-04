@@ -42,35 +42,60 @@ export function ChatContextPanel({
       </div>
       <section className="workflow-section">
         <MetadataRow label="Project" value={projectLabel} />
+        <MetadataRow label="Mode" value={
+          <StatusBadge status={
+            latestResponse?.mode === 'Formalization'
+              ? 'ready'
+              : latestResponse?.mode === 'Confirmation'
+                ? 'warning'
+                : 'neutral'
+          }>
+            {latestResponse?.mode ?? 'Exploration'}
+          </StatusBadge>
+        } />
         <MetadataRow
-          label="Mode"
+          label="Trace"
           value={
-            <StatusBadge status={latestResponse?.mode === 'Formalization' ? 'ready' : 'neutral'}>
-              {latestResponse?.mode ?? 'Exploration'}
+            <StatusBadge status={latestResponse?.traceId ? 'ready' : 'neutral'}>
+              {latestResponse?.traceId ? `#${latestResponse.traceId}` : 'No trace id yet'}
             </StatusBadge>
           }
         />
-        <MetadataRow label="Trace" value={latestResponse?.traceId ? `#${latestResponse.traceId}` : 'No trace yet'} />
+        {latestResponse?.dogfoodTraceId ? (
+          <MetadataRow
+            label="Dogfood trace"
+            value={
+              <StatusBadge status="ready">
+                {latestResponse.dogfoodTraceId}{latestResponse.dogfoodTracePath ? ` (${latestResponse.dogfoodTracePath})` : ''}
+              </StatusBadge>
+            }
+          />
+        ) : null}
         <MetadataRow
-          label="Context"
+          label="Context summary"
           value={
             <StatusBadge status={latestResponse?.contextSummary ? 'ready' : 'neutral'}>
               {latestResponse?.contextSummary ? 'Returned' : 'Pending'}
             </StatusBadge>
           }
         />
-        <p>{latestResponse?.contextSummary ?? 'Context summary will appear after the backend returns a grounded response.'}</p>
+        <p>{latestResponse?.contextSummary ?? 'No context summary was returned yet.'}</p>
         {latestResponse?.reasoningSummary ? <p>{latestResponse.reasoningSummary}</p> : null}
         {latestResponse?.disambiguationQuestion ? (
           <p>
             <strong>Next choice:</strong> {latestResponse.disambiguationQuestion}
           </p>
         ) : null}
-        <p>
-          <strong>Dogfood trace:</strong>{' '}
-          {latestResponse?.dogfoodTraceId ? `#${latestResponse.dogfoodTraceId}` : 'None'}
-          {latestResponse?.dogfoodTracePath ? ` (${latestResponse.dogfoodTracePath})` : ''}
-        </p>
+        {latestResponse?.reasoningTrace && latestResponse.reasoningTrace.length > 0 ? (
+          <details open>
+            <summary>Reasoning trace (from backend)</summary>
+            <ul>
+              {latestResponse.reasoningTrace.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
       <ChatSourceList response={latestResponse} />
       <ChatSuggestedActions
@@ -78,6 +103,7 @@ export function ChatContextPanel({
         responseText={latestResponseText}
         governanceActions={latestResponse?.governanceActions ?? []}
         hasGovernanceActions={Boolean(latestResponse?.showGovernanceActions)}
+        mode={latestResponse?.mode ?? null}
       />
     </aside>
   );

@@ -47,7 +47,7 @@ test.describe('LocalTest manual cockpit smoke', () => {
     await page.getByTestId('chat.command.send').click();
     await expect(page.getByTestId('chat.thread')).toContainText('Where are we on this project?');
     await expect(page.getByTestId('chat.thread')).toContainText(/Project state|Recent tickets/i, { timeout: 30_000 });
-    await expect(page.getByTestId('chat.contextPanel')).toContainText(/Grounded from|Context Used/i);
+    await expect(page.getByTestId('chat.contextPanel')).toContainText(/Context summary|grounded project context/i);
     await expect(page.getByTestId('chat.command.reviewProjectState')).toBeVisible();
     await page.getByTestId('chat.command.reviewProjectState').click();
     await expect(page.getByTestId('chat.thread')).toContainText('Review Project State');

@@ -99,7 +99,8 @@ Any refactor touching one stage must update this matrix in this section before m
 Chat completion must never assume governance intent. Backend mode contract:
 
 - `projectStateReview`: project review text and state summary.
-- `projectQuestion` (default): prompt-inference mode, which can resolve to:
+- `projectQuestion` (default): prompt-inference mode, resolved by
+  `IContextAgentRouteJudge` into:
   - `Exploration` (default),
   - `Formalization` (explicit commitment language),
   - `Confirmation` (mixed or ambiguous intent).
@@ -107,6 +108,8 @@ Chat completion must never assume governance intent. Backend mode contract:
   - `exploration`
   - `formalization`
   - `confirmation`
+- Route inference must add route trace signals for UI and diagnostics, including confidence,
+  intent kind, context resolver flags, evidence use, and risk summary.
 
 Response envelope rules:
 
@@ -116,7 +119,7 @@ Response envelope rules:
 
 Client-facing UX rules:
 
-- `Copy Markdown` is always available for assistant responses.
+- `Copy Markdown` is only shown for non-exploration responses.
 - `Save Discussion` / `View Sources` are only shown when response metadata says governance is active.
 - Reasoning visibility must remain honest and inspectable, including:
   - `reasoningTrace` list

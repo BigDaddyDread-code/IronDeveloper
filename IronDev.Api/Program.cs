@@ -71,6 +71,8 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
+builder.Services.AddScoped<IContextAgentRouteJudge, ContextAgentRouteJudgeService>();
+builder.Services.AddScoped<IContextAgentService, ContextAgentService>();
 builder.Services.AddScoped<IProjectChatResponseService, ProjectChatResponseService>();
 builder.Services.AddScoped<IProjectStateReviewService, ProjectStateReviewService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();

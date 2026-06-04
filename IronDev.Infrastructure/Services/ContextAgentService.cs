@@ -101,7 +101,9 @@ public sealed class ContextAgentService : IContextAgentService
     public async Task<ContextAgentResult> RunAsync(ContextAgentRequest request, CancellationToken ct = default)
     {
         var limits       = request.Limits ?? DefaultLimits;
-        var traceGroupId = Guid.NewGuid().ToString("N");
+        var traceGroupId = string.IsNullOrWhiteSpace(request.TraceGroupId)
+            ? Guid.NewGuid().ToString("N")
+            : request.TraceGroupId;
         var warnings     = new List<string>();
         var evidence     = new List<CodeEvidence>();
         var candidates   = new List<TicketCandidate>();

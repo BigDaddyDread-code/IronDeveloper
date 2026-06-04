@@ -9,6 +9,7 @@ public interface ILlmTraceService
     // ── Core operations ───────────────────────────────────────────────────
     void AddTrace(LlmTraceEntry trace);
     IReadOnlyList<LlmTraceEntry> GetRecentTraces(int max = 100);
+    IReadOnlyList<LlmTraceEntry> GetTracesByGroupId(string traceGroupId, int max = 100);
     void Clear();
     string ExportTrace(LlmTraceEntry trace);
     string ExportAll();

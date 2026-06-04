@@ -36,7 +36,7 @@ test('captures Chat hierarchy with visible composer and collapsible context', as
           'const nextAction = "Review build readiness";',
           '```'
         ].join('\n'),
-        contextSummary: 'Context used: project summary, recent tickets, recent runs.',
+        contextSummary: 'Project exploration lane using project context.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/chatToBuild/ChatWorkspace.tsx',
         linkedSymbols: 'ChatWorkspace',
         traceId: 42

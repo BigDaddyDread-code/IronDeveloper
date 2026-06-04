@@ -179,9 +179,18 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, freeformChat.StatusCode);
         using var freeformBody = JsonDocument.Parse(await freeformChat.Content.ReadAsStringAsync());
         var freeformResponse = freeformBody.RootElement.GetProperty("response").GetString();
+        var freeformMode = freeformBody.RootElement.GetProperty("mode").GetString();
         Assert.IsTrue(freeformResponse?.Contains("Minesweeper", StringComparison.OrdinalIgnoreCase) == true);
-        Assert.IsTrue(freeformResponse?.Contains("buildable work", StringComparison.OrdinalIgnoreCase) == true);
-        Assert.IsFalse(freeformResponse!.Contains("Recent tickets", StringComparison.OrdinalIgnoreCase));
+        Assert.IsNotNull(freeformMode);
+        Assert.IsTrue(
+            freeformMode.Equals("Exploration", StringComparison.OrdinalIgnoreCase) ||
+            freeformMode.Equals("Formalization", StringComparison.OrdinalIgnoreCase) ||
+            freeformMode.Equals("Confirmation", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(
+            (freeformMode.Equals("Exploration", StringComparison.OrdinalIgnoreCase) && freeformResponse?.Contains("open reasoning", StringComparison.OrdinalIgnoreCase) == true) ||
+            (freeformMode.Equals("Formalization", StringComparison.OrdinalIgnoreCase) && freeformResponse?.Contains("handoff", StringComparison.OrdinalIgnoreCase) == true) ||
+            (freeformMode.Equals("Confirmation", StringComparison.OrdinalIgnoreCase) && freeformResponse?.Contains("lane you want", StringComparison.OrdinalIgnoreCase) == true)
+        );
 
         var wrongProjectChat = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
         {

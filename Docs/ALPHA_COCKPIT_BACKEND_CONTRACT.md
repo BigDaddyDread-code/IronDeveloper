@@ -9,8 +9,13 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
 - Run proposals must be validated first: `CodeProposalValidator` must pass before any disposable run executes build/run commands.
 - Chat completion is mode-aware:
   - `projectQuestion` defaults to inference-based `Exploration`, `Formalization`, or `Confirmation`.
+  - `projectQuestion` inference runs through `IContextAgentRouteJudge` and includes a route trace id for dogfood diagnostics.
   - `projectStateReview` remains explicit project-review behavior.
-  - Formalization mode may return governance affordances; exploration must not.
+  - `Exploration` may not return governance actions.
+  - `Confirmation` requires explicit lane choice before exposing governance affordances.
+  - `Formalization` may return governance affordances.
+  - `reasoningTrace`, `reasoningSummary`, `disambiguationQuestion`, and route signals must be present for inspectability.
+- A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;
   - the ticket belongs to the route project;

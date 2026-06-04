@@ -206,7 +206,7 @@ test('LocalTest login uses the normal auth form and continues to project selecti
       contentType: 'application/json',
       body: JSON.stringify({
         response: 'Project state: Selectable Project is ready.',
-        contextSummary: 'Context used: selected project.',
+        contextSummary: 'Selectable Project: exploration lane using project context (tickets=0, decisions=0, documents=0, runs=0). No route signals in response.',
         linkedFilePaths: '',
         linkedSymbols: '',
         traceId: null
@@ -472,7 +472,7 @@ test('home project selector persists selection and unblocks project workspaces',
       contentType: 'application/json',
       body: JSON.stringify({
         response: 'Project state: Selectable Project is ready.',
-        contextSummary: 'Context used: selected project.',
+        contextSummary: 'Selectable Project: exploration lane using project context (tickets=0, decisions=0, documents=0, runs=0). No route signals in response.',
         linkedFilePaths: '',
         linkedSymbols: '',
         traceId: null
@@ -1169,29 +1169,31 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       ? markdownResponse
       : isFormalization
         ? [
-            '## Formalization mode',
+            "I'm in **Formalization** lane now.",
             '',
-            `Objective draft: ${body.prompt}`,
+            'I can hand this into a formal pipeline once the lane is stable.',
             '',
-            '### Handoff intent',
+            '### Delivery framing',
             '- Keep scope to one verifiable behavior slice.',
-            '- Define acceptance criteria before start.',
-            '- Include verification intent, not only happy-path behavior.'
+            '- Define acceptance criteria before handoff.',
+            '- Include verification intent, not only happy-path behavior.',
+            '### Handoff options',
+            '- Save this response as a Discussion.',
+            '- Create a Ticket from the Discussion.'
           ].join('\n')
         : [
-            '## Exploration mode',
-            '',
-            `You asked: ${body.prompt}`,
+            "I'm in **Exploration** mode.",
+            `Prompt: ${body.prompt}`,
             '',
             '### Inferred options',
             '- Option A: clarify scope and constraints first.',
             '- Option B: compare implementation approaches.',
-            '- Option C: keep it lightweight and run only after a readiness gate.',
+            '- Option C: keep it lightweight and lock only one path.',
             '',
             '### Risks / assumptions surfaced',
             '- Storage model and persistence assumptions are not selected yet.',
             '- Testability strategy and failure expectations are not yet fixed.',
-            '- Build command profile is not selected until this is formalized.'
+            '- Build command profile is not selected until you explicitly lock formalization.'
           ].join('\n');
     if (!isProjectStateReview) {
       freeformPrompt = body.prompt ?? '';
@@ -1205,16 +1207,16 @@ test('chat workspace sends project-scoped messages and reviews project state', a
         mode: isFormalization ? 'Formalization' : 'Exploration',
         showGovernanceActions: isFormalization,
         governanceActions: isFormalization ? ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'] : [],
-        contextSummary: 'Context used: tickets, recent runs, and decisions.',
+        contextSummary: 'TicketsProject: exploration lane using project context (tickets=1, decisions=1, documents=0, runs=1). No route signals in response.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
         traceId: isFormalization ? 1001 : 909,
         reasoningTrace: isFormalization
-          ? ['Prompt classified as formalization.', 'Handoff actions have been exposed.']
-          : ['Prompt normalized and mode selected.', 'Project context loaded.', 'Exploration selected: open reasoning is returned.'],
+            ? ['Prompt classified as formalization.', 'Handoff actions have been exposed.']
+            : ['Exploration lane selected for project \'TicketsProject\'.', 'Project context loaded and assumptions were identified.'],
         reasoningSummary: isFormalization
-          ? 'Formalization selected; handoff actions are available. Trace entries: 2.'
-          : 'Exploration selected; reasoning stays open and no governance actions are auto-exposed. Trace entries: 3.',
+          ? 'Formalization lane selected; governance actions are available after confirmation checks. Trace entries: 2.'
+          : 'Exploration lane selected; governance actions stay suppressed.',
         disambiguationQuestion: null
       })
     });
@@ -1242,7 +1244,7 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText('build me minesweeper');
-  await expect(page.getByTestId('chat.thread')).toContainText('## Exploration mode');
+  await expect(page.getByTestId('chat.thread')).toContainText("I'm in **Exploration** mode.");
   await expect(page.getByTestId('chat.thread')).toContainText('Inferred options');
   await expect(page.getByTestId('chat.thread')).not.toContainText('Recent tickets');
   expect(freeformPrompt).toBe('build me minesweeper');
@@ -1256,27 +1258,27 @@ test('chat workspace sends project-scoped messages and reviews project state', a
         projectId: 7,
         chatSessionId: 9007,
         tags: 'projectQuestion',
-        contextSummary: 'Context used: tickets, recent runs, and decisions.'
+        contextSummary: 'TicketsProject: exploration lane using project context (tickets=1, decisions=1, documents=0, runs=1). No route signals in response.'
       })
     ])
   );
-  await expect(page.getByRole('heading', { name: 'Exploration mode' })).toBeVisible();
-  await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Exploration mode' })).not.toBeVisible();
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(0);
   await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(0);
   await expect(page.getByTestId('chat.message.reasoning')).toBeVisible();
 
   await page.getByTestId('chat.composer.input').fill('make this a ticket: build me minesweeper');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
   await page.getByTestId('chat.command.send').click();
-  await expect(page.getByTestId('chat.thread')).toContainText('## Formalization mode');
-  await expect(page.getByTestId('chat.thread')).toContainText('Handoff intent');
-  await expect(page.getByRole('heading', { name: 'Formalization mode' })).toBeVisible();
+  await expect(page.getByTestId('chat.thread')).toContainText("I'm in **Formalization** lane now.");
+  await expect(page.getByTestId('chat.thread')).toContainText('### Handoff options');
+  await expect(page.getByRole('heading', { name: 'Exploration mode' })).not.toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
   await expect(page.getByTestId('chat.message.saveDiscussion')).toBeVisible();
   await page.getByTestId('chat.message.saveDiscussion').click();
   await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
   expect(savedDiscussionBody.content).toContain('build me minesweeper');
-  await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('TicketsProject: exploration lane using project context');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
 
@@ -1331,7 +1333,7 @@ test('primary usage flow moves from Home to Chat to Build review package', async
       contentType: 'application/json',
       body: JSON.stringify({
         response: 'Project state: IronDeveloper has ready ticket work and no blocking sandbox failures.',
-        contextSummary: 'Context used: project summary, recent tickets, recent runs.',
+        contextSummary: 'TicketsProject: exploration lane using project context (tickets=0, decisions=0, documents=0, runs=2). No route signals in response.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/chatToBuild/BuildRoute.tsx',
         linkedSymbols: 'BuildRoute',
         traceId: 'trace-primary-flow'
@@ -1478,7 +1480,7 @@ test('primary usage flow moves from Home to Chat to Build review package', async
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.reviewProjectState').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Project state: IronDeveloper');
-  await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: project summary');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('TicketsProject: exploration lane using project context');
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
 
   await page.getByTestId('shell.nav.build').click();

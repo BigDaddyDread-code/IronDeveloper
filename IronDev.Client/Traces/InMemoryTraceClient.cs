@@ -20,6 +20,13 @@ public sealed class InMemoryTraceClient : ITraceApiClient
     }
 
     public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int take = 100) => _traces.Take(take).ToList();
+    public IReadOnlyList<LlmTraceEntry> GetTracesByGroupId(string traceGroupId, int take = 100) =>
+        string.IsNullOrWhiteSpace(traceGroupId)
+            ? []
+            : _traces
+                .Where(trace => string.Equals(trace.TraceGroupId, traceGroupId, StringComparison.Ordinal))
+                .Take(take)
+                .ToList();
 
     public void Clear() => _traces.Clear();
 
