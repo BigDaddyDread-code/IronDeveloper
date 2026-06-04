@@ -69,6 +69,7 @@ Mandatory checks before merge:
   - `LlmChatModeClassifier` remains the only governance-mode authority; route judges, controllers, response composers, replay code, and React components must not infer or override chat mode.
   - `LlmChatClarificationClassifier` is the only clarification authority; clarification must not force or mutate `Confirmation`.
   - `ChatGovernanceGate` remains the single rule for showing `Copy Markdown`, `Save Discussion`, `Create Ticket`, and `View Sources`.
+  - `ProjectChatResponseService` must remain a governance spine only. Context lookup belongs in `ProjectChatContextPipeline`, prose generation belongs in `ProjectChatResponseComposer`, and trace/context metadata belongs in `ProjectChatResponseMetadataBuilder`.
 - Chat replay and persistence changes must also update the persisted `ChatMessage.Tags` schema and normalized turn tables:
   - Persisted assistant responses must include a versioned envelope (`v:1`) with mode + clarification + gate + trace metadata.
   - UI mapping code must read this envelope when restoring messages and must not infer modes from empty defaults.

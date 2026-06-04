@@ -41,6 +41,7 @@ Product integrity requires explicit, inspectable transitions between these modes
 14. Chat-turn audit tables are created by migration/setup scripts, not runtime services.
 15. Assistant message insert, session timestamp update, and normalized turn persistence share one transaction.
 16. Clarification fallback preserves evidence conservatively and must not mutate mode or gate.
+17. `ProjectChatResponseService` remains an orchestration spine only. Context pipeline, response composition, and response metadata formatting live in separate named collaborators.
 
 ## Reasoning
 
@@ -49,7 +50,7 @@ The goal is not to stop governance; it is to delay governance controls until int
 ## Consequences
 
 - `ChatController` owns HTTP shape only and must not infer mode from router output.
-- `IProjectChatResponseService` owns route/classify/compose/gate orchestration.
+- `IProjectChatResponseService` owns classify/gate orchestration, but delegates context lookup/routing to `ProjectChatContextPipeline`, response text generation to `ProjectChatResponseComposer`, and trace/context projection to `ProjectChatResponseMetadataBuilder`.
 - `IronDev.TauriShell` consumes the expanded chat payload and hides save/view/copy actions unless the gate allows them.
 - Tests must assert mode-shape differences rather than a single hard-coded template.
 - Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode`, `clarification`, and `gate` instead of defaulting to opaque templates.

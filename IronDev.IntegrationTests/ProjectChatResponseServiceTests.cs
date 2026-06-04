@@ -1,4 +1,3 @@
-using System.Reflection;
 using IronDev.Core.Chat;
 using IronDev.Infrastructure.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -33,11 +32,38 @@ public sealed class ProjectChatResponseServiceTests
         string prompt,
         ChatClarificationState clarification)
     {
-        var method = typeof(ProjectChatResponseService).GetMethod(
-            "BuildExplorationClarificationResponse",
-            BindingFlags.NonPublic | BindingFlags.Static);
+        return ProjectChatResponseComposer.BuildExplorationClarificationResponse(
+            prompt,
+            "IronDeveloper",
+            clarification);
+    }
 
-        Assert.IsNotNull(method, "Expected exploration clarification response helper to exist.");
-        return (string)method.Invoke(null, [prompt, "IronDeveloper", clarification])!;
+    [TestMethod]
+    public void ProjectChatResponseService_RemainsGovernanceSpine_NotComposerOrContextPipeline()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseService.cs"));
+
+        Assert.IsFalse(source.Contains("GetRecentTicketsAsync", StringComparison.Ordinal), "Context loading belongs in ProjectChatContextPipeline.");
+        Assert.IsFalse(source.Contains("GetResponseAsync", StringComparison.Ordinal), "LLM response composition belongs in ProjectChatResponseComposer.");
+        Assert.IsFalse(source.Contains("BuildReasoningTrace", StringComparison.Ordinal), "Trace formatting belongs in ProjectChatResponseMetadataBuilder.");
+        StringAssert.Contains(source, "ChatGovernanceGate.FromDecision(modeDecision)");
+        StringAssert.Contains(source, "_modeClassifier.ClassifyAsync");
+        StringAssert.Contains(source, "_clarificationClassifier.ClassifyAsync");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = AppContext.BaseDirectory;
+        while (!string.IsNullOrWhiteSpace(directory))
+        {
+            if (Directory.Exists(Path.Combine(directory, ".git")))
+                return directory;
+
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+
+        Assert.Fail("Could not locate repository root.");
+        return string.Empty;
     }
 }
