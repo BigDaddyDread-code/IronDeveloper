@@ -3,13 +3,14 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { ChatCompletionResponse, ChatMessage } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
-import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
+import type { ChatResponseMode, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 const projectReviewPrompt = [
   'Review the current project state for this project.',
   'Include current project state, recent tickets, recent decisions, recent runs, risks or blockers, and recommended next actions.',
   'Use grounded project context and call out missing context clearly.'
 ].join('\n');
+const chatMessageTagVersion = 1;
 
 export function useProjectChat() {
   const session = useSessionContext();
@@ -148,13 +149,15 @@ export function useProjectChat() {
           activeModel: null,
           mode: request?.mode ?? 'projectQuestion'
         });
+        const responseMode = coerceResponseMode(response.mode) ?? (response.showGovernanceActions ? 'Formalization' : null);
+        const savedAssistantTags = buildAssistantTagEnvelope(response, responseMode);
 
         const savedAssistantMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
           projectId,
           chatSessionId: activeSessionId,
           role: 'assistant',
           message: response.response?.trim() || 'IronDev.Api returned an empty response.',
-          tags: request?.mode ?? 'projectQuestion',
+          tags: savedAssistantTags,
           contextSummary: response.contextSummary ?? null,
           linkedFilePaths: response.linkedFilePaths ?? null,
           linkedSymbols: response.linkedSymbols ?? null
@@ -166,7 +169,19 @@ export function useProjectChat() {
           content: response.response?.trim() || 'IronDev.Api returned an empty response.',
           response: {
             ...response,
-            response: response.response?.trim() || 'IronDev.Api returned an empty response.'
+            response: response.response?.trim() || 'IronDev.Api returned an empty response.',
+            mode: responseMode,
+            showGovernanceActions: response.showGovernanceActions ?? false,
+            governanceActions: response.governanceActions ?? null,
+            reasoningTrace: response.reasoningTrace ?? null,
+            disambiguationQuestion: response.disambiguationQuestion ?? null,
+            reasoningSummary: response.reasoningSummary ?? null,
+            dogfoodTraceId: response.dogfoodTraceId ?? null,
+            dogfoodTracePath: response.dogfoodTracePath ?? null,
+            linkedFilePaths: response.linkedFilePaths ?? null,
+            linkedSymbols: response.linkedSymbols ?? null,
+            contextSummary: response.contextSummary ?? null,
+            traceId: response.traceId ?? null
           },
           createdUtc: new Date().toISOString()
         };
@@ -280,6 +295,11 @@ export function useProjectChat() {
 function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
   const role = message.role === 'assistant' ? 'assistant' : 'user';
   const content = message.message?.trim() || '';
+  const metadata = parseAssistantTagMetadata(message.tags);
+  const responseMode =
+    metadata.mode ??
+    coerceResponseMode(message.tags) ??
+    coerceLegacyModeToResponseMode(message.tags);
 
   return {
     id: `${role}-${message.id ?? `${message.chatSessionId ?? 'local'}-${Date.now()}`}`,
@@ -287,25 +307,191 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
     content,
     canContinueInBuild: role === 'user',
     createdUtc: message.createdDate ?? new Date().toISOString(),
-        response:
-          role === 'assistant'
-            ? {
-                response: content,
-                contextSummary: message.contextSummary ?? null,
-                linkedFilePaths: message.linkedFilePaths ?? null,
-                linkedSymbols: message.linkedSymbols ?? null,
-                traceId: null,
-                mode: null,
-                showGovernanceActions: false,
-                governanceActions: null,
-                reasoningTrace: null,
-                disambiguationQuestion: null,
-                reasoningSummary: null,
-                dogfoodTraceId: null,
-                dogfoodTracePath: null
-              }
-            : null
+    response: role === 'assistant'
+      ? {
+          response: content,
+          contextSummary: metadata.contextSummary ?? message.contextSummary ?? null,
+          linkedFilePaths: metadata.linkedFilePaths ?? message.linkedFilePaths ?? null,
+          linkedSymbols: metadata.linkedSymbols ?? message.linkedSymbols ?? null,
+          traceId: metadata.traceId ?? null,
+          mode: responseMode,
+          showGovernanceActions: metadata.showGovernanceActions ?? false,
+          governanceActions: metadata.governanceActions ?? null,
+          reasoningTrace: metadata.reasoningTrace ?? [],
+          disambiguationQuestion: metadata.disambiguationQuestion ?? null,
+          reasoningSummary: metadata.reasoningSummary ?? null,
+          dogfoodTraceId: metadata.dogfoodTraceId ?? null,
+          dogfoodTracePath: metadata.dogfoodTracePath ?? null
+        }
+      : null
   };
+}
+
+function buildAssistantTagEnvelope(response: ChatCompletionResponse, mode: ChatResponseMode | null) {
+  return JSON.stringify({
+    v: chatMessageTagVersion,
+    mode,
+    showGovernanceActions: response.showGovernanceActions ?? false,
+    governanceActions: response.governanceActions,
+    reasoningTrace: response.reasoningTrace ?? [],
+    disambiguationQuestion: response.disambiguationQuestion,
+    reasoningSummary: response.reasoningSummary,
+    dogfoodTraceId: response.dogfoodTraceId,
+    dogfoodTracePath: response.dogfoodTracePath,
+    traceId: response.traceId,
+    contextSummary: response.contextSummary,
+    linkedFilePaths: response.linkedFilePaths,
+    linkedSymbols: response.linkedSymbols
+  });
+}
+
+function parseAssistantTagMetadata(rawTags: string | null | undefined) {
+  if (!rawTags) {
+    return {} as AssistantTagMetadata;
+  }
+
+  try {
+  const parsed = JSON.parse(rawTags) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {} as AssistantTagMetadata;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const version = toNumber(record.v);
+    if (version !== chatMessageTagVersion) {
+      return {} as AssistantTagMetadata;
+    }
+    const mode = coerceResponseMode(typeof record.mode === 'string' ? record.mode : undefined);
+    const showGovernanceActions = typeof record.showGovernanceActions === 'boolean'
+      ? record.showGovernanceActions
+      : undefined;
+    const reasoningTrace = toStringList(record.reasoningTrace);
+    const governanceActions = toStringList(record.governanceActions);
+    const disambiguationQuestion = typeof record.disambiguationQuestion === 'string'
+      ? record.disambiguationQuestion
+      : null;
+    const reasoningSummary = typeof record.reasoningSummary === 'string'
+      ? record.reasoningSummary
+      : null;
+    const dogfoodTraceId = typeof record.dogfoodTraceId === 'string'
+      ? record.dogfoodTraceId
+      : null;
+    const dogfoodTracePath = typeof record.dogfoodTracePath === 'string'
+      ? record.dogfoodTracePath
+      : null;
+    const traceId = toNumber(record.traceId);
+    const contextSummary = typeof record.contextSummary === 'string'
+      ? record.contextSummary
+      : null;
+    const linkedFilePaths = typeof record.linkedFilePaths === 'string'
+      ? record.linkedFilePaths
+      : null;
+    const linkedSymbols = typeof record.linkedSymbols === 'string'
+      ? record.linkedSymbols
+      : null;
+
+    return {
+      mode,
+      showGovernanceActions,
+      reasoningTrace,
+      governanceActions,
+      disambiguationQuestion,
+      reasoningSummary,
+      dogfoodTraceId,
+      dogfoodTracePath,
+      traceId,
+      contextSummary,
+      linkedFilePaths,
+      linkedSymbols
+    } as AssistantTagMetadata;
+  } catch {
+    return {} as AssistantTagMetadata;
+  }
+}
+
+interface AssistantTagMetadata {
+  mode?: ChatResponseMode | null;
+  showGovernanceActions?: boolean;
+  governanceActions?: string[];
+  reasoningTrace?: string[];
+  disambiguationQuestion?: string | null;
+  reasoningSummary?: string | null;
+  dogfoodTraceId?: string | null;
+  dogfoodTracePath?: string | null;
+  traceId?: number | null;
+  contextSummary?: string | null;
+  linkedFilePaths?: string | null;
+  linkedSymbols?: string | null;
+}
+
+function coerceResponseMode(value?: string | null): ChatResponseMode | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'exploration') {
+    return 'Exploration';
+  }
+
+  if (normalized === 'formalization') {
+    return 'Formalization';
+  }
+
+  if (normalized === 'confirmation') {
+    return 'Confirmation';
+  }
+
+  return null;
+}
+
+function coerceLegacyModeToResponseMode(value?: string | null): ChatResponseMode | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'projectquestion') {
+    return null;
+  }
+
+  if (normalized === 'projectexploration' || normalized === 'exploration') {
+    return 'Exploration';
+  }
+
+  if (normalized === 'projectformalization' || normalized === 'formalization') {
+    return 'Formalization';
+  }
+
+  if (normalized === 'projectconfirmation' || normalized === 'confirmation') {
+    return 'Confirmation';
+  }
+
+  return null;
+}
+
+function toNumber(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function toStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function createSessionTitle(prompt: string) {

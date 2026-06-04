@@ -126,6 +126,7 @@ Client-facing UX rules:
   - `reasoningSummary`
   - optional `disambiguationQuestion`
   - optional dogfood trace references.
+- Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode/reasoning metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode` / governance affordances from this envelope.
 
 ### Allowed UI responsibilities
 

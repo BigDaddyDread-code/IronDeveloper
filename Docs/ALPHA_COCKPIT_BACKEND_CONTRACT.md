@@ -11,10 +11,24 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
   - `projectQuestion` defaults to inference-based `Exploration`, `Formalization`, or `Confirmation`.
   - `projectQuestion` inference runs through `IContextAgentRouteJudge` and includes a route trace id for dogfood diagnostics.
   - `projectStateReview` remains explicit project-review behavior.
+  - Backend returns full response metadata in `ChatCompletionResponse` for persisted reconstruction and UI replay:
+    - `mode` (Exploration | Formalization | Confirmation)
+    - `showGovernanceActions`
+    - `reasoningTrace`
+    - `reasoningSummary`
+    - `disambiguationQuestion`
+    - `dogfoodTraceId`
+    - `dogfoodTracePath`
+    - `contextSummary`
+    - `linkedFilePaths`
+    - `linkedSymbols`
   - `Exploration` may not return governance actions.
   - `Confirmation` requires explicit lane choice before exposing governance affordances.
   - `Formalization` may return governance affordances.
   - `reasoningTrace`, `reasoningSummary`, `disambiguationQuestion`, and route signals must be present for inspectability.
+- Chat history persistence uses the `ChatMessage.Tags` column to store assistant metadata:
+  - The shell stores assistant mode/reasoning metadata as a versioned JSON envelope in `Tags` (`{ "v": 1, ... }`).
+  - Replays must parse this envelope and reconstruct the same mode/affordance state; legacy non-JSON `tags` should be treated as opaque and not override explicit metadata.
 - A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;

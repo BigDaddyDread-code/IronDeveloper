@@ -190,9 +190,18 @@ public sealed class ChatController : ControllerBase
 
         var mode = ProjectConversationMode.Exploration;
         var isExplicitFormalization = IsExplicitFormalizationIntent(decision, request.Prompt);
+
+        if (TryResolveConversationModeFromContextMode(decision.ContextMode, out var contextMode))
+            mode = contextMode;
+
         if (decision.NeedsClarification || (isExplicitFormalization && decision.Confidence < 0.6d))
         {
             mode = ProjectConversationMode.Confirmation;
+        }
+        else if (decision.ContextMode != null &&
+                 string.Equals(decision.ContextMode.Trim(), "Formalization", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = ProjectConversationMode.Formalization;
         }
         else if (isExplicitFormalization || decision.RequestKind is ContextRequestKind.CreateTicket or ContextRequestKind.CreateTicketsFromDiscussion)
         {
@@ -221,6 +230,29 @@ public sealed class ChatController : ControllerBase
             routeSignals.Add($"Risks: {string.Join(" | ", decision.Risks)}");
 
         return (mode, routeSignals);
+    }
+
+    private static bool TryResolveConversationModeFromContextMode(string contextMode, out ProjectConversationMode mode)
+    {
+        switch (contextMode?.Trim())
+        {
+            case string value when value.Equals("Formalization", StringComparison.OrdinalIgnoreCase):
+                mode = ProjectConversationMode.Formalization;
+                return true;
+            case string value when value.Equals("Confirmation", StringComparison.OrdinalIgnoreCase):
+                mode = ProjectConversationMode.Confirmation;
+                return true;
+            case string value
+                when value.Equals("Exploration", StringComparison.OrdinalIgnoreCase)
+                     || value.Equals("ArchitectureDecisionExploration", StringComparison.OrdinalIgnoreCase)
+                     || value.Equals("ArchitectureAdvice", StringComparison.OrdinalIgnoreCase)
+                     || value.Equals("GeneralDiscussion", StringComparison.OrdinalIgnoreCase):
+                mode = ProjectConversationMode.Exploration;
+                return true;
+            default:
+                mode = ProjectConversationMode.Exploration;
+                return false;
+        }
     }
 
     private static bool IsExplicitFormalizationIntent(IronDev.Core.Models.ContextAgentRouteDecision decision, string userRequest)

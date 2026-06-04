@@ -39,5 +39,6 @@ The goal is not to stop governance; it is to delay governance controls until int
 - `ChatController` and `IProjectChatResponseService` now own mode inference and response shaping.
 - `IronDev.TauriShell` consumes the expanded chat payload and hides save/view actions in exploration by default.
 - Tests must assert mode-shape differences rather than a single hard-coded template.
+- Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode` and governance affordances instead of defaulting to opaque templates.
 - `Docs/ARCHITECTURE.md`, `Docs/AGENTS.md`, `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`, and boundary docs must reference the cockpit mode contract.
 - `ApiBoundaryTests` must validate that chat ownership remains context-only and that stage ownership remains explicit.
