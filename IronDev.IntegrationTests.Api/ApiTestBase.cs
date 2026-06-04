@@ -197,6 +197,9 @@ public abstract class ApiTestBase
             END
 
             -- Extend ChatMessages (Sessions & Grounding)
+            IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'Tags')
+                ALTER TABLE dbo.ChatMessages ALTER COLUMN Tags NVARCHAR(MAX) NULL;
+
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'ChatSessionId')
                 ALTER TABLE dbo.ChatMessages ADD ChatSessionId BIGINT NULL;
             

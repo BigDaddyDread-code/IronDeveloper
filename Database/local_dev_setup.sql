@@ -111,7 +111,7 @@ BEGIN
         ChatSessionId BIGINT NOT NULL,
         Role NVARCHAR(50) NOT NULL,
         Message NVARCHAR(MAX) NOT NULL,
-        Tags NVARCHAR(500) NULL,
+        Tags NVARCHAR(MAX) NULL,
         ContextSummary NVARCHAR(MAX) NULL,
         LinkedFilePaths NVARCHAR(MAX) NULL,
         LinkedSymbols NVARCHAR(MAX) NULL,
@@ -120,6 +120,11 @@ BEGIN
         CONSTRAINT FK_ChatMessages_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
         CONSTRAINT FK_ChatMessages_Sessions FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id)
     );
+END
+
+IF OBJECT_ID('dbo.ChatMessages', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.ChatMessages ALTER COLUMN Tags NVARCHAR(MAX) NULL;
 END
 
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NULL

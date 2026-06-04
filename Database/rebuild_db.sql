@@ -99,7 +99,7 @@ CREATE TABLE dbo.ChatMessages
     ChatSessionId BIGINT NOT NULL,
     Role NVARCHAR(50) NOT NULL,
     Message NVARCHAR(MAX) NOT NULL,
-    Tags NVARCHAR(500) NULL,
+    Tags NVARCHAR(MAX) NULL,
     ContextSummary NVARCHAR(MAX) NULL,
     LinkedFilePaths NVARCHAR(MAX) NULL,
     LinkedSymbols NVARCHAR(MAX) NULL,
