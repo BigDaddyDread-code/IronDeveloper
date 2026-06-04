@@ -101,9 +101,10 @@ Chat completion must never assume governance intent. Mode authority is explicit 
 ```text
 User message
   -> IContextAgentRouteJudge / IContextAgentService  (context hints only)
-  -> IChatModeClassifier                             (only governance-mode authority)
+  -> LlmChatModeClassifier                          (only governance-mode authority)
+  -> passive ChatClarificationState mapper           (evidence only)
   -> ProjectChatResponseService composer             (answers using selected mode)
-  -> ChatGovernanceGate                              (derives UI permissions)
+  -> ChatGovernanceGate                              (single source for UI permissions)
   -> ChatTurnEnvelope / ChatMessage.Tags             (replay metadata)
 ```
 
@@ -112,14 +113,17 @@ Hard rule: only `IChatModeClassifier` decides `Exploration`, `Formalization`, or
 Allowed responsibilities:
 
 - `IContextAgentRouteJudge` may emit request kind, confidence, evidence, risk, and `ContextModeHint` as a route hint.
-- `IProjectChatResponseService` may validate classifier output by failing closed to `Confirmation`, compose the answer, and derive the `ChatGovernanceGate`.
-- Tauri may render only from the backend payload and the local `chatGovernanceGate.ts` projection.
+- `IProjectChatResponseService` may validate classifier output by failing closed to `Confirmation`, compose the answer, and attach passive clarification evidence.
+- `ChatGovernanceGate` is the single source for action visibility.
+- Tauri may render only from the backend gate payload and the local `chatGovernanceGate.ts` projection.
 - Replay may restore the persisted envelope.
 
 Forbidden responsibilities:
 
 - `ChatController` must not infer, override, or translate route hints into governance mode.
+- `ChatController` must not accept explicit governance mode as a bypass around `LlmChatModeClassifier`.
 - Request kind values such as `CreateTicket`, `BuildTicket`, or `CreateTicketsFromDiscussion` must not become governance mode directly.
+- `ContextRequiresClarification` must not force `Confirmation`; clarification is passive evidence only.
 - The response composer must not return a different mode while answering.
 - React components must not contain their own mode/action policy checks.
 - Legacy string tags such as `projectQuestion` must not be treated as replay mode authority.
@@ -141,7 +145,7 @@ Backend mode contract:
 Response envelope rules:
 
 - `Exploration`: no governance actions in UI, full reasoning trace/sum available.
-- `Formalization`: governance actions included (`showGovernanceActions`, `governanceActions`) and handoff path remains available.
+- `Formalization`: governance gate allows handoff actions and the handoff path remains available.
 - `Confirmation`: asks for lane confirmation before enabling formalization actions.
 - Invalid or unparsable classifier output fails closed to `Confirmation`.
 
@@ -155,11 +159,12 @@ Client-facing UX rules:
   - `reasoningSummary`
   - optional `disambiguationQuestion`
   - optional dogfood trace references.
-- Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode/reasoning metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode` / governance affordances from this envelope.
+- Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode, clarification, and gate metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode`, `clarification`, and governance affordances from this envelope without backend recompute.
 
 Mode inference invariants:
 
 - The backend must drive mode from `IChatModeClassifier` only.
+- `ChatClarificationState` is not a classifier and must not mutate `ChatGovernanceMode`.
 - The context router is a scout. Its `ContextModeHint` value is a hint, not authority.
 - A `CreateTicket`/`CreateTicketsFromDiscussion` route hint without explicit lane-lock language must not trigger governance actions.
 - Missing mode is treated as unknown for reconstruction; UI must still behave in conservative exploration mode until explicit mode metadata is present.

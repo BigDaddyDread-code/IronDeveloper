@@ -11,22 +11,37 @@ export interface ChatModeGate {
   confidence: number | null;
   governanceActions: string[];
   showGovernanceActions: boolean;
+  modeBadgeStatus: 'ready' | 'warning' | 'neutral';
 }
 
 export function getChatModeGate(response: ChatCompletionResponse | null | undefined): ChatModeGate {
-  const mode = coerceChatGovernanceMode(response?.mode);
-  const isFormalization = mode === 'Formalization';
+  const gate = response?.gate;
+  const mode = coerceChatGovernanceMode(gate?.mode ?? response?.mode);
+  const canSaveDiscussion = gate?.canSaveDiscussion === true;
+  const canCreateTicket = gate?.canCreateTicket === true;
+  const canViewSources = gate?.canViewSources === true;
+  const canCopyMarkdown = gate?.canCopyMarkdown === true;
+  const showGovernanceActions = canSaveDiscussion || canCreateTicket || canViewSources || canCopyMarkdown;
 
   return {
     mode,
-    canSaveDiscussion: isFormalization,
-    canCreateTicket: isFormalization,
-    canViewSources: isFormalization,
-    canCopyMarkdown: isFormalization,
-    reason: response?.modeReason ?? null,
-    confidence: typeof response?.modeConfidence === 'number' ? response.modeConfidence : null,
-    governanceActions: isFormalization ? response?.governanceActions?.filter(Boolean) ?? [] : [],
-    showGovernanceActions: isFormalization
+    canSaveDiscussion,
+    canCreateTicket,
+    canViewSources,
+    canCopyMarkdown,
+    reason: gate?.reason ?? response?.modeReason ?? null,
+    confidence: typeof gate?.confidence === 'number'
+      ? gate.confidence
+      : typeof response?.modeConfidence === 'number'
+        ? response.modeConfidence
+        : null,
+    governanceActions: showGovernanceActions ? gate?.governanceActions?.filter(Boolean) ?? [] : [],
+    showGovernanceActions,
+    modeBadgeStatus: mode === 'Formalization'
+      ? 'ready'
+      : mode === 'Confirmation'
+        ? 'warning'
+        : 'neutral'
   };
 }
 

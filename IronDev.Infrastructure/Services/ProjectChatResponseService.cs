@@ -1,5 +1,6 @@
 using System.Text;
 using IronDev.Core;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
@@ -15,6 +16,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     private readonly IContextAgentRouteJudge _routeJudge;
     private readonly IContextAgentService _contextAgent;
     private readonly IChatModeClassifier _modeClassifier;
+    private readonly IChatClarificationMapper _clarificationMapper;
     private readonly IChatPromptTemplateProvider _promptTemplates;
     private readonly ILLMService _llm;
     private readonly ILlmTraceService _traceService;
@@ -26,6 +28,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         IContextAgentRouteJudge routeJudge,
         IContextAgentService contextAgent,
         IChatModeClassifier modeClassifier,
+        IChatClarificationMapper clarificationMapper,
         IChatPromptTemplateProvider promptTemplates,
         ILlmTraceService traceService,
         ILLMService llm)
@@ -36,6 +39,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         _routeJudge = routeJudge;
         _contextAgent = contextAgent;
         _modeClassifier = modeClassifier;
+        _clarificationMapper = clarificationMapper;
         _promptTemplates = promptTemplates;
         _traceService = traceService;
         _llm = llm;
@@ -90,12 +94,20 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
                 explicitMode),
             cancellationToken).ConfigureAwait(false);
 
+        var clarification = _clarificationMapper.Map(
+            new ChatContextState(
+                contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
+                contextAgentResult.ClarificationQuestions.Concat(routeDecision.ClarificationQuestions).ToList(),
+                contextAgentResult.ContextSummary),
+            normalizedPrompt);
+
         var finalPrompt = contextAgentResult.FinalPrompt ?? string.Empty;
         var gate = ChatGovernanceGate.FromDecision(modeDecision);
         var responseMode = modeDecision.Mode;
         var assistantResponse = await BuildAssistantMessageAsync(
             contextAgentResult,
             modeDecision,
+            clarification,
             finalPrompt,
             normalizedPrompt,
             project.Name,
@@ -124,7 +136,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         var tracingSummary = BuildReasoningSummary(contextAgentResult, responseMode, reasoningTrace);
 
         var disambiguationQuestion = contextAgentResult.IsClarificationRequired
-            ? BuildDisambiguationQuestion(contextAgentResult.ClarificationQuestions)
+            ? BuildDisambiguationQuestion(clarification.Questions)
             : null;
 
         return new ProjectChatResponseResult(
@@ -132,8 +144,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             responseMode.ToString(),
             modeDecision.Confidence,
             modeDecision.Reason,
-            gate.ShowGovernanceActions,
-            gate.GovernanceActions,
+            clarification,
+            gate,
             reasoningTrace,
             disambiguationQuestion,
             tracingSummary,
@@ -227,17 +239,14 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     private async Task<string> BuildAssistantMessageAsync(
         ContextAgentResult contextAgentResult,
         ChatModeDecision modeDecision,
+        ChatClarificationState clarification,
         string finalPrompt,
         string prompt,
         string projectName,
         CancellationToken cancellationToken)
     {
-        if (contextAgentResult.IsClarificationRequired)
-        {
-            var questions = BuildClarificationQuestionBullets(contextAgentResult.ClarificationQuestions);
-            return $"I can't safely answer yet. I need clarification for this request." +
-                $"{Environment.NewLine}{Environment.NewLine}{questions}";
-        }
+        if (clarification.Required && modeDecision.Mode == ChatGovernanceMode.Exploration)
+            return BuildExplorationClarificationResponse(prompt, projectName, clarification);
 
         if (!contextAgentResult.AllowsProseResponse || string.IsNullOrWhiteSpace(finalPrompt))
         {
@@ -382,6 +391,26 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         foreach (var q in questions)
             sb.AppendLine($"- {q}");
         return sb.ToString();
+    }
+
+    private static string BuildExplorationClarificationResponse(
+        string prompt,
+        string projectName,
+        ChatClarificationState clarification)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Yes. I would treat this as Exploration, not a commitment lane.");
+        sb.AppendLine();
+        sb.AppendLine($"Project: {projectName}");
+        sb.AppendLine($"Idea: {prompt}");
+        sb.AppendLine();
+        sb.AppendLine(clarification.Kind == ChatClarificationKind.ProductScope
+            ? "What I need is product shape, not governance ceremony:"
+            : "The missing detail is still lightweight enough to ask directly:");
+        sb.Append(BuildClarificationQuestionBullets(clarification.Questions));
+        sb.AppendLine();
+        sb.AppendLine("Until you ask to save, ticket, or build it, I will keep this exploratory.");
+        return sb.ToString().Trim();
     }
 
     private static string BuildDisambiguationQuestion(IReadOnlyList<string> questions)

@@ -46,13 +46,7 @@ export function ChatContextPanel({
       <section className="workflow-section">
         <MetadataRow label="Project" value={projectLabel} />
         <MetadataRow label="Mode" value={
-          <StatusBadge status={
-            gate.mode === 'Formalization'
-              ? 'ready'
-              : gate.mode === 'Confirmation'
-                ? 'warning'
-                : 'neutral'
-          }>
+          <StatusBadge status={gate.modeBadgeStatus}>
             {gate.mode ?? 'Unknown'}
           </StatusBadge>
         } />

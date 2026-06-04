@@ -146,7 +146,7 @@ Intended consumers:
 | DELETE | `/api/projects/{projectId}/chat/sessions/{sessionId}` | `ChatController.DeleteSession` | Delete session. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 | GET | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages` | `ChatController.GetRecentMessages` | List messages. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 | POST | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages` | `ChatController.SaveMessage` | Save message. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
-| POST | `/api/projects/{projectId}/chat/complete` | `ChatController.Complete` | Run chat completion with explicit mode (`projectQuestion`, `projectStateReview`, `exploration`, `formalization`, `confirmation`). | Implemented | TauriShell, Legacy WPF | Returns `mode`, `showGovernanceActions`, `governanceActions`, `reasoningTrace`, and `reasoningSummary`. |
+| POST | `/api/projects/{projectId}/chat/complete` | `ChatController.Complete` | Run project chat completion (`projectQuestion`) or explicit project state review (`projectStateReview`). | Implemented | TauriShell, Legacy WPF | Returns `mode`, `clarification`, `gate`, `reasoningTrace`, and `reasoningSummary`. |
 | POST | `/api/projects/{projectId}/chat/feedback` | `ChatController.SaveFeedback` | Save message feedback. | Implemented | TauriShell, Legacy WPF | Typed client exists. |
 
 ## Profiles

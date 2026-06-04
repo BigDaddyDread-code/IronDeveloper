@@ -1,3 +1,4 @@
+using IronDev.Core.Chat;
 using IronDev.Core.Models;
 using IronDev.Infrastructure.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -5,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests;
 
 [TestClass]
-public sealed class ChatModeClassifierServiceTests
+public sealed class LlmChatModeClassifierTests
 {
     [TestMethod]
     public async Task ClassifyAsync_ReturnsStructuredModeDecision()
@@ -17,7 +18,7 @@ public sealed class ChatModeClassifierServiceTests
               "reason": "The user is asking questions and has not requested a durable artifact."
             }
             """);
-        var classifier = new ChatModeClassifierService(llm);
+        var classifier = new LlmChatModeClassifier(llm);
 
         var decision = await classifier.ClassifyAsync(BuildRequest("what information do you need?"));
 
@@ -27,23 +28,10 @@ public sealed class ChatModeClassifierServiceTests
     }
 
     [TestMethod]
-    public async Task ClassifyAsync_ExplicitModeBypassesLlmAndOwnsDecision()
-    {
-        var llm = new StubLlmService("INVALID_JSON");
-        var classifier = new ChatModeClassifierService(llm);
-
-        var decision = await classifier.ClassifyAsync(BuildRequest("turn this into tickets", ChatGovernanceMode.Formalization));
-
-        Assert.AreEqual(ChatGovernanceMode.Formalization, decision.Mode);
-        Assert.AreEqual(1.0, decision.Confidence);
-        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
-    }
-
-    [TestMethod]
     public async Task ClassifyAsync_InvalidModelOutputFailsClosedToConfirmation()
     {
         var llm = new StubLlmService("not json");
-        var classifier = new ChatModeClassifierService(llm);
+        var classifier = new LlmChatModeClassifier(llm);
 
         var decision = await classifier.ClassifyAsync(BuildRequest("maybe create a ticket, not sure"));
 
@@ -61,7 +49,7 @@ public sealed class ChatModeClassifierServiceTests
               "reason": "The route hinted ticket creation, but the user is still discussing the idea."
             }
             """);
-        var classifier = new ChatModeClassifierService(llm);
+        var classifier = new LlmChatModeClassifier(llm);
 
         var decision = await classifier.ClassifyAsync(BuildRequest(
             "I want build minesweeper, what do you need?",
@@ -73,12 +61,53 @@ public sealed class ChatModeClassifierServiceTests
         Assert.AreEqual(0.88, decision.Confidence);
     }
 
+    [TestMethod]
+    public async Task ClassifyAsync_ContextClarificationCannotForceConfirmation()
+    {
+        var llm = new StubLlmService("""
+            {
+              "mode": "Exploration",
+              "confidence": 0.95,
+              "reason": "The user is exploring a broad product idea and needs product scope."
+            }
+            """);
+        var classifier = new LlmChatModeClassifier(llm);
+
+        var decision = await classifier.ClassifyAsync(BuildRequest(
+            "I want build monopoly game",
+            contextRequiresClarification: true));
+
+        Assert.AreEqual(ChatGovernanceMode.Exploration, decision.Mode);
+        Assert.AreEqual(0.95, decision.Confidence);
+    }
+
+    [TestMethod]
+    public async Task ClassifyAsync_ExplicitModeIsPromptConstraintNotBypass()
+    {
+        var llm = new StubLlmService("""
+            {
+              "mode": "Exploration",
+              "confidence": 0.92,
+              "reason": "The explicit constraint is not supported by the user text."
+            }
+            """);
+        var classifier = new LlmChatModeClassifier(llm);
+
+        var decision = await classifier.ClassifyAsync(BuildRequest(
+            "what would you need before we pick a first playable slice?",
+            explicitMode: ChatGovernanceMode.Formalization));
+
+        Assert.AreEqual(ChatGovernanceMode.Exploration, decision.Mode);
+        Assert.AreEqual(1, llm.ReceivedPrompts.Count);
+    }
+
     private static ChatModeClassificationRequest BuildRequest(
         string userMessage,
         ChatGovernanceMode? explicitMode = null,
         ContextRequestKind routeKind = ContextRequestKind.GeneralChat,
         string contextModeHint = "Exploration",
-        bool allowTicketCreation = false) =>
+        bool allowTicketCreation = false,
+        bool contextRequiresClarification = false) =>
         new(
             userMessage,
             RecentConversationSummary: string.Empty,
@@ -93,6 +122,6 @@ public sealed class ChatModeClassifierServiceTests
                 AllowTicketCreation = allowTicketCreation
             },
             ProjectSummary: "Test project",
-            ContextRequiresClarification: false,
+            ContextRequiresClarification: contextRequiresClarification,
             ExplicitMode: explicitMode);
 }

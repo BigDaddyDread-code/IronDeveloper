@@ -1213,11 +1213,40 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     const isFormalizationPrompt = !isConfirmationPrompt && (normalizedPrompt.includes('make this a ticket') || normalizedPrompt.includes('save this as'));
     const isFormalization = !isProjectStateReview && isFormalizationPrompt;
     const isConfirmation = !isProjectStateReview && isConfirmationPrompt;
+    const gate = {
+      mode: isFormalization ? 'Formalization' : isConfirmation ? 'Confirmation' : 'Exploration',
+      canSaveDiscussion: isFormalization,
+      canCreateTicket: isFormalization,
+      canViewSources: isFormalization,
+      canCopyMarkdown: isFormalization,
+      reason: isFormalization
+        ? 'The user explicitly requested ticket formalization.'
+        : isConfirmation
+          ? 'The user expressed uncertainty about governance commitment.'
+          : 'The user is exploring product scope.',
+      confidence: isFormalization ? 0.94 : isConfirmation ? 0.86 : 0.95,
+      governanceActions: isFormalization ? ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'] : []
+    };
+    const clarification = isFormalization || isConfirmation
+      ? {
+          required: false,
+          kind: 'None',
+          questions: [],
+          reason: null
+        }
+      : {
+          required: true,
+          kind: 'ProductScope',
+          questions: ['What first playable slice do you want to build?'],
+          reason: 'The user is exploring a broad product idea that needs product scope.'
+        };
     const responseText = isProjectStateReview
       ? markdownResponse
       : isFormalization
         ? [
             "I'm in **Formalization** lane now.",
+            '',
+            `Prompt: ${body.prompt}`,
             '',
             'I can hand this into a formal pipeline once the lane is stable.',
             '',
@@ -1258,9 +1287,11 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       contentType: 'application/json',
       body: JSON.stringify({
         response: responseText,
-        mode: isFormalization ? 'Formalization' : isConfirmation ? 'Confirmation' : 'Exploration',
-        showGovernanceActions: isFormalization,
-        governanceActions: isFormalization ? ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'] : [],
+        mode: gate.mode,
+        modeConfidence: gate.confidence,
+        modeReason: gate.reason,
+        clarification,
+        gate,
         contextSummary: 'TicketsProject: exploration lane using project context (tickets=1, decisions=1, documents=0, runs=1). No route signals in response.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
@@ -1297,25 +1328,26 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await expect(page.getByTestId('chat.composer.disabledReason')).toContainText('Enter a message before sending.');
 
-  await page.getByTestId('chat.composer.input').fill('build me minesweeper');
+  await page.getByTestId('chat.composer.input').fill('I want build monopoly game');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
   await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.send').click();
-  await expect(page.getByTestId('chat.thread')).toContainText('build me minesweeper');
+  await expect(page.getByTestId('chat.thread')).toContainText('I want build monopoly game');
   await expect(page.getByTestId('chat.thread')).toContainText("I'm in **Exploration** mode.");
+  await expect(page.getByTestId('chat.thread')).not.toContainText("I can't safely answer");
   await expect(page.getByTestId('chat.thread')).toContainText('Inferred options');
   await expect(page.getByTestId('chat.thread')).not.toContainText('Recent tickets');
-  expect(freeformPrompt).toBe('build me minesweeper');
+  expect(freeformPrompt).toBe('I want build monopoly game');
   expect(freeformMode).toBe('projectQuestion');
   expect(chatPersistence.savedSessions).toHaveLength(1);
   expect(chatPersistence.savedMessages).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ role: 'user', message: 'build me minesweeper', projectId: 7, chatSessionId: 9007, tags: 'projectQuestion' }),
+      expect.objectContaining({ role: 'user', message: 'I want build monopoly game', projectId: 7, chatSessionId: 9007, tags: 'projectQuestion' }),
       expect.objectContaining({
         role: 'assistant',
         projectId: 7,
         chatSessionId: 9007,
-        tags: expect.stringContaining('"mode":"Exploration"'),
+        tags: expect.stringMatching(/"mode":"Exploration".*"clarification":\{"required":true,"kind":"ProductScope"/),
         contextSummary: 'TicketsProject: exploration lane using project context (tickets=1, decisions=1, documents=0, runs=1). No route signals in response.'
       })
     ])
@@ -1334,18 +1366,18 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(0);
   await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(0);
 
-  await page.getByTestId('chat.composer.input').fill('make this a ticket: build me minesweeper');
+  await page.getByTestId('chat.composer.input').fill('make this a ticket: build me monopoly');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
   await page.getByTestId('chat.command.send').click();
   await expect(page.getByTestId('chat.thread')).toContainText("I'm in **Formalization** lane now.");
-  await expect(page.getByTestId('chat.thread')).toContainText('### Handoff options');
+  await expect(page.getByTestId('chat.thread')).toContainText('Handoff options');
   await expect(page.getByRole('heading', { name: 'Exploration mode' })).not.toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(1);
   await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(1);
   await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(1);
   await page.getByTestId('chat.message.saveDiscussion').click();
   await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
-  expect(savedDiscussionBody.content).toContain('build me minesweeper');
+  expect(savedDiscussionBody.content).toContain('build me monopoly');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('TicketsProject: exploration lane using project context');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
@@ -1372,8 +1404,22 @@ test('chat workspace replays persisted governance envelope and ignores legacy ta
     mode: 'Formalization',
     modeConfidence: 0.99,
     modeReason: 'Persisted classifier decision.',
-    showGovernanceActions: true,
-    governanceActions: ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'],
+    clarification: {
+      required: false,
+      kind: 'None',
+      questions: [],
+      reason: null
+    },
+    gate: {
+      mode: 'Formalization',
+      canSaveDiscussion: true,
+      canCreateTicket: true,
+      canViewSources: true,
+      canCopyMarkdown: true,
+      reason: 'Persisted classifier decision.',
+      confidence: 0.99,
+      governanceActions: ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.']
+    },
     reasoningTrace: ['Persisted classifier selected Formalization.'],
     reasoningSummary: 'Persisted formalization replay.',
     contextSummary: 'Persisted formalization context summary.',

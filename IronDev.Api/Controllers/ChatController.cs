@@ -1,4 +1,5 @@
 using IronDev.Data.Models;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Infrastructure.Services;
@@ -105,18 +106,21 @@ public sealed class ChatController : ControllerBase
                 Mode: "Exploration",
                 ModeConfidence: null,
                 ModeReason: "Project state review request is explicit and non-commitment.",
-                ShowGovernanceActions: false));
+                Clarification: ChatClarificationState.None,
+                Gate: ChatGovernanceGate.FromDecision(new ChatModeDecision(
+                    ChatGovernanceMode.Exploration,
+                    1,
+                    "Project state review is not a formalization lane."))));
         }
 
-        var hasExplicitMode = TryResolveExplicitConversationMode(mode, out var explicitMode);
-        if (!hasExplicitMode && !string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion, projectStateReview, exploration, formalization, or confirmation." });
+        if (!string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion or projectStateReview." });
 
         var recentConversationSummary = await BuildRecentConversationSummaryAsync(projectId, request.SessionId, ct);
         var answer = await _projectChat.RespondAsync(
             projectId,
             request.Prompt,
-            hasExplicitMode ? explicitMode : null,
+            null,
             recentConversationSummary: recentConversationSummary,
             sessionId: request.SessionId,
             cancellationToken: ct);
@@ -132,8 +136,8 @@ public sealed class ChatController : ControllerBase
             answer.Mode,
             answer.ModeConfidence,
             answer.ModeReason,
-            answer.ShowGovernanceActions,
-            answer.GovernanceActions,
+            answer.Clarification,
+            answer.Gate,
             answer.ReasoningTrace,
             answer.DisambiguationQuestion,
             answer.ReasoningSummary,
@@ -158,21 +162,6 @@ public sealed class ChatController : ControllerBase
         return string.Join(Environment.NewLine, pairs);
     }
 
-    private static bool TryResolveExplicitConversationMode(string mode, out ChatGovernanceMode resolvedMode)
-    {
-        resolvedMode = mode switch
-        {
-            var value when value.Equals("exploration", StringComparison.OrdinalIgnoreCase) => ChatGovernanceMode.Exploration,
-            var value when value.Equals("formalization", StringComparison.OrdinalIgnoreCase) => ChatGovernanceMode.Formalization,
-            var value when value.Equals("confirmation", StringComparison.OrdinalIgnoreCase) => ChatGovernanceMode.Confirmation,
-            _ => ChatGovernanceMode.Exploration
-        };
-
-        return mode.Equals("exploration", StringComparison.OrdinalIgnoreCase)
-            || mode.Equals("formalization", StringComparison.OrdinalIgnoreCase)
-            || mode.Equals("confirmation", StringComparison.OrdinalIgnoreCase);
-    }
-
     public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);
     public sealed record ChatCompletionResponse(
         string Response,
@@ -183,8 +172,8 @@ public sealed class ChatController : ControllerBase
         string? Mode = null,
         double? ModeConfidence = null,
         string? ModeReason = null,
-        bool? ShowGovernanceActions = null,
-        IReadOnlyList<string>? GovernanceActions = null,
+        ChatClarificationState? Clarification = null,
+        ChatGovernanceGate? Gate = null,
         IReadOnlyList<string>? ReasoningTrace = null,
         string? DisambiguationQuestion = null,
         string? ReasoningSummary = null,

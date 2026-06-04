@@ -1,5 +1,5 @@
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
-using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Services;
 

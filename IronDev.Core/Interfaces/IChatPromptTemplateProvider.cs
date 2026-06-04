@@ -1,4 +1,4 @@
-using IronDev.Core.Models;
+using IronDev.Core.Chat;
 
 namespace IronDev.Core.Interfaces;
 

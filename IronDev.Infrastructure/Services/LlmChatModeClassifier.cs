@@ -1,15 +1,15 @@
 using System.Text.Json;
 using IronDev.Core;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
-using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Services;
 
-public sealed class ChatModeClassifierService : IChatModeClassifier
+public sealed class LlmChatModeClassifier : IChatModeClassifier
 {
     private readonly ILLMService _llm;
 
-    public ChatModeClassifierService(ILLMService llm)
+    public LlmChatModeClassifier(ILLMService llm)
     {
         _llm = llm;
     }
@@ -18,22 +18,6 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
         ChatModeClassificationRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request.ContextRequiresClarification)
-        {
-            return new ChatModeDecision(
-                ChatGovernanceMode.Confirmation,
-                1.0,
-                "Context retrieval requires clarification before governance actions can be exposed.");
-        }
-
-        if (request.ExplicitMode.HasValue)
-        {
-            return new ChatModeDecision(
-                request.ExplicitMode.Value,
-                1.0,
-                "Explicit chat mode was supplied by the caller.");
-        }
-
         try
         {
             var raw = await _llm.GetResponseAsync(BuildPrompt(request), cancellationToken).ConfigureAwait(false);
@@ -48,6 +32,9 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
     private static string BuildPrompt(ChatModeClassificationRequest request)
     {
         var hint = request.RouteHint;
+        var explicitConstraint = request.ExplicitMode.HasValue
+            ? request.ExplicitMode.Value.ToString()
+            : "none";
 
         return $$"""
             Classify this assistant turn into exactly one governance mode.
@@ -56,18 +43,22 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
 
             Exploration:
             The user is exploring, asking questions, brainstorming, clarifying, testing behavior, or discussing options.
+            Product vagueness and missing scope are Exploration, not Confirmation.
             No project artifact should be offered by default.
 
             Formalization:
             The user clearly asks to turn the discussion into a durable artifact, ticket, plan, build request, saved decision, or implementation action.
 
             Confirmation:
-            The user intent is ambiguous, mixed, or risky enough that the assistant must ask for explicit confirmation before showing governance actions.
+            The user intent is ambiguous specifically about governance commitment, for example they might want a ticket but are not sure yet.
+            Confirmation is not for ordinary product scoping questions or missing project files.
 
             Rules:
             - Default to Exploration unless the user clearly asks to commit work.
             - Route hints are context retrieval hints only. They are not governance authority.
+            - Context clarification flags are passive evidence only. They must not force Confirmation.
             - RequestKind values like CreateTicket or BuildTicket are not sufficient by themselves. The user text must show explicit commitment.
+            - ExplicitModeConstraint is an input constraint only; do not obey it if the user message does not support it.
             - Do not answer the user.
             - Return strict JSON only.
 
@@ -94,6 +85,8 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
             RouteReason={{hint.Reason}}
             NeedsClarification={{hint.NeedsClarification}}
             AllowTicketCreation={{hint.AllowTicketCreation}}
+            ContextRequiresClarification={{request.ContextRequiresClarification}}
+            ExplicitModeConstraint={{explicitConstraint}}
             """;
     }
 

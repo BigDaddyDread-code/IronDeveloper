@@ -1,4 +1,4 @@
-namespace IronDev.Core.Models;
+namespace IronDev.Core.Chat;
 
 public enum ChatGovernanceMode
 {
@@ -14,6 +14,28 @@ public enum ChatPromptTemplate
     Confirmation
 }
 
+public enum ChatClarificationKind
+{
+    None,
+    GeneralScope,
+    ProductScope
+}
+
+public sealed record ChatClarificationState(
+    bool Required,
+    ChatClarificationKind Kind,
+    IReadOnlyList<string> Questions,
+    string? Reason)
+{
+    public static ChatClarificationState None { get; } =
+        new(false, ChatClarificationKind.None, Array.Empty<string>(), null);
+}
+
+public sealed record ChatContextState(
+    bool RequiresClarification,
+    IReadOnlyList<string> ClarificationQuestions,
+    string? ContextSummary);
+
 public sealed record ChatModeDecision(
     ChatGovernanceMode Mode,
     double Confidence,
@@ -22,7 +44,7 @@ public sealed record ChatModeDecision(
 public sealed record ChatModeClassificationRequest(
     string UserMessage,
     string RecentConversationSummary,
-    ContextAgentRouteDecision RouteHint,
+    Models.ContextAgentRouteDecision RouteHint,
     string? ProjectSummary,
     bool ContextRequiresClarification,
     ChatGovernanceMode? ExplicitMode);
@@ -72,8 +94,8 @@ public sealed record ChatTurnEnvelope(
     ChatGovernanceMode Mode,
     double ModeConfidence,
     string ModeReason,
-    bool ShowGovernanceActions,
-    IReadOnlyList<string> GovernanceActions,
+    ChatClarificationState Clarification,
+    ChatGovernanceGate Gate,
     string? RouteTraceId,
     string? DogfoodTraceId);
 
@@ -82,8 +104,8 @@ public sealed record ProjectChatResponseResult(
     string Mode,
     double? ModeConfidence,
     string? ModeReason,
-    bool? ShowGovernanceActions = null,
-    IReadOnlyList<string>? GovernanceActions = null,
+    ChatClarificationState Clarification,
+    ChatGovernanceGate Gate,
     IReadOnlyList<string>? ReasoningTrace = null,
     string? DisambiguationQuestion = null,
     string? ReasoningSummary = null,

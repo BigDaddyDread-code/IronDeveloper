@@ -152,7 +152,8 @@ export function useProjectChat() {
         });
         const responseMode = coerceChatGovernanceMode(response.mode);
         const responseGate = getChatModeGate({ ...response, mode: responseMode });
-        const savedAssistantTags = buildAssistantTagEnvelope(response, responseMode);
+        const responseWithGate = { ...response, mode: responseMode, gate: responseGate };
+        const savedAssistantTags = buildAssistantTagEnvelope(responseWithGate, responseMode);
 
         const savedAssistantMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
           projectId,
@@ -175,8 +176,8 @@ export function useProjectChat() {
             mode: responseMode,
             modeConfidence: response.modeConfidence ?? null,
             modeReason: response.modeReason ?? null,
-            showGovernanceActions: responseGate.showGovernanceActions,
-            governanceActions: responseGate.governanceActions,
+            clarification: response.clarification ?? null,
+            gate: responseGate,
             reasoningTrace: response.reasoningTrace ?? [],
             disambiguationQuestion: response.disambiguationQuestion ?? null,
             reasoningSummary: response.reasoningSummary ?? null,
@@ -313,13 +314,13 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           response: content,
           modeConfidence: metadata.modeConfidence ?? null,
           modeReason: metadata.modeReason ?? null,
+          clarification: metadata.clarification ?? null,
+          gate: metadata.gate ?? null,
           contextSummary: metadata.contextSummary ?? message.contextSummary ?? null,
           linkedFilePaths: metadata.linkedFilePaths ?? message.linkedFilePaths ?? null,
           linkedSymbols: metadata.linkedSymbols ?? message.linkedSymbols ?? null,
           traceId: metadata.traceId ?? null,
           mode: responseMode,
-          showGovernanceActions: metadata.showGovernanceActions ?? false,
-          governanceActions: metadata.governanceActions ?? null,
           reasoningTrace: metadata.reasoningTrace ?? [],
           disambiguationQuestion: metadata.disambiguationQuestion ?? null,
           reasoningSummary: metadata.reasoningSummary ?? null,

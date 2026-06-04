@@ -59,11 +59,6 @@ public sealed class ContextAgentRouteDecision
     public bool UsedFallbackRules { get; set; }
     public bool UsedConversationContextResolver { get; set; }
     public string ContextModeHint { get; set; } = string.Empty;
-    public string ContextMode
-    {
-        get => ContextModeHint;
-        set => ContextModeHint = value;
-    }
     
     public IReadOnlyList<DeepLookupTarget> DeepLookupTargets { get; set; } = Array.Empty<DeepLookupTarget>();
 }
