@@ -1,4 +1,5 @@
 using System.Text;
+using System.IO;
 using IronDev.Core;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
@@ -51,6 +52,16 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     private readonly IContextAgentService _contextAgent;
     private readonly ILLMService _llm;
     private readonly ILlmTraceService _traceService;
+    private readonly string _explorationInstructionText;
+    private readonly string _formalizationInstructionText;
+    private const string FormalizationModeInstructionFile = "FormalizationModeInstructions.md";
+    private const string ExplorationModeInstructionFile = "ExplorationModeInstructions.md";
+    private const string AgentInstructionDirectory = "agent-instructions";
+    private const string DocsDirectory = "Docs";
+    private const string FormalizationInstructionFallback =
+        "You are in Formalization Mode.\n\nThe user is asking to lock work into artifacts.\n\n- Produce concise, implementation-ready output only.\n- Surface risks, trade-offs, dependencies, assumptions, and test impact.\n- Prefer explicit next actions for ticket/discussion handoff.\n- Do not drift into exploratory chatter when user intent is already committed.";
+    private const string ExplorationInstructionFallback =
+        "You are in Exploration Mode.\n\nThis is a normal conversation or information-gathering turn.\n\n- Answer the user directly and naturally.\n- Do not try to architect, structure, formalize, or turn the discussion into project artefacts.\n- Do not mention tickets, discussions, saving work, or governance steps unless the user explicitly asks.\n- Stay conversational. Think out loud if it helps. Ask clarifying questions.\n- Keep it lightweight and focused on the current question.\n\nOnly move toward formalization when the user clearly wants to commit something.";
 
     public ProjectChatResponseService(
         IProjectService projects,
@@ -66,6 +77,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         _contextAgent = contextAgent;
         _traceService = traceService;
         _llm = llm;
+        _explorationInstructionText = LoadInstruction(ExplorationModeInstructionFile, ExplorationInstructionFallback);
+        _formalizationInstructionText = LoadInstruction(FormalizationModeInstructionFile, FormalizationInstructionFallback);
     }
 
     public async Task<ProjectChatResponseResult?> RespondAsync(
@@ -219,12 +232,68 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
         try
         {
-            return (await _llm.GetResponseAsync(finalPrompt, cancellationToken).ConfigureAwait(false)).Trim();
+            var modePrompt = InjectModeInstruction(finalPrompt, mode);
+            return (await _llm.GetResponseAsync(modePrompt, cancellationToken).ConfigureAwait(false)).Trim();
         }
         catch (Exception ex)
         {
             return BuildFallbackResponse(contextAgentResult, mode, prompt, projectName, ex);
         }
+    }
+
+    private string InjectModeInstruction(string finalPrompt, ProjectConversationMode mode)
+    {
+        var instruction = mode switch
+        {
+            ProjectConversationMode.Formalization => _formalizationInstructionText,
+            ProjectConversationMode.Exploration => _explorationInstructionText,
+            ProjectConversationMode.Confirmation => _explorationInstructionText,
+            _ => _explorationInstructionText
+        };
+
+        return $"{instruction}\n\n{finalPrompt}".Trim();
+    }
+
+    private static string LoadInstruction(string fileName, string fallback)
+    {
+        var filePath = ResolveInstructionPath(fileName);
+        if (string.IsNullOrWhiteSpace(filePath))
+            return fallback;
+
+        try
+        {
+            return File.ReadAllText(filePath);
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private static string? ResolveInstructionPath(string fileName)
+    {
+        var roots = new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory };
+
+        foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
+
+            var current = Path.GetFullPath(root);
+            for (var i = 0; i < 8; i++)
+            {
+                var candidate = Path.Combine(current, DocsDirectory, AgentInstructionDirectory, fileName);
+                if (File.Exists(candidate))
+                    return candidate;
+
+                var parent = Directory.GetParent(current);
+                if (parent is null)
+                    break;
+                current = parent.FullName;
+            }
+        }
+
+        return null;
     }
 
     private static string BuildNonProseResponse(
