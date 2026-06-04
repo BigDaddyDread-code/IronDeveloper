@@ -1,4 +1,5 @@
 using System.Text;
+using IronDev.AI;
 using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
 using IronDev.Core;
@@ -46,6 +47,11 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
+builder.Host.UseDefaultServiceProvider(options =>
+{
+    options.ValidateScopes = true;
+    options.ValidateOnBuild = true;
+});
 
 var environmentInfo = CreateEnvironmentInfo(builder);
 ValidateEnvironmentSafety(environmentInfo);
@@ -71,6 +77,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
+builder.Services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
 builder.Services.AddScoped<IContextAgentRouteJudge, ContextAgentRouteJudgeService>();
 builder.Services.AddScoped<IContextAgentService, ContextAgentService>();
 builder.Services.AddScoped<IChatModeClassifier, ChatModeClassifierService>();
