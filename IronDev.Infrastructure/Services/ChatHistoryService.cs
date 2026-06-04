@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -258,60 +259,76 @@ public sealed class ChatHistoryService : IChatHistoryService
 
         const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
         using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
 
-        var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            ownerSql,
-            new { message.ProjectId, TenantId = _tenant.TenantId },
-            cancellationToken: cancellationToken));
+        try
+        {
+            var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                ownerSql,
+                new { message.ProjectId, TenantId = _tenant.TenantId },
+                transaction,
+                cancellationToken: cancellationToken));
 
-        if (owns == 0)
-            throw new UnauthorizedAccessException($"Project {message.ProjectId} does not belong to tenant {_tenant.TenantId}.");
+            if (owns == 0)
+                throw new UnauthorizedAccessException($"Project {message.ProjectId} does not belong to tenant {_tenant.TenantId}.");
 
-        const string sql = """
-            INSERT INTO dbo.ChatMessages 
-                (TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols)
-            OUTPUT inserted.Id
-            VALUES 
-                (@TenantId, @ProjectId, @ChatSessionId, @Role, @Message, @Tags, @ContextSummary, @LinkedFilePaths, @LinkedSymbols);
-            """;
+            const string sql = """
+                INSERT INTO dbo.ChatMessages
+                    (TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols)
+                OUTPUT inserted.Id
+                VALUES
+                    (@TenantId, @ProjectId, @ChatSessionId, @Role, @Message, @Tags, @ContextSummary, @LinkedFilePaths, @LinkedSymbols);
+                """;
 
-        var id = await connection.QuerySingleAsync<long>(new CommandDefinition(
-            sql,
-            new
-            {
-                TenantId = _tenant.TenantId,
-                message.ProjectId,
-                message.ChatSessionId,
-                message.Role,
-                message.Message,
-                message.Tags,
-                message.ContextSummary,
-                message.LinkedFilePaths,
-                message.LinkedSymbols
-            },
-            cancellationToken: cancellationToken));
+            var id = await connection.QuerySingleAsync<long>(new CommandDefinition(
+                sql,
+                new
+                {
+                    TenantId = _tenant.TenantId,
+                    message.ProjectId,
+                    message.ChatSessionId,
+                    message.Role,
+                    message.Message,
+                    message.Tags,
+                    message.ContextSummary,
+                    message.LinkedFilePaths,
+                    message.LinkedSymbols
+                },
+                transaction,
+                cancellationToken: cancellationToken));
 
-        // Update session's UpdatedDate
-        const string updateSessionSql = "UPDATE dbo.ProjectChatSessions SET UpdatedDate = SYSUTCDATETIME() WHERE Id = @ChatSessionId";
-        await connection.ExecuteAsync(new CommandDefinition(
-            updateSessionSql,
-            new { message.ChatSessionId },
-            cancellationToken: cancellationToken));
+            // Update session's UpdatedDate
+            const string updateSessionSql = "UPDATE dbo.ProjectChatSessions SET UpdatedDate = SYSUTCDATETIME() WHERE Id = @ChatSessionId";
+            await connection.ExecuteAsync(new CommandDefinition(
+                updateSessionSql,
+                new { message.ChatSessionId },
+                transaction,
+                cancellationToken: cancellationToken));
 
-        await _turnPersistence.PersistAsync(
-            new ChatTurnPersistenceRequest(
-                id,
-                _tenant.TenantId,
-                message.ProjectId,
-                message.ChatSessionId,
-                message.Role,
-                message.Tags,
-                message.ContextSummary,
-                message.LinkedFilePaths,
-                message.LinkedSymbols),
-            cancellationToken).ConfigureAwait(false);
+            await _turnPersistence.PersistAsync(
+                new ChatTurnPersistenceRequest(
+                    id,
+                    _tenant.TenantId,
+                    message.ProjectId,
+                    message.ChatSessionId,
+                    message.Role,
+                    message.Tags,
+                    message.ContextSummary,
+                    message.LinkedFilePaths,
+                    message.LinkedSymbols),
+                connection,
+                transaction,
+                cancellationToken).ConfigureAwait(false);
 
-        return id;
+            transaction.Commit();
+            return id;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<ChatMessage>> GetRecentMessagesAsync(

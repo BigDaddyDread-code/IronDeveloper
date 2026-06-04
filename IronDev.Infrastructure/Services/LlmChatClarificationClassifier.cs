@@ -141,20 +141,18 @@ public sealed class LlmChatClarificationClassifier : IChatClarificationClassifie
                 true,
                 ChatClarificationKind.GovernanceIntent,
                 DefaultQuestions(ChatClarificationKind.GovernanceIntent),
-                reason);
+                $"Fallback clarification evidence: {reason} Confirmation mode requires an explicit lane question, but this does not mutate mode or gate.");
         }
 
         var questions = NormalizeQuestions(request.ContextState.ClarificationQuestions);
         if (!request.ContextState.RequiresClarification || questions.Count == 0)
             return ChatClarificationState.None;
 
-        var kind = LooksLikeBroadProductIntent(request.UserMessage)
-            ? ChatClarificationKind.ProductScope
-            : LooksLikeMissingProjectContext(request.ContextState)
-                ? ChatClarificationKind.MissingProjectContext
-                : ChatClarificationKind.GeneralScope;
-
-        return new ChatClarificationState(true, kind, questions, reason);
+        return new ChatClarificationState(
+            true,
+            ChatClarificationKind.GeneralScope,
+            questions,
+            $"Fallback clarification evidence: {reason}");
     }
 
     private static IReadOnlyList<string> NormalizeQuestions(IEnumerable<string>? questions)
@@ -208,30 +206,6 @@ public sealed class LlmChatClarificationClassifier : IChatClarificationClassifie
     {
         return Enum.TryParse(value, ignoreCase: true, out kind) &&
                Enum.IsDefined(kind);
-    }
-
-    private static bool LooksLikeBroadProductIntent(string userMessage)
-    {
-        var lower = userMessage.ToLowerInvariant();
-        return lower.Contains("build", StringComparison.Ordinal) ||
-            lower.Contains("make", StringComparison.Ordinal) ||
-            lower.Contains("create", StringComparison.Ordinal) ||
-            lower.Contains("write", StringComparison.Ordinal) ||
-            lower.Contains("design", StringComparison.Ordinal) ||
-            lower.StartsWith("i want ", StringComparison.Ordinal) ||
-            lower.Contains(" i want ", StringComparison.Ordinal);
-    }
-
-    private static bool LooksLikeMissingProjectContext(ChatContextState contextState)
-    {
-        var haystack = string.Join(" ", contextState.ClarificationQuestions.Append(contextState.ContextSummary ?? string.Empty))
-            .ToLowerInvariant();
-        return haystack.Contains("project", StringComparison.Ordinal) ||
-            haystack.Contains("repository", StringComparison.Ordinal) ||
-            haystack.Contains("repo", StringComparison.Ordinal) ||
-            haystack.Contains("file", StringComparison.Ordinal) ||
-            haystack.Contains("index", StringComparison.Ordinal) ||
-            haystack.Contains("context", StringComparison.Ordinal);
     }
 
     private sealed record RawClarificationDecision(

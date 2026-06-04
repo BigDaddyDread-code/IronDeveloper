@@ -35,6 +35,18 @@ public sealed class ChatGovernanceDeletionTests
             "ChatClarificationMapper must stay deleted. Slice 2 uses active clarification classification.");
 
         AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatTurnPersistenceService.cs"),
+            "EnsureTablesAsync");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatTurnPersistenceService.cs"),
+            "CREATE TABLE dbo.ChatTurn");
+
+        AssertFileContains(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatHistoryService.cs"),
+            "BeginTransaction");
+
+        AssertFileDoesNotContain(
             Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseService.cs"),
             "governance ceremony");
 
@@ -60,6 +72,13 @@ public sealed class ChatGovernanceDeletionTests
         Assert.IsTrue(File.Exists(path), $"Expected source file missing: {path}");
         var text = File.ReadAllText(path);
         Assert.IsFalse(text.Contains(forbidden, StringComparison.Ordinal), $"Forbidden symbol remains in {path}: {forbidden}");
+    }
+
+    private static void AssertFileContains(string path, string required)
+    {
+        Assert.IsTrue(File.Exists(path), $"Expected source file missing: {path}");
+        var text = File.ReadAllText(path);
+        Assert.IsTrue(text.Contains(required, StringComparison.Ordinal), $"Required symbol missing in {path}: {required}");
     }
 
     private static string FindRepoRoot()

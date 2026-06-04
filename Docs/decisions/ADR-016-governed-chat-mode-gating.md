@@ -38,6 +38,9 @@ Product integrity requires explicit, inspectable transitions between these modes
 11. The response composer receives the selected mode and must not reclassify the turn while generating content.
 12. Mode and clarification classifier boundaries are prompt-constrained JSON with strict validation. They are not provider-enforced structured output.
 13. Saved assistant envelopes are normalized into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`; `ChatMessage.Tags` remains a replay bridge.
+14. Chat-turn audit tables are created by migration/setup scripts, not runtime services.
+15. Assistant message insert, session timestamp update, and normalized turn persistence share one transaction.
+16. Clarification fallback preserves evidence conservatively and must not mutate mode or gate.
 
 ## Reasoning
 
@@ -51,6 +54,7 @@ The goal is not to stop governance; it is to delay governance controls until int
 - Tests must assert mode-shape differences rather than a single hard-coded template.
 - Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode`, `clarification`, and `gate` instead of defaulting to opaque templates.
 - `ChatHistoryService.SaveMessageAsync` persists assistant envelopes into normalized turn tables for audit; legacy string tags intentionally create no turn-governance rows.
+- `Database/migrate_chat_turn_audit.sql` and `Docs/migrations/008_ChatTurnAudit.sql` own chat-turn audit schema; runtime chat services fail loudly when the schema is missing.
 - Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001`: replace prompt-constrained classifier JSON with provider-enforced JSON/schema output once `ILLMService` exposes that capability. Removal condition: classifier parse recovery no longer needs brace extraction.
 - `Docs/ARCHITECTURE.md`, `Docs/AGENTS.md`, `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`, and boundary docs must reference the cockpit mode contract.
 - `ApiBoundaryTests` must validate that chat ownership remains context-only and that stage ownership remains explicit.

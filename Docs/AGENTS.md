@@ -73,6 +73,7 @@ Mandatory checks before merge:
   - Persisted assistant responses must include a versioned envelope (`v:1`) with mode + clarification + gate + trace metadata.
   - UI mapping code must read this envelope when restoring messages and must not infer modes from empty defaults.
   - `ChatHistoryService.SaveMessageAsync` must normalize assistant envelopes into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
+  - Runtime services must not create chat-turn audit tables. Use `Database/migrate_chat_turn_audit.sql` or the full setup scripts, and keep assistant message insert + session update + audit writes in one transaction.
   - Legacy string tags must not create normalized governance rows.
 - API boundary tests include updated seam ownership checks in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
 - Proposal outputs that enter Run must be hard-failed by validation gates before any build, test, or command execution.

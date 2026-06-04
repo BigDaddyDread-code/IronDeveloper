@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Data;
 using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Core.Chat;
@@ -29,15 +30,33 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         ChatTurnPersistenceRequest request,
         CancellationToken cancellationToken = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            await PersistAsync(request, connection, transaction, cancellationToken).ConfigureAwait(false);
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public async Task PersistAsync(
+        ChatTurnPersistenceRequest request,
+        IDbConnection connection,
+        IDbTransaction transaction,
+        CancellationToken cancellationToken = default)
+    {
         if (!string.Equals(request.Role, "assistant", StringComparison.OrdinalIgnoreCase))
             return;
 
         var envelope = ParseEnvelope(request.Tags);
         if (envelope is null)
             return;
-
-        using var connection = _connectionFactory.CreateConnection();
-        await EnsureTablesAsync(connection, cancellationToken).ConfigureAwait(false);
 
         const string deleteSql = """
             DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @ChatMessageId AND TenantId = @TenantId;
@@ -48,6 +67,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         await connection.ExecuteAsync(new CommandDefinition(
             deleteSql,
             new { request.ChatMessageId, TenantId = _tenant.TenantId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         const string governanceSql = """
@@ -70,6 +90,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 ModeReason = envelope.ModeReason,
                 GateJson = JsonSerializer.Serialize(envelope.Gate, JsonOptions)
             },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         const string clarificationSql = """
@@ -92,6 +113,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 envelope.Clarification.Reason,
                 QuestionsJson = JsonSerializer.Serialize(envelope.Clarification.Questions, JsonOptions)
             },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         const string traceSql = """
@@ -115,6 +137,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 request.LinkedFilePaths,
                 request.LinkedSymbols
             },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -123,7 +146,6 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureTablesAsync(connection, cancellationToken).ConfigureAwait(false);
 
         const string sql = """
             SELECT
@@ -204,70 +226,6 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         {
             return null;
         }
-    }
-
-    private static async Task EnsureTablesAsync(
-        System.Data.IDbConnection connection,
-        CancellationToken cancellationToken)
-    {
-        const string sql = """
-            IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.ChatTurnGovernance
-                (
-                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    TenantId INT NOT NULL,
-                    ProjectId INT NOT NULL,
-                    ChatSessionId BIGINT NOT NULL,
-                    ChatMessageId BIGINT NOT NULL,
-                    Mode NVARCHAR(50) NOT NULL,
-                    ModeConfidence FLOAT NOT NULL,
-                    ModeReason NVARCHAR(MAX) NOT NULL,
-                    GateJson NVARCHAR(MAX) NOT NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME()
-                );
-                CREATE UNIQUE INDEX UX_ChatTurnGovernance_MessageTenant ON dbo.ChatTurnGovernance(ChatMessageId, TenantId);
-            END
-
-            IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.ChatTurnClarifications
-                (
-                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    TenantId INT NOT NULL,
-                    ProjectId INT NOT NULL,
-                    ChatSessionId BIGINT NOT NULL,
-                    ChatMessageId BIGINT NOT NULL,
-                    Required BIT NOT NULL,
-                    Kind NVARCHAR(100) NOT NULL,
-                    Reason NVARCHAR(MAX) NULL,
-                    QuestionsJson NVARCHAR(MAX) NOT NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnClarifications_CreatedUtc DEFAULT SYSUTCDATETIME()
-                );
-                CREATE UNIQUE INDEX UX_ChatTurnClarifications_MessageTenant ON dbo.ChatTurnClarifications(ChatMessageId, TenantId);
-            END
-
-            IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.ChatTurnTraces
-                (
-                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    TenantId INT NOT NULL,
-                    ProjectId INT NOT NULL,
-                    ChatSessionId BIGINT NOT NULL,
-                    ChatMessageId BIGINT NOT NULL,
-                    RouteTraceId NVARCHAR(200) NULL,
-                    DogfoodTraceId NVARCHAR(200) NULL,
-                    ContextSummary NVARCHAR(MAX) NULL,
-                    LinkedFilePaths NVARCHAR(MAX) NULL,
-                    LinkedSymbols NVARCHAR(MAX) NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnTraces_CreatedUtc DEFAULT SYSUTCDATETIME()
-                );
-                CREATE UNIQUE INDEX UX_ChatTurnTraces_MessageTenant ON dbo.ChatTurnTraces(ChatMessageId, TenantId);
-            END
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private sealed class PersistedTurnRow

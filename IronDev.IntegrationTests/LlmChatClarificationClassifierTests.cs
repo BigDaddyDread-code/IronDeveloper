@@ -53,7 +53,7 @@ public sealed class LlmChatClarificationClassifierTests
     }
 
     [TestMethod]
-    public async Task ClassifyAsync_InvalidJsonFallsBackFromContextWithoutChangingMode()
+    public async Task ClassifyAsync_InvalidJsonPreservesContextQuestionsAsGeneralScopeFallback()
     {
         var llm = new StubLlmService("not json");
         var classifier = new LlmChatClarificationClassifier(llm);
@@ -65,8 +65,30 @@ public sealed class LlmChatClarificationClassifierTests
             questions: ["Which repository should I inspect?"]));
 
         Assert.IsTrue(clarification.Required);
-        Assert.AreEqual(ChatClarificationKind.MissingProjectContext, clarification.Kind);
+        Assert.AreEqual(ChatClarificationKind.GeneralScope, clarification.Kind);
         Assert.AreEqual("Which repository should I inspect?", clarification.Questions.Single());
+        StringAssert.Contains(clarification.Reason, "Fallback clarification evidence");
+    }
+
+    [TestMethod]
+    public async Task ClassifyAsync_ConfirmationFallbackDoesNotEnableGovernanceActions()
+    {
+        var llm = new StubLlmService("not json");
+        var classifier = new LlmChatClarificationClassifier(llm);
+        var modeDecision = new ChatModeDecision(ChatGovernanceMode.Confirmation, 0, "Mode classifier failed closed.");
+
+        var clarification = await classifier.ClassifyAsync(BuildRequest(
+            "maybe turn this into a ticket, not sure",
+            modeDecision,
+            requiresClarification: false,
+            questions: []));
+        var gate = ChatGovernanceGate.FromDecision(modeDecision);
+
+        Assert.AreEqual(ChatGovernanceMode.Confirmation, modeDecision.Mode);
+        Assert.AreEqual(ChatClarificationKind.GovernanceIntent, clarification.Kind);
+        Assert.IsFalse(gate.ShowGovernanceActions);
+        Assert.IsFalse(gate.CanCreateTicket);
+        StringAssert.Contains(clarification.Reason, "does not mutate mode or gate");
     }
 
     private static ChatClarificationClassificationRequest BuildRequest(

@@ -46,6 +46,9 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
 - Chat turn audit persistence is normalized:
   - `ChatHistoryService.SaveMessageAsync` persists assistant envelope state into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
   - These tables are the durable audit path for governance mode, clarification, gate, and trace pointers.
+  - Audit tables are created by `Database/migrate_chat_turn_audit.sql`, `Database/local_dev_setup.sql`, or `Database/rebuild_db.sql`; runtime services must not create them.
+  - Assistant message insert, session timestamp update, and normalized turn writes share one transaction.
+  - Clarification fallback must be visibly marked in the reason and cannot alter the final mode or `ChatGovernanceGate`.
   - `ChatMessage.Tags` remains a client replay bridge, not the permanent storage design.
 - A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:

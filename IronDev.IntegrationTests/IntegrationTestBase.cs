@@ -179,6 +179,61 @@ public abstract class IntegrationTestBase
                 );
             END
 
+            IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatTurnGovernance
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NOT NULL,
+                    ChatMessageId BIGINT NOT NULL,
+                    Mode NVARCHAR(50) NOT NULL,
+                    ModeConfidence FLOAT NOT NULL,
+                    ModeReason NVARCHAR(MAX) NOT NULL,
+                    GateJson NVARCHAR(MAX) NOT NULL,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME()
+                );
+                CREATE UNIQUE INDEX UX_ChatTurnGovernance_MessageTenant ON dbo.ChatTurnGovernance(ChatMessageId, TenantId);
+            END
+
+            IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatTurnClarifications
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NOT NULL,
+                    ChatMessageId BIGINT NOT NULL,
+                    Required BIT NOT NULL,
+                    Kind NVARCHAR(100) NOT NULL,
+                    Reason NVARCHAR(MAX) NULL,
+                    QuestionsJson NVARCHAR(MAX) NOT NULL,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnClarifications_CreatedUtc DEFAULT SYSUTCDATETIME()
+                );
+                CREATE UNIQUE INDEX UX_ChatTurnClarifications_MessageTenant ON dbo.ChatTurnClarifications(ChatMessageId, TenantId);
+            END
+
+            IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatTurnTraces
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NOT NULL,
+                    ChatMessageId BIGINT NOT NULL,
+                    RouteTraceId NVARCHAR(200) NULL,
+                    DogfoodTraceId NVARCHAR(200) NULL,
+                    ContextSummary NVARCHAR(MAX) NULL,
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnTraces_CreatedUtc DEFAULT SYSUTCDATETIME()
+                );
+                CREATE UNIQUE INDEX UX_ChatTurnTraces_MessageTenant ON dbo.ChatTurnTraces(ChatMessageId, TenantId);
+            END
+
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
             IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnTraces;
             IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnClarifications;
