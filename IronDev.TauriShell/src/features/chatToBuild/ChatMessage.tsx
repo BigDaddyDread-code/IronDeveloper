@@ -12,6 +12,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMessageProps) {
   const mode = message.response?.mode;
   const isFormalizationMode = mode === 'Formalization';
+  const isExplorationMode = mode === 'Exploration' || !mode;
   const showGovernanceActions = Boolean(message.response?.showGovernanceActions);
   const hasSources = Boolean(
     message.response?.contextSummary ||
@@ -37,8 +38,8 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
         </div>
       ) : null}
       {reasoningTrace.length > 0 ? (
-        <details className="chat-message__reasoning" data-testid="chat.message.reasoning">
-          <summary>View reasoning trace</summary>
+        <details className="chat-message__reasoning" data-testid="chat.message.reasoning" open>
+          <summary>Raw reasoning trace</summary>
           <ul>
             {reasoningTrace.map((item) => (
               <li key={item}>{item}</li>
@@ -53,14 +54,16 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
       ) : null}
       {message.role === 'assistant' ? (
         <div className="chat-message__actions" data-testid="chat.message.actions">
-          <CommandButton
-            type="button"
-            variant="subtle"
-            testId="chat.message.copyMarkdown"
-            onClick={() => void navigator.clipboard?.writeText(message.content)}
-          >
-            Copy Markdown
-          </CommandButton>
+          {!isExplorationMode ? (
+            <CommandButton
+              type="button"
+              variant="subtle"
+              testId="chat.message.copyMarkdown"
+              onClick={() => void navigator.clipboard?.writeText(message.content)}
+            >
+              Copy Markdown
+            </CommandButton>
+          ) : null}
           {showGovernanceActions && onSaveDiscussion ? (
             <CommandButton
               type="button"

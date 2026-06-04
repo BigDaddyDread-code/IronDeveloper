@@ -62,6 +62,10 @@ Mandatory checks before merge:
 
 - The stage matrix in `Docs/ARCHITECTURE.md` includes all five stages: Discussion, Chat, Proposal, Build, and Run.
 - Changes that alter stage ownership or contracts also update `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`.
+- Chat-mode behavior changes that alter governance surfacing must update:
+  - `Docs/ARCHITECTURE.md` with explicit Exploration/Formalization/Confirmation rules.
+  - `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md` with UI/back-end mode contract.
+  - Decision log entries in `Docs/decisions/` when mode taxonomy or governance gates change.
 - API boundary tests include updated seam ownership checks in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
 - Proposal outputs that enter Run must be hard-failed by validation gates before any build, test, or command execution.
   - `DisposableCodeRunService` must only transition a run from `Running` to `PausedForApproval` when `CodeProposalValidationResult.IsValid` is true.

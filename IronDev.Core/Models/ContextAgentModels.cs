@@ -181,6 +181,7 @@ public sealed class ContextAgentRequest
 {
     public int    ProjectId   { get; init; }
     public long   SessionId   { get; init; }
+    public string TraceGroupId { get; init; } = string.Empty;
     public string UserRequest { get; init; } = string.Empty;
     public string RecentConversationSummary { get; init; } = string.Empty;
 

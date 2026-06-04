@@ -141,5 +141,6 @@ public class LlmProviderTests
         public string ExportAll() => string.Empty;
         public string ExportTrace(LlmTraceEntry entry) => string.Empty;
         public IReadOnlyList<LlmTraceEntry> GetRecentTraces(int take = 100) => [];
+        public IReadOnlyList<LlmTraceEntry> GetTracesByGroupId(string traceGroupId, int take = 100) => [];
     }
 }

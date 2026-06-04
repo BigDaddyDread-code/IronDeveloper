@@ -1,4 +1,6 @@
 using IronDev.Data.Models;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Infrastructure.Services;
 using IronDev.Services;
 using System.Linq;
@@ -13,20 +15,24 @@ public sealed class ChatController : ControllerBase
 {
     private const string ProjectQuestionMode = "projectQuestion";
     private const string ProjectStateReviewMode = "projectStateReview";
+    private const int RecentConversationSummaryMessageLimit = 12;
 
     private readonly IChatHistoryService _chat;
     private readonly IChatFeedbackService _feedback;
+    private readonly IContextAgentRouteJudge _routeJudge;
     private readonly IProjectChatResponseService _projectChat;
     private readonly IProjectStateReviewService _projectStateReview;
 
     public ChatController(
         IChatHistoryService chat,
         IChatFeedbackService feedback,
+        IContextAgentRouteJudge routeJudge,
         IProjectChatResponseService projectChat,
         IProjectStateReviewService projectStateReview)
     {
         _chat = chat;
         _feedback = feedback;
+        _routeJudge = routeJudge;
         _projectChat = projectChat;
         _projectStateReview = projectStateReview;
     }
@@ -107,11 +113,44 @@ public sealed class ChatController : ControllerBase
         if (!hasExplicitMode && !string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion, projectStateReview, exploration, formalization, or confirmation." });
 
-        var conversationMode = string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase)
-            ? DetectConversationMode(request.Prompt)
-            : explicitMode;
+        var isProjectQuestion = string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase);
 
-        var answer = await _projectChat.RespondAsync(projectId, request.Prompt, conversationMode, ct);
+        var routeTraceId = Guid.NewGuid().ToString("N");
+        ProjectConversationMode conversationMode;
+        IReadOnlyList<string> routeSignals;
+        var recentConversationSummary = await BuildRecentConversationSummaryAsync(projectId, request.SessionId, ct);
+
+        if (isProjectQuestion)
+        {
+            var resolved = await ResolveConversationModeByRouteJudge(
+                projectId,
+                request,
+                recentConversationSummary,
+                ct,
+                routeTraceId);
+            conversationMode = resolved.Mode;
+            routeSignals = resolved.RouteSignals;
+        }
+        else
+        {
+            conversationMode = explicitMode;
+            routeSignals = [
+                $"Explicit mode requested in API payload: {explicitMode}",
+                $"Exploration/formalization intent was set by client rather than route judge."
+            ];
+        }
+
+        var includeDetailedMetadata = !isProjectQuestion || conversationMode != ProjectConversationMode.Exploration;
+        var answer = await _projectChat.RespondAsync(
+            projectId,
+            request.Prompt,
+            conversationMode,
+            routeSignals,
+            routeTraceId,
+            includeDetailedMetadata,
+            recentConversationSummary: recentConversationSummary,
+            sessionId: request.SessionId,
+            cancellationToken: ct);
         if (answer is null)
             return NotFound();
 
@@ -130,6 +169,91 @@ public sealed class ChatController : ControllerBase
             answer.DogfoodTraceId,
             null));
 
+    }
+
+    private async Task<(ProjectConversationMode Mode, IReadOnlyList<string> RouteSignals)> ResolveConversationModeByRouteJudge(
+        int projectId,
+        ChatCompletionRequest request,
+        string recentConversationSummary,
+        CancellationToken ct,
+        string traceGroupId)
+    {
+        var decision = await _routeJudge.DecideRouteAsync(new ContextAgentRouteRequest
+        {
+            TraceGroupId = traceGroupId,
+            ProjectId = projectId,
+            SessionId = request.SessionId ?? 0,
+            UserRequest = request.Prompt,
+            RecentConversationSummary = recentConversationSummary,
+            InitialIntentFromPromptContextBuilder = null
+        }, ct);
+
+        var mode = ProjectConversationMode.Exploration;
+        var isExplicitFormalization = IsExplicitFormalizationIntent(decision, request.Prompt);
+        if (decision.NeedsClarification || (isExplicitFormalization && decision.Confidence < 0.6d))
+        {
+            mode = ProjectConversationMode.Confirmation;
+        }
+        else if (isExplicitFormalization || decision.RequestKind is ContextRequestKind.CreateTicket or ContextRequestKind.CreateTicketsFromDiscussion)
+        {
+            mode = ProjectConversationMode.Formalization;
+        }
+
+        var routeSignals = new List<string>
+        {
+            $"Context agent route decision: Kind={decision.RequestKind}",
+            $"Route confidence: {decision.Confidence:0.00}",
+            $"Reason: {(string.IsNullOrWhiteSpace(decision.Reason) ? "no explicit reason from judge" : decision.Reason)}",
+            $"Formalization intent: {isExplicitFormalization}",
+            $"Request kind flags: request='{decision.RequestKind}', allowTicketCreation={decision.AllowTicketCreation}, allowConflictBlocking={decision.AllowConflictBlocking}, allowDeepLookup={decision.AllowDeepLookup}",
+            $"Resolution metadata: ContextMode={decision.ContextMode}, UsedConversationResolver={decision.UsedConversationContextResolver}, UsedLlmJudge={decision.UsedLlmJudge}, UsedFallbackRules={decision.UsedFallbackRules}"
+        };
+
+        if (decision.NeedsClarification && decision.ClarificationQuestions.Count > 0)
+            routeSignals.Add($"Clarification required: {string.Join(" | ", decision.ClarificationQuestions)}");
+
+        if (decision.EvidenceUsed.Count > 0)
+            routeSignals.Add($"Evidence used: {string.Join(" | ", decision.EvidenceUsed)}");
+        else
+            routeSignals.Add("Evidence used: none");
+
+        if (decision.Risks.Count > 0)
+            routeSignals.Add($"Risks: {string.Join(" | ", decision.Risks)}");
+
+        return (mode, routeSignals);
+    }
+
+    private static bool IsExplicitFormalizationIntent(IronDev.Core.Models.ContextAgentRouteDecision decision, string userRequest)
+    {
+        var explicitMode = string.Equals(decision.ContextMode, "Formalization", StringComparison.OrdinalIgnoreCase);
+        if (explicitMode)
+            return true;
+
+        var lower = (userRequest ?? string.Empty).ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(lower))
+            return false;
+
+        if (decision.RequestKind is ContextRequestKind.CreateTicket or ContextRequestKind.CreateTicketsFromDiscussion)
+            return true;
+
+        var markers = new[] { "make this a ticket", "save this as", "formalize", "formalise", "handoff", "create discussion", "create tickets", "turn this into" };
+        return markers.Any(marker => lower.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<string> BuildRecentConversationSummaryAsync(int projectId, long? sessionId, CancellationToken ct)
+    {
+        if (!sessionId.HasValue || sessionId.Value <= 0)
+            return string.Empty;
+
+        var messages = await _chat.GetRecentMessagesAsync(projectId, sessionId.Value, RecentConversationSummaryMessageLimit, ct).ConfigureAwait(false);
+        if (messages.Count == 0)
+            return string.Empty;
+
+        var pairs = messages
+            .Where(message => !string.IsNullOrWhiteSpace(message.Message))
+            .Select(message => $"{message.Role}: {message.Message.Trim()}");
+
+        return string.Join(Environment.NewLine, pairs);
     }
 
     private static bool TryResolveExplicitConversationMode(string mode, out ProjectConversationMode resolvedMode)
@@ -151,63 +275,6 @@ public sealed class ChatController : ControllerBase
             || mode.Equals("projectExploration", StringComparison.OrdinalIgnoreCase)
             || mode.Equals("projectFormalization", StringComparison.OrdinalIgnoreCase)
             || mode.Equals("projectConfirmation", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static ProjectConversationMode DetectConversationMode(string prompt)
-    {
-        var normalized = (prompt ?? string.Empty).ToLowerInvariant().ReplaceLineEndings(" ").Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-            return ProjectConversationMode.Exploration;
-
-        var formalizationSignals = new[]
-        {
-            "make this a ticket",
-            "save this as",
-            "save this",
-            "turn this into",
-            "create ticket",
-            "build this into",
-            "formalize",
-            "lock this in",
-            "lock it in",
-            "create a ticket",
-            "save as a ticket",
-            "commit this",
-            "persist this"
-        };
-
-        var exploratorySignals = new[]
-        {
-            "what information",
-            "what do you need",
-            "what do i need",
-            "how does",
-            "how should",
-            "why",
-            "explore",
-            "probe",
-            "think about",
-            "show me",
-            "can you explain",
-            "what would",
-            "what if",
-            "trade-off",
-            "trade offs",
-            "alternatives",
-            "risks",
-            "help me understand"
-        };
-
-        var exploratoryCount = exploratorySignals.Count(signal => normalized.Contains(signal, StringComparison.OrdinalIgnoreCase));
-        var formalizationCount = formalizationSignals.Count(signal => normalized.Contains(signal, StringComparison.OrdinalIgnoreCase));
-
-        if (exploratoryCount >= 1 && formalizationCount >= 1)
-            return ProjectConversationMode.Confirmation;
-        if (formalizationCount >= 1)
-            return ProjectConversationMode.Formalization;
-        if (normalized.Contains('?') || exploratoryCount >= 1)
-            return ProjectConversationMode.Exploration;
-        return ProjectConversationMode.Exploration;
     }
 
     public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);

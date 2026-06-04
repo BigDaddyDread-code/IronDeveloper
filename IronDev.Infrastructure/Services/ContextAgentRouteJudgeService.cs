@@ -25,8 +25,36 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
 
     private static readonly string[] ChangePrefixes =
     [
-        "implement", "replace", "change", "build", "generate", "add", "update",
-        "fix", "refactor", "remove", "rewrite", "migrate", "create"
+        "implement", "replace", "change", "fix", "refactor", "remove", "rewrite", "migrate",
+        "update"
+    ];
+
+    private static readonly string[] FormalizationCommandPrefixes =
+    [
+        "create a ticket",
+        "create ticket",
+        "build ticket",
+        "build a ticket",
+        "make this a ticket",
+        "make this into a ticket",
+        "turn this into a ticket",
+        "turn this into tickets",
+        "save this as a discussion",
+        "save this discussion",
+        "save as a discussion",
+        "save discussion",
+        "save to discussion",
+        "create a discussion",
+        "formalize",
+        "formalise",
+        "handoff",
+        "record this",
+        "document this",
+        "create work packet",
+        "create tickets",
+        "make this a work item",
+        "create decision",
+        "lock this in"
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -68,20 +96,24 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
             // Pre-router catch obvious cases
             else if (IsObviousFallback(request))
             {
-                decision = FallbackRoute(request.UserRequest, request.InitialIntentFromPromptContextBuilder);
+                decision = ForceExplicitCommitGuardrails(
+                    FallbackRoute(request.UserRequest, request.InitialIntentFromPromptContextBuilder),
+                    request.UserRequest);
                 usedFallbackRules = true;
             }
             else
             {
                 rawJson = await _llmService.GetResponseAsync(prompt, cancellationToken);
-                decision = ParseJsonDecision(rawJson, request.UserRequest);
+                decision = ForceExplicitCommitGuardrails(ParseJsonDecision(rawJson, request.UserRequest), request.UserRequest);
                 usedLlmJudge = true;
             }
         }
         catch (Exception ex)
         {
             rawJson = $"LLM Error: {ex.Message}";
-            decision = FallbackRoute(request.UserRequest, request.InitialIntentFromPromptContextBuilder);
+            decision = ForceExplicitCommitGuardrails(
+                FallbackRoute(request.UserRequest, request.InitialIntentFromPromptContextBuilder),
+                request.UserRequest);
             usedFallbackRules = true;
         }
 
@@ -202,13 +234,17 @@ Classify using only the evidence provided.
 Important rules:
 - Inspection, verification, explanation, review, ""look for"", ""check whether"", and ""what does"" requests must not be blocked by ticket conflicts.
 - Ticket creation requests may run related-ticket and conflict checks.
-- Change, replace, implement, or build requests may run architecture-decision conflict checks.
+- Change, replace, implement, or build requests may run architecture-decision conflict checks only when the user is signaling formalization intent.
+- Do not classify generic build/generate/add requests as BuildTicket unless explicit handoff language exists.
 - COMMAND TEXT RULE: The words ""create a ticket"", ""extract candidates"", ""candidates from discussion"", and ""create tickets"" are command text, not work-domain text.
 - You MUST strip these command phrases from the effectiveWorkText.
 - The word ""ticket"" is only a work-domain signal if the work itself concerns ticket management (e.g., ""archive ticket"").
 - If the user asks if a feature exists, supports something, or is implemented, classify as VerifyImplementation.
 - Existing tickets and decisions are evidence, not automatic blockers.
 - If unsure, ask clarification.
+- Explicit lane-lock rule:
+  - Words like "make this a ticket", "save this as a discussion", "formalize", "handoff", "create work packet", and similar force Formalization.
+  - If explicit lane-lock language is missing, stay in Exploration and do not force lane handoff.
 - Do not answer the user.
 - Return valid JSON only.
 
@@ -219,6 +255,7 @@ Return this JSON shape:
   ""confidence"": 0.0,
   ""effectiveWorkText"": ""Expanded and resolved request text (e.g. 'industry standard' -> 'industry standard persistence for BookSeller')"",
   ""reason"": """",
+  ""contextMode"": ""Exploration|Formalization|ArchitectureAdvice|ArchitectureDecisionExploration|GeneralDiscussion"",
   ""allowCodeSearch"": true,
   ""allowDeepLookup"": true,
   ""allowConflictAssessment"": false,
@@ -341,7 +378,7 @@ Evidence Packet:
     {
         var lower = (request ?? string.Empty).ToLowerInvariant().Trim();
         
-        if (intent == "CreateTicket" || lower.StartsWith("/ticket") || lower.StartsWith("/create-ticket") || lower.StartsWith("create a ticket"))
+        if (intent == "CreateTicket" || lower.StartsWith("/ticket") || lower.StartsWith("/create-ticket") || lower.StartsWith("create a ticket") || HasExplicitFormalizationIntent(lower, ContextRequestKind.CreateTicket))
         {
             return new ContextAgentRouteDecision
             {
@@ -355,7 +392,27 @@ Evidence Packet:
                 AllowConflictAssessment = true,
                 AllowConflictBlocking   = true,
                 AllowTicketCreation     = true,
-                RelatedTicketsAreContextOnly = false
+                RelatedTicketsAreContextOnly = false,
+                ContextMode = "Formalization"
+            };
+        }
+
+        if (HasExplicitBuildTicketIntent(lower))
+        {
+            return new ContextAgentRouteDecision
+            {
+                OriginalUserRequest     = request ?? string.Empty,
+                EffectiveWorkText       = request ?? string.Empty,
+                RequestKind             = ContextRequestKind.BuildTicket,
+                Confidence              = 0.9,
+                Reason                  = "Deterministic pre-router: Explicit build ticket command.",
+                AllowCodeSearch         = true,
+                AllowDeepLookup         = true,
+                AllowConflictAssessment = true,
+                AllowConflictBlocking   = true,
+                AllowTicketCreation     = true,
+                RelatedTicketsAreContextOnly = false,
+                ContextMode = "Formalization"
             };
         }
 
@@ -379,6 +436,7 @@ Evidence Packet:
                 AllowConflictBlocking   = false,
                 AllowTicketCreation     = false,
                 RelatedTicketsAreContextOnly = true,
+                ContextMode = "Exploration",
                 DeepLookupTargets = IdentifyTargets(lower)
             };
         }
@@ -387,21 +445,26 @@ Evidence Packet:
         {
             var kind = ContextRequestKind.ChangeImplementation;
             if (lower.StartsWith("replace")) kind = ContextRequestKind.ReplaceArchitecture;
-            if (lower.StartsWith("build")) kind = ContextRequestKind.BuildTicket;
+            var effectiveMode = HasExplicitFormalizationIntent(lower, kind)
+                ? "Formalization"
+                : "Exploration";
+            if (effectiveMode == "Formalization")
+                kind = ContextRequestKind.BuildTicket;
 
             return new ContextAgentRouteDecision
             {
                 OriginalUserRequest     = request ?? string.Empty,
                 EffectiveWorkText       = request ?? string.Empty,
                 RequestKind             = kind,
-                Confidence              = 0.8,
+                Confidence              = effectiveMode == "Formalization" ? 0.9 : 0.72,
                 Reason                  = "Deterministic pre-router: Change command.",
                 AllowCodeSearch         = true,
                 AllowDeepLookup         = true,
                 AllowConflictAssessment = true,
                 AllowConflictBlocking   = true,
                 AllowTicketCreation     = false,
-                RelatedTicketsAreContextOnly = false
+                RelatedTicketsAreContextOnly = false,
+                ContextMode = effectiveMode
             };
         }
 
@@ -410,14 +473,15 @@ Evidence Packet:
             OriginalUserRequest     = request ?? string.Empty,
             EffectiveWorkText       = request ?? string.Empty,
             RequestKind             = ContextRequestKind.GeneralChat,
-            Confidence              = 0.5,
+            Confidence              = 0.74,
             Reason                  = "Deterministic pre-router: Fallback to general chat.",
             AllowCodeSearch         = true,
             AllowDeepLookup         = false,
             AllowConflictAssessment = false,
             AllowConflictBlocking   = false,
             AllowTicketCreation     = false,
-            RelatedTicketsAreContextOnly = true
+            RelatedTicketsAreContextOnly = true,
+            ContextMode = "Exploration"
         };
     }
 
@@ -447,10 +511,16 @@ Evidence Packet:
             overrides.Add("Inspection requests must treat related tickets as context-only. Overriding RelatedTicketsAreContextOnly to true.");
         }
 
-        if (decision.Confidence < 0.70)
+        if (isCreateTicket && !needsClarification && decision.Confidence < 0.55)
         {
             needsClarification = true;
-            overrides.Add("Confidence is below 0.70. Setting NeedsClarification to true.");
+            overrides.Add("Create-ticket request with weak confidence. Setting NeedsClarification to true.");
+        }
+
+        if (HasExplicitFormalizationIntent(lower, decision.RequestKind) && !needsClarification && decision.Confidence < 0.55)
+        {
+            needsClarification = true;
+            overrides.Add("Formalization intent with weak confidence. Setting NeedsClarification to true.");
         }
 
         if (isCreateTicket && !allowConflictBlocking)
@@ -516,6 +586,93 @@ Evidence Packet:
             UsedConversationContextResolver = decision.UsedConversationContextResolver,
             ContextMode = decision.ContextMode
         };
+    }
+
+    private static ContextAgentRouteDecision ForceExplicitCommitGuardrails(
+        ContextAgentRouteDecision decision,
+        string userRequest)
+    {
+        var lower = (userRequest ?? string.Empty).ToLowerInvariant().Trim();
+
+        if (decision.RequestKind == ContextRequestKind.BuildTicket && !HasExplicitFormalizationIntent(lower, ContextRequestKind.BuildTicket))
+        {
+            decision.RequestKind = ContextRequestKind.ChangeImplementation;
+            decision.ContextMode = "Exploration";
+            decision.Confidence = Math.Max(decision.Confidence, 0.72);
+            decision.Reason = string.IsNullOrWhiteSpace(decision.Reason)
+                ? "Demoted BuildTicket: explicit lane-lock text missing."
+                : $"{decision.Reason} | Demoted BuildTicket: explicit lane-lock text missing.";
+        }
+
+        if ((decision.RequestKind == ContextRequestKind.ChangeImplementation ||
+             decision.RequestKind == ContextRequestKind.ReplaceArchitecture) &&
+            string.IsNullOrWhiteSpace(decision.ContextMode))
+        {
+            decision.ContextMode = HasExplicitFormalizationIntent(lower, decision.RequestKind) ? "Formalization" : "Exploration";
+        }
+
+        return decision;
+    }
+
+    private static bool HasExplicitFormalizationIntent(string lower, ContextRequestKind kind)
+    {
+        if (kind == ContextRequestKind.CreateTicket || kind == ContextRequestKind.CreateTicketsFromDiscussion)
+            return HasExplicitFormalizationIntent(lower);
+
+        return HasExplicitFormalizationIntent(lower);
+    }
+
+    private static bool HasExplicitFormalizationIntent(string lower)
+    {
+        if (string.IsNullOrWhiteSpace(lower))
+            return false;
+
+        if (ContainsAny(lower, FormalizationCommandPrefixes))
+            return true;
+
+        if ((ContainsWord(lower, "save") || ContainsWord(lower, "persist")) &&
+            ContainsAny(lower, ["discussion", "ticket", "handoff", "decision", "work"]))
+        {
+            return true;
+        }
+
+        if ((ContainsWord(lower, "make") || ContainsWord(lower, "turn") || ContainsWord(lower, "convert")) &&
+            ContainsAny(lower, ["a ticket", "this into", "to a ticket", "as discussion", "handoff", "decision"]))
+        {
+            return true;
+        }
+
+        if (ContainsWord(lower, "create") &&
+            ContainsAny(lower, ["ticket", "discussion", "work packet", "handoff", "decision"]))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasExplicitBuildTicketIntent(string lower)
+    {
+        return ContainsAny(lower, ["build ticket", "build me a ticket", "build a ticket", "generate a ticket", "generate tickets", "create a ticket"]);
+    }
+
+    private static bool ContainsAny(string lower, string[] terms)
+    {
+        return terms.Any(term => lower.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool ContainsWord(string lower, string term)
+    {
+        var token = term.AsSpan().Trim();
+        if (token.Length == 0 || lower.Length == 0)
+            return false;
+
+        if (string.Equals(lower, token, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return lower.Contains($" {token} ", StringComparison.OrdinalIgnoreCase) ||
+               lower.StartsWith($"{token} ", StringComparison.OrdinalIgnoreCase) ||
+               lower.EndsWith($" {token}", StringComparison.OrdinalIgnoreCase);
     }
 
     private IReadOnlyList<DeepLookupTarget> IdentifyTargets(string lower)

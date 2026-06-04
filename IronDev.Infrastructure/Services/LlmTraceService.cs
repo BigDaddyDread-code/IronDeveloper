@@ -86,6 +86,20 @@ public class LlmTraceService : ILlmTraceService
         }
     }
 
+    public IReadOnlyList<LlmTraceEntry> GetTracesByGroupId(string traceGroupId, int max = 100)
+    {
+        lock (_lock)
+        {
+            if (string.IsNullOrWhiteSpace(traceGroupId))
+                return Array.Empty<LlmTraceEntry>();
+
+            return _traces
+                .Where(trace => string.Equals(trace.TraceGroupId, traceGroupId, StringComparison.Ordinal))
+                .Take(max)
+                .ToList();
+        }
+    }
+
     public void Clear()
     {
         lock (_lock)

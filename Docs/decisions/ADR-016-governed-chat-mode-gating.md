@@ -25,7 +25,10 @@ Product integrity requires explicit, inspectable transitions between these modes
 4. `Formalization` responses surface governance affordances (`showGovernanceActions`, `governanceActions`), while `Exploration` and `Confirmation` do not.
 5. `Confirmation` requires user confirmation text before escalating to governance actions.
 6. Chat responses include reason-chain fields (`reasoningTrace`, `reasoningSummary`, optional `disambiguationQuestion`) so the user can inspect how the assistant decided mode and next step.
-7. Frontend rendering of governance actions is UI-gated to the response mode/flags, and `Copy Markdown` remains always available.
+7. Frontend rendering of governance actions and rich-copy affordances is mode-aware:
+   - `Save Discussion` and `View Sources` are only shown in Formalization mode.
+   - `Copy Markdown` is hidden for Exploration, shown for Formalization and Confirmation mode paths.
+   - Raw reasoning is shown in message/thread surfaces regardless of mode.
 
 ## Reasoning
 

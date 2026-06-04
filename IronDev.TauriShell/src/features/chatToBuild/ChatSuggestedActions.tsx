@@ -5,10 +5,14 @@ interface ChatSuggestedActionsProps {
   responseText: string | null;
   governanceActions: string[];
   hasGovernanceActions: boolean;
+  mode: string | null;
 }
 
-export function ChatSuggestedActions({ hasResponse, responseText, governanceActions, hasGovernanceActions }: ChatSuggestedActionsProps) {
+export function ChatSuggestedActions({ hasResponse, responseText, governanceActions, hasGovernanceActions, mode }: ChatSuggestedActionsProps) {
+  const resolvedMode = mode ?? 'Exploration';
+  const isExplorationMode = resolvedMode === 'Exploration';
   const copyDisabledReason = !responseText ? 'No response to copy yet.' : undefined;
+  const canCopy = !isExplorationMode;
 
   return (
     <section className="chat-suggested-actions" data-testid="chat.suggestedActions">
@@ -23,28 +27,30 @@ export function ChatSuggestedActions({ hasResponse, responseText, governanceActi
         </ul>
       ) : null}
       <div className="chat-suggested-actions__grid">
-        <CommandButton
-          type="button"
-          variant="secondary"
-          disabled={!responseText}
-          title={copyDisabledReason}
-          onClick={() => {
-            if (responseText) {
-              void navigator.clipboard?.writeText(responseText);
-            }
-          }}
-          testId="chat.action.copy"
-        >
-          Copy
-        </CommandButton>
+        {!isExplorationMode ? (
+          <CommandButton
+            type="button"
+            variant="secondary"
+            disabled={!responseText}
+            title={copyDisabledReason}
+            onClick={() => {
+              if (responseText) {
+                void navigator.clipboard?.writeText(responseText);
+              }
+            }}
+            testId="chat.action.copy"
+          >
+            Copy response
+          </CommandButton>
+        ) : null}
       </div>
-      <p className="state-muted" data-testid="chat.actions.pending">
-        {hasResponse
-          ? hasGovernanceActions
-            ? 'Governance actions are available in this response.'
-            : 'Exploration response: no governance actions yet. Continue probing or request formalization.'
-          : 'Send a message to unlock response actions.'}
-      </p>
+      {!canCopy && hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Exploration lane: reasoning is open. Ask for formalization when ready to lock intent.</p> : null}
+      {canCopy && hasResponse ? (
+        <p className="state-muted" data-testid="chat.actions.modeHint">
+          {hasGovernanceActions ? 'Formalization lane: governance actions are available.' : 'Mode is set to continuation or explicit handoff path.'}
+        </p>
+      ) : null}
+      {!hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Send a message to unlock response actions.</p> : null}
     </section>
   );
 }
