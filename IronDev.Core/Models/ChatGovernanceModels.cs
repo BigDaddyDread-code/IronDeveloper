@@ -7,6 +7,13 @@ public enum ChatGovernanceMode
     Confirmation
 }
 
+public enum ChatPromptTemplate
+{
+    Exploration,
+    Formalization,
+    Confirmation
+}
+
 public sealed record ChatModeDecision(
     ChatGovernanceMode Mode,
     double Confidence,

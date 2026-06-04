@@ -49,30 +49,76 @@ async function seedSelectedProject(page: import('@playwright/test').Page, projec
   }, projectId);
 }
 
-async function mockChatPersistence(page: import('@playwright/test').Page, projectId: number) {
+type MockChatSession = {
+  id: number;
+  projectId?: number;
+  title?: string;
+  summary?: string;
+  createdDate?: string;
+  updatedDate?: string;
+};
+
+type MockChatMessage = {
+  id: number;
+  projectId?: number;
+  chatSessionId?: number;
+  role: 'user' | 'assistant';
+  message: string;
+  tags?: string | null;
+  contextSummary?: string | null;
+  linkedFilePaths?: string | null;
+  linkedSymbols?: string | null;
+  createdDate?: string;
+};
+
+type MockChatPersistenceOptions = {
+  sessions?: MockChatSession[];
+  messagesBySessionId?: Record<number, MockChatMessage[]>;
+};
+
+async function mockChatPersistence(page: import('@playwright/test').Page, projectId: number, options: MockChatPersistenceOptions = {}) {
   const savedSessions: unknown[] = [];
   const savedMessages: unknown[] = [];
+  const seededSessions = [...(options.sessions ?? [])];
+  const seededMessagesBySessionId = new Map<number, MockChatMessage[]>(
+    Object.entries(options.messagesBySessionId ?? {}).map(([sessionId, messages]) => [Number(sessionId), [...messages]])
+  );
   let nextSessionId = 9000 + projectId;
   let nextMessageId = 9100 + projectId;
 
   await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions`, async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(seededSessions) });
       return;
     }
 
-    savedSessions.push(route.request().postDataJSON());
+    const savedSession = route.request().postDataJSON() as MockChatSession;
+    savedSessions.push(savedSession);
+    seededSessions.unshift({ ...savedSession, id: nextSessionId });
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nextSessionId) });
   });
 
   await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions/*/messages`, async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      const sessionIdMatch = /\/chat\/sessions\/(\d+)\/messages$/i.exec(new URL(route.request().url()).pathname);
+      const requestedSessionId = sessionIdMatch ? Number(sessionIdMatch[1]) : NaN;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(seededMessagesBySessionId.get(requestedSessionId) ?? []) });
       return;
     }
 
-    savedMessages.push(route.request().postDataJSON());
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nextMessageId++) });
+    const savedMessage = route.request().postDataJSON() as MockChatMessage;
+    const savedMessageId = nextMessageId++;
+    savedMessages.push(savedMessage);
+    if (typeof savedMessage.chatSessionId === 'number') {
+      const sessionMessages = seededMessagesBySessionId.get(savedMessage.chatSessionId) ?? [];
+      sessionMessages.push({
+        ...savedMessage,
+        id: savedMessageId,
+        createdDate: new Date().toISOString()
+      });
+      seededMessagesBySessionId.set(savedMessage.chatSessionId, sessionMessages);
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(savedMessageId) });
   });
 
   return {
@@ -1163,8 +1209,10 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     lastMode = body.mode ?? '';
     const isProjectStateReview = body.mode === 'projectStateReview';
     const normalizedPrompt = (body.prompt ?? '').toLowerCase();
-    const isFormalizationPrompt = normalizedPrompt.includes('make this a ticket') || normalizedPrompt.includes('save this as');
+    const isConfirmationPrompt = normalizedPrompt.includes('maybe make this a ticket') || normalizedPrompt.includes('not sure yet');
+    const isFormalizationPrompt = !isConfirmationPrompt && (normalizedPrompt.includes('make this a ticket') || normalizedPrompt.includes('save this as'));
     const isFormalization = !isProjectStateReview && isFormalizationPrompt;
+    const isConfirmation = !isProjectStateReview && isConfirmationPrompt;
     const responseText = isProjectStateReview
       ? markdownResponse
       : isFormalization
@@ -1181,6 +1229,12 @@ test('chat workspace sends project-scoped messages and reviews project state', a
             '- Save this response as a Discussion.',
             '- Create a Ticket from the Discussion.'
           ].join('\n')
+        : isConfirmation
+          ? [
+              "I'm in **Confirmation** lane.",
+              '',
+              'Do you want to keep exploring, or lock this into a ticket?'
+            ].join('\n')
         : [
             "I'm in **Exploration** mode.",
             `Prompt: ${body.prompt}`,
@@ -1204,7 +1258,7 @@ test('chat workspace sends project-scoped messages and reviews project state', a
       contentType: 'application/json',
       body: JSON.stringify({
         response: responseText,
-        mode: isFormalization ? 'Formalization' : 'Exploration',
+        mode: isFormalization ? 'Formalization' : isConfirmation ? 'Confirmation' : 'Exploration',
         showGovernanceActions: isFormalization,
         governanceActions: isFormalization ? ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'] : [],
         contextSummary: 'TicketsProject: exploration lane using project context (tickets=1, decisions=1, documents=0, runs=1). No route signals in response.',
@@ -1213,11 +1267,15 @@ test('chat workspace sends project-scoped messages and reviews project state', a
         traceId: isFormalization ? 1001 : 909,
         reasoningTrace: isFormalization
             ? ['Prompt classified as formalization.', 'Handoff actions have been exposed.']
+            : isConfirmation
+              ? ['Confirmation lane selected.', 'Governance actions remain hidden.']
             : ['Exploration lane selected for project \'TicketsProject\'.', 'Project context loaded and assumptions were identified.'],
         reasoningSummary: isFormalization
           ? 'Formalization lane selected; governance actions are available after confirmation checks. Trace entries: 2.'
+          : isConfirmation
+            ? 'Confirmation lane selected; governance actions stay suppressed.'
           : 'Exploration lane selected; governance actions stay suppressed.',
-        disambiguationQuestion: null
+        disambiguationQuestion: isConfirmation ? 'Keep exploring or formalize into a ticket?' : null
       })
     });
   });
@@ -1265,7 +1323,16 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByRole('heading', { name: 'Exploration mode' })).not.toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(0);
   await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(0);
+  await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(0);
   await expect(page.getByTestId('chat.message.reasoning')).toBeVisible();
+
+  await page.getByTestId('chat.composer.input').fill('maybe make this a ticket, not sure yet');
+  await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await page.getByTestId('chat.command.send').click();
+  await expect(page.getByTestId('chat.thread')).toContainText("I'm in **Confirmation** lane.");
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(0);
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(0);
+  await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(0);
 
   await page.getByTestId('chat.composer.input').fill('make this a ticket: build me minesweeper');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
@@ -1273,8 +1340,9 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.thread')).toContainText("I'm in **Formalization** lane now.");
   await expect(page.getByTestId('chat.thread')).toContainText('### Handoff options');
   await expect(page.getByRole('heading', { name: 'Exploration mode' })).not.toBeVisible();
-  await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
-  await expect(page.getByTestId('chat.message.saveDiscussion')).toBeVisible();
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(1);
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(1);
+  await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(1);
   await page.getByTestId('chat.message.saveDiscussion').click();
   await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
   expect(savedDiscussionBody.content).toContain('build me minesweeper');
@@ -1295,6 +1363,82 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   expect(lastPrompt).toContain('recent decisions');
   expect(lastPrompt).toContain('recent runs');
   expect(lastMode).toBe('projectStateReview');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('chat workspace replays persisted governance envelope and ignores legacy tags', async ({ page }) => {
+  const formalizationTags = JSON.stringify({
+    v: 1,
+    mode: 'Formalization',
+    modeConfidence: 0.99,
+    modeReason: 'Persisted classifier decision.',
+    showGovernanceActions: true,
+    governanceActions: ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'],
+    reasoningTrace: ['Persisted classifier selected Formalization.'],
+    reasoningSummary: 'Persisted formalization replay.',
+    contextSummary: 'Persisted formalization context summary.',
+    linkedFilePaths: 'PersistedFormalization.cs',
+    linkedSymbols: 'PersistedFormalization'
+  });
+  await mockTicketProject(page, {
+    sessions: [
+      {
+        id: 9701,
+        projectId: 7,
+        title: 'Persisted mode replay',
+        summary: 'Persisted chat session',
+        createdDate: '2026-06-04T00:00:00Z',
+        updatedDate: '2026-06-04T00:00:00Z'
+      }
+    ],
+    messagesBySessionId: {
+      9701: [
+        {
+          id: 97010,
+          projectId: 7,
+          chatSessionId: 9701,
+          role: 'user',
+          message: 'old project question',
+          tags: 'projectQuestion',
+          createdDate: '2026-06-04T00:00:01Z'
+        },
+        {
+          id: 97011,
+          projectId: 7,
+          chatSessionId: 9701,
+          role: 'assistant',
+          message: 'Legacy assistant slice',
+          tags: 'Formalization',
+          contextSummary: 'Legacy context that must not become a governance gate.',
+          linkedFilePaths: 'LegacyFormalization.cs',
+          linkedSymbols: 'LegacyFormalization',
+          createdDate: '2026-06-04T00:00:02Z'
+        },
+        {
+          id: 97012,
+          projectId: 7,
+          chatSessionId: 9701,
+          role: 'assistant',
+          message: 'Persisted Formalization slice',
+          tags: formalizationTags,
+          createdDate: '2026-06-04T00:00:03Z'
+        }
+      ]
+    }
+  });
+
+  await page.goto('/');
+  await openTickets(page);
+  await page.getByTestId('shell.nav.chat').click();
+
+  await expect(page.getByTestId('chat.thread')).toContainText('Legacy assistant slice');
+  await expect(page.getByTestId('chat.thread')).toContainText('Persisted Formalization slice');
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(1);
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(1);
+  await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(1);
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('Persisted formalization context summary.');
+  await expect(page.getByTestId('chat.sources')).toContainText('PersistedFormalization.cs');
+  await expect(page.getByTestId('chat.sources')).toContainText('PersistedFormalization');
   await expectNoHorizontalOverflow(page);
 });
 
@@ -1506,7 +1650,7 @@ test('primary usage flow moves from Home to Chat to Build review package', async
   await expectNoHorizontalOverflow(page);
 });
 
-async function mockTicketProject(page: import('@playwright/test').Page) {
+async function mockTicketProject(page: import('@playwright/test').Page, chatPersistenceOptions: MockChatPersistenceOptions = {}) {
   await seedToken(page);
   await seedSelectedProject(page, 7);
   await mockHealthyApi(page);
@@ -1534,7 +1678,7 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
-  const chatPersistence = await mockChatPersistence(page, 7);
+  const chatPersistence = await mockChatPersistence(page, 7, chatPersistenceOptions);
   await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryNoLinkedRun) });
   });

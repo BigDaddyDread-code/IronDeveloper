@@ -51,9 +51,34 @@ public sealed class ChatModeClassifierServiceTests
         Assert.AreEqual(0, decision.Confidence);
     }
 
+    [TestMethod]
+    public async Task ClassifyAsync_RouteHintCannotForceFormalization()
+    {
+        var llm = new StubLlmService("""
+            {
+              "mode": "Exploration",
+              "confidence": 0.88,
+              "reason": "The route hinted ticket creation, but the user is still discussing the idea."
+            }
+            """);
+        var classifier = new ChatModeClassifierService(llm);
+
+        var decision = await classifier.ClassifyAsync(BuildRequest(
+            "I want build minesweeper, what do you need?",
+            routeKind: ContextRequestKind.CreateTicket,
+            contextModeHint: "Formalization",
+            allowTicketCreation: true));
+
+        Assert.AreEqual(ChatGovernanceMode.Exploration, decision.Mode);
+        Assert.AreEqual(0.88, decision.Confidence);
+    }
+
     private static ChatModeClassificationRequest BuildRequest(
         string userMessage,
-        ChatGovernanceMode? explicitMode = null) =>
+        ChatGovernanceMode? explicitMode = null,
+        ContextRequestKind routeKind = ContextRequestKind.GeneralChat,
+        string contextModeHint = "Exploration",
+        bool allowTicketCreation = false) =>
         new(
             userMessage,
             RecentConversationSummary: string.Empty,
@@ -61,10 +86,11 @@ public sealed class ChatModeClassifierServiceTests
             {
                 OriginalUserRequest = userMessage,
                 EffectiveWorkText = userMessage,
-                RequestKind = ContextRequestKind.GeneralChat,
+                RequestKind = routeKind,
                 Confidence = 0.72,
                 Reason = "Test route hint.",
-                ContextModeHint = "Exploration"
+                ContextModeHint = contextModeHint,
+                AllowTicketCreation = allowTicketCreation
             },
             ProjectSummary: "Test project",
             ContextRequiresClarification: false,
