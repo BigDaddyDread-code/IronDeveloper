@@ -58,7 +58,12 @@ public sealed class ContextAgentRouteDecision
     public bool UsedLlmJudge { get; set; }
     public bool UsedFallbackRules { get; set; }
     public bool UsedConversationContextResolver { get; set; }
-    public string ContextMode { get; set; } = string.Empty;
+    public string ContextModeHint { get; set; } = string.Empty;
+    public string ContextMode
+    {
+        get => ContextModeHint;
+        set => ContextModeHint = value;
+    }
     
     public IReadOnlyList<DeepLookupTarget> DeepLookupTargets { get; set; } = Array.Empty<DeepLookupTarget>();
 }

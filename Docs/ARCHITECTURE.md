@@ -96,11 +96,38 @@ Any refactor touching one stage must update this matrix in this section before m
 
 ## Chat Cockpit Modes
 
-Chat completion must never assume governance intent. Backend mode contract:
+Chat completion must never assume governance intent. Mode authority is explicit and single-owner:
+
+```text
+User message
+  -> IContextAgentRouteJudge / IContextAgentService  (context hints only)
+  -> IChatModeClassifier                             (only governance-mode authority)
+  -> ProjectChatResponseService composer             (answers using selected mode)
+  -> ChatGovernanceGate                              (derives UI permissions)
+  -> ChatTurnEnvelope / ChatMessage.Tags             (replay metadata)
+```
+
+Hard rule: only `IChatModeClassifier` decides `Exploration`, `Formalization`, or `Confirmation`.
+
+Allowed responsibilities:
+
+- `IContextAgentRouteJudge` may emit request kind, confidence, evidence, risk, and `ContextModeHint` as a route hint.
+- `IProjectChatResponseService` may validate classifier output by failing closed to `Confirmation`, compose the answer, and derive the `ChatGovernanceGate`.
+- Tauri may render only from the backend payload and the local `chatGovernanceGate.ts` projection.
+- Replay may restore the persisted envelope.
+
+Forbidden responsibilities:
+
+- `ChatController` must not infer, override, or translate route hints into governance mode.
+- Request kind values such as `CreateTicket`, `BuildTicket`, or `CreateTicketsFromDiscussion` must not become governance mode directly.
+- The response composer must not return a different mode while answering.
+- React components must not contain their own mode/action policy checks.
+- Legacy string tags such as `projectQuestion` must not be treated as replay mode authority.
+
+Backend mode contract:
 
 - `projectStateReview`: project review text and state summary.
-- `projectQuestion` (default): prompt-inference mode, resolved by
-  `IContextAgentRouteJudge` into:
+- `projectQuestion` (default): classifier-led mode selection using context-route hints:
   - `Exploration` (default),
   - `Formalization` (explicit commitment language),
   - `Confirmation` (mixed or ambiguous intent).
@@ -108,25 +135,34 @@ Chat completion must never assume governance intent. Backend mode contract:
   - `exploration`
   - `formalization`
   - `confirmation`
-- Route inference must add route trace signals for UI and diagnostics, including confidence,
-  intent kind, context resolver flags, evidence use, and risk summary.
+- Route inference must add hint trace signals for UI and diagnostics, including confidence,
+  request kind, context resolver flags, evidence use, and risk summary.
 
 Response envelope rules:
 
 - `Exploration`: no governance actions in UI, full reasoning trace/sum available.
 - `Formalization`: governance actions included (`showGovernanceActions`, `governanceActions`) and handoff path remains available.
 - `Confirmation`: asks for lane confirmation before enabling formalization actions.
+- Invalid or unparsable classifier output fails closed to `Confirmation`.
 
 Client-facing UX rules:
 
-- `Copy Markdown` is only shown for non-exploration responses.
-- `Save Discussion` / `View Sources` are only shown when response metadata says governance is active.
+- `Copy Markdown`, `Save Discussion`, and `View Sources` are only shown when `ChatGovernanceGate` allows them.
+- `Exploration` and `Confirmation` suppress formalization actions.
 - Reasoning visibility must remain honest and inspectable, including:
+  - `modeReason`
   - `reasoningTrace` list
   - `reasoningSummary`
   - optional `disambiguationQuestion`
   - optional dogfood trace references.
 - Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode/reasoning metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode` / governance affordances from this envelope.
+
+Mode inference invariants:
+
+- The backend must drive mode from `IChatModeClassifier` only.
+- The context router is a scout. Its `ContextModeHint` value is a hint, not authority.
+- A `CreateTicket`/`CreateTicketsFromDiscussion` route hint without explicit lane-lock language must not trigger governance actions.
+- Missing mode is treated as unknown for reconstruction; UI must still behave in conservative exploration mode until explicit mode metadata is present.
 
 ### Allowed UI responsibilities
 

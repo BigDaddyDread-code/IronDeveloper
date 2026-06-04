@@ -20,15 +20,20 @@ Product integrity requires explicit, inspectable transitions between these modes
 
 1. `projectQuestion` (default) and `projectStateReview` remain supported for existing clients.
 2. New explicit modes `exploration`, `formalization`, and `confirmation` are accepted.
-3. `projectQuestion` remains the inference default but now drives prompt classification into
-   `Exploration`, `Formalization`, or `Confirmation`.
-4. `Formalization` responses surface governance affordances (`showGovernanceActions`, `governanceActions`), while `Exploration` and `Confirmation` do not.
-5. `Confirmation` requires user confirmation text before escalating to governance actions.
-6. Chat responses include reason-chain fields (`reasoningTrace`, `reasoningSummary`, optional `disambiguationQuestion`) so the user can inspect how the assistant decided mode and next step.
-7. Frontend rendering of governance actions and rich-copy affordances is mode-aware:
+3. `projectQuestion` remains the default, but route/context output is only a hint.
+4. `IChatModeClassifier` is the only authority that selects `Exploration`, `Formalization`, or `Confirmation`.
+5. `Formalization` responses surface governance affordances (`showGovernanceActions`, `governanceActions`), while `Exploration` and `Confirmation` do not.
+6. `Confirmation` requires user confirmation text before escalating to governance actions.
+7. Chat responses include reason-chain fields (`reasoningTrace`, `reasoningSummary`, optional `disambiguationQuestion`) so the user can inspect how the assistant decided mode and next step.
+8. Frontend rendering of governance actions and rich-copy affordances is mode-aware:
    - `Save Discussion` and `View Sources` are only shown in Formalization mode.
-   - `Copy Markdown` is hidden for Exploration, shown for Formalization and Confirmation mode paths.
+   - `Copy Markdown` is hidden for Exploration and Confirmation, shown for Formalization mode paths.
+   - Components render from the single `chatGovernanceGate.ts` rule instead of duplicating mode checks.
    - Raw reasoning is shown in message/thread surfaces regardless of mode.
+9. Anti-inference guard:
+   - `CreateTicket`/`CreateTicketsFromDiscussion` classifications do not auto-escalate unless explicit lane-lock language is present.
+   - Missing mode or legacy history tags must not be treated as an affirmative governance signal.
+10. The response composer receives the selected mode and must not reclassify the turn while generating content.
 
 ## Reasoning
 
@@ -36,8 +41,9 @@ The goal is not to stop governance; it is to delay governance controls until int
 
 ## Consequences
 
-- `ChatController` and `IProjectChatResponseService` now own mode inference and response shaping.
-- `IronDev.TauriShell` consumes the expanded chat payload and hides save/view actions in exploration by default.
+- `ChatController` owns HTTP shape only and must not infer mode from router output.
+- `IProjectChatResponseService` owns route/classify/compose/gate orchestration.
+- `IronDev.TauriShell` consumes the expanded chat payload and hides save/view/copy actions unless the gate allows them.
 - Tests must assert mode-shape differences rather than a single hard-coded template.
 - Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode` and governance affordances instead of defaulting to opaque templates.
 - `Docs/ARCHITECTURE.md`, `Docs/AGENTS.md`, `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`, and boundary docs must reference the cockpit mode contract.

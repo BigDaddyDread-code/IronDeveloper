@@ -3,6 +3,7 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { ChatCompletionResponse, ChatMessage } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
 import type { ChatResponseMode, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 const projectReviewPrompt = [
@@ -149,7 +150,8 @@ export function useProjectChat() {
           activeModel: null,
           mode: request?.mode ?? 'projectQuestion'
         });
-        const responseMode = coerceResponseMode(response.mode) ?? (response.showGovernanceActions ? 'Formalization' : null);
+        const responseMode = coerceChatGovernanceMode(response.mode);
+        const responseGate = getChatModeGate({ ...response, mode: responseMode });
         const savedAssistantTags = buildAssistantTagEnvelope(response, responseMode);
 
         const savedAssistantMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
@@ -171,9 +173,11 @@ export function useProjectChat() {
             ...response,
             response: response.response?.trim() || 'IronDev.Api returned an empty response.',
             mode: responseMode,
-            showGovernanceActions: response.showGovernanceActions ?? false,
-            governanceActions: response.governanceActions ?? null,
-            reasoningTrace: response.reasoningTrace ?? null,
+            modeConfidence: response.modeConfidence ?? null,
+            modeReason: response.modeReason ?? null,
+            showGovernanceActions: responseGate.showGovernanceActions,
+            governanceActions: responseGate.governanceActions,
+            reasoningTrace: response.reasoningTrace ?? [],
             disambiguationQuestion: response.disambiguationQuestion ?? null,
             reasoningSummary: response.reasoningSummary ?? null,
             dogfoodTraceId: response.dogfoodTraceId ?? null,
@@ -296,10 +300,7 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
   const role = message.role === 'assistant' ? 'assistant' : 'user';
   const content = message.message?.trim() || '';
   const metadata = parseAssistantTagMetadata(message.tags);
-  const responseMode =
-    metadata.mode ??
-    coerceResponseMode(message.tags) ??
-    coerceLegacyModeToResponseMode(message.tags);
+  const responseMode = metadata.mode ?? null;
 
   return {
     id: `${role}-${message.id ?? `${message.chatSessionId ?? 'local'}-${Date.now()}`}`,
@@ -308,8 +309,10 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
     canContinueInBuild: role === 'user',
     createdUtc: message.createdDate ?? new Date().toISOString(),
     response: role === 'assistant'
-      ? {
+        ? {
           response: content,
+          modeConfidence: metadata.modeConfidence ?? null,
+          modeReason: metadata.modeReason ?? null,
           contextSummary: metadata.contextSummary ?? message.contextSummary ?? null,
           linkedFilePaths: metadata.linkedFilePaths ?? message.linkedFilePaths ?? null,
           linkedSymbols: metadata.linkedSymbols ?? message.linkedSymbols ?? null,
@@ -328,11 +331,15 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
 }
 
 function buildAssistantTagEnvelope(response: ChatCompletionResponse, mode: ChatResponseMode | null) {
+  const gate = getChatModeGate({ ...response, mode });
+
   return JSON.stringify({
     v: chatMessageTagVersion,
-    mode,
-    showGovernanceActions: response.showGovernanceActions ?? false,
-    governanceActions: response.governanceActions,
+    mode: gate.mode,
+    modeConfidence: gate.confidence,
+    modeReason: gate.reason,
+    showGovernanceActions: gate.showGovernanceActions,
+    governanceActions: gate.governanceActions,
     reasoningTrace: response.reasoningTrace ?? [],
     disambiguationQuestion: response.disambiguationQuestion,
     reasoningSummary: response.reasoningSummary,
@@ -361,7 +368,11 @@ function parseAssistantTagMetadata(rawTags: string | null | undefined) {
     if (version !== chatMessageTagVersion) {
       return {} as AssistantTagMetadata;
     }
-    const mode = coerceResponseMode(typeof record.mode === 'string' ? record.mode : undefined);
+    const mode = coerceChatGovernanceMode(typeof record.mode === 'string' ? record.mode : undefined);
+    const modeConfidence = toNumber(record.modeConfidence);
+    const modeReason = typeof record.modeReason === 'string'
+      ? record.modeReason
+      : null;
     const showGovernanceActions = typeof record.showGovernanceActions === 'boolean'
       ? record.showGovernanceActions
       : undefined;
@@ -392,6 +403,8 @@ function parseAssistantTagMetadata(rawTags: string | null | undefined) {
 
     return {
       mode,
+      modeConfidence,
+      modeReason,
       showGovernanceActions,
       reasoningTrace,
       governanceActions,
@@ -411,6 +424,8 @@ function parseAssistantTagMetadata(rawTags: string | null | undefined) {
 
 interface AssistantTagMetadata {
   mode?: ChatResponseMode | null;
+  modeConfidence?: number | null;
+  modeReason?: string | null;
   showGovernanceActions?: boolean;
   governanceActions?: string[];
   reasoningTrace?: string[];
@@ -422,52 +437,6 @@ interface AssistantTagMetadata {
   contextSummary?: string | null;
   linkedFilePaths?: string | null;
   linkedSymbols?: string | null;
-}
-
-function coerceResponseMode(value?: string | null): ChatResponseMode | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'exploration') {
-    return 'Exploration';
-  }
-
-  if (normalized === 'formalization') {
-    return 'Formalization';
-  }
-
-  if (normalized === 'confirmation') {
-    return 'Confirmation';
-  }
-
-  return null;
-}
-
-function coerceLegacyModeToResponseMode(value?: string | null): ChatResponseMode | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'projectquestion') {
-    return null;
-  }
-
-  if (normalized === 'projectexploration' || normalized === 'exploration') {
-    return 'Exploration';
-  }
-
-  if (normalized === 'projectformalization' || normalized === 'formalization') {
-    return 'Formalization';
-  }
-
-  if (normalized === 'projectconfirmation' || normalized === 'confirmation') {
-    return 'Confirmation';
-  }
-
-  return null;
 }
 
 function toNumber(value: unknown) {

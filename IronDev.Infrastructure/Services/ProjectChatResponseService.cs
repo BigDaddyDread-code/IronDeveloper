@@ -8,48 +8,14 @@ using IronDev.Services;
 
 namespace IronDev.Infrastructure.Services;
 
-public interface IProjectChatResponseService
-{
-    Task<ProjectChatResponseResult?> RespondAsync(
-        int projectId,
-        string prompt,
-        ProjectConversationMode mode = ProjectConversationMode.Exploration,
-        IReadOnlyList<string>? routeSignals = null,
-        string? dogfoodTraceId = null,
-        bool includeDetailedMetadata = false,
-        string? recentConversationSummary = null,
-        long? sessionId = null,
-        CancellationToken cancellationToken = default);
-}
-
-public sealed record ProjectChatResponseResult(
-    string Response,
-    string ContextSummary,
-    string LinkedFilePaths,
-    string LinkedSymbols,
-    string Mode,
-    bool ShowGovernanceActions,
-    IReadOnlyList<string> GovernanceActions,
-    IReadOnlyList<string> ReasoningTrace,
-    string? DisambiguationQuestion,
-    string? ReasoningSummary,
-    string? DogfoodTraceId = null,
-    string? DogfoodTracePath = null,
-    long? TraceId = null);
-
-public enum ProjectConversationMode
-{
-    Exploration,
-    Formalization,
-    Confirmation
-}
-
 public sealed class ProjectChatResponseService : IProjectChatResponseService
 {
     private readonly IProjectService _projects;
     private readonly ITicketService _tickets;
     private readonly IProjectMemoryService _memory;
+    private readonly IContextAgentRouteJudge _routeJudge;
     private readonly IContextAgentService _contextAgent;
+    private readonly IChatModeClassifier _modeClassifier;
     private readonly ILLMService _llm;
     private readonly ILlmTraceService _traceService;
     private readonly string _explorationInstructionText;
@@ -67,14 +33,18 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         IProjectService projects,
         ITicketService tickets,
         IProjectMemoryService memory,
+        IContextAgentRouteJudge routeJudge,
         IContextAgentService contextAgent,
+        IChatModeClassifier modeClassifier,
         ILlmTraceService traceService,
         ILLMService llm)
     {
         _projects = projects;
         _tickets = tickets;
         _memory = memory;
+        _routeJudge = routeJudge;
         _contextAgent = contextAgent;
+        _modeClassifier = modeClassifier;
         _traceService = traceService;
         _llm = llm;
         _explorationInstructionText = LoadInstruction(ExplorationModeInstructionFile, ExplorationInstructionFallback);
@@ -84,16 +54,14 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     public async Task<ProjectChatResponseResult?> RespondAsync(
         int projectId,
         string prompt,
-        ProjectConversationMode mode = ProjectConversationMode.Exploration,
-        IReadOnlyList<string>? routeSignals = null,
+        ChatGovernanceMode? explicitMode = null,
         string? dogfoodTraceId = null,
-        bool includeDetailedMetadata = false,
         string? recentConversationSummary = null,
         long? sessionId = null,
         CancellationToken cancellationToken = default)
     {
         var normalizedPrompt = prompt.ReplaceLineEndings(" ").Trim();
-        var normalizedSignals = routeSignals?.Where(item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [];
+        var recentSummary = recentConversationSummary ?? string.Empty;
 
         var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
         if (project is null)
@@ -105,70 +73,127 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         var documents = await _memory.GetContextDocumentsAsync(projectId, status: "Active", take: 5, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var correlationId = string.IsNullOrWhiteSpace(dogfoodTraceId) ? Guid.NewGuid().ToString("N") : dogfoodTraceId;
+        var routeDecision = await ResolveContextRouteAsync(
+            projectId,
+            sessionId,
+            normalizedPrompt,
+            recentSummary,
+            correlationId,
+            cancellationToken).ConfigureAwait(false);
+        var routeSignals = BuildRouteSignals(routeDecision);
+
         var contextAgentResult = await RunContextAgentAsync(
             projectId,
             sessionId,
             normalizedPrompt,
-            recentConversationSummary ?? string.Empty,
+            recentSummary,
             correlationId,
             cancellationToken).ConfigureAwait(false);
 
-        if (contextAgentResult is null)
-        {
-            return BuildFailureResult(project, mode, tickets, decisions, documents, rules, normalizedSignals, correlationId);
-        }
-
-        var responseMode = mode;
-        if (contextAgentResult.IsClarificationRequired)
-            responseMode = ProjectConversationMode.Confirmation;
+        var modeDecision = await _modeClassifier.ClassifyAsync(
+            new ChatModeClassificationRequest(
+                normalizedPrompt,
+                recentSummary,
+                routeDecision,
+                project.Name,
+                contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
+                explicitMode),
+            cancellationToken).ConfigureAwait(false);
 
         var finalPrompt = contextAgentResult.FinalPrompt ?? string.Empty;
-        var response = await BuildAssistantMessageAsync(contextAgentResult, responseMode, finalPrompt, normalizedPrompt, project.Name, cancellationToken).ConfigureAwait(false);
-
-        var reasoningTrace = BuildReasoningTrace(
+        var gate = ChatGovernanceGate.FromDecision(modeDecision);
+        var responseMode = modeDecision.Mode;
+        var assistantResponse = await BuildAssistantMessageAsync(
             contextAgentResult,
-            normalizedSignals,
-            includeDetailedMetadata,
-            responseMode,
-            correlationId);
+            modeDecision,
+            finalPrompt,
+            normalizedPrompt,
+            project.Name,
+            cancellationToken).ConfigureAwait(false);
+
+        var contextSummary = BuildContextSummary(project, responseMode, tickets, decisions, documents, rules, routeSignals, contextAgentResult.ContextSummary);
+        var linkedFilePaths = responseMode == ChatGovernanceMode.Formalization || responseMode == ChatGovernanceMode.Confirmation
+            ? string.Join(Environment.NewLine, DistinctDelimited(
+                tickets.Select(t => t.LinkedFilePaths)
+                    .Concat(decisions.Select(d => d.LinkedFilePaths))
+                    .Concat(contextAgentResult.Evidence.Select(e => e.FilePath)
+                )))
+            : null;
+        var linkedSymbols = responseMode == ChatGovernanceMode.Formalization || responseMode == ChatGovernanceMode.Confirmation
+            ? string.Join(Environment.NewLine, DistinctDelimited(
+                tickets.Select(t => t.LinkedSymbols)
+                    .Concat(decisions.Select(d => d.LinkedSymbols))
+                    .Concat(contextAgentResult.Evidence.Select(e => e.SymbolName)
+                )))
+            : null;
+        var reasoningTrace = BuildReasoningTrace(
+                contextAgentResult,
+                routeSignals,
+                modeDecision,
+                correlationId);
         var tracingSummary = BuildReasoningSummary(contextAgentResult, responseMode, reasoningTrace);
-
-        var linkedFilePaths = DistinctDelimited(
-            tickets.Select(t => t.LinkedFilePaths)
-                .Concat(decisions.Select(d => d.LinkedFilePaths))
-                .Concat(contextAgentResult.Evidence.Select(e => e.FilePath))
-        );
-
-        var linkedSymbols = DistinctDelimited(
-            tickets.Select(t => t.LinkedSymbols)
-                .Concat(decisions.Select(d => d.LinkedSymbols))
-                .Concat(contextAgentResult.Evidence.Select(e => e.SymbolName))
-        );
 
         var disambiguationQuestion = contextAgentResult.IsClarificationRequired
             ? BuildDisambiguationQuestion(contextAgentResult.ClarificationQuestions)
             : null;
-        var showGovernanceActions = responseMode == ProjectConversationMode.Formalization &&
-            !contextAgentResult.IsClarificationRequired &&
-            contextAgentResult.AllowsProseResponse;
-        var governanceActions = showGovernanceActions && contextAgentResult.SuggestedActions.Length > 0
-            ? contextAgentResult.SuggestedActions
-            : responseMode == ProjectConversationMode.Formalization
-                ? DefaultFormalizationActions
-                : Array.Empty<string>();
 
         return new ProjectChatResponseResult(
-            response,
-            BuildContextSummary(project, responseMode, tickets, decisions, documents, rules, normalizedSignals, contextAgentResult.ContextSummary),
-            string.Join(Environment.NewLine, linkedFilePaths),
-            string.Join(Environment.NewLine, linkedSymbols),
+            assistantResponse,
             responseMode.ToString(),
-            showGovernanceActions,
-            governanceActions,
+            modeDecision.Confidence,
+            modeDecision.Reason,
+            gate.ShowGovernanceActions,
+            gate.GovernanceActions,
             reasoningTrace,
             disambiguationQuestion,
             tracingSummary,
+            contextSummary,
+            linkedFilePaths,
+            linkedSymbols,
             correlationId);
+    }
+
+    private async Task<ContextAgentRouteDecision> ResolveContextRouteAsync(
+        int projectId,
+        long? sessionId,
+        string prompt,
+        string recentConversationSummary,
+        string traceGroupId,
+        CancellationToken cancellationToken)
+    {
+        return await _routeJudge.DecideRouteAsync(new ContextAgentRouteRequest
+        {
+            TraceGroupId = traceGroupId,
+            ProjectId = projectId,
+            SessionId = sessionId ?? 0,
+            UserRequest = prompt,
+            RecentConversationSummary = recentConversationSummary,
+            InitialIntentFromPromptContextBuilder = string.Empty
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static IReadOnlyList<string> BuildRouteSignals(ContextAgentRouteDecision decision)
+    {
+        var routeSignals = new List<string>
+        {
+            $"Context route hint: Kind={decision.RequestKind}",
+            $"Route confidence: {decision.Confidence:0.00}",
+            $"Route reason: {(string.IsNullOrWhiteSpace(decision.Reason) ? "no explicit reason from router" : decision.Reason)}",
+            $"ContextModeHint={decision.ContextModeHint}; allowTicketCreation={decision.AllowTicketCreation}; allowConflictBlocking={decision.AllowConflictBlocking}; allowDeepLookup={decision.AllowDeepLookup}",
+            $"Route machinery: UsedConversationResolver={decision.UsedConversationContextResolver}; UsedLlmJudge={decision.UsedLlmJudge}; UsedFallbackRules={decision.UsedFallbackRules}"
+        };
+
+        if (decision.NeedsClarification && decision.ClarificationQuestions.Count > 0)
+            routeSignals.Add($"Route clarification required: {string.Join(" | ", decision.ClarificationQuestions)}");
+
+        routeSignals.Add(decision.EvidenceUsed.Count > 0
+            ? $"Route evidence used: {string.Join(" | ", decision.EvidenceUsed)}"
+            : "Route evidence used: none");
+
+        if (decision.Risks.Count > 0)
+            routeSignals.Add($"Route risks: {string.Join(" | ", decision.Risks)}");
+
+        return routeSignals;
     }
 
     private async Task<ContextAgentResult> RunContextAgentAsync(
@@ -211,7 +236,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
     private async Task<string> BuildAssistantMessageAsync(
         ContextAgentResult contextAgentResult,
-        ProjectConversationMode mode,
+        ChatModeDecision modeDecision,
         string finalPrompt,
         string prompt,
         string projectName,
@@ -220,38 +245,50 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         if (contextAgentResult.IsClarificationRequired)
         {
             var questions = BuildClarificationQuestionBullets(contextAgentResult.ClarificationQuestions);
-            return
-                $"I can't safely answer yet. I need clarification for this request." +
+            return $"I can't safely answer yet. I need clarification for this request." +
                 $"{Environment.NewLine}{Environment.NewLine}{questions}";
         }
 
         if (!contextAgentResult.AllowsProseResponse || string.IsNullOrWhiteSpace(finalPrompt))
         {
-            return BuildNonProseResponse(contextAgentResult, mode, prompt, projectName);
+            return BuildNonProseResponse(contextAgentResult, modeDecision.Mode, prompt, projectName);
         }
 
         try
         {
-            var modePrompt = InjectModeInstruction(finalPrompt, mode);
-            return (await _llm.GetResponseAsync(modePrompt, cancellationToken).ConfigureAwait(false)).Trim();
+            var compositionPrompt = BuildCompositionPrompt(finalPrompt, modeDecision);
+            return (await _llm.GetResponseAsync(compositionPrompt, cancellationToken).ConfigureAwait(false)).Trim();
         }
         catch (Exception ex)
         {
-            return BuildFallbackResponse(contextAgentResult, mode, prompt, projectName, ex);
+            return BuildFallbackResponse(contextAgentResult, modeDecision.Mode, prompt, projectName, ex);
         }
     }
 
-    private string InjectModeInstruction(string finalPrompt, ProjectConversationMode mode)
+    private string BuildCompositionPrompt(string finalPrompt, ChatModeDecision modeDecision)
     {
-        var instruction = mode switch
+        var modeInstruction = modeDecision.Mode switch
         {
-            ProjectConversationMode.Formalization => _formalizationInstructionText,
-            ProjectConversationMode.Exploration => _explorationInstructionText,
-            ProjectConversationMode.Confirmation => _explorationInstructionText,
+            ChatGovernanceMode.Formalization => _formalizationInstructionText,
+            ChatGovernanceMode.Confirmation =>
+                "You are in Confirmation Mode.\n\nAsk the user to confirm the intended lane or missing decision. Do not expose or suggest governance actions yet.",
             _ => _explorationInstructionText
         };
 
-        return $"{instruction}\n\n{finalPrompt}".Trim();
+        return $"""
+            Governance mode selected by classifier: {modeDecision.Mode}
+            Classifier reason: {modeDecision.Reason}
+            Classifier confidence: {modeDecision.Confidence:0.00}
+
+            Mode instructions:
+            {modeInstruction}
+
+            You are the response composer.
+            Use the selected mode. Do not reclassify the mode. Do not output JSON.
+
+            Context-built answer prompt:
+            {finalPrompt}
+            """.Trim();
     }
 
     private static string LoadInstruction(string fileName, string fallback)
@@ -298,7 +335,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
     private static string BuildNonProseResponse(
         ContextAgentResult contextAgentResult,
-        ProjectConversationMode mode,
+        ChatGovernanceMode mode,
         string prompt,
         string projectName)
     {
@@ -359,7 +396,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
     private static string BuildFallbackResponse(
         ContextAgentResult contextAgentResult,
-        ProjectConversationMode mode,
+        ChatGovernanceMode mode,
         string prompt,
         string projectName,
         Exception ex)
@@ -417,65 +454,22 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         return sb.ToString().TrimEnd();
     }
 
-    private ProjectChatResponseResult BuildFailureResult(
-        Project project,
-        ProjectConversationMode mode,
-        IReadOnlyList<ProjectTicket> tickets,
-        IReadOnlyList<ProjectDecision> decisions,
-        IReadOnlyList<ProjectContextDocument> documents,
-        IReadOnlyList<ProjectRule> rules,
-        IReadOnlyList<string> normalizedSignals,
-        string correlationId)
-    {
-        var contextSummary = BuildContextSummary(
-            project,
-            mode,
-            tickets,
-            decisions,
-            documents,
-            rules,
-            normalizedSignals,
-            string.Empty);
-
-        var modeLabel = ModeLabel(mode);
-        var failureResponse =
-            $"[{modeLabel}] Pipeline assembly failed before response model could be produced." +
-            $"{Environment.NewLine}{Environment.NewLine}" +
-            $"Correlation: {correlationId}" +
-            $"{Environment.NewLine}Route signals: {(normalizedSignals.Count == 0 ? \"none\" : string.Join(\" | \", normalizedSignals))}" +
-            $"{Environment.NewLine}Recovery action: retry request after transient dependency recovers or refine scope.";
-
-        return new ProjectChatResponseResult(
-            failureResponse,
-            contextSummary,
-            string.Join(Environment.NewLine, Array.Empty<string>()),
-            string.Join(Environment.NewLine, Array.Empty<string>()),
-            mode.ToString(),
-            false,
-            Array.Empty<string>(),
-            BuildReasoningTrace(new ContextAgentResult { WasSuccessful = false }, normalizedSignals, includeDetailedMetadata: false, mode, correlationId),
-            "Retry with fewer constraints or provide explicit intent.",
-            "Response pipeline was not able to run.",
-            correlationId);
-    }
-
-    private static string ModeLabel(ProjectConversationMode mode) =>
-        mode == ProjectConversationMode.Formalization
+    private static string ModeLabel(ChatGovernanceMode mode) =>
+        mode == ChatGovernanceMode.Formalization
             ? "Formalization"
-            : mode == ProjectConversationMode.Confirmation
+            : mode == ChatGovernanceMode.Confirmation
                 ? "Confirmation"
                 : "Exploration";
 
-    private static string BuildModeNextStepHint(ProjectConversationMode mode) =>
-        mode == ProjectConversationMode.Formalization
+    private static string BuildModeNextStepHint(ChatGovernanceMode mode) =>
+        mode == ChatGovernanceMode.Formalization
             ? "Next step options: 1) confirm lock-down phrasing, 2) stay in exploration and inspect alternatives, 3) reject command-level lane request."
             : "Next step options: 1) ask follow-up probes, 2) request explicit formalization, 3) provide constraints for a narrower scope.";
 
     private static List<string> BuildReasoningTrace(
         ContextAgentResult contextAgentResult,
         IReadOnlyList<string> routeSignals,
-        bool includeDetailedMetadata,
-        ProjectConversationMode mode,
+        ChatModeDecision modeDecision,
         string traceGroupId)
     {
         var grouped = contextAgentResult.TraceGroupId.Length > 0
@@ -485,6 +479,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
         if (!string.IsNullOrWhiteSpace(grouped))
             traceLines.Add($"Dogfood trace group: {grouped}");
+
+        traceLines.Add($"Mode classifier: {modeDecision.Mode} ({modeDecision.Confidence:0.00}) - {modeDecision.Reason}");
 
         if (!string.IsNullOrWhiteSpace(contextAgentResult.ContextSummary))
             traceLines.Add(contextAgentResult.ContextSummary);
@@ -497,24 +493,24 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         if (routeSignals.Count > 0)
             traceLines.AddRange(routeSignals.Select(signal => $"Route signal: {signal}"));
 
-        if (includeDetailedMetadata && routeSignals.Count == 0)
+        if (routeSignals.Count == 0)
             traceLines.Add("No explicit route signals were attached for this request.");
 
         if (traceLines.Count == 0)
-            traceLines.Add($"[{mode}] No trace payload captured yet; reasoning path is being assembled.");
+            traceLines.Add($"[{modeDecision.Mode}] No trace payload captured yet; reasoning path is being assembled.");
 
         return traceLines;
     }
 
     private static string BuildReasoningSummary(
         ContextAgentResult contextAgentResult,
-        ProjectConversationMode mode,
+        ChatGovernanceMode mode,
         IReadOnlyList<string> reasoningTrace)
     {
         var baseReason = mode switch
         {
-            ProjectConversationMode.Formalization => "Formalization lane selected; governance actions are available after lane is clear.",
-            ProjectConversationMode.Confirmation => "Lane confirmation required before exposing formalization actions.",
+            ChatGovernanceMode.Formalization => "Formalization lane selected; governance actions are available after lane is clear.",
+            ChatGovernanceMode.Confirmation => "Lane confirmation required before exposing formalization actions.",
             _ => "Exploration lane selected; governance actions stay suppressed."
         };
 
@@ -528,7 +524,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
     private static string BuildContextSummary(
         Project project,
-        ProjectConversationMode mode,
+        ChatGovernanceMode mode,
         IReadOnlyList<ProjectTicket> tickets,
         IReadOnlyList<ProjectDecision> decisions,
         IReadOnlyList<ProjectContextDocument> documents,
@@ -536,9 +532,9 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         IReadOnlyList<string> routeSignals,
         string contextResultSummary)
     {
-        var laneLabel = mode == ProjectConversationMode.Formalization
+        var laneLabel = mode == ChatGovernanceMode.Formalization
             ? "formalization"
-            : mode == ProjectConversationMode.Confirmation
+            : mode == ChatGovernanceMode.Confirmation
                 ? "confirmation"
                 : "exploration";
 
@@ -565,9 +561,4 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             .ToList();
     }
 
-    private static IReadOnlyList<string> DefaultFormalizationActions => new[]
-    {
-        "Save this response as a Discussion.",
-        "Create a Ticket from the saved Discussion."
-    };
 }

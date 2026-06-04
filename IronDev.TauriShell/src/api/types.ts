@@ -39,8 +39,10 @@ export type BuildReadinessResult = components['schemas']['BuildReadinessResult']
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
 export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'];
-export interface ChatCompletionResponse extends components['schemas']['ChatCompletionResponse'] {
+export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'] & {
   mode?: string | null;
+  modeConfidence?: number | null;
+  modeReason?: string | null;
   showGovernanceActions?: boolean | null;
   governanceActions?: string[] | null;
   reasoningTrace?: string[] | null;
@@ -48,7 +50,7 @@ export interface ChatCompletionResponse extends components['schemas']['ChatCompl
   reasoningSummary?: string | null;
   dogfoodTraceId?: string | null;
   dogfoodTracePath?: string | null;
-}
+};
 export type ProjectChatSession = components['schemas']['ProjectChatSession'];
 export type ChatMessage = components['schemas']['ChatMessage'];
 

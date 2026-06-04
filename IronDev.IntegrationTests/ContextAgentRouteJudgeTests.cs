@@ -63,6 +63,80 @@ public sealed class ContextAgentRouteJudgeTests
     }
 
     [TestMethod]
+    public async Task DecideRouteAsync_PersistsContextModeHint_FromJsonDecision()
+    {
+        // Arrange
+        var request = new ContextAgentRouteRequest
+        {
+            UserRequest = "should we use minimal API?",
+            ProjectId = 1,
+            SessionId = 123
+        };
+
+        _llm = new StubLlmService("""
+            {
+              "requestKind": "ArchitectureAdvice",
+              "confidence": 0.91,
+              "contextModeHint": "Formalization",
+              "effectiveWorkText": "Should we use minimal API for this endpoint set?",
+              "reason": "User asked for formalization-level architectural direction.",
+              "allowCodeSearch": false,
+              "allowDeepLookup": true,
+              "allowConflictAssessment": false,
+              "allowConflictBlocking": false,
+              "allowTicketCreation": false,
+              "relatedTicketsAreContextOnly": true,
+              "needsClarification": false
+            }
+            """);
+        _judge = new ContextAgentRouteJudgeService(_llm, new LlmTraceService());
+
+        // Act
+        var decision = await _judge.DecideRouteAsync(request);
+
+        // Assert
+        Assert.AreEqual("Formalization", decision.ContextModeHint);
+    }
+
+    [TestMethod]
+    public async Task DecideRouteAsync_DemotesCreateTicket_WhenNoExplicitFormalizationIntent()
+    {
+        // Arrange
+        var request = new ContextAgentRouteRequest
+        {
+            UserRequest = "add a ticket for auth work and save in backlog", 
+            ProjectId = 1,
+            SessionId = 123
+        };
+
+        _llm = new StubLlmService("""
+            {
+              "requestKind": "CreateTicket",
+              "confidence": 0.84,
+              "contextModeHint": "Formalization",
+              "effectiveWorkText": "add a ticket for auth work and save in backlog",
+              "reason": "Heuristic parser returned create-ticket intent.",
+              "allowCodeSearch": true,
+              "allowDeepLookup": true,
+              "allowConflictAssessment": true,
+              "allowConflictBlocking": true,
+              "allowTicketCreation": true,
+              "relatedTicketsAreContextOnly": false,
+              "needsClarification": false
+            }
+            """);
+        _judge = new ContextAgentRouteJudgeService(_llm, new LlmTraceService());
+
+        // Act
+        var decision = await _judge.DecideRouteAsync(request);
+
+        // Assert
+        Assert.AreEqual(ContextRequestKind.ChangeImplementation, decision.RequestKind);
+        Assert.AreEqual("Exploration", decision.ContextModeHint);
+        Assert.IsFalse(decision.AllowTicketCreation);
+    }
+
+    [TestMethod]
     public async Task DecideRouteAsync_ShortMessage_RequiresClarification_WhenContextMissing()
     {
         // Arrange

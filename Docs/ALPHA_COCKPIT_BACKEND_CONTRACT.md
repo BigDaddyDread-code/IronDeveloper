@@ -8,11 +8,16 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
 - Do not use global run identifiers as sufficient authorization or ownership proof.
 - Run proposals must be validated first: `CodeProposalValidator` must pass before any disposable run executes build/run commands.
 - Chat completion is mode-aware:
-  - `projectQuestion` defaults to inference-based `Exploration`, `Formalization`, or `Confirmation`.
-  - `projectQuestion` inference runs through `IContextAgentRouteJudge` and includes a route trace id for dogfood diagnostics.
+  - `projectQuestion` defaults to classifier-based `Exploration`, `Formalization`, or `Confirmation`.
+  - Context routing runs through `IContextAgentRouteJudge` and `IContextAgentService` for hints, evidence, and trace diagnostics only.
+  - `IChatModeClassifier` is the single authority for the final governance mode.
+  - `ProjectChatResponseService` composes the answer using the classifier-selected mode and must not let the composer reclassify the turn.
+  - `ChatGovernanceGate` derives UI permissions from the classifier decision.
   - `projectStateReview` remains explicit project-review behavior.
   - Backend returns full response metadata in `ChatCompletionResponse` for persisted reconstruction and UI replay:
     - `mode` (Exploration | Formalization | Confirmation)
+    - `modeConfidence`
+    - `modeReason`
     - `showGovernanceActions`
     - `reasoningTrace`
     - `reasoningSummary`
@@ -25,10 +30,13 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
   - `Exploration` may not return governance actions.
   - `Confirmation` requires explicit lane choice before exposing governance affordances.
   - `Formalization` may return governance affordances.
-  - `reasoningTrace`, `reasoningSummary`, `disambiguationQuestion`, and route signals must be present for inspectability.
+    - `reasoningTrace`, `reasoningSummary`, `disambiguationQuestion`, and route signals must be present for inspectability.
+  - `CreateTicket` or `CreateTicketsFromDiscussion` route hints without explicit formalization language must not trigger governance actions.
+  - Mode may be `Exploration`/`Formalization`/`Confirmation`; unknown mode values are treated as conservatively non-governance in clients.
 - Chat history persistence uses the `ChatMessage.Tags` column to store assistant metadata:
   - The shell stores assistant mode/reasoning metadata as a versioned JSON envelope in `Tags` (`{ "v": 1, ... }`).
-  - Replays must parse this envelope and reconstruct the same mode/affordance state; legacy non-JSON `tags` should be treated as opaque and not override explicit metadata.
+  - Replays must parse this envelope and reconstruct the same mode/affordance state through `chatGovernanceGate.ts`.
+  - Legacy non-JSON `tags` should be treated as opaque and must not infer mode.
 - A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;
