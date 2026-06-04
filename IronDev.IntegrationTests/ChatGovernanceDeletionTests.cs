@@ -26,21 +26,13 @@ public sealed class ChatGovernanceDeletionTests
             Path.Combine(root, "IronDev.Infrastructure", "Services", "LlmChatModeClassifier.cs"),
             "Context retrieval requires clarification before governance actions can be exposed.");
 
-        AssertFileDoesNotContain(
-            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
-            "monopoly");
+        Assert.IsFalse(
+            File.Exists(Path.Combine(root, "IronDev.Core", "Interfaces", "IChatClarificationMapper.cs")),
+            "IChatClarificationMapper must stay deleted. LlmChatClarificationClassifier owns clarification.");
 
-        AssertFileDoesNotContain(
-            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
-            "minesweeper");
-
-        AssertFileDoesNotContain(
-            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
-            "naughts");
-
-        AssertFileDoesNotContain(
-            Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs"),
-            "crosses");
+        Assert.IsFalse(
+            File.Exists(Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatClarificationMapper.cs")),
+            "ChatClarificationMapper must stay deleted. Slice 2 uses active clarification classification.");
 
         AssertFileDoesNotContain(
             Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseService.cs"),

@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using IronDev.Core.Auth;
+using IronDev.Core.Chat;
+using IronDev.Core.Interfaces;
 using IronDev.Data;
 using IronDev.Data.Models;
 
@@ -31,11 +33,16 @@ public sealed class ChatHistoryService : IChatHistoryService
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ICurrentTenantContext _tenant;
+    private readonly IChatTurnPersistenceService _turnPersistence;
 
-    public ChatHistoryService(IDbConnectionFactory connectionFactory, ICurrentTenantContext tenant)
+    public ChatHistoryService(
+        IDbConnectionFactory connectionFactory,
+        ICurrentTenantContext tenant,
+        IChatTurnPersistenceService turnPersistence)
     {
         _connectionFactory = connectionFactory;
         _tenant = tenant;
+        _turnPersistence = turnPersistence;
     }
 
     public async Task<IReadOnlyList<ProjectChatSession>> GetRecentSessionsAsync(int projectId, int take = 50, CancellationToken cancellationToken = default)
@@ -170,6 +177,41 @@ public sealed class ChatHistoryService : IChatHistoryService
     {
         using var connection = _connectionFactory.CreateConnection();
 
+        const string deleteTurnStateSql = """
+            IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NOT NULL
+            BEGIN
+                DELETE FROM dbo.ChatTurnTraces
+                WHERE ChatMessageId IN
+                (
+                    SELECT Id FROM dbo.ChatMessages
+                    WHERE ChatSessionId = @SessionId
+                      AND TenantId = @TenantId
+                );
+            END
+
+            IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL
+            BEGIN
+                DELETE FROM dbo.ChatTurnClarifications
+                WHERE ChatMessageId IN
+                (
+                    SELECT Id FROM dbo.ChatMessages
+                    WHERE ChatSessionId = @SessionId
+                      AND TenantId = @TenantId
+                );
+            END
+
+            IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NOT NULL
+            BEGIN
+                DELETE FROM dbo.ChatTurnGovernance
+                WHERE ChatMessageId IN
+                (
+                    SELECT Id FROM dbo.ChatMessages
+                    WHERE ChatSessionId = @SessionId
+                      AND TenantId = @TenantId
+                );
+            END
+            """;
+
         const string deleteMessagesSql = """
             DELETE FROM dbo.ChatMessages
             WHERE ChatSessionId = @SessionId
@@ -181,6 +223,11 @@ public sealed class ChatHistoryService : IChatHistoryService
             WHERE Id = @SessionId
               AND TenantId = @TenantId;
             """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            deleteTurnStateSql,
+            new { SessionId = sessionId, TenantId = _tenant.TenantId },
+            cancellationToken: cancellationToken));
 
         await connection.ExecuteAsync(new CommandDefinition(
             deleteMessagesSql,
@@ -250,6 +297,19 @@ public sealed class ChatHistoryService : IChatHistoryService
             updateSessionSql,
             new { message.ChatSessionId },
             cancellationToken: cancellationToken));
+
+        await _turnPersistence.PersistAsync(
+            new ChatTurnPersistenceRequest(
+                id,
+                _tenant.TenantId,
+                message.ProjectId,
+                message.ChatSessionId,
+                message.Role,
+                message.Tags,
+                message.ContextSummary,
+                message.LinkedFilePaths,
+                message.LinkedSymbols),
+            cancellationToken).ConfigureAwait(false);
 
         return id;
     }

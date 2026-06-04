@@ -18,7 +18,10 @@ public enum ChatClarificationKind
 {
     None,
     GeneralScope,
-    ProductScope
+    ProductScope,
+    MissingProjectContext,
+    GovernanceIntent,
+    SafetyOrRisk
 }
 
 public sealed record ChatClarificationState(
@@ -48,6 +51,14 @@ public sealed record ChatModeClassificationRequest(
     string? ProjectSummary,
     bool ContextRequiresClarification,
     ChatGovernanceMode? ExplicitMode);
+
+public sealed record ChatClarificationClassificationRequest(
+    string UserMessage,
+    string RecentConversationSummary,
+    ChatContextState ContextState,
+    ChatModeDecision ModeDecision,
+    string? ProjectSummary,
+    Models.ContextAgentRouteDecision RouteHint);
 
 public sealed record ChatGovernanceGate(
     ChatGovernanceMode Mode,
@@ -98,6 +109,30 @@ public sealed record ChatTurnEnvelope(
     ChatGovernanceGate Gate,
     string? RouteTraceId,
     string? DogfoodTraceId);
+
+public sealed record ChatTurnPersistenceRequest(
+    long ChatMessageId,
+    int TenantId,
+    int ProjectId,
+    long ChatSessionId,
+    string Role,
+    string? Tags,
+    string? ContextSummary,
+    string? LinkedFilePaths,
+    string? LinkedSymbols);
+
+public sealed record ChatTurnPersistenceSnapshot(
+    long ChatMessageId,
+    ChatGovernanceMode Mode,
+    double ModeConfidence,
+    string ModeReason,
+    ChatClarificationState Clarification,
+    ChatGovernanceGate Gate,
+    string? RouteTraceId,
+    string? DogfoodTraceId,
+    string? ContextSummary,
+    string? LinkedFilePaths,
+    string? LinkedSymbols);
 
 public sealed record ProjectChatResponseResult(
     string Response,

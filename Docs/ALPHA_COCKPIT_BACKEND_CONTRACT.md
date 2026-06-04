@@ -12,9 +12,10 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
   - The controller accepts only `projectQuestion` and `projectStateReview`; explicit governance modes are not API request kinds.
   - Context routing runs through `IContextAgentRouteJudge` and `IContextAgentService` for hints, evidence, and trace diagnostics only.
   - `LlmChatModeClassifier` is the single authority for the final governance mode.
-  - Slice 1 uses prompt-constrained classifier JSON with strict validation, not provider-enforced structured output.
+  - `LlmChatClarificationClassifier` is the single authority for clarification kind/questions.
+  - Mode and clarification use prompt-constrained classifier JSON with strict validation, not provider-enforced structured output.
   - Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001` tracks replacing brace-extracted JSON with provider-enforced JSON/schema output when `ILLMService` supports it.
-  - `ChatClarificationState` is passive evidence only and must not force `Confirmation`.
+  - Clarification is separate from governance mode and must not force `Confirmation`.
   - `ProjectChatResponseService` composes the answer using the classifier-selected mode and must not let the composer reclassify the turn.
   - `ChatGovernanceGate` is the single source for UI permissions.
   - `projectStateReview` remains explicit project-review behavior.
@@ -42,6 +43,10 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
   - The shell stores assistant mode, clarification, gate, and trace metadata as a versioned JSON envelope in `Tags` (`{ "v": 1, ... }`).
   - Replays must parse this envelope and reconstruct the same mode, clarification, and gate state without backend recompute.
   - Legacy non-JSON `tags` should be treated as opaque and must not infer mode.
+- Chat turn audit persistence is normalized:
+  - `ChatHistoryService.SaveMessageAsync` persists assistant envelope state into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
+  - These tables are the durable audit path for governance mode, clarification, gate, and trace pointers.
+  - `ChatMessage.Tags` remains a client replay bridge, not the permanent storage design.
 - A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;

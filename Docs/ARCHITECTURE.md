@@ -102,18 +102,21 @@ Chat completion must never assume governance intent. Mode authority is explicit 
 User message
   -> IContextAgentRouteJudge / IContextAgentService  (context hints only)
   -> LlmChatModeClassifier                          (only governance-mode authority)
-  -> passive ChatClarificationState mapper           (evidence only)
+  -> LlmChatClarificationClassifier                  (only clarification authority)
   -> ProjectChatResponseService composer             (answers using selected mode)
   -> ChatGovernanceGate                              (single source for UI permissions)
-  -> ChatTurnEnvelope / ChatMessage.Tags             (replay metadata)
+  -> ChatTurnEnvelope / ChatMessage.Tags             (client replay bridge)
+  -> ChatTurnGovernance / ChatTurnClarifications / ChatTurnTraces
+                                                        (durable audit storage)
 ```
 
 Hard rule: only `IChatModeClassifier` decides `Exploration`, `Formalization`, or `Confirmation`.
+Hard rule: only `IChatClarificationClassifier` decides `ChatClarificationState`.
 
 Allowed responsibilities:
 
 - `IContextAgentRouteJudge` may emit request kind, confidence, evidence, risk, and `ContextModeHint` as a route hint.
-- `IProjectChatResponseService` may validate classifier output by failing closed to `Confirmation`, compose the answer, and attach passive clarification evidence.
+- `IProjectChatResponseService` may validate mode classifier output by failing closed to `Confirmation`, run clarification classification, compose the answer, and attach clarification evidence.
 - `ChatGovernanceGate` is the single source for action visibility.
 - Tauri may render only from the backend gate payload and the local `chatGovernanceGate.ts` projection.
 - Replay may restore the persisted envelope.
@@ -123,8 +126,9 @@ Forbidden responsibilities:
 - `ChatController` must not infer, override, or translate route hints into governance mode.
 - `ChatController` must not accept explicit governance mode as a bypass around `LlmChatModeClassifier`.
 - Request kind values such as `CreateTicket`, `BuildTicket`, or `CreateTicketsFromDiscussion` must not become governance mode directly.
-- `ContextRequiresClarification` must not force `Confirmation`; clarification is passive evidence only.
+- `ContextRequiresClarification` must not force `Confirmation`; clarification is a separate classifier output.
 - The response composer must not return a different mode while answering.
+- The clarification classifier must not mutate the selected governance mode.
 - React components must not contain their own mode/action policy checks.
 - Legacy string tags such as `projectQuestion` must not be treated as replay mode authority.
 
@@ -135,10 +139,6 @@ Backend mode contract:
   - `Exploration` (default),
   - `Formalization` (explicit commitment language),
   - `Confirmation` (mixed or ambiguous intent).
-- Explicit modes supported by request:
-  - `exploration`
-  - `formalization`
-  - `confirmation`
 - Route inference must add hint trace signals for UI and diagnostics, including confidence,
   request kind, context resolver flags, evidence use, and risk summary.
 
@@ -159,12 +159,12 @@ Client-facing UX rules:
   - `reasoningSummary`
   - optional `disambiguationQuestion`
   - optional dogfood trace references.
-- Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode, clarification, and gate metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode`, `clarification`, and governance affordances from this envelope without backend recompute.
+- Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode, clarification, and gate metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode`, `clarification`, and governance affordances from this envelope without backend recompute. Backend persistence also normalizes saved assistant envelopes into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`; tags are a replay bridge, not the permanent audit design.
 
 Mode inference invariants:
 
 - The backend must drive mode from `IChatModeClassifier` only.
-- `ChatClarificationState` is not a classifier and must not mutate `ChatGovernanceMode`.
+- `IChatClarificationClassifier` owns `ChatClarificationState`; clarification must not mutate `ChatGovernanceMode`.
 - The context router is a scout. Its `ContextModeHint` value is a hint, not authority.
 - A `CreateTicket`/`CreateTicketsFromDiscussion` route hint without explicit lane-lock language must not trigger governance actions.
 - Missing mode is treated as unknown for reconstruction; UI must still behave in conservative exploration mode until explicit mode metadata is present.
