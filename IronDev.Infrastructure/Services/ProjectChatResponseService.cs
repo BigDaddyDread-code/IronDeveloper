@@ -16,7 +16,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     private readonly IContextAgentRouteJudge _routeJudge;
     private readonly IContextAgentService _contextAgent;
     private readonly IChatModeClassifier _modeClassifier;
-    private readonly IChatClarificationMapper _clarificationMapper;
+    private readonly IChatClarificationClassifier _clarificationClassifier;
     private readonly IChatPromptTemplateProvider _promptTemplates;
     private readonly ILLMService _llm;
     private readonly ILlmTraceService _traceService;
@@ -28,7 +28,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         IContextAgentRouteJudge routeJudge,
         IContextAgentService contextAgent,
         IChatModeClassifier modeClassifier,
-        IChatClarificationMapper clarificationMapper,
+        IChatClarificationClassifier clarificationClassifier,
         IChatPromptTemplateProvider promptTemplates,
         ILlmTraceService traceService,
         ILLMService llm)
@@ -39,7 +39,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         _routeJudge = routeJudge;
         _contextAgent = contextAgent;
         _modeClassifier = modeClassifier;
-        _clarificationMapper = clarificationMapper;
+        _clarificationClassifier = clarificationClassifier;
         _promptTemplates = promptTemplates;
         _traceService = traceService;
         _llm = llm;
@@ -94,12 +94,20 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
                 explicitMode),
             cancellationToken).ConfigureAwait(false);
 
-        var clarification = _clarificationMapper.Map(
-            new ChatContextState(
-                contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
-                contextAgentResult.ClarificationQuestions.Concat(routeDecision.ClarificationQuestions).ToList(),
-                contextAgentResult.ContextSummary),
-            normalizedPrompt);
+        var chatContextState = new ChatContextState(
+            contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
+            contextAgentResult.ClarificationQuestions.Concat(routeDecision.ClarificationQuestions).ToList(),
+            contextAgentResult.ContextSummary);
+
+        var clarification = await _clarificationClassifier.ClassifyAsync(
+            new ChatClarificationClassificationRequest(
+                normalizedPrompt,
+                recentSummary,
+                chatContextState,
+                modeDecision,
+                project.Name,
+                routeDecision),
+            cancellationToken).ConfigureAwait(false);
 
         var finalPrompt = contextAgentResult.FinalPrompt ?? string.Empty;
         var gate = ChatGovernanceGate.FromDecision(modeDecision);

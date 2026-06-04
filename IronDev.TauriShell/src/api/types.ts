@@ -39,7 +39,13 @@ export type BuildReadinessResult = components['schemas']['BuildReadinessResult']
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
 export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'];
-export type ChatClarificationKind = 'None' | 'GeneralScope' | 'ProductScope';
+export type ChatClarificationKind =
+  | 'None'
+  | 'GeneralScope'
+  | 'ProductScope'
+  | 'MissingProjectContext'
+  | 'GovernanceIntent'
+  | 'SafetyOrRisk';
 export interface ChatClarificationState {
   required: boolean;
   kind: ChatClarificationKind;

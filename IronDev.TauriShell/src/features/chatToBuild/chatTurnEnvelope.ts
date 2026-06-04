@@ -155,7 +155,13 @@ function parseGate(value: unknown): ChatModeGate | null {
 }
 
 function normalizeClarificationKind(value: string | null | undefined): ChatClarificationKind {
-  return value === 'ProductScope' || value === 'GeneralScope' ? value : 'None';
+  return value === 'ProductScope' ||
+    value === 'GeneralScope' ||
+    value === 'MissingProjectContext' ||
+    value === 'GovernanceIntent' ||
+    value === 'SafetyOrRisk'
+    ? value
+    : 'None';
 }
 
 function toNumber(value: unknown) {
