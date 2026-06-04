@@ -2,6 +2,7 @@ import type { ChatCompletionResponse } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { MetadataRow } from '../../components/MetadataRow';
 import { StatusBadge } from '../../components/StatusBadge';
+import { getChatModeGate } from './chatGovernanceGate';
 import { ChatSourceList } from './ChatSourceList';
 import { ChatSuggestedActions } from './ChatSuggestedActions';
 
@@ -20,6 +21,8 @@ export function ChatContextPanel({
   isCollapsed,
   onToggleCollapsed
 }: ChatContextPanelProps) {
+  const gate = getChatModeGate(latestResponse);
+
   if (isCollapsed) {
     return null;
   }
@@ -44,13 +47,13 @@ export function ChatContextPanel({
         <MetadataRow label="Project" value={projectLabel} />
         <MetadataRow label="Mode" value={
           <StatusBadge status={
-            latestResponse?.mode === 'Formalization'
+            gate.mode === 'Formalization'
               ? 'ready'
-              : latestResponse?.mode === 'Confirmation'
+              : gate.mode === 'Confirmation'
                 ? 'warning'
                 : 'neutral'
           }>
-            {latestResponse?.mode ?? 'Exploration'}
+            {gate.mode ?? 'Unknown'}
           </StatusBadge>
         } />
         <MetadataRow
@@ -61,6 +64,21 @@ export function ChatContextPanel({
             </StatusBadge>
           }
         />
+        {typeof gate.confidence === 'number' ? (
+          <MetadataRow
+            label="Mode confidence"
+            value={
+              <StatusBadge status={gate.confidence >= 0.75 ? 'ready' : 'warning'}>
+                {`${(gate.confidence * 100).toFixed(0)}%`}
+              </StatusBadge>
+            }
+          />
+        ) : null}
+        {gate.reason ? (
+          <p className="chat-context-panel__mode-reason">
+            <strong>Mode reason:</strong> {gate.reason}
+          </p>
+        ) : null}
         {latestResponse?.dogfoodTraceId ? (
           <MetadataRow
             label="Dogfood trace"
@@ -101,9 +119,7 @@ export function ChatContextPanel({
       <ChatSuggestedActions
         hasResponse={Boolean(latestResponse)}
         responseText={latestResponseText}
-        governanceActions={latestResponse?.governanceActions ?? []}
-        hasGovernanceActions={Boolean(latestResponse?.showGovernanceActions)}
-        mode={latestResponse?.mode ?? null}
+        gate={gate}
       />
     </aside>
   );

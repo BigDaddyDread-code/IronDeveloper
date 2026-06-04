@@ -1257,7 +1257,7 @@ test('chat workspace sends project-scoped messages and reviews project state', a
         role: 'assistant',
         projectId: 7,
         chatSessionId: 9007,
-        tags: 'projectQuestion',
+        tags: expect.stringContaining('"mode":"Exploration"'),
         contextSummary: 'TicketsProject: exploration lane using project context (tickets=1, decisions=1, documents=0, runs=1). No route signals in response.'
       })
     ])

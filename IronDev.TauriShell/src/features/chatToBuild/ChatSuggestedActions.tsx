@@ -1,33 +1,30 @@
 import { CommandButton } from '../../components/CommandButton';
+import type { ChatModeGate } from './chatGovernanceGate';
 
 interface ChatSuggestedActionsProps {
   hasResponse: boolean;
   responseText: string | null;
-  governanceActions: string[];
-  hasGovernanceActions: boolean;
-  mode: string | null;
+  gate: ChatModeGate;
 }
 
-export function ChatSuggestedActions({ hasResponse, responseText, governanceActions, hasGovernanceActions, mode }: ChatSuggestedActionsProps) {
-  const resolvedMode = mode ?? 'Exploration';
-  const isExplorationMode = resolvedMode === 'Exploration';
+export function ChatSuggestedActions({ hasResponse, responseText, gate }: ChatSuggestedActionsProps) {
+  const hasKnownMode = Boolean(gate.mode);
   const copyDisabledReason = !responseText ? 'No response to copy yet.' : undefined;
-  const canCopy = !isExplorationMode;
 
   return (
     <section className="chat-suggested-actions" data-testid="chat.suggestedActions">
       <div className="workflow-section__header">
         <h4>Actions</h4>
       </div>
-      {hasGovernanceActions && governanceActions.length > 0 ? (
+      {gate.showGovernanceActions && gate.governanceActions.length > 0 ? (
         <ul className="chat-suggested-actions__governance" data-testid="chat.actions.governance">
-          {governanceActions.map((action) => (
+          {gate.governanceActions.map((action) => (
             <li key={action}>{action}</li>
           ))}
         </ul>
       ) : null}
       <div className="chat-suggested-actions__grid">
-        {!isExplorationMode ? (
+        {gate.canCopyMarkdown ? (
           <CommandButton
             type="button"
             variant="secondary"
@@ -44,10 +41,12 @@ export function ChatSuggestedActions({ hasResponse, responseText, governanceActi
           </CommandButton>
         ) : null}
       </div>
-      {!canCopy && hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Exploration lane: reasoning is open. Ask for formalization when ready to lock intent.</p> : null}
-      {canCopy && hasResponse ? (
+      {!hasKnownMode && hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Mode is not explicitly set by the backend yet; governance actions are hidden until lane is explicit.</p> : null}
+      {gate.mode === 'Exploration' && hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Exploration lane: reasoning is open. Ask for formalization when ready to lock intent.</p> : null}
+      {gate.mode === 'Confirmation' && hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Confirmation lane: choose the intended path before governance actions appear.</p> : null}
+      {gate.showGovernanceActions && hasResponse ? (
         <p className="state-muted" data-testid="chat.actions.modeHint">
-          {hasGovernanceActions ? 'Formalization lane: governance actions are available.' : 'Mode is set to continuation or explicit handoff path.'}
+          Formalization lane: governance actions are available.
         </p>
       ) : null}
       {!hasResponse ? <p className="state-muted" data-testid="chat.actions.modeHint">Send a message to unlock response actions.</p> : null}

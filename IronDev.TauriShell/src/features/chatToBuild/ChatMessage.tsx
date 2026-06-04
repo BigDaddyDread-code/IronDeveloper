@@ -1,6 +1,7 @@
 import { DateTimeDisplay } from '../../utils/dateTimeDisplay';
 import { CommandButton } from '../../components/CommandButton';
 import { MarkdownRenderer } from '../../components/MarkdownRenderer';
+import { getChatModeGate } from './chatGovernanceGate';
 import type { ChatWorkspaceMessage } from './chatTypes';
 
 interface ChatMessageProps {
@@ -10,18 +11,19 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMessageProps) {
-  const mode = message.response?.mode;
-  const isFormalizationMode = mode === 'Formalization';
-  const isExplorationMode = mode === 'Exploration' || !mode;
-  const showGovernanceActions = Boolean(message.response?.showGovernanceActions);
+  const gate = getChatModeGate(message.response);
+  const mode = gate.mode;
   const hasSources = Boolean(
     message.response?.contextSummary ||
     message.response?.linkedFilePaths ||
     message.response?.linkedSymbols ||
     message.response?.traceId
   );
+  const canViewSources = gate.canViewSources && hasSources;
   const reasoningTrace = message.response?.reasoningTrace ?? [];
   const disambiguationQuestion = message.response?.disambiguationQuestion;
+  const modeConfidence = gate.confidence;
+  const modeReason = gate.reason;
 
   return (
     <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
@@ -31,6 +33,17 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
           <time dateTime={message.createdUtc}>{DateTimeDisplay.toLocalDisplay(message.createdUtc)}</time>
         </div>
       </header>
+      {mode ? (
+        <p className="chat-message__mode" data-testid="chat.message.mode">
+          <strong>Mode:</strong> {mode}
+          {typeof modeConfidence === 'number' ? ` (${Math.round(modeConfidence * 100)}%)` : null}
+        </p>
+      ) : null}
+      {modeReason ? (
+        <p className="chat-message__modeReason" data-testid="chat.message.modeReason">
+          <strong>Mode reason:</strong> {modeReason}
+        </p>
+      ) : null}
       <MarkdownRenderer markdown={message.content} testId={`chat.message.${message.role}.markdown`} />
       {disambiguationQuestion ? (
         <div className="chat-message__disambiguation" data-testid="chat.message.disambiguation">
@@ -54,7 +67,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
       ) : null}
       {message.role === 'assistant' ? (
         <div className="chat-message__actions" data-testid="chat.message.actions">
-          {!isExplorationMode ? (
+          {gate.canCopyMarkdown ? (
             <CommandButton
               type="button"
               variant="subtle"
@@ -64,7 +77,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
               Copy Markdown
             </CommandButton>
           ) : null}
-          {showGovernanceActions && onSaveDiscussion ? (
+          {gate.canSaveDiscussion && onSaveDiscussion ? (
             <CommandButton
               type="button"
               variant="secondary"
@@ -75,7 +88,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
               {message.discussionSaveStatus === 'saving' ? 'Saving Discussion' : 'Save Discussion'}
             </CommandButton>
           ) : null}
-          {isFormalizationMode && hasSources && onViewSources ? (
+          {canViewSources && onViewSources ? (
             <CommandButton
               type="button"
               variant="subtle"

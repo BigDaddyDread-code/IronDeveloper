@@ -139,7 +139,7 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
             UsedLlmJudge = usedLlmJudge,
             UsedFallbackRules = usedFallbackRules,
             UsedConversationContextResolver = usedConversationResolver,
-            ContextMode = decision.ContextMode
+            ContextModeHint = decision.ContextModeHint
         };
 
         decision = ApplySafetyValidation(decision, request.UserRequest, safetyOverrides);
@@ -180,7 +180,7 @@ public sealed class ContextAgentRouteJudgeService : IContextAgentRouteJudge
                 CurrentUserMessage = request.UserRequest,
                 RequestText = request.RecentConversationSummary,
                 RawResponseText = rawJson,
-                ParsedResponseSummary = $"Mode={decision.ContextMode} | Effective={decision.EffectiveWorkText}",
+                ParsedResponseSummary = $"ModeHint={decision.ContextModeHint} | Effective={decision.EffectiveWorkText}",
                 WasSuccessful = true
             };
             _traceService.AddTrace(tResolution);
@@ -243,7 +243,7 @@ Important rules:
 - Existing tickets and decisions are evidence, not automatic blockers.
 - If unsure, ask clarification.
 - Explicit lane-lock rule:
-  - Words like "make this a ticket", "save this as a discussion", "formalize", "handoff", "create work packet", and similar force Formalization.
+  - Words like ""make this a ticket"", ""save this as a discussion"", ""formalize"", ""handoff"", ""create work packet"", and similar force Formalization.
   - If explicit lane-lock language is missing, stay in Exploration and do not force lane handoff.
 - Do not answer the user.
 - Return valid JSON only.
@@ -255,7 +255,7 @@ Return this JSON shape:
   ""confidence"": 0.0,
   ""effectiveWorkText"": ""Expanded and resolved request text (e.g. 'industry standard' -> 'industry standard persistence for BookSeller')"",
   ""reason"": """",
-  ""contextMode"": ""Exploration|Formalization|ArchitectureAdvice|ArchitectureDecisionExploration|GeneralDiscussion"",
+  ""contextModeHint"": ""Exploration|Formalization|Confirmation"",
   ""allowCodeSearch"": true,
   ""allowDeepLookup"": true,
   ""allowConflictAssessment"": false,
@@ -307,6 +307,7 @@ Evidence Packet:
             RequestKind = decision.RequestKind,
             Confidence = decision.Confidence,
             Reason = decision.Reason ?? string.Empty,
+            ContextModeHint = decision.ContextModeHint,
             AllowCodeSearch = decision.AllowCodeSearch,
             AllowDeepLookup = decision.AllowDeepLookup,
             AllowConflictAssessment = decision.AllowConflictAssessment,
@@ -340,7 +341,7 @@ Evidence Packet:
             NeedsClarification = resolution.NeedsClarification,
             ClarificationQuestions = resolution.ClarificationQuestions,
             EvidenceUsed = resolution.EvidenceUsed,
-            ContextMode = resolution.ContextMode
+            ContextModeHint = resolution.ContextMode
         };
 
     private static string BuildResolutionTraceText(ConversationContextResolution resolution)
@@ -393,7 +394,7 @@ Evidence Packet:
                 AllowConflictBlocking   = true,
                 AllowTicketCreation     = true,
                 RelatedTicketsAreContextOnly = false,
-                ContextMode = "Formalization"
+                ContextModeHint = "Formalization"
             };
         }
 
@@ -412,7 +413,7 @@ Evidence Packet:
                 AllowConflictBlocking   = true,
                 AllowTicketCreation     = true,
                 RelatedTicketsAreContextOnly = false,
-                ContextMode = "Formalization"
+                ContextModeHint = "Formalization"
             };
         }
 
@@ -436,7 +437,7 @@ Evidence Packet:
                 AllowConflictBlocking   = false,
                 AllowTicketCreation     = false,
                 RelatedTicketsAreContextOnly = true,
-                ContextMode = "Exploration",
+                ContextModeHint = "Exploration",
                 DeepLookupTargets = IdentifyTargets(lower)
             };
         }
@@ -464,7 +465,7 @@ Evidence Packet:
                 AllowConflictBlocking   = true,
                 AllowTicketCreation     = false,
                 RelatedTicketsAreContextOnly = false,
-                ContextMode = effectiveMode
+                ContextModeHint = effectiveMode
             };
         }
 
@@ -481,7 +482,7 @@ Evidence Packet:
             AllowConflictBlocking   = false,
             AllowTicketCreation     = false,
             RelatedTicketsAreContextOnly = true,
-            ContextMode = "Exploration"
+            ContextModeHint = "Exploration"
         };
     }
 
@@ -584,7 +585,7 @@ Evidence Packet:
             UsedLlmJudge = decision.UsedLlmJudge,
             UsedFallbackRules = decision.UsedFallbackRules,
             UsedConversationContextResolver = decision.UsedConversationContextResolver,
-            ContextMode = decision.ContextMode
+            ContextModeHint = decision.ContextModeHint
         };
     }
 
@@ -593,26 +594,37 @@ Evidence Packet:
         string userRequest)
     {
         var lower = (userRequest ?? string.Empty).ToLowerInvariant().Trim();
+        var originalRequestKind = decision.RequestKind;
 
-        if (decision.RequestKind == ContextRequestKind.BuildTicket && !HasExplicitFormalizationIntent(lower, ContextRequestKind.BuildTicket))
+        if (DecisionRequiresExplicitLane(decision.RequestKind) && !HasExplicitFormalizationIntent(lower, decision.RequestKind))
         {
             decision.RequestKind = ContextRequestKind.ChangeImplementation;
-            decision.ContextMode = "Exploration";
+            decision.ContextModeHint = "Exploration";
             decision.Confidence = Math.Max(decision.Confidence, 0.72);
+            decision.AllowConflictAssessment = false;
+            decision.AllowConflictBlocking = false;
+            decision.AllowTicketCreation = false;
+            decision.RelatedTicketsAreContextOnly = true;
             decision.Reason = string.IsNullOrWhiteSpace(decision.Reason)
-                ? "Demoted BuildTicket: explicit lane-lock text missing."
-                : $"{decision.Reason} | Demoted BuildTicket: explicit lane-lock text missing.";
+                ? $"Demoted {originalRequestKind}: explicit lane-lock text missing."
+                : $"{decision.Reason} | Demoted {originalRequestKind}: explicit lane-lock text missing.";
         }
 
         if ((decision.RequestKind == ContextRequestKind.ChangeImplementation ||
              decision.RequestKind == ContextRequestKind.ReplaceArchitecture) &&
-            string.IsNullOrWhiteSpace(decision.ContextMode))
+            string.IsNullOrWhiteSpace(decision.ContextModeHint))
         {
-            decision.ContextMode = HasExplicitFormalizationIntent(lower, decision.RequestKind) ? "Formalization" : "Exploration";
+            decision.ContextModeHint = HasExplicitFormalizationIntent(lower, decision.RequestKind) ? "Formalization" : "Exploration";
         }
 
         return decision;
     }
+
+    private static bool DecisionRequiresExplicitLane(ContextRequestKind requestKind) =>
+        requestKind is
+            ContextRequestKind.BuildTicket or
+            ContextRequestKind.CreateTicket or
+            ContextRequestKind.CreateTicketsFromDiscussion;
 
     private static bool HasExplicitFormalizationIntent(string lower, ContextRequestKind kind)
     {
@@ -663,7 +675,7 @@ Evidence Packet:
 
     private static bool ContainsWord(string lower, string term)
     {
-        var token = term.AsSpan().Trim();
+        var token = term.Trim();
         if (token.Length == 0 || lower.Length == 0)
             return false;
 
@@ -714,11 +726,11 @@ Evidence Packet:
                 $"AllowConflictBlocking: {decision.AllowConflictBlocking}\n" +
                 $"AllowTicketCreation: {decision.AllowTicketCreation}\n" +
                 $"RelatedTicketsAreContextOnly: {decision.RelatedTicketsAreContextOnly}\n" +
-                $"ContextMode: {decision.ContextMode}\n" +
+                $"ContextModeHint: {decision.ContextModeHint}\n" +
                 $"UsedConversationContextResolver: {decision.UsedConversationContextResolver}\n" +
                 $"\nRaw JSON:\n{rawJson}\n\nOverrides:\n{string.Join("\n", decision.SafetyOverrides)}",
             ParsedResponseSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence} | Effective={decision.EffectiveWorkText}",
-            ContextSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence} | Mode={decision.ContextMode} | ConflictBlocking={decision.AllowConflictBlocking} | DeepLookup={decision.AllowDeepLookup} | UsedResolver={decision.UsedConversationContextResolver} | UsedLlmJudge={decision.UsedLlmJudge} | UsedFallbackRules={decision.UsedFallbackRules}",
+            ContextSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence} | ModeHint={decision.ContextModeHint} | ConflictBlocking={decision.AllowConflictBlocking} | DeepLookup={decision.AllowDeepLookup} | UsedResolver={decision.UsedConversationContextResolver} | UsedLlmJudge={decision.UsedLlmJudge} | UsedFallbackRules={decision.UsedFallbackRules}",
             WasSuccessful = true
         };
         _traceService.AddTrace(trace);
