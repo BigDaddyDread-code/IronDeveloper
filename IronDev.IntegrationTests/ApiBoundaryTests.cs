@@ -99,6 +99,99 @@ public sealed class ApiBoundaryTests
         }
     }
 
+    [TestMethod]
+    public void BackendSpineBoundaries_MustKeepStageOwnershipInChatDiscussionProposalBuildRunFlow()
+    {
+        var root = FindRepositoryRoot();
+
+        var architecture = File.ReadAllText(Path.Combine(root, "Docs", "ARCHITECTURE.md"));
+        var requiredMatrixTokens = new[]
+        {
+            "## Backend Spine Boundary Matrix",
+            "| Discussion |",
+            "| Chat |",
+            "| Proposal |",
+            "| Build |",
+            "| Run |"
+        };
+
+        foreach (var token in requiredMatrixTokens)
+        {
+            Assert.IsTrue(
+                architecture.Contains(token, StringComparison.Ordinal),
+                $"Architecture boundary matrix must include required section content: {token}");
+        }
+
+        var chatController = File.ReadAllText(Path.Combine(root, "IronDev.Api", "Controllers", "ChatController.cs"));
+        var discussionController = File.ReadAllText(
+            Path.Combine(root, "IronDev.Api", "Controllers", "DiscussionCodeLoopController.cs"));
+        var ticketsController = File.ReadAllText(
+            Path.Combine(root, "IronDev.Api", "Controllers", "TicketsController.cs"));
+
+        var chatForbidden = new[]
+        {
+            "ITicketBuildOrchestrator",
+            "ITicketBuildRunService",
+            "IBuilderProposalService",
+            "IDisposableCodeRunService",
+            "IRunReviewPackageService",
+            "IBuilderReadinessService"
+        };
+
+        foreach (var token in chatForbidden)
+        {
+            Assert.IsFalse(
+                chatController.Contains(token, StringComparison.Ordinal),
+                $"ChatController must not own build/proposal/run services directly. Found '{token}'.");
+        }
+
+        var discussionRequired = new[]
+        {
+            "IDiscussionDocumentService",
+            "ITicketFromDocumentService",
+            "ITicketReviewService",
+            "IDisposableCodeRunService",
+            "IRunReviewPackageService"
+        };
+
+        foreach (var token in discussionRequired)
+        {
+            Assert.IsTrue(
+                discussionController.Contains(token, StringComparison.Ordinal),
+                $"DiscussionCodeLoopController must include '{token}' for Discussion->Review->Run stage ownership.");
+        }
+
+        var discussionForbidden = new[]
+        {
+            "ITicketBuildOrchestrator",
+            "ITicketBuildRunService",
+            "IBuilderProposalService",
+            "IBuilderReadinessService"
+        };
+
+        foreach (var token in discussionForbidden)
+        {
+            Assert.IsFalse(
+                discussionController.Contains(token, StringComparison.Ordinal),
+                $"DiscussionCodeLoopController must not bypass the ticket/build seam. Found forbidden '{token}'.");
+        }
+
+        var ticketsRequired = new[]
+        {
+            "IBuilderProposalService",
+            "ITicketBuildOrchestrator",
+            "ITicketBuildRunService",
+            "ITicketRunReviewService"
+        };
+
+        foreach (var token in ticketsRequired)
+        {
+            Assert.IsTrue(
+                ticketsController.Contains(token, StringComparison.Ordinal),
+                $"TicketsController should own the proposal/build/run interfaces. Missing '{token}'.");
+        }
+    }
+
     private static void AssertProjectDoesNotReference(string root, string projectDirectory, string forbiddenReference)
     {
         var projectRoot = Path.Combine(root, projectDirectory);

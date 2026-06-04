@@ -11,6 +11,7 @@ import { ChatRoute } from '../features/chatToBuild/ChatRoute';
 import { HomeRoute } from '../features/home/HomeRoute';
 import { KnowledgeRoute } from '../features/knowledge/KnowledgeRoute';
 import { SettingsRoute } from '../features/settings/SettingsRoute';
+import { SignInRoute } from '../features/auth/SignInRoute';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceNav } from './WorkspaceNav';
 
@@ -40,6 +41,10 @@ export function IronDevShell() {
   }, [navigation]);
 
   const activeRoute = useMemo(() => routeForId(navigation.activeRouteId), [navigation.activeRouteId]);
+  const shouldShowSignIn =
+    activeRoute.id !== 'settings' &&
+    (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
+
   const routeWorkspace = useMemo(() => {
     switch (activeRoute.id) {
       case 'home':
@@ -59,6 +64,10 @@ export function IronDevShell() {
     }
   }, [activeRoute, onRouteReady]);
 
+  if (shouldShowSignIn) {
+    return <SignInRoute />;
+  }
+
   const projectStatus =
     project.projectSelectionMode === 'api'
       ? 'selected'
@@ -74,6 +83,7 @@ export function IronDevShell() {
         : 'Project required';
 
   const safeCommands = routeMeta.workspaceCommands ?? [];
+  const visibleRouteMeta = routeMeta;
 
   return (
     <AppShell
@@ -85,13 +95,13 @@ export function IronDevShell() {
           projectName={project.selectedProjectName}
           projectStatus={projectStatus}
           workspaceLabel={activeRoute.label}
-          workspaceSummaryChips={routeMeta.workspaceSummaryChips}
+          workspaceSummaryChips={visibleRouteMeta.workspaceSummaryChips}
           userDisplayName={project.userProfile?.displayName ?? null}
           tokenConfigured={session.tokenConfigured}
           tenantName={project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? null}
           commands={safeCommands}
-          blockedReason={routeMeta.workspaceBlockReason}
-          blockedReasonTestId={routeMeta.blockReasonTestId}
+          blockedReason={visibleRouteMeta.workspaceBlockReason}
+          blockedReasonTestId={visibleRouteMeta.blockReasonTestId}
           projectLabel={projectLabel}
         />
       }

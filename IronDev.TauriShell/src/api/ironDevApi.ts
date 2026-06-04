@@ -4,6 +4,7 @@ import type {
   BuildReadinessResult,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatMessage,
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
@@ -15,6 +16,7 @@ import type {
   LoginResponse,
   ProjectDocument,
   ProjectDocumentVersion,
+  ProjectChatSession,
   ProjectImplementationPlan,
   ProjectSummary,
   ProjectTicket,
@@ -23,6 +25,8 @@ import type {
   RunTicketReviewResponse,
   SaveDiscussionRequest,
   SaveDiscussionResponse,
+  SaveProjectChatMessageRequest,
+  SaveProjectChatSessionRequest,
   StartDisposableCodeRunRequest,
   StartDisposableCodeRunResponse,
   StartTicketBuildRunRequest,
@@ -406,6 +410,45 @@ class IronDevApiClient {
     return this.request<ChatCompletionResponse>(`/api/projects/${projectId}/chat/complete`, {
       method: 'POST',
       body: { ...request, projectId },
+      signal
+    });
+  }
+
+  async getProjectChatSessions(projectId: number, signal?: AbortSignal): Promise<ProjectChatSession[]> {
+    return this.request<ProjectChatSession[]>(`/api/projects/${projectId}/chat/sessions`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async saveProjectChatSession(
+    projectId: number,
+    request: SaveProjectChatSessionRequest,
+    signal?: AbortSignal
+  ): Promise<number> {
+    return this.request<number>(`/api/projects/${projectId}/chat/sessions`, {
+      method: 'POST',
+      body: { ...request, projectId },
+      signal
+    });
+  }
+
+  async getProjectChatMessages(projectId: number, sessionId: number, signal?: AbortSignal): Promise<ChatMessage[]> {
+    return this.request<ChatMessage[]>(`/api/projects/${projectId}/chat/sessions/${sessionId}/messages`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async saveProjectChatMessage(
+    projectId: number,
+    sessionId: number,
+    request: SaveProjectChatMessageRequest,
+    signal?: AbortSignal
+  ): Promise<number> {
+    return this.request<number>(`/api/projects/${projectId}/chat/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: { ...request, projectId, chatSessionId: sessionId },
       signal
     });
   }

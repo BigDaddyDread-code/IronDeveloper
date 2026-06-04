@@ -66,6 +66,64 @@ Do not put the CLI behind API endpoints. The API is the product boundary; the CL
 
 Forward clients must not reference or call `IronDev.Infrastructure` directly.
 
+## Backend Spine Boundary Matrix
+
+The backend workflow spine must stay explicit and reviewable:
+
+| Stage | Primary owner | Owned API contracts | Owned responsibilities | Forbidden coupling | Required handoff |
+|---|---|---|---|---|---|
+| Discussion | `DiscussionCodeLoopController` + `IDiscussionDocumentService` | `POST /api/projects/{projectId}/discussions`, `POST /api/projects/{projectId}/documents/{documentVersionId}/tickets` | Capture, normalize, and version discussion artifacts | Direct ticket execution, proposal generation, run execution, or workspace actions | `discussion -> document -> ticket` |
+| Chat | `ChatController` + `IProjectStateReviewService` | `POST /api/projects/{projectId}/chat/complete`, `GET /api/projects/{projectId}/chat/sessions/*` | User context review + memory trace composition only | Proposal/build/run APIs, ticket mutation, or workspace execution | `chat -> context summary only` |
+| Proposal | `TicketsController` + `IBuilderProposalService` | `POST /api/projects/{projectId}/proposal`, `POST /api/tickets/{ticketId}/proposal`, `POST /api/projects/{projectId}/proposal/validate-architecture` | Transform review outcome into a `BuilderProposal` and validate architecture constraints | Run control, workspace execution, or repository writes | `proposal -> build run request` |
+| Build | `TicketsController` + `ITicketBuildOrchestrator` + `ITicketBuildRunService` | `POST /api/projects/{projectId}/tickets/{ticketId}/build-preview`, `POST .../build-runs`, `GET .../build-runs*` | Build readiness, disposable run scheduling, and durable run state transitions | Proposal mutation, proposal-only editing, unapproved command/root overrides | `build -> run event stream` |
+| Run | `IDisposableCodeRunService` + `IRunReviewPackageService` + `RunReportsController` | `POST /api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs`, `GET .../build-runs/{runId}/review`, `GET .../review-package` | Execute backend-owned run profile, collect command/verification evidence, produce review package | Client-supplied workspace paths, stdout parsing as API authority, or real-repo mutation | `run -> review package (PausedForApproval)` |
+
+Allowed transitions (only):
+
+```text
+Discussion -> Document -> Ticket -> Review/Plan -> Proposal -> Build Run -> Evidence -> Review Package -> PausedForApproval
+Chat -> Context Summary (or Ticket via documented route only)
+```
+
+Disallowed transitions:
+
+- Chat directly calling proposal/build/run services
+- Discussion path calling CLI or dogfood services
+- Run profile, command list, timeout, or cleanup policy coming from client-supplied request data
+- Run outputs writing directly to the active repository or non-disposable workspace
+
+Any refactor touching one stage must update this matrix in this section before merge.
+
+## Chat Cockpit Modes
+
+Chat completion must never assume governance intent. Backend mode contract:
+
+- `projectStateReview`: project review text and state summary.
+- `projectQuestion` (default): prompt-inference mode, which can resolve to:
+  - `Exploration` (default),
+  - `Formalization` (explicit commitment language),
+  - `Confirmation` (mixed or ambiguous intent).
+- Explicit modes supported by request:
+  - `exploration`
+  - `formalization`
+  - `confirmation`
+
+Response envelope rules:
+
+- `Exploration`: no governance actions in UI, full reasoning trace/sum available.
+- `Formalization`: governance actions included (`showGovernanceActions`, `governanceActions`) and handoff path remains available.
+- `Confirmation`: asks for lane confirmation before enabling formalization actions.
+
+Client-facing UX rules:
+
+- `Copy Markdown` is always available for assistant responses.
+- `Save Discussion` / `View Sources` are only shown when response metadata says governance is active.
+- Reasoning visibility must remain honest and inspectable, including:
+  - `reasoningTrace` list
+  - `reasoningSummary`
+  - optional `disambiguationQuestion`
+  - optional dogfood trace references.
+
 ### Allowed UI responsibilities
 
 - View composition

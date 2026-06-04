@@ -30,18 +30,12 @@ export function ChatRoute({ route, onRouteReady }: ChatRouteProps) {
 
   return (
     <main className="chat-route-workspace" data-testid="chat.route" aria-label={route.label}>
-      <div className="workspace-page-heading">
-        <p className="eyebrow">Project conversation</p>
-        <h2>Chat</h2>
-        <p>Ask IronDev about the selected project, then inspect the context and sources used in the response.</p>
-      </div>
       <ChatWorkspace
         messages={chat.messages}
         composerValue={chat.draft}
         isSending={chat.isSending}
         disabledReason={chat.disabledReason}
         sendDisabledReason={chat.sendDisabledReason}
-        buildBridgeDisabledReason={chat.buildBridgeDisabledReason}
         errorMessage={chat.errorMessage}
         latestResponse={chat.latestResponse}
         latestResponseText={chat.latestResponseText}
@@ -49,7 +43,7 @@ export function ChatRoute({ route, onRouteReady }: ChatRouteProps) {
         onComposerChange={chat.setDraft}
         onSend={chat.sendMessage}
         onReviewProjectState={chat.reviewProjectState}
-        onContinueInBuild={chat.continueInBuild}
+        onSaveDiscussion={chat.saveDiscussionFromMessage}
       />
     </main>
   );

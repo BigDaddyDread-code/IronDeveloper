@@ -168,6 +168,21 @@ public sealed class EndpointContractTests : ApiTestBase
         var chatContext = chatBody.RootElement.GetProperty("contextSummary").GetString();
         Assert.IsTrue(chatContext?.Contains("ticket", StringComparison.OrdinalIgnoreCase) == true);
 
+        var freeformChat = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
+        {
+            projectId = project.Id,
+            sessionId = (long?)null,
+            prompt = "build me minesweeper",
+            activeModel = "test",
+            mode = "projectQuestion"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, freeformChat.StatusCode);
+        using var freeformBody = JsonDocument.Parse(await freeformChat.Content.ReadAsStringAsync());
+        var freeformResponse = freeformBody.RootElement.GetProperty("response").GetString();
+        Assert.IsTrue(freeformResponse?.Contains("Minesweeper", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.IsTrue(freeformResponse?.Contains("buildable work", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.IsFalse(freeformResponse!.Contains("Recent tickets", StringComparison.OrdinalIgnoreCase));
+
         var wrongProjectChat = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
         {
             projectId = project.Id + 999,

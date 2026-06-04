@@ -39,7 +39,37 @@ export type BuildReadinessResult = components['schemas']['BuildReadinessResult']
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
 export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'];
-export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'];
+export interface ChatCompletionResponse extends components['schemas']['ChatCompletionResponse'] {
+  mode?: string | null;
+  showGovernanceActions?: boolean | null;
+  governanceActions?: string[] | null;
+  reasoningTrace?: string[] | null;
+  disambiguationQuestion?: string | null;
+  reasoningSummary?: string | null;
+  dogfoodTraceId?: string | null;
+  dogfoodTracePath?: string | null;
+}
+export type ProjectChatSession = components['schemas']['ProjectChatSession'];
+export type ChatMessage = components['schemas']['ChatMessage'];
+
+export interface SaveProjectChatSessionRequest {
+  id?: number;
+  projectId: number;
+  title?: string;
+  summary?: string | null;
+}
+
+export interface SaveProjectChatMessageRequest {
+  projectId: number;
+  chatSessionId: number;
+  role: 'user' | 'assistant';
+  message: string;
+  tags?: string | null;
+  contextSummary?: string | null;
+  linkedFilePaths?: string | null;
+  linkedSymbols?: string | null;
+}
+
 export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
 export type TicketReadinessLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
 export type TicketCreateStatus = 'idle' | 'validating' | 'submitting' | 'success' | 'error';

@@ -54,6 +54,21 @@ Live model calls are opt-in per governed command. If the provider is unavailable
 - BuilderAgent may repair only inside the disposable workspace.
 - Human approval is still required before any future real repository apply path.
 
+## Workflow Boundary Governance (Discussion, Chat, Proposal, Build, Run)
+
+Every workflow refactor touching the self-improvement spine must be governed by a concrete ownership matrix in `Docs/ARCHITECTURE.md` and validated by tests.
+
+Mandatory checks before merge:
+
+- The stage matrix in `Docs/ARCHITECTURE.md` includes all five stages: Discussion, Chat, Proposal, Build, and Run.
+- Changes that alter stage ownership or contracts also update `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`.
+- API boundary tests include updated seam ownership checks in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
+- Proposal outputs that enter Run must be hard-failed by validation gates before any build, test, or command execution.
+  - `DisposableCodeRunService` must only transition a run from `Running` to `PausedForApproval` when `CodeProposalValidationResult.IsValid` is true.
+  - Invalid proposals must always persist `code-proposal.json`, `code-proposal-validation.json`, emit `CodeProposalRejected`, and transition to `Failed`.
+- Ticket/build/review packages continue to use project-scoped IDs only; no product workflow route accepts free-form workspace roots, command lists, or cleanup policy from clients.
+- Product CLI and Tauri client integration only use `IronDev.Client`; any scenario helpers remain labeled internal dogfood unless they map to the same product spine.
+
 ## Current Campaign
 
 IRONDEV-157 matures the control plane by:

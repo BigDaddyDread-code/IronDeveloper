@@ -130,4 +130,20 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
+  await page.route('**/irondev-api/api/projects/7/chat/sessions', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return;
+    }
+
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(9007) });
+  });
+  await page.route('**/irondev-api/api/projects/7/chat/sessions/*/messages', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return;
+    }
+
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(9107) });
+  });
 }

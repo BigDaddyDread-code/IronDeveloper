@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
-import { AuthRequiredState } from '../../components/AuthRequiredState';
 import { CommandButton } from '../../components/CommandButton';
 import { ProjectSelector } from '../../components/ProjectSelector';
 import { Surface } from '../../design-system/Surface';
@@ -18,8 +17,6 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
   const session = useSessionContext();
   const project = useProjectContext();
   const navigation = useWorkspaceNavigation();
-  const shouldShowAuthForm =
-    !session.tokenConfigured && (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
 
   const projectLabel = project.selectedProjectName ?? (project.selectedProjectId ? `Project ${project.selectedProjectId}` : 'Project required');
   const readinessLabel =
@@ -45,21 +42,10 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
     });
   }, [onRouteReady, routeSummary]);
 
-  const signIn = useCallback(async () => {
-    await session.signIn({ email: session.email.trim(), password: session.password });
-    await project.refreshProjectContext();
-  }, [project, session]);
-
   const projectActionBlockedReason = project.selectedProjectId ? null : 'Select a project before starting the primary flow.';
 
   return (
     <main className="product-workspace product-workspace--home" data-testid="home.workspace" aria-label={route.label}>
-      <section className="workspace-page-heading">
-        <p className="eyebrow">Project command centre</p>
-        <h2>Home</h2>
-        <p>Start here for the selected project, system readiness, and the next useful action.</p>
-      </section>
-
       <div className="product-grid product-grid--home">
         <Surface testId="home.projectSummary">
           <div className="section-heading">
@@ -74,40 +60,6 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               { label: 'Tenant', value: project.tenants.find((tenant) => tenant.id === project.selectedTenantId)?.name ?? 'Not selected' }
             ]}
           />
-          {shouldShowAuthForm ? (
-            <div className="home-auth-state" data-testid="home.authState">
-              <AuthRequiredState
-                apiStatus={session.apiStatus}
-                accessStatus={project.accessStatus}
-                authLabel={session.tokenConfigured ? 'Token rejected' : 'Missing token'}
-                tokenDraft={session.tokenDraft}
-                email={session.email}
-                password={session.password}
-                isConfigOpen={session.isTokenEditorOpen}
-                isLocalTestEnvironment={Boolean(session.environmentInfo?.isTestEnvironment)}
-                tenants={project.tenants}
-                projects={project.projects}
-                selectedTenantId={project.selectedTenantId}
-                selectedProjectId={project.selectedProjectId}
-                isBusy={session.isAuthBusy || project.isRefreshing}
-                errorMessage={session.errorMessage}
-                onConfigureToken={() => session.setTokenEditorOpen(!session.isTokenEditorOpen)}
-                onRetry={() => void project.refreshProjectContext()}
-                onTokenDraftChange={session.setTokenDraft}
-                onEmailChange={session.setEmail}
-                onPasswordChange={session.setPassword}
-                onSaveToken={() => {
-                  session.saveToken();
-                  if (session.tokenDraft.length === 0) {
-                    project.setProjectAccessStatus('authRequired');
-                  }
-                }}
-                onSignIn={() => void signIn()}
-                onSelectTenant={project.selectTenantContext}
-                onSelectProject={project.selectProjectContext}
-              />
-            </div>
-          ) : null}
           {!project.selectedProjectId && session.tokenConfigured ? (
             <div className="home-project-picker" data-testid="home.projectSelector">
               <div>

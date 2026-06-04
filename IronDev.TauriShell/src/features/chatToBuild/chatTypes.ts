@@ -1,7 +1,7 @@
 import type { ChatCompletionResponse } from '../../api/types';
 
 export type ChatMessageRole = 'user' | 'assistant';
-export type ChatSendMode = 'projectStateReview';
+export type ChatSendMode = 'projectQuestion' | 'projectStateReview';
 
 export interface ChatWorkspaceMessage {
   id: string;
@@ -10,6 +10,12 @@ export interface ChatWorkspaceMessage {
   createdUtc: string;
   canContinueInBuild?: boolean;
   response?: ChatCompletionResponse | null;
+  discussionSaveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  discussionSaveError?: string | null;
+  savedDiscussion?: {
+    documentId: number;
+    documentVersionId: number;
+  } | null;
 }
 
 export interface ChatSendRequest {

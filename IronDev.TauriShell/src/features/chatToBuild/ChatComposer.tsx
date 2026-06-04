@@ -5,11 +5,9 @@ interface ChatComposerProps {
   isSending: boolean;
   disabledReason: string | null;
   sendDisabledReason: string | null;
-  buildBridgeDisabledReason: string | null;
   onChange: (value: string) => void;
   onSend: () => void;
   onReviewProjectState: () => void;
-  onContinueInBuild: () => void;
 }
 
 export function ChatComposer({
@@ -17,11 +15,9 @@ export function ChatComposer({
   isSending,
   disabledReason,
   sendDisabledReason,
-  buildBridgeDisabledReason,
   onChange,
   onSend,
-  onReviewProjectState,
-  onContinueInBuild
+  onReviewProjectState
 }: ChatComposerProps) {
   const sendBlockedReason = sendDisabledReason ?? disabledReason;
 
@@ -41,16 +37,6 @@ export function ChatComposer({
           testId="chat.command.reviewProjectState"
         >
           Review Project State
-        </CommandButton>
-        <CommandButton
-          type="button"
-          variant="secondary"
-          onClick={onContinueInBuild}
-          disabled={Boolean(buildBridgeDisabledReason || isSending)}
-          title={buildBridgeDisabledReason ?? undefined}
-          testId="chat.command.continueInBuild"
-        >
-          Continue in Build
         </CommandButton>
       </div>
       <label className="chat-composer__field">

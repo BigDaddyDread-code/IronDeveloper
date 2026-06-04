@@ -13,7 +13,6 @@ interface ChatWorkspaceProps {
   isSending: boolean;
   disabledReason: string | null;
   sendDisabledReason: string | null;
-  buildBridgeDisabledReason: string | null;
   errorMessage: string | null;
   latestResponse: ChatCompletionResponse | null;
   latestResponseText: string | null;
@@ -21,7 +20,7 @@ interface ChatWorkspaceProps {
   onComposerChange: (value: string) => void;
   onSend: (request?: ChatSendRequest) => void;
   onReviewProjectState: () => void;
-  onContinueInBuild: () => void;
+  onSaveDiscussion: (messageId: string) => void;
 }
 
 export function ChatWorkspace({
@@ -30,7 +29,6 @@ export function ChatWorkspace({
   isSending,
   disabledReason,
   sendDisabledReason,
-  buildBridgeDisabledReason,
   errorMessage,
   latestResponse,
   latestResponseText,
@@ -38,7 +36,7 @@ export function ChatWorkspace({
   onComposerChange,
   onSend,
   onReviewProjectState,
-  onContinueInBuild
+  onSaveDiscussion
 }: ChatWorkspaceProps) {
   const [isContextOpen, setIsContextOpen] = useState(true);
 
@@ -46,7 +44,12 @@ export function ChatWorkspace({
     <Surface className="chat-workspace-panel" testId="chat.workspace">
       <div className={`chat-workspace-layout ${isContextOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
         <div className="chat-workspace-layout__thread">
-          <ChatThread messages={messages} isSending={isSending} />
+          <ChatThread
+            messages={messages}
+            isSending={isSending}
+            onSaveDiscussion={onSaveDiscussion}
+            onViewSources={() => setIsContextOpen(true)}
+          />
           {errorMessage ? <p className="state-error" data-testid="chat.error">{errorMessage}</p> : null}
           <ChatComposer
             value={composerValue}
@@ -56,8 +59,6 @@ export function ChatWorkspace({
             onChange={onComposerChange}
             onSend={() => onSend()}
             onReviewProjectState={onReviewProjectState}
-            onContinueInBuild={onContinueInBuild}
-            buildBridgeDisabledReason={buildBridgeDisabledReason}
           />
         </div>
         <ChatContextPanel

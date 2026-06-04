@@ -49,17 +49,52 @@ async function seedSelectedProject(page: import('@playwright/test').Page, projec
   }, projectId);
 }
 
+async function mockChatPersistence(page: import('@playwright/test').Page, projectId: number) {
+  const savedSessions: unknown[] = [];
+  const savedMessages: unknown[] = [];
+  let nextSessionId = 9000 + projectId;
+  let nextMessageId = 9100 + projectId;
+
+  await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return;
+    }
+
+    savedSessions.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nextSessionId) });
+  });
+
+  await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions/*/messages`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return;
+    }
+
+    savedMessages.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nextMessageId++) });
+  });
+
+  return {
+    savedSessions,
+    savedMessages,
+    get currentSessionId() {
+      return nextSessionId;
+    }
+  };
+}
+
 function isTicketListRoute(url: string) {
   return new URL(url).pathname === '/irondev-api/api/projects/7/tickets';
 }
 
-test('tickets shell exposes cockpit regions and auth state', async ({ page }) => {
+test('normal sign-in appears before the product workspace shell', async ({ page }) => {
   await mockHealthyApi(page);
   await page.goto('/');
 
-  await expect(page.getByTestId('app.shell')).toBeVisible();
-  await expect(page.getByTestId('app.header')).toBeVisible();
-  await expect(page.getByTestId('app.apiStatus')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
+  await expect(page.getByTestId('app.shell')).toHaveCount(0);
+  await expect(page.getByTestId('app.header')).toHaveCount(0);
   await expect(page.getByTestId('app.versionStrip')).toBeVisible();
   await expect(page.getByTestId('app.version.environment')).toContainText('LocalTest');
   await expect(page.getByTestId('app.version.ui')).toContainText('UI unknown');
@@ -67,28 +102,13 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.version.commit')).toContainText('commit unknown');
   await expect(page.getByTestId('app.version.api')).toContainText('API connected');
   await expect(page.getByTestId('app.version.apiHost')).toContainText('localhost:5000');
-  await expect(page.getByTestId('home.workspace')).toBeVisible();
   for (const route of ['home', 'chat', 'build', 'tickets', 'knowledge', 'runs', 'settings']) {
-    await expect(page.getByTestId(`shell.nav.${route}`)).toBeVisible();
+    await expect(page.getByTestId(`shell.nav.${route}`)).toHaveCount(0);
   }
   await expect(page.getByText('Chat to Build', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Run Reports', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Promotion Review', { exact: true })).toHaveCount(0);
-  await expect(page.getByTestId('shell.nav.tickets')).toBeVisible();
-  await openTickets(page);
-  await expect(page.getByTestId('tickets.workspace')).toBeVisible();
-  await expect(page.getByTestId('tickets.header')).toBeVisible();
-  await expect(page.getByTestId('ticket.list')).toBeVisible();
-  await expect(page.getByTestId('ticket.detail')).toBeVisible();
-  await expect(page.getByTestId('ticket.inspector')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeVisible();
-  await expect(page.getByTestId('environment.badge')).toContainText('LocalTest');
-  await expect(page.getByTestId('ticket.command.startDisposableRun')).toBeDisabled();
-  await expect(page.getByTestId('ticket.command.reviewLatestRun')).toBeDisabled();
-  await expect(page.getByTestId('ticket.command.create')).toBeVisible();
-  await expect(page.getByTestId('ticket.command.create')).toBeDisabled();
-  await expect(page.getByTestId('ticket.create.blockedReason')).toContainText('Sign in or configure a valid token');
+  await expect(page.getByTestId('tickets.workspace')).toHaveCount(0);
   await expect(page.getByTestId('app.authState')).toBeVisible();
   await expect(page.getByTestId('auth.form')).toBeVisible();
   await expect(page.getByTestId('auth.signIn')).toBeVisible();
@@ -105,10 +125,8 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
   await expect(page.getByTestId('app.authState.retry')).toBeVisible();
   await expect(page.getByTestId('api.status.authRequired')).toBeVisible();
   await expect(page.getByTestId('api.status.connected')).toBeVisible();
-  await expect(page.getByTestId('project.status.missing')).toBeVisible();
   expect(await page.getByTestId('project.status.selected').count()).toBe(0);
   expect(await page.getByTestId('project.status.fallback').count()).toBe(0);
-  await expect(page.getByTestId('ticket.inspector.evidence')).toContainText('Project required');
 
   await page.getByTestId('app.authState.configureToken').click();
   await expect(page.getByTestId('auth.tokenInput')).toBeVisible();
@@ -117,7 +135,7 @@ test('tickets shell exposes cockpit regions and auth state', async ({ page }) =>
 });
 
 test('settings shows UI build identity and API environment details', async ({ page }) => {
-  await mockHealthyApi(page);
+  await mockTicketProject(page);
 
   await page.goto('/');
   await page.getByTestId('shell.nav.settings').click();
@@ -181,6 +199,7 @@ test('LocalTest login uses the normal auth form and continues to project selecti
   await page.route('**/irondev-api/api/projects/8/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
   });
+  await mockChatPersistence(page, 8);
   await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
     await route.fulfill({
       status: 200,
@@ -246,7 +265,7 @@ test('LocalTest login uses the normal auth form and continues to project selecti
 
   await page.goto('/');
 
-  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toHaveText('LocalTest credentials are prefilled for this environment.');
   await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
@@ -312,7 +331,7 @@ test('LocalTest credentials are not exposed outside LocalTest', async ({ page })
 
   await page.goto('/');
 
-  await expect(page.getByTestId('home.authState')).toBeVisible();
+  await expect(page.getByTestId('auth.route')).toBeVisible();
   await expect(page.getByTestId('auth.localtestCredentials')).toHaveCount(0);
   await expect(page.getByTestId('auth.email')).toHaveValue('');
   await expect(page.getByTestId('auth.password')).toHaveValue('');
@@ -446,6 +465,7 @@ test('home project selector persists selection and unblocks project workspaces',
   await page.route('**/irondev-api/api/projects/8/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 8 }) });
   });
+  await mockChatPersistence(page, 8);
   await page.route('**/irondev-api/api/projects/8/chat/complete', async (route) => {
     await route.fulfill({
       status: 200,
@@ -1110,6 +1130,9 @@ test('ticket start disposable run links a real run review without enabling revie
 test('chat workspace sends project-scoped messages and reviews project state', async ({ page }) => {
   let lastPrompt = '';
   let lastMode = '';
+  let freeformPrompt = '';
+  let freeformMode = '';
+  let savedDiscussionBody: { title?: string; content?: string } = {};
   const markdownResponse = [
     '# Project state',
     '',
@@ -1125,22 +1148,74 @@ test('chat workspace sends project-scoped messages and reviews project state', a
     '',
     '<script>window.__irondevUnsafeMarkdown = true</script>'
   ].join('\n');
-  await mockTicketProject(page);
+  const chatPersistence = await mockTicketProject(page);
+  await page.route('**/irondev-api/api/projects/7/discussions', async (route) => {
+    savedDiscussionBody = route.request().postDataJSON() as { title?: string; content?: string };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ documentId: 222, documentVersionId: 333 })
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     const body = route.request().postDataJSON() as { prompt?: string; mode?: string };
     lastPrompt = body.prompt ?? '';
     lastMode = body.mode ?? '';
+    const isProjectStateReview = body.mode === 'projectStateReview';
+    const normalizedPrompt = (body.prompt ?? '').toLowerCase();
+    const isFormalizationPrompt = normalizedPrompt.includes('make this a ticket') || normalizedPrompt.includes('save this as');
+    const isFormalization = !isProjectStateReview && isFormalizationPrompt;
+    const responseText = isProjectStateReview
+      ? markdownResponse
+      : isFormalization
+        ? [
+            '## Formalization mode',
+            '',
+            `Objective draft: ${body.prompt}`,
+            '',
+            '### Handoff intent',
+            '- Keep scope to one verifiable behavior slice.',
+            '- Define acceptance criteria before start.',
+            '- Include verification intent, not only happy-path behavior.'
+          ].join('\n')
+        : [
+            '## Exploration mode',
+            '',
+            `You asked: ${body.prompt}`,
+            '',
+            '### Inferred options',
+            '- Option A: clarify scope and constraints first.',
+            '- Option B: compare implementation approaches.',
+            '- Option C: keep it lightweight and run only after a readiness gate.',
+            '',
+            '### Risks / assumptions surfaced',
+            '- Storage model and persistence assumptions are not selected yet.',
+            '- Testability strategy and failure expectations are not yet fixed.',
+            '- Build command profile is not selected until this is formalized.'
+          ].join('\n');
+    if (!isProjectStateReview) {
+      freeformPrompt = body.prompt ?? '';
+      freeformMode = body.mode ?? '';
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        response: lastPrompt.includes('recent tickets')
-          ? markdownResponse
-          : '## Tickets workspace\n\nUse the Tickets workspace to review `build readiness`.',
+        response: responseText,
+        mode: isFormalization ? 'Formalization' : 'Exploration',
+        showGovernanceActions: isFormalization,
+        governanceActions: isFormalization ? ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.'] : [],
         contextSummary: 'Context used: tickets, recent runs, and decisions.',
         linkedFilePaths: 'IronDev.TauriShell/src/features/tickets/TicketsWorkspace.tsx',
         linkedSymbols: 'TicketsWorkspace',
-        traceId: 909
+        traceId: isFormalization ? 1001 : 909,
+        reasoningTrace: isFormalization
+          ? ['Prompt classified as formalization.', 'Handoff actions have been exposed.']
+          : ['Prompt normalized and mode selected.', 'Project context loaded.', 'Exploration selected: open reasoning is returned.'],
+        reasoningSummary: isFormalization
+          ? 'Formalization selected; handoff actions are available. Trace entries: 2.'
+          : 'Exploration selected; reasoning stays open and no governance actions are auto-exposed. Trace entries: 3.',
+        disambiguationQuestion: null
       })
     });
   });
@@ -1159,17 +1234,48 @@ test('chat workspace sends project-scoped messages and reviews project state', a
   await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toHaveCount(0);
   await expect(page.getByTestId('chat.command.send')).toBeDisabled();
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await expect(page.getByTestId('chat.composer.disabledReason')).toContainText('Enter a message before sending.');
 
-  await page.getByTestId('chat.composer.input').fill('Where should I start?');
+  await page.getByTestId('chat.composer.input').fill('build me minesweeper');
   await expect(page.getByTestId('chat.command.send')).toBeEnabled();
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeEnabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.send').click();
-  await expect(page.getByTestId('chat.thread')).toContainText('Where should I start?');
-  await expect(page.getByTestId('chat.thread')).toContainText('Use the Tickets workspace to review build readiness.');
-  await expect(page.getByRole('heading', { name: 'Tickets workspace' })).toBeVisible();
+  await expect(page.getByTestId('chat.thread')).toContainText('build me minesweeper');
+  await expect(page.getByTestId('chat.thread')).toContainText('## Exploration mode');
+  await expect(page.getByTestId('chat.thread')).toContainText('Inferred options');
+  await expect(page.getByTestId('chat.thread')).not.toContainText('Recent tickets');
+  expect(freeformPrompt).toBe('build me minesweeper');
+  expect(freeformMode).toBe('projectQuestion');
+  expect(chatPersistence.savedSessions).toHaveLength(1);
+  expect(chatPersistence.savedMessages).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ role: 'user', message: 'build me minesweeper', projectId: 7, chatSessionId: 9007, tags: 'projectQuestion' }),
+      expect.objectContaining({
+        role: 'assistant',
+        projectId: 7,
+        chatSessionId: 9007,
+        tags: 'projectQuestion',
+        contextSummary: 'Context used: tickets, recent runs, and decisions.'
+      })
+    ])
+  );
+  await expect(page.getByRole('heading', { name: 'Exploration mode' })).toBeVisible();
   await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(0);
+  await expect(page.getByTestId('chat.message.reasoning')).toBeVisible();
+
+  await page.getByTestId('chat.composer.input').fill('make this a ticket: build me minesweeper');
+  await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await page.getByTestId('chat.command.send').click();
+  await expect(page.getByTestId('chat.thread')).toContainText('## Formalization mode');
+  await expect(page.getByTestId('chat.thread')).toContainText('Handoff intent');
+  await expect(page.getByRole('heading', { name: 'Formalization mode' })).toBeVisible();
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toBeVisible();
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toBeVisible();
+  await page.getByTestId('chat.message.saveDiscussion').click();
+  await expect(page.getByTestId('chat.message.savedDiscussion')).toContainText('Document 222');
+  expect(savedDiscussionBody.content).toContain('build me minesweeper');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: tickets, recent runs, and decisions.');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace.tsx');
   await expect(page.getByTestId('chat.sources')).toContainText('TicketsWorkspace');
@@ -1369,16 +1475,16 @@ test('primary usage flow moves from Home to Chat to Build review package', async
 
   await page.getByTestId('home.action.reviewProjectState').click();
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
   await page.getByTestId('chat.command.reviewProjectState').click();
   await expect(page.getByTestId('chat.thread')).toContainText('Project state: IronDeveloper');
   await expect(page.getByTestId('chat.contextPanel')).toContainText('Context used: project summary');
-  await expect(page.getByTestId('chat.command.continueInBuild')).toBeDisabled();
+  await expect(page.getByTestId('chat.command.continueInBuild')).toHaveCount(0);
 
-  await page.getByTestId('chat.composer.input').fill(buildDiscussionMarkdown);
-  await page.getByTestId('chat.command.continueInBuild').click();
+  await page.getByTestId('shell.nav.build').click();
   await expect(page.getByTestId('build.workspace')).toBeVisible();
   await expect(page.getByTestId('chat-build.stageRail')).toBeVisible();
+  await page.getByTestId('chat-build.discussion.content').fill(buildDiscussionMarkdown);
   await expect(page.getByTestId('chat-build.discussion.content')).toHaveValue(buildDiscussionMarkdown);
   await page.getByTestId('chat-build.command.saveDiscussion').click();
   await expect(page.getByTestId('chat-build.discussionDocument')).toContainText('222');
@@ -1426,6 +1532,7 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
+  const chatPersistence = await mockChatPersistence(page, 7);
   await page.route('**/irondev-api/api/projects/7/tickets/101/evidence-summary', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticketEvidenceSummaryNoLinkedRun) });
   });
@@ -1489,6 +1596,8 @@ async function mockTicketProject(page: import('@playwright/test').Page) {
       body: JSON.stringify([])
     });
   });
+
+  return chatPersistence;
 }
 
 async function mockRunReportWorkspace(

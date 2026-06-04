@@ -1,6 +1,6 @@
 # API/Client/CLI Boundary Findings
 
-Last reviewed: 2026-05-26
+Last reviewed: 2026-06-02
 
 ## Boundary Target
 
@@ -26,6 +26,8 @@ This branch started as an evidence slice and now includes boundary hardening. It
 - Product CLI commands call `IronDev.Api` through `IronDev.Client`/`IIronDevApiClient`, so current ticket persistence is API-backed rather than SQL/file/repository-backed.
 - `IronDev.TauriShell` uses generated OpenAPI TypeScript types and browser API helpers, not the C# `IronDev.Client`. That keeps it away from Infrastructure but means it is not literally on the same typed client library.
 - `IronDev.Client` includes product-shaped run status/report/event methods mapped to `/api/runs/*`, plus a ticket build-run starter. Ticket build workflows now publish SQL-backed live events; durable resumable workflow state is still missing.
+- Proposal-to-run execution is now explicitly validation-first: `CodeProposalValidator` runs before command execution and writes proposal/evidence artifacts before a run transition to `Failed` on rejection.
+- Chat completion now returns mode-scoped metadata (`mode`, `showGovernanceActions`, `reasoningTrace`, `reasoningSummary`) so the shell can render exploration vs formalization behavior without guessing intent.
 
 ## Leaking Or Missing
 
