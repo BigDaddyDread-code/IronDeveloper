@@ -350,6 +350,56 @@ public sealed class Slice1GovernanceBoundaryTests
     }
 
     [TestMethod]
+    public void Slice2_ClarificationStateCannotRevealGovernanceActions()
+    {
+        var clarification = new ChatClarificationState(
+            true,
+            ChatClarificationKind.GovernanceIntent,
+            ["Do you want to keep exploring, or turn this into a ticket?"],
+            "The user may need help choosing whether to commit.");
+
+        var contextState = new ChatContextState(
+            RequiresClarification: false,
+            ClarificationQuestions: Array.Empty<string>(),
+            ContextSummary: "The user is still exploring.",
+            CurrentUserMessage: "not sure yet, keep talking it through",
+            Origin: ChatContextStateOrigin.ProjectChatResponseCompiler,
+            ClassifiedClarification: clarification);
+
+        var decision = new ChatModeDecision(
+            ChatGovernanceMode.Exploration,
+            0.91,
+            "The user is still exploring and did not request a durable governance action.");
+
+        var gate = ChatGovernanceGate.FromDecision(decision);
+        var classified = contextState.ClassifiedClarification;
+
+        Assert.IsNotNull(classified);
+        Assert.IsTrue(classified.Required);
+        Assert.AreEqual(ChatClarificationKind.GovernanceIntent, classified.Kind);
+        Assert.IsFalse(gate.ShowGovernanceActions, "Clarification must not reveal governance actions when mode is Exploration.");
+        Assert.IsFalse(gate.CanSaveDiscussion);
+        Assert.IsFalse(gate.CanCreateTicket);
+        Assert.IsFalse(gate.CanViewSources);
+        Assert.IsFalse(gate.CanCopyMarkdown);
+        Assert.AreEqual(0, gate.GovernanceActions.Count);
+    }
+
+    [TestMethod]
+    public void Slice2_ModeClassifierDoesNotReferenceClassifiedClarification()
+    {
+        var root = FindRepoRoot();
+        var source = File.ReadAllText(Path.Combine(root, "IronDev.Infrastructure", "Services", "LlmChatModeClassifier.cs"));
+
+        Assert.IsFalse(
+            source.Contains("ClassifiedClarification", StringComparison.Ordinal),
+            "Mode classifier must not read classified clarification output.");
+        Assert.IsFalse(
+            source.Contains("ChatClarificationState", StringComparison.Ordinal),
+            "Mode classifier must not accept or inspect ChatClarificationState.");
+    }
+
+    [TestMethod]
     public async Task Slice1_09_OldAcceptedDecisionIsEvidenceNotAnAuthority()
     {
         var llm = new StubLlmService(
