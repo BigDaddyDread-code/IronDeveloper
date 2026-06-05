@@ -76,7 +76,7 @@ export interface ChatTurnAuditResponse {
   contextSummary?: string | null;
   linkedFilePaths?: string | null;
   linkedSymbols?: string | null;
-  hasFallbackEvidence: boolean;
+  isFallbackEvidence: boolean;
 }
 export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'] & {
   mode?: string | null;

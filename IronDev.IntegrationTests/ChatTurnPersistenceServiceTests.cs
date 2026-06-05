@@ -76,6 +76,31 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task SaveMessageAsync_UserEnvelopeDoesNotPersistNormalizedTurnRows()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "User tags test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "user",
+            Message = "Turn this into a ticket.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        Assert.IsNull(await turnPersistence.GetByMessageIdAsync(messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+    }
+
+    [TestMethod]
     public async Task GetByMessageAsync_RequiresProjectAndSessionScope()
     {
         var projectId = await SeedProjectAsync();
@@ -103,7 +128,41 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
-    public async Task GetByMessageAsync_ReturnsFallbackEvidenceFromClarificationReason()
+    public async Task GetByMessageAsync_RequiresTenantScope()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Tenant scoped audit read"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        Assert.IsNotNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+
+        TenantContext.TenantId = 2;
+        try
+        {
+            Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+        }
+        finally
+        {
+            TenantContext.TenantId = 1;
+        }
+    }
+
+    [TestMethod]
+    public async Task GetByMessageAsync_DoesNotInferFallbackEvidenceFromClarificationReason()
     {
         var projectId = await SeedProjectAsync();
         var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
@@ -128,6 +187,7 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
         Assert.IsNotNull(snapshot);
         Assert.AreEqual(ChatGovernanceMode.Confirmation, snapshot.Mode);
         StringAssert.Contains(snapshot.Clarification.Reason, "Fallback clarification evidence");
+        Assert.IsFalse(snapshot.IsFallbackEvidence);
     }
 
     [TestMethod]

@@ -1525,7 +1525,7 @@ test('chat workspace replays persisted governance envelope and ignores legacy ta
         contextSummary: 'Durable audit context summary.',
         linkedFilePaths: 'DurableFormalization.cs',
         linkedSymbols: 'DurableFormalization',
-        hasFallbackEvidence: false
+        isFallbackEvidence: false
       }
     }
   });

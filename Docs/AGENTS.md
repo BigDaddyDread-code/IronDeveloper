@@ -79,6 +79,9 @@ Mandatory checks before merge:
   - Chat audit read APIs must be project/session/message scoped and must not recompute mode, clarification, or gate during replay.
   - Runtime services must not create chat-turn audit tables. Use `Database/migrate_chat_turn_audit.sql` or the full setup scripts, and keep assistant message insert + session update + audit writes in one transaction.
   - Legacy string tags must not create normalized governance rows.
+  - UI replay may hydrate durable audit rows per assistant message only while bounded to the current history page. Follow-up `CHAT-AUDIT-BATCH-001` owns replacing that bridge with a session-scoped batch endpoint.
+  - Fallback evidence must be typed audit data. Follow-up `CHAT-AUDIT-FALLBACK-TYPED-001` owns durable fallback evidence persistence; services and UI must not infer it by scanning prose for words such as fallback.
+  - Audit labels belong in trace/inspection panels, not normal chat answer text.
 - API boundary tests include updated seam ownership checks in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
 - Proposal outputs that enter Run must be hard-failed by validation gates before any build, test, or command execution.
   - `DisposableCodeRunService` must only transition a run from `Running` to `PausedForApproval` when `CodeProposalValidationResult.IsValid` is true.

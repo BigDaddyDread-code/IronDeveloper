@@ -13,6 +13,8 @@ const projectReviewPrompt = [
   'Use grounded project context and call out missing context clearly.'
 ].join('\n');
 
+const chatAuditHydrationLimit = 50;
+
 export function useProjectChat() {
   const session = useSessionContext();
   const project = useProjectContext();
@@ -344,7 +346,7 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           auditFallbackReason: hasTagReplay
             ? 'Durable audit row was unavailable; restored from ChatMessage.Tags replay envelope.'
             : null,
-          auditHasFallbackEvidence: hasFallbackEvidence(metadata.modeReason, metadata.clarification?.reason)
+          auditHasFallbackEvidence: false
         }
       : null
   };
@@ -357,10 +359,20 @@ async function hydrateMessagesWithDurableAudit(
   mappedMessages: ChatWorkspaceMessage[],
   client: ReturnType<typeof useSessionContext>['client']
 ) {
+  // Slice 4 keeps replay hydration bounded to the current history page. The follow-up is
+  // CHAT-AUDIT-BATCH-001: replace this with one session-scoped batch audit endpoint.
+  const auditHydrationTargets = new Set(
+    mappedMessages
+      .map((message, index) => ({ message, index }))
+      .filter(({ message }) => message.role === 'assistant')
+      .slice(-chatAuditHydrationLimit)
+      .map(({ index }) => index)
+  );
+
   return Promise.all(
     mappedMessages.map(async (mappedMessage, index) => {
       const apiMessage = history[index];
-      if (mappedMessage.role !== 'assistant' || !apiMessage?.id) {
+      if (mappedMessage.role !== 'assistant' || !apiMessage?.id || !auditHydrationTargets.has(index)) {
         return mappedMessage;
       }
 
@@ -420,7 +432,7 @@ function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditRe
       reasoningSummary: `Durable audit replay restored ${mode ?? 'unknown'} mode, clarification, gate, and trace pointers without backend recompute.`,
       auditSource: 'durable',
       auditFallbackReason: null,
-      auditHasFallbackEvidence: audit.hasFallbackEvidence
+      auditHasFallbackEvidence: audit.isFallbackEvidence
     }
   };
 }
@@ -436,7 +448,7 @@ function buildDurableAuditTrace(audit: ChatTurnAuditResponse) {
     `Gate: save=${Boolean(audit.gate?.canSaveDiscussion)}; ticket=${Boolean(audit.gate?.canCreateTicket)}; sources=${Boolean(audit.gate?.canViewSources)}; copy=${Boolean(audit.gate?.canCopyMarkdown)}.`,
     audit.routeTraceId ? `Route trace id: ${audit.routeTraceId}` : 'Route trace id: none.',
     audit.dogfoodTraceId ? `Dogfood trace id: ${audit.dogfoodTraceId}` : 'Dogfood trace id: none.',
-    audit.hasFallbackEvidence ? 'Fallback evidence: present.' : 'Fallback evidence: none.'
+    audit.isFallbackEvidence ? 'Fallback evidence: present.' : 'Fallback evidence: none.'
   ];
 }
 
@@ -452,10 +464,6 @@ function hasAssistantTagReplayMetadata(metadata: ReturnType<typeof parseAssistan
     metadata.linkedFilePaths ||
     metadata.linkedSymbols
   );
-}
-
-function hasFallbackEvidence(...values: Array<string | null | undefined>) {
-  return values.some((value) => Boolean(value?.toLowerCase().includes('fallback')));
 }
 
 function createSessionTitle(prompt: string) {

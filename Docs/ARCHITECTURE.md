@@ -121,7 +121,7 @@ Allowed responsibilities:
 - `ProjectChatResponseComposer` owns LLM composition, mode instruction injection, non-prose fallback text, and natural exploration clarification responses. It may pass selected mode instructions into the model, but the prompt must forbid leaking classifier names, confidence, route hints, gates, or internal policy machinery to the user unless explicitly asked.
 - `ProjectChatResponseMetadataBuilder` owns context summaries, linked source projection, reasoning trace lines, reasoning summaries, and disambiguation text.
 - Clarification fallback must be conservative: preserve explicit context questions as `GeneralScope`, return `None` when no clarification evidence exists, and use `GovernanceIntent` only when the selected mode has already failed closed to `Confirmation`.
-- Clarification fallback must mark its reason as fallback evidence and must not mutate the selected governance mode or `ChatGovernanceGate`.
+- Clarification fallback must not mutate the selected governance mode or `ChatGovernanceGate`. Fallback-looking prose is trace text only; fallback evidence must be a typed audit field, not inferred by scanning `modeReason` or clarification reason text. Debt ticket `CHAT-AUDIT-FALLBACK-TYPED-001` tracks persisting a first-class fallback evidence column/source once fallback evidence becomes durable audit data.
 - `ChatGovernanceGate` is the single source for action visibility.
 - Tauri may render only from the backend gate payload and the local `chatGovernanceGate.ts` projection.
 - Replay may restore the persisted envelope.
@@ -169,6 +169,8 @@ Client-facing UX rules:
 - Chat turn audit reads are project/session/message scoped through the API and must not recompute mode, clarification, or gate on replay.
 - Chat turn audit tables are schema-owned, not runtime-created. `Database/migrate_chat_turn_audit.sql`, `Database/local_dev_setup.sql`, and `Database/rebuild_db.sql` own creation of `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`; `ChatTurnPersistenceService` assumes the schema exists and fails loudly if it does not.
 - `ChatHistoryService.SaveMessageAsync` owns the chat persistence transaction boundary. Assistant message insert, session timestamp update, and normalized audit writes commit or roll back together. Delete/reinsert audit refresh is allowed only inside that transaction.
+- Slice 4 UI replay may hydrate durable audit rows per assistant message only within the bounded current history page. Debt ticket `CHAT-AUDIT-BATCH-001` must replace this with `GET /api/projects/{projectId}/chat/sessions/{sessionId}/audit` before the replay surface expands beyond the current page.
+- Audit source and fallback labels belong in trace/inspection surfaces such as reasoning details and side panels. Normal chat body content must not be flooded with audit implementation labels.
 
 Mode inference invariants:
 

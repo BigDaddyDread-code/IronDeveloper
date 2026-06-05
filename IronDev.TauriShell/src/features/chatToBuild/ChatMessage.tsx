@@ -46,31 +46,33 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
           <strong>Mode reason:</strong> {modeReason}
         </p>
       ) : null}
-      {auditSourceLabel ? (
-        <p className="chat-message__auditSource" data-testid="chat.message.auditSource">
-          <strong>Audit source:</strong> {auditSourceLabel}
-          {message.response?.auditHasFallbackEvidence ? ' (fallback evidence present)' : null}
-        </p>
-      ) : null}
-      {message.response?.auditFallbackReason ? (
-        <p className="chat-message__auditFallback" data-testid="chat.message.auditFallback">
-          {message.response.auditFallbackReason}
-        </p>
-      ) : null}
       <MarkdownRenderer markdown={message.content} testId={`chat.message.${message.role}.markdown`} />
       {disambiguationQuestion ? (
         <div className="chat-message__disambiguation" data-testid="chat.message.disambiguation">
           <strong>Clarify:</strong> {disambiguationQuestion}
         </div>
       ) : null}
-      {reasoningTrace.length > 0 ? (
+      {reasoningTrace.length > 0 || auditSourceLabel || message.response?.auditFallbackReason ? (
         <details className="chat-message__reasoning" data-testid="chat.message.reasoning" open>
           <summary>Raw reasoning trace</summary>
-          <ul>
-            {reasoningTrace.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          {auditSourceLabel ? (
+            <p className="chat-message__auditSource" data-testid="chat.message.auditSource">
+              <strong>Audit source:</strong> {auditSourceLabel}
+              {message.response?.auditHasFallbackEvidence ? ' (fallback evidence present)' : null}
+            </p>
+          ) : null}
+          {message.response?.auditFallbackReason ? (
+            <p className="chat-message__auditFallback" data-testid="chat.message.auditFallback">
+              {message.response.auditFallbackReason}
+            </p>
+          ) : null}
+          {reasoningTrace.length > 0 ? (
+            <ul>
+              {reasoningTrace.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
         </details>
       ) : null}
       {message.response?.reasoningSummary ? (

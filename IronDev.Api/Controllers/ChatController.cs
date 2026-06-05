@@ -79,7 +79,7 @@ public sealed class ChatController : ControllerBase
 
         return Ok(new ChatTurnAuditResponse(
             snapshot.ChatMessageId,
-            "DurableAudit",
+            ChatAuditSource.DurableAudit,
             snapshot.Mode,
             snapshot.ModeConfidence,
             snapshot.ModeReason,
@@ -90,7 +90,7 @@ public sealed class ChatController : ControllerBase
             snapshot.ContextSummary,
             snapshot.LinkedFilePaths,
             snapshot.LinkedSymbols,
-            HasFallbackEvidence(snapshot)));
+            snapshot.IsFallbackEvidence));
     }
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
@@ -214,11 +214,4 @@ public sealed class ChatController : ControllerBase
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>
         _feedback.SaveFeedbackAsync(feedback, ct);
 
-    private static bool HasFallbackEvidence(ChatTurnPersistenceSnapshot snapshot) =>
-        ContainsFallback(snapshot.ModeReason) ||
-        ContainsFallback(snapshot.Clarification.Reason);
-
-    private static bool ContainsFallback(string? value) =>
-        !string.IsNullOrWhiteSpace(value) &&
-        value.Contains("fallback", StringComparison.OrdinalIgnoreCase);
 }
