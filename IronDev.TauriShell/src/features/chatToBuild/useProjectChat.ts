@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ChatCompletionResponse, ChatMessage } from '../../api/types';
+import type { ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
-import type { ChatResponseMode, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
+import { buildAssistantTagEnvelope, parseAssistantTagMetadata } from './chatTurnEnvelope';
+import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 const projectReviewPrompt = [
   'Review the current project state for this project.',
   'Include current project state, recent tickets, recent decisions, recent runs, risks or blockers, and recommended next actions.',
   'Use grounded project context and call out missing context clearly.'
 ].join('\n');
-const chatMessageTagVersion = 1;
+
+const chatAuditHydrationLimit = 50;
 
 export function useProjectChat() {
   const session = useSessionContext();
@@ -57,9 +59,17 @@ export function useProjectChat() {
         }
 
         const history = await session.client.getProjectChatMessages(projectId, latestSession.id);
+        const replayedMessages = history.map(mapApiMessage).filter(Boolean);
+        const hydratedMessages = await hydrateMessagesWithDurableAudit(
+          projectId,
+          latestSession.id,
+          history,
+          replayedMessages,
+          session.client
+        );
         if (!isCancelled) {
           setSessionId(latestSession.id);
-          setMessages(history.map(mapApiMessage).filter(Boolean));
+          setMessages(hydratedMessages);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -152,7 +162,8 @@ export function useProjectChat() {
         });
         const responseMode = coerceChatGovernanceMode(response.mode);
         const responseGate = getChatModeGate({ ...response, mode: responseMode });
-        const savedAssistantTags = buildAssistantTagEnvelope(response, responseMode);
+        const responseWithGate = { ...response, mode: responseMode, gate: responseGate };
+        const savedAssistantTags = buildAssistantTagEnvelope(responseWithGate, responseMode);
 
         const savedAssistantMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
           projectId,
@@ -175,13 +186,17 @@ export function useProjectChat() {
             mode: responseMode,
             modeConfidence: response.modeConfidence ?? null,
             modeReason: response.modeReason ?? null,
-            showGovernanceActions: responseGate.showGovernanceActions,
-            governanceActions: responseGate.governanceActions,
+            clarification: response.clarification ?? null,
+            gate: responseGate,
             reasoningTrace: response.reasoningTrace ?? [],
             disambiguationQuestion: response.disambiguationQuestion ?? null,
             reasoningSummary: response.reasoningSummary ?? null,
             dogfoodTraceId: response.dogfoodTraceId ?? null,
             dogfoodTracePath: response.dogfoodTracePath ?? null,
+            routeTraceId: response.routeTraceId ?? null,
+            auditSource: 'live',
+            auditFallbackReason: null,
+            auditHasFallbackEvidence: false,
             linkedFilePaths: response.linkedFilePaths ?? null,
             linkedSymbols: response.linkedSymbols ?? null,
             contextSummary: response.contextSummary ?? null,
@@ -301,6 +316,7 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
   const content = message.message?.trim() || '';
   const metadata = parseAssistantTagMetadata(message.tags);
   const responseMode = metadata.mode ?? null;
+  const hasTagReplay = hasAssistantTagReplayMetadata(metadata);
 
   return {
     id: `${role}-${message.id ?? `${message.chatSessionId ?? 'local'}-${Date.now()}`}`,
@@ -313,154 +329,141 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           response: content,
           modeConfidence: metadata.modeConfidence ?? null,
           modeReason: metadata.modeReason ?? null,
+          clarification: metadata.clarification ?? null,
+          gate: metadata.gate ?? null,
           contextSummary: metadata.contextSummary ?? message.contextSummary ?? null,
           linkedFilePaths: metadata.linkedFilePaths ?? message.linkedFilePaths ?? null,
           linkedSymbols: metadata.linkedSymbols ?? message.linkedSymbols ?? null,
           traceId: metadata.traceId ?? null,
           mode: responseMode,
-          showGovernanceActions: metadata.showGovernanceActions ?? false,
-          governanceActions: metadata.governanceActions ?? null,
           reasoningTrace: metadata.reasoningTrace ?? [],
           disambiguationQuestion: metadata.disambiguationQuestion ?? null,
           reasoningSummary: metadata.reasoningSummary ?? null,
           dogfoodTraceId: metadata.dogfoodTraceId ?? null,
-          dogfoodTracePath: metadata.dogfoodTracePath ?? null
+          dogfoodTracePath: metadata.dogfoodTracePath ?? null,
+          routeTraceId: null,
+          auditSource: hasTagReplay ? 'tags' : 'none',
+          auditFallbackReason: hasTagReplay
+            ? 'Durable audit row was unavailable; restored from ChatMessage.Tags replay envelope.'
+            : null,
+          auditHasFallbackEvidence: false
         }
       : null
   };
 }
 
-function buildAssistantTagEnvelope(response: ChatCompletionResponse, mode: ChatResponseMode | null) {
-  const gate = getChatModeGate({ ...response, mode });
+async function hydrateMessagesWithDurableAudit(
+  projectId: number,
+  sessionId: number,
+  history: ChatMessage[],
+  mappedMessages: ChatWorkspaceMessage[],
+  client: ReturnType<typeof useSessionContext>['client']
+) {
+  // Slice 4 keeps replay hydration bounded to the current history page. The follow-up is
+  // CHAT-AUDIT-BATCH-001: replace this with one session-scoped batch audit endpoint.
+  const auditHydrationTargets = new Set(
+    mappedMessages
+      .map((message, index) => ({ message, index }))
+      .filter(({ message }) => message.role === 'assistant')
+      .slice(-chatAuditHydrationLimit)
+      .map(({ index }) => index)
+  );
 
-  return JSON.stringify({
-    v: chatMessageTagVersion,
-    mode: gate.mode,
-    modeConfidence: gate.confidence,
-    modeReason: gate.reason,
-    showGovernanceActions: gate.showGovernanceActions,
-    governanceActions: gate.governanceActions,
-    reasoningTrace: response.reasoningTrace ?? [],
-    disambiguationQuestion: response.disambiguationQuestion,
-    reasoningSummary: response.reasoningSummary,
-    dogfoodTraceId: response.dogfoodTraceId,
-    dogfoodTracePath: response.dogfoodTracePath,
-    traceId: response.traceId,
-    contextSummary: response.contextSummary,
-    linkedFilePaths: response.linkedFilePaths,
-    linkedSymbols: response.linkedSymbols
+  return Promise.all(
+    mappedMessages.map(async (mappedMessage, index) => {
+      const apiMessage = history[index];
+      if (mappedMessage.role !== 'assistant' || !apiMessage?.id || !auditHydrationTargets.has(index)) {
+        return mappedMessage;
+      }
+
+      try {
+        const audit = await client.getProjectChatMessageAudit(projectId, sessionId, apiMessage.id);
+        return applyDurableAudit(mappedMessage, audit);
+      } catch (error) {
+        if (error instanceof IronDevApiError && error.status === 404) {
+          return mappedMessage;
+        }
+
+        return {
+          ...mappedMessage,
+          response: mappedMessage.response
+            ? {
+                ...mappedMessage.response,
+                auditFallbackReason: 'Durable audit lookup failed; showing replay metadata if available.'
+              }
+            : mappedMessage.response
+        };
+      }
+    })
+  );
+}
+
+function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditResponse): ChatWorkspaceMessage {
+  const mode = coerceChatGovernanceMode(audit.mode);
+  const gate = getChatModeGate({
+    mode,
+    modeConfidence: audit.modeConfidence,
+    modeReason: audit.modeReason,
+    gate: audit.gate
   });
-}
+  const disambiguationQuestion = audit.clarification?.required
+    ? audit.clarification.questions?.[0] ?? null
+    : null;
 
-function parseAssistantTagMetadata(rawTags: string | null | undefined) {
-  if (!rawTags) {
-    return {} as AssistantTagMetadata;
-  }
-
-  try {
-  const parsed = JSON.parse(rawTags) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {} as AssistantTagMetadata;
-    }
-
-    const record = parsed as Record<string, unknown>;
-    const version = toNumber(record.v);
-    if (version !== chatMessageTagVersion) {
-      return {} as AssistantTagMetadata;
-    }
-    const mode = coerceChatGovernanceMode(typeof record.mode === 'string' ? record.mode : undefined);
-    const modeConfidence = toNumber(record.modeConfidence);
-    const modeReason = typeof record.modeReason === 'string'
-      ? record.modeReason
-      : null;
-    const showGovernanceActions = typeof record.showGovernanceActions === 'boolean'
-      ? record.showGovernanceActions
-      : undefined;
-    const reasoningTrace = toStringList(record.reasoningTrace);
-    const governanceActions = toStringList(record.governanceActions);
-    const disambiguationQuestion = typeof record.disambiguationQuestion === 'string'
-      ? record.disambiguationQuestion
-      : null;
-    const reasoningSummary = typeof record.reasoningSummary === 'string'
-      ? record.reasoningSummary
-      : null;
-    const dogfoodTraceId = typeof record.dogfoodTraceId === 'string'
-      ? record.dogfoodTraceId
-      : null;
-    const dogfoodTracePath = typeof record.dogfoodTracePath === 'string'
-      ? record.dogfoodTracePath
-      : null;
-    const traceId = toNumber(record.traceId);
-    const contextSummary = typeof record.contextSummary === 'string'
-      ? record.contextSummary
-      : null;
-    const linkedFilePaths = typeof record.linkedFilePaths === 'string'
-      ? record.linkedFilePaths
-      : null;
-    const linkedSymbols = typeof record.linkedSymbols === 'string'
-      ? record.linkedSymbols
-      : null;
-
-    return {
+  return {
+    ...message,
+    response: {
+      ...(message.response ?? { response: message.content }),
+      response: message.content,
       mode,
-      modeConfidence,
-      modeReason,
-      showGovernanceActions,
-      reasoningTrace,
-      governanceActions,
+      modeConfidence: audit.modeConfidence,
+      modeReason: audit.modeReason,
+      clarification: audit.clarification,
+      gate,
+      contextSummary: audit.contextSummary ?? null,
+      linkedFilePaths: audit.linkedFilePaths ?? null,
+      linkedSymbols: audit.linkedSymbols ?? null,
+      dogfoodTraceId: audit.dogfoodTraceId ?? null,
+      dogfoodTracePath: null,
+      routeTraceId: audit.routeTraceId ?? null,
+      traceId: null,
+      reasoningTrace: buildDurableAuditTrace(audit),
       disambiguationQuestion,
-      reasoningSummary,
-      dogfoodTraceId,
-      dogfoodTracePath,
-      traceId,
-      contextSummary,
-      linkedFilePaths,
-      linkedSymbols
-    } as AssistantTagMetadata;
-  } catch {
-    return {} as AssistantTagMetadata;
-  }
+      reasoningSummary: `Durable audit replay restored ${mode ?? 'unknown'} mode, clarification, gate, and trace pointers without backend recompute.`,
+      auditSource: 'durable',
+      auditFallbackReason: null,
+      auditHasFallbackEvidence: audit.isFallbackEvidence
+    }
+  };
 }
 
-interface AssistantTagMetadata {
-  mode?: ChatResponseMode | null;
-  modeConfidence?: number | null;
-  modeReason?: string | null;
-  showGovernanceActions?: boolean;
-  governanceActions?: string[];
-  reasoningTrace?: string[];
-  disambiguationQuestion?: string | null;
-  reasoningSummary?: string | null;
-  dogfoodTraceId?: string | null;
-  dogfoodTracePath?: string | null;
-  traceId?: number | null;
-  contextSummary?: string | null;
-  linkedFilePaths?: string | null;
-  linkedSymbols?: string | null;
+function buildDurableAuditTrace(audit: ChatTurnAuditResponse) {
+  return [
+    `Durable audit source: ${audit.source}.`,
+    `Mode: ${audit.mode} (${Math.round(audit.modeConfidence * 100)}%).`,
+    `Mode reason: ${audit.modeReason}`,
+    audit.clarification?.required
+      ? `Clarification: ${audit.clarification.kind} - ${(audit.clarification.questions ?? []).join(' | ')}`
+      : 'Clarification: none required.',
+    `Gate: save=${Boolean(audit.gate?.canSaveDiscussion)}; ticket=${Boolean(audit.gate?.canCreateTicket)}; sources=${Boolean(audit.gate?.canViewSources)}; copy=${Boolean(audit.gate?.canCopyMarkdown)}.`,
+    audit.routeTraceId ? `Route trace id: ${audit.routeTraceId}` : 'Route trace id: none.',
+    audit.dogfoodTraceId ? `Dogfood trace id: ${audit.dogfoodTraceId}` : 'Dogfood trace id: none.',
+    audit.isFallbackEvidence ? 'Fallback evidence: present.' : 'Fallback evidence: none.'
+  ];
 }
 
-function toNumber(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-function toStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean);
+function hasAssistantTagReplayMetadata(metadata: ReturnType<typeof parseAssistantTagMetadata>) {
+  return Boolean(
+    metadata.mode ||
+    metadata.gate ||
+    metadata.modeReason ||
+    metadata.clarification ||
+    metadata.reasoningTrace?.length ||
+    metadata.reasoningSummary ||
+    metadata.contextSummary ||
+    metadata.linkedFilePaths ||
+    metadata.linkedSymbols
+  );
 }
 
 function createSessionTitle(prompt: string) {

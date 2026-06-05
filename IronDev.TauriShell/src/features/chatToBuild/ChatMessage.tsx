@@ -2,6 +2,7 @@ import { DateTimeDisplay } from '../../utils/dateTimeDisplay';
 import { CommandButton } from '../../components/CommandButton';
 import { MarkdownRenderer } from '../../components/MarkdownRenderer';
 import { getChatModeGate } from './chatGovernanceGate';
+import type { ChatAuditSource } from '../../api/types';
 import type { ChatWorkspaceMessage } from './chatTypes';
 
 interface ChatMessageProps {
@@ -24,6 +25,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
   const disambiguationQuestion = message.response?.disambiguationQuestion;
   const modeConfidence = gate.confidence;
   const modeReason = gate.reason;
+  const auditSourceLabel = formatAuditSource(message.response?.auditSource);
 
   return (
     <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
@@ -50,14 +52,27 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
           <strong>Clarify:</strong> {disambiguationQuestion}
         </div>
       ) : null}
-      {reasoningTrace.length > 0 ? (
+      {reasoningTrace.length > 0 || auditSourceLabel || message.response?.auditFallbackReason ? (
         <details className="chat-message__reasoning" data-testid="chat.message.reasoning" open>
           <summary>Raw reasoning trace</summary>
-          <ul>
-            {reasoningTrace.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          {auditSourceLabel ? (
+            <p className="chat-message__auditSource" data-testid="chat.message.auditSource">
+              <strong>Audit source:</strong> {auditSourceLabel}
+              {message.response?.auditHasFallbackEvidence ? ' (fallback evidence present)' : null}
+            </p>
+          ) : null}
+          {message.response?.auditFallbackReason ? (
+            <p className="chat-message__auditFallback" data-testid="chat.message.auditFallback">
+              {message.response.auditFallbackReason}
+            </p>
+          ) : null}
+          {reasoningTrace.length > 0 ? (
+            <ul>
+              {reasoningTrace.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
         </details>
       ) : null}
       {message.response?.reasoningSummary ? (
@@ -110,4 +125,24 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
       ) : null}
     </article>
   );
+}
+
+function formatAuditSource(source: ChatAuditSource | undefined) {
+  if (source === 'durable') {
+    return 'Durable audit';
+  }
+
+  if (source === 'tags') {
+    return 'Tags replay fallback';
+  }
+
+  if (source === 'live') {
+    return 'Live response';
+  }
+
+  if (source === 'none') {
+    return 'No audit metadata';
+  }
+
+  return null;
 }

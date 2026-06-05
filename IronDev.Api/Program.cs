@@ -1,6 +1,8 @@
 using System.Text;
+using IronDev.AI;
 using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
+using IronDev.Core.Chat;
 using IronDev.Core;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
@@ -46,6 +48,11 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
+builder.Host.UseDefaultServiceProvider(options =>
+{
+    options.ValidateScopes = true;
+    options.ValidateOnBuild = true;
+});
 
 var environmentInfo = CreateEnvironmentInfo(builder);
 ValidateEnvironmentSafety(environmentInfo);
@@ -71,9 +78,16 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
+builder.Services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
 builder.Services.AddScoped<IContextAgentRouteJudge, ContextAgentRouteJudgeService>();
 builder.Services.AddScoped<IContextAgentService, ContextAgentService>();
-builder.Services.AddScoped<IChatModeClassifier, ChatModeClassifierService>();
+builder.Services.AddScoped<IChatModeClassifier, LlmChatModeClassifier>();
+builder.Services.AddScoped<IChatClarificationClassifier, LlmChatClarificationClassifier>();
+builder.Services.AddScoped<IChatTurnPersistenceService, ChatTurnPersistenceService>();
+builder.Services.AddScoped<IChatPromptTemplateProvider, FileSystemChatPromptTemplateProvider>();
+builder.Services.AddScoped<ProjectChatContextPipeline>();
+builder.Services.AddScoped<ProjectChatResponseComposer>();
+builder.Services.AddSingleton<ProjectChatResponseMetadataBuilder>();
 builder.Services.AddScoped<IProjectChatResponseService, ProjectChatResponseService>();
 builder.Services.AddScoped<IProjectStateReviewService, ProjectStateReviewService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();

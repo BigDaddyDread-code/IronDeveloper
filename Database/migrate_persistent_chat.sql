@@ -42,7 +42,7 @@ CREATE TABLE dbo.ChatMessages
     ChatSessionId BIGINT NOT NULL,
     Role NVARCHAR(50) NOT NULL,
     Message NVARCHAR(MAX) NOT NULL,
-    Tags NVARCHAR(500) NULL,
+    Tags NVARCHAR(MAX) NULL,
     
     -- Grounded context metadata
     ContextSummary NVARCHAR(MAX) NULL,

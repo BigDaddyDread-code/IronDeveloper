@@ -66,11 +66,22 @@ Mandatory checks before merge:
   - `Docs/ARCHITECTURE.md` with explicit Exploration/Formalization/Confirmation rules.
   - `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md` with UI/back-end mode contract.
   - Decision log entries in `Docs/decisions/` when mode taxonomy or governance gates change.
-  - `IChatModeClassifier` remains the only governance-mode authority; route judges, controllers, response composers, replay code, and React components must not infer or override chat mode.
-  - `chatGovernanceGate.ts` remains the single Tauri rule for showing `Copy Markdown`, `Save Discussion`, `Create Ticket`, and `View Sources`.
-- Chat replay and persistence changes must also update the persisted `ChatMessage.Tags` schema:
-  - Persisted assistant responses must include a versioned envelope (`v:1`) with mode + reasoning + governance metadata.
-  - UI mapping code must read this envelope when restoring messages and must not infer modes from empty defaults.
+  - `LlmChatModeClassifier` remains the only governance-mode authority; route judges, controllers, response composers, replay code, and React components must not infer or override chat mode.
+  - `LlmChatClarificationClassifier` is the only clarification authority; clarification must not force or mutate `Confirmation`.
+  - `ChatGovernanceGate` remains the single rule for showing `Copy Markdown`, `Save Discussion`, `Create Ticket`, and `View Sources`.
+  - `ProjectChatResponseService` must remain a governance spine only. Context lookup belongs in `ProjectChatContextPipeline`, prose generation belongs in `ProjectChatResponseComposer`, and trace/context metadata belongs in `ProjectChatResponseMetadataBuilder`.
+  - `ProjectChatContextPipeline` must keep broad context-agent input separate from smaller response-summary context instead of hiding duplicate fetches.
+  - `ProjectChatResponseComposer` must not leak classifier names, confidence, route hints, gates, or internal governance machinery into the answer unless the user asks how the cockpit decided.
+- Chat replay and persistence changes must also update the persisted `ChatMessage.Tags` schema and normalized turn tables:
+  - Persisted assistant responses must include a versioned envelope (`v:1`) with mode + clarification + gate + trace metadata.
+  - UI mapping code must prefer durable audit rows when restoring messages, may read this envelope only as a labeled replay fallback, and must not infer modes from empty defaults.
+  - `ChatHistoryService.SaveMessageAsync` must normalize assistant envelopes into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
+  - Chat audit read APIs must be project/session/message scoped and must not recompute mode, clarification, or gate during replay.
+  - Runtime services must not create chat-turn audit tables. Use `Database/migrate_chat_turn_audit.sql` or the full setup scripts, and keep assistant message insert + session update + audit writes in one transaction.
+  - Legacy string tags must not create normalized governance rows.
+  - UI replay may hydrate durable audit rows per assistant message only while bounded to the current history page. Follow-up `CHAT-AUDIT-BATCH-001` owns replacing that bridge with a session-scoped batch endpoint.
+  - Fallback evidence must be typed audit data. Follow-up `CHAT-AUDIT-FALLBACK-TYPED-001` owns durable fallback evidence persistence; services and UI must not infer it by scanning prose for words such as fallback.
+  - Audit labels belong in trace/inspection panels, not normal chat answer text.
 - API boundary tests include updated seam ownership checks in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.
 - Proposal outputs that enter Run must be hard-failed by validation gates before any build, test, or command execution.
   - `DisposableCodeRunService` must only transition a run from `Running` to `PausedForApproval` when `CodeProposalValidationResult.IsValid` is true.

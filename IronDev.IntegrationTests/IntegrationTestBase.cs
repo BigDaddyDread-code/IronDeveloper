@@ -59,6 +59,7 @@ public abstract class IntegrationTestBase
         services.AddSingleton<ICurrentTenantContext>(TenantContext);
 
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<IChatTurnPersistenceService, ChatTurnPersistenceService>();
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
         services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
         services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
@@ -77,6 +78,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
         services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
         services.AddScoped<ICodeChangeProposalService, CodeChangeProposalService>();
+        services.AddScoped<IChatClarificationClassifier, LlmChatClarificationClassifier>();
         services.AddScoped<IDotNetBuildService, DotNetRunnerService>();
         services.AddScoped<IDotNetTestService, DotNetRunnerService>();
         services.AddScoped<ILLMService, FakeLlmService>();
@@ -177,7 +179,66 @@ public abstract class IntegrationTestBase
                 );
             END
 
+            IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatTurnGovernance
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NOT NULL,
+                    ChatMessageId BIGINT NOT NULL,
+                    Mode NVARCHAR(50) NOT NULL,
+                    ModeConfidence FLOAT NOT NULL,
+                    ModeReason NVARCHAR(MAX) NOT NULL,
+                    GateJson NVARCHAR(MAX) NOT NULL,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME()
+                );
+                CREATE UNIQUE INDEX UX_ChatTurnGovernance_MessageTenant ON dbo.ChatTurnGovernance(ChatMessageId, TenantId);
+            END
+
+            IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatTurnClarifications
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NOT NULL,
+                    ChatMessageId BIGINT NOT NULL,
+                    Required BIT NOT NULL,
+                    Kind NVARCHAR(100) NOT NULL,
+                    Reason NVARCHAR(MAX) NULL,
+                    QuestionsJson NVARCHAR(MAX) NOT NULL,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnClarifications_CreatedUtc DEFAULT SYSUTCDATETIME()
+                );
+                CREATE UNIQUE INDEX UX_ChatTurnClarifications_MessageTenant ON dbo.ChatTurnClarifications(ChatMessageId, TenantId);
+            END
+
+            IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ChatTurnTraces
+                (
+                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    TenantId INT NOT NULL,
+                    ProjectId INT NOT NULL,
+                    ChatSessionId BIGINT NOT NULL,
+                    ChatMessageId BIGINT NOT NULL,
+                    RouteTraceId NVARCHAR(200) NULL,
+                    DogfoodTraceId NVARCHAR(200) NULL,
+                    ContextSummary NVARCHAR(MAX) NULL,
+                    LinkedFilePaths NVARCHAR(MAX) NULL,
+                    LinkedSymbols NVARCHAR(MAX) NULL,
+                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnTraces_CreatedUtc DEFAULT SYSUTCDATETIME()
+                );
+                CREATE UNIQUE INDEX UX_ChatTurnTraces_MessageTenant ON dbo.ChatTurnTraces(ChatMessageId, TenantId);
+            END
+
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
+            IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnTraces;
+            IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnClarifications;
+            IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnGovernance;
+            DELETE FROM dbo.ChatMessages;
             IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
             IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
             IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
@@ -188,7 +249,9 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
             IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DELETE FROM dbo.ProjectRules;
-            DELETE FROM dbo.ChatMessages;
+            IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
+            IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
             DELETE FROM dbo.ProjectDecisions;
             DELETE FROM dbo.ProjectFiles;
             DELETE FROM dbo.ProjectTickets;

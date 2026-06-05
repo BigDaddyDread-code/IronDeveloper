@@ -1,6 +1,6 @@
-# Alpha Cockpit Backend Contract
+# Cockpit Backend Contract
 
-IronDev's alpha cockpit API is project-scoped by default. Any endpoint that returns ticket work, run evidence, memory, documents, or decisions must prove the route project owns the returned object.
+IronDev's cockpit API is project-scoped by default. Any endpoint that returns ticket work, run evidence, memory, documents, or decisions must prove the route project owns the returned object.
 
 ## Contract Rules
 
@@ -9,16 +9,24 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
 - Run proposals must be validated first: `CodeProposalValidator` must pass before any disposable run executes build/run commands.
 - Chat completion is mode-aware:
   - `projectQuestion` defaults to classifier-based `Exploration`, `Formalization`, or `Confirmation`.
+  - The controller accepts only `projectQuestion` and `projectStateReview`; explicit governance modes are not API request kinds.
   - Context routing runs through `IContextAgentRouteJudge` and `IContextAgentService` for hints, evidence, and trace diagnostics only.
-  - `IChatModeClassifier` is the single authority for the final governance mode.
-  - `ProjectChatResponseService` composes the answer using the classifier-selected mode and must not let the composer reclassify the turn.
-  - `ChatGovernanceGate` derives UI permissions from the classifier decision.
+  - `LlmChatModeClassifier` is the single authority for the final governance mode.
+  - `LlmChatClarificationClassifier` is the single authority for clarification kind/questions.
+  - Mode and clarification use prompt-constrained classifier JSON with strict validation, not provider-enforced structured output.
+  - Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001` tracks replacing brace-extracted JSON with provider-enforced JSON/schema output when `ILLMService` supports it.
+  - Clarification is separate from governance mode and must not force `Confirmation`.
+  - `ProjectChatResponseService` is the orchestration spine only: context lookup/routing lives in `ProjectChatContextPipeline`, answer text lives in `ProjectChatResponseComposer`, and trace/context projection lives in `ProjectChatResponseMetadataBuilder`.
+  - `ProjectChatContextPipeline` keeps the broad context-agent slice separate from the smaller response-summary slice; duplicate context fetches should not hide inside collaborator methods.
+  - `ProjectChatResponseComposer` composes the answer using the classifier-selected mode and must not reclassify the turn or leak internal governance/classifier details into user-facing prose unless explicitly asked.
+  - `ChatGovernanceGate` is the single source for UI permissions.
   - `projectStateReview` remains explicit project-review behavior.
   - Backend returns full response metadata in `ChatCompletionResponse` for persisted reconstruction and UI replay:
     - `mode` (Exploration | Formalization | Confirmation)
     - `modeConfidence`
     - `modeReason`
-    - `showGovernanceActions`
+    - `clarification`
+    - `gate`
     - `reasoningTrace`
     - `reasoningSummary`
     - `disambiguationQuestion`
@@ -34,9 +42,21 @@ IronDev's alpha cockpit API is project-scoped by default. Any endpoint that retu
   - `CreateTicket` or `CreateTicketsFromDiscussion` route hints without explicit formalization language must not trigger governance actions.
   - Mode may be `Exploration`/`Formalization`/`Confirmation`; unknown mode values are treated as conservatively non-governance in clients.
 - Chat history persistence uses the `ChatMessage.Tags` column to store assistant metadata:
-  - The shell stores assistant mode/reasoning metadata as a versioned JSON envelope in `Tags` (`{ "v": 1, ... }`).
-  - Replays must parse this envelope and reconstruct the same mode/affordance state through `chatGovernanceGate.ts`.
+  - The shell stores assistant mode, clarification, gate, and trace metadata as a versioned JSON envelope in `Tags` (`{ "v": 1, ... }`).
+  - Replays may parse this envelope only as a labeled fallback when durable audit rows are unavailable.
   - Legacy non-JSON `tags` should be treated as opaque and must not infer mode.
+- Chat turn audit persistence is normalized:
+  - `ChatHistoryService.SaveMessageAsync` persists assistant envelope state into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
+  - These tables are the durable audit path for governance mode, clarification, gate, and trace pointers.
+  - `GET /api/projects/{projectId}/chat/sessions/{sessionId}/messages/{messageId}/audit` returns the durable audit snapshot for a specific chat turn and proves tenant/project/session/message scope.
+  - UI trace/sidebar surfaces must prefer this durable audit endpoint and clearly label `ChatMessage.Tags` as replay fallback when used.
+  - Audit tables are created by `Database/migrate_chat_turn_audit.sql`, `Database/local_dev_setup.sql`, or `Database/rebuild_db.sql`; runtime services must not create them.
+  - Assistant message insert, session timestamp update, and normalized turn writes share one transaction.
+  - Clarification fallback may be described in trace text, but fallback evidence must be typed audit data. The backend and UI must not scan `modeReason` or clarification reason prose to infer fallback state.
+  - `ChatMessage.Tags` remains a client replay bridge, not the permanent storage design.
+  - Slice 4 client replay may hydrate durable audit rows per assistant message only while bounded to the current history page. Follow-up `CHAT-AUDIT-BATCH-001` owns a session-scoped batch audit endpoint.
+  - Follow-up `CHAT-AUDIT-FALLBACK-TYPED-001` owns durable fallback evidence persistence once fallback evidence needs to survive as auditable state.
+  - Audit source/fallback labels belong in trace and inspection panels, not normal chat answer text.
 - A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;

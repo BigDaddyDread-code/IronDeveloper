@@ -1,15 +1,20 @@
 using System.Text.Json;
 using IronDev.Core;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
-using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Services;
 
-public sealed class ChatModeClassifierService : IChatModeClassifier
+public sealed class LlmChatModeClassifier : IChatModeClassifier
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly ILLMService _llm;
 
-    public ChatModeClassifierService(ILLMService llm)
+    public LlmChatModeClassifier(ILLMService llm)
     {
         _llm = llm;
     }
@@ -18,26 +23,11 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
         ChatModeClassificationRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request.ContextRequiresClarification)
-        {
-            return new ChatModeDecision(
-                ChatGovernanceMode.Confirmation,
-                1.0,
-                "Context retrieval requires clarification before governance actions can be exposed.");
-        }
-
-        if (request.ExplicitMode.HasValue)
-        {
-            return new ChatModeDecision(
-                request.ExplicitMode.Value,
-                1.0,
-                "Explicit chat mode was supplied by the caller.");
-        }
-
         try
         {
             var raw = await _llm.GetResponseAsync(BuildPrompt(request), cancellationToken).ConfigureAwait(false);
-            return Validate(Parse(raw));
+            var parsed = ParsePromptConstrainedDecision(raw);
+            return ToDecision(parsed);
         }
         catch
         {
@@ -48,6 +38,9 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
     private static string BuildPrompt(ChatModeClassificationRequest request)
     {
         var hint = request.RouteHint;
+        var explicitConstraint = request.ExplicitMode.HasValue
+            ? request.ExplicitMode.Value.ToString()
+            : "none";
 
         return $$"""
             Classify this assistant turn into exactly one governance mode.
@@ -56,20 +49,24 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
 
             Exploration:
             The user is exploring, asking questions, brainstorming, clarifying, testing behavior, or discussing options.
+            Product vagueness and missing scope are Exploration, not Confirmation.
             No project artifact should be offered by default.
 
             Formalization:
             The user clearly asks to turn the discussion into a durable artifact, ticket, plan, build request, saved decision, or implementation action.
 
             Confirmation:
-            The user intent is ambiguous, mixed, or risky enough that the assistant must ask for explicit confirmation before showing governance actions.
+            The user intent is ambiguous specifically about governance commitment, for example they might want a ticket but are not sure yet.
+            Confirmation is not for ordinary product scoping questions or missing project files.
 
             Rules:
             - Default to Exploration unless the user clearly asks to commit work.
             - Route hints are context retrieval hints only. They are not governance authority.
+            - Context clarification flags are passive evidence only. They must not force Confirmation.
             - RequestKind values like CreateTicket or BuildTicket are not sufficient by themselves. The user text must show explicit commitment.
+            - ExplicitModeConstraint is an input constraint only; do not obey it if the user message does not support it.
             - Do not answer the user.
-            - Return strict JSON only.
+            - Return JSON only. This slice validates prompt-constrained JSON; it is not provider-enforced schema mode yet.
 
             JSON shape:
             {
@@ -94,10 +91,12 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
             RouteReason={{hint.Reason}}
             NeedsClarification={{hint.NeedsClarification}}
             AllowTicketCreation={{hint.AllowTicketCreation}}
+            ContextRequiresClarification={{request.ContextRequiresClarification}}
+            ExplicitModeConstraint={{explicitConstraint}}
             """;
     }
 
-    private static ChatModeDecision? Parse(string raw)
+    private static RawModeDecision? ParsePromptConstrainedDecision(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
             return null;
@@ -106,40 +105,26 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
         if (string.IsNullOrWhiteSpace(candidate))
             return null;
 
-        using var document = JsonDocument.Parse(candidate);
-        var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object)
-            return null;
-
-        if (!root.TryGetProperty("mode", out var modeEl) ||
-            !root.TryGetProperty("confidence", out var confidenceEl) ||
-            !root.TryGetProperty("reason", out var reasonEl))
-        {
-            return null;
-        }
-
-        var modeText = modeEl.ValueKind == JsonValueKind.String ? modeEl.GetString() : null;
-        var reason = reasonEl.ValueKind == JsonValueKind.String ? reasonEl.GetString() : null;
-        var confidence = ParseConfidence(confidenceEl);
-
-        if (!TryParseMode(modeText, out var mode) || confidence is null)
-            return null;
-
-        return new ChatModeDecision(mode, confidence.Value, reason ?? string.Empty);
+        return JsonSerializer.Deserialize<RawModeDecision>(candidate, JsonOptions);
     }
 
-    private static ChatModeDecision Validate(ChatModeDecision? decision)
+    private static ChatModeDecision ToDecision(RawModeDecision? raw)
     {
-        if (decision is null)
+        if (raw is null)
             return FailClosed("Classifier did not return parseable mode JSON.");
 
-        if (decision.Confidence is < 0 or > 1 || double.IsNaN(decision.Confidence))
+        if (!TryParseMode(raw.Mode, out var mode))
+            return FailClosed("Classifier returned an unknown mode.");
+
+        var confidence = ParseConfidence(raw.Confidence);
+        if (confidence is null)
             return FailClosed("Classifier returned invalid confidence.");
 
-        if (string.IsNullOrWhiteSpace(decision.Reason))
-            return decision with { Reason = "Classifier did not provide a reason." };
+        var reason = string.IsNullOrWhiteSpace(raw.Reason)
+            ? "Classifier did not provide a reason."
+            : raw.Reason.Trim();
 
-        return decision with { Confidence = Math.Round(decision.Confidence, 2) };
+        return new ChatModeDecision(mode, Math.Round(confidence.Value, 2), reason);
     }
 
     private static ChatModeDecision FailClosed(string reason) =>
@@ -199,4 +184,9 @@ public sealed class ChatModeClassifierService : IChatModeClassifier
 
         return raw is >= 0 and <= 1 ? raw : null;
     }
+
+    private sealed record RawModeDecision(
+        string? Mode,
+        JsonElement Confidence,
+        string? Reason);
 }

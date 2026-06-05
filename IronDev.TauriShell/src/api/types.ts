@@ -39,17 +39,60 @@ export type BuildReadinessResult = components['schemas']['BuildReadinessResult']
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
 export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'];
+export type ChatClarificationKind =
+  | 'None'
+  | 'GeneralScope'
+  | 'ProductScope'
+  | 'MissingProjectContext'
+  | 'GovernanceIntent'
+  | 'SafetyOrRisk';
+export interface ChatClarificationState {
+  required: boolean;
+  kind: ChatClarificationKind;
+  questions: string[];
+  reason?: string | null;
+}
+export interface ChatGovernanceGate {
+  mode?: string | null;
+  canSaveDiscussion?: boolean | null;
+  canCreateTicket?: boolean | null;
+  canViewSources?: boolean | null;
+  canCopyMarkdown?: boolean | null;
+  reason?: string | null;
+  confidence?: number | null;
+  governanceActions?: string[] | null;
+}
+export type ChatAuditSource = 'durable' | 'tags' | 'live' | 'none';
+export interface ChatTurnAuditResponse {
+  chatMessageId: number;
+  source: 'DurableAudit';
+  mode: string;
+  modeConfidence: number;
+  modeReason: string;
+  clarification: ChatClarificationState;
+  gate: ChatGovernanceGate;
+  routeTraceId?: string | null;
+  dogfoodTraceId?: string | null;
+  contextSummary?: string | null;
+  linkedFilePaths?: string | null;
+  linkedSymbols?: string | null;
+  isFallbackEvidence: boolean;
+}
 export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'] & {
   mode?: string | null;
   modeConfidence?: number | null;
   modeReason?: string | null;
-  showGovernanceActions?: boolean | null;
-  governanceActions?: string[] | null;
+  clarification?: ChatClarificationState | null;
+  gate?: ChatGovernanceGate | null;
   reasoningTrace?: string[] | null;
   disambiguationQuestion?: string | null;
   reasoningSummary?: string | null;
   dogfoodTraceId?: string | null;
   dogfoodTracePath?: string | null;
+  routeTraceId?: string | null;
+  auditSource?: ChatAuditSource;
+  auditFallbackReason?: string | null;
+  auditHasFallbackEvidence?: boolean;
 };
 export type ProjectChatSession = components['schemas']['ProjectChatSession'];
 export type ChatMessage = components['schemas']['ChatMessage'];

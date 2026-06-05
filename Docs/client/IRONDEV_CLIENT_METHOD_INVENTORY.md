@@ -170,7 +170,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `SaveFeedbackAsync` | POST | `/api/projects/{projectId}/chat/feedback` | `ChatMessageFeedback` | `long` | Retired WPF history / TauriShell | Implemented |
 | `GetRecentMessagesAsync` | GET | `/api/projects/{projectId}/chat/sessions/{sessionId}/messages?take={take}` | None | `IReadOnlyList<ChatMessage>` | Retired WPF history / TauriShell | Implemented |
 | `CompleteAsync` | POST | `/api/projects/{projectId}/chat/complete` | `ChatCompletionRequest` | `ChatCompletionResponse` | Retired WPF history / TauriShell | Implemented |
-| *(payload extension)* | `mode`/`showGovernanceActions`/`governanceActions`/`reasoningTrace`/`reasoningSummary` | n/a | n/a | `ChatCompletionResponse` | n/a | Implemented |
+| *(payload extension)* | `mode`/`clarification`/`gate`/`reasoningTrace`/`reasoningSummary` | n/a | n/a | `ChatCompletionResponse` | n/a | Implemented |
 
 ## Profiles
 

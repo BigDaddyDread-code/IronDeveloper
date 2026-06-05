@@ -22,6 +22,7 @@ export function ChatContextPanel({
   onToggleCollapsed
 }: ChatContextPanelProps) {
   const gate = getChatModeGate(latestResponse);
+  const auditSourceLabel = formatAuditSource(latestResponse?.auditSource);
 
   if (isCollapsed) {
     return null;
@@ -46,24 +47,48 @@ export function ChatContextPanel({
       <section className="workflow-section">
         <MetadataRow label="Project" value={projectLabel} />
         <MetadataRow label="Mode" value={
-          <StatusBadge status={
-            gate.mode === 'Formalization'
-              ? 'ready'
-              : gate.mode === 'Confirmation'
-                ? 'warning'
-                : 'neutral'
-          }>
+          <StatusBadge status={gate.modeBadgeStatus}>
             {gate.mode ?? 'Unknown'}
           </StatusBadge>
         } />
         <MetadataRow
           label="Trace"
           value={
-            <StatusBadge status={latestResponse?.traceId ? 'ready' : 'neutral'}>
-              {latestResponse?.traceId ? `#${latestResponse.traceId}` : 'No trace id yet'}
+            <StatusBadge status={latestResponse?.routeTraceId || latestResponse?.dogfoodTraceId || latestResponse?.traceId ? 'ready' : 'neutral'}>
+              {latestResponse?.routeTraceId ??
+                latestResponse?.dogfoodTraceId ??
+                (latestResponse?.traceId ? `#${latestResponse.traceId}` : 'No trace id yet')}
             </StatusBadge>
           }
         />
+        {auditSourceLabel ? (
+          <MetadataRow
+            label="Audit source"
+            value={
+              <StatusBadge status={latestResponse?.auditSource === 'durable' ? 'ready' : latestResponse?.auditSource === 'tags' ? 'warning' : 'neutral'}>
+                {auditSourceLabel}
+              </StatusBadge>
+            }
+          />
+        ) : null}
+        {latestResponse?.auditHasFallbackEvidence ? (
+          <MetadataRow
+            label="Fallback evidence"
+            value={<StatusBadge status="warning">Present</StatusBadge>}
+          />
+        ) : null}
+        {latestResponse?.clarification ? (
+          <MetadataRow
+            label="Clarification"
+            value={
+              <StatusBadge status={latestResponse.clarification.required ? 'warning' : 'neutral'}>
+                {latestResponse.clarification.required
+                  ? `${latestResponse.clarification.kind} required`
+                  : 'None'}
+              </StatusBadge>
+            }
+          />
+        ) : null}
         {typeof gate.confidence === 'number' ? (
           <MetadataRow
             label="Mode confidence"
@@ -79,6 +104,7 @@ export function ChatContextPanel({
             <strong>Mode reason:</strong> {gate.reason}
           </p>
         ) : null}
+        {latestResponse?.auditFallbackReason ? <p>{latestResponse.auditFallbackReason}</p> : null}
         {latestResponse?.dogfoodTraceId ? (
           <MetadataRow
             label="Dogfood trace"
@@ -123,4 +149,24 @@ export function ChatContextPanel({
       />
     </aside>
   );
+}
+
+function formatAuditSource(source: ChatCompletionResponse['auditSource'] | undefined) {
+  if (source === 'durable') {
+    return 'Durable audit';
+  }
+
+  if (source === 'tags') {
+    return 'Tags replay fallback';
+  }
+
+  if (source === 'live') {
+    return 'Live response';
+  }
+
+  if (source === 'none') {
+    return 'No audit metadata';
+  }
+
+  return null;
 }

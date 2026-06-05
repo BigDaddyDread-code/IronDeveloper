@@ -8,6 +8,9 @@ USE [IronDeveloper];
 GO
 
 IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DROP TABLE dbo.ChatMessageFeedback;
+IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NOT NULL DROP TABLE dbo.ChatTurnTraces;
+IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL DROP TABLE dbo.ChatTurnClarifications;
+IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NOT NULL DROP TABLE dbo.ChatTurnGovernance;
 IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DROP TABLE dbo.ArtifactSourceReferences;
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTickets;
 IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DROP TABLE dbo.ProjectRules;
@@ -99,7 +102,7 @@ CREATE TABLE dbo.ChatMessages
     ChatSessionId BIGINT NOT NULL,
     Role NVARCHAR(50) NOT NULL,
     Message NVARCHAR(MAX) NOT NULL,
-    Tags NVARCHAR(500) NULL,
+    Tags NVARCHAR(MAX) NULL,
     ContextSummary NVARCHAR(MAX) NULL,
     LinkedFilePaths NVARCHAR(MAX) NULL,
     LinkedSymbols NVARCHAR(MAX) NULL,
@@ -124,6 +127,61 @@ CREATE TABLE dbo.ChatMessageFeedback
     CONSTRAINT FK_ChatMessageFeedback_Projects     FOREIGN KEY (ProjectId)     REFERENCES dbo.Projects(Id),
     CONSTRAINT FK_ChatMessageFeedback_Sessions     FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id),
     CONSTRAINT FK_ChatMessageFeedback_ChatMessages FOREIGN KEY (ChatMessageId) REFERENCES dbo.ChatMessages(Id)
+);
+
+CREATE TABLE dbo.ChatTurnGovernance
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL,
+    ProjectId INT NOT NULL,
+    ChatSessionId BIGINT NOT NULL,
+    ChatMessageId BIGINT NOT NULL,
+    Mode NVARCHAR(50) NOT NULL,
+    ModeConfidence FLOAT NOT NULL,
+    ModeReason NVARCHAR(MAX) NOT NULL,
+    GateJson NVARCHAR(MAX) NOT NULL,
+    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ChatTurnGovernance_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ChatTurnGovernance_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
+    CONSTRAINT FK_ChatTurnGovernance_Sessions FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id),
+    CONSTRAINT FK_ChatTurnGovernance_Messages FOREIGN KEY (ChatMessageId) REFERENCES dbo.ChatMessages(Id)
+);
+
+CREATE TABLE dbo.ChatTurnClarifications
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL,
+    ProjectId INT NOT NULL,
+    ChatSessionId BIGINT NOT NULL,
+    ChatMessageId BIGINT NOT NULL,
+    Required BIT NOT NULL,
+    Kind NVARCHAR(100) NOT NULL,
+    Reason NVARCHAR(MAX) NULL,
+    QuestionsJson NVARCHAR(MAX) NOT NULL,
+    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnClarifications_CreatedUtc DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ChatTurnClarifications_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ChatTurnClarifications_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
+    CONSTRAINT FK_ChatTurnClarifications_Sessions FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id),
+    CONSTRAINT FK_ChatTurnClarifications_Messages FOREIGN KEY (ChatMessageId) REFERENCES dbo.ChatMessages(Id)
+);
+
+CREATE TABLE dbo.ChatTurnTraces
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    TenantId INT NOT NULL,
+    ProjectId INT NOT NULL,
+    ChatSessionId BIGINT NOT NULL,
+    ChatMessageId BIGINT NOT NULL,
+    RouteTraceId NVARCHAR(200) NULL,
+    DogfoodTraceId NVARCHAR(200) NULL,
+    ContextSummary NVARCHAR(MAX) NULL,
+    LinkedFilePaths NVARCHAR(MAX) NULL,
+    LinkedSymbols NVARCHAR(MAX) NULL,
+    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnTraces_CreatedUtc DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ChatTurnTraces_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+    CONSTRAINT FK_ChatTurnTraces_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
+    CONSTRAINT FK_ChatTurnTraces_Sessions FOREIGN KEY (ChatSessionId) REFERENCES dbo.ProjectChatSessions(Id),
+    CONSTRAINT FK_ChatTurnTraces_Messages FOREIGN KEY (ChatMessageId) REFERENCES dbo.ChatMessages(Id)
 );
 
 CREATE TABLE dbo.ProjectSummaries
@@ -386,6 +444,15 @@ CREATE UNIQUE INDEX UX_ProjectFiles_ProjectId_FilePath
 
 CREATE INDEX IX_ChatMessageFeedback_ProjectId_CreatedDate
     ON dbo.ChatMessageFeedback(ProjectId, CreatedDate DESC);
+
+CREATE UNIQUE INDEX UX_ChatTurnGovernance_MessageTenant
+    ON dbo.ChatTurnGovernance(ChatMessageId, TenantId);
+
+CREATE UNIQUE INDEX UX_ChatTurnClarifications_MessageTenant
+    ON dbo.ChatTurnClarifications(ChatMessageId, TenantId);
+
+CREATE UNIQUE INDEX UX_ChatTurnTraces_MessageTenant
+    ON dbo.ChatTurnTraces(ChatMessageId, TenantId);
 GO
 
 -- Tenant 1: Default

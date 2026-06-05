@@ -1,4 +1,5 @@
 using IronDev.Data.Models;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Infrastructure.Services;
@@ -19,17 +20,20 @@ public sealed class ChatController : ControllerBase
 
     private readonly IChatHistoryService _chat;
     private readonly IChatFeedbackService _feedback;
+    private readonly IChatTurnPersistenceService _turnPersistence;
     private readonly IProjectChatResponseService _projectChat;
     private readonly IProjectStateReviewService _projectStateReview;
 
     public ChatController(
         IChatHistoryService chat,
         IChatFeedbackService feedback,
+        IChatTurnPersistenceService turnPersistence,
         IProjectChatResponseService projectChat,
         IProjectStateReviewService projectStateReview)
     {
         _chat = chat;
         _feedback = feedback;
+        _turnPersistence = turnPersistence;
         _projectChat = projectChat;
         _projectStateReview = projectStateReview;
     }
@@ -61,6 +65,33 @@ public sealed class ChatController : ControllerBase
     [HttpGet("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
     public Task<IReadOnlyList<ChatMessage>> GetMessages(int projectId, long sessionId, [FromQuery] int take = 50, CancellationToken ct = default) =>
         _chat.GetRecentMessagesAsync(projectId, sessionId, take, ct);
+
+    [HttpGet("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages/{messageId:long}/audit")]
+    public async Task<ActionResult<ChatTurnAuditResponse>> GetMessageAudit(
+        int projectId,
+        long sessionId,
+        long messageId,
+        CancellationToken ct = default)
+    {
+        var snapshot = await _turnPersistence.GetByMessageAsync(projectId, sessionId, messageId, ct).ConfigureAwait(false);
+        if (snapshot is null)
+            return NotFound();
+
+        return Ok(new ChatTurnAuditResponse(
+            snapshot.ChatMessageId,
+            ChatAuditSource.DurableAudit,
+            snapshot.Mode,
+            snapshot.ModeConfidence,
+            snapshot.ModeReason,
+            snapshot.Clarification,
+            snapshot.Gate,
+            snapshot.RouteTraceId,
+            snapshot.DogfoodTraceId,
+            snapshot.ContextSummary,
+            snapshot.LinkedFilePaths,
+            snapshot.LinkedSymbols,
+            snapshot.IsFallbackEvidence));
+    }
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
     public async Task<ActionResult<long>> SaveMessage(int projectId, long sessionId, ChatMessage message, CancellationToken ct)
@@ -105,18 +136,21 @@ public sealed class ChatController : ControllerBase
                 Mode: "Exploration",
                 ModeConfidence: null,
                 ModeReason: "Project state review request is explicit and non-commitment.",
-                ShowGovernanceActions: false));
+                Clarification: ChatClarificationState.None,
+                Gate: ChatGovernanceGate.FromDecision(new ChatModeDecision(
+                    ChatGovernanceMode.Exploration,
+                    1,
+                    "Project state review is not a formalization lane."))));
         }
 
-        var hasExplicitMode = TryResolveExplicitConversationMode(mode, out var explicitMode);
-        if (!hasExplicitMode && !string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion, projectStateReview, exploration, formalization, or confirmation." });
+        if (!string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion or projectStateReview." });
 
         var recentConversationSummary = await BuildRecentConversationSummaryAsync(projectId, request.SessionId, ct);
         var answer = await _projectChat.RespondAsync(
             projectId,
             request.Prompt,
-            hasExplicitMode ? explicitMode : null,
+            null,
             recentConversationSummary: recentConversationSummary,
             sessionId: request.SessionId,
             cancellationToken: ct);
@@ -132,8 +166,8 @@ public sealed class ChatController : ControllerBase
             answer.Mode,
             answer.ModeConfidence,
             answer.ModeReason,
-            answer.ShowGovernanceActions,
-            answer.GovernanceActions,
+            answer.Clarification,
+            answer.Gate,
             answer.ReasoningTrace,
             answer.DisambiguationQuestion,
             answer.ReasoningSummary,
@@ -158,21 +192,6 @@ public sealed class ChatController : ControllerBase
         return string.Join(Environment.NewLine, pairs);
     }
 
-    private static bool TryResolveExplicitConversationMode(string mode, out ChatGovernanceMode resolvedMode)
-    {
-        resolvedMode = mode switch
-        {
-            var value when value.Equals("exploration", StringComparison.OrdinalIgnoreCase) => ChatGovernanceMode.Exploration,
-            var value when value.Equals("formalization", StringComparison.OrdinalIgnoreCase) => ChatGovernanceMode.Formalization,
-            var value when value.Equals("confirmation", StringComparison.OrdinalIgnoreCase) => ChatGovernanceMode.Confirmation,
-            _ => ChatGovernanceMode.Exploration
-        };
-
-        return mode.Equals("exploration", StringComparison.OrdinalIgnoreCase)
-            || mode.Equals("formalization", StringComparison.OrdinalIgnoreCase)
-            || mode.Equals("confirmation", StringComparison.OrdinalIgnoreCase);
-    }
-
     public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);
     public sealed record ChatCompletionResponse(
         string Response,
@@ -183,8 +202,8 @@ public sealed class ChatController : ControllerBase
         string? Mode = null,
         double? ModeConfidence = null,
         string? ModeReason = null,
-        bool? ShowGovernanceActions = null,
-        IReadOnlyList<string>? GovernanceActions = null,
+        ChatClarificationState? Clarification = null,
+        ChatGovernanceGate? Gate = null,
         IReadOnlyList<string>? ReasoningTrace = null,
         string? DisambiguationQuestion = null,
         string? ReasoningSummary = null,
@@ -194,4 +213,5 @@ public sealed class ChatController : ControllerBase
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>
         _feedback.SaveFeedbackAsync(feedback, ct);
+
 }

@@ -1045,8 +1045,8 @@ Return JSON only.";
         sb.AppendLine();
         sb.AppendLine("=== CONTEXT AGENT GUIDELINES ===");
         sb.AppendLine($"- Your current route is: {route.RequestKind}");
-        if (!string.IsNullOrWhiteSpace(route.ContextMode))
-            sb.AppendLine($"- Current context mode is: {route.ContextMode}");
+        if (!string.IsNullOrWhiteSpace(route.ContextModeHint))
+            sb.AppendLine($"- Current context mode hint is: {route.ContextModeHint}");
         if (!string.Equals(route.EffectiveWorkText, request.UserRequest, StringComparison.Ordinal))
         {
             sb.AppendLine($"- Original user text: {request.UserRequest}");

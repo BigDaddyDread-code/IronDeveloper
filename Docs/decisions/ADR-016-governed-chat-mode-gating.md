@@ -18,22 +18,34 @@ Product integrity requires explicit, inspectable transitions between these modes
 
 `POST /api/projects/{projectId}/chat/complete` must operate as a mode-aware contract:
 
-1. `projectQuestion` (default) and `projectStateReview` remain supported for existing clients.
-2. New explicit modes `exploration`, `formalization`, and `confirmation` are accepted.
-3. `projectQuestion` remains the default, but route/context output is only a hint.
+1. `projectQuestion` (default) and `projectStateReview` remain the only accepted chat completion request kinds.
+2. Explicit governance modes `exploration`, `formalization`, and `confirmation` are removed from the API boundary.
+3. Any future explicit governance intent may be classifier evidence only; it must never become a controller bypass.
 4. `IChatModeClassifier` is the only authority that selects `Exploration`, `Formalization`, or `Confirmation`.
-5. `Formalization` responses surface governance affordances (`showGovernanceActions`, `governanceActions`), while `Exploration` and `Confirmation` do not.
-6. `Confirmation` requires user confirmation text before escalating to governance actions.
-7. Chat responses include reason-chain fields (`reasoningTrace`, `reasoningSummary`, optional `disambiguationQuestion`) so the user can inspect how the assistant decided mode and next step.
-8. Frontend rendering of governance actions and rich-copy affordances is mode-aware:
+5. `IChatClarificationClassifier` is the only authority that selects clarification kind/questions; it must not mutate the governance mode.
+6. `Formalization` responses surface governance affordances through `ChatGovernanceGate`, while `Exploration` and `Confirmation` do not.
+7. `Confirmation` requires user confirmation text before escalating to governance actions.
+8. Chat responses include reason-chain fields (`reasoningTrace`, `reasoningSummary`, optional `disambiguationQuestion`) so the user can inspect how the assistant decided mode and next step.
+9. Frontend rendering of governance actions and rich-copy affordances is mode-aware:
    - `Save Discussion` and `View Sources` are only shown in Formalization mode.
    - `Copy Markdown` is hidden for Exploration and Confirmation, shown for Formalization mode paths.
-   - Components render from the single `chatGovernanceGate.ts` rule instead of duplicating mode checks.
+   - Components render from the single `ChatGovernanceGate` projection instead of duplicating mode checks.
    - Raw reasoning is shown in message/thread surfaces regardless of mode.
-9. Anti-inference guard:
+10. Anti-inference guard:
    - `CreateTicket`/`CreateTicketsFromDiscussion` classifications do not auto-escalate unless explicit lane-lock language is present.
    - Missing mode or legacy history tags must not be treated as an affirmative governance signal.
-10. The response composer receives the selected mode and must not reclassify the turn while generating content.
+   - Context clarification does not force `Confirmation`; product-scope vagueness remains `Exploration` with passive clarification evidence.
+11. The response composer receives the selected mode and must not reclassify the turn while generating content.
+12. Mode and clarification classifier boundaries are prompt-constrained JSON with strict validation. They are not provider-enforced structured output.
+13. Saved assistant envelopes are normalized into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`; `ChatMessage.Tags` remains a replay bridge.
+14. Chat-turn audit tables are created by migration/setup scripts, not runtime services.
+15. Assistant message insert, session timestamp update, and normalized turn persistence share one transaction.
+16. Clarification fallback preserves evidence conservatively and must not mutate mode or gate.
+17. `ProjectChatResponseService` remains an orchestration spine only. Context pipeline, response composition, and response metadata formatting live in separate named collaborators.
+18. The context pipeline keeps broad context-agent input separate from smaller response-summary context, and the composer must not leak internal classifier/governance machinery into user-facing prose unless explicitly asked.
+19. Runtime chat replay surfaces durable audit rows first. `ChatMessage.Tags` is a labeled replay fallback only, never the durable audit source.
+20. Audit source is a constrained contract value, and fallback evidence is typed audit metadata. Prose such as mode reason or clarification reason must not be scanned to infer fallback state.
+21. Slice 4 replay may hydrate durable audit per assistant message only while bounded to the current history page; expanding beyond that requires a batch audit endpoint.
 
 ## Reasoning
 
@@ -42,9 +54,16 @@ The goal is not to stop governance; it is to delay governance controls until int
 ## Consequences
 
 - `ChatController` owns HTTP shape only and must not infer mode from router output.
-- `IProjectChatResponseService` owns route/classify/compose/gate orchestration.
+- `IProjectChatResponseService` owns classify/gate orchestration, but delegates context lookup/routing to `ProjectChatContextPipeline`, response text generation to `ProjectChatResponseComposer`, and trace/context projection to `ProjectChatResponseMetadataBuilder`.
 - `IronDev.TauriShell` consumes the expanded chat payload and hides save/view/copy actions unless the gate allows them.
 - Tests must assert mode-shape differences rather than a single hard-coded template.
-- Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode` and governance affordances instead of defaulting to opaque templates.
+- Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode`, `clarification`, and `gate` instead of defaulting to opaque templates.
+- `ChatHistoryService.SaveMessageAsync` persists assistant envelopes into normalized turn tables for audit; legacy string tags intentionally create no turn-governance rows.
+- `Database/migrate_chat_turn_audit.sql` and `Docs/migrations/008_ChatTurnAudit.sql` own chat-turn audit schema; runtime chat services fail loudly when the schema is missing.
+- `GET /api/projects/{projectId}/chat/sessions/{sessionId}/messages/{messageId}/audit` exposes project/session/message-scoped durable audit snapshots for UI trace/sidebar inspection.
+- Audit source and fallback labels are inspection details, not normal chat content.
+- Debt ticket `CHAT-AUDIT-BATCH-001`: add `GET /api/projects/{projectId}/chat/sessions/{sessionId}/audit` and remove per-message replay hydration once chat history expands beyond the bounded page.
+- Debt ticket `CHAT-AUDIT-FALLBACK-TYPED-001`: persist first-class fallback evidence/source instead of treating fallback wording as audit data.
+- Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001`: replace prompt-constrained classifier JSON with provider-enforced JSON/schema output once `ILLMService` exposes that capability. Removal condition: classifier parse recovery no longer needs brace extraction.
 - `Docs/ARCHITECTURE.md`, `Docs/AGENTS.md`, `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`, and boundary docs must reference the cockpit mode contract.
 - `ApiBoundaryTests` must validate that chat ownership remains context-only and that stage ownership remains explicit.
