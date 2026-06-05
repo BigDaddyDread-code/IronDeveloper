@@ -77,7 +77,10 @@ public sealed class QualityAgent : StaticIronDevAgent
         };
     }
 
-    private const int SubprocessTimeoutSeconds = 300;
+    private static int SubprocessTimeoutSeconds =>
+        int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed)
+            ? parsed
+            : 300;
 
     private async Task<(int ExitCode, string Stdout, string Stderr)> RunProcessAsync(
         string fileName, string[] arguments, CancellationToken ct)

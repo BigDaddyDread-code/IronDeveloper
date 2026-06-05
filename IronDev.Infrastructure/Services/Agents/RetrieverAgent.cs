@@ -80,7 +80,10 @@ public sealed class RetrieverAgent : StaticIronDevAgent
         };
     }
 
-    private const int SubprocessTimeoutSeconds = 300;
+    private static int SubprocessTimeoutSeconds =>
+        int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed)
+            ? parsed
+            : 300;
 
     private async Task<(int ExitCode, string Stdout, string Stderr, string Command)> RunDotnetAsync(
         string[] arguments, CancellationToken ct)
