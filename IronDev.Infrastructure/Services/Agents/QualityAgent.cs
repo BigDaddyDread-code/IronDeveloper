@@ -12,13 +12,20 @@ public sealed class QualityAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
+    private readonly IAgentProcessRunner _processRunner;
 
-    public QualityAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
+    public QualityAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        string repoRoot,
+        IAgentLlmClient? llmClient = null,
+        IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
+        _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -85,42 +92,8 @@ public sealed class QualityAgent : StaticIronDevAgent
     private async Task<(int ExitCode, string Stdout, string Stderr)> RunProcessAsync(
         string fileName, string[] arguments, CancellationToken ct)
     {
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = fileName,
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
-
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(SubprocessTimeoutSeconds));
-
-        try
-        {
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
-            await process.WaitForExitAsync(timeoutCts.Token);
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
-            return (process.ExitCode, stdout, stderr);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            // Timeout — kill the process tree
-            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-            return (-1, string.Empty,
-                $"QualityAgent subprocess timed out after {SubprocessTimeoutSeconds}s and was killed.");
-        }
+        var result = await _processRunner.RunAsync(fileName, arguments, _repoRoot, ct);
+        return (result.ExitCode, result.Stdout, result.Stderr);
     }
 
     private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
@@ -169,6 +142,25 @@ public sealed class QualityAgent : StaticIronDevAgent
 
     private static QualityReport BuildQualityReport(string stdout, string stderr, string planPath, string runId, int exitCode)
     {
+        if (exitCode == -1)
+        {
+            var timeoutSeconds = int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed) ? parsed : 300;
+            return new QualityReport
+            {
+                PlanPath = planPath,
+                DogfoodRunId = runId,
+                Status = "failed",
+                Summary = $"QualityAgent subprocess timed out after {timeoutSeconds}s.",
+                BuildSucceeded = false,
+                FocusedTestsSucceeded = false,
+                FormatSucceeded = false,
+                PackageAuditSucceeded = false,
+                CodeStandardsSucceeded = false,
+                EvidencePaths = [],
+                Boundary = "037 wraps the deterministic code standards/toolchain gate only; it does not perform LLM code review or patch code."
+            };
+        }
+
         try
         {
             using var document = JsonDocument.Parse(stdout);

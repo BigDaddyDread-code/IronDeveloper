@@ -23,6 +23,26 @@ public sealed class AgentSubprocessTimeoutTests
     }
 
     [TestMethod]
+    public async Task AgentProcessRunner_Timeout_ShouldKillProcessAndReturnTimedOut()
+    {
+        var runner = new AgentProcessRunner();
+        Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", "1");
+        try
+        {
+            // powershell -Command Start-Sleep -Seconds 5 hangs reliably for 5 seconds.
+            var result = await runner.RunAsync("powershell", new[] { "-Command", "Start-Sleep -Seconds 5" }, GetRepoRoot());
+
+            Assert.IsTrue(result.TimedOut);
+            Assert.AreEqual(-1, result.ExitCode);
+            StringAssert.Contains(result.Stderr, "powershell subprocess timed out after 1s and was killed");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", null);
+        }
+    }
+
+    [TestMethod]
     public async Task SupervisorAgent_Timeout_ShouldKillProcessAndFailGracefully()
     {
         var repoRoot = GetRepoRoot();
@@ -49,16 +69,15 @@ public sealed class AgentSubprocessTimeoutTests
             }
         };
 
-        // Set the timeout to 1 second so it times out quickly
         Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", "1");
         try
         {
             var result = await agent.RunAsync(request);
 
             Assert.AreEqual(AgentRunStatus.Failed, result.Status);
-            // SupervisorAgent maps overall failure to 1
-            Assert.AreEqual(1, result.ExitCode);
+            Assert.AreEqual(1, result.ExitCode); // SupervisorAgent maps failure to 1
             Assert.IsNotNull(result.OutputJson);
+            StringAssert.Contains(result.Summary, "subprocess timeout");
             Assert.IsTrue(result.CommandsRun.Count > 0);
         }
         finally
@@ -101,7 +120,8 @@ public sealed class AgentSubprocessTimeoutTests
             Assert.AreEqual(AgentRunStatus.Failed, result.Status);
             Assert.AreEqual(-1, result.ExitCode);
             Assert.IsNotNull(result.OutputJson);
-            StringAssert.Contains(result.OutputJson, "RetrieverAgent subprocess timed out after 1s and was killed.");
+            StringAssert.Contains(result.Summary, "RetrieverAgent subprocess timed out after 1s.");
+            StringAssert.Contains(result.OutputJson, "dotnet subprocess timed out after 1s and was killed.");
         }
         finally
         {
@@ -143,7 +163,8 @@ public sealed class AgentSubprocessTimeoutTests
             Assert.AreEqual(AgentRunStatus.Failed, result.Status);
             Assert.AreEqual(-1, result.ExitCode);
             Assert.IsNotNull(result.OutputJson);
-            StringAssert.Contains(result.OutputJson, "QualityAgent subprocess timed out after 1s and was killed.");
+            StringAssert.Contains(result.Summary, "QualityAgent subprocess timed out after 1s.");
+            StringAssert.Contains(result.OutputJson, "QualityAgent subprocess timed out after 1s.");
         }
         finally
         {

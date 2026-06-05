@@ -10,13 +10,20 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
+    private readonly IAgentProcessRunner _processRunner;
 
-    public SupervisorAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
+    public SupervisorAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        string repoRoot,
+        IAgentLlmClient? llmClient = null,
+        IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
+        _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -287,7 +294,9 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             Status = status,
             Summary = status == AgentRunStatus.Succeeded
                 ? $"SupervisorAgent retrieved '{topMemoryTitle}' and TesterAgent reported: {testSummary}"
-                : "SupervisorAgent loop failed before producing a clean Codex handoff.",
+                : (memory.ExitCode == -1 || thoughtLedger.ExitCode == -1 || tests.ExitCode == -1)
+                    ? "SupervisorAgent loop failed due to a subprocess timeout."
+                    : "SupervisorAgent loop failed before producing a clean Codex handoff.",
             ModelProfileName = profile.Name,
             Provider = profile.Provider,
             Model = profile.Model,
@@ -430,43 +439,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
     private async Task<CommandRun> RunDotnetAsync(string[] arguments, CancellationToken ct)
     {
-        var command = "dotnet " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
-
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(SubprocessTimeoutSeconds));
-
-        try
-        {
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
-            await process.WaitForExitAsync(timeoutCts.Token);
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
-            return new CommandRun(command, process.ExitCode, stdout, stderr);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            // Timeout — kill the process tree
-            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-            return new CommandRun(command, -1, string.Empty,
-                $"SupervisorAgent subprocess timed out after {SubprocessTimeoutSeconds}s and was killed.");
-        }
+        var result = await _processRunner.RunAsync("dotnet", arguments, _repoRoot, ct);
+        return new CommandRun(result.Command, result.ExitCode, result.Stdout, result.Stderr);
     }
 
     private static string RequireInput(AgentRequest request, string key)
