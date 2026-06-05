@@ -423,6 +423,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             : "No live model response supplied; deterministic SupervisorAgent orchestration remained in force.";
     }
 
+    private const int SubprocessTimeoutSeconds = 300;
+
     private async Task<CommandRun> RunDotnetAsync(string[] arguments, CancellationToken ct)
     {
         var command = "dotnet " + string.Join(" ", arguments.Select(QuoteIfNeeded));
@@ -442,11 +444,26 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             process.StartInfo.ArgumentList.Add(argument);
 
         process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
 
-        return new CommandRun(command, process.ExitCode, stdout, stderr);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(SubprocessTimeoutSeconds));
+
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            await process.WaitForExitAsync(timeoutCts.Token);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+            return new CommandRun(command, process.ExitCode, stdout, stderr);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Timeout — kill the process tree
+            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            return new CommandRun(command, -1, string.Empty,
+                $"SupervisorAgent subprocess timed out after {SubprocessTimeoutSeconds}s and was killed.");
+        }
     }
 
     private static string RequireInput(AgentRequest request, string key)

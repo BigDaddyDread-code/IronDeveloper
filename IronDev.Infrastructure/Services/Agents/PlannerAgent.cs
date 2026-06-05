@@ -132,7 +132,6 @@ public sealed class PlannerAgent : StaticIronDevAgent
         var runId = string.IsNullOrWhiteSpace(request.DogfoodRunId)
             ? $"PlannerIntake-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;
-        var likelyTypo = prompt.Contains("solitare", StringComparison.OrdinalIgnoreCase);
         var llmPrompt = BuildProductSpikePrompt(prompt, detectedProject, normalizedPrompt);
         var liveLlmRequested = ReadBoolInput(request, "live_llm");
         var llmResult = await ResolveLlmResultAsync(profile, llmPrompt, liveLlmRequested, request, ct);
@@ -145,9 +144,7 @@ public sealed class PlannerAgent : StaticIronDevAgent
             detectedProject,
             projectKnown = false,
             confidence = 0.62,
-            assumptions = likelyTypo
-                ? new[] { "The prompt says 'solitare'; treating 'Solitaire' as a tentative spelling correction only." }
-                : new[] { "The prompt looks like a new product/app spike request, not an instruction to write immediately." },
+            assumptions = new[] { "The prompt looks like a new product/app spike request, not an instruction to write immediately." },
             clarifyingQuestions = new[]
             {
                 "Should this become a new dogfood project fixture?",
@@ -321,15 +318,21 @@ public sealed class PlannerAgent : StaticIronDevAgent
 
     private static string DetectProjectName(string prompt)
     {
-        if (prompt.Contains("solitare", StringComparison.OrdinalIgnoreCase) ||
-            prompt.Contains("solitaire", StringComparison.OrdinalIgnoreCase))
+        // Look for a likely project name: a capitalised word that isn't a common English word.
+        var commonWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            return "Solitaire";
-        }
+            "I", "A", "An", "The", "Please", "Create", "Build", "Make", "Add",
+            "New", "Can", "Could", "Would", "Should", "Want", "Need", "Help"
+        };
+        var words = prompt.Split([' ', '\t', '\r', '\n', ',', '.', '!', '?'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var candidate = words.FirstOrDefault(word =>
+            word.Length >= 2 &&
+            char.IsUpper(word[0]) &&
+            !commonWords.Contains(word));
 
-        return "UnspecifiedProductSpike";
+        return string.IsNullOrWhiteSpace(candidate) ? "UnspecifiedProductSpike" : candidate;
     }
 
-    private static string NormalizePrompt(string prompt)
-        => prompt.Replace("solitare", "Solitaire", StringComparison.OrdinalIgnoreCase).Trim();
+    private static string NormalizePrompt(string prompt) => prompt.Trim();
 }

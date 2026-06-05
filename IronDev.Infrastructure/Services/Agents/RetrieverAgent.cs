@@ -53,6 +53,38 @@ public sealed class RetrieverAgent : StaticIronDevAgent
             runId
         };
 
+        var (exitCode, stdout, stderr, command) = await RunDotnetAsync(arguments, ct);
+
+        var output = string.IsNullOrWhiteSpace(stderr)
+            ? stdout
+            : stdout + Environment.NewLine + stderr;
+        var prompt = BuildPrompt(project, query, stdout);
+        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
+        var contextBundle = exitCode == 0
+            ? BuildContextBundle(stdout, profile, prompt, liveLlmRequested, llmResult)
+            : output;
+
+        return new AgentResult
+        {
+            AgentName = AgentName,
+            Status = exitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
+            Summary = ExtractSummary(stdout),
+            ModelProfileName = profile.Name,
+            Provider = profile.Provider,
+            Model = profile.Model,
+            ExitCode = exitCode,
+            OutputJson = contextBundle,
+            CommandsRun = [command],
+            EvidencePaths = [],
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
+
+    private const int SubprocessTimeoutSeconds = 300;
+
+    private async Task<(int ExitCode, string Stdout, string Stderr, string Command)> RunDotnetAsync(
+        string[] arguments, CancellationToken ct)
+    {
         var command = "dotnet " + string.Join(" ", arguments.Select(QuoteIfNeeded));
         var process = new Process
         {
@@ -70,33 +102,27 @@ public sealed class RetrieverAgent : StaticIronDevAgent
             process.StartInfo.ArgumentList.Add(argument);
 
         process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
 
-        var output = string.IsNullOrWhiteSpace(stderr)
-            ? stdout
-            : stdout + Environment.NewLine + stderr;
-        var prompt = BuildPrompt(project, query, stdout);
-        var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
-        var contextBundle = process.ExitCode == 0
-            ? BuildContextBundle(stdout, profile, prompt, liveLlmRequested, llmResult)
-            : output;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(SubprocessTimeoutSeconds));
 
-        return new AgentResult
+        try
         {
-            AgentName = AgentName,
-            Status = process.ExitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
-            Summary = ExtractSummary(stdout),
-            ModelProfileName = profile.Name,
-            Provider = profile.Provider,
-            Model = profile.Model,
-            ExitCode = process.ExitCode,
-            OutputJson = contextBundle,
-            CommandsRun = [command],
-            EvidencePaths = [],
-            CompletedAtUtc = DateTimeOffset.UtcNow
-        };
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            await process.WaitForExitAsync(timeoutCts.Token);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+            return (process.ExitCode, stdout, stderr, command);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Timeout — kill the process tree
+            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            return (-1, string.Empty,
+                $"RetrieverAgent subprocess timed out after {SubprocessTimeoutSeconds}s and was killed.",
+                command);
+        }
     }
 
     private static string RequireInput(AgentRequest request, string key)

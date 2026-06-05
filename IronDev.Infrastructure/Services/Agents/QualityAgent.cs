@@ -50,27 +50,9 @@ public sealed class QualityAgent : StaticIronDevAgent
         };
 
         var command = "powershell " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "powershell",
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
+        var (exitCode, stdout, stderr) = await RunProcessAsync("powershell", arguments, ct);
 
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-
-        var report = BuildQualityReport(stdout, stderr, planPath, runId, process.ExitCode);
+        var report = BuildQualityReport(stdout, stderr, planPath, runId, exitCode);
         var prompt = BuildPrompt(report);
         report.LlmIntelligence = BuildLlmEvidence(
             profile,
@@ -82,17 +64,60 @@ public sealed class QualityAgent : StaticIronDevAgent
         return new AgentResult
         {
             AgentName = AgentName,
-            Status = process.ExitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
+            Status = exitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
             Summary = report.Summary,
             ModelProfileName = profile.Name,
             Provider = profile.Provider,
             Model = profile.Model,
-            ExitCode = process.ExitCode,
+            ExitCode = exitCode,
             OutputJson = reportJson,
             CommandsRun = [command],
             EvidencePaths = report.EvidencePaths,
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private const int SubprocessTimeoutSeconds = 300;
+
+    private async Task<(int ExitCode, string Stdout, string Stderr)> RunProcessAsync(
+        string fileName, string[] arguments, CancellationToken ct)
+    {
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                WorkingDirectory = _repoRoot,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            }
+        };
+
+        foreach (var argument in arguments)
+            process.StartInfo.ArgumentList.Add(argument);
+
+        process.Start();
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(SubprocessTimeoutSeconds));
+
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            await process.WaitForExitAsync(timeoutCts.Token);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+            return (process.ExitCode, stdout, stderr);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Timeout — kill the process tree
+            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            return (-1, string.Empty,
+                $"QualityAgent subprocess timed out after {SubprocessTimeoutSeconds}s and was killed.");
+        }
     }
 
     private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
