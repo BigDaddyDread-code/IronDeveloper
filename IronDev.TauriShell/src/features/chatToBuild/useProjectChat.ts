@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
+import type { ChatClarificationKind, ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
@@ -400,14 +400,15 @@ async function hydrateMessagesWithDurableAudit(
 
 function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditResponse): ChatWorkspaceMessage {
   const mode = coerceChatGovernanceMode(audit.mode);
+  const clarification = normalizeAuditClarification(audit.clarification);
   const gate = getChatModeGate({
     mode,
     modeConfidence: audit.modeConfidence,
     modeReason: audit.modeReason,
     gate: audit.gate
   });
-  const disambiguationQuestion = audit.clarification?.required
-    ? audit.clarification.questions?.[0] ?? null
+  const disambiguationQuestion = clarification?.required
+    ? clarification.questions?.[0] ?? null
     : null;
 
   return {
@@ -418,7 +419,7 @@ function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditRe
       mode,
       modeConfidence: audit.modeConfidence,
       modeReason: audit.modeReason,
-      clarification: audit.clarification,
+      clarification,
       gate,
       contextSummary: audit.contextSummary ?? null,
       linkedFilePaths: audit.linkedFilePaths ?? null,
@@ -438,18 +439,69 @@ function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditRe
 }
 
 function buildDurableAuditTrace(audit: ChatTurnAuditResponse) {
+  const clarification = normalizeAuditClarification(audit.clarification);
   return [
     `Durable audit source: ${audit.source}.`,
     `Mode: ${audit.mode} (${Math.round(audit.modeConfidence * 100)}%).`,
     `Mode reason: ${audit.modeReason}`,
-    audit.clarification?.required
-      ? `Clarification: ${audit.clarification.kind} - ${(audit.clarification.questions ?? []).join(' | ')}`
+    clarification?.required
+      ? `Clarification: ${clarification.kind} - ${(clarification.questions ?? []).join(' | ')}`
       : 'Clarification: none required.',
     `Gate: save=${Boolean(audit.gate?.canSaveDiscussion)}; ticket=${Boolean(audit.gate?.canCreateTicket)}; sources=${Boolean(audit.gate?.canViewSources)}; copy=${Boolean(audit.gate?.canCopyMarkdown)}.`,
     audit.routeTraceId ? `Route trace id: ${audit.routeTraceId}` : 'Route trace id: none.',
     audit.dogfoodTraceId ? `Dogfood trace id: ${audit.dogfoodTraceId}` : 'Dogfood trace id: none.',
     audit.isFallbackEvidence ? 'Fallback evidence: present.' : 'Fallback evidence: none.'
   ];
+}
+
+function normalizeAuditClarification(clarification: ChatTurnAuditResponse['clarification'] | null | undefined) {
+  if (!clarification) {
+    return null;
+  }
+
+  return {
+    ...clarification,
+    kind: coerceChatClarificationKind(clarification.kind)
+  };
+}
+
+function coerceChatClarificationKind(value: ChatClarificationKind | number | string | null | undefined): ChatClarificationKind {
+  if (value === 0) {
+    return 'None';
+  }
+
+  if (value === 1) {
+    return 'GeneralScope';
+  }
+
+  if (value === 2) {
+    return 'ProductScope';
+  }
+
+  if (value === 3) {
+    return 'MissingProjectContext';
+  }
+
+  if (value === 4) {
+    return 'GovernanceIntent';
+  }
+
+  if (value === 5) {
+    return 'SafetyOrRisk';
+  }
+
+  const normalized = String(value ?? '').trim();
+  if (
+    normalized === 'GeneralScope' ||
+    normalized === 'ProductScope' ||
+    normalized === 'MissingProjectContext' ||
+    normalized === 'GovernanceIntent' ||
+    normalized === 'SafetyOrRisk'
+  ) {
+    return normalized;
+  }
+
+  return 'None';
 }
 
 function hasAssistantTagReplayMetadata(metadata: ReturnType<typeof parseAssistantTagMetadata>) {

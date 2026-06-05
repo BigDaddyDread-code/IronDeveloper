@@ -86,6 +86,7 @@ builder.Services.AddScoped<IChatClarificationClassifier, LlmChatClarificationCla
 builder.Services.AddScoped<IChatTurnPersistenceService, ChatTurnPersistenceService>();
 builder.Services.AddScoped<IChatPromptTemplateProvider, FileSystemChatPromptTemplateProvider>();
 builder.Services.AddScoped<ProjectChatContextPipeline>();
+builder.Services.AddScoped<ProjectChatContextStateCompiler>();
 builder.Services.AddScoped<ProjectChatResponseComposer>();
 builder.Services.AddSingleton<ProjectChatResponseMetadataBuilder>();
 builder.Services.AddScoped<IProjectChatResponseService, ProjectChatResponseService>();

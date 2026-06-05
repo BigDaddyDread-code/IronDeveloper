@@ -32,6 +32,28 @@ public sealed class LlmChatClarificationClassifierTests
     }
 
     [TestMethod]
+    public async Task ClassifyAsync_RecommendationRequestDoesNotRequireClarification()
+    {
+        var llm = new StubLlmService("""
+            {
+              "required": true,
+              "kind": "ProductScope",
+              "questions": ["What first playable slice do you want to build?"],
+              "reason": "The model should not be asked for this turn."
+            }
+            """);
+        var classifier = new LlmChatClarificationClassifier(llm);
+
+        var clarification = await classifier.ClassifyAsync(BuildRequest(
+            "So what slice be",
+            new ChatModeDecision(ChatGovernanceMode.Exploration, 0.9, "The user is asking for a next slice recommendation.")));
+
+        Assert.IsFalse(clarification.Required);
+        Assert.AreEqual(ChatClarificationKind.None, clarification.Kind);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
+    }
+
+    [TestMethod]
     public async Task ClassifyAsync_GovernanceIntentIsClarificationOnly()
     {
         var llm = new StubLlmService("""
@@ -50,6 +72,62 @@ public sealed class LlmChatClarificationClassifierTests
 
         Assert.IsTrue(clarification.Required);
         Assert.AreEqual(ChatClarificationKind.GovernanceIntent, clarification.Kind);
+    }
+
+    [TestMethod]
+    public async Task ClassifyAsync_AddThatArchitectureWithBoundTargetDoesNotRequireMissingProjectClarification()
+    {
+        var llm = new StubLlmService("""
+            {
+              "required": true,
+              "kind": "MissingProjectContext",
+              "questions": ["Which project should I add this to?"],
+              "reason": "The model should not be asked for this turn."
+            }
+            """);
+        var classifier = new LlmChatClarificationClassifier(llm);
+
+        var clarification = await classifier.ClassifyAsync(BuildRequest(
+            "add that artecture",
+            new ChatModeDecision(ChatGovernanceMode.Formalization, 0.94, "The user asked to add the bound architecture."),
+            recentConversationSummary: """
+                user: I want to build a goblin shopkeeper game. Customers get angrier each day.
+                user: sql server and entity framework
+                assistant: SQL Server and Entity Framework are the right durable storage architecture.
+                """,
+            routeEffectiveWorkText: "Add SQL Server + Entity Framework as the architecture decision for Goblin Shopkeeper Game storage architecture."));
+
+        Assert.IsFalse(clarification.Required);
+        Assert.AreEqual(ChatClarificationKind.None, clarification.Kind);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
+    }
+
+    [TestMethod]
+    public async Task ClassifyAsync_ArtifactFromAlreadyDecidedContextDoesNotAskUserToRepeatDecisions()
+    {
+        var llm = new StubLlmService("""
+            {
+              "required": true,
+              "kind": "MissingProjectContext",
+              "questions": ["What specific architecture decisions have already been made?"],
+              "reason": "The model should not be asked for this turn."
+            }
+            """);
+        var classifier = new LlmChatClarificationClassifier(llm);
+
+        var clarification = await classifier.ClassifyAsync(BuildRequest(
+            "can you create artecture document with whats already decided and question need answering",
+            new ChatModeDecision(ChatGovernanceMode.Formalization, 0.9, "The user requested an architecture document."),
+            recentConversationSummary: """
+                user: I want to build a fishing game where the fish get smarter each day
+                user: use Unity
+                user: use SQL Server backend and Dapper
+                """,
+            routeEffectiveWorkText: "Create an architecture document from known decisions and open questions."));
+
+        Assert.IsFalse(clarification.Required);
+        Assert.AreEqual(ChatClarificationKind.None, clarification.Kind);
+        Assert.AreEqual(0, llm.ReceivedPrompts.Count);
     }
 
     [TestMethod]
@@ -95,11 +173,13 @@ public sealed class LlmChatClarificationClassifierTests
         string userMessage,
         ChatModeDecision modeDecision,
         bool requiresClarification = true,
-        IReadOnlyList<string>? questions = null)
+        IReadOnlyList<string>? questions = null,
+        string recentConversationSummary = "",
+        string? routeEffectiveWorkText = null)
     {
         return new ChatClarificationClassificationRequest(
             userMessage,
-            RecentConversationSummary: string.Empty,
+            RecentConversationSummary: recentConversationSummary,
             ContextState: new ChatContextState(
                 requiresClarification,
                 questions ?? ["What first slice should we shape?"],
@@ -109,7 +189,7 @@ public sealed class LlmChatClarificationClassifierTests
             RouteHint: new ContextAgentRouteDecision
             {
                 OriginalUserRequest = userMessage,
-                EffectiveWorkText = userMessage,
+                EffectiveWorkText = routeEffectiveWorkText ?? userMessage,
                 RequestKind = ContextRequestKind.GeneralChat,
                 Confidence = 0.75,
                 Reason = "Test route hint.",

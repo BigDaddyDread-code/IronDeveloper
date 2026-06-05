@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 
@@ -18,7 +19,12 @@ public sealed class ConversationContextResolver : IConversationContextResolver
         "recommended approach",
         "standard approach",
         "what's standard",
-        "what is standard"
+        "what is standard",
+        "what do you recommend",
+        "what do yo recommend",
+        "what would you recommend",
+        "what should i use",
+        "which should i use"
     ];
 
     private static readonly string[] ConfirmationFollowUps =
@@ -43,6 +49,18 @@ public sealed class ConversationContextResolver : IConversationContextResolver
         "is it already implemented",
         "check this exists",
         "verify this exists"
+    ];
+
+    private static readonly string[] ArchitectureAddFollowUps =
+    [
+        "add that architecture",
+        "add that artecture",
+        "add this architecture",
+        "add this artecture",
+        "capture that architecture",
+        "capture this architecture",
+        "record that architecture",
+        "record this architecture"
     ];
 
     public ConversationContextResolution Resolve(ContextAgentRouteRequest request)
@@ -104,8 +122,41 @@ public sealed class ConversationContextResolver : IConversationContextResolver
                 "Ticket command inherits the active topic and pending recommendation.");
         }
 
+        if (IsAny(lower, ArchitectureAddFollowUps))
+        {
+            var recommendation = FirstUseful(
+                snapshot.LastRecommendation,
+                snapshot.LastOptionsPresented.LastOrDefault());
+
+            return Resolved(
+                original,
+                BuildArchitectureAddText(snapshot, recommendation),
+                "ArchitectureDecision",
+                ContextRequestKind.ArchitectureDecisionExploration,
+                snapshot,
+                requiresCodeEvidence: false,
+                allowsTicketCreation: false,
+                ["ActiveTopic", "PendingDecision", "LastRecommendation", "LastOptionsPresented"],
+                "Architecture add follow-up resolved against latest topical target.");
+        }
+
         if (IsAny(lower, ConfirmationFollowUps))
         {
+            if (IsShortAffirmation(lower) &&
+                !LastAssistantAskedForGovernanceCommitment(request.RecentConversationSummary))
+            {
+                return Resolved(
+                    original,
+                    BuildExplorationContinuationText(snapshot),
+                    "Exploration",
+                    ContextRequestKind.GeneralChat,
+                    snapshot,
+                    requiresCodeEvidence: false,
+                    allowsTicketCreation: false,
+                    ["TopicKind", "ActiveTopic", "LastOptionsPresented"],
+                    "Short affirmation resolved against the active non-governance topic.");
+            }
+
             var recommendation = FirstUseful(
                 ExtractRecommendationFromConfirmation(original),
                 snapshot.LastRecommendation,
@@ -132,7 +183,7 @@ public sealed class ConversationContextResolver : IConversationContextResolver
             var topic = DescribeTopic(snapshot);
             var text = lower.Contains("industry standard")
                 ? BuildIndustryStandardQuestion(snapshot)
-                : $"What is the recommended architecture approach for {topic}?";
+                : BuildRecommendationQuestion(snapshot, topic);
 
             return Resolved(
                 original,
@@ -156,37 +207,98 @@ public sealed class ConversationContextResolver : IConversationContextResolver
             return null;
 
         var haystack = $"{conversation}\n{request.UserRequest}".ToLowerInvariant();
-        var isPersistenceDiscussion =
-            ContainsAny(haystack, "persist", "persistence", "save data", "database", "db", "orm", "dapper", "sql server") &&
-            ContainsAny(haystack, "bookseller", "bookservice", "book.cs", "books");
+        return TryInferTopicalSnapshot(request, conversation, haystack);
+    }
 
-        if (!isPersistenceDiscussion)
-            return null;
+    private static ConversationContextSnapshot? TryInferTopicalSnapshot(
+        ContextAgentRouteRequest request,
+        string conversation,
+        string haystack)
+    {
+        var projectName = InferProjectName(conversation);
 
-        var projectName = ContainsAny(haystack, "bookseller", "bookservice", "book.cs")
-            ? "BookSeller"
-            : "the project";
-
-        var recommendation = ExtractPersistenceRecommendation(request.UserRequest);
-        if (string.IsNullOrWhiteSpace(recommendation))
-            recommendation = ExtractPersistenceRecommendation(conversation);
-
-        return new ConversationContextSnapshot
+        if (IsStorageChoice(haystack))
         {
-            ProjectId = request.ProjectId,
-            SessionId = request.SessionId,
-            ActiveTopic = $"{projectName} persistence architecture",
-            CurrentGoal = "choose database and data access approach",
-            ContextMode = "ArchitectureAdvice",
-            PendingDecision = "Choose persistence engine and data access style",
-            LastRecommendation = recommendation,
-            LastOptionsPresented = string.IsNullOrWhiteSpace(recommendation) ? [] : [recommendation],
-            KnownFacts =
-            [
-                $"{projectName} currently has no database",
-                $"{projectName} needs persisted book data"
-            ]
-        };
+            var options = ExtractStorageOptions(haystack);
+            var recommendation = ExtractStorageRecommendation(haystack);
+            return new ConversationContextSnapshot
+            {
+                ProjectId = request.ProjectId,
+                SessionId = request.SessionId,
+                TopicKind = ConversationTopicKind.StorageChoice,
+                ActiveTopic = $"{projectName} storage architecture",
+                CurrentGoal = "choose storage approach",
+                ContextMode = "ArchitectureAdvice",
+                PendingDecision = "Choose storage engine and data access style",
+                LastRecommendation = recommendation,
+                LastOptionsPresented = options,
+                KnownFacts =
+                [
+                    $"{projectName} is the active project idea",
+                    "The latest topical target is storage choice"
+                ]
+            };
+        }
+
+        if (IsPlatformChoice(haystack))
+        {
+            return new ConversationContextSnapshot
+            {
+                ProjectId = request.ProjectId,
+                SessionId = request.SessionId,
+                TopicKind = ConversationTopicKind.PlatformChoice,
+                ActiveTopic = $"{projectName} platform choice",
+                CurrentGoal = "choose first implementation platform",
+                ContextMode = "ArchitectureAdvice",
+                PendingDecision = "Choose platform/runtime for the first playable version",
+                LastOptionsPresented = ExtractPlatformOptions(haystack),
+                KnownFacts =
+                [
+                    $"{projectName} is the active project idea",
+                    "The latest topical target is platform choice"
+                ]
+            };
+        }
+
+        if (ContainsAny(haystack, "rules of the game", "game rules", "rules for"))
+        {
+            return new ConversationContextSnapshot
+            {
+                ProjectId = request.ProjectId,
+                SessionId = request.SessionId,
+                TopicKind = ConversationTopicKind.GameRules,
+                ActiveTopic = $"{projectName} game rules",
+                CurrentGoal = "capture and refine the game rules",
+                ContextMode = "ArchitectureAdvice",
+                PendingDecision = "Decide the game rules to preserve",
+                KnownFacts =
+                [
+                    $"{projectName} is the active project idea",
+                    "The latest topical target is game rules"
+                ]
+            };
+        }
+
+        if (ContainsAny(haystack, "first slice", "what slice", "smallest playable", "slice 1"))
+        {
+            return new ConversationContextSnapshot
+            {
+                ProjectId = request.ProjectId,
+                SessionId = request.SessionId,
+                TopicKind = ConversationTopicKind.FirstSlice,
+                ActiveTopic = $"{projectName} first playable slice",
+                CurrentGoal = "choose the first playable slice",
+                ContextMode = "ArchitectureAdvice",
+                PendingDecision = "Choose the first playable slice",
+                KnownFacts =
+                [
+                    $"{projectName} is the active project idea",
+                    "The latest topical target is first slice"
+                ]
+            };
+        }
+
+        return null;
     }
 
     public static ConversationContextSnapshot? TryParseSnapshot(string text)
@@ -242,6 +354,7 @@ public sealed class ConversationContextResolver : IConversationContextResolver
             SessionId = ParseLong(single.GetValueOrDefault("SessionId")),
             ProjectId = ParseInt(single.GetValueOrDefault("ProjectId")),
             ActiveTopic = single.GetValueOrDefault("ActiveTopic") ?? string.Empty,
+            TopicKind = ParseTopicKind(single.GetValueOrDefault("TopicKind")),
             CurrentGoal = single.GetValueOrDefault("CurrentGoal") ?? string.Empty,
             ContextMode = single.GetValueOrDefault("ContextMode") ?? string.Empty,
             PendingDecision = single.GetValueOrDefault("PendingDecision") ?? string.Empty,
@@ -299,6 +412,30 @@ public sealed class ConversationContextResolver : IConversationContextResolver
     private static bool IsAny(string lower, IEnumerable<string> phrases)
         => phrases.Any(p => lower == p || lower.TrimEnd('?') == p || lower.StartsWith(p + " "));
 
+    private static bool IsShortAffirmation(string lower)
+        => lower is "yes" or "y" or "yep" or "yeah" or "ok" or "okay" or "sounds good";
+
+    private static bool LastAssistantAskedForGovernanceCommitment(string recentConversationSummary)
+    {
+        if (string.IsNullOrWhiteSpace(recentConversationSummary))
+            return false;
+
+        var lastAssistant = recentConversationSummary
+            .Replace("\r\n", "\n")
+            .Split('\n')
+            .LastOrDefault(line => line.TrimStart().StartsWith("assistant:", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(lastAssistant))
+            return false;
+
+        var normalized = lastAssistant.ToLowerInvariant();
+        return normalized.Contains("save this", StringComparison.Ordinal) ||
+               normalized.Contains("record this", StringComparison.Ordinal) ||
+               normalized.Contains("create a ticket", StringComparison.Ordinal) ||
+               normalized.Contains("turn this into", StringComparison.Ordinal) ||
+               normalized.Contains("commit", StringComparison.Ordinal) ||
+               normalized.Contains("architecture decision", StringComparison.Ordinal);
+    }
+
     private static bool ContainsAny(string text, params string[] terms)
         => terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
 
@@ -311,14 +448,6 @@ public sealed class ConversationContextResolver : IConversationContextResolver
     private static string BuildPersistenceSubject(ConversationContextSnapshot snapshot)
     {
         var recommendation = FirstUseful(snapshot.LastRecommendation, snapshot.LastOptionsPresented.FirstOrDefault());
-        if (IsBookPersistence(snapshot))
-        {
-            var project = ExtractProjectName(snapshot);
-            return string.IsNullOrWhiteSpace(recommendation)
-                ? $"{project} has persistence for books already"
-                : $"{project} already has {recommendation} persistence for books";
-        }
-
         var topic = DescribeTopic(snapshot);
         return string.IsNullOrWhiteSpace(recommendation)
             ? $"{topic} already exists"
@@ -328,9 +457,6 @@ public sealed class ConversationContextResolver : IConversationContextResolver
     private static string BuildTicketWorkText(ConversationContextSnapshot snapshot)
     {
         var recommendation = FirstUseful(snapshot.LastRecommendation, snapshot.LastOptionsPresented.FirstOrDefault());
-        if (IsBookPersistence(snapshot) && !string.IsNullOrWhiteSpace(recommendation))
-            return $"add {recommendation} persistence for {ExtractProjectName(snapshot)} books.";
-
         var topic = DescribeTopic(snapshot);
         if (!string.IsNullOrWhiteSpace(recommendation))
             return $"add {recommendation} for {topic}.";
@@ -341,10 +467,18 @@ public sealed class ConversationContextResolver : IConversationContextResolver
 
     private static string BuildIndustryStandardQuestion(ConversationContextSnapshot snapshot)
     {
-        if (IsBookPersistence(snapshot))
-            return $"What is the industry-standard persistence approach for {ExtractProjectName(snapshot)}?";
-
         return $"What is the industry-standard approach for {DescribeTopic(snapshot)}?";
+    }
+
+    private static string BuildRecommendationQuestion(ConversationContextSnapshot snapshot, string topic)
+    {
+        if ((IsStorageSnapshot(snapshot) || IsPlatformSnapshot(snapshot)) &&
+            snapshot.LastOptionsPresented.Count > 0)
+        {
+            return $"Recommend between {string.Join(" and ", snapshot.LastOptionsPresented)} for {topic}.";
+        }
+
+        return $"What is the recommended architecture approach for {topic}?";
     }
 
     private static string BuildConfirmationText(
@@ -352,18 +486,31 @@ public sealed class ConversationContextResolver : IConversationContextResolver
         string recommendation,
         string verb)
     {
-        if (!string.IsNullOrWhiteSpace(recommendation) && IsBookPersistence(snapshot))
-        {
-            var project = ExtractProjectName(snapshot);
-            return verb == "Select"
-                ? $"Select {recommendation} from the last persistence options presented for {project}."
-                : $"Confirm {recommendation} as the persistence recommendation for {project}.";
-        }
-
         if (!string.IsNullOrWhiteSpace(recommendation))
             return $"{verb} {recommendation} for {DescribeTopic(snapshot)}.";
 
         return $"{verb} the pending decision for {DescribeTopic(snapshot)}.";
+    }
+
+    private static string BuildExplorationContinuationText(ConversationContextSnapshot snapshot)
+    {
+        var selected = FirstUseful(snapshot.LastRecommendation, snapshot.LastOptionsPresented.LastOrDefault());
+        var topic = DescribeTopic(snapshot);
+        return string.IsNullOrWhiteSpace(selected)
+            ? $"Continue exploring {topic}."
+            : $"Continue with {selected} for {topic}.";
+    }
+
+    private static string BuildArchitectureAddText(ConversationContextSnapshot snapshot, string recommendation)
+    {
+        var topic = DescribeTopic(snapshot);
+        if (!string.IsNullOrWhiteSpace(recommendation))
+            return $"Add {recommendation} as the architecture decision for {topic}.";
+
+        if (!string.IsNullOrWhiteSpace(snapshot.PendingDecision))
+            return $"Add the pending architecture decision for {topic}: {snapshot.PendingDecision}.";
+
+        return $"Add the architecture decision for {topic}.";
     }
 
     private static string ExtractRecommendationFromConfirmation(string text)
@@ -401,6 +548,112 @@ public sealed class ConversationContextResolver : IConversationContextResolver
         return "Dapper";
     }
 
+    private static bool IsStorageChoice(string haystack)
+        => ContainsAny(haystack, "json or sql server", "sql server", "entity framework", "ef core", "database", "storage");
+
+    private static bool IsPlatformChoice(string haystack)
+        => ContainsAny(haystack, "web or forms", "winforms", "windows forms", "web app", "desktop app");
+
+    private static bool IsStorageSnapshot(ConversationContextSnapshot snapshot)
+        => snapshot.TopicKind == ConversationTopicKind.StorageChoice ||
+           snapshot.TopicKind == ConversationTopicKind.ArchitectureChoice ||
+           ContainsAny(
+            $"{snapshot.ActiveTopic} {snapshot.CurrentGoal} {snapshot.PendingDecision}",
+            "storage",
+            "database",
+            "persistence");
+
+    private static bool IsPlatformSnapshot(ConversationContextSnapshot snapshot)
+        => snapshot.TopicKind == ConversationTopicKind.PlatformChoice ||
+           ContainsAny(
+            $"{snapshot.ActiveTopic} {snapshot.CurrentGoal} {snapshot.PendingDecision}",
+            "platform",
+            "runtime",
+            "winforms",
+            "web");
+
+    private static IReadOnlyList<string> ExtractStorageOptions(string haystack)
+    {
+        var options = new List<string>();
+        AddIfPresent(options, haystack, "json", "JSON");
+        AddIfPresent(options, haystack, "sql server", "SQL Server");
+        AddIfPresent(options, haystack, "entity framework", "Entity Framework");
+        AddIfPresent(options, haystack, "ef core", "EF Core");
+        AddIfPresent(options, haystack, "sqlite", "SQLite");
+        AddIfPresent(options, haystack, "postgres", "PostgreSQL");
+        return CoalesceStorageOptions(options);
+    }
+
+    private static IReadOnlyList<string> ExtractPlatformOptions(string haystack)
+    {
+        var options = new List<string>();
+        AddIfPresent(options, haystack, "web", "Web");
+        AddIfPresent(options, haystack, "forms", "WinForms");
+        AddIfPresent(options, haystack, "winforms", "WinForms");
+        AddIfPresent(options, haystack, "windows forms", "WinForms");
+        AddIfPresent(options, haystack, "desktop", "Desktop");
+        return options.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static IReadOnlyList<string> CoalesceStorageOptions(IReadOnlyList<string> options)
+    {
+        var normalized = options.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (normalized.Contains("SQL Server", StringComparer.OrdinalIgnoreCase) &&
+            normalized.Contains("Entity Framework", StringComparer.OrdinalIgnoreCase))
+        {
+            normalized.RemoveAll(option => option.Equals("SQL Server", StringComparison.OrdinalIgnoreCase) ||
+                                           option.Equals("Entity Framework", StringComparison.OrdinalIgnoreCase));
+            normalized.Add("SQL Server + Entity Framework");
+        }
+
+        return normalized;
+    }
+
+    private static string ExtractStorageRecommendation(string haystack)
+    {
+        if (haystack.Contains("sql server", StringComparison.OrdinalIgnoreCase) &&
+            (haystack.Contains("entity framework", StringComparison.OrdinalIgnoreCase) ||
+             haystack.Contains("ef core", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "SQL Server + Entity Framework";
+        }
+
+        if (haystack.Contains("sql server", StringComparison.OrdinalIgnoreCase) &&
+            haystack.Contains("i will", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SQL Server";
+        }
+
+        return string.Empty;
+    }
+
+    private static string InferProjectName(string conversation)
+    {
+        var projectMatch = Regex.Match(
+            conversation,
+            @"(?<name>[A-Z][A-Za-z0-9]+)\s+project",
+            RegexOptions.CultureInvariant);
+
+        if (projectMatch.Success)
+            return projectMatch.Groups["name"].Value.Trim();
+
+        var match = Regex.Match(
+            conversation,
+            @"build\s+(?:a|an)?\s*(?<name>[a-z0-9 '\-]+?game)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (match.Success)
+            return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(match.Groups["name"].Value.Trim().ToLowerInvariant());
+
+        return "the current project";
+    }
+
+    private static void AddIfPresent(List<string> options, string haystack, string needle, string label)
+    {
+        if (haystack.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            options.Add(label);
+    }
+
     private static string NormalizeRecommendation(string value)
     {
         var cleaned = value.Trim().TrimEnd('.', '!', '?');
@@ -413,30 +666,14 @@ public sealed class ConversationContextResolver : IConversationContextResolver
             .Trim();
     }
 
-    private static bool IsBookPersistence(ConversationContextSnapshot snapshot)
-    {
-        var haystack = string.Join(" ", new[]
-        {
-            snapshot.ActiveTopic,
-            snapshot.CurrentGoal,
-            snapshot.PendingDecision,
-            snapshot.LastRecommendation,
-            string.Join(" ", snapshot.KnownFacts)
-        }).ToLowerInvariant();
-
-        return haystack.Contains("bookseller") &&
-               (haystack.Contains("persist") || haystack.Contains("database") || haystack.Contains("storage"));
-    }
-
-    private static string ExtractProjectName(ConversationContextSnapshot snapshot)
-    {
-        var topic = DescribeTopic(snapshot);
-        var first = topic.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        return string.IsNullOrWhiteSpace(first) ? "the project" : first;
-    }
-
     private static string FirstUseful(params string?[] values)
         => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
+
+    private static ConversationTopicKind ParseTopicKind(string? value)
+        => Enum.TryParse(value, ignoreCase: true, out ConversationTopicKind parsed) &&
+           Enum.IsDefined(parsed)
+            ? parsed
+            : ConversationTopicKind.Unknown;
 
     private static long ParseLong(string? value)
         => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;

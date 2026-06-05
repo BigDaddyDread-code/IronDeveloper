@@ -191,6 +191,36 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task SaveMessageAsync_NormalizesRequiredClarificationWithNoneKind()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Invalid clarification invariant test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Need a slice recommendation.",
+            Tags = BuildInvalidClarificationEnvelopeJson()
+        });
+
+        var snapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsTrue(snapshot.Clarification.Required);
+        Assert.AreNotEqual(ChatClarificationKind.None, snapshot.Clarification.Kind);
+        Assert.AreEqual(ChatClarificationKind.GeneralScope, snapshot.Clarification.Kind);
+        Assert.AreEqual("What slice should we start with?", snapshot.Clarification.Questions.Single());
+    }
+
+    [TestMethod]
     public async Task DeleteSessionAsync_DeletesPersistedTurnRowsBeforeMessages()
     {
         var projectId = await SeedProjectAsync();
@@ -270,6 +300,34 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
           },
           "routeTraceId": "route-fallback",
           "dogfoodTraceId": "dogfood-fallback"
+        }
+        """;
+
+    private static string BuildInvalidClarificationEnvelopeJson() =>
+        """
+        {
+          "v": 1,
+          "mode": "Exploration",
+          "modeConfidence": 0.85,
+          "modeReason": "The user is exploring a product slice.",
+          "clarification": {
+            "required": true,
+            "kind": "None",
+            "questions": ["What slice should we start with?"],
+            "reason": "Invalid contradictory envelope from replay."
+          },
+          "gate": {
+            "mode": "Exploration",
+            "canSaveDiscussion": false,
+            "canCreateTicket": false,
+            "canViewSources": false,
+            "canCopyMarkdown": false,
+            "reason": "The user is exploring a product slice.",
+            "confidence": 0.85,
+            "governanceActions": []
+          },
+          "routeTraceId": null,
+          "dogfoodTraceId": "dogfood-invalid-clarification"
         }
         """;
 }

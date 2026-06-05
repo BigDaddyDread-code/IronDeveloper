@@ -63,7 +63,7 @@ public sealed class ContextAgentRouteJudgeTests
     }
 
     [TestMethod]
-    public async Task DecideRouteAsync_PersistsContextModeHint_FromJsonDecision()
+    public async Task DecideRouteAsync_NormalizesGovernanceModeHint_FromJsonDecision()
     {
         // Arrange
         var request = new ContextAgentRouteRequest
@@ -95,7 +95,7 @@ public sealed class ContextAgentRouteJudgeTests
         var decision = await _judge.DecideRouteAsync(request);
 
         // Assert
-        Assert.AreEqual("Formalization", decision.ContextModeHint);
+        Assert.AreEqual("Exploration", decision.ContextModeHint);
     }
 
     [TestMethod]

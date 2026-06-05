@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { EmptyState } from '../../components/EmptyState';
 import type { ChatWorkspaceMessage } from './chatTypes';
 import { ChatMessage } from './ChatMessage';
@@ -10,6 +11,15 @@ interface ChatThreadProps {
 }
 
 export function ChatThread({ messages, isSending, onSaveDiscussion, onViewSources }: ChatThreadProps) {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'end'
+    });
+  }, [messages.length, isSending]);
+
   return (
     <section className="chat-thread" data-testid="chat.thread">
       {messages.length === 0 ? (
@@ -27,6 +37,7 @@ export function ChatThread({ messages, isSending, onSaveDiscussion, onViewSource
               onViewSources={onViewSources}
             />
           ))}
+          <div ref={bottomRef} />
         </div>
       )}
       {isSending ? <p className="chat-thread__sending" data-testid="chat.sending">Sending...</p> : null}

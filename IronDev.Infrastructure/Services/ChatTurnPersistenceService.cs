@@ -57,6 +57,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         var envelope = ParseEnvelope(request.Tags);
         if (envelope is null)
             return;
+        var clarification = NormalizeClarification(envelope.Clarification);
 
         const string deleteSql = """
             DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @ChatMessageId AND TenantId = @TenantId;
@@ -108,10 +109,10 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 request.ProjectId,
                 request.ChatSessionId,
                 request.ChatMessageId,
-                Required = envelope.Clarification.Required,
-                Kind = envelope.Clarification.Kind.ToString(),
-                envelope.Clarification.Reason,
-                QuestionsJson = JsonSerializer.Serialize(envelope.Clarification.Questions, JsonOptions)
+                Required = clarification.Required,
+                Kind = clarification.Kind.ToString(),
+                clarification.Reason,
+                QuestionsJson = JsonSerializer.Serialize(clarification.Questions, JsonOptions)
             },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -214,9 +215,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             ? Array.Empty<string>()
             : JsonSerializer.Deserialize<IReadOnlyList<string>>(row.QuestionsJson, JsonOptions) ?? Array.Empty<string>();
 
-        var clarification = row.Required
-            ? new ChatClarificationState(true, kind, questions, row.ClarificationReason)
-            : ChatClarificationState.None;
+        var clarification = NormalizeClarification(row.Required, kind, questions, row.ClarificationReason);
 
         return new ChatTurnPersistenceSnapshot(
             row.ChatMessageId,
@@ -246,6 +245,39 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         {
             return null;
         }
+    }
+
+    private static ChatClarificationState NormalizeClarification(ChatClarificationState clarification) =>
+        NormalizeClarification(
+            clarification.Required,
+            clarification.Kind,
+            clarification.Questions,
+            clarification.Reason);
+
+    private static ChatClarificationState NormalizeClarification(
+        bool required,
+        ChatClarificationKind kind,
+        IReadOnlyList<string> questions,
+        string? reason)
+    {
+        var normalizedQuestions = questions
+            .Where(question => !string.IsNullOrWhiteSpace(question))
+            .Select(question => question.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (!required || (kind == ChatClarificationKind.None && normalizedQuestions.Count == 0))
+            return ChatClarificationState.None;
+
+        var normalizedKind = kind == ChatClarificationKind.None
+            ? ChatClarificationKind.GeneralScope
+            : kind;
+
+        return new ChatClarificationState(
+            true,
+            normalizedKind,
+            normalizedQuestions,
+            string.IsNullOrWhiteSpace(reason) ? $"Clarification required for {normalizedKind}." : reason.Trim());
     }
 
     private sealed class PersistedTurnRow

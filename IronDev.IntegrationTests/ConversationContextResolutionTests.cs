@@ -29,7 +29,7 @@ public sealed class ConversationContextResolutionTests
         });
 
         Assert.AreEqual(ContextRequestKind.ArchitectureAdvice, decision.RequestKind);
-        Assert.AreEqual("What is the industry-standard persistence approach for BookSeller?", decision.EffectiveWorkText);
+        Assert.AreEqual("What is the industry-standard approach for BookSeller persistence architecture?", decision.EffectiveWorkText);
         Assert.IsTrue(decision.UsedConversationContextResolver);
         Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
 
@@ -60,7 +60,7 @@ public sealed class ConversationContextResolutionTests
 
         var routeTrace = FindTrace(traceService, ContextAgentStage.RouteDecision);
         Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("Kind=ArchitectureAdvice"));
-        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("What is the industry-standard persistence approach for BookSeller?"));
+        Assert.IsTrue(routeTrace.ParsedResponseSummary.Contains("What is the industry-standard approach for BookSeller persistence architecture?"));
 
         var toolSearch = traceService.GetRecentTraces()
             .Any(t => t.FeatureName == ContextAgentStage.ToolCallSearch);
@@ -87,7 +87,7 @@ public sealed class ConversationContextResolutionTests
     }
 
     [TestMethod]
-    public async Task YesFollowUp_ConfirmsPendingRecommendation()
+    public async Task YesFollowUp_BindsToActiveTopicWithoutCreatingDecisionArtifact()
     {
         var judge = new ContextAgentRouteJudgeService(new ConversationStateAwareLlm(), new LlmTraceService());
 
@@ -99,8 +99,8 @@ public sealed class ConversationContextResolutionTests
             RecentConversationSummary = BookSellerPersistenceState()
         });
 
-        Assert.AreEqual(ContextRequestKind.ArchitectureDecisionExploration, decision.RequestKind);
-        Assert.AreEqual("Confirm SQLite + Dapper as the persistence recommendation for BookSeller.", decision.EffectiveWorkText);
+        Assert.AreEqual(ContextRequestKind.GeneralChat, decision.RequestKind);
+        Assert.AreEqual("Continue with SQLite + Dapper for BookSeller persistence architecture.", decision.EffectiveWorkText);
         Assert.IsFalse(decision.NeedsClarification);
         Assert.IsFalse(decision.AllowCodeSearch);
         Assert.IsFalse(decision.AllowConflictAssessment);
@@ -122,7 +122,7 @@ public sealed class ConversationContextResolutionTests
         });
 
         Assert.AreEqual(ContextRequestKind.ArchitectureDecisionExploration, decision.RequestKind);
-        Assert.AreEqual("Confirm SQL Server + Dapper as the persistence recommendation for BookSeller.", decision.EffectiveWorkText);
+        Assert.AreEqual("Confirm SQL Server + Dapper for BookSeller storage architecture.", decision.EffectiveWorkText);
         Assert.IsTrue(decision.UsedConversationContextResolver);
         Assert.IsFalse(decision.AllowCodeSearch);
         Assert.IsFalse(decision.AllowConflictAssessment);
@@ -169,7 +169,7 @@ public sealed class ConversationContextResolutionTests
         });
 
         Assert.AreEqual(ContextRequestKind.ArchitectureDecisionExploration, decision.RequestKind);
-        Assert.AreEqual("Select SQLite + Dapper from the last persistence options presented for BookSeller.", decision.EffectiveWorkText);
+        Assert.AreEqual("Select SQLite + Dapper for BookSeller persistence architecture.", decision.EffectiveWorkText);
         Assert.IsFalse(decision.NeedsClarification);
     }
 
@@ -187,7 +187,7 @@ public sealed class ConversationContextResolutionTests
         });
 
         Assert.AreEqual(ContextRequestKind.CreateTicket, decision.RequestKind);
-        Assert.AreEqual("add SQLite + Dapper persistence for BookSeller books.", decision.EffectiveWorkText);
+        Assert.AreEqual("add SQLite + Dapper for BookSeller persistence architecture.", decision.EffectiveWorkText);
         Assert.IsTrue(decision.AllowTicketCreation);
         Assert.IsTrue(decision.AllowConflictAssessment);
         Assert.IsTrue(decision.AllowConflictBlocking);
@@ -207,10 +207,76 @@ public sealed class ConversationContextResolutionTests
         });
 
         Assert.AreEqual(ContextRequestKind.VerifyImplementation, decision.RequestKind);
-        Assert.AreEqual("Verify whether BookSeller already has SQLite + Dapper persistence for books.", decision.EffectiveWorkText);
+        Assert.AreEqual("Verify whether SQLite + Dapper for BookSeller persistence architecture already exists.", decision.EffectiveWorkText);
         Assert.IsTrue(decision.AllowCodeSearch);
         Assert.IsTrue(decision.AllowDeepLookup);
         Assert.IsFalse(decision.AllowConflictAssessment);
+    }
+
+    [TestMethod]
+    public async Task WhatDoYouRecommendAfterJsonVsSqlServer_ResolvesStorageTarget()
+    {
+        var llm = new ConversationStateAwareLlm();
+        var judge = new ContextAgentRouteJudgeService(llm, new LlmTraceService());
+
+        var decision = await judge.DecideRouteAsync(new ContextAgentRouteRequest
+        {
+            ProjectId = 1,
+            SessionId = 4003,
+            UserRequest = "what do yo recommend",
+            RecentConversationSummary = GoblinStorageConversation()
+        });
+
+        Assert.AreEqual(ContextRequestKind.ArchitectureAdvice, decision.RequestKind);
+        Assert.AreEqual("Recommend between JSON and SQL Server for Goblin Shopkeeper Game storage architecture.", decision.EffectiveWorkText);
+        Assert.IsTrue(decision.UsedConversationContextResolver);
+        Assert.IsFalse(decision.NeedsClarification);
+        Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
+    }
+
+    [TestMethod]
+    public async Task YesAfterWinFormsQuestion_BindsPlatformTargetAsExploration()
+    {
+        var llm = new ConversationStateAwareLlm();
+        var judge = new ContextAgentRouteJudgeService(llm, new LlmTraceService());
+
+        var decision = await judge.DecideRouteAsync(new ContextAgentRouteRequest
+        {
+            ProjectId = 1,
+            SessionId = 4004,
+            UserRequest = "yes",
+            RecentConversationSummary = PetDragonPlatformConversation()
+        });
+
+        Assert.AreEqual(ContextRequestKind.GeneralChat, decision.RequestKind);
+        Assert.AreEqual("Continue with WinForms for Pet Dragon Game platform choice.", decision.EffectiveWorkText);
+        Assert.IsTrue(decision.UsedConversationContextResolver);
+        Assert.IsFalse(decision.NeedsClarification);
+        Assert.IsFalse(decision.AllowTicketCreation);
+        Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
+    }
+
+    [TestMethod]
+    public async Task AddThatArchitecture_BindsToLatestStorageArchitecture()
+    {
+        var llm = new ConversationStateAwareLlm();
+        var judge = new ContextAgentRouteJudgeService(llm, new LlmTraceService());
+
+        var decision = await judge.DecideRouteAsync(new ContextAgentRouteRequest
+        {
+            ProjectId = 1,
+            SessionId = 4003,
+            UserRequest = "add that artecture",
+            RecentConversationSummary = GoblinSqlServerEfConversation()
+        });
+
+        Assert.AreEqual(ContextRequestKind.ArchitectureDecisionExploration, decision.RequestKind);
+        Assert.AreEqual("Add SQL Server + Entity Framework as the architecture decision for Goblin Shopkeeper Game storage architecture.", decision.EffectiveWorkText);
+        Assert.IsTrue(decision.UsedConversationContextResolver);
+        Assert.IsFalse(decision.NeedsClarification);
+        Assert.IsFalse(decision.AllowCodeSearch);
+        Assert.IsFalse(decision.AllowConflictAssessment);
+        Assert.AreEqual(string.Empty, llm.LastRoutePrompt);
     }
 
     [TestMethod]
@@ -268,6 +334,7 @@ public sealed class ConversationContextResolutionTests
             ConversationContextSnapshot:
             SessionId: 9001
             ProjectId: 44
+            TopicKind: StorageChoice
             ActiveTopic: BookSeller persistence architecture
             CurrentGoal: choose database/ORM approach
             ContextMode: ArchitectureAdvice
@@ -294,6 +361,40 @@ public sealed class ConversationContextResolutionTests
             assistant: No implementation exists yet for saving data in the BookSeller project. Here are my recommendations for achieving efficient data persistence using industry-standard practices.
             assistant: Use a database and data access layer for BookService.cs and Book.cs.
             assistant: Should I record this as a BookSeller architecture decision?
+            """;
+    }
+
+    private static string GoblinStorageConversation()
+    {
+        return """
+            user: I want to build a goblin shopkeeper game. Customers get angrier each day.
+            assistant: Nice. Start with the smallest playable loop first.
+            user: web or forms or something else?
+            assistant: For a quick prototype, WinForms can be a good local loop.
+            user: json or sql server
+            assistant: JSON is lighter for prototype config; SQL Server is better once saves and progression become durable.
+            """;
+    }
+
+    private static string GoblinSqlServerEfConversation()
+    {
+        return """
+            user: I want to build a goblin shopkeeper game. Customers get angrier each day.
+            assistant: Nice. Start with the smallest playable loop first.
+            user: json or sql server
+            assistant: JSON is lighter for prototype config; SQL Server is better once saves and progression become durable.
+            user: sql server and entity framework
+            assistant: SQL Server and Entity Framework are the right durable storage architecture once the game needs saves, customer history, inventory, and progression.
+            """;
+    }
+
+    private static string PetDragonPlatformConversation()
+    {
+        return """
+            user: I want to make a pet dragon game where the dragon grows based on real-world steps
+            assistant: Nice. Start with the smallest playable loop first.
+            user: winforms app?
+            assistant: WinForms is a good fit if you want a quick local desktop prototype for the pet dragon game.
             """;
     }
 
@@ -358,7 +459,7 @@ public sealed class ConversationContextResolutionTests
                     {
                       "requestKind": "ArchitectureAdvice",
                       "confidence": 0.97,
-                      "effectiveWorkText": "What is the industry-standard persistence approach for BookSeller?",
+                      "effectiveWorkText": "What is the industry-standard approach for BookSeller persistence architecture?",
                       "reason": "Resolved short follow-up against the active BookSeller persistence topic.",
                       "allowCodeSearch": false,
                       "allowDeepLookup": false,
@@ -378,10 +479,10 @@ public sealed class ConversationContextResolutionTests
             {
                 return """
                     {
-                      "requestKind": "ArchitectureDecisionExploration",
+                      "requestKind": "GeneralChat",
                       "confidence": 0.92,
-                      "effectiveWorkText": "Confirm SQLite + Dapper as the persistence recommendation for BookSeller.",
-                      "reason": "The reply confirms the pending recommendation.",
+                      "effectiveWorkText": "Continue with SQLite + Dapper for BookSeller persistence architecture.",
+                      "reason": "The reply continues the active non-governance topic.",
                       "allowCodeSearch": false,
                       "allowDeepLookup": false,
                       "allowConflictAssessment": false,
@@ -402,7 +503,7 @@ public sealed class ConversationContextResolutionTests
                     {
                       "requestKind": "ArchitectureDecisionExploration",
                       "confidence": 0.9,
-                      "effectiveWorkText": "Select SQLite + Dapper from the last persistence options presented for BookSeller.",
+                      "effectiveWorkText": "Select SQLite + Dapper for BookSeller persistence architecture.",
                       "reason": "The reply refers to the last recommended option.",
                       "allowCodeSearch": false,
                       "allowDeepLookup": false,
@@ -424,7 +525,7 @@ public sealed class ConversationContextResolutionTests
                     {
                       "requestKind": "CreateTicket",
                       "confidence": 0.95,
-                      "effectiveWorkText": "Create a ticket to add SQLite + Dapper persistence for BookSeller books.",
+                      "effectiveWorkText": "Create a ticket to add SQLite + Dapper for BookSeller persistence architecture.",
                       "reason": "Ticket command inherits the active topic and pending recommendation.",
                       "allowCodeSearch": false,
                       "allowDeepLookup": false,

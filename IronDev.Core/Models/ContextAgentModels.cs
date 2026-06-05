@@ -35,6 +35,16 @@ public enum ContextRequestKind
     ArchitectureDecisionExploration
 }
 
+public enum ConversationTopicKind
+{
+    Unknown,
+    StorageChoice,
+    PlatformChoice,
+    ArchitectureChoice,
+    GameRules,
+    FirstSlice
+}
+
 public sealed class ContextAgentRouteDecision
 {
     public string OriginalUserRequest { get; set; } = string.Empty;
@@ -67,6 +77,7 @@ public sealed class ConversationContextSnapshot
 {
     public long SessionId { get; init; }
     public int ProjectId { get; init; }
+    public ConversationTopicKind TopicKind { get; init; } = ConversationTopicKind.Unknown;
     public string ActiveTopic { get; init; } = string.Empty;
     public string CurrentGoal { get; init; } = string.Empty;
     public string ContextMode { get; init; } = string.Empty;
@@ -78,6 +89,7 @@ public sealed class ConversationContextSnapshot
     public DateTime? UpdatedUtc { get; init; }
 
     public bool HasUsefulState =>
+        TopicKind != ConversationTopicKind.Unknown ||
         !string.IsNullOrWhiteSpace(ActiveTopic) ||
         !string.IsNullOrWhiteSpace(CurrentGoal) ||
         !string.IsNullOrWhiteSpace(PendingDecision) ||
@@ -335,6 +347,18 @@ public enum ContextAgentResultType
     Failed
 }
 
+/// <summary>
+/// Advisory output emitted by ContextAgent when it detects a work-creation opportunity.
+/// The host must handle this proposal explicitly and does not mutate governance.
+/// </summary>
+public sealed class AgentProposal
+{
+    public string Intent { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public IReadOnlyList<string> RecommendedNextActions { get; init; } = Array.Empty<string>();
+    public bool RequiresApproval { get; init; } = true;
+}
+
 public sealed class ContextAgentResult
 {
     // ── The assembled prompt ──────────────────────────────────────────────
@@ -344,11 +368,8 @@ public sealed class ContextAgentResult
     /// </summary>
     public string? FinalPrompt { get; init; }
     public ContextAgentResultType ResultType { get; init; } = ContextAgentResultType.Prompt;
-    public bool RequiresAction { get; init; }
+    public AgentProposal? Proposal { get; init; }
     public bool AllowsProseResponse { get; init; } = true;
-    public string ActionIntent { get; init; } = string.Empty;
-    public string ActionMessage { get; init; } = string.Empty;
-    public IReadOnlyList<string> SuggestedActions { get; init; } = Array.Empty<string>();
 
     // ── Clarification path ────────────────────────────────────────────────
     /// <summary>True when the agent needs user input before it can continue.</summary>

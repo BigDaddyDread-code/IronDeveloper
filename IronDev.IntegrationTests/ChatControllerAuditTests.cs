@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using IronDev.Api.Controllers;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
@@ -35,6 +36,30 @@ public sealed class ChatControllerAuditTests
         Assert.AreEqual(9001, audit.ChatMessageId);
         Assert.AreEqual(ChatGovernanceMode.Formalization, audit.Mode);
         Assert.IsFalse(audit.IsFallbackEvidence);
+    }
+
+    [TestMethod]
+    public async Task GetMessageAudit_SerializesAuditEnumsAsStrings()
+    {
+        var snapshot = BuildSnapshot(messageId: 9001);
+        var controller = new ChatController(
+            new UnusedChatHistoryService(),
+            new UnusedChatFeedbackService(),
+            new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
+            new UnusedProjectChatResponseService(),
+            new UnusedProjectStateReviewService());
+
+        var result = await controller.GetMessageAudit(7, 9701, 9001);
+        var ok = result.Result as OkObjectResult;
+        Assert.IsNotNull(ok);
+
+        var json = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        StringAssert.Contains(json, "\"source\":\"DurableAudit\"");
+        StringAssert.Contains(json, "\"mode\":\"Formalization\"");
+        StringAssert.Contains(json, "\"kind\":\"None\"");
+        Assert.IsFalse(json.Contains("\"mode\":0", StringComparison.Ordinal), json);
+        Assert.IsFalse(json.Contains("\"kind\":0", StringComparison.Ordinal), json);
     }
 
     [TestMethod]
