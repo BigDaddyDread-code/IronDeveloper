@@ -12,13 +12,20 @@ public sealed class QualityAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
+    private readonly IAgentProcessRunner _processRunner;
 
-    public QualityAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
+    public QualityAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        string repoRoot,
+        IAgentLlmClient? llmClient = null,
+        IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
+        _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -50,27 +57,9 @@ public sealed class QualityAgent : StaticIronDevAgent
         };
 
         var command = "powershell " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "powershell",
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
+        var (exitCode, stdout, stderr) = await RunProcessAsync("powershell", arguments, ct);
 
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-
-        var report = BuildQualityReport(stdout, stderr, planPath, runId, process.ExitCode);
+        var report = BuildQualityReport(stdout, stderr, planPath, runId, exitCode);
         var prompt = BuildPrompt(report);
         report.LlmIntelligence = BuildLlmEvidence(
             profile,
@@ -82,17 +71,29 @@ public sealed class QualityAgent : StaticIronDevAgent
         return new AgentResult
         {
             AgentName = AgentName,
-            Status = process.ExitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
+            Status = exitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
             Summary = report.Summary,
             ModelProfileName = profile.Name,
             Provider = profile.Provider,
             Model = profile.Model,
-            ExitCode = process.ExitCode,
+            ExitCode = exitCode,
             OutputJson = reportJson,
             CommandsRun = [command],
             EvidencePaths = report.EvidencePaths,
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private static int SubprocessTimeoutSeconds =>
+        int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed)
+            ? parsed
+            : 300;
+
+    private async Task<(int ExitCode, string Stdout, string Stderr)> RunProcessAsync(
+        string fileName, string[] arguments, CancellationToken ct)
+    {
+        var result = await _processRunner.RunAsync(fileName, arguments, _repoRoot, ct);
+        return (result.ExitCode, result.Stdout, result.Stderr);
     }
 
     private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
@@ -141,6 +142,25 @@ public sealed class QualityAgent : StaticIronDevAgent
 
     private static QualityReport BuildQualityReport(string stdout, string stderr, string planPath, string runId, int exitCode)
     {
+        if (exitCode == -1)
+        {
+            var timeoutSeconds = int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed) ? parsed : 300;
+            return new QualityReport
+            {
+                PlanPath = planPath,
+                DogfoodRunId = runId,
+                Status = "failed",
+                Summary = $"QualityAgent subprocess timed out after {timeoutSeconds}s.",
+                BuildSucceeded = false,
+                FocusedTestsSucceeded = false,
+                FormatSucceeded = false,
+                PackageAuditSucceeded = false,
+                CodeStandardsSucceeded = false,
+                EvidencePaths = [],
+                Boundary = "037 wraps the deterministic code standards/toolchain gate only; it does not perform LLM code review or patch code."
+            };
+        }
+
         try
         {
             using var document = JsonDocument.Parse(stdout);

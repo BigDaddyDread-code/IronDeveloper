@@ -10,13 +10,20 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
+    private readonly IAgentProcessRunner _processRunner;
 
-    public SupervisorAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
+    public SupervisorAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        string repoRoot,
+        IAgentLlmClient? llmClient = null,
+        IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
+        _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -287,7 +294,9 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             Status = status,
             Summary = status == AgentRunStatus.Succeeded
                 ? $"SupervisorAgent retrieved '{topMemoryTitle}' and TesterAgent reported: {testSummary}"
-                : "SupervisorAgent loop failed before producing a clean Codex handoff.",
+                : (memory.ExitCode == -1 || thoughtLedger.ExitCode == -1 || tests.ExitCode == -1)
+                    ? "SupervisorAgent loop failed due to a subprocess timeout."
+                    : "SupervisorAgent loop failed before producing a clean Codex handoff.",
             ModelProfileName = profile.Name,
             Provider = profile.Provider,
             Model = profile.Model,
@@ -423,30 +432,15 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             : "No live model response supplied; deterministic SupervisorAgent orchestration remained in force.";
     }
 
+    private static int SubprocessTimeoutSeconds =>
+        int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed)
+            ? parsed
+            : 300;
+
     private async Task<CommandRun> RunDotnetAsync(string[] arguments, CancellationToken ct)
     {
-        var command = "dotnet " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
-
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-
-        return new CommandRun(command, process.ExitCode, stdout, stderr);
+        var result = await _processRunner.RunAsync("dotnet", arguments, _repoRoot, ct);
+        return new CommandRun(result.Command, result.ExitCode, result.Stdout, result.Stderr);
     }
 
     private static string RequireInput(AgentRequest request, string key)

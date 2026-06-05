@@ -68,6 +68,18 @@ public sealed class ConscienceAgent : StaticIronDevAgent
             violatedBoundaries.Add("ProjectMemoryRemainsAuthority");
         }
 
+        if (ContainsAny(actionText, "self-approve", "self approve", "approve itself", "auto-merge", "automerge"))
+        {
+            blockingFactors.Add("Action text implies self-approval or auto-merge, which is categorically blocked.");
+            violatedBoundaries.Add("NoAgentSelfApproval");
+        }
+
+        if (ContainsAny(actionText, "bypass", "skip conscience", "skip thoughtledger", "override governance"))
+        {
+            blockingFactors.Add("Action text implies bypassing a governance gate.");
+            violatedBoundaries.Add("GovernanceGatesCannotBeBypassed");
+        }
+
         if (ContainsAny(actionText, "workspace", "apply", "patch") &&
             ContainsAny(actionText, "disposable") &&
             !ContainsAny(boundaryText, "disposable workspace", "outside real repo", "before hash", "after hash"))
@@ -100,7 +112,9 @@ public sealed class ConscienceAgent : StaticIronDevAgent
         var result = new
         {
             decision,
-            confidence = decision == "Allow" ? 0.82m : decision == "Block" ? 0.91m : 0.67m,
+            confidence = decision == "Allow" ? 0.82m
+                : decision == "Block" ? Math.Min(0.95m, 0.88m + (blockingFactors.Count * 0.02m))
+                : 0.67m,
             reasons = blockingFactors.Count > 0 ? blockingFactors : missingEvidence.Count > 0 ? missingEvidence : allowingFactors,
             allowingFactors,
             blockingFactors,

@@ -11,13 +11,20 @@ public sealed class RetrieverAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
+    private readonly IAgentProcessRunner _processRunner;
 
-    public RetrieverAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot, IAgentLlmClient? llmClient = null)
+    public RetrieverAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        string repoRoot,
+        IAgentLlmClient? llmClient = null,
+        IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
+        _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -53,50 +60,45 @@ public sealed class RetrieverAgent : StaticIronDevAgent
             runId
         };
 
-        var command = "dotnet " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
-
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
+        var (exitCode, stdout, stderr, command) = await RunDotnetAsync(arguments, ct);
 
         var output = string.IsNullOrWhiteSpace(stderr)
             ? stdout
             : stdout + Environment.NewLine + stderr;
         var prompt = BuildPrompt(project, query, stdout);
         var llmResult = await ResolveLlmResultAsync(profile, prompt, liveLlmRequested, request, ct);
-        var contextBundle = process.ExitCode == 0
+        var contextBundle = exitCode == 0
             ? BuildContextBundle(stdout, profile, prompt, liveLlmRequested, llmResult)
             : output;
 
         return new AgentResult
         {
             AgentName = AgentName,
-            Status = process.ExitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
-            Summary = ExtractSummary(stdout),
+            Status = exitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
+            Summary = exitCode == -1
+                ? $"RetrieverAgent subprocess timed out after {SubprocessTimeoutSeconds}s."
+                : ExtractSummary(stdout),
             ModelProfileName = profile.Name,
             Provider = profile.Provider,
             Model = profile.Model,
-            ExitCode = process.ExitCode,
+            ExitCode = exitCode,
             OutputJson = contextBundle,
             CommandsRun = [command],
             EvidencePaths = [],
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private static int SubprocessTimeoutSeconds =>
+        int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed)
+            ? parsed
+            : 300;
+
+    private async Task<(int ExitCode, string Stdout, string Stderr, string Command)> RunDotnetAsync(
+        string[] arguments, CancellationToken ct)
+    {
+        var result = await _processRunner.RunAsync("dotnet", arguments, _repoRoot, ct);
+        return (result.ExitCode, result.Stdout, result.Stderr, result.Command);
     }
 
     private static string RequireInput(AgentRequest request, string key)
