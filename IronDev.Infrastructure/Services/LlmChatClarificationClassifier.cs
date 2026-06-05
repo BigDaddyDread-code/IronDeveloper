@@ -25,6 +25,24 @@ public sealed class LlmChatClarificationClassifier : IChatClarificationClassifie
         ChatClarificationClassificationRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (request.ModeDecision.Mode == ChatGovernanceMode.Exploration &&
+            IsRecommendationRequest(request.UserMessage))
+        {
+            return ChatClarificationState.None;
+        }
+
+        if (IsBoundArchitectureFollowUp(request.UserMessage) &&
+            HasConversationTarget(request))
+        {
+            return ChatClarificationState.None;
+        }
+
+        if (request.ModeDecision.Mode == ChatGovernanceMode.Formalization &&
+            IsArtifactFromKnownDiscussionRequest(request.UserMessage))
+        {
+            return ChatClarificationState.None;
+        }
+
         try
         {
             var raw = await _llm.GetResponseAsync(BuildPrompt(request), cancellationToken).ConfigureAwait(false);
@@ -60,6 +78,11 @@ public sealed class LlmChatClarificationClassifier : IChatClarificationClassifie
             - Missing project context is MissingProjectContext, not GovernanceIntent.
             - Only ambiguous commitment language should become GovernanceIntent.
             - Do not ask governance/process questions for ordinary product scoping.
+            - If the user asks for a recommendation, suggested first slice, next step, or what to do next, return None unless a required missing fact blocks a safe answer.
+            - Asking "what slice", "which slice", or similar means the assistant should recommend a slice, not ask the user to choose one.
+            - If the user says "add that architecture" or similar, and Recent conversation or Route hint already resolves "that" to a project/storage/platform/rules target, return None.
+            - Do not ask "which project/repository/file" when Project summary and the current session topic already provide enough target context.
+            - If the user asks for an artifact from what is already decided, missing information belongs under Open Questions. Return None unless there is no usable conversation context at all.
             - Prefer one or two concise questions.
             - Return JSON only.
 
@@ -162,6 +185,82 @@ public sealed class LlmChatClarificationClassifier : IChatClarificationClassifie
             .Select(question => question.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static bool IsRecommendationRequest(string userMessage)
+    {
+        if (string.IsNullOrWhiteSpace(userMessage))
+            return false;
+
+        var normalized = userMessage.Trim().ToLowerInvariant();
+        return normalized.Contains("what slice", StringComparison.Ordinal) ||
+               normalized.Contains("which slice", StringComparison.Ordinal) ||
+               normalized.Contains("recommend", StringComparison.Ordinal) ||
+               normalized.Contains("suggest", StringComparison.Ordinal) ||
+               normalized.Contains("next step", StringComparison.Ordinal) ||
+               normalized.Contains("what should", StringComparison.Ordinal) ||
+               normalized.Contains("where should", StringComparison.Ordinal) ||
+               normalized.Contains("what first", StringComparison.Ordinal);
+    }
+
+    private static bool IsBoundArchitectureFollowUp(string userMessage)
+    {
+        if (string.IsNullOrWhiteSpace(userMessage))
+            return false;
+
+        var normalized = userMessage.Trim().ToLowerInvariant();
+        return normalized.Contains("add that architecture", StringComparison.Ordinal) ||
+               normalized.Contains("add that artecture", StringComparison.Ordinal) ||
+               normalized.Contains("add this architecture", StringComparison.Ordinal) ||
+               normalized.Contains("add this artecture", StringComparison.Ordinal) ||
+               normalized.Contains("capture that architecture", StringComparison.Ordinal) ||
+               normalized.Contains("capture this architecture", StringComparison.Ordinal) ||
+               normalized.Contains("record that architecture", StringComparison.Ordinal) ||
+               normalized.Contains("record this architecture", StringComparison.Ordinal);
+    }
+
+    private static bool IsArtifactFromKnownDiscussionRequest(string userMessage)
+    {
+        if (string.IsNullOrWhiteSpace(userMessage))
+            return false;
+
+        var normalized = userMessage.Trim().ToLowerInvariant();
+        var asksForKnownContext =
+            normalized.Contains("already decided", StringComparison.Ordinal) ||
+            normalized.Contains("whats already decided", StringComparison.Ordinal) ||
+            normalized.Contains("what's already decided", StringComparison.Ordinal) ||
+            normalized.Contains("questions need answering", StringComparison.Ordinal) ||
+            normalized.Contains("questions needing answering", StringComparison.Ordinal);
+        var asksForArtifact =
+            normalized.Contains("document", StringComparison.Ordinal) ||
+            normalized.Contains("doc", StringComparison.Ordinal) ||
+            normalized.Contains("architecture", StringComparison.Ordinal) ||
+            normalized.Contains("artecture", StringComparison.Ordinal) ||
+            normalized.Contains("discussion", StringComparison.Ordinal);
+
+        return asksForKnownContext && asksForArtifact;
+    }
+
+    private static bool HasConversationTarget(ChatClarificationClassificationRequest request)
+    {
+        var haystack = string.Join('\n', new[]
+        {
+            request.RecentConversationSummary,
+            request.RouteHint.EffectiveWorkText,
+            request.RouteHint.Reason,
+            request.ContextState.ContextSummary,
+            request.ProjectSummary
+        }).ToLowerInvariant();
+
+        return haystack.Contains("sql server", StringComparison.Ordinal) ||
+               haystack.Contains("entity framework", StringComparison.Ordinal) ||
+               haystack.Contains("json", StringComparison.Ordinal) ||
+               haystack.Contains("winforms", StringComparison.Ordinal) ||
+               haystack.Contains("web or forms", StringComparison.Ordinal) ||
+               haystack.Contains("storage architecture", StringComparison.Ordinal) ||
+               haystack.Contains("platform choice", StringComparison.Ordinal) ||
+               haystack.Contains("game rules", StringComparison.Ordinal) ||
+               haystack.Contains("first playable slice", StringComparison.Ordinal);
     }
 
     private static IReadOnlyList<string> DefaultQuestions(ChatClarificationKind kind) =>

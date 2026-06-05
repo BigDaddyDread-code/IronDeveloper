@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using IronDev.Client;
+using IronDev.Core.ChatProbe;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
@@ -62,6 +64,14 @@ public static class IronDevCli
             return await HandleScenarioRunAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "scenario", "report"))
             return await HandleScenarioReportAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "chat-probe", "run"))
+            return await HandleChatProbeRunAsync(args, output, error, handler, cancellationToken);
+        if (IsCommand(args, "chat-probe", "list-scenarios"))
+            return await HandleChatProbeListScenariosAsync(args, output, error, cancellationToken);
+        if (IsCommand(args, "chat-probe", "list-personas"))
+            return await HandleChatProbeListPersonasAsync(args, output, error, cancellationToken);
+        if (IsCommand(args, "chat-probe", "export-failures"))
+            return await HandleChatProbeExportFailuresAsync(args, output, error, cancellationToken);
 
         error.WriteLine($"Unknown command: {string.Join(' ', args)}");
         PrintUsage(error);
@@ -1144,9 +1154,293 @@ public static class IronDevCli
         error.WriteLine("  irondev scenario run <scenario-id> --project-id <id> [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev scenario report <run-id> --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine();
+        error.WriteLine("  irondev chat-probe run --project-id <id> [--count 10] [--seed 42] [--scenario <id>] [--persona <name>] [--report-dir <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
+        error.WriteLine("  irondev chat-probe list-scenarios [--json]");
+        error.WriteLine("  irondev chat-probe list-personas [--json]");
+        error.WriteLine("  irondev chat-probe export-failures --run-id <id> [--output-dir <path>] [--json]");
+        error.WriteLine();
         error.WriteLine("Default API base URL: http://localhost:5000");
         error.WriteLine("Overrides: --api-base-url, IRONDEV_API_BASE_URL, irondev.cli.json");
     }
+
+    // ── Chat Probe CLI handlers ────────────────────────────────────────────────
+
+    private static readonly JsonSerializerOptions ProbeJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters    = { new JsonStringEnumConverter() }
+    };
+
+    private static string DefaultProbeReportDir =>
+        Path.Combine("tools", "dogfood", "chat-probe-runs");
+
+    private static async Task<int> HandleChatProbeRunAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
+    {
+        var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        var token      = ResolveToken(GetOption(args, "--token"), ReadEnvironment(), GetOption(args, "--config"));
+        var json       = HasFlag(args, "--json");
+
+        if (!TryGetIntOption(args, "--project-id", out var projectId))
+        {
+            error.WriteLine("Missing or invalid required option: --project-id <id>");
+            return 2;
+        }
+
+        var scenarioId = GetOption(args, "--scenario");
+        var personaName = GetOption(args, "--persona");
+        var reportDir  = GetOption(args, "--report-dir") ?? DefaultProbeReportDir;
+        var seed       = TryGetIntOption(args, "--seed", out var parsedSeed) ? parsedSeed : 0;
+        var count      = TryGetIntOption(args, "--count", out var parsedCount) ? parsedCount : 10;
+
+        // Resolve scenario(s)
+        IReadOnlyList<ProbeScenario> scenarios;
+        if (!string.IsNullOrWhiteSpace(scenarioId))
+        {
+            var single = ProbeScenarioCatalog.GetById(scenarioId);
+            if (single is null)
+            {
+                error.WriteLine($"Unknown scenario: {scenarioId}. Run 'irondev chat-probe list-scenarios' to see available scenarios.");
+                return 2;
+            }
+            scenarios = [single];
+            count = 1;
+        }
+        else
+        {
+            scenarios = ProbeScenarioCatalog.GetBatch(count, seed).Select(b => b.Scenario).ToList();
+        }
+
+        // Resolve persona (optional — null = rotate from seed)
+        PersonaProfile? fixedPersona = null;
+        if (!string.IsNullOrWhiteSpace(personaName))
+        {
+            fixedPersona = PersonaEngine.ParseName(personaName);
+            if (fixedPersona is null)
+            {
+                error.WriteLine($"Unknown persona: {personaName}. Run 'irondev chat-probe list-personas' to see available personas.");
+                return 2;
+            }
+        }
+
+        // Build chat session adapter (wraps IChatApiClient into the IChatProbeSession port)
+        var chatClient  = ChatApiClientFactory.Create(apiBaseUrl, token, handler);
+        var probeSession = new ChatProbeSessionAdapter(chatClient);
+
+        var driver   = new ChatProbeDriver();
+        var writer   = new ProbeTranscriptWriter();
+        var options  = new ProbeRunOptions();
+        var batchId  = $"batch-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}";
+        var runs     = new List<ProbeRunResult>();
+        var startedAt = DateTimeOffset.UtcNow;
+
+        if (!json)
+        {
+            output.WriteLine($"Running {scenarios.Count} chat probe(s)...");
+            output.WriteLine($"Report dir: {Path.GetFullPath(reportDir)}");
+            output.WriteLine();
+        }
+
+        for (var i = 0; i < scenarios.Count; i++)
+        {
+            var scenario = scenarios[i];
+            var persona  = fixedPersona ?? PersonaEngine.GetFromSeed(seed + i);
+
+            if (!json)
+                output.WriteLine($"[{i + 1}/{scenarios.Count}] {scenario.Name} / {persona.Name}");
+
+            try
+            {
+                var result = await driver.RunAsync(probeSession, projectId, scenario, persona, options, cancellationToken);
+                runs.Add(result);
+                await writer.WriteRunAsync(result, Path.Combine(reportDir, batchId, "runs"), cancellationToken);
+
+                if (!json)
+                {
+                    var icon = result.Outcome switch
+                    {
+                        ProbeRunOutcome.Pass     => "✅",
+                        ProbeRunOutcome.SoftFail => "⚠",
+                        ProbeRunOutcome.HardFail => "❌",
+                        _                        => "?"
+                    };
+                    output.WriteLine($"  {icon} {result.Outcome} — {result.AllFailures.Count} failure(s)");
+                }
+            }
+            catch (Exception ex)
+            {
+                error.WriteLine($"  Run failed with exception: {ex.Message}");
+            }
+        }
+
+        // Build batch summary
+        var failureCounts = runs
+            .SelectMany(r => r.AllFailures)
+            .GroupBy(f => f.Type)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var batch = new ProbeBatchSummary
+        {
+            BatchId      = batchId,
+            TotalRuns    = runs.Count,
+            Passed       = runs.Count(r => r.Outcome == ProbeRunOutcome.Pass),
+            SoftFailed   = runs.Count(r => r.Outcome == ProbeRunOutcome.SoftFail),
+            HardFailed   = runs.Count(r => r.Outcome == ProbeRunOutcome.HardFail),
+            FailureCounts = failureCounts,
+            Runs         = runs,
+            StartedUtc   = startedAt,
+            CompletedUtc = DateTimeOffset.UtcNow
+        };
+
+        // Write batch summary files
+        await writer.WriteBatchAsync(batch, reportDir, cancellationToken);
+
+        if (json)
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(batch, ProbeJsonOptions));
+        }
+        else
+        {
+            output.WriteLine();
+            output.WriteLine($"Runs:      {batch.TotalRuns}");
+            output.WriteLine($"Pass:      {batch.Passed}");
+            output.WriteLine($"Soft fail: {batch.SoftFailed}");
+            output.WriteLine($"Hard fail: {batch.HardFailed}");
+
+            if (batch.FailureCounts.Count > 0)
+            {
+                output.WriteLine();
+                output.WriteLine("Top failures:");
+                output.WriteLine(batch.FormatTopFailures());
+            }
+
+            output.WriteLine();
+            output.WriteLine($"Reports: {Path.GetFullPath(Path.Combine(reportDir, batchId))}");
+        }
+
+        return batch.HardFailed > 0 ? 1 : 0;
+    }
+
+    private static Task<int> HandleChatProbeListScenariosAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var scenarios = ProbeScenarioCatalog.GetAll();
+        if (HasFlag(args, "--json"))
+        {
+            var simple = scenarios.Select(s => new
+            {
+                s.ScenarioId,
+                s.Name,
+                Category     = s.Category.ToString(),
+                s.ProjectIdea,
+                StepCount    = s.Steps.Count
+            });
+            output.WriteLine(JsonSerializer.Serialize(simple, ProbeJsonOptions));
+        }
+        else
+        {
+            output.WriteLine($"Chat probe scenarios ({scenarios.Count}):");
+            output.WriteLine();
+            foreach (var s in scenarios)
+                output.WriteLine($"  {s.ScenarioId,-30} {s.Category,-14} {s.Steps.Count} steps  — {s.ProjectIdea}");
+        }
+
+        return Task.FromResult(0);
+    }
+
+    private static Task<int> HandleChatProbeListPersonasAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var personas = PersonaEngine.GetAll();
+        if (HasFlag(args, "--json"))
+        {
+            var simple = personas.Select(p => new
+            {
+                Id          = p.Id.ToString(),
+                p.Name,
+                p.Description
+            });
+            output.WriteLine(JsonSerializer.Serialize(simple, ProbeJsonOptions));
+        }
+        else
+        {
+            output.WriteLine($"Chat probe personas ({personas.Count}):");
+            output.WriteLine();
+            foreach (var p in personas)
+                output.WriteLine($"  {p.Id,-20} {p.Name,-20} — {p.Description}");
+        }
+
+        return Task.FromResult(0);
+    }
+
+    private static async Task<int> HandleChatProbeExportFailuresAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var runId     = GetOption(args, "--run-id");
+        var outputDir = GetOption(args, "--output-dir")
+            ?? Path.Combine("tests", "chat-regressions");
+
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            error.WriteLine("Missing required option: --run-id <id>");
+            return 2;
+        }
+
+        // Search for the run result in the default report directory
+        var reportRoot = GetOption(args, "--report-dir") ?? DefaultProbeReportDir;
+        var resultPath = Directory.GetFiles(reportRoot, "result.json", SearchOption.AllDirectories)
+            .FirstOrDefault(f => f.Contains(runId, StringComparison.OrdinalIgnoreCase));
+
+        if (resultPath is null)
+        {
+            error.WriteLine($"Run result not found for run-id: {runId}");
+            error.WriteLine($"Looked in: {Path.GetFullPath(reportRoot)}");
+            return 1;
+        }
+
+        ProbeRunResult? run;
+        try
+        {
+            var json = await File.ReadAllTextAsync(resultPath, cancellationToken);
+            run = JsonSerializer.Deserialize<ProbeRunResult>(json, ProbeJsonOptions);
+        }
+        catch (Exception ex)
+        {
+            error.WriteLine($"Failed to read run result: {ex.Message}");
+            return 1;
+        }
+
+        if (run is null)
+        {
+            error.WriteLine("Run result file is empty or invalid.");
+            return 1;
+        }
+
+        var exporter = new ProbeRegressionExporter();
+        await exporter.ExportRunAsync(run, outputDir, cancellationToken);
+
+        if (HasFlag(args, "--json"))
+            await output.WriteLineAsync(JsonSerializer.Serialize(new { exported = true, runId, outputDir }, ProbeJsonOptions));
+        else
+            output.WriteLine($"Exported regression fixture to: {Path.GetFullPath(outputDir)}");
+
+        return 0;
+    }
+
+    // ── End chat-probe handlers ───────────────────────────────────────────────
 
     private sealed record ChatToBuildProofReport
     {

@@ -18,9 +18,10 @@ public sealed class ProjectChatResponseMetadataBuilder
     public ProjectChatResponseMetadata Build(
         ProjectChatContextPipelineResult context,
         ChatModeDecision modeDecision,
-        ChatClarificationState clarification,
-        string traceGroupId)
+        string traceGroupId,
+        ChatContextState? contextState = null)
     {
+        var clarification = contextState?.ClassifiedClarification ?? ChatClarificationState.None;
         var responseMode = modeDecision.Mode;
         var contextSummary = BuildContextSummary(
             context.Project,
@@ -52,7 +53,8 @@ public sealed class ProjectChatResponseMetadataBuilder
             context.ContextAgentResult,
             context.RouteSignals,
             modeDecision,
-            traceGroupId);
+            traceGroupId,
+            contextState);
 
         var reasoningSummary = BuildReasoningSummary(context.ContextAgentResult, responseMode, reasoningTrace);
         var disambiguationQuestion = clarification.Required
@@ -72,7 +74,8 @@ public sealed class ProjectChatResponseMetadataBuilder
         ContextAgentResult contextAgentResult,
         IReadOnlyList<string> routeSignals,
         ChatModeDecision modeDecision,
-        string traceGroupId)
+        string traceGroupId,
+        ChatContextState? contextState)
     {
         var grouped = contextAgentResult.TraceGroupId.Length > 0
             ? contextAgentResult.TraceGroupId
@@ -83,6 +86,9 @@ public sealed class ProjectChatResponseMetadataBuilder
             traceLines.Add($"Dogfood trace group: {grouped}");
 
         traceLines.Add($"Mode classifier: {modeDecision.Mode} ({modeDecision.Confidence:0.00}) - {modeDecision.Reason}");
+        var clarification = contextState?.ClassifiedClarification ?? ChatClarificationState.None;
+        traceLines.Add(
+            $"Clarification classifier: Required={clarification.Required}; Kind={clarification.Kind}; Reason={clarification.Reason ?? "none"}");
 
         if (!string.IsNullOrWhiteSpace(contextAgentResult.ContextSummary))
             traceLines.Add(contextAgentResult.ContextSummary);
@@ -97,6 +103,42 @@ public sealed class ProjectChatResponseMetadataBuilder
 
         if (routeSignals.Count == 0)
             traceLines.Add("No explicit route signals were attached for this request.");
+
+        if (contextState is not null)
+        {
+            traceLines.Add($"Context state provenance: origin={contextState.Origin}; fromChatContextState={contextState.Origin == ChatContextStateOrigin.ProjectChatResponseCompiler}");
+            if (contextState.SemanticEvidence?.Count > 0)
+            {
+                traceLines.Add("Memory evidence consumed by classifier:");
+                traceLines.AddRange(contextState.SemanticEvidence.Select(
+                    e => $"Evidence: SourceId={e.SourceId}; SourceType={e.SourceType}; AuthorityLevel={e.AuthorityLevel}; IsCurrent={e.IsCurrent}; FromChatContextState={contextState.Origin == ChatContextStateOrigin.ProjectChatResponseCompiler}; UsedFor={e.UsedFor}; {TruncateText(e.Excerpt, 140)}"));
+            }
+            else
+            {
+                traceLines.Add("No semantic memory evidence was supplied to the classifier.");
+            }
+
+            if (contextState.AvailableSkillHints?.Count > 0)
+            {
+                var skills = string.Join(" | ", contextState.AvailableSkillHints.Select(
+                    h => $"[{contextState.Origin == ChatContextStateOrigin.ProjectChatResponseCompiler}] {h.SkillId}={h.DisplayName}"));
+                traceLines.Add($"Skill availability context: {skills}");
+            }
+
+            traceLines.Add(contextState.EpisodicMemoryEnabled
+                ? "Episodic memory enabled for this classification."
+                : "Episodic memory disabled for this classification.");
+
+            if (contextState.ActiveArtifact is not null)
+            {
+                traceLines.Add($"Active artifact: {contextState.ActiveArtifact.ArtifactType} {contextState.ActiveArtifact.ArtifactId}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(contextState.CurrentUserMessage))
+            {
+                traceLines.Add($"Current user message in context state: {TruncateText(contextState.CurrentUserMessage, 200)}");
+            }
+        }
 
         if (traceLines.Count == 0)
             traceLines.Add($"[{modeDecision.Mode}] No trace payload captured yet; reasoning path is being assembled.");
@@ -178,5 +220,16 @@ public sealed class ProjectChatResponseMetadataBuilder
             .SelectMany(value => value!.Split(['\r', '\n', ';', '|', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        if (text.Length <= maxLength)
+            return text;
+
+        return text[..maxLength].TrimEnd() + "...";
     }
 }

@@ -142,8 +142,7 @@ public sealed class ProjectChatContextPipeline
                 WasSuccessful = false,
                 TraceGroupId = traceGroupId,
                 ContextSummary = $"Context agent pipeline failed for project {projectId}.",
-                Warnings = "Context agent execution failed.",
-                SuggestedActions = []
+                Warnings = "Context agent execution failed."
             };
         }
     }

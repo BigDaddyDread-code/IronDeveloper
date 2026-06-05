@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace IronDev.Core.Chat;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ChatGovernanceMode
 {
     Exploration,
@@ -24,6 +25,15 @@ public enum ChatPromptTemplate
     Confirmation
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ChatContextStateOrigin
+{
+    Unknown,
+    ProjectChatResponseCompiler,
+    ExternalInput
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ChatClarificationKind
 {
     None,
@@ -47,7 +57,41 @@ public sealed record ChatClarificationState(
 public sealed record ChatContextState(
     bool RequiresClarification,
     IReadOnlyList<string> ClarificationQuestions,
-    string? ContextSummary);
+    string? ContextSummary,
+    string CurrentUserMessage = "",
+    IReadOnlyList<RecentChatTurn>? RecentTurns = null,
+    ActiveArtifactContext? ActiveArtifact = null,
+    IReadOnlyList<MemoryEvidence>? SemanticEvidence = null,
+    IReadOnlyList<AvailableSkillHint>? AvailableSkillHints = null,
+    bool EpisodicMemoryEnabled = false,
+    ChatContextStateOrigin Origin = ChatContextStateOrigin.Unknown,
+    ChatClarificationState? ClassifiedClarification = null);
+
+public sealed record RecentChatTurn(
+    string Role,
+    string Message,
+    DateTimeOffset? Timestamp = null);
+
+public sealed record ActiveArtifactContext(
+    string ArtifactType = "",
+    string? ArtifactId = null,
+    string? Title = null,
+    string? Summary = null);
+
+public sealed record MemoryEvidence(
+    string SourceId = "",
+    string SourceType = "",
+    string Title = "",
+    string Excerpt = "",
+    bool IsCurrent = false,
+    double RelevanceScore = 0,
+    string AuthorityLevel = "",
+    string UsedFor = "ContextOnly");
+
+public sealed record AvailableSkillHint(
+    string SkillId = "",
+    string DisplayName = "",
+    string CapabilitySummary = "");
 
 public sealed record ChatModeDecision(
     ChatGovernanceMode Mode,
@@ -60,7 +104,8 @@ public sealed record ChatModeClassificationRequest(
     Models.ContextAgentRouteDecision RouteHint,
     string? ProjectSummary,
     bool ContextRequiresClarification,
-    ChatGovernanceMode? ExplicitMode);
+    ChatGovernanceMode? ExplicitMode,
+    ChatContextState? ContextState = null);
 
 public sealed record ChatClarificationClassificationRequest(
     string UserMessage,

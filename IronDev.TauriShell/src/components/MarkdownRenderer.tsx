@@ -21,7 +21,7 @@ export function MarkdownRenderer({ markdown, className, testId }: MarkdownRender
 }
 
 function renderBlocks(markdown: string) {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const lines = normalizeMarkdown(markdown).replace(/\r\n/g, '\n').split('\n');
   const blocks: ReactNode[] = [];
 
   for (let index = 0; index < lines.length;) {
@@ -164,14 +164,22 @@ function MarkdownCodeBlock({ language, content }: CodeBlock) {
 }
 
 function renderInline(text: string) {
-  const parts = text.split(/(`[^`]+`)/g);
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
   return parts.map((part, index) => {
     if (part.startsWith('`') && part.endsWith('`') && part.length > 1) {
       return <code key={`${part}-${index}`}>{part.slice(1, -1)}</code>;
     }
 
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
     return <span key={`${part}-${index}`}>{part}</span>;
   });
+}
+
+function normalizeMarkdown(markdown: string) {
+  return markdown.replace(/^(\s*\d+\.)(?=\S)/gm, '$1 ');
 }
 
 function startsSpecialBlock(lines: string[], index: number) {

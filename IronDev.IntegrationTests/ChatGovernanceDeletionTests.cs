@@ -19,6 +19,14 @@ public sealed class ChatGovernanceDeletionTests
             "TryResolveExplicitConversationMode");
 
         AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Api", "Controllers", "ChatController.cs"),
+            "save this");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Api", "Controllers", "ChatController.cs"),
+            "save discussion");
+
+        AssertFileDoesNotContain(
             Path.Combine(root, "IronDev.Core", "Models", "ContextAgentModels.cs"),
             "get => ContextModeHint");
 
@@ -55,6 +63,34 @@ public sealed class ChatGovernanceDeletionTests
             "commitment lane");
 
         AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ContextAgentRouteJudgeService.cs"),
+            "ContextModeHint = \"Formalization\"");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ContextAgentRouteJudgeService.cs"),
+            "intent == \"CreateTicket\"");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ContextAgentRouteJudgeService.cs"),
+            "HasExplicitFormalizationIntent");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ContextAgentRouteJudgeService.cs"),
+            "save this discussion");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ConversationContextResolver.cs"),
+            "BookSeller");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ConversationContextResolver.cs"),
+            "bookservice");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.Infrastructure", "Services", "ConversationContextResolver.cs"),
+            "book.cs");
+
+        AssertFileDoesNotContain(
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "ChatContextPanel.tsx"),
             "mode === 'Formalization'");
 
@@ -63,8 +99,24 @@ public sealed class ChatGovernanceDeletionTests
             "mode === 'Formalization'");
 
         AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "ChatMessage.tsx"),
+            "message.content.includes");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "ChatMessage.tsx"),
+            "<details open");
+
+        AssertFileDoesNotContain(
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "ChatSuggestedActions.tsx"),
             "mode === 'Formalization'");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "useProjectChat.ts"),
+            "content.includes(");
+
+        AssertFileDoesNotContain(
+            Path.Combine(root, "IronDev.TauriShell", "src", "features", "chatToBuild", "useProjectChat.ts"),
+            "message.includes(");
     }
 
     private static void AssertFileDoesNotContain(string path, string forbidden)

@@ -1,11 +1,13 @@
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 
 namespace IronDev.Infrastructure.Services;
 
 public sealed class ProjectChatResponseService : IProjectChatResponseService
 {
     private readonly ProjectChatContextPipeline _contextPipeline;
+    private readonly ProjectChatContextStateCompiler _contextStateCompiler;
     private readonly IChatModeClassifier _modeClassifier;
     private readonly IChatClarificationClassifier _clarificationClassifier;
     private readonly ProjectChatResponseComposer _composer;
@@ -13,12 +15,14 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
 
     public ProjectChatResponseService(
         ProjectChatContextPipeline contextPipeline,
+        ProjectChatContextStateCompiler contextStateCompiler,
         IChatModeClassifier modeClassifier,
         IChatClarificationClassifier clarificationClassifier,
         ProjectChatResponseComposer composer,
         ProjectChatResponseMetadataBuilder metadataBuilder)
     {
         _contextPipeline = contextPipeline;
+        _contextStateCompiler = contextStateCompiler;
         _modeClassifier = modeClassifier;
         _clarificationClassifier = clarificationClassifier;
         _composer = composer;
@@ -52,20 +56,18 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         var contextAgentResult = context.ContextAgentResult;
         var routeDecision = context.RouteDecision;
 
+        var chatContextState = _contextStateCompiler.Compile(context, normalizedPrompt, recentSummary);
+
         var modeDecision = await _modeClassifier.ClassifyAsync(
             new ChatModeClassificationRequest(
-                normalizedPrompt,
-                recentSummary,
-                routeDecision,
-                context.Project.Name,
-                contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
-                explicitMode),
+                UserMessage: normalizedPrompt,
+                RecentConversationSummary: recentSummary,
+                RouteHint: routeDecision,
+                ProjectSummary: context.Project.Name,
+                ContextRequiresClarification: contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
+                ExplicitMode: explicitMode,
+                ContextState: chatContextState),
             cancellationToken).ConfigureAwait(false);
-
-        var chatContextState = new ChatContextState(
-            contextAgentResult.IsClarificationRequired || routeDecision.NeedsClarification,
-            contextAgentResult.ClarificationQuestions.Concat(routeDecision.ClarificationQuestions).ToList(),
-            contextAgentResult.ContextSummary);
 
         var clarification = await _clarificationClassifier.ClassifyAsync(
             new ChatClarificationClassificationRequest(
@@ -76,18 +78,20 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
                 context.Project.Name,
                 routeDecision),
             cancellationToken).ConfigureAwait(false);
+        chatContextState = chatContextState with { ClassifiedClarification = clarification };
 
         var gate = ChatGovernanceGate.FromDecision(modeDecision);
         var assistantResponse = await _composer.BuildAsync(
             contextAgentResult,
             modeDecision,
-            clarification,
+            chatContextState,
             contextAgentResult.FinalPrompt ?? string.Empty,
             normalizedPrompt,
+            recentSummary,
             context.Project.Name,
             cancellationToken).ConfigureAwait(false);
 
-        var metadata = _metadataBuilder.Build(context, modeDecision, clarification, correlationId);
+        var metadata = _metadataBuilder.Build(context, modeDecision, correlationId, chatContextState);
 
         return new ProjectChatResponseResult(
             assistantResponse,

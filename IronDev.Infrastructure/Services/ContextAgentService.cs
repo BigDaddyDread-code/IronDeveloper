@@ -175,52 +175,72 @@ public sealed class ContextAgentService : IContextAgentService
         {
             if (request.CreateTicketIntent.RequiresClarification)
             {
-                return new ContextAgentResult
+            return new ContextAgentResult
+            {
+                TraceGroupId = traceGroupId,
+                ResultType = ContextAgentResultType.Clarification,
+                IsClarificationRequired = true,
+                ClarificationQuestions = request.CreateTicketIntent.ClarificationQuestions,
+                Proposal = new AgentProposal
                 {
-                    TraceGroupId = traceGroupId,
-                    ResultType = ContextAgentResultType.Clarification,
-                    IsClarificationRequired = true,
-                    ClarificationQuestions = request.CreateTicketIntent.ClarificationQuestions,
-                    RequiresAction = true,
-                    AllowsProseResponse = false,
-                    ActionIntent = request.CreateTicketIntent.Intent,
-                    WasSuccessful = true,
-                    ContextSummary = "Clarification required before ticket draft action can run.",
-                    Warnings = string.Join("; ", warnings),
-                };
-            }
+                    Intent = request.CreateTicketIntent.Intent,
+                    Message = "Create-ticket command needs clarification before drafting work.",
+                    RecommendedNextActions =
+                    [
+                        "Ask the user to restate the feature request in one sentence.",
+                        "Collect a concrete acceptance target."
+                    ],
+                    RequiresApproval = true
+                },
+                AllowsProseResponse = false,
+                WasSuccessful = true,
+                ContextSummary = "Clarification required before ticket draft action can run.",
+                Warnings = string.Join("; ", warnings),
+            };
+        }
 
             if (!string.IsNullOrWhiteSpace(request.CreateTicketIntent.WorkText)
                 && request.RecentTickets.Count == 0)
             {
-                return new ContextAgentResult
+            return new ContextAgentResult
+            {
+                TraceGroupId = traceGroupId,
+                ResultType = ContextAgentResultType.ActionRequired,
+                Proposal = new AgentProposal
                 {
-                    TraceGroupId = traceGroupId,
-                    ResultType = ContextAgentResultType.ActionRequired,
-                    RequiresAction = true,
-                    AllowsProseResponse = false,
-                    ActionIntent = request.CreateTicketIntent.Intent,
-                    ActionMessage = "Create draft ticket workflow should handle this command.",
-                    WasSuccessful = true,
-                    ContextSummary = $"Action routed: {request.CreateTicketIntent.Intent}",
-                    Warnings = string.Join("; ", warnings),
-                };
-            }
+                    Intent = request.CreateTicketIntent.Intent,
+                    Message = "Create draft ticket workflow should handle this command.",
+                    RecommendedNextActions =
+                    [
+                        "Open draft-ticket UI.",
+                        "Render user work as candidate draft payload."
+                    ],
+                    RequiresApproval = true
+                },
+                AllowsProseResponse = false,
+                WasSuccessful = true,
+                ContextSummary = $"Action routed: {request.CreateTicketIntent.Intent}",
+                Warnings = string.Join("; ", warnings),
+            };
+        }
 
             return new ContextAgentResult
             {
                 TraceGroupId = traceGroupId,
                 ResultType = ContextAgentResultType.ActionBlocked,
-                RequiresAction = true,
+                Proposal = new AgentProposal
+                {
+                    Intent = request.CreateTicketIntent.Intent,
+                    Message = "I found a ticket-creation command, but no source work was available to turn into draft tickets.",
+                    RecommendedNextActions =
+                    [
+                        "Select or generate a candidate ticket list first.",
+                        "Use 'ticket this' after an assistant response.",
+                        "Write the work directly after the command."
+                    ],
+                    RequiresApproval = true
+                },
                 AllowsProseResponse = false,
-                ActionIntent = request.CreateTicketIntent.Intent,
-                ActionMessage = "I found a ticket-creation command, but no source work was available to turn into draft tickets.",
-                SuggestedActions =
-                [
-                    "Select or generate a candidate ticket list first.",
-                    "Use 'ticket this' after an assistant response.",
-                    "Write the work directly after the command."
-                ],
                 WasSuccessful = false,
                 ContextSummary = "Action blocked: missing source work for ticket draft action.",
                 Warnings = string.Join("; ", warnings),

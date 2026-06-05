@@ -23,9 +23,11 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
   const canViewSources = gate.canViewSources && hasSources;
   const reasoningTrace = message.response?.reasoningTrace ?? [];
   const disambiguationQuestion = message.response?.disambiguationQuestion;
+  const clarificationQuestions = message.response?.clarification?.questions?.filter(Boolean) ?? [];
   const modeConfidence = gate.confidence;
   const modeReason = gate.reason;
   const auditSourceLabel = formatAuditSource(message.response?.auditSource);
+  const reasoningSummary = message.response?.reasoningSummary;
 
   return (
     <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
@@ -35,26 +37,42 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
           <time dateTime={message.createdUtc}>{DateTimeDisplay.toLocalDisplay(message.createdUtc)}</time>
         </div>
       </header>
-      {mode ? (
-        <p className="chat-message__mode" data-testid="chat.message.mode">
-          <strong>Mode:</strong> {mode}
-          {typeof modeConfidence === 'number' ? ` (${Math.round(modeConfidence * 100)}%)` : null}
-        </p>
-      ) : null}
-      {modeReason ? (
-        <p className="chat-message__modeReason" data-testid="chat.message.modeReason">
-          <strong>Mode reason:</strong> {modeReason}
-        </p>
-      ) : null}
       <MarkdownRenderer markdown={message.content} testId={`chat.message.${message.role}.markdown`} />
-      {disambiguationQuestion ? (
-        <div className="chat-message__disambiguation" data-testid="chat.message.disambiguation">
-          <strong>Clarify:</strong> {disambiguationQuestion}
-        </div>
-      ) : null}
-      {reasoningTrace.length > 0 || auditSourceLabel || message.response?.auditFallbackReason ? (
-        <details className="chat-message__reasoning" data-testid="chat.message.reasoning" open>
-          <summary>Raw reasoning trace</summary>
+      {reasoningTrace.length > 0 ||
+      auditSourceLabel ||
+      message.response?.auditFallbackReason ||
+      reasoningSummary ||
+      mode ||
+      modeReason ||
+      clarificationQuestions.length > 0 ||
+      disambiguationQuestion ? (
+        <details className="chat-message__reasoning" data-testid="chat.message.reasoning">
+          <summary>Audit / reasoning trace</summary>
+          {mode ? (
+            <p className="chat-message__mode" data-testid="chat.message.mode">
+              <strong>Mode:</strong> {mode}
+              {typeof modeConfidence === 'number' ? ` (${Math.round(modeConfidence * 100)}%)` : null}
+            </p>
+          ) : null}
+          {modeReason ? (
+            <p className="chat-message__modeReason" data-testid="chat.message.modeReason">
+              <strong>Mode reason:</strong> {modeReason}
+            </p>
+          ) : null}
+          {clarificationQuestions.length > 0 || disambiguationQuestion ? (
+            <div className="chat-message__disambiguation" data-testid="chat.message.disambiguation">
+              <strong>Clarification needed:</strong>
+              {clarificationQuestions.length > 0 ? (
+                <ul>
+                  {clarificationQuestions.map((question) => (
+                    <li key={question}>{question}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{disambiguationQuestion}</p>
+              )}
+            </div>
+          ) : null}
           {auditSourceLabel ? (
             <p className="chat-message__auditSource" data-testid="chat.message.auditSource">
               <strong>Audit source:</strong> {auditSourceLabel}
@@ -66,6 +84,11 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
               {message.response.auditFallbackReason}
             </p>
           ) : null}
+          {reasoningSummary ? (
+            <p className="chat-message__reasoningSummary" data-testid="chat.message.reasoningSummary">
+              {reasoningSummary}
+            </p>
+          ) : null}
           {reasoningTrace.length > 0 ? (
             <ul>
               {reasoningTrace.map((item) => (
@@ -74,11 +97,6 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
             </ul>
           ) : null}
         </details>
-      ) : null}
-      {message.response?.reasoningSummary ? (
-        <p className="chat-message__reasoningSummary" data-testid="chat.message.reasoningSummary">
-          {message.response.reasoningSummary}
-        </p>
       ) : null}
       {message.role === 'assistant' ? (
         <div className="chat-message__actions" data-testid="chat.message.actions">

@@ -14,6 +14,12 @@ export interface ChatModeGate {
   modeBadgeStatus: 'ready' | 'warning' | 'neutral';
 }
 
+const modeBadgeStatusByMode: Record<ChatResponseMode, ChatModeGate['modeBadgeStatus']> = {
+  Exploration: 'neutral',
+  Formalization: 'ready',
+  Confirmation: 'warning'
+};
+
 export function getChatModeGate(response: ChatCompletionResponse | null | undefined): ChatModeGate {
   const gate = response?.gate;
   const mode = coerceChatGovernanceMode(gate?.mode ?? response?.mode);
@@ -37,20 +43,28 @@ export function getChatModeGate(response: ChatCompletionResponse | null | undefi
         : null,
     governanceActions: showGovernanceActions ? gate?.governanceActions?.filter(Boolean) ?? [] : [],
     showGovernanceActions,
-    modeBadgeStatus: mode === 'Formalization'
-      ? 'ready'
-      : mode === 'Confirmation'
-        ? 'warning'
-        : 'neutral'
+    modeBadgeStatus: mode ? modeBadgeStatusByMode[mode] : 'neutral'
   };
 }
 
-export function coerceChatGovernanceMode(value?: string | null): ChatResponseMode | null {
-  if (!value) {
+export function coerceChatGovernanceMode(value?: string | number | null): ChatResponseMode | null {
+  if (value === null || value === undefined || value === '') {
     return null;
   }
 
-  const normalized = value.trim().toLowerCase();
+  if (value === 0) {
+    return 'Exploration';
+  }
+
+  if (value === 1) {
+    return 'Formalization';
+  }
+
+  if (value === 2) {
+    return 'Confirmation';
+  }
+
+  const normalized = String(value).trim().toLowerCase();
   if (normalized === 'exploration') {
     return 'Exploration';
   }
