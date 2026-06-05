@@ -74,6 +74,7 @@ type MockChatMessage = {
 type MockChatPersistenceOptions = {
   sessions?: MockChatSession[];
   messagesBySessionId?: Record<number, MockChatMessage[]>;
+  auditsByMessageId?: Record<number, unknown>;
 };
 
 async function mockChatPersistence(page: import('@playwright/test').Page, projectId: number, options: MockChatPersistenceOptions = {}) {
@@ -119,6 +120,19 @@ async function mockChatPersistence(page: import('@playwright/test').Page, projec
       seededMessagesBySessionId.set(savedMessage.chatSessionId, sessionMessages);
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(savedMessageId) });
+  });
+
+  await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions/*/messages/*/audit`, async (route) => {
+    const messageIdMatch = /\/messages\/(\d+)\/audit$/i.exec(new URL(route.request().url()).pathname);
+    const requestedMessageId = messageIdMatch ? Number(messageIdMatch[1]) : NaN;
+    const audit = options.auditsByMessageId?.[requestedMessageId];
+
+    if (!audit) {
+      await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'No durable audit row.' }) });
+      return;
+    }
+
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(audit) });
   });
 
   return {
@@ -1465,11 +1479,54 @@ test('chat workspace replays persisted governance envelope and ignores legacy ta
           projectId: 7,
           chatSessionId: 9701,
           role: 'assistant',
-          message: 'Persisted Formalization slice',
+          message: 'Tags fallback Formalization slice',
           tags: formalizationTags,
           createdDate: '2026-06-04T00:00:03Z'
+        },
+        {
+          id: 97013,
+          projectId: 7,
+          chatSessionId: 9701,
+          role: 'assistant',
+          message: 'Durable audit Formalization slice',
+          tags: null,
+          contextSummary: 'Message context that durable audit should replace.',
+          linkedFilePaths: 'MessageOnly.cs',
+          linkedSymbols: 'MessageOnly',
+          createdDate: '2026-06-04T00:00:04Z'
         }
       ]
+    },
+    auditsByMessageId: {
+      97013: {
+        chatMessageId: 97013,
+        source: 'DurableAudit',
+        mode: 'Formalization',
+        modeConfidence: 0.88,
+        modeReason: 'Durable audit decision.',
+        clarification: {
+          required: false,
+          kind: 'None',
+          questions: [],
+          reason: null
+        },
+        gate: {
+          mode: 'Formalization',
+          canSaveDiscussion: true,
+          canCreateTicket: true,
+          canViewSources: true,
+          canCopyMarkdown: true,
+          reason: 'Durable audit decision.',
+          confidence: 0.88,
+          governanceActions: ['Save this response as a Discussion.', 'Create a Ticket from the saved Discussion.']
+        },
+        routeTraceId: 'route-audit-97013',
+        dogfoodTraceId: 'dogfood-audit-97013',
+        contextSummary: 'Durable audit context summary.',
+        linkedFilePaths: 'DurableFormalization.cs',
+        linkedSymbols: 'DurableFormalization',
+        hasFallbackEvidence: false
+      }
     }
   });
 
@@ -1478,13 +1535,18 @@ test('chat workspace replays persisted governance envelope and ignores legacy ta
   await page.getByTestId('shell.nav.chat').click();
 
   await expect(page.getByTestId('chat.thread')).toContainText('Legacy assistant slice');
-  await expect(page.getByTestId('chat.thread')).toContainText('Persisted Formalization slice');
-  await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(1);
-  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(1);
-  await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(1);
-  await expect(page.getByTestId('chat.contextPanel')).toContainText('Persisted formalization context summary.');
-  await expect(page.getByTestId('chat.sources')).toContainText('PersistedFormalization.cs');
-  await expect(page.getByTestId('chat.sources')).toContainText('PersistedFormalization');
+  await expect(page.getByTestId('chat.thread')).toContainText('Tags fallback Formalization slice');
+  await expect(page.getByTestId('chat.thread')).toContainText('Durable audit Formalization slice');
+  await expect(page.getByTestId('chat.message.copyMarkdown')).toHaveCount(2);
+  await expect(page.getByTestId('chat.message.saveDiscussion')).toHaveCount(2);
+  await expect(page.getByTestId('chat.message.viewSources')).toHaveCount(2);
+  await expect(page.getByTestId('chat.thread')).toContainText('Audit source: Tags replay fallback');
+  await expect(page.getByTestId('chat.thread')).toContainText('Audit source: Durable audit');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('Durable audit');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('Durable audit context summary.');
+  await expect(page.getByTestId('chat.contextPanel')).toContainText('route-audit-97013');
+  await expect(page.getByTestId('chat.sources')).toContainText('DurableFormalization.cs');
+  await expect(page.getByTestId('chat.sources')).toContainText('DurableFormalization');
   await expectNoHorizontalOverflow(page);
 });
 

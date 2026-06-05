@@ -74,8 +74,9 @@ Mandatory checks before merge:
   - `ProjectChatResponseComposer` must not leak classifier names, confidence, route hints, gates, or internal governance machinery into the answer unless the user asks how the cockpit decided.
 - Chat replay and persistence changes must also update the persisted `ChatMessage.Tags` schema and normalized turn tables:
   - Persisted assistant responses must include a versioned envelope (`v:1`) with mode + clarification + gate + trace metadata.
-  - UI mapping code must read this envelope when restoring messages and must not infer modes from empty defaults.
+  - UI mapping code must prefer durable audit rows when restoring messages, may read this envelope only as a labeled replay fallback, and must not infer modes from empty defaults.
   - `ChatHistoryService.SaveMessageAsync` must normalize assistant envelopes into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
+  - Chat audit read APIs must be project/session/message scoped and must not recompute mode, clarification, or gate during replay.
   - Runtime services must not create chat-turn audit tables. Use `Database/migrate_chat_turn_audit.sql` or the full setup scripts, and keep assistant message insert + session update + audit writes in one transaction.
   - Legacy string tags must not create normalized governance rows.
 - API boundary tests include updated seam ownership checks in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.

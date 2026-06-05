@@ -43,6 +43,7 @@ Product integrity requires explicit, inspectable transitions between these modes
 16. Clarification fallback preserves evidence conservatively and must not mutate mode or gate.
 17. `ProjectChatResponseService` remains an orchestration spine only. Context pipeline, response composition, and response metadata formatting live in separate named collaborators.
 18. The context pipeline keeps broad context-agent input separate from smaller response-summary context, and the composer must not leak internal classifier/governance machinery into user-facing prose unless explicitly asked.
+19. Runtime chat replay surfaces durable audit rows first. `ChatMessage.Tags` is a labeled replay fallback only, never the durable audit source.
 
 ## Reasoning
 
@@ -57,6 +58,7 @@ The goal is not to stop governance; it is to delay governance controls until int
 - Persisted assistant responses now write a versioned metadata envelope into `ChatMessage.Tags` so replayed sessions reconstruct the same `mode`, `clarification`, and `gate` instead of defaulting to opaque templates.
 - `ChatHistoryService.SaveMessageAsync` persists assistant envelopes into normalized turn tables for audit; legacy string tags intentionally create no turn-governance rows.
 - `Database/migrate_chat_turn_audit.sql` and `Docs/migrations/008_ChatTurnAudit.sql` own chat-turn audit schema; runtime chat services fail loudly when the schema is missing.
+- `GET /api/projects/{projectId}/chat/sessions/{sessionId}/messages/{messageId}/audit` exposes project/session/message-scoped durable audit snapshots for UI trace/sidebar inspection.
 - Debt ticket `CHAT-GOV-STRUCTURED-OUTPUT-001`: replace prompt-constrained classifier JSON with provider-enforced JSON/schema output once `ILLMService` exposes that capability. Removal condition: classifier parse recovery no longer needs brace extraction.
 - `Docs/ARCHITECTURE.md`, `Docs/AGENTS.md`, `Docs/ALPHA_COCKPIT_BACKEND_CONTRACT.md`, and boundary docs must reference the cockpit mode contract.
 - `ApiBoundaryTests` must validate that chat ownership remains context-only and that stage ownership remains explicit.

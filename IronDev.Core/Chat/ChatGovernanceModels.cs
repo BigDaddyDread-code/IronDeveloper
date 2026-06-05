@@ -134,6 +134,21 @@ public sealed record ChatTurnPersistenceSnapshot(
     string? LinkedFilePaths,
     string? LinkedSymbols);
 
+public sealed record ChatTurnAuditResponse(
+    long ChatMessageId,
+    string Source,
+    ChatGovernanceMode Mode,
+    double ModeConfidence,
+    string ModeReason,
+    ChatClarificationState Clarification,
+    ChatGovernanceGate Gate,
+    string? RouteTraceId,
+    string? DogfoodTraceId,
+    string? ContextSummary,
+    string? LinkedFilePaths,
+    string? LinkedSymbols,
+    bool HasFallbackEvidence);
+
 public sealed record ProjectChatResponseResult(
     string Response,
     string Mode,

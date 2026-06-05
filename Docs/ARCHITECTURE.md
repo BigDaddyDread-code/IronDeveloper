@@ -165,6 +165,8 @@ Client-facing UX rules:
   - optional `disambiguationQuestion`
   - optional dogfood trace references.
 - Chat history replay must not infer mode from an empty default. Persisted assistant messages must carry mode, clarification, and gate metadata in `ChatMessage.Tags` as a versioned JSON envelope (`v:1`) and UI mapping must reconstruct `mode`, `clarification`, and governance affordances from this envelope without backend recompute. Backend persistence also normalizes saved assistant envelopes into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`; tags are a replay bridge, not the permanent audit design.
+- Chat history inspection must prefer durable audit rows from `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`. `ChatMessage.Tags` may be used only as a clearly labeled replay fallback when durable audit rows are absent; UI must not present Tags fallback as durable audit.
+- Chat turn audit reads are project/session/message scoped through the API and must not recompute mode, clarification, or gate on replay.
 - Chat turn audit tables are schema-owned, not runtime-created. `Database/migrate_chat_turn_audit.sql`, `Database/local_dev_setup.sql`, and `Database/rebuild_db.sql` own creation of `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`; `ChatTurnPersistenceService` assumes the schema exists and fails loudly if it does not.
 - `ChatHistoryService.SaveMessageAsync` owns the chat persistence transaction boundary. Assistant message insert, session timestamp update, and normalized audit writes commit or roll back together. Delete/reinsert audit refresh is allowed only inside that transaction.
 
@@ -176,6 +178,7 @@ Mode inference invariants:
 - The context router is a scout. Its `ContextModeHint` value is a hint, not authority.
 - A `CreateTicket`/`CreateTicketsFromDiscussion` route hint without explicit lane-lock language must not trigger governance actions.
 - Missing mode is treated as unknown for reconstruction; UI must still behave in conservative exploration mode until explicit mode metadata is present.
+- Missing durable audit is treated as an audit gap, not permission to infer. UI may display versioned `ChatMessage.Tags` as "Tags replay fallback"; legacy string tags remain opaque and cannot enable governance actions.
 
 ### Allowed UI responsibilities
 

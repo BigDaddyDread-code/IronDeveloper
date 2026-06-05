@@ -62,6 +62,22 @@ export interface ChatGovernanceGate {
   confidence?: number | null;
   governanceActions?: string[] | null;
 }
+export type ChatAuditSource = 'durable' | 'tags' | 'live' | 'none';
+export interface ChatTurnAuditResponse {
+  chatMessageId: number;
+  source: 'DurableAudit';
+  mode: string;
+  modeConfidence: number;
+  modeReason: string;
+  clarification: ChatClarificationState;
+  gate: ChatGovernanceGate;
+  routeTraceId?: string | null;
+  dogfoodTraceId?: string | null;
+  contextSummary?: string | null;
+  linkedFilePaths?: string | null;
+  linkedSymbols?: string | null;
+  hasFallbackEvidence: boolean;
+}
 export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'] & {
   mode?: string | null;
   modeConfidence?: number | null;
@@ -73,6 +89,10 @@ export type ChatCompletionResponse = components['schemas']['ChatCompletionRespon
   reasoningSummary?: string | null;
   dogfoodTraceId?: string | null;
   dogfoodTracePath?: string | null;
+  routeTraceId?: string | null;
+  auditSource?: ChatAuditSource;
+  auditFallbackReason?: string | null;
+  auditHasFallbackEvidence?: boolean;
 };
 export type ProjectChatSession = components['schemas']['ProjectChatSession'];
 export type ChatMessage = components['schemas']['ChatMessage'];

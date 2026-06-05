@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ChatCompletionResponse, ChatMessage } from '../../api/types';
+import type { ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
@@ -57,9 +57,17 @@ export function useProjectChat() {
         }
 
         const history = await session.client.getProjectChatMessages(projectId, latestSession.id);
+        const replayedMessages = history.map(mapApiMessage).filter(Boolean);
+        const hydratedMessages = await hydrateMessagesWithDurableAudit(
+          projectId,
+          latestSession.id,
+          history,
+          replayedMessages,
+          session.client
+        );
         if (!isCancelled) {
           setSessionId(latestSession.id);
-          setMessages(history.map(mapApiMessage).filter(Boolean));
+          setMessages(hydratedMessages);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -183,6 +191,10 @@ export function useProjectChat() {
             reasoningSummary: response.reasoningSummary ?? null,
             dogfoodTraceId: response.dogfoodTraceId ?? null,
             dogfoodTracePath: response.dogfoodTracePath ?? null,
+            routeTraceId: response.routeTraceId ?? null,
+            auditSource: 'live',
+            auditFallbackReason: null,
+            auditHasFallbackEvidence: false,
             linkedFilePaths: response.linkedFilePaths ?? null,
             linkedSymbols: response.linkedSymbols ?? null,
             contextSummary: response.contextSummary ?? null,
@@ -302,6 +314,7 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
   const content = message.message?.trim() || '';
   const metadata = parseAssistantTagMetadata(message.tags);
   const responseMode = metadata.mode ?? null;
+  const hasTagReplay = hasAssistantTagReplayMetadata(metadata);
 
   return {
     id: `${role}-${message.id ?? `${message.chatSessionId ?? 'local'}-${Date.now()}`}`,
@@ -325,10 +338,124 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           disambiguationQuestion: metadata.disambiguationQuestion ?? null,
           reasoningSummary: metadata.reasoningSummary ?? null,
           dogfoodTraceId: metadata.dogfoodTraceId ?? null,
-          dogfoodTracePath: metadata.dogfoodTracePath ?? null
+          dogfoodTracePath: metadata.dogfoodTracePath ?? null,
+          routeTraceId: null,
+          auditSource: hasTagReplay ? 'tags' : 'none',
+          auditFallbackReason: hasTagReplay
+            ? 'Durable audit row was unavailable; restored from ChatMessage.Tags replay envelope.'
+            : null,
+          auditHasFallbackEvidence: hasFallbackEvidence(metadata.modeReason, metadata.clarification?.reason)
         }
       : null
   };
+}
+
+async function hydrateMessagesWithDurableAudit(
+  projectId: number,
+  sessionId: number,
+  history: ChatMessage[],
+  mappedMessages: ChatWorkspaceMessage[],
+  client: ReturnType<typeof useSessionContext>['client']
+) {
+  return Promise.all(
+    mappedMessages.map(async (mappedMessage, index) => {
+      const apiMessage = history[index];
+      if (mappedMessage.role !== 'assistant' || !apiMessage?.id) {
+        return mappedMessage;
+      }
+
+      try {
+        const audit = await client.getProjectChatMessageAudit(projectId, sessionId, apiMessage.id);
+        return applyDurableAudit(mappedMessage, audit);
+      } catch (error) {
+        if (error instanceof IronDevApiError && error.status === 404) {
+          return mappedMessage;
+        }
+
+        return {
+          ...mappedMessage,
+          response: mappedMessage.response
+            ? {
+                ...mappedMessage.response,
+                auditFallbackReason: 'Durable audit lookup failed; showing replay metadata if available.'
+              }
+            : mappedMessage.response
+        };
+      }
+    })
+  );
+}
+
+function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditResponse): ChatWorkspaceMessage {
+  const mode = coerceChatGovernanceMode(audit.mode);
+  const gate = getChatModeGate({
+    mode,
+    modeConfidence: audit.modeConfidence,
+    modeReason: audit.modeReason,
+    gate: audit.gate
+  });
+  const disambiguationQuestion = audit.clarification?.required
+    ? audit.clarification.questions?.[0] ?? null
+    : null;
+
+  return {
+    ...message,
+    response: {
+      ...(message.response ?? { response: message.content }),
+      response: message.content,
+      mode,
+      modeConfidence: audit.modeConfidence,
+      modeReason: audit.modeReason,
+      clarification: audit.clarification,
+      gate,
+      contextSummary: audit.contextSummary ?? null,
+      linkedFilePaths: audit.linkedFilePaths ?? null,
+      linkedSymbols: audit.linkedSymbols ?? null,
+      dogfoodTraceId: audit.dogfoodTraceId ?? null,
+      dogfoodTracePath: null,
+      routeTraceId: audit.routeTraceId ?? null,
+      traceId: null,
+      reasoningTrace: buildDurableAuditTrace(audit),
+      disambiguationQuestion,
+      reasoningSummary: `Durable audit replay restored ${mode ?? 'unknown'} mode, clarification, gate, and trace pointers without backend recompute.`,
+      auditSource: 'durable',
+      auditFallbackReason: null,
+      auditHasFallbackEvidence: audit.hasFallbackEvidence
+    }
+  };
+}
+
+function buildDurableAuditTrace(audit: ChatTurnAuditResponse) {
+  return [
+    `Durable audit source: ${audit.source}.`,
+    `Mode: ${audit.mode} (${Math.round(audit.modeConfidence * 100)}%).`,
+    `Mode reason: ${audit.modeReason}`,
+    audit.clarification?.required
+      ? `Clarification: ${audit.clarification.kind} - ${(audit.clarification.questions ?? []).join(' | ')}`
+      : 'Clarification: none required.',
+    `Gate: save=${Boolean(audit.gate?.canSaveDiscussion)}; ticket=${Boolean(audit.gate?.canCreateTicket)}; sources=${Boolean(audit.gate?.canViewSources)}; copy=${Boolean(audit.gate?.canCopyMarkdown)}.`,
+    audit.routeTraceId ? `Route trace id: ${audit.routeTraceId}` : 'Route trace id: none.',
+    audit.dogfoodTraceId ? `Dogfood trace id: ${audit.dogfoodTraceId}` : 'Dogfood trace id: none.',
+    audit.hasFallbackEvidence ? 'Fallback evidence: present.' : 'Fallback evidence: none.'
+  ];
+}
+
+function hasAssistantTagReplayMetadata(metadata: ReturnType<typeof parseAssistantTagMetadata>) {
+  return Boolean(
+    metadata.mode ||
+    metadata.gate ||
+    metadata.modeReason ||
+    metadata.clarification ||
+    metadata.reasoningTrace?.length ||
+    metadata.reasoningSummary ||
+    metadata.contextSummary ||
+    metadata.linkedFilePaths ||
+    metadata.linkedSymbols
+  );
+}
+
+function hasFallbackEvidence(...values: Array<string | null | undefined>) {
+  return values.some((value) => Boolean(value?.toLowerCase().includes('fallback')));
 }
 
 function createSessionTitle(prompt: string) {
