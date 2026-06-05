@@ -83,14 +83,24 @@ public sealed class ChatGovernanceDeletionTests
 
     private static string FindRepoRoot()
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
+        var candidates = new[]
         {
-            if (File.Exists(Path.Combine(current.FullName, "IronDev.slnx")))
-                return current.FullName;
-            current = current.Parent;
+            Environment.GetEnvironmentVariable("IRONDEV_REPO_ROOT"),
+            Directory.GetCurrentDirectory(),
+            AppContext.BaseDirectory
+        };
+
+        foreach (var candidate in candidates.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            var current = new DirectoryInfo(candidate!);
+            while (current is not null)
+            {
+                if (File.Exists(Path.Combine(current.FullName, "IronDev.slnx")))
+                    return current.FullName;
+                current = current.Parent;
+            }
         }
 
-        throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
+        throw new DirectoryNotFoundException("Could not locate repository root from test output directory or current working directory.");
     }
 }

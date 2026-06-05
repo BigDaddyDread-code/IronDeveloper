@@ -16,10 +16,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\IronDev.Api\IronDev.Api.csproj" />
     <ProjectReference Include="..\IronDev.Core\IronDev.Core.csproj" />
     <ProjectReference Include="..\tools\IronDev.Cli\IronDev.Cli.csproj" />
     <ProjectReference Include="..\IronDev.Infrastructure\IronDev.Infrastructure.csproj" />

@@ -76,6 +76,121 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task SaveMessageAsync_UserEnvelopeDoesNotPersistNormalizedTurnRows()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "User tags test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "user",
+            Message = "Turn this into a ticket.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        Assert.IsNull(await turnPersistence.GetByMessageIdAsync(messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+    }
+
+    [TestMethod]
+    public async Task GetByMessageAsync_RequiresProjectAndSessionScope()
+    {
+        var projectId = await SeedProjectAsync();
+        var otherProjectId = await SeedProjectAsync(name: "Other Project");
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Scoped audit read"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        Assert.IsNotNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(otherProjectId, sessionId, messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId + 1, messageId));
+    }
+
+    [TestMethod]
+    public async Task GetByMessageAsync_RequiresTenantScope()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Tenant scoped audit read"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        Assert.IsNotNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+
+        TenantContext.TenantId = 2;
+        try
+        {
+            Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+        }
+        finally
+        {
+            TenantContext.TenantId = 1;
+        }
+    }
+
+    [TestMethod]
+    public async Task GetByMessageAsync_DoesNotInferFallbackEvidenceFromClarificationReason()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Fallback audit read"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Need lane confirmation.",
+            Tags = BuildFallbackEnvelopeJson()
+        });
+
+        var snapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+
+        Assert.IsNotNull(snapshot);
+        Assert.AreEqual(ChatGovernanceMode.Confirmation, snapshot.Mode);
+        StringAssert.Contains(snapshot.Clarification.Reason, "Fallback clarification evidence");
+        Assert.IsFalse(snapshot.IsFallbackEvidence);
+    }
+
+    [TestMethod]
     public async Task DeleteSessionAsync_DeletesPersistedTurnRowsBeforeMessages()
     {
         var projectId = await SeedProjectAsync();
@@ -127,6 +242,34 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
           },
           "routeTraceId": "route-123",
           "dogfoodTraceId": "dogfood-456"
+        }
+        """;
+
+    private static string BuildFallbackEnvelopeJson() =>
+        """
+        {
+          "v": 1,
+          "mode": "Confirmation",
+          "modeConfidence": 0.55,
+          "modeReason": "Ambiguous commitment language.",
+          "clarification": {
+            "required": true,
+            "kind": "GovernanceIntent",
+            "questions": ["Do you want exploration or formalization?"],
+            "reason": "Fallback clarification evidence: confirmation mode requires an explicit lane question."
+          },
+          "gate": {
+            "mode": "Confirmation",
+            "canSaveDiscussion": false,
+            "canCreateTicket": false,
+            "canViewSources": false,
+            "canCopyMarkdown": false,
+            "reason": "Ambiguous commitment language.",
+            "confidence": 0.55,
+            "governanceActions": []
+          },
+          "routeTraceId": "route-fallback",
+          "dogfoodTraceId": "dogfood-fallback"
         }
         """;
 }

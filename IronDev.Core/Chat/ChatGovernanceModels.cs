@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace IronDev.Core.Chat;
 
 public enum ChatGovernanceMode
@@ -5,6 +7,14 @@ public enum ChatGovernanceMode
     Exploration,
     Formalization,
     Confirmation
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ChatAuditSource
+{
+    DurableAudit,
+    TagsReplayFallback,
+    None
 }
 
 public enum ChatPromptTemplate
@@ -132,7 +142,23 @@ public sealed record ChatTurnPersistenceSnapshot(
     string? DogfoodTraceId,
     string? ContextSummary,
     string? LinkedFilePaths,
-    string? LinkedSymbols);
+    string? LinkedSymbols,
+    bool IsFallbackEvidence = false);
+
+public sealed record ChatTurnAuditResponse(
+    long ChatMessageId,
+    ChatAuditSource Source,
+    ChatGovernanceMode Mode,
+    double ModeConfidence,
+    string ModeReason,
+    ChatClarificationState Clarification,
+    ChatGovernanceGate Gate,
+    string? RouteTraceId,
+    string? DogfoodTraceId,
+    string? ContextSummary,
+    string? LinkedFilePaths,
+    string? LinkedSymbols,
+    bool IsFallbackEvidence);
 
 public sealed record ProjectChatResponseResult(
     string Response,

@@ -5,6 +5,7 @@ import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatMessage,
+  ChatTurnAuditResponse,
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
@@ -438,6 +439,21 @@ class IronDevApiClient {
       method: 'GET',
       signal
     });
+  }
+
+  async getProjectChatMessageAudit(
+    projectId: number,
+    sessionId: number,
+    messageId: number,
+    signal?: AbortSignal
+  ): Promise<ChatTurnAuditResponse> {
+    return this.request<ChatTurnAuditResponse>(
+      `/api/projects/${projectId}/chat/sessions/${sessionId}/messages/${messageId}/audit`,
+      {
+        method: 'GET',
+        signal
+      }
+    );
   }
 
   async saveProjectChatMessage(

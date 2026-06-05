@@ -18,4 +18,10 @@ public interface IChatTurnPersistenceService
     Task<ChatTurnPersistenceSnapshot?> GetByMessageIdAsync(
         long chatMessageId,
         CancellationToken cancellationToken = default);
+
+    Task<ChatTurnPersistenceSnapshot?> GetByMessageAsync(
+        int projectId,
+        long chatSessionId,
+        long chatMessageId,
+        CancellationToken cancellationToken = default);
 }

@@ -43,15 +43,20 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
   - Mode may be `Exploration`/`Formalization`/`Confirmation`; unknown mode values are treated as conservatively non-governance in clients.
 - Chat history persistence uses the `ChatMessage.Tags` column to store assistant metadata:
   - The shell stores assistant mode, clarification, gate, and trace metadata as a versioned JSON envelope in `Tags` (`{ "v": 1, ... }`).
-  - Replays must parse this envelope and reconstruct the same mode, clarification, and gate state without backend recompute.
+  - Replays may parse this envelope only as a labeled fallback when durable audit rows are unavailable.
   - Legacy non-JSON `tags` should be treated as opaque and must not infer mode.
 - Chat turn audit persistence is normalized:
   - `ChatHistoryService.SaveMessageAsync` persists assistant envelope state into `ChatTurnGovernance`, `ChatTurnClarifications`, and `ChatTurnTraces`.
   - These tables are the durable audit path for governance mode, clarification, gate, and trace pointers.
+  - `GET /api/projects/{projectId}/chat/sessions/{sessionId}/messages/{messageId}/audit` returns the durable audit snapshot for a specific chat turn and proves tenant/project/session/message scope.
+  - UI trace/sidebar surfaces must prefer this durable audit endpoint and clearly label `ChatMessage.Tags` as replay fallback when used.
   - Audit tables are created by `Database/migrate_chat_turn_audit.sql`, `Database/local_dev_setup.sql`, or `Database/rebuild_db.sql`; runtime services must not create them.
   - Assistant message insert, session timestamp update, and normalized turn writes share one transaction.
-  - Clarification fallback must be visibly marked in the reason and cannot alter the final mode or `ChatGovernanceGate`.
+  - Clarification fallback may be described in trace text, but fallback evidence must be typed audit data. The backend and UI must not scan `modeReason` or clarification reason prose to infer fallback state.
   - `ChatMessage.Tags` remains a client replay bridge, not the permanent storage design.
+  - Slice 4 client replay may hydrate durable audit rows per assistant message only while bounded to the current history page. Follow-up `CHAT-AUDIT-BATCH-001` owns a session-scoped batch audit endpoint.
+  - Follow-up `CHAT-AUDIT-FALLBACK-TYPED-001` owns durable fallback evidence persistence once fallback evidence needs to survive as auditable state.
+  - Audit source/fallback labels belong in trace and inspection panels, not normal chat answer text.
 - A valid `dogfoodTraceId` is the single pointer to route/trace records for route decisions and reasoning.
 - A ticket-scoped run endpoint must verify:
   - the ticket exists;

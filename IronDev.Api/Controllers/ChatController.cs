@@ -20,17 +20,20 @@ public sealed class ChatController : ControllerBase
 
     private readonly IChatHistoryService _chat;
     private readonly IChatFeedbackService _feedback;
+    private readonly IChatTurnPersistenceService _turnPersistence;
     private readonly IProjectChatResponseService _projectChat;
     private readonly IProjectStateReviewService _projectStateReview;
 
     public ChatController(
         IChatHistoryService chat,
         IChatFeedbackService feedback,
+        IChatTurnPersistenceService turnPersistence,
         IProjectChatResponseService projectChat,
         IProjectStateReviewService projectStateReview)
     {
         _chat = chat;
         _feedback = feedback;
+        _turnPersistence = turnPersistence;
         _projectChat = projectChat;
         _projectStateReview = projectStateReview;
     }
@@ -62,6 +65,33 @@ public sealed class ChatController : ControllerBase
     [HttpGet("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
     public Task<IReadOnlyList<ChatMessage>> GetMessages(int projectId, long sessionId, [FromQuery] int take = 50, CancellationToken ct = default) =>
         _chat.GetRecentMessagesAsync(projectId, sessionId, take, ct);
+
+    [HttpGet("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages/{messageId:long}/audit")]
+    public async Task<ActionResult<ChatTurnAuditResponse>> GetMessageAudit(
+        int projectId,
+        long sessionId,
+        long messageId,
+        CancellationToken ct = default)
+    {
+        var snapshot = await _turnPersistence.GetByMessageAsync(projectId, sessionId, messageId, ct).ConfigureAwait(false);
+        if (snapshot is null)
+            return NotFound();
+
+        return Ok(new ChatTurnAuditResponse(
+            snapshot.ChatMessageId,
+            ChatAuditSource.DurableAudit,
+            snapshot.Mode,
+            snapshot.ModeConfidence,
+            snapshot.ModeReason,
+            snapshot.Clarification,
+            snapshot.Gate,
+            snapshot.RouteTraceId,
+            snapshot.DogfoodTraceId,
+            snapshot.ContextSummary,
+            snapshot.LinkedFilePaths,
+            snapshot.LinkedSymbols,
+            snapshot.IsFallbackEvidence));
+    }
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
     public async Task<ActionResult<long>> SaveMessage(int projectId, long sessionId, ChatMessage message, CancellationToken ct)
@@ -183,4 +213,5 @@ public sealed class ChatController : ControllerBase
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>
         _feedback.SaveFeedbackAsync(feedback, ct);
+
 }

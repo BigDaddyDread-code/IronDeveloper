@@ -145,6 +145,24 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         long chatMessageId,
         CancellationToken cancellationToken = default)
     {
+        return await GetByMessageCoreAsync(null, null, chatMessageId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ChatTurnPersistenceSnapshot?> GetByMessageAsync(
+        int projectId,
+        long chatSessionId,
+        long chatMessageId,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetByMessageCoreAsync(projectId, chatSessionId, chatMessageId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ChatTurnPersistenceSnapshot?> GetByMessageCoreAsync(
+        int? projectId,
+        long? chatSessionId,
+        long chatMessageId,
+        CancellationToken cancellationToken)
+    {
         using var connection = _connectionFactory.CreateConnection();
 
         const string sql = """
@@ -169,12 +187,14 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             LEFT JOIN dbo.ChatTurnTraces t
                 ON t.ChatMessageId = g.ChatMessageId AND t.TenantId = g.TenantId
             WHERE g.ChatMessageId = @ChatMessageId
-              AND g.TenantId = @TenantId;
+              AND g.TenantId = @TenantId
+              AND (@ProjectId IS NULL OR g.ProjectId = @ProjectId)
+              AND (@ChatSessionId IS NULL OR g.ChatSessionId = @ChatSessionId);
             """;
 
         var row = await connection.QuerySingleOrDefaultAsync<PersistedTurnRow>(new CommandDefinition(
             sql,
-            new { ChatMessageId = chatMessageId, TenantId = _tenant.TenantId },
+            new { ChatMessageId = chatMessageId, TenantId = _tenant.TenantId, ProjectId = projectId, ChatSessionId = chatSessionId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         if (row is null)
