@@ -1,10 +1,13 @@
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
+using System.Text.RegularExpressions;
 
 namespace IronDev.Infrastructure.Services.Agents;
 
 public sealed class AgentGovernanceGate : IAgentGovernanceGate
 {
+    private static readonly Regex Sha256Regex = new(@"^[A-Fa-f0-9]{64}$", RegexOptions.Compiled);
+
     public AgentGovernanceDecision Evaluate(AgentDefinition definition, AgentRequest request)
     {
         if (!definition.Enabled)
@@ -30,6 +33,25 @@ public sealed class AgentGovernanceGate : IAgentGovernanceGate
                 MaxImpact(request.RequestedToolCalls));
         }
 
+        var requestedLegacyHighImpactTools = request.RequestedTools
+            .Where(tool => AgentToolCapabilityCatalog.IsHighImpact(tool))
+            .Where(tool => !request.RequestedToolCalls.Any(call =>
+                string.Equals(call.ToolName, tool, StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tool => tool, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (requestedLegacyHighImpactTools.Length > 0)
+        {
+            return Block(
+                $"Legacy requested high-impact tools require typed tool-call metadata: {string.Join(", ", requestedLegacyHighImpactTools)}.",
+                AgentApprovalDecision.Missing,
+                AgentActionImpact.WorkspaceMutation,
+                requiresApproval: true);
+        }
+
+        var approval = request.ApprovalEvidence;
+
         foreach (var call in request.RequestedToolCalls)
         {
             if (string.IsNullOrWhiteSpace(call.ToolName))
@@ -38,6 +60,15 @@ public sealed class AgentGovernanceGate : IAgentGovernanceGate
             var highImpact = IsHighImpact(call);
             if (!highImpact)
                 continue;
+
+            if (string.IsNullOrWhiteSpace(call.ToolCallId))
+            {
+                return Block(
+                    $"High-impact tool '{call.ToolName}' is missing ToolCallId metadata.",
+                    AgentApprovalDecision.Invalid,
+                    call.Impact,
+                    requiresApproval: true);
+            }
 
             if (request.DryRunOnly)
             {
@@ -48,12 +79,38 @@ public sealed class AgentGovernanceGate : IAgentGovernanceGate
                     requiresApproval: true);
             }
 
-            var approval = request.ApprovalEvidence;
             if (approval is null)
             {
                 return Block(
                     $"High-impact tool '{call.ToolName}' requires typed approval evidence.",
                     AgentApprovalDecision.Missing,
+                    call.Impact,
+                    requiresApproval: true);
+            }
+
+            if (string.IsNullOrWhiteSpace(approval.ApprovalId))
+            {
+                return Block(
+                    $"High-impact tool '{call.ToolName}' approval evidence is missing ApprovalId.",
+                    AgentApprovalDecision.Invalid,
+                    call.Impact,
+                    requiresApproval: true);
+            }
+
+            if (approval.ApprovedToolCallIds.All(approvedId => !string.Equals(approvedId, call.ToolCallId, StringComparison.Ordinal)))
+            {
+                return Block(
+                    $"Approval evidence for high-impact tool '{call.ToolName}' does not include ToolCallId '{call.ToolCallId}'.",
+                    AgentApprovalDecision.Invalid,
+                    call.Impact,
+                    requiresApproval: true);
+            }
+
+            if (approval.Evidence.Any(evidence => !IsEvidenceItemComplete(evidence, out _)))
+            {
+                return Block(
+                    $"Approval for high-impact tool '{call.ToolName}' has invalid evidence metadata.",
+                    AgentApprovalDecision.Invalid,
                     call.Impact,
                     requiresApproval: true);
             }
@@ -98,14 +155,35 @@ public sealed class AgentGovernanceGate : IAgentGovernanceGate
                     requiresApproval: true);
             }
 
-            if (call.EvidenceRequired &&
-                (approval.Evidence.Count == 0 || approval.Evidence.Any(evidence => string.IsNullOrWhiteSpace(evidence.Sha256))))
+            if ((call.EvidenceRequired || call.EvidenceSourceIds.Count > 0) &&
+                approval.Evidence.Count == 0)
             {
                 return Block(
-                    $"Approval for high-impact tool '{call.ToolName}' is missing hashed evidence.",
+                    $"Approval for high-impact tool '{call.ToolName}' has invalid evidence metadata.",
                     AgentApprovalDecision.Invalid,
                     call.Impact,
                     requiresApproval: true);
+            }
+
+            if (call.EvidenceSourceIds.Count > 0)
+            {
+                var evidenceIds = new HashSet<string>(
+                    approval.Evidence
+                        .Select(evidence => evidence.EvidenceId),
+                    StringComparer.Ordinal);
+
+                var missingEvidenceSourceIds = call.EvidenceSourceIds
+                    .Where(sourceId => !evidenceIds.Contains(sourceId))
+                    .ToArray();
+
+                if (missingEvidenceSourceIds.Length > 0)
+                {
+                    return Block(
+                        $"Approval for high-impact tool '{call.ToolName}' references EvidenceSourceIds not in approval evidence: {string.Join(", ", missingEvidenceSourceIds)}.",
+                        AgentApprovalDecision.Invalid,
+                        call.Impact,
+                        requiresApproval: true);
+                }
             }
         }
 
@@ -124,6 +202,7 @@ public sealed class AgentGovernanceGate : IAgentGovernanceGate
     }
 
     private static bool IsHighImpact(AgentToolCallRequest call) =>
+        AgentToolCapabilityCatalog.IsHighImpact(call.ToolName) ||
         call.RequiresApproval ||
         call.AllowsFileWrites ||
         call.AllowsProcessExecution ||
@@ -133,6 +212,36 @@ public sealed class AgentGovernanceGate : IAgentGovernanceGate
             or AgentActionImpact.MemoryMutation
             or AgentActionImpact.ExternalNetwork
             or AgentActionImpact.Unknown;
+
+    private static bool IsEvidenceItemComplete(AgentEvidenceItem item, out string? failureReason)
+    {
+        if (string.IsNullOrWhiteSpace(item.EvidenceId))
+        {
+            failureReason = "missing evidence item evidence-id";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Kind))
+        {
+            failureReason = "missing evidence item kind";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(item.ProducedBy))
+        {
+            failureReason = "missing evidence producer";
+            return false;
+        }
+
+        if (!Sha256Regex.IsMatch(item.Sha256))
+        {
+            failureReason = $"invalid evidence hash '{item.Sha256}'";
+            return false;
+        }
+
+        failureReason = null;
+        return true;
+    }
 
     private static AgentActionImpact MaxImpact(IReadOnlyList<AgentToolCallRequest> calls)
     {
