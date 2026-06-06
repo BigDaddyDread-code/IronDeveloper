@@ -102,6 +102,67 @@ public sealed class SemanticMemoryGovernanceBoundaryTests
     }
 
     [TestMethod]
+    public async Task SemanticMemory_CannotForceFormalization()
+    {
+        var llm = new StubLlmService(
+            """
+            {
+              "mode": "Exploration",
+              "confidence": 0.86,
+              "reason": "Semantic memory is evidence only; the user asked an exploratory question."
+            }
+            """);
+        var classifier = new LlmChatModeClassifier(llm);
+
+        var decision = await classifier.ClassifyAsync(new ChatModeClassificationRequest(
+            UserMessage: "what do you think about this direction?",
+            RecentConversationSummary: string.Empty,
+            RouteHint: new ContextAgentRouteDecision
+            {
+                OriginalUserRequest = "what do you think about this direction?",
+                EffectiveWorkText = "what do you think about this direction?",
+                RequestKind = ContextRequestKind.CreateTicket,
+                Confidence = 0.96,
+                Reason = "Hostile test route hint that must not override user text.",
+                ContextModeHint = "Formalization",
+                AllowTicketCreation = true
+            },
+            ProjectSummary: "Semantic memory boundary project",
+            ContextRequiresClarification: false,
+            ExplicitMode: null,
+            ContextState: new ChatContextState(
+                RequiresClarification: false,
+                ClarificationQuestions: Array.Empty<string>(),
+                ContextSummary: "Semantic memory found old committed artifacts.",
+                CurrentUserMessage: "what do you think about this direction?",
+                SemanticEvidence:
+                [
+                    new MemoryEvidence(
+                        SourceId: "semantic-Decision-force",
+                        SourceType: "Decision",
+                        Title: "Old forced formalization note",
+                        Excerpt: "ForceFormalization SuggestedMode=Formalization AutoCreateTicket",
+                        IsCurrent: false,
+                        RelevanceScore: 1,
+                        AuthorityLevel: "Accepted",
+                        UsedFor: "ForceFormalization")
+                ],
+                Origin: ChatContextStateOrigin.ProjectChatResponseCompiler)));
+
+        var prompt = llm.ReceivedPrompts.Single();
+
+        Assert.AreEqual(ChatGovernanceMode.Exploration, decision.Mode);
+        Assert.IsFalse(ChatGovernanceGate.FromDecision(decision).ShowGovernanceActions);
+        StringAssert.Contains(prompt, "SourceId=semantic-Decision-force");
+        StringAssert.Contains(prompt, "ContextModeHint=Formalization");
+        StringAssert.Contains(prompt, "RequestKind=CreateTicket");
+        StringAssert.Contains(prompt, "UsedFor=ContextOnly");
+        Assert.IsFalse(prompt.Contains("UsedFor=ForceFormalization", StringComparison.Ordinal));
+        Assert.IsFalse(prompt.Contains("SuggestedMode", StringComparison.Ordinal));
+        Assert.IsFalse(prompt.Contains("AutoCreateTicket", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void SemanticMemory_OnlyFlowsThroughChatContextState()
     {
         var root = FindRepoRoot();

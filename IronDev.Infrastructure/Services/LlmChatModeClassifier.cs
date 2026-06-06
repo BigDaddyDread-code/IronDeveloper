@@ -133,8 +133,39 @@ public sealed class LlmChatModeClassifier : IChatModeClassifier
         if (evidence is null || evidence.Count == 0)
             return [];
 
-        return [.. evidence.Select(e => e with { UsedFor = "ContextOnly" })];
+        return [.. evidence.Select(e => e with
+        {
+            Title = SanitizeMemoryText(e.Title),
+            Excerpt = SanitizeMemoryText(e.Excerpt),
+            AuthorityLevel = SanitizeMemoryText(e.AuthorityLevel),
+            UsedFor = "ContextOnly"
+        })];
     }
+
+    private static string SanitizeMemoryText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        var sanitized = text;
+        foreach (var token in ForbiddenMemoryDirectiveTokens)
+            sanitized = sanitized.Replace(token, "[redacted-memory-directive]", StringComparison.OrdinalIgnoreCase);
+
+        return sanitized;
+    }
+
+    private static readonly IReadOnlyList<string> ForbiddenMemoryDirectiveTokens =
+    [
+        "SuggestedMode",
+        "SuggestedAction",
+        "ShouldShowButton",
+        "ShouldAutoFormalize",
+        "ShouldInvokeSkill",
+        "AutoCreateTicket",
+        "RecommendedGateState",
+        "ForceFormalization",
+        "ForceConfirmation"
+    ];
 
     private static string BuildSkillHintBlock(IReadOnlyList<AvailableSkillHint>? skillHints) =>
         BuildMemoryList(
