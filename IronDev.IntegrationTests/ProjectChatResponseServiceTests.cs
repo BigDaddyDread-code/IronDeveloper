@@ -581,8 +581,12 @@ public sealed class ProjectChatResponseServiceTests
         var directory = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(directory))
         {
-            if (Directory.Exists(Path.Combine(directory, ".git")))
+            if (Directory.Exists(Path.Combine(directory, ".git")) ||
+                File.Exists(Path.Combine(directory, ".git")) ||
+                File.Exists(Path.Combine(directory, "IronDev.slnx")))
+            {
                 return directory;
+            }
 
             directory = Directory.GetParent(directory)?.FullName;
         }

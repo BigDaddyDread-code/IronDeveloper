@@ -77,9 +77,13 @@ public sealed class ChatController : ControllerBase
         if (snapshot is null)
             return NotFound();
 
+        var source = snapshot.IsFallbackEvidence
+            ? ChatAuditSource.TagsReplayFallback
+            : ChatAuditSource.DurableAudit;
+
         return Ok(new ChatTurnAuditResponse(
             snapshot.ChatMessageId,
-            ChatAuditSource.DurableAudit,
+            source,
             snapshot.Mode,
             snapshot.ModeConfidence,
             snapshot.ModeReason,

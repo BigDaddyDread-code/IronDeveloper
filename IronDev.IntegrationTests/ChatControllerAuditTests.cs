@@ -39,6 +39,27 @@ public sealed class ChatControllerAuditTests
     }
 
     [TestMethod]
+    public async Task GetMessageAudit_LabelsTagsReplayFallback_WhenSnapshotIsFallbackEvidence()
+    {
+        var snapshot = BuildSnapshot(messageId: 9001, isFallbackEvidence: true);
+        var controller = new ChatController(
+            new UnusedChatHistoryService(),
+            new UnusedChatFeedbackService(),
+            new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
+            new UnusedProjectChatResponseService(),
+            new UnusedProjectStateReviewService());
+
+        var result = await controller.GetMessageAudit(7, 9701, 9001);
+
+        var ok = result.Result as OkObjectResult;
+        Assert.IsNotNull(ok);
+        var audit = ok.Value as ChatTurnAuditResponse;
+        Assert.IsNotNull(audit);
+        Assert.AreEqual(ChatAuditSource.TagsReplayFallback, audit.Source);
+        Assert.IsTrue(audit.IsFallbackEvidence);
+    }
+
+    [TestMethod]
     public async Task GetMessageAudit_SerializesAuditEnumsAsStrings()
     {
         var snapshot = BuildSnapshot(messageId: 9001);
@@ -81,7 +102,7 @@ public sealed class ChatControllerAuditTests
         Assert.IsInstanceOfType(wrongMessage.Result, typeof(NotFoundResult));
     }
 
-    private static ChatTurnPersistenceSnapshot BuildSnapshot(long messageId) =>
+    private static ChatTurnPersistenceSnapshot BuildSnapshot(long messageId, bool isFallbackEvidence = false) =>
         new(
             messageId,
             ChatGovernanceMode.Formalization,
@@ -96,7 +117,8 @@ public sealed class ChatControllerAuditTests
             "dogfood-audit-test",
             "Durable audit context.",
             "src/App.cs",
-            "App");
+            "App",
+            isFallbackEvidence);
 
     private sealed class ScopedTurnPersistenceService : IChatTurnPersistenceService
     {
