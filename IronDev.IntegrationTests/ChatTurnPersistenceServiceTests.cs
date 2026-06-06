@@ -143,6 +143,116 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task AuditLookup_PrefersNormalizedRowsOverTags()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Normalized audit lookup test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        var snapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsFalse(snapshot.IsFallbackEvidence);
+        Assert.AreEqual(ChatGovernanceMode.Formalization, snapshot.Mode);
+    }
+
+    [TestMethod]
+    public async Task AuditLookup_LabelsTagFallbackAsFallback()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Tags fallback lookup test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson(),
+            ContextSummary = "Fallback context summary.",
+            LinkedFilePaths = "src/Fallback.cs",
+            LinkedSymbols = "Fallback"
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnClarifications WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnGovernance WHERE ChatMessageId = @MessageId;
+            """,
+            new { MessageId = messageId });
+
+        var snapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsTrue(snapshot.IsFallbackEvidence);
+        Assert.AreEqual(ChatGovernanceMode.Formalization, snapshot.Mode);
+        Assert.AreEqual(ChatClarificationKind.GovernanceIntent, snapshot.Clarification.Kind);
+        Assert.AreEqual("Fallback context summary.", snapshot.ContextSummary);
+        Assert.AreEqual("src/Fallback.cs", snapshot.LinkedFilePaths);
+        Assert.AreEqual("Fallback", snapshot.LinkedSymbols);
+    }
+
+    [TestMethod]
+    public async Task AuditLookup_TagFallbackRequiresScope()
+    {
+        var projectId = await SeedProjectAsync();
+        var otherProjectId = await SeedProjectAsync(name: "Other fallback project");
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Scoped fallback lookup test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnClarifications WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnGovernance WHERE ChatMessageId = @MessageId;
+            """,
+            new { MessageId = messageId });
+
+        Assert.IsNotNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(otherProjectId, sessionId, messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId + 1, messageId));
+    }
+
+    [TestMethod]
     public async Task SaveMessageAsync_LegacyTagsDoNotPersistNormalizedTurnRows()
     {
         var projectId = await SeedProjectAsync();

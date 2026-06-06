@@ -25,7 +25,7 @@ When replacing normalized audit rows for a message, delete and insert operations
 
 Audit responses label their source explicitly:
 
-- `DurableAudit`: normalized audit rows were read.
-- `TagsReplayFallback`: fallback evidence was reconstructed from tags.
+- `NormalizedRows`: normalized audit rows were read.
+- `TagsFallback`: fallback evidence was reconstructed from tags.
 
 Fallback data is compatibility evidence, not equivalent to normalized durable audit rows.

@@ -32,14 +32,14 @@ public sealed class ChatControllerAuditTests
         Assert.IsNotNull(ok);
         var audit = ok.Value as ChatTurnAuditResponse;
         Assert.IsNotNull(audit);
-        Assert.AreEqual(ChatAuditSource.DurableAudit, audit.Source);
+        Assert.AreEqual(ChatAuditSource.NormalizedRows, audit.Source);
         Assert.AreEqual(9001, audit.ChatMessageId);
         Assert.AreEqual(ChatGovernanceMode.Formalization, audit.Mode);
         Assert.IsFalse(audit.IsFallbackEvidence);
     }
 
     [TestMethod]
-    public async Task GetMessageAudit_LabelsTagsReplayFallback_WhenSnapshotIsFallbackEvidence()
+    public async Task GetMessageAudit_LabelsTagsFallback_WhenSnapshotIsFallbackEvidence()
     {
         var snapshot = BuildSnapshot(messageId: 9001, isFallbackEvidence: true);
         var controller = new ChatController(
@@ -55,7 +55,7 @@ public sealed class ChatControllerAuditTests
         Assert.IsNotNull(ok);
         var audit = ok.Value as ChatTurnAuditResponse;
         Assert.IsNotNull(audit);
-        Assert.AreEqual(ChatAuditSource.TagsReplayFallback, audit.Source);
+        Assert.AreEqual(ChatAuditSource.TagsFallback, audit.Source);
         Assert.IsTrue(audit.IsFallbackEvidence);
     }
 
@@ -76,7 +76,7 @@ public sealed class ChatControllerAuditTests
 
         var json = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-        StringAssert.Contains(json, "\"source\":\"DurableAudit\"");
+        StringAssert.Contains(json, "\"source\":\"NormalizedRows\"");
         StringAssert.Contains(json, "\"mode\":\"Formalization\"");
         StringAssert.Contains(json, "\"kind\":\"None\"");
         Assert.IsFalse(json.Contains("\"mode\":0", StringComparison.Ordinal), json);
