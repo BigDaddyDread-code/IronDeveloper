@@ -8,7 +8,7 @@ public sealed class GovernedToolRegistry
 {
     private readonly string _repoRoot;
     private readonly string _runnerProject;
-    private readonly IReadOnlyList<AgentToolCapability> _capabilities;
+    private readonly IReadOnlyList<GovernedAgentToolCapability> _capabilities;
     private readonly IReadOnlyList<ProjectRuntimeProfile> _runtimeProfiles;
 
     public GovernedToolRegistry(string repoRoot)
@@ -19,14 +19,14 @@ public sealed class GovernedToolRegistry
         _runtimeProfiles = CreateRuntimeProfiles();
     }
 
-    public IReadOnlyList<AgentToolCapability> ListCapabilities() => _capabilities;
+    public IReadOnlyList<GovernedAgentToolCapability> ListCapabilities() => _capabilities;
 
     public IReadOnlyList<ProjectRuntimeProfile> ListRuntimeProfiles() => _runtimeProfiles;
 
-    public bool TryGetCapability(string name, out AgentToolCapability capability)
+    public bool TryGetCapability(string name, out GovernedAgentToolCapability capability)
     {
         capability = _capabilities.FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
-            ?? new AgentToolCapability { Name = name, Description = "Unknown tool capability." };
+            ?? new GovernedAgentToolCapability { Name = name, Description = "Unknown tool capability." };
         return !string.Equals(capability.Description, "Unknown tool capability.", StringComparison.Ordinal);
     }
 
@@ -66,7 +66,7 @@ public sealed class GovernedToolRegistry
 
     private async Task<AgentToolResult> RunMemorySearchAsync(
         AgentToolRequest request,
-        AgentToolCapability capability,
+        GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
     {
@@ -116,7 +116,7 @@ public sealed class GovernedToolRegistry
 
     private Task<AgentToolResult> RunCodeSearchAsync(
         AgentToolRequest request,
-        AgentToolCapability capability,
+        GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
     {
@@ -150,7 +150,7 @@ public sealed class GovernedToolRegistry
             capability.Boundary));
     }
 
-    private AgentToolResult RunTraceRead(AgentToolRequest request, AgentToolCapability capability, DateTimeOffset started)
+    private AgentToolResult RunTraceRead(AgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
     {
         var runsRoot = Path.Combine(_repoRoot, "tools", "dogfood", "runs");
         var reports = Directory.Exists(runsRoot)
@@ -174,7 +174,7 @@ public sealed class GovernedToolRegistry
             capability.Boundary);
     }
 
-    private AgentToolResult RunFailureLatest(AgentToolRequest request, AgentToolCapability capability, DateTimeOffset started)
+    private AgentToolResult RunFailureLatest(AgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
     {
         var runsRoot = Path.Combine(_repoRoot, "tools", "dogfood", "runs");
         var failures = Directory.Exists(runsRoot)
@@ -199,7 +199,7 @@ public sealed class GovernedToolRegistry
 
     private async Task<AgentToolResult> RunTestPlanAsync(
         AgentToolRequest request,
-        AgentToolCapability capability,
+        GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
     {
@@ -218,7 +218,7 @@ public sealed class GovernedToolRegistry
 
     private async Task<AgentToolResult> RunQualityGateAsync(
         AgentToolRequest request,
-        AgentToolCapability capability,
+        GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
     {
@@ -235,7 +235,7 @@ public sealed class GovernedToolRegistry
         return ProcessBackedResult(request, capability, started, run, $"Quality gate {planPath} exit={run.ExitCode}.");
     }
 
-    private AgentToolResult RunProjectBuildProfile(AgentToolRequest request, AgentToolCapability capability, DateTimeOffset started)
+    private AgentToolResult RunProjectBuildProfile(AgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
     {
         var profile = ResolveRuntimeProfile(request.Project, request.Runtime);
         return Succeeded(
@@ -255,7 +255,7 @@ public sealed class GovernedToolRegistry
 
     private AgentToolResult ProcessBackedResult(
         AgentToolRequest request,
-        AgentToolCapability capability,
+        GovernedAgentToolCapability capability,
         DateTimeOffset started,
         ProcessRun run,
         string summary)
@@ -349,7 +349,7 @@ public sealed class GovernedToolRegistry
             Boundary = "Governed tool runner failed closed."
         };
 
-    private static IReadOnlyList<AgentToolCapability> CreateCapabilities() =>
+    private static IReadOnlyList<GovernedAgentToolCapability> CreateCapabilities() =>
     [
         new()
         {
@@ -500,3 +500,4 @@ public sealed class GovernedToolRegistry
         public string Path { get; init; } = string.Empty;
     }
 }
+
