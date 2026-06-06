@@ -7,12 +7,14 @@ using Microsoft.Data.SqlClient;
 using Dapper;
 using IronDev.Core;
 using IronDev.Core.Auth;
+using IronDev.Core.KnowledgeCompiler;
 using IronDev.Data;
 using IronDev.Services;
 using IronDev.AI;
 using IronDev.Core.Interfaces;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
+using IronDev.Infrastructure.Services.SemanticMemory;
 
 namespace IronDev.IntegrationTests;
 
@@ -63,6 +65,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
         services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
         services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
+        services.AddScoped<IProjectMemoryMapService, ProjectMemoryMapService>();
         services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
         services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
         services.AddScoped<ITicketService, TicketService>();
@@ -76,6 +79,8 @@ public abstract class IntegrationTestBase
         services.AddScoped<IBuilderProposalService, BuilderProposalService>();
         services.AddScoped<IBuildErrorClassifierService, BuildErrorClassifierService>();
         services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
+        services.AddScoped<ISemanticArtefactRepository, SemanticArtefactRepository>();
+        services.AddScoped<ISemanticChunkRepository, SemanticChunkRepository>();
         services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
         services.AddScoped<ICodeChangeProposalService, CodeChangeProposalService>();
         services.AddScoped<IChatClarificationClassifier, LlmChatClarificationClassifier>();
@@ -242,6 +247,10 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
             IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
             IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
+            IF OBJECT_ID('dbo.SemanticSearchTraces', 'U') IS NOT NULL DELETE FROM dbo.SemanticSearchTraces;
+            IF OBJECT_ID('dbo.EmbeddingJobs', 'U') IS NOT NULL DELETE FROM dbo.EmbeddingJobs;
+            IF OBJECT_ID('dbo.SemanticChunks', 'U') IS NOT NULL DELETE FROM dbo.SemanticChunks;
+            IF OBJECT_ID('dbo.SemanticArtefacts', 'U') IS NOT NULL DELETE FROM dbo.SemanticArtefacts;
             IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DELETE FROM dbo.CodeIndexEntries;
             IF OBJECT_ID('dbo.ProjectProfiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectProfiles;
             IF OBJECT_ID('dbo.ProjectCommands', 'U') IS NOT NULL DELETE FROM dbo.ProjectCommands;
@@ -252,6 +261,7 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
             IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
+            IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             DELETE FROM dbo.ProjectDecisions;
             DELETE FROM dbo.ProjectFiles;
             DELETE FROM dbo.ProjectTickets;
