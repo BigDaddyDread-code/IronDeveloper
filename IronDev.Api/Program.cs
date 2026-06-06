@@ -92,6 +92,7 @@ builder.Services.AddSingleton<ProjectChatResponseMetadataBuilder>();
 builder.Services.AddScoped<IProjectChatResponseService, ProjectChatResponseService>();
 builder.Services.AddScoped<IProjectStateReviewService, ProjectStateReviewService>();
 builder.Services.AddScoped<IProjectMemoryService, ProjectMemoryService>();
+builder.Services.AddScoped<IProjectMemoryMapService, ProjectMemoryMapService>();
 builder.Services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
 builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
 builder.Services.AddScoped<IProjectProfileService, ProjectProfileService>();
