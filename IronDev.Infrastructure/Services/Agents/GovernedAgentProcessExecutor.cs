@@ -8,7 +8,8 @@ namespace IronDev.Infrastructure.Services.Agents;
 public sealed class GovernedAgentProcessExecutor : IGovernedAgentProcessExecutor
 {
     private const string DefaultEvidenceRoot = "IronDev.AgentProcessEvidence";
-    private const string DefaultPolicyDecision = "allowed";
+    private const string ProcessPolicyDecision = "allowed_by_executable_and_argument_policy";
+    private const string ApprovedPowerShellScriptRoot = "tools/dogfood";
     private static readonly HashSet<string> AllowedExecutables = new(StringComparer.OrdinalIgnoreCase)
     {
         "powershell",
@@ -105,6 +106,59 @@ public sealed class GovernedAgentProcessExecutor : IGovernedAgentProcessExecutor
 
         if (request.Arguments.Count == 0)
             throw new InvalidOperationException($"Governed process execution for '{executable}' requires arguments.");
+
+        if (IsPowerShellExecutable(executable))
+            ValidatePowerShellArguments(request);
+    }
+
+    private static bool IsPowerShellExecutable(string executable) =>
+        string.Equals(executable, "powershell", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(executable, "powershell.exe", StringComparison.OrdinalIgnoreCase);
+
+    private static void ValidatePowerShellArguments(GovernedAgentProcessRequest request)
+    {
+        if (request.Arguments.Any(argument => IsArgument(argument, "-Command") || IsArgument(argument, "/Command")))
+            throw new InvalidOperationException("Governed PowerShell execution rejected: -Command is not allowed. Use -File with an approved script path.");
+
+        if (request.Arguments.Any(argument => IsArgument(argument, "-EncodedCommand") || IsArgument(argument, "/EncodedCommand")))
+            throw new InvalidOperationException("Governed PowerShell execution rejected: -EncodedCommand is not allowed.");
+
+        if (!request.Arguments.Any(argument => IsArgument(argument, "-NoProfile")))
+            throw new InvalidOperationException("Governed PowerShell execution rejected: -NoProfile is required.");
+
+        var fileArgumentIndex = IndexOfArgument(request.Arguments, "-File");
+        if (fileArgumentIndex < 0)
+            throw new InvalidOperationException("Governed PowerShell execution rejected: -File is required.");
+
+        if (fileArgumentIndex >= request.Arguments.Count - 1 || string.IsNullOrWhiteSpace(request.Arguments[fileArgumentIndex + 1]))
+            throw new InvalidOperationException("Governed PowerShell execution rejected: -File requires a script path.");
+
+        var scriptPath = request.Arguments[fileArgumentIndex + 1];
+        var fullScriptPath = Path.GetFullPath(Path.IsPathRooted(scriptPath)
+            ? scriptPath
+            : Path.Combine(request.WorkingDirectory, scriptPath));
+        var approvedRoot = EnsureTrailingSeparator(Path.GetFullPath(Path.Combine(request.WorkingDirectory, ApprovedPowerShellScriptRoot)));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+        if (!fullScriptPath.StartsWith(approvedRoot, comparison))
+            throw new InvalidOperationException($"Governed PowerShell execution rejected: script path must stay under {ApprovedPowerShellScriptRoot}.");
+
+        if (!string.Equals(Path.GetExtension(fullScriptPath), ".ps1", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Governed PowerShell execution rejected: -File must reference a .ps1 script.");
+    }
+
+    private static bool IsArgument(string value, string expected) =>
+        string.Equals(value, expected, StringComparison.OrdinalIgnoreCase);
+
+    private static int IndexOfArgument(IReadOnlyList<string> arguments, string expected)
+    {
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            if (IsArgument(arguments[index], expected))
+                return index;
+        }
+
+        return -1;
     }
 
     private static ProcessStartInfo CreateProcessStartInfo(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
@@ -158,7 +212,7 @@ public sealed class GovernedAgentProcessExecutor : IGovernedAgentProcessExecutor
         metadata.AppendLine($"tool_call_id={request.ToolCallId}");
         metadata.AppendLine($"command={command}");
         metadata.AppendLine($"purpose={request.Purpose}");
-        metadata.AppendLine($"default_policy={DefaultPolicyDecision}");
+        metadata.AppendLine($"process_policy_decision={ProcessPolicyDecision}");
         metadata.AppendLine($"started_utc={startedAtUtc:O}");
         metadata.AppendLine($"completed_utc={completedAtUtc:O}");
         metadata.AppendLine($"duration_ms={(long)(completedAtUtc - startedAtUtc).TotalMilliseconds}");
@@ -185,4 +239,9 @@ public sealed class GovernedAgentProcessExecutor : IGovernedAgentProcessExecutor
 
     private static string SanitizeForFilePath(string value) =>
         NonIdSafeChars.Replace(value, "_").Trim('_');
+
+    private static string EnsureTrailingSeparator(string path) =>
+        path.EndsWith(Path.DirectorySeparatorChar)
+            ? path
+            : path + Path.DirectorySeparatorChar;
 }
