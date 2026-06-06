@@ -216,6 +216,44 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task AuditLookup_ByMessageIdDoesNotUseTagsFallback()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "ID-only fallback boundary test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnClarifications WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnGovernance WHERE ChatMessageId = @MessageId;
+            """,
+            new { MessageId = messageId });
+
+        Assert.IsNull(await turnPersistence.GetByMessageIdAsync(messageId));
+
+        var scopedSnapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+        Assert.IsNotNull(scopedSnapshot);
+        Assert.IsTrue(scopedSnapshot.IsFallbackEvidence);
+    }
+
+    [TestMethod]
     public async Task AuditLookup_TagFallbackRequiresScope()
     {
         var projectId = await SeedProjectAsync();

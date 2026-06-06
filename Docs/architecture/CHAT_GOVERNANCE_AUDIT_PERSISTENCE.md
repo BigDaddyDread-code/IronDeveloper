@@ -4,7 +4,7 @@ Status: Slice 4 durability note
 
 ## Guarantee
 
-New assistant chat turns that carry a v1 governance envelope are saved as one logical database write:
+New assistant chat turns saved through the governed `SaveMessageAsync` path and carrying a v1 governance envelope are saved as one logical database write:
 
 - `ChatMessages`
 - `ChatTurnGovernance`

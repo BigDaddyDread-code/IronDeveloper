@@ -146,7 +146,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         long chatMessageId,
         CancellationToken cancellationToken = default)
     {
-        return await GetByMessageCoreAsync(null, null, chatMessageId, cancellationToken).ConfigureAwait(false);
+        return await GetByMessageCoreAsync(null, null, chatMessageId, allowTagFallback: false, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ChatTurnPersistenceSnapshot?> GetByMessageAsync(
@@ -155,13 +155,14 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         long chatMessageId,
         CancellationToken cancellationToken = default)
     {
-        return await GetByMessageCoreAsync(projectId, chatSessionId, chatMessageId, cancellationToken).ConfigureAwait(false);
+        return await GetByMessageCoreAsync(projectId, chatSessionId, chatMessageId, allowTagFallback: true, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<ChatTurnPersistenceSnapshot?> GetByMessageCoreAsync(
         int? projectId,
         long? chatSessionId,
         long chatMessageId,
+        bool allowTagFallback,
         CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -198,9 +199,11 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             new { ChatMessageId = chatMessageId, TenantId = _tenant.TenantId, ProjectId = projectId, ChatSessionId = chatSessionId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        if (row is null)
+        if (row is null && allowTagFallback)
             return await GetTagFallbackByMessageCoreAsync(connection, projectId, chatSessionId, chatMessageId, cancellationToken)
                 .ConfigureAwait(false);
+        if (row is null)
+            return null;
 
         return BuildSnapshot(row, isFallbackEvidence: false);
     }
