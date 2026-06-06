@@ -46,7 +46,7 @@ public sealed class AgentMemoryContractTests
         var property = typeof(AgentProposal).GetProperty(nameof(AgentProposal.EvidenceSourceIds));
 
         Assert.IsNotNull(property);
-        Assert.IsTrue(property.GetCustomAttribute<RequiredMemberAttribute>() is not null,
+        Assert.IsNotNull(property.GetCustomAttribute<RequiredMemberAttribute>(),
             "AgentProposal.EvidenceSourceIds must be required so new proposals cannot omit evidence provenance.");
     }
 
@@ -95,10 +95,10 @@ public sealed class AgentMemoryContractTests
             "The user is exploring memory-backed context, not committing work."));
 
         Assert.IsTrue(proposal.RequiresApproval);
-        Assert.AreEqual(1, proposal.EvidenceSourceIds.Count);
+        Assert.HasCount(1, proposal.EvidenceSourceIds);
         Assert.IsFalse(gate.ShowGovernanceActions);
         Assert.IsFalse(gate.CanCreateTicket);
-        Assert.AreEqual(0, gate.GovernanceActions.Count);
+        Assert.IsEmpty(gate.GovernanceActions);
     }
 
     [TestMethod]
