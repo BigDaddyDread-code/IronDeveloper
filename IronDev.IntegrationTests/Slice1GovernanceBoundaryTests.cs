@@ -632,11 +632,15 @@ public sealed class Slice1GovernanceBoundaryTests
         var agentSource = ReadFile(Path.Combine(root, "IronDev.Infrastructure", "Services", "ContextAgentService.cs"));
         Assert.IsTrue(agentSource.Contains("Proposal = new AgentProposal"), "Agents should emit advisory proposals.");
         Assert.IsTrue(agentSource.Contains("RequiresApproval = true"), "Agent proposals must remain requires-approval by default.");
+        Assert.IsTrue(agentSource.Contains("EvidenceSourceIds = "), "Agent proposals must explicitly declare evidence source ids, even when empty.");
 
         var proposalMatches = Regex.Matches(agentSource, @"Proposal\s*=\s*new AgentProposal\b");
         var requiresApprovalMatches = Regex.Matches(agentSource, @"RequiresApproval\s*=\s*true");
+        var evidenceSourceMatches = Regex.Matches(agentSource, @"EvidenceSourceIds\s*=");
         Assert.IsTrue(proposalMatches.Count <= requiresApprovalMatches.Count,
             "Each agent proposal block should include an explicit RequiresApproval assignment.");
+        Assert.IsTrue(proposalMatches.Count <= evidenceSourceMatches.Count,
+            "Each agent proposal block should include explicit EvidenceSourceIds.");
     }
 
     private static string FindRepoRoot()

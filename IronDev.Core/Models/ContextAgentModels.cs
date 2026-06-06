@@ -356,6 +356,7 @@ public sealed class AgentProposal
     public string Intent { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
     public IReadOnlyList<string> RecommendedNextActions { get; init; } = Array.Empty<string>();
+    public required IReadOnlyList<string> EvidenceSourceIds { get; init; }
     public bool RequiresApproval { get; init; } = true;
 }
 
