@@ -406,14 +406,6 @@ public static class IronDevCli
         }
         catch (IronDevApiException ex)
         {
-            if (json)
-            {
-                await output.WriteLineAsync(JsonSerializer.Serialize(
-                    BuildRunReportFailureContractEnvelope(runId, ex),
-                    JsonOptions));
-                return 1;
-            }
-
             WriteApiError("runs report", ex, error);
             return 1;
         }
@@ -908,41 +900,6 @@ public static class IronDevCli
             ),
             status == "failed" ? ["Run report indicates failure."] : [],
             warnings);
-    }
-
-    private static RunsReportContractEnvelope BuildRunReportFailureContractEnvelope(
-        string runId,
-        IronDevApiException ex)
-    {
-        var summaryPrefix = $"IronDev.Api runs report failed with {(int)ex.StatusCode} {ex.StatusCode}.";
-        var failures = new List<string> { summaryPrefix };
-        if (!string.IsNullOrWhiteSpace(ex.ResponseBody))
-            failures.Add(ex.ResponseBody);
-
-        var runStatus = ex.StatusCode == System.Net.HttpStatusCode.NotFound ? "not_found" : "error";
-
-        return new RunsReportContractEnvelope(
-            "failed",
-            "runs report",
-            null,
-            "Run report could not be loaded.",
-            new RunsReportContractData(
-                runId,
-                runStatus,
-                null,
-                null,
-                null,
-                null,
-                [],
-                [],
-                [],
-                null,
-                new Dictionary<string, string>(),
-                []
-            ),
-            failures,
-            []
-        );
     }
 
     private static string DetermineRunReportCommandStatus(string runStatus, string recommendation)
