@@ -291,7 +291,7 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task RunsReport_WhenRunIsMissing_ReturnsNonZeroAndWritesApiError()
+    public async Task RunsReport_WhenRunIsMissing_ReturnsNonZeroAndWritesContractEnvelope()
     {
         var handler = new RunReportContractHandler
         {
@@ -309,8 +309,16 @@ public sealed class IronDevCliTests
             CancellationToken.None);
 
         Assert.AreEqual(1, result, error.ToString());
-        StringAssert.Contains(error.ToString(), "404");
-        Assert.AreEqual(string.Empty, output.ToString());
+        StringAssert.IsMatch(output.ToString(), @"\S+");
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual("failed", root.GetProperty("status").GetString());
+        Assert.AreEqual("runs report", root.GetProperty("command").GetString());
+        var data = root.GetProperty("data");
+        Assert.AreEqual("run-missing", data.GetProperty("runId").GetString());
+        Assert.AreEqual("not_found", data.GetProperty("status").GetString());
+        Assert.Greater(root.GetProperty("errors").GetArrayLength(), 0);
     }
 
     [TestMethod]
