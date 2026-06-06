@@ -111,7 +111,7 @@ public sealed class ProjectChatResponseMetadataBuilder
             {
                 traceLines.Add("Memory evidence consumed by classifier:");
                 traceLines.AddRange(contextState.SemanticEvidence.Select(
-                    e => $"Evidence: SourceId={e.SourceId}; SourceType={e.SourceType}; AuthorityLevel={e.AuthorityLevel}; IsCurrent={e.IsCurrent}; FromChatContextState={contextState.Origin == ChatContextStateOrigin.ProjectChatResponseCompiler}; UsedFor={e.UsedFor}; {TruncateText(e.Excerpt, 140)}"));
+                    e => $"Evidence: SourceId={e.SourceId}; SourceType={e.SourceType}; AuthorityLevel={e.AuthorityLevel}; IsCurrent={e.IsCurrent}; StalenessReason={FormatEvidenceNullable(e.StalenessReason)}; SupersededBy={FormatEvidenceNullable(e.SupersededBySourceId)}; RetrievalTraceId={FormatEvidenceNullable(e.RetrievalTraceId)}; RetrievalRank={FormatEvidenceNullable(e.RetrievalRank?.ToString())}; MatchReason={FormatEvidenceNullable(e.MatchReason)}; FromChatContextState={contextState.Origin == ChatContextStateOrigin.ProjectChatResponseCompiler}; UsedFor={e.UsedFor}; {TruncateText(e.Excerpt, 140)}"));
             }
             else
             {
@@ -212,6 +212,9 @@ public sealed class ProjectChatResponseMetadataBuilder
         }
         return sb.ToString().TrimEnd();
     }
+
+    private static string FormatEvidenceNullable(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "none" : value;
 
     private static IReadOnlyList<string> DistinctDelimited(IEnumerable<string?> values)
     {

@@ -32,9 +32,11 @@ public sealed class SemanticMemoryEvidenceProvider : ISemanticMemoryEvidenceProv
                 limit: 6,
                 cancellationToken).ConfigureAwait(false);
 
+            var retrievalTraceId = Guid.NewGuid().ToString("N");
+
             return bundle.Results
                 .Take(6)
-                .Select(ToEvidence)
+                .Select((result, index) => ToEvidence(result, userMessage, index + 1, retrievalTraceId))
                 .Where(evidence => !string.IsNullOrWhiteSpace(evidence.SourceId) &&
                                    !string.IsNullOrWhiteSpace(evidence.Excerpt))
                 .ToList();
@@ -45,7 +47,11 @@ public sealed class SemanticMemoryEvidenceProvider : ISemanticMemoryEvidenceProv
         }
     }
 
-    private static MemoryEvidence ToEvidence(SemanticSearchResult result)
+    private static MemoryEvidence ToEvidence(
+        SemanticSearchResult result,
+        string query,
+        int rank,
+        string retrievalTraceId)
     {
         var sourceType = FirstNonEmpty(result.SourceEntityType, result.ArtefactType, "SemanticMemory");
         var sourceId = FirstNonEmpty(
@@ -60,17 +66,27 @@ public sealed class SemanticMemoryEvidenceProvider : ISemanticMemoryEvidenceProv
             : result.SimilarityScore > 0
                 ? result.SimilarityScore
                 : result.Similarity;
+        var sourceCurrentness = MemoryCurrentnessNormalizer.FromDocumentStatus(result.Document.Status);
+        var currentness = MemoryCurrentnessNormalizer.FromSemanticResult(result.IsStale, sourceCurrentness);
 
         return new MemoryEvidence(
             SourceId: $"semantic-{sourceType}-{sourceId}",
             SourceType: sourceType,
             Title: title,
             Excerpt: TruncateText(excerpt, 260),
-            IsCurrent: !result.IsStale,
+            IsCurrent: currentness.IsCurrent,
             RelevanceScore: relevance,
-            AuthorityLevel: MemoryAuthorityNormalizer.FromSemanticAuthority(
-                FirstNonEmpty(result.AuthorityLevel, result.Document.AuthorityLevel, MemoryAuthorityLevels.ObservedFact)),
-            UsedFor: ContextOnly);
+            AuthorityLevel: MemoryAuthorityNormalizer.FromDocumentAuthority(
+                FirstNonEmpty(result.AuthorityLevel, result.Document.AuthorityLevel, MemoryAuthorityLevels.ObservedFact),
+                result.Document.Status),
+            UsedFor: ContextOnly,
+            StalenessReason: currentness.StalenessReason,
+            SupersededBySourceId: currentness.SupersededBySourceId,
+            RetrievalTraceId: retrievalTraceId,
+            RetrievalRank: rank,
+            RetrievalQuery: TruncateText(query, 160),
+            MatchReason: result.MatchReason,
+            VectorSimilarity: result.VectorSimilarity);
     }
 
     private static string FirstNonEmpty(params string?[] values) =>

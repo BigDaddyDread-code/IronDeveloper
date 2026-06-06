@@ -102,54 +102,66 @@ public sealed class ProjectChatContextStateCompiler
 
         foreach (var decision in context.Decisions.Take(5))
         {
+            var currentness = MemoryCurrentnessNormalizer.FromDecisionStatus(decision.Status);
             evidence.Add(new MemoryEvidence(
                 SourceId: $"decision-{decision.Id}",
                 SourceType: "Decision",
                 Title: decision.Title,
                 Excerpt: TruncateText(decision.Detail, 260),
-                IsCurrent: decision.Status.Equals("Accepted", StringComparison.OrdinalIgnoreCase),
+                IsCurrent: currentness.IsCurrent,
                 RelevanceScore: 0.8,
                 AuthorityLevel: MemoryAuthorityNormalizer.FromDecisionStatus(decision.Status),
-                UsedFor: "ContextOnly"));
+                UsedFor: "ContextOnly",
+                StalenessReason: currentness.StalenessReason,
+                SupersededBySourceId: currentness.SupersededBySourceId));
         }
 
         foreach (var ticket in context.Tickets.Take(5))
         {
+            var currentness = MemoryCurrentnessNormalizer.FromTicketState(ticket.Status, ticket.IsDeleted);
             evidence.Add(new MemoryEvidence(
                 SourceId: $"ticket-{ticket.Id}",
                 SourceType: "Ticket",
                 Title: ticket.Title,
                 Excerpt: TruncateText(string.Join(" ", ticket.Summary, ticket.Content, ticket.Background, ticket.Problem), 260),
                 RelevanceScore: 0.72,
-                IsCurrent: IsCurrentStatus(ticket.Status),
+                IsCurrent: currentness.IsCurrent,
                 AuthorityLevel: MemoryAuthorityNormalizer.FromTicketState(ticket.IsGenerated, ticket.Status),
-                UsedFor: "ContextOnly"));
+                UsedFor: "ContextOnly",
+                StalenessReason: currentness.StalenessReason,
+                SupersededBySourceId: currentness.SupersededBySourceId));
         }
 
         foreach (var document in context.Documents.Take(5))
         {
+            var currentness = MemoryCurrentnessNormalizer.FromDocumentStatus(document.Status);
             evidence.Add(new MemoryEvidence(
                 SourceId: $"document-{document.Id}",
                 SourceType: "Document",
                 Title: document.Title,
                 Excerpt: TruncateText(string.Join(" ", document.Summary, document.Content), 260),
-                IsCurrent: document.Status.Equals("Active", StringComparison.OrdinalIgnoreCase),
+                IsCurrent: currentness.IsCurrent,
                 RelevanceScore: 0.7,
                 AuthorityLevel: MemoryAuthorityNormalizer.FromDocumentAuthority(document.AuthorityLevel, document.Status),
-                UsedFor: "ContextOnly"));
+                UsedFor: "ContextOnly",
+                StalenessReason: currentness.StalenessReason,
+                SupersededBySourceId: currentness.SupersededBySourceId));
         }
 
         foreach (var rule in context.Rules.Take(5))
         {
+            var currentness = MemoryCurrentnessNormalizer.FromRuleEnforcementLevel(rule.EnforcementLevel);
             evidence.Add(new MemoryEvidence(
                 SourceId: $"rule-{rule.Id}",
                 SourceType: "Rule",
                 Title: rule.Name,
                 Excerpt: TruncateText(rule.Description, 260),
-                IsCurrent: true,
+                IsCurrent: currentness.IsCurrent,
                 RelevanceScore: 0.72,
                 AuthorityLevel: MemoryAuthorityNormalizer.FromRuleEnforcementLevel(rule.EnforcementLevel),
-                UsedFor: "ContextOnly"));
+                UsedFor: "ContextOnly",
+                StalenessReason: currentness.StalenessReason,
+                SupersededBySourceId: currentness.SupersededBySourceId));
         }
 
         foreach (var item in context.SemanticMemoryEvidence.Take(6))
@@ -163,24 +175,22 @@ public sealed class ProjectChatContextStateCompiler
 
         if (context.RouteDecision.EvidenceUsed.Count > 0)
         {
+            var currentness = MemoryCurrentnessNormalizer.RuntimeTrace();
             evidence.Add(new MemoryEvidence(
                 SourceId: "route",
                 SourceType: "Trace",
                 Title: "Route evidence",
                 Excerpt: TruncateText(string.Join(" | ", context.RouteDecision.EvidenceUsed), 260),
-                IsCurrent: true,
+                IsCurrent: currentness.IsCurrent,
                 RelevanceScore: 0.55,
                 AuthorityLevel: MemoryAuthorityNormalizer.RuntimeTrace,
-                UsedFor: "ContextOnly"));
+                UsedFor: "ContextOnly",
+                StalenessReason: currentness.StalenessReason,
+                SupersededBySourceId: currentness.SupersededBySourceId));
         }
 
         return evidence;
     }
-
-    private static bool IsCurrentStatus(string status) =>
-        status.Equals("Draft", StringComparison.OrdinalIgnoreCase) ||
-        status.Equals("InProgress", StringComparison.OrdinalIgnoreCase) ||
-        status.Equals("Active", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<AvailableSkillHint> BuildAvailableSkillHints(ContextAgentRouteDecision routeDecision)
     {

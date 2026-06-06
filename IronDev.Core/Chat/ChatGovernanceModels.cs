@@ -86,7 +86,14 @@ public sealed record MemoryEvidence(
     bool IsCurrent = false,
     double RelevanceScore = 0,
     string AuthorityLevel = "",
-    string UsedFor = "ContextOnly");
+    string UsedFor = "ContextOnly",
+    string? StalenessReason = null,
+    string? SupersededBySourceId = null,
+    string? RetrievalTraceId = null,
+    int? RetrievalRank = null,
+    string? RetrievalQuery = null,
+    string? MatchReason = null,
+    double? VectorSimilarity = null);
 
 public sealed record AvailableSkillHint(
     string SkillId = "",
