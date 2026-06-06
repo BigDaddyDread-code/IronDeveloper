@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
@@ -8,13 +7,19 @@ namespace IronDev.Infrastructure.Services.Agents;
 public sealed class TesterAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
+    private readonly IGovernedAgentProcessExecutor _processExecutor;
     private readonly string _repoRoot;
 
-    public TesterAgent(AgentDefinition definition, IAgentModelResolver modelResolver, string repoRoot)
+    public TesterAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        string repoRoot,
+        IGovernedAgentProcessExecutor? processExecutor = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
+        _processExecutor = processExecutor ?? new GovernedAgentProcessExecutor();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -41,45 +46,28 @@ public sealed class TesterAgent : StaticIronDevAgent
             "-Json"
         };
 
-        var command = "powershell " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "powershell",
-                WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
-
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-
+        var processResult = await ExecutePowershellAsync(arguments, ct);
+        var stdout = processResult.Stdout;
+        var stderr = processResult.Stderr;
         var output = string.IsNullOrWhiteSpace(stderr)
             ? stdout
             : stdout + Environment.NewLine + stderr;
 
         var evidencePaths = ExtractEvidencePaths(stdout);
+        evidencePaths = [.. evidencePaths, .. processResult.EvidencePaths];
         var summary = ExtractSummary(stdout);
 
         return new AgentResult
         {
             AgentName = AgentName,
-            Status = process.ExitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
+            Status = processResult.ExitCode == 0 ? AgentRunStatus.Succeeded : AgentRunStatus.Failed,
             Summary = summary,
             ModelProfileName = profile.Name,
             Provider = profile.Provider,
             Model = profile.Model,
-            ExitCode = process.ExitCode,
+            ExitCode = processResult.ExitCode,
             OutputJson = output,
-            CommandsRun = [command],
+            CommandsRun = [processResult.Command],
             EvidencePaths = evidencePaths,
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
@@ -134,6 +122,20 @@ public sealed class TesterAgent : StaticIronDevAgent
             : stdout.Trim().Split(Environment.NewLine).FirstOrDefault() ?? "TesterAgent completed.";
     }
 
-    private static string QuoteIfNeeded(string value) =>
-        value.Contains(' ', StringComparison.Ordinal) ? $"\"{value}\"" : value;
+    private async Task<GovernedAgentProcessResult> ExecutePowershellAsync(
+        string[] arguments,
+        CancellationToken ct)
+    {
+        return await _processExecutor.ExecuteAsync(new GovernedAgentProcessRequest
+        {
+            ToolCallId = ResolveToolCallId(),
+            FileName = "powershell",
+            Arguments = arguments,
+            WorkingDirectory = _repoRoot,
+            Purpose = "TesterAgent plan execution"
+        }, ct);
+    }
+
+    private string ResolveToolCallId() =>
+        $"{AgentName}-powershell-{Guid.NewGuid():N}";
 }

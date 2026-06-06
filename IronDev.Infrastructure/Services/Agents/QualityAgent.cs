@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
@@ -12,20 +11,20 @@ public sealed class QualityAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
-    private readonly IAgentProcessRunner _processRunner;
+    private readonly IGovernedAgentProcessExecutor _processExecutor;
 
     public QualityAgent(
         AgentDefinition definition,
         IAgentModelResolver modelResolver,
         string repoRoot,
         IAgentLlmClient? llmClient = null,
-        IAgentProcessRunner? processRunner = null)
+        IGovernedAgentProcessExecutor? processExecutor = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
-        _processRunner = processRunner ?? new AgentProcessRunner();
+        _processExecutor = processExecutor ?? new GovernedAgentProcessExecutor();
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -56,8 +55,10 @@ public sealed class QualityAgent : StaticIronDevAgent
             "-Json"
         };
 
-        var command = "powershell " + string.Join(" ", arguments.Select(QuoteIfNeeded));
-        var (exitCode, stdout, stderr) = await RunProcessAsync("powershell", arguments, ct);
+        var processResult = await RunProcessAsync("powershell", arguments, ct);
+        var exitCode = processResult.ExitCode;
+        var stdout = processResult.Stdout;
+        var stderr = processResult.Stderr;
 
         var report = BuildQualityReport(stdout, stderr, planPath, runId, exitCode);
         var prompt = BuildPrompt(report);
@@ -78,22 +79,23 @@ public sealed class QualityAgent : StaticIronDevAgent
             Model = profile.Model,
             ExitCode = exitCode,
             OutputJson = reportJson,
-            CommandsRun = [command],
-            EvidencePaths = report.EvidencePaths,
+            CommandsRun = [processResult.Command],
+            EvidencePaths = report.EvidencePaths.Concat(processResult.EvidencePaths).ToArray(),
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
     }
 
-    private static int SubprocessTimeoutSeconds =>
-        int.TryParse(Environment.GetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS"), out var parsed)
-            ? parsed
-            : 300;
-
-    private async Task<(int ExitCode, string Stdout, string Stderr)> RunProcessAsync(
+    private async Task<GovernedAgentProcessResult> RunProcessAsync(
         string fileName, string[] arguments, CancellationToken ct)
     {
-        var result = await _processRunner.RunAsync(fileName, arguments, _repoRoot, ct);
-        return (result.ExitCode, result.Stdout, result.Stderr);
+        return await _processExecutor.ExecuteAsync(new GovernedAgentProcessRequest
+        {
+            ToolCallId = ResolveToolCallId(),
+            FileName = fileName,
+            Arguments = arguments,
+            WorkingDirectory = _repoRoot,
+            Purpose = "QualityAgent deterministic quality command"
+        }, ct);
     }
 
     private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
@@ -249,6 +251,9 @@ public sealed class QualityAgent : StaticIronDevAgent
         bool.TryParse(value, out var parsed) &&
         parsed;
 
+    private string ResolveToolCallId() =>
+        $"{AgentName}-quality-{Guid.NewGuid():N}";
+
     private static string BuildPrompt(QualityReport report) =>
         $"""
         You are QualityAgent / KilljoyAgent for IronDev/IDA.
@@ -284,9 +289,6 @@ public sealed class QualityAgent : StaticIronDevAgent
         error = result.WasSuccessful ? string.Empty : result.ErrorMessage,
         boundary = "Live QualityAgent output is advisory debt/risk commentary only. Deterministic quality gates remain authoritative."
     };
-
-    private static string QuoteIfNeeded(string value) =>
-        value.Contains(' ', StringComparison.Ordinal) ? $"\"{value}\"" : value;
 
     private sealed record QualityReport
     {
