@@ -390,6 +390,54 @@ public sealed class AgentSubprocessTimeoutTests
         Assert.IsFalse(qualitySource.Contains("ProcessStartInfo", StringComparison.Ordinal), "QualityAgent should not configure raw ProcessStartInfo.");
     }
 
+    [TestMethod]
+    public async Task GovernedAgentProcessExecutor_ShouldRejectPowershellCommandMode()
+    {
+        var executor = new GovernedAgentProcessExecutor();
+        var request = new GovernedAgentProcessRequest
+        {
+            ToolCallId = Guid.NewGuid().ToString("N"),
+            FileName = "powershell",
+            WorkingDirectory = GetRepoRoot(),
+            Arguments = ["-NoProfile", "-Command", "Get-Date"]
+        };
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => executor.ExecuteAsync(request));
+        StringAssert.Contains(ex.Message, "Governed PowerShell execution rejected: -Command is not allowed");
+    }
+
+    [TestMethod]
+    public async Task GovernedAgentProcessExecutor_ShouldRequireNoProfile()
+    {
+        var executor = new GovernedAgentProcessExecutor();
+        var request = new GovernedAgentProcessRequest
+        {
+            ToolCallId = Guid.NewGuid().ToString("N"),
+            FileName = "powershell",
+            WorkingDirectory = GetRepoRoot(),
+            Arguments = ["-File", "tools/dogfood/Invoke-TestAgentPlan.ps1"]
+        };
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => executor.ExecuteAsync(request));
+        StringAssert.Contains(ex.Message, "Governed PowerShell execution rejected: -NoProfile is required");
+    }
+
+    [TestMethod]
+    public async Task GovernedAgentProcessExecutor_ShouldRequireFileInvocation()
+    {
+        var executor = new GovernedAgentProcessExecutor();
+        var request = new GovernedAgentProcessRequest
+        {
+            ToolCallId = Guid.NewGuid().ToString("N"),
+            FileName = "powershell",
+            WorkingDirectory = GetRepoRoot(),
+            Arguments = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-CommandMode", "foo"]
+        };
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => executor.ExecuteAsync(request));
+        StringAssert.Contains(ex.Message, "Governed PowerShell execution rejected: -File is required");
+    }
+
     private sealed class FakeGovernedAgentProcessExecutor : IGovernedAgentProcessExecutor
     {
         private readonly Func<GovernedAgentProcessRequest, GovernedAgentProcessResult> _resultFactory;
