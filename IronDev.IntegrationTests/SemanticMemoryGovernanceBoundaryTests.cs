@@ -245,6 +245,50 @@ public sealed class SemanticMemoryGovernanceBoundaryTests
     }
 
     [TestMethod]
+    public async Task SourceGraphLinks_DoNotInfluenceModeOrGate()
+    {
+        var llm = new StubLlmService(
+            """
+            {
+              "mode": "Exploration",
+              "confidence": 0.83,
+              "reason": "Source graph links are provenance only."
+            }
+            """);
+        var classifier = new LlmChatModeClassifier(llm);
+        var decision = await classifier.ClassifyAsync(BuildRequest(
+            "what do you think about this source-linked memory?",
+            new ChatContextState(
+                RequiresClarification: false,
+                ClarificationQuestions: Array.Empty<string>(),
+                ContextSummary: "Source graph includes Supersedes and GeneratedFrom provenance.",
+                CurrentUserMessage: "what do you think about this source-linked memory?",
+                SemanticEvidence:
+                [
+                    new MemoryEvidence(
+                        SourceId: "document-22",
+                        SourceType: "Document",
+                        Title: "Linked source memory",
+                        Excerpt: "Supersedes GeneratedFrom SourceChatMessage SourceDocumentVersion",
+                        IsCurrent: true,
+                        RelevanceScore: 0.98,
+                        AuthorityLevel: "Accepted",
+                        UsedFor: "ContextOnly",
+                        MatchReason: "source graph provenance")
+                ],
+                Origin: ChatContextStateOrigin.ProjectChatResponseCompiler)));
+
+        var gate = ChatGovernanceGate.FromDecision(decision);
+
+        Assert.AreEqual(ChatGovernanceMode.Exploration, decision.Mode);
+        Assert.IsFalse(gate.ShowGovernanceActions);
+        Assert.IsFalse(gate.CanCreateTicket);
+        Assert.IsFalse(gate.CanSaveDiscussion);
+        Assert.AreEqual(0, gate.GovernanceActions.Count);
+        StringAssert.Contains(llm.ReceivedPrompts.Single(), "UsedFor=ContextOnly");
+    }
+
+    [TestMethod]
     public void SemanticMemory_OnlyFlowsThroughChatContextState()
     {
         var root = FindRepoRoot();

@@ -41,6 +41,22 @@ public sealed record ProjectMemoryLink(
     string TargetSourceId,
     string? TargetSourceType = null);
 
+public static class ProjectMemoryLinkTypes
+{
+    public const string DerivedFrom = "DerivedFrom";
+    public const string GeneratedFrom = "GeneratedFrom";
+    public const string Supersedes = "Supersedes";
+    public const string SupersededBy = "SupersededBy";
+    public const string SourceChatMessage = "SourceChatMessage";
+    public const string SourceDocumentVersion = "SourceDocumentVersion";
+    public const string Implements = "Implements";
+    public const string Tests = "Tests";
+    public const string Explains = "Explains";
+    public const string ConflictsWith = "ConflictsWith";
+    public const string ParentArtefact = "ParentArtefact";
+    public const string SourceEntity = "SourceEntity";
+}
+
 public sealed record ProjectMemorySourceGraph(
     IReadOnlyList<ProjectMemorySourceNode> Nodes,
     IReadOnlyList<ProjectMemorySourceEdge> Edges)

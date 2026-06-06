@@ -1,3 +1,4 @@
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
@@ -110,22 +111,157 @@ public sealed class ProjectMemoryMapBackendTests : IntegrationTestBase
         var semanticArtefact = map.Items.Single(entry => entry.SourceType == "SemanticArtefact");
         Assert.AreEqual("ObservedFact", semanticArtefact.AuthorityLevel);
         Assert.IsTrue(semanticArtefact.IsCurrent);
-        Assert.IsTrue(semanticArtefact.Links!.Any(link => link.LinkType == "SourceEntity"));
+        Assert.IsTrue(semanticArtefact.Links!.Any(link => link.LinkType == ProjectMemoryLinkTypes.SourceEntity));
 
         var semanticChunk = map.Items.Single(entry => entry.SourceType == "SemanticChunk");
         Assert.AreEqual("ObservedFact", semanticChunk.AuthorityLevel);
         Assert.IsTrue(semanticChunk.IsCurrent);
-        Assert.IsTrue(semanticChunk.Links!.Any(link => link.LinkType == "ParentArtefact"));
+        Assert.IsTrue(semanticChunk.Links!.Any(link => link.LinkType == ProjectMemoryLinkTypes.ParentArtefact));
         Assert.IsTrue(map.Graph.Nodes.Any(node => node.SourceId == semanticArtefact.SourceId && node.SourceType == "SemanticArtefact"));
         Assert.IsTrue(map.Graph.Nodes.Any(node => node.SourceId == semanticChunk.SourceId && node.SourceType == "SemanticChunk"));
         Assert.IsTrue(map.Graph.Edges.Any(edge =>
             edge.FromSourceId == semanticArtefact.SourceId &&
             edge.ToSourceId == "Document-semantic-doc" &&
-            edge.LinkType == "SourceEntity"));
+            edge.LinkType == ProjectMemoryLinkTypes.SourceEntity));
         Assert.IsTrue(map.Graph.Edges.Any(edge =>
             edge.FromSourceId == semanticChunk.SourceId &&
             edge.ToSourceId == semanticArtefact.SourceId &&
-            edge.LinkType == "ParentArtefact"));
+            edge.LinkType == ProjectMemoryLinkTypes.ParentArtefact));
+    }
+
+    [TestMethod]
+    public async Task ProjectMemoryMap_SourceGraphCapturesDocumentSupersessionAndSourceChatMessage()
+    {
+        var projectId = await SeedProjectAsync(name: "Source Graph Document Project");
+        var memory = ServiceProvider.GetRequiredService<IProjectMemoryService>();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var mapService = ServiceProvider.GetRequiredService<IProjectMemoryMapService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Source graph session"
+        });
+        var sourceMessageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Source graph source message."
+        });
+        var olderId = await memory.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            Title = "Old architecture note",
+            Content = "Old memory statement.",
+            AuthorityLevel = "Accepted",
+            Status = "Superseded"
+        });
+        var newerId = await memory.SaveContextDocumentAsync(new ProjectContextDocument
+        {
+            ProjectId = projectId,
+            Title = "Current architecture note",
+            Content = "Current memory statement.",
+            AuthorityLevel = "Accepted",
+            Status = "Active",
+            SupersedesDocumentId = olderId,
+            SourceChatMessageId = sourceMessageId
+        });
+
+        var map = await mapService.GetMapAsync(projectId);
+
+        Assert.IsNotNull(map);
+        var current = map.Items.Single(entry => entry.SourceId == $"document-{newerId}");
+        Assert.IsTrue(current.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.SourceChatMessage &&
+            link.TargetSourceId == $"chat-message-{sourceMessageId}"));
+        Assert.IsTrue(current.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.DerivedFrom &&
+            link.TargetSourceId == $"chat-message-{sourceMessageId}"));
+        Assert.IsTrue(current.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.Supersedes &&
+            link.TargetSourceId == $"document-{olderId}"));
+        Assert.IsTrue(map.Graph.Edges.Any(edge =>
+            edge.FromSourceId == $"document-{newerId}" &&
+            edge.ToSourceId == $"document-{olderId}" &&
+            edge.LinkType == ProjectMemoryLinkTypes.Supersedes));
+        Assert.IsTrue(map.Graph.Edges.Any(edge =>
+            edge.FromSourceId == $"document-{olderId}" &&
+            edge.ToSourceId == $"document-{newerId}" &&
+            edge.LinkType == ProjectMemoryLinkTypes.SupersededBy));
+    }
+
+    [TestMethod]
+    public async Task ProjectMemoryMap_SourceGraphCapturesGeneratedTicketSources()
+    {
+        var projectId = await SeedProjectAsync(name: "Generated Ticket Source Graph Project");
+        var tickets = ServiceProvider.GetRequiredService<ITicketService>();
+        var mapService = ServiceProvider.GetRequiredService<IProjectMemoryMapService>();
+
+        await tickets.SaveTicketAsync(new ProjectTicket
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Title = "Generated source-linked ticket",
+            Content = "Generated from source evidence.",
+            Status = "Draft",
+            IsGenerated = true,
+            SourceChatMessageId = 777,
+            SourceDocumentVersionId = 888
+        });
+
+        var map = await mapService.GetMapAsync(projectId);
+
+        Assert.IsNotNull(map);
+        var ticket = map.Items.Single(entry => entry.Title == "Generated source-linked ticket");
+        Assert.IsTrue(ticket.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.SourceChatMessage &&
+            link.TargetSourceId == "chat-message-777"));
+        Assert.IsTrue(ticket.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.SourceDocumentVersion &&
+            link.TargetSourceId == "document-version-888"));
+        Assert.IsTrue(ticket.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.GeneratedFrom &&
+            link.TargetSourceId == "chat-message-777"));
+        Assert.IsTrue(ticket.Links!.Any(link =>
+            link.LinkType == ProjectMemoryLinkTypes.GeneratedFrom &&
+            link.TargetSourceId == "document-version-888"));
+        Assert.IsTrue(map.Graph.Nodes.Any(node =>
+            node.SourceId == "document-version-888" &&
+            node.SourceType == "DocumentVersion" &&
+            node.AuthorityLevel == MemoryAuthorityLevels.Unknown &&
+            !node.IsCurrent));
+    }
+
+    [TestMethod]
+    public async Task ProjectMemoryMap_SourceGraphRepresentsUnknownLinkedTargetsSafely()
+    {
+        var projectId = await SeedProjectAsync(name: "Unknown Source Graph Project");
+        var artefacts = ServiceProvider.GetRequiredService<ISemanticArtefactRepository>();
+        var mapService = ServiceProvider.GetRequiredService<IProjectMemoryMapService>();
+
+        await artefacts.UpsertArtefactAsync(new SemanticArtefactDraft
+        {
+            Id = Guid.NewGuid(),
+            TenantId = TenantContext.TenantId,
+            ProjectId = projectId,
+            SourceEntityType = string.Empty,
+            SourceEntityId = "orphan-source",
+            ArtefactType = "Document",
+            AuthorityLevel = "ObservedFact",
+            Title = "Orphan semantic artefact",
+            Summary = "Linked source type is unknown.",
+            ContentHash = "orphan-hash",
+            SearchableText = "Linked source type is unknown."
+        });
+
+        var map = await mapService.GetMapAsync(projectId);
+
+        Assert.IsNotNull(map);
+        Assert.IsTrue(map.Graph.Nodes.Any(node =>
+            node.SourceId == "-orphan-source" &&
+            node.SourceType == "Unknown" &&
+            node.AuthorityLevel == MemoryAuthorityLevels.Unknown &&
+            !node.IsCurrent));
     }
 
     [TestMethod]

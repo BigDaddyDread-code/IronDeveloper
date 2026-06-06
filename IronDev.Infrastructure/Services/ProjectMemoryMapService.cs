@@ -110,7 +110,7 @@ public sealed class ProjectMemoryMapService : IProjectMemoryMapService
             SourceStatus: decision.Status,
             UsedFor: "ContextOnly",
             CreatedUtc: ToOffset(decision.CreatedDate),
-            Links: SourceMessageLink(decision.SourceChatMessageId));
+            Links: SourceMessageLink(decision.SourceChatMessageId, includeDerivedFrom: true));
     }
 
     private static ProjectMemoryMapItem MapTicket(ProjectTicket ticket)
@@ -128,7 +128,7 @@ public sealed class ProjectMemoryMapService : IProjectMemoryMapService
             SourceStatus: ticket.Status,
             UsedFor: "ContextOnly",
             CreatedUtc: ToOffset(ticket.CreatedDate),
-            Links: SourceMessageLink(ticket.SourceChatMessageId));
+            Links: TicketLinks(ticket));
     }
 
     private static ProjectMemoryMapItem MapDocument(ProjectContextDocument document)
@@ -188,7 +188,7 @@ public sealed class ProjectMemoryMapService : IProjectMemoryMapService
             UpdatedUtc: ToOffset(artefact.UpdatedUtc),
             Links:
             [
-                new ProjectMemoryLink("SourceEntity", $"{artefact.SourceEntityType}-{artefact.SourceEntityId}", artefact.SourceEntityType)
+                new ProjectMemoryLink(ProjectMemoryLinkTypes.SourceEntity, $"{artefact.SourceEntityType}-{artefact.SourceEntityId}", artefact.SourceEntityType)
             ]);
     }
 
@@ -213,7 +213,7 @@ public sealed class ProjectMemoryMapService : IProjectMemoryMapService
             UpdatedUtc: ToOffset(chunk.EmbeddedAtUtc),
             Links:
             [
-                new ProjectMemoryLink("ParentArtefact", $"semantic-artefact-{artefact.Id:N}", "SemanticArtefact")
+                new ProjectMemoryLink(ProjectMemoryLinkTypes.ParentArtefact, $"semantic-artefact-{artefact.Id:N}", "SemanticArtefact")
             ]);
     }
 
@@ -221,16 +221,50 @@ public sealed class ProjectMemoryMapService : IProjectMemoryMapService
     {
         var links = new List<ProjectMemoryLink>();
         if (document.SourceChatMessageId.HasValue)
-            links.Add(new ProjectMemoryLink("SourceChatMessage", $"chat-message-{document.SourceChatMessageId.Value}", "ChatMessage"));
+        {
+            links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.SourceChatMessage, $"chat-message-{document.SourceChatMessageId.Value}", "ChatMessage"));
+            links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.DerivedFrom, $"chat-message-{document.SourceChatMessageId.Value}", "ChatMessage"));
+        }
+
         if (document.SupersedesDocumentId.HasValue)
-            links.Add(new ProjectMemoryLink("Supersedes", $"document-{document.SupersedesDocumentId.Value}", "Document"));
+            links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.Supersedes, $"document-{document.SupersedesDocumentId.Value}", "Document"));
         return links;
     }
 
-    private static IReadOnlyList<ProjectMemoryLink> SourceMessageLink(long? sourceChatMessageId) =>
-        sourceChatMessageId.HasValue
-            ? [new ProjectMemoryLink("SourceChatMessage", $"chat-message-{sourceChatMessageId.Value}", "ChatMessage")]
-            : [];
+    private static IReadOnlyList<ProjectMemoryLink> TicketLinks(ProjectTicket ticket)
+    {
+        var links = new List<ProjectMemoryLink>();
+        if (ticket.SourceChatMessageId.HasValue)
+        {
+            links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.SourceChatMessage, $"chat-message-{ticket.SourceChatMessageId.Value}", "ChatMessage"));
+            if (ticket.IsGenerated)
+                links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.GeneratedFrom, $"chat-message-{ticket.SourceChatMessageId.Value}", "ChatMessage"));
+        }
+
+        if (ticket.SourceDocumentVersionId.HasValue)
+        {
+            links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.SourceDocumentVersion, $"document-version-{ticket.SourceDocumentVersionId.Value}", "DocumentVersion"));
+            if (ticket.IsGenerated)
+                links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.GeneratedFrom, $"document-version-{ticket.SourceDocumentVersionId.Value}", "DocumentVersion"));
+        }
+
+        return links;
+    }
+
+    private static IReadOnlyList<ProjectMemoryLink> SourceMessageLink(long? sourceChatMessageId, bool includeDerivedFrom = false)
+    {
+        if (!sourceChatMessageId.HasValue)
+            return [];
+
+        var sourceId = $"chat-message-{sourceChatMessageId.Value}";
+        var links = new List<ProjectMemoryLink>
+        {
+            new(ProjectMemoryLinkTypes.SourceChatMessage, sourceId, "ChatMessage")
+        };
+        if (includeDerivedFrom)
+            links.Add(new ProjectMemoryLink(ProjectMemoryLinkTypes.DerivedFrom, sourceId, "ChatMessage"));
+        return links;
+    }
 
     private static ProjectMemorySourceGraph BuildSourceGraph(IReadOnlyList<ProjectMemoryMapItem> entries)
     {
@@ -259,6 +293,8 @@ public sealed class ProjectMemoryMapService : IProjectMemoryMapService
                 }
 
                 edges.Add(new ProjectMemorySourceEdge(entry.SourceId, link.TargetSourceId, link.LinkType));
+                if (string.Equals(link.LinkType, ProjectMemoryLinkTypes.Supersedes, StringComparison.OrdinalIgnoreCase))
+                    edges.Add(new ProjectMemorySourceEdge(link.TargetSourceId, entry.SourceId, ProjectMemoryLinkTypes.SupersededBy));
             }
         }
 
