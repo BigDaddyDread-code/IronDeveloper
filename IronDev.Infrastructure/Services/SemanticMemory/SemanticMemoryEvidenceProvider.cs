@@ -41,9 +41,27 @@ public sealed class SemanticMemoryEvidenceProvider : ISemanticMemoryEvidenceProv
                                    !string.IsNullOrWhiteSpace(evidence.Excerpt))
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
-            return Array.Empty<MemoryEvidence>();
+            var retrievalTraceId = Guid.NewGuid().ToString("N");
+            return
+            [
+                new MemoryEvidence(
+                    SourceId: $"semantic-retrieval-failure-{projectId}",
+                    SourceType: "SemanticMemoryFailure",
+                    Title: "Semantic memory retrieval failed",
+                    Excerpt: "Semantic memory retrieval failed; no semantic evidence was used for this turn.",
+                    IsCurrent: false,
+                    RelevanceScore: 0,
+                    AuthorityLevel: MemoryAuthorityLevels.Unknown,
+                    UsedFor: ContextOnly,
+                    StalenessReason: "Semantic memory retrieval failed.",
+                    RetrievalTraceId: retrievalTraceId,
+                    RetrievalRank: 0,
+                    RetrievalQuery: TruncateText(userMessage, 160),
+                    MatchReason: TruncateText($"{ex.GetType().Name}: {ex.Message}", 220),
+                    VectorSimilarity: null)
+            ];
         }
     }
 
