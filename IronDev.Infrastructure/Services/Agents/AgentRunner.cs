@@ -20,6 +20,7 @@ public sealed class AgentRunner : IAgentRunner
     {
         var startedAtUtc = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();
+        var executionTraceId = Guid.NewGuid().ToString("N");
         var definition = _registry.GetDefinition(request.AgentName);
         var governance = _governanceGate.Evaluate(definition, request);
 
@@ -30,6 +31,7 @@ public sealed class AgentRunner : IAgentRunner
                 request,
                 definition,
                 governance,
+                executionTraceId,
                 startedAtUtc,
                 stopwatch.ElapsedMilliseconds);
         }
@@ -38,13 +40,14 @@ public sealed class AgentRunner : IAgentRunner
         var result = await agent.RunAsync(request, ct);
         stopwatch.Stop();
 
-        return StampResult(request, definition, governance, result, startedAtUtc, stopwatch.ElapsedMilliseconds);
+        return StampResult(request, definition, governance, result, executionTraceId, startedAtUtc, stopwatch.ElapsedMilliseconds);
     }
 
     private static AgentResult BuildBlockedResult(
         AgentRequest request,
         AgentDefinition definition,
         AgentGovernanceDecision governance,
+        string executionTraceId,
         DateTimeOffset startedAtUtc,
         long durationMs)
     {
@@ -55,6 +58,8 @@ public sealed class AgentRunner : IAgentRunner
             reason = governance.Reason,
             agent = definition.Name,
             goalId = request.GoalId,
+            proposalId = request.ProposalId,
+            approvalId = request.ApprovalEvidence?.ApprovalId,
             dogfoodRunId = request.DogfoodRunId,
             requestedTools = request.RequestedTools,
             requestedToolCalls = request.RequestedToolCalls.Select(call => new
@@ -69,6 +74,7 @@ public sealed class AgentRunner : IAgentRunner
                 call.ApprovalScope
             }),
             allowedTools = definition.AllowedTools,
+            executionTraceId,
             approvalDecision = governance.ApprovalDecision.ToString(),
             dryRunOnly = request.DryRunOnly,
             violations = governance.Violations,
@@ -89,7 +95,7 @@ public sealed class AgentRunner : IAgentRunner
             AllowedTools = definition.AllowedTools,
             ApprovalDecision = governance.ApprovalDecision,
             ApprovalFailureReason = governance.Reason,
-            TraceId = request.ProposalId,
+            TraceId = executionTraceId,
             WasDryRun = request.DryRunOnly,
             StartedAtUtc = startedAtUtc,
             CompletedAtUtc = completedAtUtc,
@@ -102,6 +108,7 @@ public sealed class AgentRunner : IAgentRunner
         AgentDefinition definition,
         AgentGovernanceDecision governance,
         AgentResult result,
+        string executionTraceId,
         DateTimeOffset startedAtUtc,
         long durationMs) =>
         new()
@@ -123,7 +130,7 @@ public sealed class AgentRunner : IAgentRunner
             ToolCalls = result.ToolCalls,
             ApprovalDecision = governance.ApprovalDecision,
             ApprovalFailureReason = result.ApprovalFailureReason,
-            TraceId = string.IsNullOrWhiteSpace(result.TraceId) ? request.ProposalId : result.TraceId,
+            TraceId = string.IsNullOrWhiteSpace(result.TraceId) ? executionTraceId : result.TraceId,
             WasDryRun = request.DryRunOnly,
             MutatedState = result.MutatedState,
             StartedAtUtc = startedAtUtc,

@@ -83,15 +83,17 @@ public sealed class AgentApprovalEvidence
     public required string ProposalHash { get; init; }
     public string ApprovedBy { get; init; } = string.Empty;
     public string Scope { get; init; } = string.Empty;
-    public AgentApprovalDecision Decision { get; init; } = AgentApprovalDecision.Approved;
+    public AgentApprovalDecision Decision { get; init; } = AgentApprovalDecision.Invalid;
     public DateTimeOffset ApprovedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public IReadOnlyList<string> ApprovedToolCallIds { get; init; } = [];
     public IReadOnlyList<AgentEvidenceItem> Evidence { get; init; } = [];
 }
 
 public sealed class AgentToolCallRequest
 {
     public required string ToolName { get; init; }
+    public string ToolCallId { get; init; } = string.Empty;
     public AgentActionImpact Impact { get; init; } = AgentActionImpact.ReadOnly;
     public bool RequiresApproval { get; init; }
     public bool AllowsFileWrites { get; init; }
@@ -105,10 +107,73 @@ public sealed class AgentToolCallRequest
 public sealed class AgentToolCallResult
 {
     public required string ToolName { get; init; }
+    public string ToolCallId { get; init; } = string.Empty;
     public AgentActionImpact Impact { get; init; } = AgentActionImpact.ReadOnly;
     public AgentRunStatus Status { get; init; }
     public string Summary { get; init; } = string.Empty;
     public IReadOnlyList<AgentEvidenceItem> Evidence { get; init; } = [];
+}
+
+public enum AgentToolImpact
+{
+    Low,
+    Medium,
+    High
+}
+
+public sealed record AgentToolCapability(
+    string ToolName,
+    AgentToolImpact Impact,
+    bool RequiresApproval);
+
+public static class AgentToolCapabilityCatalog
+{
+    private static readonly IReadOnlyDictionary<string, AgentToolCapability> _catalog = new Dictionary<string, AgentToolCapability>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["repo.write"] = new AgentToolCapability("repo.write", AgentToolImpact.High, true),
+        ["disposable.workspace.write"] = new AgentToolCapability("disposable.workspace.write", AgentToolImpact.High, true),
+        ["build.run"] = new AgentToolCapability("build.run", AgentToolImpact.High, true),
+        ["project.build"] = new AgentToolCapability("project.build", AgentToolImpact.High, true),
+        ["test.run"] = new AgentToolCapability("test.run", AgentToolImpact.High, true),
+        ["test.plan"] = new AgentToolCapability("test.plan", AgentToolImpact.High, true),
+        ["test.run-plan"] = new AgentToolCapability("test.run-plan", AgentToolImpact.High, true),
+        ["quality.run-gate"] = new AgentToolCapability("quality.run-gate", AgentToolImpact.High, true),
+        ["cli.run"] = new AgentToolCapability("cli.run", AgentToolImpact.High, true),
+        ["dotnet.build"] = new AgentToolCapability("dotnet.build", AgentToolImpact.High, true),
+        ["dotnet.test"] = new AgentToolCapability("dotnet.test", AgentToolImpact.High, true),
+        ["dotnet.format"] = new AgentToolCapability("dotnet.format", AgentToolImpact.High, true),
+        ["code_standards.analyse_patch"] = new AgentToolCapability("code_standards.analyse_patch", AgentToolImpact.High, true),
+        ["package.audit"] = new AgentToolCapability("package.audit", AgentToolImpact.High, true),
+        ["trace.write"] = new AgentToolCapability("trace.write", AgentToolImpact.High, true),
+        ["memory.proposal.stage"] = new AgentToolCapability("memory.proposal.stage", AgentToolImpact.High, true),
+
+        ["memory.search"] = new AgentToolCapability("memory.search", AgentToolImpact.Low, false),
+        ["build.compose"] = new AgentToolCapability("build.compose", AgentToolImpact.Low, false),
+        ["thought.ledger"] = new AgentToolCapability("thought.ledger", AgentToolImpact.Low, false)
+    };
+
+    public static IReadOnlyDictionary<string, AgentToolCapability> Catalog => _catalog;
+
+    public static bool TryGet(string toolName, out AgentToolCapability capability)
+    {
+        if (string.IsNullOrWhiteSpace(toolName))
+        {
+            capability = default;
+            return false;
+        }
+
+        return _catalog.TryGetValue(toolName, out capability);
+    }
+
+    public static bool IsHighImpact(string toolName)
+    {
+        return TryGet(toolName, out var capability) && capability.Impact == AgentToolImpact.High;
+    }
+
+    public static bool RequiresApproval(string toolName)
+    {
+        return TryGet(toolName, out var capability) && capability.RequiresApproval;
+    }
 }
 
 public sealed class AgentGovernanceDecision
