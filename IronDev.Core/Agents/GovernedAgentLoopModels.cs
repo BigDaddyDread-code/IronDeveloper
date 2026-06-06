@@ -1,6 +1,6 @@
 namespace IronDev.Core.Agents;
 
-public sealed record AgentToolCapability
+public sealed record GovernedAgentToolCapability
 {
     public required string Name { get; init; }
     public required string Description { get; init; }
