@@ -152,6 +152,11 @@ public sealed class ProjectChatContextStateCompiler
                 UsedFor: "ContextOnly"));
         }
 
+        foreach (var item in context.SemanticMemoryEvidence.Take(6))
+        {
+            evidence.Add(item with { UsedFor = "ContextOnly" });
+        }
+
         if (context.RouteDecision.EvidenceUsed.Count > 0)
         {
             evidence.Add(new MemoryEvidence(

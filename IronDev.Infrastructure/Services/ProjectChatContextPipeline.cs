@@ -1,4 +1,6 @@
 using IronDev.Core.Interfaces;
+using IronDev.Core.Chat;
+using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
@@ -11,6 +13,7 @@ public sealed record ProjectChatContextPipelineResult(
     IReadOnlyList<ProjectDecision> Decisions,
     IReadOnlyList<ProjectRule> Rules,
     IReadOnlyList<ProjectContextDocument> Documents,
+    IReadOnlyList<MemoryEvidence> SemanticMemoryEvidence,
     ContextAgentRouteDecision RouteDecision,
     IReadOnlyList<string> RouteSignals,
     ContextAgentResult ContextAgentResult);
@@ -20,6 +23,7 @@ public sealed class ProjectChatContextPipeline
     private readonly IProjectService _projects;
     private readonly ITicketService _tickets;
     private readonly IProjectMemoryService _memory;
+    private readonly ISemanticMemoryEvidenceProvider _semanticMemoryEvidenceProvider;
     private readonly IContextAgentRouteJudge _routeJudge;
     private readonly IContextAgentService _contextAgent;
 
@@ -27,12 +31,14 @@ public sealed class ProjectChatContextPipeline
         IProjectService projects,
         ITicketService tickets,
         IProjectMemoryService memory,
+        ISemanticMemoryEvidenceProvider semanticMemoryEvidenceProvider,
         IContextAgentRouteJudge routeJudge,
         IContextAgentService contextAgent)
     {
         _projects = projects;
         _tickets = tickets;
         _memory = memory;
+        _semanticMemoryEvidenceProvider = semanticMemoryEvidenceProvider;
         _routeJudge = routeJudge;
         _contextAgent = contextAgent;
     }
@@ -55,6 +61,11 @@ public sealed class ProjectChatContextPipeline
         var summaryDecisions = contextAgentDecisions.Take(5).ToList();
         var rules = await _memory.GetProjectRulesAsync(projectId, cancellationToken).ConfigureAwait(false);
         var documents = await _memory.GetContextDocumentsAsync(projectId, status: "Active", take: 5, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var semanticMemoryEvidence = await _semanticMemoryEvidenceProvider.GetEvidenceAsync(
+            projectId,
+            prompt,
+            recentConversationSummary,
+            cancellationToken).ConfigureAwait(false);
 
         var routeDecision = await ResolveContextRouteAsync(
             projectId,
@@ -83,6 +94,7 @@ public sealed class ProjectChatContextPipeline
             summaryDecisions,
             rules,
             documents,
+            semanticMemoryEvidence,
             routeDecision,
             routeSignals,
             contextAgentResult);

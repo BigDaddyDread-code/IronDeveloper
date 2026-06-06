@@ -97,6 +97,7 @@ public static class CodeIntelligenceServiceCollectionExtensions
                 ? sp.GetRequiredService<WeaviateSemanticMemoryService>()
                 : sp.GetRequiredService<InMemorySemanticMemoryService>();
         });
+        services.AddTransient<ISemanticMemoryEvidenceProvider, SemanticMemoryEvidenceProvider>();
         services.AddTransient<ISemanticWorkflowMemoryNode, SemanticWorkflowMemoryNode>();
 
         // ── LangGraph-style ticket workflow first slice ──────────────────────

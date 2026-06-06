@@ -507,6 +507,7 @@ public sealed class ProjectChatResponseServiceTests
                 new() { Id = 31, Name = "Security rule", Description = "Never persist raw credentials." }
             },
             new List<ProjectContextDocument>(),
+            new List<MemoryEvidence>(),
             new ContextAgentRouteDecision
             {
                 RequestKind = ContextRequestKind.CreateTicket,
