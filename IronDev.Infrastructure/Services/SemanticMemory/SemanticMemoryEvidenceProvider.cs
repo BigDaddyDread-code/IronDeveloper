@@ -68,7 +68,8 @@ public sealed class SemanticMemoryEvidenceProvider : ISemanticMemoryEvidenceProv
             Excerpt: TruncateText(excerpt, 260),
             IsCurrent: !result.IsStale,
             RelevanceScore: relevance,
-            AuthorityLevel: FirstNonEmpty(result.AuthorityLevel, result.Document.AuthorityLevel, "ObservedFact"),
+            AuthorityLevel: MemoryAuthorityNormalizer.FromSemanticAuthority(
+                FirstNonEmpty(result.AuthorityLevel, result.Document.AuthorityLevel, MemoryAuthorityLevels.ObservedFact)),
             UsedFor: ContextOnly);
     }
 
