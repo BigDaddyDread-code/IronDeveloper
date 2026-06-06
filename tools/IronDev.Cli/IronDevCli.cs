@@ -380,6 +380,7 @@ public static class IronDevCli
         CancellationToken cancellationToken)
     {
         var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
+        var json = HasFlag(args, "--json");
         var runId = GetOption(args, "--run-id");
         if (string.IsNullOrWhiteSpace(runId))
         {
@@ -394,11 +395,25 @@ public static class IronDevCli
         try
         {
             var report = await client.GetRunReportAsync(runId, cancellationToken);
-            await WriteJsonOrTextAsync(output, report, HasFlag(args, "--json"), FormatRunReport(report));
-            return 0;
+            var envelope = BuildRunReportContractEnvelope(report);
+
+            if (json)
+                await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
+            else
+                await WriteJsonOrTextAsync(output, report, json, FormatRunReport(report));
+
+            return envelope.Status is "succeeded" ? 0 : 1;
         }
         catch (IronDevApiException ex)
         {
+            if (json)
+            {
+                await output.WriteLineAsync(JsonSerializer.Serialize(
+                    BuildRunReportFailureContractEnvelope(runId, ex),
+                    JsonOptions));
+                return 1;
+            }
+
             WriteApiError("runs report", ex, error);
             return 1;
         }
@@ -823,6 +838,143 @@ public static class IronDevCli
             return FormatRunStatus(report.Status);
 
         return $"{report.Status.RunId}: {report.Status.Status} - {detail.Summary}";
+    }
+
+    private sealed record RunsReportContractEnvelope(
+        string Status,
+        string Command,
+        string? TraceId,
+        string Summary,
+        RunsReportContractData Data,
+        IReadOnlyList<string> Errors,
+        IReadOnlyList<string> Warnings);
+
+    private sealed record RunsReportContractData(
+        string RunId,
+        string Status,
+        string? AgentName,
+        string? GovernanceDecision,
+        string? ApprovalDecision,
+        string? TraceId,
+        string[] ToolCalls,
+        string[] ProcessCommandSummary,
+        string[] EvidencePaths,
+        string? BlockedReason,
+        IReadOnlyDictionary<string, string> Evidence,
+        IReadOnlyList<string> Warnings);
+
+    private static RunsReportContractEnvelope BuildRunReportContractEnvelope(RunReportDto report)
+    {
+        var status = DetermineRunReportCommandStatus(report.Status.Status, report.Status.Recommendation);
+        var traceId = report.Report?.TraceId ?? report.Status.TraceId;
+        var evidence = report.Report?.Evidence ?? [];
+        var toolCalls = evidence.Select(item => item.Path).ToArray();
+        var commandSummaries = evidence.Select(item =>
+            string.IsNullOrWhiteSpace(item.Summary)
+                ? $"{item.Type}: {item.Path}"
+                : $"{item.Type}: {item.Summary}")
+            .ToArray();
+        var evidencePaths = evidence.Select(item => item.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var evidenceMap = evidence
+            .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Summary,
+                StringComparer.OrdinalIgnoreCase);
+        var agentName = report.Report?.Stages.FirstOrDefault()?.AgentName;
+
+        var warnings = report.Report?.Warnings ?? [];
+
+        return new RunsReportContractEnvelope(
+            status,
+            "runs report",
+            traceId,
+            status is "succeeded"
+                ? $"Run '{report.Status.RunId}' completed successfully."
+                : $"Run '{report.Status.RunId}' is {status}.",
+            new RunsReportContractData(
+                report.Status.RunId,
+                report.Status.Status,
+                agentName,
+                report.Status.Recommendation,
+                ResolveApprovalDecision(report.Status.Status, report.Status.Recommendation),
+                traceId,
+                toolCalls,
+                commandSummaries,
+                evidencePaths,
+                status is "blocked" ? report.Status.Recommendation : null,
+                evidenceMap,
+                warnings
+            ),
+            status == "failed" ? ["Run report indicates failure."] : [],
+            warnings);
+    }
+
+    private static RunsReportContractEnvelope BuildRunReportFailureContractEnvelope(
+        string runId,
+        IronDevApiException ex)
+    {
+        var summaryPrefix = $"IronDev.Api runs report failed with {(int)ex.StatusCode} {ex.StatusCode}.";
+        var failures = new List<string> { summaryPrefix };
+        if (!string.IsNullOrWhiteSpace(ex.ResponseBody))
+            failures.Add(ex.ResponseBody);
+
+        var runStatus = ex.StatusCode == System.Net.HttpStatusCode.NotFound ? "not_found" : "error";
+
+        return new RunsReportContractEnvelope(
+            "failed",
+            "runs report",
+            null,
+            "Run report could not be loaded.",
+            new RunsReportContractData(
+                runId,
+                runStatus,
+                null,
+                null,
+                null,
+                null,
+                [],
+                [],
+                [],
+                null,
+                new Dictionary<string, string>(),
+                []
+            ),
+            failures,
+            []
+        );
+    }
+
+    private static string DetermineRunReportCommandStatus(string runStatus, string recommendation)
+    {
+        if (string.Equals(runStatus, "Failed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(recommendation, "failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "failed";
+        }
+
+        if (string.Equals(runStatus, "PausedForApproval", StringComparison.OrdinalIgnoreCase) ||
+            runStatus.Contains("Approval", StringComparison.OrdinalIgnoreCase) ||
+            recommendation.Contains("Approval", StringComparison.OrdinalIgnoreCase))
+        {
+            return "blocked";
+        }
+
+        if (string.Equals(runStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return "blocked";
+
+        return "succeeded";
+    }
+
+    private static string ResolveApprovalDecision(string status, string recommendation)
+    {
+        if (string.Equals(status, "PausedForApproval", StringComparison.OrdinalIgnoreCase) ||
+            recommendation.Contains("approval", StringComparison.OrdinalIgnoreCase))
+        {
+            return "required";
+        }
+
+        return status.Equals("Failed", StringComparison.OrdinalIgnoreCase) ? "denied" : "not_required";
     }
 
     private static string FormatRunEvent(RunEventDto runEvent) =>

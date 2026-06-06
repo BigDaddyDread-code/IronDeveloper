@@ -2,7 +2,9 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using IronDev.Client.Tickets;
+using IronDev.Core.RunReports;
 using IronDev.Cli;
 using IronDev.Core.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -217,6 +219,106 @@ public sealed class IronDevCliTests
             handler.Requests.Select(request => request.RequestUri?.AbsolutePath).ToArray());
         StringAssert.Contains(output.ToString(), "\"runId\": \"run-123\"");
         StringAssert.Contains(output.ToString(), "RunCompleted run-123");
+    }
+
+    [TestMethod]
+    public async Task RunsReport_WithJson_ReturnsCliContractEnvelope()
+    {
+        var handler = new RunReportContractHandler
+        {
+            RunId = "run-123",
+            Status = "Completed",
+            Recommendation = "Review",
+            TraceId = "trace-run-123",
+            ToolCallPaths = ["logs/process.json", "logs/verification.json"]
+        };
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["runs", "report", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+
+        Assert.AreEqual(0, result, error.ToString());
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual("runs report", root.GetProperty("command").GetString());
+        Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+        Assert.AreEqual("trace-run-123", root.GetProperty("traceId").GetString());
+
+        var data = root.GetProperty("data");
+        Assert.AreEqual("run-123", data.GetProperty("runId").GetString());
+        Assert.AreEqual("Completed", data.GetProperty("status").GetString());
+        StringAssert.AreEqualIgnoringCase("not_required", data.GetProperty("approvalDecision").GetString());
+        Assert.IsTrue(data.GetProperty("evidencePaths").GetArrayLength() > 0);
+        Assert.IsTrue(data.GetProperty("toolCalls").GetArrayLength() > 0);
+        Assert.AreEqual(0, data.GetProperty("warnings").GetArrayLength());
+        Assert.AreEqual(0, root.GetProperty("errors").GetArrayLength());
+    }
+
+    [DataTestMethod]
+    [DataRow("PausedForApproval", "blocked")]
+    [DataRow("Failed", "failed")]
+    public async Task RunsReport_BlockedOrFailedStates_ReturnNonZero(string runStatus, string expectedCommandStatus)
+    {
+        var handler = new RunReportContractHandler
+        {
+            RunId = "run-123",
+            Status = runStatus,
+            Recommendation = runStatus == "Failed" ? "Execution failed" : "Approval required",
+            TraceId = "trace-run-123",
+            ToolCallPaths = ["logs/process.json"]
+        };
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["runs", "report", "--run-id", "run-123", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+
+        Assert.AreEqual(1, result, error.ToString());
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual(expectedCommandStatus, root.GetProperty("status").GetString());
+    }
+
+    [TestMethod]
+    public async Task RunsReport_WhenRunIsMissing_ReturnsNonZeroAndWritesContractEnvelope()
+    {
+        var handler = new RunReportContractHandler
+        {
+            RunId = "run-missing",
+            NotFound = true
+        };
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["runs", "report", "--run-id", "run-missing", "--api-base-url", "http://localhost:5000", "--token", "test-token", "--json"],
+            output,
+            error,
+            handler,
+            CancellationToken.None);
+
+        Assert.AreEqual(1, result, error.ToString());
+        StringAssert.IsMatch(output.ToString(), @"\S+");
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual("failed", root.GetProperty("status").GetString());
+        Assert.AreEqual("runs report", root.GetProperty("command").GetString());
+        var data = root.GetProperty("data");
+        Assert.AreEqual("run-missing", data.GetProperty("runId").GetString());
+        Assert.AreEqual("not_found", data.GetProperty("status").GetString());
+        Assert.Greater(root.GetProperty("errors").GetArrayLength(), 0);
     }
 
     [TestMethod]
@@ -740,6 +842,90 @@ public sealed class IronDevCliTests
             }
 
             return clone;
+        }
+    }
+
+    private sealed class RunReportContractHandler : HttpMessageHandler
+    {
+        public string RunId { get; init; } = string.Empty;
+        public string Status { get; init; } = "Completed";
+        public string Recommendation { get; init; } = "Review";
+        public string? TraceId { get; init; } = "trace";
+        public string[] ToolCallPaths { get; init; } = [];
+        public bool NotFound { get; init; }
+
+        public List<HttpRequestMessage> Requests { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+
+            if (request.RequestUri?.AbsolutePath == "/health")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"status":"healthy"}""", Encoding.UTF8, "application/json")
+                });
+            }
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == $"/api/runs/{RunId}/report")
+            {
+                if (NotFound)
+                {
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                    {
+                        Content = new StringContent($"{{\"detail\":\"Run '{RunId}' not found.\"}}", Encoding.UTF8, "application/json")
+                    });
+                }
+
+                var payload = new RunReportDto
+                {
+                    Status = new RunStatusDto
+                    {
+                        RunId = RunId,
+                        TraceId = TraceId,
+                        Project = "IronDev",
+                        Title = "Run Contract",
+                        Status = Status,
+                        Recommendation = Recommendation
+                    },
+                    Report = new RunReportDetail
+                    {
+                        RunId = RunId,
+                        TraceId = TraceId,
+                        Project = "IronDev",
+                        Title = "Run Contract",
+                        Status = Status,
+                        Summary = "Run contract validation.",
+                        Recommendation = Recommendation,
+                        Evidence = ToolCallPaths.Select(path => new RunEvidenceItem
+                        {
+                            Type = "tool-call",
+                            Path = path,
+                            Summary = "Process command summary"
+                        }).ToArray(),
+                        Stages = [
+                            new RunStageStatus
+                            {
+                                StageName = "Governed agent",
+                                AgentName = "quality",
+                                Status = "Done",
+                                Summary = "Governed process review stage."
+                            }
+                        ]
+                    }
+                };
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+            });
         }
     }
 }
