@@ -250,4 +250,131 @@ public sealed class AgentSubprocessTimeoutTests
         var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => agent.RunAsync(request));
         StringAssert.Contains(ex.Message, "approved JSON test-plan");
     }
+
+    [TestMethod]
+    public async Task TesterAgent_ShouldUseGovernedProcessExecutor()
+    {
+        var repoRoot = GetRepoRoot();
+        var definition = new AgentDefinition
+        {
+            Name = "TesterAgent",
+            Purpose = "Test TesterAgent should use governed process executor.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var executor = new FakeGovernedAgentProcessExecutor(request => new GovernedAgentProcessResult
+        {
+            ToolCallId = request.ToolCallId,
+            Command = "powershell \"-NoProfile\" \"-ExecutionPolicy\" \"Bypass\" \"-File\" \"stub\"",
+            ExitCode = 0,
+            Stdout = """{"summary":"TesterExecutorPath","evidence":[{"path":"stub.evidence.json"}]}""",
+            Stderr = string.Empty,
+            TimedOut = false,
+            EvidencePaths = ["test-results/tester-executor-stdout.log"],
+            DurationMs = 0
+        });
+        var agent = new TesterAgent(definition, resolver, repoRoot, executor);
+
+        var request = new AgentRequest
+        {
+            AgentName = "TesterAgent",
+            GoalId = "test-goal",
+            DogfoodRunId = "test-run",
+            Inputs = new Dictionary<string, string>
+            {
+                ["plan_path"] = "irondev-code-standards-alpha.json"
+            }
+        };
+
+        var result = await agent.RunAsync(request);
+
+        Assert.AreEqual(1, executor.InvocationCount);
+        Assert.AreEqual("powershell", executor.Calls[0].FileName);
+        StringAssert.Contains(result.Summary, "TesterExecutorPath");
+        Assert.AreEqual(1, result.CommandsRun.Count);
+        StringAssert.Contains(result.CommandsRun[0], "powershell");
+        CollectionAssert.Contains(result.EvidencePaths.ToArray(), "test-results/tester-executor-stdout.log");
+    }
+
+    [TestMethod]
+    public async Task QualityAgent_ShouldUseGovernedProcessExecutor()
+    {
+        var repoRoot = GetRepoRoot();
+        var definition = new AgentDefinition
+        {
+            Name = "QualityAgent",
+            Purpose = "Test QualityAgent should use governed process executor.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var executor = new FakeGovernedAgentProcessExecutor(request => new GovernedAgentProcessResult
+        {
+            ToolCallId = request.ToolCallId,
+            Command = "powershell \"-NoProfile\" \"-ExecutionPolicy\" \"Bypass\" \"-File\" \"stub\"",
+            ExitCode = 0,
+            Stdout = """{"status":"passed","summary":"QualityExecutorPath","steps":[]}""",
+            Stderr = string.Empty,
+            TimedOut = false,
+            EvidencePaths = ["test-results/quality-executor-stdout.log"],
+            DurationMs = 0
+        });
+        var agent = new QualityAgent(definition, resolver, repoRoot, null, executor);
+
+        var request = new AgentRequest
+        {
+            AgentName = "QualityAgent",
+            GoalId = "test-goal",
+            DogfoodRunId = "test-run",
+            Inputs = new Dictionary<string, string>
+            {
+                ["plan_path"] = "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                ["live_llm"] = "false"
+            }
+        };
+
+        var result = await agent.RunAsync(request);
+
+        Assert.AreEqual(1, executor.InvocationCount);
+        Assert.AreEqual("powershell", executor.Calls[0].FileName);
+        Assert.AreEqual(AgentRunStatus.Succeeded, result.Status);
+        StringAssert.Contains(result.CommandsRun[0], "powershell");
+        CollectionAssert.Contains(result.EvidencePaths.ToArray(), "test-results/quality-executor-stdout.log");
+    }
+
+    [TestMethod]
+    public void AgentProcessBoundaryTests_ShouldNotUseRawProcessInAgents()
+    {
+        var testerSource = File.ReadAllText(
+            Path.Combine(GetRepoRoot(), "IronDev.Infrastructure", "Services", "Agents", "TesterAgent.cs"));
+        var qualitySource = File.ReadAllText(
+            Path.Combine(GetRepoRoot(), "IronDev.Infrastructure", "Services", "Agents", "QualityAgent.cs"));
+
+        Assert.IsFalse(testerSource.Contains("new Process", StringComparison.Ordinal), "TesterAgent should not instantiate raw Process.");
+        Assert.IsFalse(qualitySource.Contains("new Process", StringComparison.Ordinal), "QualityAgent should not instantiate raw Process.");
+        Assert.IsFalse(testerSource.Contains("ProcessStartInfo", StringComparison.Ordinal), "TesterAgent should not configure raw ProcessStartInfo.");
+        Assert.IsFalse(qualitySource.Contains("ProcessStartInfo", StringComparison.Ordinal), "QualityAgent should not configure raw ProcessStartInfo.");
+    }
+
+    private sealed class FakeGovernedAgentProcessExecutor : IGovernedAgentProcessExecutor
+    {
+        private readonly Func<GovernedAgentProcessRequest, GovernedAgentProcessResult> _resultFactory;
+        private readonly List<GovernedAgentProcessRequest> _calls = [];
+
+        public FakeGovernedAgentProcessExecutor(Func<GovernedAgentProcessRequest, GovernedAgentProcessResult> resultFactory)
+        {
+            _resultFactory = resultFactory;
+        }
+
+        public int InvocationCount => _calls.Count;
+        public IReadOnlyList<GovernedAgentProcessRequest> Calls => _calls;
+
+        public Task<GovernedAgentProcessResult> ExecuteAsync(
+            GovernedAgentProcessRequest request,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            _calls.Add(request);
+            return Task.FromResult(_resultFactory(request));
+        }
+    }
 }
