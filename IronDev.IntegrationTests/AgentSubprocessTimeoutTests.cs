@@ -150,7 +150,7 @@ public sealed class AgentSubprocessTimeoutTests
             Inputs = new Dictionary<string, string>
             {
                 ["project"] = "TestProject",
-                ["plan_path"] = "TestPlan.md",
+                ["plan_path"] = "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
                 ["live_llm"] = "false"
             }
         };
@@ -170,5 +170,84 @@ public sealed class AgentSubprocessTimeoutTests
         {
             Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", null);
         }
+    }
+
+    [TestMethod]
+    public async Task TesterAgent_ShouldRejectAbsolutePlanPath()
+    {
+        var repoRoot = GetRepoRoot();
+        var definition = new AgentDefinition
+        {
+            Name = "TesterAgent",
+            Purpose = "Test TesterAgent plan path boundary.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var agent = new TesterAgent(definition, resolver, repoRoot);
+
+        var request = new AgentRequest
+        {
+            AgentName = "TesterAgent",
+            Inputs = new Dictionary<string, string>
+            {
+                ["plan_path"] = Path.Combine(repoRoot, "tools", "dogfood", "test-agent-plans", "irondev-code-standards-alpha.json")
+            }
+        };
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => agent.RunAsync(request));
+        StringAssert.Contains(ex.Message, "must be relative");
+    }
+
+    [TestMethod]
+    public async Task TesterAgent_ShouldRejectPlanTraversal()
+    {
+        var repoRoot = GetRepoRoot();
+        var definition = new AgentDefinition
+        {
+            Name = "TesterAgent",
+            Purpose = "Test TesterAgent plan path boundary.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var agent = new TesterAgent(definition, resolver, repoRoot);
+
+        var request = new AgentRequest
+        {
+            AgentName = "TesterAgent",
+            Inputs = new Dictionary<string, string>
+            {
+                ["plan_path"] = "../outside.json"
+            }
+        };
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => agent.RunAsync(request));
+        StringAssert.Contains(ex.Message, "must stay under");
+    }
+
+    [TestMethod]
+    public async Task QualityAgent_ShouldRejectUnsafePlanPath()
+    {
+        var repoRoot = GetRepoRoot();
+        var definition = new AgentDefinition
+        {
+            Name = "QualityAgent",
+            Purpose = "Test QualityAgent plan path boundary.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var agent = new QualityAgent(definition, resolver, repoRoot);
+
+        var request = new AgentRequest
+        {
+            AgentName = "QualityAgent",
+            Inputs = new Dictionary<string, string>
+            {
+                ["plan_path"] = "TestPlan.md",
+                ["live_llm"] = "false"
+            }
+        };
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => agent.RunAsync(request));
+        StringAssert.Contains(ex.Message, "approved JSON test-plan");
     }
 }

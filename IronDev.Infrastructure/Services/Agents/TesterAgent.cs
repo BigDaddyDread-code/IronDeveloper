@@ -26,6 +26,7 @@ public sealed class TesterAgent : StaticIronDevAgent
             : request.DogfoodRunId;
 
         var scriptPath = Path.Combine(_repoRoot, "tools", "dogfood", "Invoke-TestAgentPlan.ps1");
+        var fullPlanPath = AgentPlanPathResolver.ResolveApprovedPlanPath(_repoRoot, planPath, AgentName);
         var arguments = new[]
         {
             "-NoProfile",
@@ -34,7 +35,7 @@ public sealed class TesterAgent : StaticIronDevAgent
             "-File",
             scriptPath,
             "-PlanPath",
-            Path.GetFullPath(Path.Combine(_repoRoot, planPath)),
+            fullPlanPath,
             "-RunId",
             runId,
             "-Json"
