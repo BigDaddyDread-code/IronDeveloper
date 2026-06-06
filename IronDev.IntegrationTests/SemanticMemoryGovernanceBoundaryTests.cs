@@ -163,6 +163,88 @@ public sealed class SemanticMemoryGovernanceBoundaryTests
     }
 
     [TestMethod]
+    public async Task SemanticMemoryFailure_IsRecordedAsContextOnlyWarningEvidence()
+    {
+        var provider = new SemanticMemoryEvidenceProvider(new FailingSemanticMemoryService());
+
+        var evidence = await provider.GetEvidenceAsync(
+            projectId: 44,
+            userMessage: "what memory applies here?",
+            recentConversationSummary: string.Empty);
+
+        Assert.AreEqual(1, evidence.Count);
+        var warning = evidence.Single();
+        Assert.AreEqual("semantic-retrieval-failure-44", warning.SourceId);
+        Assert.AreEqual("SemanticMemoryFailure", warning.SourceType);
+        Assert.AreEqual("Unknown", warning.AuthorityLevel);
+        Assert.AreEqual("ContextOnly", warning.UsedFor);
+        Assert.IsFalse(warning.IsCurrent);
+        Assert.AreEqual(0, warning.RelevanceScore);
+        Assert.AreEqual(0, warning.RetrievalRank);
+        Assert.AreEqual("what memory applies here?", warning.RetrievalQuery);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(warning.RetrievalTraceId));
+        StringAssert.Contains(warning.MatchReason!, nameof(InvalidOperationException));
+        StringAssert.Contains(warning.StalenessReason!, "failed");
+    }
+
+    [TestMethod]
+    public void ResponseMetadata_RecordsRetrievalEvidenceTraceDetails()
+    {
+        var builder = new ProjectChatResponseMetadataBuilder();
+        var contextState = new ChatContextState(
+            RequiresClarification: false,
+            ClarificationQuestions: Array.Empty<string>(),
+            ContextSummary: "Semantic memory trace test.",
+            CurrentUserMessage: "what memory applies here?",
+            SemanticEvidence:
+            [
+                new MemoryEvidence(
+                    SourceId: "semantic-Decision-42",
+                    SourceType: "Decision",
+                    Title: "Accepted audit decision",
+                    Excerpt: "Persist audit rows transactionally.",
+                    IsCurrent: true,
+                    RelevanceScore: 0.92,
+                    AuthorityLevel: "Accepted",
+                    UsedFor: "ContextOnly",
+                    RetrievalTraceId: "trace-123",
+                    RetrievalRank: 1,
+                    RetrievalQuery: "audit persistence",
+                    MatchReason: "semantic similarity and authority boost",
+                    VectorSimilarity: 0.84)
+            ],
+            Origin: ChatContextStateOrigin.ProjectChatResponseCompiler);
+        var context = new ProjectChatContextPipelineResult(
+            Project: new Project { Id = 44, Name = "Trace Project" },
+            Tickets: Array.Empty<ProjectTicket>(),
+            Decisions: Array.Empty<ProjectDecision>(),
+            Rules: Array.Empty<ProjectRule>(),
+            Documents: Array.Empty<ProjectContextDocument>(),
+            SemanticMemoryEvidence: contextState.SemanticEvidence!,
+            RouteDecision: new ContextAgentRouteDecision(),
+            RouteSignals: Array.Empty<string>(),
+            ContextAgentResult: new ContextAgentResult { WasSuccessful = true });
+
+        var metadata = builder.Build(
+            context,
+            new ChatModeDecision(ChatGovernanceMode.Exploration, 0.82, "Exploration keeps memory advisory."),
+            "trace-group",
+            contextState);
+        var trace = string.Join('\n', metadata.ReasoningTrace);
+
+        StringAssert.Contains(trace, "SourceId=semantic-Decision-42");
+        StringAssert.Contains(trace, "AuthorityLevel=Accepted");
+        StringAssert.Contains(trace, "IsCurrent=True");
+        StringAssert.Contains(trace, "RetrievalTraceId=trace-123");
+        StringAssert.Contains(trace, "RetrievalRank=1");
+        StringAssert.Contains(trace, "RetrievalQuery=audit persistence");
+        StringAssert.Contains(trace, "MatchReason=semantic similarity and authority boost");
+        StringAssert.Contains(trace, "VectorSimilarity=0.84");
+        StringAssert.Contains(trace, "RelevanceScore=0.92");
+        StringAssert.Contains(trace, "UsedFor=ContextOnly");
+    }
+
+    [TestMethod]
     public void SemanticMemory_OnlyFlowsThroughChatContextState()
     {
         var root = FindRepoRoot();
@@ -335,5 +417,38 @@ public sealed class SemanticMemoryGovernanceBoundaryTests
 
         public Task<SemanticMemoryHealth> GetHealthAsync(int projectId, CancellationToken ct = default) =>
             Task.FromResult(new SemanticMemoryHealth { ProjectId = projectId, ProviderName = "Stub", ProviderStatus = "Healthy" });
+    }
+
+    private sealed class FailingSemanticMemoryService : ISemanticMemoryService
+    {
+        public Task QueueIndexAsync(SemanticIndexRequest request, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task EmbedAndStoreAsync(ProjectContextDocument document, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(SemanticSearchQuery query, CancellationToken ct = default) =>
+            throw new InvalidOperationException("semantic backend unavailable");
+
+        public Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(int projectId, string query, int limit = 8, double minSimilarity = 0.75, CancellationToken ct = default) =>
+            throw new InvalidOperationException("semantic backend unavailable");
+
+        public Task<SemanticContextBundle> BuildContextBundleAsync(int projectId, string query, string callerContext, int limit = 8, CancellationToken ct = default) =>
+            throw new InvalidOperationException("semantic backend unavailable");
+
+        public Task RebuildIndexAsync(int projectId, IProgress<SemanticIndexRebuildProgress>? progress = null, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task RebuildProjectAsync(int projectId, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task MarkStaleAsync(SemanticStaleRequest request, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task DeleteEmbeddingAsync(Guid artefactId, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task<SemanticMemoryHealth> GetHealthAsync(int projectId, CancellationToken ct = default) =>
+            Task.FromResult(new SemanticMemoryHealth { ProjectId = projectId, ProviderName = "Failing", ProviderStatus = "Unavailable" });
     }
 }
