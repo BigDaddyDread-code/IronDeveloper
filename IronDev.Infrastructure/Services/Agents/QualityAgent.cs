@@ -41,7 +41,7 @@ public sealed class QualityAgent : StaticIronDevAgent
         var liveLlmRequested = ReadBoolInput(request, "live_llm");
 
         var scriptPath = Path.Combine(_repoRoot, "tools", "dogfood", "Invoke-TestAgentPlan.ps1");
-        var fullPlanPath = Path.GetFullPath(Path.Combine(_repoRoot, planPath));
+        var fullPlanPath = AgentPlanPathResolver.ResolveApprovedPlanPath(_repoRoot, planPath, AgentName);
         var arguments = new[]
         {
             "-NoProfile",

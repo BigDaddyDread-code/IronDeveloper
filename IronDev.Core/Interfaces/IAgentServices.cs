@@ -31,6 +31,11 @@ public interface IAgentRunner
     Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default);
 }
 
+public interface IAgentGovernanceGate
+{
+    AgentGovernanceDecision Evaluate(AgentDefinition definition, AgentRequest request);
+}
+
 public interface IThoughtLedgerService
 {
     ThoughtLedgerResult Explain(

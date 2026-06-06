@@ -8,6 +8,27 @@ public enum AgentRunStatus
     Skipped
 }
 
+public enum AgentActionImpact
+{
+    Unknown,
+    ReadOnly,
+    Diagnostic,
+    ProcessExecution,
+    WorkspaceMutation,
+    MemoryMutation,
+    ExternalNetwork
+}
+
+public enum AgentApprovalDecision
+{
+    NotRequired,
+    Missing,
+    Approved,
+    Rejected,
+    Expired,
+    Invalid
+}
+
 public sealed class AgentDefinition
 {
     public required string Name { get; init; }
@@ -36,8 +57,68 @@ public sealed class AgentRequest
     public string GoalId { get; init; } = string.Empty;
     public string DogfoodRunId { get; init; } = string.Empty;
     public IReadOnlyList<string> RequestedTools { get; init; } = [];
+    public IReadOnlyList<AgentToolCallRequest> RequestedToolCalls { get; init; } = [];
+    public AgentApprovalEvidence? ApprovalEvidence { get; init; }
+    public string ProposalId { get; init; } = string.Empty;
+    public string ProposalHash { get; init; } = string.Empty;
+    public bool DryRunOnly { get; init; } = true;
     public IReadOnlyDictionary<string, string> Inputs { get; init; } = new Dictionary<string, string>();
     public DateTimeOffset CreatedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class AgentEvidenceItem
+{
+    public required string EvidenceId { get; init; }
+    public required string Kind { get; init; }
+    public string Path { get; init; } = string.Empty;
+    public required string Sha256 { get; init; }
+    public string ProducedBy { get; init; } = string.Empty;
+    public DateTimeOffset CreatedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class AgentApprovalEvidence
+{
+    public required string ApprovalId { get; init; }
+    public required string ProposalId { get; init; }
+    public required string ProposalHash { get; init; }
+    public string ApprovedBy { get; init; } = string.Empty;
+    public string Scope { get; init; } = string.Empty;
+    public AgentApprovalDecision Decision { get; init; } = AgentApprovalDecision.Approved;
+    public DateTimeOffset ApprovedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public IReadOnlyList<AgentEvidenceItem> Evidence { get; init; } = [];
+}
+
+public sealed class AgentToolCallRequest
+{
+    public required string ToolName { get; init; }
+    public AgentActionImpact Impact { get; init; } = AgentActionImpact.ReadOnly;
+    public bool RequiresApproval { get; init; }
+    public bool AllowsFileWrites { get; init; }
+    public bool AllowsProcessExecution { get; init; }
+    public bool AllowsWorkspaceMutation { get; init; }
+    public bool EvidenceRequired { get; init; }
+    public string ApprovalScope { get; init; } = string.Empty;
+    public IReadOnlyList<string> EvidenceSourceIds { get; init; } = [];
+}
+
+public sealed class AgentToolCallResult
+{
+    public required string ToolName { get; init; }
+    public AgentActionImpact Impact { get; init; } = AgentActionImpact.ReadOnly;
+    public AgentRunStatus Status { get; init; }
+    public string Summary { get; init; } = string.Empty;
+    public IReadOnlyList<AgentEvidenceItem> Evidence { get; init; } = [];
+}
+
+public sealed class AgentGovernanceDecision
+{
+    public bool IsAllowed { get; init; }
+    public string Reason { get; init; } = string.Empty;
+    public AgentApprovalDecision ApprovalDecision { get; init; } = AgentApprovalDecision.NotRequired;
+    public AgentActionImpact MaxImpact { get; init; } = AgentActionImpact.ReadOnly;
+    public bool RequiresApproval { get; init; }
+    public IReadOnlyList<string> Violations { get; init; } = [];
 }
 
 public sealed class AgentResult
@@ -56,6 +137,12 @@ public sealed class AgentResult
     public IReadOnlyList<string> AllowedTools { get; init; } = [];
     public IReadOnlyList<string> CommandsRun { get; init; } = [];
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+    public IReadOnlyList<AgentToolCallResult> ToolCalls { get; init; } = [];
+    public AgentApprovalDecision ApprovalDecision { get; init; } = AgentApprovalDecision.NotRequired;
+    public string ApprovalFailureReason { get; init; } = string.Empty;
+    public string TraceId { get; init; } = string.Empty;
+    public bool WasDryRun { get; init; } = true;
+    public bool MutatedState { get; init; }
     public DateTimeOffset StartedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset CompletedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public long DurationMs { get; init; }

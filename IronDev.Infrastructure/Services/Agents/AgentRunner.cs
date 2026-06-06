@@ -8,10 +8,12 @@ namespace IronDev.Infrastructure.Services.Agents;
 public sealed class AgentRunner : IAgentRunner
 {
     private readonly IAgentRegistry _registry;
+    private readonly IAgentGovernanceGate _governanceGate;
 
-    public AgentRunner(IAgentRegistry registry)
+    public AgentRunner(IAgentRegistry registry, IAgentGovernanceGate? governanceGate = null)
     {
         _registry = registry;
+        _governanceGate = governanceGate ?? new AgentGovernanceGate();
     }
 
     public async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -19,59 +21,58 @@ public sealed class AgentRunner : IAgentRunner
         var startedAtUtc = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();
         var definition = _registry.GetDefinition(request.AgentName);
-        var disallowedTools = request.RequestedTools
-            .Where(tool => !definition.AllowedTools.Contains(tool, StringComparer.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tool => tool, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var governance = _governanceGate.Evaluate(definition, request);
 
-        if (!definition.Enabled)
+        if (!governance.IsAllowed)
         {
             stopwatch.Stop();
             return BuildBlockedResult(
                 request,
                 definition,
+                governance,
                 startedAtUtc,
-                stopwatch.ElapsedMilliseconds,
-                $"Agent '{definition.Name}' is disabled.");
-        }
-
-        if (disallowedTools.Length > 0)
-        {
-            stopwatch.Stop();
-            return BuildBlockedResult(
-                request,
-                definition,
-                startedAtUtc,
-                stopwatch.ElapsedMilliseconds,
-                $"Agent '{definition.Name}' requested tools outside its declared boundary: {string.Join(", ", disallowedTools)}.");
+                stopwatch.ElapsedMilliseconds);
         }
 
         var agent = _registry.GetAgent(request.AgentName);
         var result = await agent.RunAsync(request, ct);
         stopwatch.Stop();
 
-        return StampResult(request, definition, result, startedAtUtc, stopwatch.ElapsedMilliseconds);
+        return StampResult(request, definition, governance, result, startedAtUtc, stopwatch.ElapsedMilliseconds);
     }
 
     private static AgentResult BuildBlockedResult(
         AgentRequest request,
         AgentDefinition definition,
+        AgentGovernanceDecision governance,
         DateTimeOffset startedAtUtc,
-        long durationMs,
-        string summary)
+        long durationMs)
     {
         var completedAtUtc = DateTimeOffset.UtcNow;
         var output = new
         {
             decision = "Block",
-            reason = summary,
+            reason = governance.Reason,
             agent = definition.Name,
             goalId = request.GoalId,
             dogfoodRunId = request.DogfoodRunId,
             requestedTools = request.RequestedTools,
+            requestedToolCalls = request.RequestedToolCalls.Select(call => new
+            {
+                call.ToolName,
+                impact = call.Impact.ToString(),
+                call.RequiresApproval,
+                call.AllowsFileWrites,
+                call.AllowsProcessExecution,
+                call.AllowsWorkspaceMutation,
+                call.EvidenceRequired,
+                call.ApprovalScope
+            }),
             allowedTools = definition.AllowedTools,
-            boundary = "AgentRunner enforces declared AgentDefinition.AllowedTools before dispatch."
+            approvalDecision = governance.ApprovalDecision.ToString(),
+            dryRunOnly = request.DryRunOnly,
+            violations = governance.Violations,
+            boundary = "AgentRunner enforces declared AgentDefinition.AllowedTools and typed agent governance before dispatch."
         };
 
         return new AgentResult
@@ -80,12 +81,16 @@ public sealed class AgentRunner : IAgentRunner
             Status = AgentRunStatus.Blocked,
             GoalId = request.GoalId,
             DogfoodRunId = request.DogfoodRunId,
-            Summary = summary,
+            Summary = governance.Reason,
             ModelProfileName = definition.DefaultModelProfile,
             ExitCode = 1,
             OutputJson = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true }),
             RequestedTools = request.RequestedTools,
             AllowedTools = definition.AllowedTools,
+            ApprovalDecision = governance.ApprovalDecision,
+            ApprovalFailureReason = governance.Reason,
+            TraceId = request.ProposalId,
+            WasDryRun = request.DryRunOnly,
             StartedAtUtc = startedAtUtc,
             CompletedAtUtc = completedAtUtc,
             DurationMs = durationMs
@@ -95,6 +100,7 @@ public sealed class AgentRunner : IAgentRunner
     private static AgentResult StampResult(
         AgentRequest request,
         AgentDefinition definition,
+        AgentGovernanceDecision governance,
         AgentResult result,
         DateTimeOffset startedAtUtc,
         long durationMs) =>
@@ -114,6 +120,12 @@ public sealed class AgentRunner : IAgentRunner
             AllowedTools = definition.AllowedTools,
             CommandsRun = result.CommandsRun,
             EvidencePaths = result.EvidencePaths,
+            ToolCalls = result.ToolCalls,
+            ApprovalDecision = governance.ApprovalDecision,
+            ApprovalFailureReason = result.ApprovalFailureReason,
+            TraceId = string.IsNullOrWhiteSpace(result.TraceId) ? request.ProposalId : result.TraceId,
+            WasDryRun = request.DryRunOnly,
+            MutatedState = result.MutatedState,
             StartedAtUtc = startedAtUtc,
             CompletedAtUtc = result.CompletedAtUtc,
             DurationMs = durationMs
