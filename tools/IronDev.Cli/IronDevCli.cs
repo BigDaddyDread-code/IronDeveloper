@@ -858,7 +858,7 @@ public static class IronDevCli
         IReadOnlyList<RunsReportToolCallCliData> ToolCalls,
         IReadOnlyList<RunsReportProcessCommandCliData> ProcessCommands,
         IReadOnlyList<RunsReportEvidenceCliData> Evidence,
-        IReadOnlyDictionary<string, string> Evidence,
+        IReadOnlyDictionary<string, string> EvidenceSummaryByPath,
         IReadOnlyList<string> Warnings);
 
     private sealed record RunsReportGovernanceCliData(
