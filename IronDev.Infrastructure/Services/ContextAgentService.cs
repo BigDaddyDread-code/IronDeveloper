@@ -190,6 +190,7 @@ public sealed class ContextAgentService : IContextAgentService
                         "Ask the user to restate the feature request in one sentence.",
                         "Collect a concrete acceptance target."
                     ],
+                    EvidenceSourceIds = Array.Empty<string>(),
                     RequiresApproval = true
                 },
                 AllowsProseResponse = false,
@@ -215,6 +216,7 @@ public sealed class ContextAgentService : IContextAgentService
                         "Open draft-ticket UI.",
                         "Render user work as candidate draft payload."
                     ],
+                    EvidenceSourceIds = Array.Empty<string>(),
                     RequiresApproval = true
                 },
                 AllowsProseResponse = false,
@@ -238,6 +240,7 @@ public sealed class ContextAgentService : IContextAgentService
                         "Use 'ticket this' after an assistant response.",
                         "Write the work directly after the command."
                     ],
+                    EvidenceSourceIds = Array.Empty<string>(),
                     RequiresApproval = true
                 },
                 AllowsProseResponse = false,
