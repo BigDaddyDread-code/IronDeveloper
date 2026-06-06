@@ -259,6 +259,7 @@ public sealed class Slice1GovernanceBoundaryTests
             },
             new List<ProjectRule>(),
             new List<ProjectContextDocument>(),
+            new List<MemoryEvidence>(),
             new ContextAgentRouteDecision
             {
                 RequestKind = ContextRequestKind.GeneralChat,
