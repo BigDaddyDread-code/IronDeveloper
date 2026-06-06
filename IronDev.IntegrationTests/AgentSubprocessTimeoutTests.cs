@@ -26,11 +26,16 @@ public sealed class AgentSubprocessTimeoutTests
     public async Task AgentProcessRunner_Timeout_ShouldKillProcessAndReturnTimedOut()
     {
         var runner = new AgentProcessRunner();
+        var repoRoot = GetRepoRoot();
+        var scriptPath = Path.Combine(repoRoot, "tools", "dogfood", $"timeout-test-{Guid.NewGuid():N}.ps1");
+        await File.WriteAllTextAsync(scriptPath, "Start-Sleep -Seconds 5");
         Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", "1");
         try
         {
-            // powershell -Command Start-Sleep -Seconds 5 hangs reliably for 5 seconds.
-            var result = await runner.RunAsync("powershell", new[] { "-Command", "Start-Sleep -Seconds 5" }, GetRepoRoot());
+            var result = await runner.RunAsync(
+                "powershell",
+                ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath],
+                repoRoot);
 
             Assert.IsTrue(result.TimedOut);
             Assert.AreEqual(-1, result.ExitCode);
@@ -39,7 +44,37 @@ public sealed class AgentSubprocessTimeoutTests
         finally
         {
             Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", null);
+            if (File.Exists(scriptPath))
+                File.Delete(scriptPath);
         }
+    }
+
+    [TestMethod]
+    public async Task AgentProcessRunner_ShouldRejectPowerShellCommandArgument()
+    {
+        var runner = new AgentProcessRunner();
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            runner.RunAsync(
+                "powershell",
+                ["-NoProfile", "-Command", "Write-Output unsafe"],
+                GetRepoRoot()));
+
+        StringAssert.Contains(ex.Message, "-Command is not allowed");
+    }
+
+    [TestMethod]
+    public async Task AgentProcessRunner_ShouldRejectPowerShellEncodedCommandArgument()
+    {
+        var runner = new AgentProcessRunner();
+
+        var ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            runner.RunAsync(
+                "powershell",
+                ["-NoProfile", "-EncodedCommand", "VwByAGkAdABlAC0ASABvAHMAdAAgAHUAbgBzAGEAZgBlAA=="],
+                GetRepoRoot()));
+
+        StringAssert.Contains(ex.Message, "-EncodedCommand is not allowed");
     }
 
     [TestMethod]
