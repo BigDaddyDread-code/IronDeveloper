@@ -109,7 +109,7 @@ public sealed class ProjectChatContextStateCompiler
                 Excerpt: TruncateText(decision.Detail, 260),
                 IsCurrent: decision.Status.Equals("Accepted", StringComparison.OrdinalIgnoreCase),
                 RelevanceScore: 0.8,
-                AuthorityLevel: decision.Status,
+                AuthorityLevel: MemoryAuthorityNormalizer.FromDecisionStatus(decision.Status),
                 UsedFor: "ContextOnly"));
         }
 
@@ -122,7 +122,7 @@ public sealed class ProjectChatContextStateCompiler
                 Excerpt: TruncateText(string.Join(" ", ticket.Summary, ticket.Content, ticket.Background, ticket.Problem), 260),
                 RelevanceScore: 0.72,
                 IsCurrent: IsCurrentStatus(ticket.Status),
-                AuthorityLevel: ticket.IsGenerated ? "Draft" : "ObservedFact",
+                AuthorityLevel: MemoryAuthorityNormalizer.FromTicketState(ticket.IsGenerated, ticket.Status),
                 UsedFor: "ContextOnly"));
         }
 
@@ -135,7 +135,7 @@ public sealed class ProjectChatContextStateCompiler
                 Excerpt: TruncateText(string.Join(" ", document.Summary, document.Content), 260),
                 IsCurrent: document.Status.Equals("Active", StringComparison.OrdinalIgnoreCase),
                 RelevanceScore: 0.7,
-                AuthorityLevel: document.AuthorityLevel,
+                AuthorityLevel: MemoryAuthorityNormalizer.FromDocumentAuthority(document.AuthorityLevel, document.Status),
                 UsedFor: "ContextOnly"));
         }
 
@@ -143,18 +143,22 @@ public sealed class ProjectChatContextStateCompiler
         {
             evidence.Add(new MemoryEvidence(
                 SourceId: $"rule-{rule.Id}",
-                SourceType: "Decision",
+                SourceType: "Rule",
                 Title: rule.Name,
                 Excerpt: TruncateText(rule.Description, 260),
                 IsCurrent: true,
                 RelevanceScore: 0.72,
-                AuthorityLevel: rule.EnforcementLevel,
+                AuthorityLevel: MemoryAuthorityNormalizer.FromRuleEnforcementLevel(rule.EnforcementLevel),
                 UsedFor: "ContextOnly"));
         }
 
         foreach (var item in context.SemanticMemoryEvidence.Take(6))
         {
-            evidence.Add(item with { UsedFor = "ContextOnly" });
+            evidence.Add(item with
+            {
+                AuthorityLevel = MemoryAuthorityNormalizer.FromSemanticAuthority(item.AuthorityLevel),
+                UsedFor = "ContextOnly"
+            });
         }
 
         if (context.RouteDecision.EvidenceUsed.Count > 0)
@@ -166,7 +170,7 @@ public sealed class ProjectChatContextStateCompiler
                 Excerpt: TruncateText(string.Join(" | ", context.RouteDecision.EvidenceUsed), 260),
                 IsCurrent: true,
                 RelevanceScore: 0.55,
-                AuthorityLevel: "ObservedFact",
+                AuthorityLevel: MemoryAuthorityNormalizer.RuntimeTrace,
                 UsedFor: "ContextOnly"));
         }
 
