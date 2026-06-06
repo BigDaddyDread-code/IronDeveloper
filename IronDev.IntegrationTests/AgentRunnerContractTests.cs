@@ -118,6 +118,27 @@ public sealed class AgentRunnerContractTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ShouldBlockHighImpactLegacyToolsWithoutTypedCallMetadata()
+    {
+        var (runner, agent) = BuildRunner(["test.run"]);
+
+        var result = await runner.RunAsync(new AgentRequest
+        {
+            AgentName = "ContractAgent",
+            ProposalId = "proposal-1",
+            ProposalHash = "hash-1",
+            RequestedTools = ["test.run"],
+            DryRunOnly = false,
+            ApprovalEvidence = ApprovedEvidence("proposal-1", "hash-1")
+        });
+
+        Assert.AreEqual(AgentRunStatus.Blocked, result.Status);
+        Assert.AreEqual(AgentApprovalDecision.Missing, result.ApprovalDecision);
+        StringAssert.Contains(result.Summary, "legacy requested high-impact tools");
+        Assert.AreEqual(0, agent.RunCount);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ShouldAllowReadOnlyTypedToolWithoutApproval()
     {
         var definition = new AgentDefinition
