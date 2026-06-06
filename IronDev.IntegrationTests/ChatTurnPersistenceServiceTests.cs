@@ -2,6 +2,8 @@ using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Data.Models;
 using IronDev.Services;
+using Dapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -10,6 +12,18 @@ namespace IronDev.IntegrationTests;
 [TestClass]
 public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
 {
+    [TestMethod]
+    public void ChatTurnPersistenceService_DoesNotRunRuntimeDdl()
+    {
+        var root = FindRepoRoot();
+        var source = File.ReadAllText(Path.Combine(root, "IronDev.Infrastructure", "Services", "ChatTurnPersistenceService.cs"));
+
+        Assert.IsFalse(source.Contains("EnsureTablesAsync", StringComparison.Ordinal), "Runtime DDL must not live in ChatTurnPersistenceService.");
+        Assert.IsFalse(source.Contains("CREATE TABLE", StringComparison.OrdinalIgnoreCase), "ChatTurnPersistenceService must not create audit tables at runtime.");
+        Assert.IsFalse(source.Contains("ALTER TABLE", StringComparison.OrdinalIgnoreCase), "ChatTurnPersistenceService must not alter audit tables at runtime.");
+        Assert.IsFalse(source.Contains("OBJECT_ID", StringComparison.OrdinalIgnoreCase), "ChatTurnPersistenceService must not probe schema at runtime.");
+    }
+
     [TestMethod]
     public async Task SaveMessageAsync_AssistantEnvelopePersistsGovernanceClarificationAndTraceRows()
     {
@@ -47,6 +61,233 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
         Assert.AreEqual("Context summary for persisted trace.", snapshot.ContextSummary);
         Assert.AreEqual("src/App.cs", snapshot.LinkedFilePaths);
         Assert.AreEqual("App", snapshot.LinkedSymbols);
+    }
+
+    [TestMethod]
+    public async Task SaveTurnAsync_WritesMessageGovernanceClarificationAndTraceAtomically()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Atomic audit write test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Atomic ticket handoff is ready.",
+            Tags = BuildEnvelopeJson(),
+            ContextSummary = "Atomic context summary.",
+            LinkedFilePaths = "src/Atomic.cs",
+            LinkedSymbols = "Atomic"
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        Assert.AreEqual(1, await CountRowsAsync(connection, "dbo.ChatMessages", "Id = @MessageId", new { MessageId = messageId }));
+        Assert.AreEqual(1, await CountRowsAsync(connection, "dbo.ChatTurnGovernance", "ChatMessageId = @MessageId", new { MessageId = messageId }));
+        Assert.AreEqual(1, await CountRowsAsync(connection, "dbo.ChatTurnClarifications", "ChatMessageId = @MessageId", new { MessageId = messageId }));
+        Assert.AreEqual(1, await CountRowsAsync(connection, "dbo.ChatTurnTraces", "ChatMessageId = @MessageId", new { MessageId = messageId }));
+    }
+
+    [TestMethod]
+    public async Task SaveTurnAsync_AuditFailureDoesNotLeaveSuccessfulMessageWithoutAuditRows()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Audit rollback test"
+        });
+        var messageText = $"Audit rollback proof {Guid.NewGuid():N}";
+
+        try
+        {
+            await chat.SaveMessageAsync(new ChatMessage
+            {
+                ProjectId = projectId,
+                ChatSessionId = sessionId,
+                Role = "assistant",
+                Message = messageText,
+                Tags = BuildNullModeReasonEnvelopeJson(),
+                ContextSummary = "This should roll back with the message.",
+                LinkedFilePaths = "src/Rollback.cs",
+                LinkedSymbols = "Rollback"
+            });
+            Assert.Fail("Expected normalized audit row failure to abort the chat message save.");
+        }
+        catch (SqlException)
+        {
+        }
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        Assert.AreEqual(
+            0,
+            await CountRowsAsync(
+                connection,
+                "dbo.ChatMessages",
+                "ChatSessionId = @SessionId AND Message = @Message",
+                new { SessionId = sessionId, Message = messageText }),
+            "The message insert must roll back when a normalized audit row fails.");
+        Assert.AreEqual(0, await CountRowsAsync(connection, "dbo.ChatTurnGovernance", "ChatSessionId = @SessionId", new { SessionId = sessionId }));
+        Assert.AreEqual(0, await CountRowsAsync(connection, "dbo.ChatTurnClarifications", "ChatSessionId = @SessionId", new { SessionId = sessionId }));
+        Assert.AreEqual(0, await CountRowsAsync(connection, "dbo.ChatTurnTraces", "ChatSessionId = @SessionId", new { SessionId = sessionId }));
+    }
+
+    [TestMethod]
+    public async Task AuditLookup_PrefersNormalizedRowsOverTags()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Normalized audit lookup test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        var snapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsFalse(snapshot.IsFallbackEvidence);
+        Assert.AreEqual(ChatGovernanceMode.Formalization, snapshot.Mode);
+    }
+
+    [TestMethod]
+    public async Task AuditLookup_LabelsTagFallbackAsFallback()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Tags fallback lookup test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson(),
+            ContextSummary = "Fallback context summary.",
+            LinkedFilePaths = "src/Fallback.cs",
+            LinkedSymbols = "Fallback"
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnClarifications WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnGovernance WHERE ChatMessageId = @MessageId;
+            """,
+            new { MessageId = messageId });
+
+        var snapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsTrue(snapshot.IsFallbackEvidence);
+        Assert.AreEqual(ChatGovernanceMode.Formalization, snapshot.Mode);
+        Assert.AreEqual(ChatClarificationKind.GovernanceIntent, snapshot.Clarification.Kind);
+        Assert.AreEqual("Fallback context summary.", snapshot.ContextSummary);
+        Assert.AreEqual("src/Fallback.cs", snapshot.LinkedFilePaths);
+        Assert.AreEqual("Fallback", snapshot.LinkedSymbols);
+    }
+
+    [TestMethod]
+    public async Task AuditLookup_ByMessageIdDoesNotUseTagsFallback()
+    {
+        var projectId = await SeedProjectAsync();
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "ID-only fallback boundary test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnClarifications WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnGovernance WHERE ChatMessageId = @MessageId;
+            """,
+            new { MessageId = messageId });
+
+        Assert.IsNull(await turnPersistence.GetByMessageIdAsync(messageId));
+
+        var scopedSnapshot = await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId);
+        Assert.IsNotNull(scopedSnapshot);
+        Assert.IsTrue(scopedSnapshot.IsFallbackEvidence);
+    }
+
+    [TestMethod]
+    public async Task AuditLookup_TagFallbackRequiresScope()
+    {
+        var projectId = await SeedProjectAsync();
+        var otherProjectId = await SeedProjectAsync(name: "Other fallback project");
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Scoped fallback lookup test"
+        });
+
+        var messageId = await chat.SaveMessageAsync(new ChatMessage
+        {
+            ProjectId = projectId,
+            ChatSessionId = sessionId,
+            Role = "assistant",
+            Message = "Ticket handoff is ready.",
+            Tags = BuildEnvelopeJson()
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            DELETE FROM dbo.ChatTurnTraces WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnClarifications WHERE ChatMessageId = @MessageId;
+            DELETE FROM dbo.ChatTurnGovernance WHERE ChatMessageId = @MessageId;
+            """,
+            new { MessageId = messageId });
+
+        Assert.IsNotNull(await turnPersistence.GetByMessageAsync(projectId, sessionId, messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(otherProjectId, sessionId, messageId));
+        Assert.IsNull(await turnPersistence.GetByMessageAsync(projectId, sessionId + 1, messageId));
     }
 
     [TestMethod]
@@ -330,4 +571,65 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
           "dogfoodTraceId": "dogfood-invalid-clarification"
         }
         """;
+
+    private static string BuildNullModeReasonEnvelopeJson() =>
+        """
+        {
+          "v": 1,
+          "mode": "Formalization",
+          "modeConfidence": 0.97,
+          "modeReason": null,
+          "clarification": {
+            "required": true,
+            "kind": "GovernanceIntent",
+            "questions": ["Do you want to turn this into a ticket?"],
+            "reason": "The user is committing the discussion into durable work."
+          },
+          "gate": {
+            "mode": "Formalization",
+            "canSaveDiscussion": true,
+            "canCreateTicket": true,
+            "canViewSources": true,
+            "canCopyMarkdown": true,
+            "reason": "The user explicitly asked to turn the discussion into project work.",
+            "confidence": 0.97,
+            "governanceActions": ["Save this response as a Discussion.", "Create a Ticket from the saved Discussion."]
+          },
+          "routeTraceId": "route-rollback",
+          "dogfoodTraceId": "dogfood-rollback"
+        }
+        """;
+
+    private static async Task<int> CountRowsAsync(
+        SqlConnection connection,
+        string table,
+        string where,
+        object parameters)
+    {
+        var sql = $"SELECT COUNT(1) FROM {table} WHERE {where};";
+        return await connection.ExecuteScalarAsync<int>(sql, parameters);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var candidates = new[]
+        {
+            Environment.GetEnvironmentVariable("IRONDEV_REPO_ROOT"),
+            Directory.GetCurrentDirectory(),
+            AppContext.BaseDirectory
+        };
+
+        foreach (var candidate in candidates.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            var current = new DirectoryInfo(candidate!);
+            while (current is not null)
+            {
+                if (File.Exists(Path.Combine(current.FullName, "IronDev.slnx")))
+                    return current.FullName;
+                current = current.Parent;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
+    }
 }

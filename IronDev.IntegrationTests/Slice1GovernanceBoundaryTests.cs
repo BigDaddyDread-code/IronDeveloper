@@ -98,6 +98,77 @@ public sealed class Slice1GovernanceBoundaryTests
     }
 
     [TestMethod]
+    public void Slice3_ProjectChatResponseServiceContainsOnlyGovernanceSpineOrchestration()
+    {
+        var root = FindRepoRoot();
+        var service = ReadFile(Path.Combine(root, "IronDev.Infrastructure", "Services", "ProjectChatResponseService.cs"));
+
+        var requiredOrchestrationCalls = new[]
+        {
+            "_contextPipeline.RunAsync",
+            "_contextStateCompiler.Compile",
+            "_modeClassifier.ClassifyAsync",
+            "_clarificationClassifier.ClassifyAsync",
+            "with { ClassifiedClarification = clarification }",
+            "ChatGovernanceGate.FromDecision(modeDecision)",
+            "_composer.BuildAsync",
+            "_metadataBuilder.Build"
+        };
+
+        foreach (var requiredCall in requiredOrchestrationCalls)
+            StringAssert.Contains(service, requiredCall);
+
+        var forbiddenResponsibilityLeaks = new[]
+        {
+            "GetRecentTickets",
+            "GetRecentDecisions",
+            "SemanticMemory",
+            "MemoryEvidence(",
+            "GetResponseAsync",
+            "BuildPrompt",
+            "ChatPromptTemplate",
+            "BuildReasoningTrace",
+            "new ChatModeDecision",
+            "new ChatGovernanceGate",
+            "new ChatClarificationState",
+            "new ProjectChatResponseMetadata",
+            "CanCreateTicket",
+            "CanSaveDiscussion",
+            "GovernanceActions"
+        };
+
+        foreach (var forbiddenLeak in forbiddenResponsibilityLeaks)
+        {
+            Assert.IsFalse(
+                service.Contains(forbiddenLeak, StringComparison.Ordinal),
+                $"ProjectChatResponseService must not reabsorb collaborator responsibility: {forbiddenLeak}");
+        }
+
+        Assert.AreEqual(
+            1,
+            Regex.Matches(service, @"ClassifiedClarification").Count,
+            "ProjectChatResponseService may only thread classified clarification into ChatContextState.");
+        Assert.IsFalse(
+            Regex.IsMatch(service, @"\bif\s*\([^)]*ClassifiedClarification", RegexOptions.Singleline),
+            "ProjectChatResponseService must not branch on classified clarification.");
+        Assert.IsFalse(
+            Regex.IsMatch(service, @"\bswitch\s*\([^)]*ClassifiedClarification", RegexOptions.Singleline),
+            "ProjectChatResponseService must not switch on classified clarification.");
+
+        AssertTokenOrder(
+            service,
+            "_contextPipeline.RunAsync",
+            "_contextStateCompiler.Compile",
+            "_modeClassifier.ClassifyAsync",
+            "_clarificationClassifier.ClassifyAsync",
+            "with { ClassifiedClarification = clarification }",
+            "ChatGovernanceGate.FromDecision(modeDecision)",
+            "_composer.BuildAsync",
+            "_metadataBuilder.Build",
+            "return new ProjectChatResponseResult");
+    }
+
+    [TestMethod]
     public void Slice1_04_NoMemoryModelContainsGovernanceSuggestionFields()
     {
         var bannedSuffixes = new[] { "SuggestedMode", "SuggestedAction" };
@@ -188,6 +259,7 @@ public sealed class Slice1GovernanceBoundaryTests
             },
             new List<ProjectRule>(),
             new List<ProjectContextDocument>(),
+            new List<MemoryEvidence>(),
             new ContextAgentRouteDecision
             {
                 RequestKind = ContextRequestKind.GeneralChat,
@@ -613,6 +685,18 @@ public sealed class Slice1GovernanceBoundaryTests
 
                 yield return path;
             }
+        }
+    }
+
+    private static void AssertTokenOrder(string source, params string[] tokens)
+    {
+        var previousIndex = -1;
+        foreach (var token in tokens)
+        {
+            var index = source.IndexOf(token, StringComparison.Ordinal);
+            Assert.IsTrue(index >= 0, $"Expected token missing from source: {token}");
+            Assert.IsTrue(index > previousIndex, $"Expected token '{token}' to appear after the previous governance spine step.");
+            previousIndex = index;
         }
     }
 

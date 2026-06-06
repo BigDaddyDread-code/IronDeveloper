@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using IronDev.Core.Chat;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 
@@ -34,6 +35,15 @@ public interface ISemanticMemoryService
     Task MarkStaleAsync(SemanticStaleRequest request, CancellationToken ct = default);
     Task DeleteEmbeddingAsync(Guid artefactId, CancellationToken ct = default);
     Task<SemanticMemoryHealth> GetHealthAsync(int projectId, CancellationToken ct = default);
+}
+
+public interface ISemanticMemoryEvidenceProvider
+{
+    Task<IReadOnlyList<MemoryEvidence>> GetEvidenceAsync(
+        int projectId,
+        string userMessage,
+        string recentConversationSummary,
+        CancellationToken cancellationToken = default);
 }
 
 public interface ISemanticChunker

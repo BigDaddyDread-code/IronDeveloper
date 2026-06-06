@@ -507,6 +507,7 @@ public sealed class ProjectChatResponseServiceTests
                 new() { Id = 31, Name = "Security rule", Description = "Never persist raw credentials." }
             },
             new List<ProjectContextDocument>(),
+            new List<MemoryEvidence>(),
             new ContextAgentRouteDecision
             {
                 RequestKind = ContextRequestKind.CreateTicket,
@@ -581,8 +582,12 @@ public sealed class ProjectChatResponseServiceTests
         var directory = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(directory))
         {
-            if (Directory.Exists(Path.Combine(directory, ".git")))
+            if (Directory.Exists(Path.Combine(directory, ".git")) ||
+                File.Exists(Path.Combine(directory, ".git")) ||
+                File.Exists(Path.Combine(directory, "IronDev.slnx")))
+            {
                 return directory;
+            }
 
             directory = Directory.GetParent(directory)?.FullName;
         }

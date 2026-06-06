@@ -146,7 +146,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         long chatMessageId,
         CancellationToken cancellationToken = default)
     {
-        return await GetByMessageCoreAsync(null, null, chatMessageId, cancellationToken).ConfigureAwait(false);
+        return await GetByMessageCoreAsync(null, null, chatMessageId, allowTagFallback: false, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ChatTurnPersistenceSnapshot?> GetByMessageAsync(
@@ -155,13 +155,14 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         long chatMessageId,
         CancellationToken cancellationToken = default)
     {
-        return await GetByMessageCoreAsync(projectId, chatSessionId, chatMessageId, cancellationToken).ConfigureAwait(false);
+        return await GetByMessageCoreAsync(projectId, chatSessionId, chatMessageId, allowTagFallback: true, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<ChatTurnPersistenceSnapshot?> GetByMessageCoreAsync(
         int? projectId,
         long? chatSessionId,
         long chatMessageId,
+        bool allowTagFallback,
         CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -198,9 +199,68 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             new { ChatMessageId = chatMessageId, TenantId = _tenant.TenantId, ProjectId = projectId, ChatSessionId = chatSessionId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
+        if (row is null && allowTagFallback)
+            return await GetTagFallbackByMessageCoreAsync(connection, projectId, chatSessionId, chatMessageId, cancellationToken)
+                .ConfigureAwait(false);
         if (row is null)
             return null;
 
+        return BuildSnapshot(row, isFallbackEvidence: false);
+    }
+
+    private async Task<ChatTurnPersistenceSnapshot?> GetTagFallbackByMessageCoreAsync(
+        IDbConnection connection,
+        int? projectId,
+        long? chatSessionId,
+        long chatMessageId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT
+                Id AS ChatMessageId,
+                Role,
+                Tags,
+                ContextSummary,
+                LinkedFilePaths,
+                LinkedSymbols
+            FROM dbo.ChatMessages
+            WHERE Id = @ChatMessageId
+              AND TenantId = @TenantId
+              AND (@ProjectId IS NULL OR ProjectId = @ProjectId)
+              AND (@ChatSessionId IS NULL OR ChatSessionId = @ChatSessionId);
+            """;
+
+        var row = await connection.QuerySingleOrDefaultAsync<PersistedMessageRow>(new CommandDefinition(
+            sql,
+            new { ChatMessageId = chatMessageId, TenantId = _tenant.TenantId, ProjectId = projectId, ChatSessionId = chatSessionId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        if (row is null)
+            return null;
+        if (!string.Equals(row.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var envelope = ParseEnvelope(row.Tags);
+        if (envelope is null)
+            return null;
+
+        return new ChatTurnPersistenceSnapshot(
+            row.ChatMessageId,
+            envelope.Mode,
+            envelope.ModeConfidence,
+            envelope.ModeReason,
+            NormalizeClarification(envelope.Clarification),
+            envelope.Gate,
+            envelope.RouteTraceId,
+            envelope.DogfoodTraceId,
+            row.ContextSummary,
+            row.LinkedFilePaths,
+            row.LinkedSymbols,
+            IsFallbackEvidence: true);
+    }
+
+    private static ChatTurnPersistenceSnapshot BuildSnapshot(PersistedTurnRow row, bool isFallbackEvidence)
+    {
         var mode = Enum.TryParse<ChatGovernanceMode>(row.Mode, ignoreCase: true, out var parsedMode)
             ? parsedMode
             : ChatGovernanceMode.Confirmation;
@@ -228,7 +288,8 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             row.DogfoodTraceId,
             row.ContextSummary,
             row.LinkedFilePaths,
-            row.LinkedSymbols);
+            row.LinkedSymbols,
+            isFallbackEvidence);
     }
 
     private static ChatTurnEnvelope? ParseEnvelope(string? tags)
@@ -293,6 +354,16 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         public string? QuestionsJson { get; set; }
         public string? RouteTraceId { get; set; }
         public string? DogfoodTraceId { get; set; }
+        public string? ContextSummary { get; set; }
+        public string? LinkedFilePaths { get; set; }
+        public string? LinkedSymbols { get; set; }
+    }
+
+    private sealed class PersistedMessageRow
+    {
+        public long ChatMessageId { get; set; }
+        public string Role { get; set; } = string.Empty;
+        public string? Tags { get; set; }
         public string? ContextSummary { get; set; }
         public string? LinkedFilePaths { get; set; }
         public string? LinkedSymbols { get; set; }

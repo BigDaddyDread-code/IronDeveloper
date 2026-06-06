@@ -32,10 +32,31 @@ public sealed class ChatControllerAuditTests
         Assert.IsNotNull(ok);
         var audit = ok.Value as ChatTurnAuditResponse;
         Assert.IsNotNull(audit);
-        Assert.AreEqual(ChatAuditSource.DurableAudit, audit.Source);
+        Assert.AreEqual(ChatAuditSource.NormalizedRows, audit.Source);
         Assert.AreEqual(9001, audit.ChatMessageId);
         Assert.AreEqual(ChatGovernanceMode.Formalization, audit.Mode);
         Assert.IsFalse(audit.IsFallbackEvidence);
+    }
+
+    [TestMethod]
+    public async Task GetMessageAudit_LabelsTagsFallback_WhenSnapshotIsFallbackEvidence()
+    {
+        var snapshot = BuildSnapshot(messageId: 9001, isFallbackEvidence: true);
+        var controller = new ChatController(
+            new UnusedChatHistoryService(),
+            new UnusedChatFeedbackService(),
+            new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
+            new UnusedProjectChatResponseService(),
+            new UnusedProjectStateReviewService());
+
+        var result = await controller.GetMessageAudit(7, 9701, 9001);
+
+        var ok = result.Result as OkObjectResult;
+        Assert.IsNotNull(ok);
+        var audit = ok.Value as ChatTurnAuditResponse;
+        Assert.IsNotNull(audit);
+        Assert.AreEqual(ChatAuditSource.TagsFallback, audit.Source);
+        Assert.IsTrue(audit.IsFallbackEvidence);
     }
 
     [TestMethod]
@@ -55,7 +76,7 @@ public sealed class ChatControllerAuditTests
 
         var json = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-        StringAssert.Contains(json, "\"source\":\"DurableAudit\"");
+        StringAssert.Contains(json, "\"source\":\"NormalizedRows\"");
         StringAssert.Contains(json, "\"mode\":\"Formalization\"");
         StringAssert.Contains(json, "\"kind\":\"None\"");
         Assert.IsFalse(json.Contains("\"mode\":0", StringComparison.Ordinal), json);
@@ -81,7 +102,7 @@ public sealed class ChatControllerAuditTests
         Assert.IsInstanceOfType(wrongMessage.Result, typeof(NotFoundResult));
     }
 
-    private static ChatTurnPersistenceSnapshot BuildSnapshot(long messageId) =>
+    private static ChatTurnPersistenceSnapshot BuildSnapshot(long messageId, bool isFallbackEvidence = false) =>
         new(
             messageId,
             ChatGovernanceMode.Formalization,
@@ -96,7 +117,8 @@ public sealed class ChatControllerAuditTests
             "dogfood-audit-test",
             "Durable audit context.",
             "src/App.cs",
-            "App");
+            "App",
+            isFallbackEvidence);
 
     private sealed class ScopedTurnPersistenceService : IChatTurnPersistenceService
     {

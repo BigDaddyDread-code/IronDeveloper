@@ -13,8 +13,8 @@ public enum ChatGovernanceMode
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ChatAuditSource
 {
-    DurableAudit,
-    TagsReplayFallback,
+    NormalizedRows,
+    TagsFallback,
     None
 }
 
