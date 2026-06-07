@@ -348,6 +348,139 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task AgentRunSupervisor_MissingRequiredOptions_WithJson_ReturnsFailureEnvelope()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["agent", "run", "supervisor", "--json"],
+            output,
+            error,
+            handler: null,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(2, result, error.ToString());
+        AssertJsonWasWritten(output);
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual("failed", root.GetProperty("status").GetString());
+        Assert.AreEqual("agent run supervisor", root.GetProperty("command").GetString());
+        AssertArrayNotEmpty(root.GetProperty("errors"));
+        Assert.AreEqual(string.Empty, root.GetProperty("data").GetProperty("runId").GetString());
+    }
+
+    [DataTestMethod]
+    [DataRow("succeeded", "Succeeded", "not_required", false)]
+    [DataRow("blocked", "Blocked", "required", true)]
+    [DataRow("failed", "Failed", "denied", false)]
+    public async Task AgentRunSupervisor_MapsReplayRunnerTesterOutcome_ToContractEnvelope(
+        string testerStatus,
+        string expectedDataAgentStatus,
+        string expectedApprovalDecision,
+        bool expectedRequiresHumanApproval)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var runner = new Func<string[], CancellationToken, Task<(int ExitCode, string Stdout, string Stderr)>>(async (_, _) =>
+        {
+            var stdout = BuildReplayRunnerSupervisorOutput(
+                commandStatus: testerStatus,
+                runStatus: testerStatus == "failed" ? "Failed" : "Completed",
+                approvalDecision: expectedApprovalDecision,
+                requiresHumanApproval: expectedRequiresHumanApproval,
+                exitCode: testerStatus == "failed" || testerStatus == "blocked" ? 1 : 0);
+
+            return (testerStatus == "failed" || testerStatus == "blocked" ? 1 : 0, stdout, string.Empty);
+        });
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            runner: runner,
+            cancellationToken: CancellationToken.None);
+
+        var expectedStatus = testerStatus == "blocked" ? "blocked" : testerStatus == "failed" ? "failed" : "succeeded";
+        Assert.AreEqual(expectedStatus == "succeeded" ? 0 : 1, result, error.ToString());
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual(expectedStatus, root.GetProperty("status").GetString());
+        Assert.AreEqual("agent run supervisor", root.GetProperty("command").GetString());
+
+        var data = root.GetProperty("data");
+        Assert.AreEqual("SupervisorAgent", data.GetProperty("agent").GetString());
+        Assert.AreEqual("AgentRunProof001", data.GetProperty("runId").GetString());
+        Assert.AreEqual(expectedDataAgentStatus, data.GetProperty("agentStatus").GetString());
+        Assert.AreEqual("report_ready", data.GetProperty("decision").GetString());
+
+        var tester = data.GetProperty("tester");
+        Assert.AreEqual("AgentRunProof001-tester", tester.GetProperty("runId").GetString());
+        Assert.AreEqual(testerStatus, tester.GetProperty("commandStatus").GetString());
+        var governance = tester.GetProperty("governance");
+        Assert.AreEqual(expectedApprovalDecision, governance.GetProperty("approvalDecision").GetString());
+        Assert.AreEqual(expectedRequiresHumanApproval, governance.GetProperty("requiresHumanApproval").GetBoolean());
+    }
+
+    [TestMethod]
+    public async Task AgentRunSupervisor_JsonOutput_IsNotReplayRunnerProductEnvelope()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var runner = new Func<string[], CancellationToken, Task<(int ExitCode, string Stdout, string Stderr)>>(async (_, _) =>
+        {
+            var stdout = BuildReplayRunnerSupervisorOutput(
+                commandStatus: "succeeded",
+                runStatus: "Completed",
+                approvalDecision: "not_required",
+                requiresHumanApproval: false);
+
+            return (0, stdout, string.Empty);
+        });
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            runner: runner,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(0, result, error.ToString());
+        AssertJsonWasWritten(output);
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+        var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+        CollectionAssert.AreEqual(
+            expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+            topLevelProperties.OrderBy(item => item).ToArray());
+        Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+        Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+    }
+
+    [TestMethod]
     public async Task TicketBuild_UsesProductBuildRunEndpoint()
     {
         var handler = new RecordingHandler();
@@ -558,6 +691,50 @@ public sealed class IronDevCliTests
         }
 
         throw new DirectoryNotFoundException("Could not find repository root.");
+    }
+
+    private static string BuildReplayRunnerSupervisorOutput(
+        string commandStatus,
+        string runStatus,
+        string approvalDecision,
+        bool requiresHumanApproval,
+        int exitCode = 0)
+    {
+        var root = JsonSerializer.Serialize(new
+        {
+            command = "agent supervisor run-goal",
+            agent = "SupervisorAgent",
+            status = commandStatus == "blocked" ? "Blocked" : commandStatus == "failed" ? "Failed" : "Succeeded",
+            summary = "Supervisor contract test run.",
+            exitCode,
+            commandsRun = new[] { "dotnet test" },
+            evidencePaths = Array.Empty<string>(),
+            loopReport = new
+            {
+                supervisor = new
+                {
+                    decision = "report_ready",
+                    decisionReason = "report ready"
+                },
+                tester = new
+                {
+                    runId = "AgentRunProof001-tester",
+                    traceId = "trace-supervisor-tester",
+                    commandStatus,
+                    runStatus,
+                    governance = new
+                    {
+                        decision = "derived",
+                        approvalDecision,
+                        blockedReason = commandStatus == "blocked" ? "AwaitingHumanApproval" : null,
+                        requiresHumanApproval
+                    },
+                    warnings = new[] { "run-contract bridge warning" }
+                }
+            }
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        return root;
     }
 
     private static void AssertEqualsIgnoreCase(string expected, string? actual)
