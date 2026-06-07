@@ -94,9 +94,10 @@ public sealed class DisposableWorkspaceDiffService : IDisposableWorkspaceDiffSer
 
         if (PathContainsSegment(workspacePath, ".git") ||
             PathsEqual(workspacePath, sourceRepo) ||
-            IsSameOrInside(sourceRepo, workspacePath))
+            IsSameOrInside(sourceRepo, workspacePath) ||
+            IsSameOrInside(workspacePath, sourceRepo))
         {
-            errors.Add("Workspace path must be isolated from the source repository.");
+            errors.Add("Workspace path and source repository must be isolated from each other.");
             return Blocked(request, workspacePath, sourceRepo, errors, warnings);
         }
 
