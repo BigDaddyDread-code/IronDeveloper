@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
 
-namespace IronDev.Core.Workspaces;
+using IronDev.Core.Workspaces;
+
+namespace IronDev.Infrastructure.Services.Workspaces;
 
 public sealed class DisposableWorkspaceReadinessService : IDisposableWorkspaceReadinessService
 {
@@ -311,3 +313,4 @@ public sealed class DisposableWorkspaceReadinessService : IDisposableWorkspaceRe
 
     private sealed record GitResult(int ExitCode, string StandardOutput, string StandardError);
 }
+

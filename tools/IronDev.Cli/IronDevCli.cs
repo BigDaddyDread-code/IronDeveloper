@@ -13,6 +13,7 @@ using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services.Agents;
 using IronDev.Infrastructure.Services.RunReports;
+using IronDev.Infrastructure.Services.Workspaces;
 
 namespace IronDev.Cli;
 
@@ -1501,7 +1502,7 @@ public static class IronDevCli
         error.WriteLine("Overrides: --api-base-url, IRONDEV_API_BASE_URL, irondev.cli.json");
     }
 
-    // ── Chat Probe CLI handlers ────────────────────────────────────────────────
+    // ?????? Chat Probe CLI handlers ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
     private static readonly JsonSerializerOptions ProbeJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -1553,7 +1554,7 @@ public static class IronDevCli
             scenarios = ProbeScenarioCatalog.GetBatch(count, seed).Select(b => b.Scenario).ToList();
         }
 
-        // Resolve persona (optional — null = rotate from seed)
+        // Resolve persona (optional ??? null = rotate from seed)
         PersonaProfile? fixedPersona = null;
         if (!string.IsNullOrWhiteSpace(personaName))
         {
@@ -1601,12 +1602,12 @@ public static class IronDevCli
                 {
                     var icon = result.Outcome switch
                     {
-                        ProbeRunOutcome.Pass     => "✅",
-                        ProbeRunOutcome.SoftFail => "⚠",
-                        ProbeRunOutcome.HardFail => "❌",
+                        ProbeRunOutcome.Pass     => "???",
+                        ProbeRunOutcome.SoftFail => "???",
+                        ProbeRunOutcome.HardFail => "???",
                         _                        => "?"
                     };
-                    output.WriteLine($"  {icon} {result.Outcome} — {result.AllFailures.Count} failure(s)");
+                    output.WriteLine($"  {icon} {result.Outcome} ??? {result.AllFailures.Count} failure(s)");
                 }
             }
             catch (Exception ex)
@@ -1687,7 +1688,7 @@ public static class IronDevCli
             output.WriteLine($"Chat probe scenarios ({scenarios.Count}):");
             output.WriteLine();
             foreach (var s in scenarios)
-                output.WriteLine($"  {s.ScenarioId,-30} {s.Category,-14} {s.Steps.Count} steps  — {s.ProjectIdea}");
+                output.WriteLine($"  {s.ScenarioId,-30} {s.Category,-14} {s.Steps.Count} steps  ??? {s.ProjectIdea}");
         }
 
         return Task.FromResult(0);
@@ -1715,7 +1716,7 @@ public static class IronDevCli
             output.WriteLine($"Chat probe personas ({personas.Count}):");
             output.WriteLine();
             foreach (var p in personas)
-                output.WriteLine($"  {p.Id,-20} {p.Name,-20} — {p.Description}");
+                output.WriteLine($"  {p.Id,-20} {p.Name,-20} ??? {p.Description}");
         }
 
         return Task.FromResult(0);
@@ -1778,7 +1779,7 @@ public static class IronDevCli
         return 0;
     }
 
-    // ── End chat-probe handlers ───────────────────────────────────────────────
+    // ?????? End chat-probe handlers ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
     private sealed record ChatToBuildProofReport
     {
