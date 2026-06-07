@@ -129,6 +129,13 @@ public sealed class DisposableWorkspacePromotionApprovalService : IDisposableWor
         {
             promotionPackageSha256 = await ComputeSha256Async(promotionPackagePath, cancellationToken).ConfigureAwait(false);
             Directory.CreateDirectory(Path.GetDirectoryName(approvalEvidencePath)!);
+
+            if (File.Exists(approvalEvidencePath))
+            {
+                errors.Add("Promotion approval evidence already exists for this run. Approval evidence is immutable.");
+                return Blocked(request, workspacePath, promotionPackagePath, createdUtc, promotionPackageSha256, errors, warnings);
+            }
+
             var allowsApply = false;
             var requiresSeparateApplyCommand = string.Equals(request.Decision, "approved", StringComparison.OrdinalIgnoreCase);
             var data = new DisposableWorkspacePromotionApprovalData

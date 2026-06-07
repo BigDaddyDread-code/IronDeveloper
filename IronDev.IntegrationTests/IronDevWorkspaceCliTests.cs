@@ -1889,6 +1889,48 @@ public sealed partial class IronDevCliTests
         try
         {
             var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var firstWorkspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WritePromotionPackageAsync("run-1", firstWorkspacePath, sourceRepo);
+
+            using var firstDoc = await RunWorkspacePromotionApprovalAsync(
+                "run-1",
+                firstWorkspacePath,
+                "approved",
+                "Rob",
+                "Reviewed validation and diff package.",
+                expectedExitCode: 0);
+            var firstHash = firstDoc.RootElement.GetProperty("data").GetProperty("promotionPackageSha256").GetString();
+
+            var secondWorkspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-2", sourceRepo);
+            var secondPackagePath = await WritePromotionPackageAsync("run-2", secondWorkspacePath, sourceRepo);
+            await File.AppendAllTextAsync(secondPackagePath, Environment.NewLine);
+
+            using var secondDoc = await RunWorkspacePromotionApprovalAsync(
+                "run-2",
+                secondWorkspacePath,
+                "approved",
+                "Rob",
+                "Reviewed changed promotion package.",
+                expectedExitCode: 0);
+            var secondHash = secondDoc.RootElement.GetProperty("data").GetProperty("promotionPackageSha256").GetString();
+
+            Assert.IsTrue(IsSha256Hex(firstHash!));
+            Assert.IsTrue(IsSha256Hex(secondHash!));
+            Assert.AreNotEqual(firstHash, secondHash);
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionApproval_ExistingApprovalEvidence_BlocksOverwrite()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-approval-immutable");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
             var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
             var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
 
@@ -1899,20 +1941,23 @@ public sealed partial class IronDevCliTests
                 "Rob",
                 "Reviewed validation and diff package.",
                 expectedExitCode: 0);
-            var firstHash = firstDoc.RootElement.GetProperty("data").GetProperty("promotionPackageSha256").GetString();
+            var approvalPath = firstDoc.RootElement.GetProperty("data").GetProperty("approvalEvidencePath").GetString()!;
+            var originalEvidence = await File.ReadAllTextAsync(approvalPath);
 
             await File.AppendAllTextAsync(packagePath, Environment.NewLine);
 
             using var secondDoc = await RunWorkspacePromotionApprovalAsync(
                 "run-1",
                 workspacePath,
-                "approved",
+                "rejected",
                 "Rob",
-                "Reviewed changed promotion package.",
-                expectedExitCode: 0);
-            var secondHash = secondDoc.RootElement.GetProperty("data").GetProperty("promotionPackageSha256").GetString();
+                "Package changed after approval.",
+                expectedExitCode: 1);
+            var root = secondDoc.RootElement;
 
-            Assert.AreNotEqual(firstHash, secondHash);
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "immutable");
+            Assert.AreEqual(originalEvidence, await File.ReadAllTextAsync(approvalPath));
         }
         finally
         {
