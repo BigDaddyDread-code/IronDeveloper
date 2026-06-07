@@ -272,7 +272,8 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
             Errors = errors,
             EvidencePaths = evidencePaths,
             CommandsRun = commandsRun,
-            RecommendedNextAction = ResolveRecommendedNextAction(status, tester)
+            RecommendedNextAction = ResolveRecommendedNextAction(status, tester),
+            RecoveryPlan = BuildRecoveryPlan(runId, status, tester, evidencePaths, commandsRun, errors, warnings)
         };
 
     private static string ResolveRecommendedNextAction(
@@ -293,6 +294,147 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
             return "Inspect tester evidence paths and produce a fix plan before patching.";
 
         return "Inspect supervisor errors, warnings, and evidence paths before patching.";
+    }
+
+    private static SupervisorRecoveryPlan BuildRecoveryPlan(
+        string runId,
+        string status,
+        AgentRunSupervisorTesterData tester,
+        IReadOnlyList<string> evidencePaths,
+        IReadOnlyList<string> commandsRun,
+        IReadOnlyList<string> errors,
+        IReadOnlyList<string> warnings)
+    {
+        if (string.Equals(tester.CommandStatus, "not_available", StringComparison.OrdinalIgnoreCase))
+        {
+            return BaseRecoveryPlan(
+                runId,
+                status,
+                "Tester run-report contract was unavailable.",
+                evidencePaths,
+                [
+                    "TesterAgent output may not have produced a run-report contract.",
+                    "Run-report lookup may have failed or returned unavailable data.",
+                    "The supervisor cannot safely interpret tester outcome without contract data."
+                ],
+                [
+                    "Inspect tester run output.",
+                    "Inspect evidence paths.",
+                    "Confirm whether TesterAgent produced a run report.",
+                    "Restore valid tester run-report contract before any patching."
+                ],
+                errors,
+                warnings);
+        }
+
+        if (string.Equals(tester.CommandStatus, "blocked", StringComparison.OrdinalIgnoreCase) ||
+            tester.Governance.RequiresHumanApproval ||
+            string.Equals(status, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            var requiredHumanChecks = new List<string>
+            {
+                "Review approval/block reason before continuing.",
+                "Confirm the requested action stays inside the approved governance boundary."
+            };
+
+            if (!string.IsNullOrWhiteSpace(tester.Governance.BlockedReason))
+                requiredHumanChecks.Add($"Blocked reason: {tester.Governance.BlockedReason}");
+
+            return BaseRecoveryPlan(
+                runId,
+                status,
+                "Supervisor run is blocked and requires human review.",
+                evidencePaths,
+                [
+                    "The tester or governance layer reported a blocked state.",
+                    "Human approval may be required before any continuation."
+                ],
+                [
+                    "Review blocked reason.",
+                    "Confirm approval boundary.",
+                    "Do not patch automatically."
+                ],
+                errors,
+                warnings,
+                requiredHumanChecks);
+        }
+
+        if (string.Equals(tester.CommandStatus, "failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return BaseRecoveryPlan(
+                runId,
+                status,
+                "Tester run failed and requires evidence inspection.",
+                evidencePaths,
+                [
+                    "A build, test, or quality command may have failed.",
+                    "The failure cause is not safe to infer without inspecting evidence."
+                ],
+                [
+                    "Inspect tester evidence paths.",
+                    "Identify failing build/test command.",
+                    "Produce a fix plan.",
+                    "Do not patch until the failure cause is understood."
+                ],
+                errors,
+                warnings);
+        }
+
+        return BaseRecoveryPlan(
+            runId,
+            status,
+            "Supervisor run failed and requires diagnosis.",
+            evidencePaths,
+            [
+                "Supervisor returned a non-success status.",
+                "Available errors, warnings, commands, and evidence should be reviewed before action."
+            ],
+            [
+                "Inspect supervisor errors and warnings.",
+                "Inspect commands run.",
+                "Inspect evidence paths.",
+                "Produce a bounded fix plan before patching."
+            ],
+            errors,
+            warnings);
+    }
+
+    private static SupervisorRecoveryPlan BaseRecoveryPlan(
+        string runId,
+        string sourceFailureStatus,
+        string problemSummary,
+        IReadOnlyList<string> evidencePaths,
+        IReadOnlyList<string> suspectedCauses,
+        IReadOnlyList<string> proposedSteps,
+        IReadOnlyList<string> errors,
+        IReadOnlyList<string> warnings,
+        IReadOnlyList<string>? requiredHumanChecks = null)
+    {
+        var stopConditions = new List<string>
+        {
+            "Do not patch automatically.",
+            "Do not execute recovery without explicit follow-up approval."
+        };
+
+        if (errors.Count > 0)
+            stopConditions.Add("Stop if errors are not understood.");
+        if (warnings.Count > 0)
+            stopConditions.Add("Stop if warnings indicate missing or derived evidence.");
+
+        return new SupervisorRecoveryPlan
+        {
+            RunId = runId,
+            Status = "planned",
+            SourceFailureStatus = sourceFailureStatus,
+            ProblemSummary = problemSummary,
+            EvidenceToInspect = evidencePaths,
+            SuspectedCauses = suspectedCauses,
+            ProposedSteps = proposedSteps,
+            StopConditions = stopConditions,
+            RequiredHumanChecks = requiredHumanChecks ?? [],
+            AllowsPatching = false,
+            AllowsExecution = false
+        };
     }
 
     private static JsonElement? TryParse(string json)
