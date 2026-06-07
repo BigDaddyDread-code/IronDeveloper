@@ -56,6 +56,7 @@ public sealed record AgentRunSupervisorContractData
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
     public IReadOnlyList<string> CommandsRun { get; init; } = [];
     public IReadOnlyList<string> Warnings { get; init; } = [];
+    public SupervisorFailurePackage? FailurePackage { get; init; }
 }
 
 public sealed record AgentRunSupervisorTesterData
@@ -74,4 +75,20 @@ public sealed record AgentRunSupervisorGovernanceData
     public required string ApprovalDecision { get; init; }
     public string? BlockedReason { get; init; }
     public required bool RequiresHumanApproval { get; init; }
+}
+
+public sealed record SupervisorFailurePackage
+{
+    public required string RunId { get; init; }
+    public required string Status { get; init; }
+    public required string Decision { get; init; }
+    public string? DecisionReason { get; init; }
+    public string? TesterCommandStatus { get; init; }
+    public string? TesterRunStatus { get; init; }
+    public string? BlockedReason { get; init; }
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public IReadOnlyList<string> Errors { get; init; } = [];
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+    public IReadOnlyList<string> CommandsRun { get; init; } = [];
+    public required string RecommendedNextAction { get; init; }
 }
