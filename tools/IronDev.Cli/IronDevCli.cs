@@ -26,13 +26,14 @@ public static class IronDevCli
     };
     private const string AgentRunSupervisorCommand = "agent run supervisor";
     private const string WorkspaceCheckCommand = "workspace check";
+    private const string WorkspacePrepareCommand = "workspace prepare";
 
     public static Task<int> RunAsync(
         string[] args,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken) =>
-        RunAsync(args, output, error, handler: null, supervisorAgentRunService: null, workspaceReadinessService: null, cancellationToken);
+        RunAsync(args, output, error, handler: null, supervisorAgentRunService: null, workspaceReadinessService: null, workspacePrepareService: null, cancellationToken);
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -41,7 +42,7 @@ public static class IronDevCli
         HttpMessageHandler? handler,
         CancellationToken cancellationToken)
     {
-        return await RunAsync(args, output, error, handler, supervisorAgentRunService: null, workspaceReadinessService: null, cancellationToken);
+        return await RunAsync(args, output, error, handler, supervisorAgentRunService: null, workspaceReadinessService: null, workspacePrepareService: null, cancellationToken);
     }
 
     public static async Task<int> RunAsync(
@@ -52,7 +53,7 @@ public static class IronDevCli
         ISupervisorAgentRunService? supervisorAgentRunService,
         CancellationToken cancellationToken)
     {
-        return await RunAsync(args, output, error, handler, supervisorAgentRunService, workspaceReadinessService: null, cancellationToken);
+        return await RunAsync(args, output, error, handler, supervisorAgentRunService, workspaceReadinessService: null, workspacePrepareService: null, cancellationToken);
     }
 
     public static async Task<int> RunAsync(
@@ -62,6 +63,7 @@ public static class IronDevCli
         HttpMessageHandler? handler,
         ISupervisorAgentRunService? supervisorAgentRunService,
         IDisposableWorkspaceReadinessService? workspaceReadinessService,
+        IDisposableWorkspacePrepareService? workspacePrepareService,
         CancellationToken cancellationToken)
     {
         if (args.Length == 0)
@@ -88,6 +90,8 @@ public static class IronDevCli
             return await HandleRunStreamAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "workspace", "check"))
             return await HandleWorkspaceCheckAsync(args, output, error, workspaceReadinessService, cancellationToken);
+        if (IsCommand(args, "workspace", "prepare"))
+            return await HandleWorkspacePrepareAsync(args, output, error, workspacePrepareService, cancellationToken);
         if (args.Length >= 3 &&
             string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[1], "run", StringComparison.OrdinalIgnoreCase) &&
@@ -534,6 +538,101 @@ public static class IronDevCli
         {
             Status = result.Status,
             Command = WorkspaceCheckCommand,
+            TraceId = null,
+            Summary = result.Summary,
+            Data = result.Data,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        };
+
+        if (json)
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(resultEnvelope, JsonOptions));
+            return result.ExitCode;
+        }
+
+        await output.WriteLineAsync(resultEnvelope.Summary);
+        foreach (var resultError in resultEnvelope.Errors)
+            error.WriteLine(resultError);
+        foreach (var warning in resultEnvelope.Warnings)
+            error.WriteLine($"Warning: {warning}");
+
+        return result.ExitCode;
+    }
+
+    private static async Task<int> HandleWorkspacePrepareAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        IDisposableWorkspacePrepareService? workspacePrepareService,
+        CancellationToken cancellationToken)
+    {
+        var json = HasFlag(args, "--json");
+        var runId = GetOption(args, "--run-id");
+        var sourceRepo = GetOption(args, "--source-repo");
+        var workspaceRoot = GetOption(args, "--workspace-root");
+
+        var validationErrors = new List<string>();
+        if (string.IsNullOrWhiteSpace(runId))
+            validationErrors.Add("Missing required option: --run-id <id>");
+        if (string.IsNullOrWhiteSpace(sourceRepo))
+            validationErrors.Add("Missing required option: --source-repo <path>");
+        if (string.IsNullOrWhiteSpace(workspaceRoot))
+            validationErrors.Add("Missing required option: --workspace-root <path>");
+
+        if (validationErrors.Count > 0)
+        {
+            if (json)
+            {
+                var envelope = new DisposableWorkspacePrepareEnvelope
+                {
+                    Status = "failed",
+                    Command = WorkspacePrepareCommand,
+                    TraceId = null,
+                    Summary = "Disposable workspace prepare could not be started.",
+                    Data = new DisposableWorkspacePrepareData
+                    {
+                        RunId = runId ?? string.Empty,
+                        SourceRepo = sourceRepo ?? string.Empty,
+                        WorkspaceRoot = workspaceRoot ?? string.Empty,
+                        WorkspacePath = string.Empty,
+                        ReadinessStatus = "not_available",
+                        Prepared = false,
+                        PreparationMethod = "copy",
+                        FilesCopied = 0,
+                        MetadataPath = null,
+                        SourceRepoMutated = false,
+                        Checks = []
+                    },
+                    Errors = validationErrors,
+                    Warnings = []
+                };
+                await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
+                return 2;
+            }
+
+            foreach (var errorMessage in validationErrors)
+                error.WriteLine(errorMessage);
+
+            PrintUsage(error);
+            return 2;
+        }
+
+        workspacePrepareService ??= new DisposableWorkspacePrepareService(
+            new DisposableWorkspaceReadinessService());
+        var result = await workspacePrepareService.PrepareAsync(
+            new DisposableWorkspacePrepareRequest
+            {
+                RunId = runId!,
+                SourceRepo = sourceRepo!,
+                WorkspaceRoot = workspaceRoot!
+            },
+            cancellationToken);
+
+        var resultEnvelope = new DisposableWorkspacePrepareEnvelope
+        {
+            Status = result.Status,
+            Command = WorkspacePrepareCommand,
             TraceId = null,
             Summary = result.Summary,
             Data = result.Data,
@@ -1487,6 +1586,7 @@ public static class IronDevCli
         error.WriteLine("  irondev runs report --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev runs stream --run-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev workspace check --run-id <id> --source-repo <path> --workspace-root <path> [--json]");
+        error.WriteLine("  irondev workspace prepare --run-id <id> --source-repo <path> --workspace-root <path> [--json]");
         error.WriteLine("  irondev agent run supervisor --project <name> --query <text> --plan <path> --run-id <id> [--live-llm true|false] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev exercise chat-to-build --project-id <id> (--input <text> | --file <path>) [--title <title>] [--scenario-id <id>] [--expected-output <text>] [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev scenario list --project-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");

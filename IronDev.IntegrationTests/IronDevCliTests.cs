@@ -577,6 +577,156 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspacePrepare_ReadinessFailure_DoesNotCreateWorkspace()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-prepare-readiness-failure");
+        try
+        {
+            var sourceRepo = Path.Combine(testRoot, "missing-source");
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspacePrepareAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("failed", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace prepare", root.GetProperty("command").GetString());
+            var data = root.GetProperty("data");
+            Assert.AreEqual("failed", data.GetProperty("readinessStatus").GetString());
+            Assert.IsFalse(data.GetProperty("prepared").GetBoolean());
+            Assert.IsFalse(Directory.Exists(data.GetProperty("workspacePath").GetString()));
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePrepare_SucceedsAfterReadinessPassesAndWritesMetadata()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-prepare-success");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryWithTrackedFilesAsync(testRoot);
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspacePrepareAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 0);
+            var root = doc.RootElement;
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace prepare", root.GetProperty("command").GetString());
+            Assert.AreEqual(0, root.GetProperty("errors").GetArrayLength());
+
+            var data = root.GetProperty("data");
+            var workspacePath = data.GetProperty("workspacePath").GetString()!;
+            var metadataPath = data.GetProperty("metadataPath").GetString()!;
+            Assert.AreEqual("succeeded", data.GetProperty("readinessStatus").GetString());
+            Assert.IsTrue(data.GetProperty("prepared").GetBoolean());
+            Assert.AreEqual("copy", data.GetProperty("preparationMethod").GetString());
+            Assert.AreEqual(2, data.GetProperty("filesCopied").GetInt32());
+            Assert.IsFalse(data.GetProperty("sourceRepoMutated").GetBoolean());
+            AssertArrayNotEmpty(data.GetProperty("checks"));
+
+            Assert.IsTrue(Directory.Exists(workspacePath));
+            Assert.IsTrue(workspacePath.StartsWith(Path.GetFullPath(workspaceRoot), StringComparison.OrdinalIgnoreCase));
+            Assert.IsFalse(workspacePath.StartsWith(Path.GetFullPath(sourceRepo), StringComparison.OrdinalIgnoreCase));
+            Assert.IsTrue(File.Exists(Path.Combine(workspacePath, "README.md")));
+            Assert.IsTrue(File.Exists(Path.Combine(workspacePath, "src", "app.cs")));
+            Assert.IsTrue(File.Exists(metadataPath));
+
+            using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
+            var metadataRoot = metadata.RootElement;
+            Assert.AreEqual("run-123", metadataRoot.GetProperty("runId").GetString());
+            Assert.AreEqual(Path.GetFullPath(sourceRepo), metadataRoot.GetProperty("sourceRepo").GetString());
+            Assert.AreEqual(workspacePath, metadataRoot.GetProperty("workspacePath").GetString());
+            Assert.AreEqual("copy", metadataRoot.GetProperty("preparationMethod").GetString());
+            Assert.IsFalse(metadataRoot.GetProperty("sourceRepoMutated").GetBoolean());
+
+            Assert.AreEqual(string.Empty, await GetGitStatusAsync(sourceRepo));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePrepare_ExcludesJunkDirectoriesFromCopy()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-prepare-exclusions");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryWithTrackedFilesAsync(testRoot);
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspacePrepareAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 0);
+            var workspacePath = doc.RootElement.GetProperty("data").GetProperty("workspacePath").GetString()!;
+
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".git")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, "bin")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, "obj")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".vs")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, "TestResults")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, "tools", "dogfood", "runs")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePrepare_JsonOutput_UsesStandardEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-prepare-envelope");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryWithTrackedFilesAsync(testRoot);
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspacePrepareAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 0);
+            var root = doc.RootElement;
+            var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+            var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+            CollectionAssert.AreEqual(
+                expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+                topLevelProperties.OrderBy(item => item).ToArray());
+            Assert.AreEqual("workspace prepare", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void WorkspacePrepareService_MustNotRunBuildTestOrAgentCommands()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "IronDev.Infrastructure",
+            "Services",
+            "Workspaces",
+            "DisposableWorkspacePrepareService.cs"));
+
+        Assert.IsFalse(source.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("RunCommandAsync", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("dotnet", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("IAgent", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("SupervisorAgent", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("TesterAgent", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("QualityAgent", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task AgentRunSupervisor_MissingRequiredOptions_WithJson_ReturnsFailureEnvelope()
     {
         var output = new StringWriter();
@@ -1244,6 +1394,32 @@ public sealed class IronDevCliTests
         return JsonDocument.Parse(output.ToString());
     }
 
+    private static async Task<JsonDocument> RunWorkspacePrepareAsync(
+        string runId,
+        string sourceRepo,
+        string workspaceRoot,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "prepare",
+                "--run-id", runId,
+                "--source-repo", sourceRepo,
+                "--workspace-root", workspaceRoot,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
     private static string CreateTemporaryDirectory(string prefix)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
@@ -1256,6 +1432,30 @@ public sealed class IronDevCliTests
         var sourceRepo = Path.Combine(testRoot, "source");
         Directory.CreateDirectory(sourceRepo);
         await RunGitForTestAsync(sourceRepo, "init", "-q");
+        return sourceRepo;
+    }
+
+    private static async Task<string> CreateTemporaryGitRepositoryWithTrackedFilesAsync(string testRoot)
+    {
+        var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, "README.md"), "hello");
+        Directory.CreateDirectory(Path.Combine(sourceRepo, "src"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, "src", "app.cs"), "public static class App { }");
+        Directory.CreateDirectory(Path.Combine(sourceRepo, "bin"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, "bin", "ignored.dll"), "bin");
+        Directory.CreateDirectory(Path.Combine(sourceRepo, "obj"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, "obj", "ignored.obj"), "obj");
+        Directory.CreateDirectory(Path.Combine(sourceRepo, ".vs"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, ".vs", "state.json"), "{}");
+        Directory.CreateDirectory(Path.Combine(sourceRepo, "TestResults"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, "TestResults", "result.trx"), "test");
+        Directory.CreateDirectory(Path.Combine(sourceRepo, "tools", "dogfood", "runs"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tools", "dogfood", "runs", "run.json"), "{}");
+
+        await RunGitForTestAsync(sourceRepo, "config", "user.email", "irondev-tests@example.local");
+        await RunGitForTestAsync(sourceRepo, "config", "user.name", "IronDev Tests");
+        await RunGitForTestAsync(sourceRepo, "add", ".");
+        await RunGitForTestAsync(sourceRepo, "commit", "-m", "initial", "-q");
         return sourceRepo;
     }
 
@@ -1281,6 +1481,29 @@ public sealed class IronDevCliTests
             throw new InvalidOperationException(
                 $"git {string.Join(' ', arguments)} failed with exit code {process.ExitCode}: {await stdout} {await stderr}");
         }
+    }
+
+    private static async Task<string> GetGitStatusAsync(string workingDirectory)
+    {
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("status");
+        startInfo.ArgumentList.Add("--porcelain");
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start git.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"git status failed with exit code {process.ExitCode}: {await stderr}");
+
+        return (await stdout).Trim();
     }
 
     private static void TryDeleteDirectory(string path)
