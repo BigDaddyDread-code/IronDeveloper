@@ -119,14 +119,27 @@ public sealed class DisposableWorkspaceReadinessService : IDisposableWorkspaceRe
                 if (gitStatus.ExitCode == 0)
                 {
                     gitStatusClean = string.IsNullOrWhiteSpace(gitStatus.StandardOutput);
-                    AddCheck(
-                        checks,
-                        errors,
-                        "source_repo_git_status_clean",
-                        gitStatusClean,
-                        "Source repository git status is clean.",
-                        "Source repository has uncommitted or untracked changes.",
-                        "blocked");
+                    if (gitStatusClean || !request.AllowDirtySourceRepo)
+                    {
+                        AddCheck(
+                            checks,
+                            errors,
+                            "source_repo_git_status_clean",
+                            gitStatusClean,
+                            "Source repository git status is clean.",
+                            "Source repository has uncommitted or untracked changes.",
+                            "blocked");
+                    }
+                    else
+                    {
+                        warnings.Add("Source repository has uncommitted or untracked changes; dirty source is allowed for this readiness check.");
+                        checks.Add(new DisposableWorkspaceReadinessCheck
+                        {
+                            Name = "source_repo_git_status_clean",
+                            Status = "passed",
+                            Message = "Source repository has changes, but dirty source is explicitly allowed for this readiness check."
+                        });
+                    }
                 }
                 else
                 {
