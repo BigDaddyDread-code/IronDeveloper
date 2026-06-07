@@ -259,17 +259,23 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
 
     private static void ValidateNoDuplicateOperations(IReadOnlyList<DryRunOperation> operations, List<string> blockers)
     {
-        var seen = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        var seen = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         foreach (var operation in operations)
         {
-            if (string.IsNullOrWhiteSpace(operation.RelativePath))
+            var normalizedPath = NormalizeRelativePath(operation.RelativePath, blockers);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
             {
                 blockers.Add("Apply dry run operation path is empty.");
                 continue;
             }
 
-            if (!seen.Add(operation.RelativePath))
-                blockers.Add($"Apply dry run contains duplicate operation for path: {operation.RelativePath}");
+            if (seen.TryGetValue(normalizedPath, out var existingOperation))
+            {
+                blockers.Add($"Apply dry run contains duplicate/conflicting operations for normalized path '{normalizedPath}': {existingOperation}, {operation.Operation}.");
+                continue;
+            }
+
+            seen[normalizedPath] = operation.Operation;
         }
     }
 

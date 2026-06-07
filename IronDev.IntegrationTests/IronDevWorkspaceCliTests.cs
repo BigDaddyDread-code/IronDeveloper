@@ -2932,6 +2932,31 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceApplyCopy_NormalizedDuplicateOperation_BlocksBeforeCopy()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-normalized-duplicate");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            Directory.CreateDirectory(Path.Combine(workspacePath, "src"));
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "src", "foo.txt"), "workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "src/foo.txt"), ("add", "src\\foo.txt")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "duplicate/conflicting operations");
+            Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, "src", "foo.txt")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
     public void DisposableWorkspaceApplyCopyService_DoesNotExecuteProcessesDeletePatchAgentsOrGit()
     {
         var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
