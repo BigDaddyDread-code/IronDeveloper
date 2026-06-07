@@ -91,4 +91,20 @@ public sealed record SupervisorFailurePackage
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
     public IReadOnlyList<string> CommandsRun { get; init; } = [];
     public required string RecommendedNextAction { get; init; }
+    public SupervisorRecoveryPlan? RecoveryPlan { get; init; }
+}
+
+public sealed record SupervisorRecoveryPlan
+{
+    public required string RunId { get; init; }
+    public required string Status { get; init; }
+    public required string SourceFailureStatus { get; init; }
+    public required string ProblemSummary { get; init; }
+    public IReadOnlyList<string> EvidenceToInspect { get; init; } = [];
+    public IReadOnlyList<string> SuspectedCauses { get; init; } = [];
+    public IReadOnlyList<string> ProposedSteps { get; init; } = [];
+    public IReadOnlyList<string> StopConditions { get; init; } = [];
+    public IReadOnlyList<string> RequiredHumanChecks { get; init; } = [];
+    public required bool AllowsPatching { get; init; }
+    public required bool AllowsExecution { get; init; }
 }

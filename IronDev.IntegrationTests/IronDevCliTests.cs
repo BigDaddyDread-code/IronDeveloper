@@ -497,6 +497,12 @@ public sealed class IronDevCliTests
             Assert.AreEqual(serviceStatus, failurePackage.GetProperty("testerCommandStatus").GetString());
             AssertArrayNotEmpty(failurePackage.GetProperty("errors"));
             Assert.IsFalse(string.IsNullOrWhiteSpace(failurePackage.GetProperty("recommendedNextAction").GetString()));
+            var recoveryPlan = failurePackage.GetProperty("recoveryPlan");
+            Assert.AreEqual(JsonValueKind.Object, recoveryPlan.ValueKind);
+            Assert.IsFalse(recoveryPlan.GetProperty("allowsPatching").GetBoolean());
+            Assert.IsFalse(recoveryPlan.GetProperty("allowsExecution").GetBoolean());
+            AssertArrayNotEmpty(recoveryPlan.GetProperty("proposedSteps"));
+            AssertArrayNotEmpty(recoveryPlan.GetProperty("stopConditions"));
         }
     }
 
@@ -580,6 +586,11 @@ public sealed class IronDevCliTests
         Assert.AreEqual("blocked", failurePackage.GetProperty("status").GetString());
         Assert.AreEqual("AwaitingHumanApproval", failurePackage.GetProperty("blockedReason").GetString());
         StringAssert.Contains(failurePackage.GetProperty("recommendedNextAction").GetString(), "Do not patch automatically");
+        var recoveryPlan = failurePackage.GetProperty("recoveryPlan");
+        Assert.IsFalse(recoveryPlan.GetProperty("allowsPatching").GetBoolean());
+        Assert.IsFalse(recoveryPlan.GetProperty("allowsExecution").GetBoolean());
+        AssertStringArrayContains(recoveryPlan.GetProperty("requiredHumanChecks"), "approval");
+        AssertStringArrayContains(recoveryPlan.GetProperty("stopConditions"), "Do not patch automatically");
     }
 
     [TestMethod]
@@ -625,6 +636,58 @@ public sealed class IronDevCliTests
             recommendedNextAction?.Contains("tester run output", StringComparison.OrdinalIgnoreCase) == true ||
             recommendedNextAction?.Contains("run-report contract", StringComparison.OrdinalIgnoreCase) == true,
             $"Unexpected recommended next action: {recommendedNextAction}");
+        var recoveryPlan = data.GetProperty("failurePackage").GetProperty("recoveryPlan");
+        StringAssert.Contains(recoveryPlan.GetProperty("problemSummary").GetString(), "Tester run-report contract");
+        AssertStringArrayContains(recoveryPlan.GetProperty("proposedSteps"), "tester run output");
+        AssertStringArrayContains(recoveryPlan.GetProperty("proposedSteps"), "run-report contract");
+        Assert.IsFalse(recoveryPlan.GetProperty("allowsPatching").GetBoolean());
+        Assert.IsFalse(recoveryPlan.GetProperty("allowsExecution").GetBoolean());
+    }
+
+    [TestMethod]
+    public async Task AgentRunSupervisor_FailedTesterRecoveryPlan_TargetsEvidenceInspection()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var fakeService = new FakeSupervisorAgentRunService
+        {
+            OnRunAsync = (_, _) => Task.FromResult(BuildSupervisorRunResult(
+                "failed",
+                "failed",
+                "denied",
+                false,
+                1,
+                "AgentRunProof001",
+                "IronDev",
+                "check current run health",
+                "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json"))
+        };
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            supervisorAgentRunService: fakeService,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(1, result, error.ToString());
+        using var doc = JsonDocument.Parse(output.ToString());
+        var failurePackage = doc.RootElement.GetProperty("data").GetProperty("failurePackage");
+        Assert.AreEqual("failed", failurePackage.GetProperty("testerCommandStatus").GetString());
+        var recoveryPlan = failurePackage.GetProperty("recoveryPlan");
+        AssertStringArrayContains(recoveryPlan.GetProperty("evidenceToInspect"), "logs/tester-evidence.log");
+        AssertStringArrayContains(recoveryPlan.GetProperty("proposedSteps"), "evidence");
+        AssertStringArrayContains(recoveryPlan.GetProperty("proposedSteps"), "failing build/test command");
+        Assert.IsFalse(recoveryPlan.GetProperty("allowsPatching").GetBoolean());
+        Assert.IsFalse(recoveryPlan.GetProperty("allowsExecution").GetBoolean());
     }
 
     [TestMethod]
@@ -978,7 +1041,7 @@ public sealed class IronDevCliTests
                     },
                     Warnings = []
                 },
-                EvidencePaths = [],
+                EvidencePaths = commandStatus == "failed" ? ["logs/tester-evidence.log"] : [],
                 CommandsRun = ["dotnet test"],
                 Warnings = [],
                 FailurePackage = serviceStatus == "succeeded"
@@ -998,17 +1061,75 @@ public sealed class IronDevCliTests
                         BlockedReason = commandStatus == "blocked" ? "AwaitingHumanApproval" : null,
                         Warnings = [],
                         Errors = ["Supervisor run failed."],
-                        EvidencePaths = [],
+                        EvidencePaths = commandStatus == "failed" ? ["logs/tester-evidence.log"] : [],
                         CommandsRun = ["dotnet test"],
                         RecommendedNextAction = commandStatus == "blocked"
                             ? "Review approval/block reason before continuing. Do not patch automatically."
                             : commandStatus == "not_available"
                                 ? "Inspect tester run output and restore a valid tester run-report contract before patching."
-                                : "Inspect tester evidence paths and produce a fix plan before patching."
+                                : "Inspect tester evidence paths and produce a fix plan before patching.",
+                        RecoveryPlan = BuildSupervisorRecoveryPlanForTest(serviceStatus, commandStatus, runId)
                     }
             },
             Errors = exitCode == 0 ? [] : ["Supervisor run failed."],
             Warnings = []
+        };
+    }
+
+    private static SupervisorRecoveryPlan BuildSupervisorRecoveryPlanForTest(
+        string serviceStatus,
+        string commandStatus,
+        string runId)
+    {
+        if (commandStatus == "blocked")
+        {
+            return new SupervisorRecoveryPlan
+            {
+                RunId = runId,
+                Status = "planned",
+                SourceFailureStatus = serviceStatus,
+                ProblemSummary = "Supervisor run is blocked and requires human review.",
+                EvidenceToInspect = [],
+                SuspectedCauses = ["The tester or governance layer reported a blocked state."],
+                ProposedSteps = ["Review blocked reason.", "Confirm approval boundary.", "Do not patch automatically."],
+                StopConditions = ["Do not patch automatically.", "Do not execute recovery without explicit follow-up approval."],
+                RequiredHumanChecks = ["Review approval/block reason before continuing."],
+                AllowsPatching = false,
+                AllowsExecution = false
+            };
+        }
+
+        if (commandStatus == "not_available")
+        {
+            return new SupervisorRecoveryPlan
+            {
+                RunId = runId,
+                Status = "planned",
+                SourceFailureStatus = serviceStatus,
+                ProblemSummary = "Tester run-report contract was unavailable.",
+                EvidenceToInspect = [],
+                SuspectedCauses = ["TesterAgent output may not have produced a run-report contract."],
+                ProposedSteps = ["Inspect tester run output.", "Inspect evidence paths.", "Restore valid tester run-report contract before any patching."],
+                StopConditions = ["Do not patch automatically.", "Do not execute recovery without explicit follow-up approval."],
+                RequiredHumanChecks = [],
+                AllowsPatching = false,
+                AllowsExecution = false
+            };
+        }
+
+        return new SupervisorRecoveryPlan
+        {
+            RunId = runId,
+            Status = "planned",
+            SourceFailureStatus = serviceStatus,
+            ProblemSummary = "Tester run failed and requires evidence inspection.",
+            EvidenceToInspect = ["logs/tester-evidence.log"],
+            SuspectedCauses = ["A build, test, or quality command may have failed."],
+            ProposedSteps = ["Inspect tester evidence paths.", "Identify failing build/test command.", "Produce a fix plan."],
+            StopConditions = ["Do not patch automatically.", "Do not execute recovery without explicit follow-up approval."],
+            RequiredHumanChecks = [],
+            AllowsPatching = false,
+            AllowsExecution = false
         };
     }
 
@@ -1042,6 +1163,16 @@ public sealed class IronDevCliTests
     private static void AssertArrayNotEmpty(JsonElement element)
     {
         Assert.IsTrue(element.GetArrayLength() > 0);
+    }
+
+    private static void AssertStringArrayContains(JsonElement element, string expected)
+    {
+        Assert.IsTrue(
+            element.ValueKind == JsonValueKind.Array &&
+            element.EnumerateArray().Any(item =>
+                item.ValueKind == JsonValueKind.String &&
+                item.GetString()?.Contains(expected, StringComparison.OrdinalIgnoreCase) == true),
+            $"Expected string array to contain '{expected}'.");
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler
