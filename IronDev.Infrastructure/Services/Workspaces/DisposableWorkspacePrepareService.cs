@@ -170,21 +170,28 @@ public sealed class DisposableWorkspacePrepareService : IDisposableWorkspacePrep
 
     private static int CopySource(string sourceRepo, string workspacePath)
     {
+        Directory.CreateDirectory(workspacePath);
+        return CopyDirectory(sourceRepo, sourceRepo, workspacePath);
+    }
+
+    private static int CopyDirectory(string sourceRoot, string currentSource, string targetRoot)
+    {
         var filesCopied = 0;
-        foreach (var directory in Directory.EnumerateDirectories(sourceRepo, "*", SearchOption.AllDirectories))
+        foreach (var directory in Directory.EnumerateDirectories(currentSource))
         {
-            if (ShouldExclude(sourceRepo, directory))
+            if (ShouldExclude(sourceRoot, directory))
                 continue;
 
-            Directory.CreateDirectory(Path.Combine(workspacePath, Path.GetRelativePath(sourceRepo, directory)));
+            Directory.CreateDirectory(Path.Combine(targetRoot, Path.GetRelativePath(sourceRoot, directory)));
+            filesCopied += CopyDirectory(sourceRoot, directory, targetRoot);
         }
 
-        foreach (var file in Directory.EnumerateFiles(sourceRepo, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(currentSource))
         {
-            if (ShouldExclude(sourceRepo, file))
+            if (ShouldExclude(sourceRoot, file))
                 continue;
 
-            var targetPath = Path.Combine(workspacePath, Path.GetRelativePath(sourceRepo, file));
+            var targetPath = Path.Combine(targetRoot, Path.GetRelativePath(sourceRoot, file));
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
             File.Copy(file, targetPath, overwrite: false);
             filesCopied++;
