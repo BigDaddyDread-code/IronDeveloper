@@ -2639,6 +2639,318 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceApplyCopy_MissingApplyDryRun_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-missing-dry-run");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo, modifiedFiles: ["tracked.txt"]);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true);
+            await WriteApplyPreflightEvidenceAsync("run-1", workspacePath, sourceRepo);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual("source", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_DryRunNotReady_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-not-ready");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("modify", "tracked.txt")], dryRunReadyForApply: false);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual("source", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_DeleteOperation_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-delete");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "old.txt"), "source old");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            File.Delete(Path.Combine(workspacePath, "old.txt"));
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("delete", "old.txt")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "Delete operations are not supported");
+            Assert.AreEqual("source old", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "old.txt")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_SourceHashDrift_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-source-drift");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("modify", "tracked.txt")]);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "drift");
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "Source hash mismatch");
+            Assert.AreEqual("drift", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_WorkspaceHashDrift_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-workspace-drift");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("modify", "tracked.txt")]);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace drift");
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "Workspace hash mismatch");
+            Assert.AreEqual("source", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_AddOperation_AppliesFile()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-add");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+            Assert.IsTrue(File.Exists(Path.Combine(sourceRepo, "new.txt")));
+            Assert.AreEqual("new workspace file", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "new.txt")));
+            Assert.IsTrue(data.GetProperty("sourceRepoMutated").GetBoolean());
+            Assert.IsTrue(File.Exists(data.GetProperty("applyCopyPath").GetString()));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_ModifyOperation_AppliesFile()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-modify");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("modify", "tracked.txt")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            var operations = data.GetProperty("operations").EnumerateArray().ToArray();
+
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual("workspace", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+            Assert.AreEqual(await ComputeSha256Async(Path.Combine(workspacePath, "tracked.txt")), await ComputeSha256Async(Path.Combine(sourceRepo, "tracked.txt")));
+            Assert.IsTrue(data.GetProperty("sourceRepoMutated").GetBoolean());
+            Assert.IsTrue(operations.All(operation => operation.GetProperty("applied").GetBoolean()));
+            Assert.IsTrue(File.Exists(data.GetProperty("applyCopyPath").GetString()));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_AddAndModify_AppliesBoth()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-add-modify");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt"), ("modify", "tracked.txt")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 0);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data");
+            var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+
+            CollectionAssert.AreEquivalent(expectedTopLevelKeys, root.EnumerateObject().Select(property => property.Name).ToArray());
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace apply-copy", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+            Assert.AreEqual(1, data.GetProperty("addCount").GetInt32());
+            Assert.AreEqual(1, data.GetProperty("modifyCount").GetInt32());
+            Assert.AreEqual(0, data.GetProperty("deleteCount").GetInt32());
+            Assert.AreEqual("new workspace file", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "new.txt")));
+            Assert.AreEqual("workspace", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_ValidationIsAllOrNothingBeforeCopy()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-all-or-nothing");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "source");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "tracked.txt"), "workspace");
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt"), ("modify", "tracked.txt")]);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "tracked.txt"), "drift");
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, "new.txt")));
+            Assert.AreEqual("drift", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_UnsafePath_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-unsafe-path");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "../outside.txt"), ("add", ".git/config"), ("add", ".irondev/runs/x")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertArrayNotEmpty(doc.RootElement.GetProperty("errors"));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+            Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, "outside.txt")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_SourceDirectoryConflict_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-source-directory");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            Directory.CreateDirectory(Path.Combine(sourceRepo, "conflict"));
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            if (Directory.Exists(Path.Combine(workspacePath, "conflict")))
+                Directory.Delete(Path.Combine(workspacePath, "conflict"), recursive: true);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "conflict"), "workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "conflict")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "source directory");
+            Assert.IsTrue(Directory.Exists(Path.Combine(sourceRepo, "conflict")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void DisposableWorkspaceApplyCopyService_DoesNotExecuteProcessesDeletePatchAgentsOrGit()
+    {
+        var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "IronDev.Infrastructure", "Services", "Workspaces", "DisposableWorkspaceApplyCopyService.cs")));
+
+        Assert.IsFalse(serviceSource.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("\"git\"", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("File.Delete", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("ApplyPatch", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("IAgent", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("SupervisorAgent", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void DisposableWorkspaceApplyDryRunService_DoesNotExecuteProcessesPatchAgentsOrMutateSource()
     {
         var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
@@ -2774,6 +3086,128 @@ public sealed partial class IronDevCliTests
         Assert.AreEqual(expectedExitCode, result, error.ToString());
         AssertJsonWasWritten(output);
         return JsonDocument.Parse(output.ToString());
+    }
+
+    private static async Task<JsonDocument> RunWorkspaceApplyCopyAsync(
+        string runId,
+        string workspacePath,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "apply-copy",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
+    private static async Task WriteApplyCopyRequiredEvidenceAsync(
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        IReadOnlyList<(string Operation, string RelativePath)> operations,
+        bool dryRunReadyForApply = true,
+        bool dryRunCanApplyNow = false,
+        bool dryRunRequiresSeparateApplyCommand = true,
+        string dryRunRecommendation = "ready_for_separate_apply_command")
+    {
+        var addedFiles = operations
+            .Where(operation => string.Equals(operation.Operation, "add", StringComparison.OrdinalIgnoreCase))
+            .Select(operation => operation.RelativePath)
+            .ToArray();
+        var modifiedFiles = operations
+            .Where(operation => string.Equals(operation.Operation, "modify", StringComparison.OrdinalIgnoreCase))
+            .Select(operation => operation.RelativePath)
+            .ToArray();
+        var deletedFiles = operations
+            .Where(operation => string.Equals(operation.Operation, "delete", StringComparison.OrdinalIgnoreCase))
+            .Select(operation => operation.RelativePath)
+            .ToArray();
+
+        var packagePath = await WritePromotionPackageAsync(runId, workspacePath, sourceRepo);
+        await WriteDiffEvidenceAsync(runId, workspacePath, sourceRepo, addedFiles: addedFiles, modifiedFiles: modifiedFiles, deletedFiles: deletedFiles);
+        await WriteApprovalEvidenceAsync(runId, workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true);
+        await WriteApplyPreflightEvidenceAsync(runId, workspacePath, sourceRepo);
+        await WriteApplyDryRunEvidenceAsync(
+            runId,
+            workspacePath,
+            sourceRepo,
+            operations,
+            readyForApply: dryRunReadyForApply,
+            canApplyNow: dryRunCanApplyNow,
+            requiresSeparateApplyCommand: dryRunRequiresSeparateApplyCommand,
+            recommendation: dryRunRecommendation);
+    }
+
+    private static async Task<string> WriteApplyDryRunEvidenceAsync(
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        IReadOnlyList<(string Operation, string RelativePath)> operations,
+        bool readyForApply = true,
+        bool canApplyNow = false,
+        bool requiresSeparateApplyCommand = true,
+        string recommendation = "ready_for_separate_apply_command")
+    {
+        var operationEntries = new List<object>();
+        foreach (var operation in operations)
+        {
+            var sourcePath = Path.GetFullPath(Path.Combine(sourceRepo, operation.RelativePath));
+            var operationWorkspacePath = Path.GetFullPath(Path.Combine(workspacePath, operation.RelativePath));
+            var sourceExists = File.Exists(sourcePath);
+            var workspaceExists = File.Exists(operationWorkspacePath);
+            operationEntries.Add(new
+            {
+                operation = operation.Operation,
+                relativePath = operation.RelativePath,
+                sourcePath,
+                workspacePath = operationWorkspacePath,
+                sourceExists,
+                workspaceExists,
+                sourceDirectoryExists = Directory.Exists(sourcePath),
+                workspaceDirectoryExists = Directory.Exists(operationWorkspacePath),
+                sourceSha256 = sourceExists ? await ComputeSha256Async(sourcePath) : null,
+                workspaceSha256 = workspaceExists ? await ComputeSha256Async(operationWorkspacePath) : null
+            });
+        }
+
+        var dryRunPath = Path.Combine(workspacePath, ".irondev", "runs", runId, "apply-dry-run.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(dryRunPath)!);
+        await File.WriteAllTextAsync(
+            dryRunPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    runId,
+                    workspacePath = Path.GetFullPath(workspacePath),
+                    sourceRepo = Path.GetFullPath(sourceRepo),
+                    createdUtc = DateTimeOffset.UtcNow,
+                    readyForApply,
+                    canApplyNow,
+                    requiresSeparateApplyCommand,
+                    recommendation,
+                    operations = operationEntries,
+                    addCount = operations.Count(operation => string.Equals(operation.Operation, "add", StringComparison.OrdinalIgnoreCase)),
+                    modifyCount = operations.Count(operation => string.Equals(operation.Operation, "modify", StringComparison.OrdinalIgnoreCase)),
+                    deleteCount = operations.Count(operation => string.Equals(operation.Operation, "delete", StringComparison.OrdinalIgnoreCase)),
+                    evidencePaths = new[] { dryRunPath }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
+        return dryRunPath;
     }
 
     private static async Task<string> WriteApplyPreflightEvidenceAsync(

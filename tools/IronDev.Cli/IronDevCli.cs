@@ -34,6 +34,7 @@ public static class IronDevCli
     private const string WorkspacePromotionApprovalCommand = "workspace promotion-approval";
     private const string WorkspaceApplyPreflightCommand = "workspace apply-preflight";
     private const string WorkspaceApplyDryRunCommand = "workspace apply-dry-run";
+    private const string WorkspaceApplyCopyCommand = "workspace apply-copy";
 
     public static Task<int> RunAsync(
         string[] args,
@@ -191,6 +192,8 @@ public static class IronDevCli
             return await HandleWorkspaceApplyPreflightAsync(args, output, error, cancellationToken);
         if (IsCommand(args, "workspace", "apply-dry-run"))
             return await HandleWorkspaceApplyDryRunAsync(args, output, error, cancellationToken);
+        if (IsCommand(args, "workspace", "apply-copy"))
+            return await HandleWorkspaceApplyCopyAsync(args, output, error, cancellationToken);
         if (args.Length >= 3 &&
             string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[1], "run", StringComparison.OrdinalIgnoreCase) &&
@@ -920,6 +923,92 @@ public static class IronDevCli
         {
             Status = result.Status,
             Command = WorkspaceApplyDryRunCommand,
+            TraceId = null,
+            Summary = result.Summary,
+            Data = result.Data,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        };
+
+        if (json)
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(resultEnvelope, JsonOptions));
+            return result.ExitCode;
+        }
+
+        await output.WriteLineAsync(resultEnvelope.Summary);
+        foreach (var resultError in resultEnvelope.Errors)
+            error.WriteLine(resultError);
+        foreach (var warning in resultEnvelope.Warnings)
+            error.WriteLine($"Warning: {warning}");
+
+        return result.ExitCode;
+    }
+
+    private static async Task<int> HandleWorkspaceApplyCopyAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var json = HasFlag(args, "--json");
+        var runId = GetOption(args, "--run-id");
+        var workspacePath = GetOption(args, "--workspace-path");
+
+        var validationErrors = new List<string>();
+        if (string.IsNullOrWhiteSpace(runId))
+            validationErrors.Add("Missing required option: --run-id <id>");
+        if (string.IsNullOrWhiteSpace(workspacePath))
+            validationErrors.Add("Missing required option: --workspace-path <path>");
+
+        if (validationErrors.Count > 0)
+        {
+            if (json)
+            {
+                var envelope = new DisposableWorkspaceApplyCopyEnvelope
+                {
+                    Status = "failed",
+                    Command = WorkspaceApplyCopyCommand,
+                    TraceId = null,
+                    Summary = "Workspace apply copy could not be started.",
+                    Data = new DisposableWorkspaceApplyCopyData
+                    {
+                        RunId = runId ?? string.Empty,
+                        WorkspacePath = workspacePath ?? string.Empty,
+                        SourceRepo = string.Empty,
+                        Applied = false,
+                        SourceRepoMutated = false,
+                        Blockers = validationErrors,
+                        Errors = validationErrors
+                    },
+                    Errors = validationErrors,
+                    Warnings = []
+                };
+                await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
+            }
+            else
+            {
+                foreach (var validationError in validationErrors)
+                    error.WriteLine(validationError);
+                PrintUsage(error);
+            }
+
+            return 2;
+        }
+
+        var service = new DisposableWorkspaceApplyCopyService();
+        var result = await service.ApplyAsync(
+            new DisposableWorkspaceApplyCopyRequest
+            {
+                RunId = runId!,
+                WorkspacePath = workspacePath!
+            },
+            cancellationToken);
+
+        var resultEnvelope = new DisposableWorkspaceApplyCopyEnvelope
+        {
+            Status = result.Status,
+            Command = WorkspaceApplyCopyCommand,
             TraceId = null,
             Summary = result.Summary,
             Data = result.Data,
@@ -2355,6 +2444,7 @@ public static class IronDevCli
         error.WriteLine("  irondev workspace promotion-approval --run-id <id> --workspace-path <path> --decision <approved|rejected> --approved-by <name-or-id> --reason <text> [--json]");
         error.WriteLine("  irondev workspace apply-preflight --run-id <id> --workspace-path <path> [--json]");
         error.WriteLine("  irondev workspace apply-dry-run --run-id <id> --workspace-path <path> [--json]");
+        error.WriteLine("  irondev workspace apply-copy --run-id <id> --workspace-path <path> [--json]");
         error.WriteLine("  irondev agent run supervisor --project <name> --query <text> --plan <path> --run-id <id> [--live-llm true|false] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev exercise chat-to-build --project-id <id> (--input <text> | --file <path>) [--title <title>] [--scenario-id <id>] [--expected-output <text>] [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev scenario list --project-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
