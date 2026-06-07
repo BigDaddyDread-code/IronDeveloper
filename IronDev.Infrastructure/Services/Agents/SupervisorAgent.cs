@@ -18,15 +18,17 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         AgentDefinition definition,
         IAgentModelResolver modelResolver,
         string repoRoot,
+        IRunReportContractReader runReportContractReader,
         IAgentLlmClient? llmClient = null,
-        IRunReportContractReader? runReportContractReader = null,
         IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
-        _runReportContractReader = runReportContractReader ?? new NullRunReportContractReader();
+        _runReportContractReader = runReportContractReader ?? throw new ArgumentNullException(
+            nameof(runReportContractReader),
+            "SupervisorAgent requires a real run report contract reader.");
         _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
@@ -578,40 +580,6 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
     private static string JoinEvidence(IEnumerable<string> evidence) =>
         string.Join('|', evidence.Where(item => !string.IsNullOrWhiteSpace(item)));
-
-    private sealed class NullRunReportContractReader : IRunReportContractReader
-    {
-        public Task<RunReportContractReadResult> ReadAsync(string runId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new RunReportContractReadResult
-            {
-                Status = "failed",
-                Command = "runs report",
-                TraceId = null,
-                Summary = "No run report reader configured.",
-                Data = new RunReportContractData
-                {
-                    RunId = runId,
-                    RunStatus = "not_available",
-                    AgentName = null,
-                    TraceId = null,
-                    Governance = new RunReportGovernanceContractData
-                    {
-                        Decision = "not_available",
-                        ApprovalDecision = "not_available",
-                        BlockedReason = null,
-                        RequiresHumanApproval = false
-                    },
-                    ToolCalls = [],
-                    ProcessCommands = [],
-                    Evidence = [],
-                    EvidenceSummaryByPath = new Dictionary<string, string>(),
-                    Warnings = ["Run report reader is not available."]
-                },
-                Errors = ["Run report contract reader is unavailable."],
-                Warnings = ["Run report contract reader is not configured; blocked or failed status should be treated as non-success."],
-                ExitCode = 1
-            });
-    }
 
     private sealed record CommandRun(string Command, int ExitCode, string Stdout, string Stderr)
     {

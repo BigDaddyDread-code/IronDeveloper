@@ -1,6 +1,9 @@
 using System.Text.Json;
+using IronDev.Client;
 using IronDev.Core.Agents;
+using IronDev.Core.RunReports;
 using IronDev.Infrastructure.Services.Agents;
+using IronDev.Infrastructure.Services.RunReports;
 
 public static class LiveRemainingGovernedAgents161Command
 {
@@ -171,7 +174,12 @@ public static class LiveRemainingGovernedAgents161Command
 
     private static async Task<AgentResult> RunSupervisorAsync(IReadOnlyList<AgentDefinition> definitions, AgentModelResolver resolver, string repoRoot, IAgentLlmClient? client, string profile, bool live, string runId, string caseId)
     {
-        var agent = new SupervisorAgent(OverrideProfile(definitions, "SupervisorAgent", profile), resolver, repoRoot, client);
+        var agent = new SupervisorAgent(
+            OverrideProfile(definitions, "SupervisorAgent", profile),
+            resolver,
+            repoRoot,
+            CreateRunReportContractReader(),
+            client);
         return await agent.RunAsync(new AgentRequest
         {
             AgentName = "SupervisorAgent",
@@ -279,5 +287,11 @@ public static class LiveRemainingGovernedAgents161Command
         }
 
         return Directory.GetCurrentDirectory();
+    }
+
+    private static IRunReportContractReader CreateRunReportContractReader()
+    {
+        var apiBaseUrl = Environment.GetEnvironmentVariable("IRONDEV_API_BASE_URL") ?? "http://localhost:5000";
+        return new RunReportContractReader(IronDevApiClientFactory.Create(apiBaseUrl));
     }
 }
