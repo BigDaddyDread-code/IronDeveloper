@@ -2,12 +2,15 @@ using System.Net;
 using System.Text.Json;
 using IronDev.Core.Agents;
 using Dapper;
+using IronDev.Client;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.KnowledgeCompiler;
+using IronDev.Core.RunReports;
 using IronDev.Core.Models;
 using IronDev.Data;
 using IronDev.Data.Models;
+using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.Agents;
@@ -1128,7 +1131,7 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
             string.Equals(definition.Name, "TesterAgent", StringComparison.OrdinalIgnoreCase)
                 ? new TesterAgent(definition, modelResolver, repoRoot)
                 : string.Equals(definition.Name, "SupervisorAgent", StringComparison.OrdinalIgnoreCase)
-                    ? new SupervisorAgent(definition, modelResolver, repoRoot, agentLlmClient)
+                    ? new SupervisorAgent(definition, modelResolver, repoRoot, CreateRunReportContractReader(), agentLlmClient)
                 : string.Equals(definition.Name, "RetrieverAgent", StringComparison.OrdinalIgnoreCase)
                     ? new RetrieverAgent(definition, modelResolver, repoRoot, agentLlmClient)
                 : string.Equals(definition.Name, "CriticAgent", StringComparison.OrdinalIgnoreCase)
@@ -1154,6 +1157,12 @@ static (AgentModelResolver ModelResolver, AgentRegistry Registry, AgentRunner Ru
     var registry = new AgentRegistry(agents, definitions);
 
     return (modelResolver, registry, new AgentRunner(registry));
+}
+
+static IRunReportContractReader CreateRunReportContractReader()
+{
+    var apiBaseUrl = Environment.GetEnvironmentVariable("IRONDEV_API_BASE_URL") ?? "http://localhost:5000";
+    return new RunReportContractReader(IronDevApiClientFactory.Create(apiBaseUrl));
 }
 
 static IReadOnlyList<ModelProfile> LoadModelProfiles(string repoRoot)

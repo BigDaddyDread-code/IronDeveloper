@@ -395,23 +395,24 @@ public static class IronDevCli
         try
         {
             var report = await client.GetRunReportAsync(runId, cancellationToken);
-            var envelope = BuildRunReportContractEnvelope(report);
+            var envelope = RunReportContractMapper.MapFromApiReport(report);
 
             if (json)
                 await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
             else
                 await WriteJsonOrTextAsync(output, report, json, FormatRunReport(report));
 
-            return envelope.Status is "succeeded" ? 0 : 1;
+            return RunReportContractMapper.MapToReadResult(envelope).ExitCode;
         }
         catch (IronDevApiException ex)
         {
             if (json)
             {
+                var failure = RunReportContractMapper.MapFromApiFailure(runId, ex.StatusCode, ex.ResponseBody);
                 await output.WriteLineAsync(JsonSerializer.Serialize(
-                    BuildRunReportFailureContractEnvelope(runId, ex),
+                    RunReportContractMapper.ToEnvelope(failure),
                     JsonOptions));
-                return 1;
+                return failure.ExitCode;
             }
 
             WriteApiError("runs report", ex, error);
@@ -838,211 +839,6 @@ public static class IronDevCli
             return FormatRunStatus(report.Status);
 
         return $"{report.Status.RunId}: {report.Status.Status} - {detail.Summary}";
-    }
-
-    private sealed record RunsReportContractEnvelope(
-        string Status,
-        string Command,
-        string? TraceId,
-        string Summary,
-        RunsReportContractData Data,
-        IReadOnlyList<string> Errors,
-        IReadOnlyList<string> Warnings);
-
-    private sealed record RunsReportContractData(
-        string RunId,
-        string RunStatus,
-        string? AgentName,
-        string? TraceId,
-        RunsReportGovernanceCliData Governance,
-        IReadOnlyList<RunsReportToolCallCliData> ToolCalls,
-        IReadOnlyList<RunsReportProcessCommandCliData> ProcessCommands,
-        IReadOnlyList<RunsReportEvidenceCliData> Evidence,
-        IReadOnlyDictionary<string, string> EvidenceSummaryByPath,
-        IReadOnlyList<string> Warnings);
-
-    private sealed record RunsReportGovernanceCliData(
-        string Decision,
-        string ApprovalDecision,
-        string? BlockedReason,
-        bool RequiresHumanApproval);
-
-    private sealed record RunsReportToolCallCliData(
-        string? ToolCallId,
-        string? ToolName,
-        string? Impact,
-        string Status,
-        string? Summary,
-        IReadOnlyList<string> EvidenceIds);
-
-    private sealed record RunsReportProcessCommandCliData(
-        string? Command,
-        int? ExitCode,
-        bool? TimedOut,
-        string? Summary,
-        string? StdoutPath,
-        string? StderrPath,
-        int? DurationMs);
-
-    private sealed record RunsReportEvidenceCliData(
-        string? EvidenceId,
-        string Kind,
-        string? Path,
-        string? Sha256,
-        string? Summary);
-
-    private static RunsReportContractEnvelope BuildRunReportContractEnvelope(RunReportDto report)
-    {
-        var status = DetermineRunReportCommandStatus(report.Status.Status, report.Status.Recommendation);
-        var traceId = report.Report?.TraceId ?? report.Status.TraceId;
-        var evidence = report.Report?.Evidence ?? [];
-        var reportWarnings = new List<string>(report.Report?.Warnings ?? []);
-        var agentName = report.Report?.Stages.FirstOrDefault()?.AgentName;
-        var governance = BuildRunReportGovernance(report.Status.Status, report.Status.Recommendation);
-        var toolCalls = Array.Empty<RunsReportToolCallCliData>();
-        var processCommands = Array.Empty<RunsReportProcessCommandCliData>();
-        var evidenceEntries = evidence
-            .Select(item => new RunsReportEvidenceCliData(
-                null,
-                string.IsNullOrWhiteSpace(item.Type) ? "unknown" : item.Type,
-                string.IsNullOrWhiteSpace(item.Path) ? null : item.Path,
-                null,
-                string.IsNullOrWhiteSpace(item.Summary) ? null : item.Summary))
-            .ToArray();
-        var evidenceMap = evidenceEntries
-            .Where(item => !string.IsNullOrWhiteSpace(item.Path))
-            .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key!,
-                group => group.First().Summary ?? string.Empty,
-                StringComparer.OrdinalIgnoreCase);
-
-        if (!string.Equals(report.Status.Status, "NotStarted", StringComparison.OrdinalIgnoreCase))
-            reportWarnings.Add("Run governance fields are derived from run status and recommendation.");
-        reportWarnings.Add("Run report did not include typed tool-call data.");
-        reportWarnings.Add("Run report did not include typed process command data.");
-
-        return new RunsReportContractEnvelope(
-            status,
-            "runs report",
-            traceId,
-            status is "succeeded"
-                ? $"Run '{report.Status.RunId}' completed successfully."
-                : $"Run '{report.Status.RunId}' is {status}.",
-            new RunsReportContractData(
-                report.Status.RunId,
-                report.Status.Status,
-                agentName,
-                traceId,
-                governance,
-                toolCalls,
-                processCommands,
-                evidenceEntries,
-                evidenceMap,
-                reportWarnings
-            ),
-            status == "failed" ? ["Run report indicates failure."] : [],
-            reportWarnings);
-    }
-
-    private static RunsReportContractEnvelope BuildRunReportFailureContractEnvelope(
-        string runId,
-        IronDevApiException ex)
-    {
-        var summaryPrefix = $"IronDev.Api runs report failed with {(int)ex.StatusCode} {ex.StatusCode}.";
-        var failures = new List<string> { summaryPrefix };
-        if (!string.IsNullOrWhiteSpace(ex.ResponseBody))
-            failures.Add(ex.ResponseBody);
-
-        var runStatus = ex.StatusCode == System.Net.HttpStatusCode.NotFound ? "not_found" : "error";
-
-        return new RunsReportContractEnvelope(
-            "failed",
-            "runs report",
-            null,
-            "Run report could not be loaded.",
-            new RunsReportContractData(
-                runId,
-                runStatus,
-                null,
-                null,
-                new RunsReportGovernanceCliData(
-                    "not_available",
-                    "not_available",
-                    null,
-                    false),
-                [],
-                [],
-                [],
-                new Dictionary<string, string>(),
-                []
-            ),
-            failures,
-            []
-        );
-    }
-
-    private static RunsReportGovernanceCliData BuildRunReportGovernance(string status, string recommendation)
-    {
-        if (IsApprovalBlocked(status, recommendation))
-        {
-            return new RunsReportGovernanceCliData(
-                "blocked",
-                "required",
-                status,
-                true);
-        }
-
-        if (string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase))
-        {
-            return new RunsReportGovernanceCliData(
-                "derived",
-                "denied",
-                null,
-                false);
-        }
-
-        return new RunsReportGovernanceCliData(
-            "derived",
-            ResolveApprovalDecision(status, recommendation),
-            null,
-            false);
-    }
-
-    private static string DetermineRunReportCommandStatus(string runStatus, string recommendation)
-    {
-        if (string.Equals(runStatus, "Failed", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(recommendation, "failed", StringComparison.OrdinalIgnoreCase))
-        {
-            return "failed";
-        }
-
-        if (IsApprovalBlocked(runStatus, recommendation))
-        {
-            return "blocked";
-        }
-
-        if (string.Equals(runStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
-            return "blocked";
-
-        return "succeeded";
-    }
-
-    private static bool IsApprovalBlocked(string runStatus, string recommendation) =>
-        string.Equals(runStatus, "PausedForApproval", StringComparison.OrdinalIgnoreCase) ||
-        runStatus.Contains("Approval", StringComparison.OrdinalIgnoreCase) ||
-        recommendation.Contains("Approval", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(runStatus, "Cancelled", StringComparison.OrdinalIgnoreCase);
-
-    private static string ResolveApprovalDecision(string status, string recommendation)
-    {
-        if (string.Equals(status, "PausedForApproval", StringComparison.OrdinalIgnoreCase) ||
-            recommendation.Contains("approval", StringComparison.OrdinalIgnoreCase))
-        {
-            return "required";
-        }
-
-        return status.Equals("Failed", StringComparison.OrdinalIgnoreCase) ? "denied" : "not_required";
     }
 
     private static string FormatRunEvent(RunEventDto runEvent) =>

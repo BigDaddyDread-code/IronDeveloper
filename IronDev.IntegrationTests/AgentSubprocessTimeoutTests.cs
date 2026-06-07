@@ -1,10 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using IronDev.Core.Agents;
+using IronDev.Core.RunReports;
 using IronDev.Core.Interfaces;
+using IronDev.Client;
 using IronDev.Infrastructure.Services.Agents;
+using IronDev.Infrastructure.Services.RunReports;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -88,7 +96,8 @@ public sealed class AgentSubprocessTimeoutTests
             DefaultModelProfile = "cheap-runner"
         };
         var resolver = new AgentModelResolver();
-        var agent = new SupervisorAgent(definition, resolver, repoRoot);
+        var fakeReader = new FakeRunReportContractReader(new Dictionary<string, RunReportContractReadResult>());
+        var agent = new SupervisorAgent(definition, resolver, repoRoot, fakeReader);
 
         var request = new AgentRequest
         {
@@ -119,6 +128,93 @@ public sealed class AgentSubprocessTimeoutTests
         {
             Environment.SetEnvironmentVariable("IRONDEV_SUBPROCESS_TIMEOUT_SECONDS", null);
         }
+    }
+
+    [DataTestMethod]
+    [DataRow("PausedForApproval", "blocked")]
+    [DataRow("Failed", "failed")]
+    public async Task SupervisorAgent_ShouldConsumeTesterRunContractForDecision(string runStatus, string expectedCommandStatus)
+    {
+        var repoRoot = GetRepoRoot();
+        var definition = new AgentDefinition
+        {
+            Name = "SupervisorAgent",
+            Purpose = "Test SupervisorAgent should consume contract report.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var runId = "test-run";
+        var testerRunId = $"{runId}-tester";
+        var fakeReader = new FakeRunReportContractReader(
+            new Dictionary<string, RunReportContractReadResult>
+            {
+                [testerRunId] = BuildRunReportContractReadResult(
+                    testerRunId,
+                    runStatus,
+                    runStatus == "Failed" ? "Execution failed" : "Approval required",
+                    "trace-run")
+            });
+        var fakeRunner = new FakeAgentProcessRunner(
+            [
+                new AgentProcessRunResult(0, """{"status":"Succeeded","contextPackage":{"Matches":[{"DocumentTitle":"Memory title"}],"SemanticTraceId":"trace-mem","WeightedContextBundle":{"summaryForAgent":"Memory context."}}}""", string.Empty, false, "retriever"),
+                new AgentProcessRunResult(0, """{"review":{"decision":"Allow"}}""", string.Empty, false, "conscience"),
+                new AgentProcessRunResult(0, """{"thoughtLedger":{}}""", string.Empty, false, "thoughtLedger"),
+                new AgentProcessRunResult(0, """{"report":{"status":"Passed"}}""", string.Empty, false, "tester-run-plan")
+            ]);
+        var agent = new SupervisorAgent(definition, resolver, repoRoot, fakeReader, null, fakeRunner);
+
+        var request = new AgentRequest
+        {
+            AgentName = "SupervisorAgent",
+            GoalId = "test-goal",
+            DogfoodRunId = runId,
+            Inputs = new Dictionary<string, string>
+            {
+                ["project"] = "TestProject",
+                ["query"] = "TestQuery",
+                ["plan_path"] = "TestPlan.md",
+                ["live_llm"] = "false"
+            }
+        };
+
+        var result = await agent.RunAsync(request);
+
+        Assert.AreEqual(AgentRunStatus.Failed, result.Status);
+        Assert.AreEqual(1, result.ExitCode);
+        Assert.AreEqual(1, fakeReader.Calls.Count);
+        Assert.AreEqual(testerRunId, fakeReader.Calls[0]);
+        Assert.IsNotNull(result.OutputJson);
+        using var document = JsonDocument.Parse(result.OutputJson);
+        var root = document.RootElement;
+        Assert.IsTrue(TryGetPropertyIgnoreCase(root, "tester", out var tester), "Expected tester section in output JSON.");
+        Assert.AreEqual(testerRunId, GetPropertyValueIgnoreCase(tester, "runId"));
+        Assert.AreEqual("trace-run", GetPropertyValueIgnoreCase(tester, "traceId"));
+        Assert.AreEqual(runStatus, GetPropertyValueIgnoreCase(tester, "runStatus"));
+        Assert.AreEqual(expectedCommandStatus, GetPropertyValueIgnoreCase(tester, "commandStatus"));
+        Assert.IsTrue(tester.TryGetProperty("governance", out var governance), "Expected governance section in tester output.");
+        Assert.IsTrue(
+            string.Equals(
+                runStatus == "PausedForApproval" ? "required" : "denied",
+                GetPropertyValueIgnoreCase(governance, "approvalDecision"),
+                StringComparison.OrdinalIgnoreCase),
+            "Expected approvalDecision to reflect the contract-derived decision.");
+        Assert.IsTrue(tester.TryGetProperty("warnings", out var warnings), "Expected warnings in tester output.");
+        Assert.AreEqual(JsonValueKind.Array, warnings.ValueKind);
+        Assert.AreEqual(4, fakeRunner.Commands.Count);
+    }
+
+    [TestMethod]
+    public async Task RunReportContractReader_ShouldCallRunsReportApiEndpoint()
+    {
+        var handler = new RunReportReaderHandler();
+        var client = IronDevApiClientFactory.Create("http://localhost:5000", handler: handler);
+        var reader = new RunReportContractReader(client);
+
+        var result = await reader.ReadAsync("run-report-reader");
+
+        Assert.AreEqual("runs report", result.Command);
+        Assert.AreEqual("succeeded", result.Status);
+        CollectionAssert.Contains(handler.RequestPaths, "/api/runs/run-report-reader/report");
     }
 
     [TestMethod]
@@ -459,5 +555,167 @@ public sealed class AgentSubprocessTimeoutTests
             _calls.Add(request);
             return Task.FromResult(_resultFactory(request));
         }
+    }
+
+    private sealed class FakeAgentProcessRunner : IAgentProcessRunner
+    {
+        private readonly Queue<AgentProcessRunResult> _scriptedResults;
+        private readonly List<string> _commands = [];
+
+        public FakeAgentProcessRunner(IEnumerable<AgentProcessRunResult> scriptedResults)
+        {
+            _scriptedResults = new Queue<AgentProcessRunResult>(scriptedResults);
+        }
+
+        public IReadOnlyList<string> Commands => _commands;
+
+        public Task<AgentProcessRunResult> RunAsync(
+            string fileName,
+            string[] arguments,
+            string workingDirectory,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var command = string.Join(' ', arguments.Prepend(fileName));
+            _commands.Add(command);
+
+            if (_scriptedResults.Count == 0)
+                return Task.FromResult(
+                    new AgentProcessRunResult(-1, string.Empty, "No scripted subprocess result was configured.", false, command));
+
+            return Task.FromResult(_scriptedResults.Dequeue());
+        }
+    }
+
+    private sealed class FakeRunReportContractReader : IRunReportContractReader
+    {
+        private readonly Dictionary<string, RunReportContractReadResult> _reports;
+        private readonly List<string> _calls = [];
+
+        public FakeRunReportContractReader(IReadOnlyDictionary<string, RunReportContractReadResult> reports)
+        {
+            _reports = new Dictionary<string, RunReportContractReadResult>(reports, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public IReadOnlyList<string> Calls => _calls;
+
+        public Task<RunReportContractReadResult> ReadAsync(string runId, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _calls.Add(runId);
+
+            if (_reports.TryGetValue(runId, out var report))
+                return Task.FromResult(report);
+
+            return Task.FromResult(RunReportContractMapper.MapFromApiFailure(runId, HttpStatusCode.NotFound, $"{{\"detail\":\"Run '{runId}' not found.\"}}"));
+        }
+    }
+
+    private sealed class RunReportReaderHandler : HttpMessageHandler
+    {
+        public List<string> RequestPaths { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestPaths.Add(request.RequestUri?.AbsolutePath ?? string.Empty);
+
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/runs/run-report-reader/report")
+            {
+                var payload = new RunReportDto
+                {
+                    Status = new RunStatusDto
+                    {
+                        RunId = "run-report-reader",
+                        Project = "IronDev",
+                        Title = "Run contract reader check",
+                        Status = "Completed",
+                        Recommendation = "Review",
+                        TraceId = "trace-reader"
+                    },
+                    Report = new RunReportDetail
+                    {
+                        RunId = "run-report-reader",
+                        Project = "IronDev",
+                        Title = "Run contract reader check",
+                        Status = "Completed",
+                        TraceId = "trace-reader",
+                        Summary = "Run contract reader check.",
+                        Recommendation = "Review",
+                        Evidence = []
+                    }
+                };
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private static RunReportContractReadResult BuildRunReportContractReadResult(
+        string runId,
+        string status,
+        string recommendation,
+        string? traceId)
+    {
+        var report = new RunReportDto
+        {
+            Status = new RunStatusDto
+            {
+                RunId = runId,
+                Status = status,
+                Recommendation = recommendation,
+                Project = "IronDev",
+                Title = "Test run",
+                TraceId = traceId
+            },
+            Report = new RunReportDetail
+            {
+                RunId = runId,
+                Project = "IronDev",
+                Title = "Test run",
+                Status = status,
+                Recommendation = recommendation,
+                TraceId = traceId,
+                Summary = $"{runId} test report.",
+                Evidence = [new RunEvidenceItem { Type = "tool-call", Path = "test-results/tester-evidence.json", Summary = "Test evidence" }]
+            }
+        };
+
+        return RunReportContractMapper.MapToReadResult(RunReportContractMapper.MapFromApiReport(report));
+    }
+
+    private static bool TryGetPropertyIgnoreCase(JsonElement element, string propertyName, out JsonElement value)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            value = default;
+            return false;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static string? GetPropertyValueIgnoreCase(JsonElement element, string propertyName)
+    {
+        Assert.IsTrue(TryGetPropertyIgnoreCase(element, propertyName, out var value), $"Expected property '{propertyName}' in JSON element.");
+        return value.GetString();
     }
 }
