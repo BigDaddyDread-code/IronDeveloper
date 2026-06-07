@@ -5,6 +5,7 @@ public sealed record DisposableWorkspacePrepareRequest
     public required string RunId { get; init; }
     public required string SourceRepo { get; init; }
     public required string WorkspaceRoot { get; init; }
+    public bool AllowDirtySourceRepo { get; init; }
 }
 
 public sealed record DisposableWorkspacePrepareData

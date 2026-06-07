@@ -26,7 +26,8 @@ public sealed class DisposableWorkspacePrepareService : IDisposableWorkspacePrep
             {
                 RunId = request.RunId,
                 SourceRepo = request.SourceRepo,
-                WorkspaceRoot = request.WorkspaceRoot
+                WorkspaceRoot = request.WorkspaceRoot,
+                AllowDirtySourceRepo = request.AllowDirtySourceRepo
             },
             cancellationToken).ConfigureAwait(false);
 

@@ -3287,6 +3287,335 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspacePostApplyValidate_MissingApplyVerify_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-missing-verify");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            await WriteApplyCopyEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")], applied: true, sourceRepoMutated: true);
+
+            using var doc = await RunWorkspacePostApplyValidateAsync("run-1", workspacePath, "dotnet-build-test", expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "post-apply-validation.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_ApplyCopyNotApplied_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-copy-not-applied");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")], applyCopyApplied: false);
+            var service = new DisposableWorkspacePostApplyValidationService(
+                new RecordingPrepareService(),
+                new RecordingValidationService());
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+
+            Assert.AreEqual("blocked", result.Status);
+            AssertStringArrayContains(JsonSerializer.SerializeToElement(result.Errors), "applied true");
+            Assert.IsFalse(Directory.Exists(workspacePath + "-post-apply-validation"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_ApplyVerifyFailed_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-verify-failed");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")], applyVerifyVerified: false, applyVerifySourceMatchesWorkspace: false, applyVerifyFailedCount: 1);
+            var service = new DisposableWorkspacePostApplyValidationService(
+                new RecordingPrepareService(),
+                new RecordingValidationService());
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+
+            Assert.AreEqual("blocked", result.Status);
+            AssertStringArrayContains(JsonSerializer.SerializeToElement(result.Errors), "verified true");
+            Assert.IsFalse(Directory.Exists(workspacePath + "-post-apply-validation"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_UnknownProfile_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-unknown-profile");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+
+            using var doc = await RunWorkspacePostApplyValidateAsync("run-1", workspacePath, "powershell", expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "not allowlisted");
+            Assert.IsFalse(Directory.Exists(workspacePath + "-post-apply-validation"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_ExistingNonEmptyValidationWorkspace_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-existing-validation");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            Directory.CreateDirectory(workspacePath + "-post-apply-validation");
+            await File.WriteAllTextAsync(Path.Combine(workspacePath + "-post-apply-validation", "some-file.txt"), "existing");
+
+            using var doc = await RunWorkspacePostApplyValidateAsync("run-1", workspacePath, "dotnet-build-test", expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "already exists");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_SuccessfulValidation_WritesEvidence()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-success");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            var prepareService = new RecordingPrepareService();
+            var validationService = new RecordingValidationService();
+            var service = new DisposableWorkspacePostApplyValidationService(prepareService, validationService);
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+            var validationWorkspacePath = workspacePath + "-post-apply-validation";
+
+            Assert.AreEqual("succeeded", result.Status);
+            Assert.IsTrue(result.Data.ValidationWorkspacePrepared);
+            Assert.IsTrue(result.Data.ValidationSucceeded);
+            Assert.AreEqual(validationWorkspacePath, result.Data.ValidationWorkspacePath);
+            Assert.IsTrue(File.Exists(result.Data.PostApplyValidationPath));
+            Assert.IsTrue(result.Data.EvidencePaths.Any(path => path.EndsWith("apply-copy.json", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(result.Data.EvidencePaths.Any(path => path.EndsWith("apply-verify.json", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(result.Data.EvidencePaths.Any(path => path.EndsWith("validation.json", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(result.Data.EvidencePaths.Any(path => path.EndsWith("post-apply-validation.json", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsNotNull(prepareService.LastRequest);
+            Assert.IsTrue(prepareService.LastRequest.AllowDirtySourceRepo);
+            Assert.AreEqual(sourceRepo, prepareService.LastRequest.SourceRepo);
+            Assert.IsNotNull(validationService.LastRequest);
+            Assert.AreEqual(validationWorkspacePath, validationService.LastRequest.WorkspacePath);
+            Assert.AreEqual("dotnet-build-test", validationService.LastRequest.ProfileId);
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_UsesPreparedValidationWorkspaceRunId()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-validation-run-id");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            var validationService = new MetadataCheckingValidationService();
+            var service = new DisposableWorkspacePostApplyValidationService(
+                new DisposableWorkspacePrepareService(new DisposableWorkspaceReadinessService()),
+                validationService);
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+            var validationWorkspacePath = workspacePath + "-post-apply-validation";
+            var validationRunId = Path.GetFileName(validationWorkspacePath);
+            var validationMetadataPath = Path.Combine(validationWorkspacePath, ".irondev", "workspace.json");
+            using var validationMetadata = JsonDocument.Parse(await File.ReadAllTextAsync(validationMetadataPath));
+
+            Assert.AreEqual("succeeded", result.Status);
+            Assert.AreEqual(validationRunId, result.Data.ValidationRunId);
+            Assert.AreEqual(validationRunId, validationMetadata.RootElement.GetProperty("runId").GetString());
+            Assert.IsNotNull(validationService.LastRequest);
+            Assert.AreEqual(validationRunId, validationService.LastRequest.RunId);
+            Assert.IsTrue(File.Exists(Path.Combine(validationWorkspacePath, ".irondev", "runs", validationRunId, "validation.json")));
+            Assert.IsFalse(File.Exists(Path.Combine(validationWorkspacePath, ".irondev", "runs", "run-1", "validation.json")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(sourceRepo, ".irondev")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_ValidationFailure_ReturnsFailedAndWritesEvidence()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-validation-failed");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            var validationService = new RecordingValidationService(status: "failed", succeeded: false);
+            var service = new DisposableWorkspacePostApplyValidationService(
+                new RecordingPrepareService(),
+                validationService);
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+
+            Assert.AreEqual("failed", result.Status);
+            Assert.IsFalse(result.Data.ValidationSucceeded);
+            Assert.IsTrue(File.Exists(result.Data.PostApplyValidationPath));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_DoesNotWriteValidationOutputsToSourceRepo()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-source-clean");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            var service = new DisposableWorkspacePostApplyValidationService(
+                new RecordingPrepareService(),
+                new RecordingValidationService());
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+
+            Assert.AreEqual("succeeded", result.Status);
+            Assert.IsFalse(Directory.Exists(Path.Combine(sourceRepo, ".irondev")));
+            Assert.IsTrue(result.Data.EvidencePaths.All(path => !path.StartsWith(sourceRepo, StringComparison.OrdinalIgnoreCase)));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePostApplyValidate_ReturnsStandardCliEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-envelope");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            File.Delete(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-verify.json"));
+
+            using var doc = await RunWorkspacePostApplyValidateAsync("run-1", workspacePath, "dotnet-build-test", expectedExitCode: 1);
+            var root = doc.RootElement;
+
+            Assert.IsTrue(root.TryGetProperty("status", out _));
+            Assert.IsTrue(root.TryGetProperty("command", out _));
+            Assert.IsTrue(root.TryGetProperty("traceId", out _));
+            Assert.IsTrue(root.TryGetProperty("summary", out _));
+            Assert.IsTrue(root.TryGetProperty("data", out _));
+            Assert.IsTrue(root.TryGetProperty("errors", out _));
+            Assert.IsTrue(root.TryGetProperty("warnings", out _));
+            Assert.AreEqual("workspace post-apply-validate", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void DisposableWorkspacePostApplyValidationService_DoesNotDirectlyExecuteProcessesGitOrAgents()
+    {
+        var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "IronDev.Infrastructure", "Services", "Workspaces", "DisposableWorkspacePostApplyValidationService.cs")));
+
+        Assert.IsFalse(serviceSource.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("\"git\"", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("IAgent", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("SupervisorAgent", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void DisposableWorkspaceApplyVerifyService_DoesNotExecuteProcessesCopyDeletePatchAgentsOrGit()
     {
         var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
@@ -3509,6 +3838,112 @@ public sealed partial class IronDevCliTests
         Assert.AreEqual(expectedExitCode, result, error.ToString());
         AssertJsonWasWritten(output);
         return JsonDocument.Parse(output.ToString());
+    }
+
+    private static async Task<JsonDocument> RunWorkspacePostApplyValidateAsync(
+        string runId,
+        string workspacePath,
+        string profileId,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "post-apply-validate",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--profile", profileId,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
+    private static async Task WritePostApplyRequiredEvidenceAsync(
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        IReadOnlyList<(string Operation, string RelativePath)> operations,
+        bool applyCopyApplied = true,
+        bool applyCopySourceRepoMutated = true,
+        bool applyVerifyVerified = true,
+        bool applyVerifySourceMatchesWorkspace = true,
+        int applyVerifyFailedCount = 0)
+    {
+        await WriteApplyCopyRequiredEvidenceAsync(runId, workspacePath, sourceRepo, operations);
+        await WriteApplyCopyEvidenceAsync(runId, workspacePath, sourceRepo, operations, applyCopyApplied, applyCopySourceRepoMutated);
+        await WriteApplyVerifyEvidenceAsync(runId, workspacePath, sourceRepo, operations, applyVerifyVerified, applyVerifySourceMatchesWorkspace, applyVerifyFailedCount);
+    }
+
+    private static async Task WriteApplyVerifyEvidenceAsync(
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        IReadOnlyList<(string Operation, string RelativePath)> operations,
+        bool verified,
+        bool sourceMatchesWorkspace,
+        int failedCount)
+    {
+        var runDirectory = Path.Combine(workspacePath, ".irondev", "runs", runId);
+        Directory.CreateDirectory(runDirectory);
+        var applyVerifyPath = Path.Combine(runDirectory, "apply-verify.json");
+        var operationEvidence = new List<object>();
+
+        foreach (var operation in operations)
+        {
+            var normalizedRelativePath = operation.RelativePath
+                .Replace('\\', Path.DirectorySeparatorChar)
+                .Replace('/', Path.DirectorySeparatorChar);
+            var sourcePath = Path.GetFullPath(Path.Combine(sourceRepo, normalizedRelativePath));
+            var workspaceFilePath = Path.GetFullPath(Path.Combine(workspacePath, normalizedRelativePath));
+            var sourceSha = File.Exists(sourcePath) ? await ComputeSha256Async(sourcePath) : string.Empty;
+            var workspaceSha = File.Exists(workspaceFilePath) ? await ComputeSha256Async(workspaceFilePath) : string.Empty;
+
+            operationEvidence.Add(new
+            {
+                operation = operation.Operation,
+                relativePath = operation.RelativePath,
+                sourcePath,
+                workspacePath = workspaceFilePath,
+                sourceExists = File.Exists(sourcePath),
+                workspaceExists = File.Exists(workspaceFilePath),
+                expectedSourceSha256After = sourceSha,
+                actualSourceSha256After = sourceSha,
+                actualWorkspaceSha256 = workspaceSha,
+                verified
+            });
+        }
+
+        await File.WriteAllTextAsync(
+            applyVerifyPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    runId,
+                    workspacePath,
+                    sourceRepo,
+                    createdUtc = DateTimeOffset.UtcNow,
+                    verified,
+                    sourceMatchesWorkspace,
+                    operations = operationEvidence,
+                    verifiedCount = verified ? operations.Count : 0,
+                    failedCount,
+                    evidencePaths = Array.Empty<string>(),
+                    blockers = Array.Empty<string>(),
+                    warnings = Array.Empty<string>(),
+                    errors = Array.Empty<string>()
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
     }
 
     private static async Task WriteApplyCopyEvidenceAsync(
@@ -3851,6 +4286,206 @@ public sealed partial class IronDevCliTests
                     WriteIndented = true
                 }));
         return packagePath;
+    }
+
+    private sealed class RecordingPrepareService : IDisposableWorkspacePrepareService
+    {
+        public DisposableWorkspacePrepareRequest? LastRequest { get; private set; }
+
+        public Task<DisposableWorkspacePrepareResult> PrepareAsync(
+            DisposableWorkspacePrepareRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            var workspacePath = Path.GetFullPath(Path.Combine(request.WorkspaceRoot, request.RunId));
+            Directory.CreateDirectory(Path.Combine(workspacePath, ".irondev"));
+            File.WriteAllText(
+                Path.Combine(workspacePath, ".irondev", "workspace.json"),
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        runId = request.RunId,
+                        sourceRepo = Path.GetFullPath(request.SourceRepo),
+                        workspacePath,
+                        createdUtc = DateTimeOffset.UtcNow,
+                        preparationMethod = "copy",
+                        sourceRepoMutated = false
+                    },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                    {
+                        WriteIndented = true
+                    }));
+
+            return Task.FromResult(new DisposableWorkspacePrepareResult
+            {
+                Status = "succeeded",
+                Summary = "Disposable workspace prepared.",
+                ExitCode = 0,
+                Data = new DisposableWorkspacePrepareData
+                {
+                    RunId = request.RunId,
+                    SourceRepo = Path.GetFullPath(request.SourceRepo),
+                    WorkspaceRoot = Path.GetFullPath(request.WorkspaceRoot),
+                    WorkspacePath = workspacePath,
+                    ReadinessStatus = "succeeded",
+                    Prepared = true,
+                    PreparationMethod = "copy",
+                    FilesCopied = 1,
+                    MetadataPath = Path.Combine(workspacePath, ".irondev", "workspace.json"),
+                    SourceRepoMutated = false
+                }
+            });
+        }
+    }
+
+    private sealed class RecordingValidationService : IDisposableWorkspaceValidationService
+    {
+        private readonly string _status;
+        private readonly bool _succeeded;
+
+        public RecordingValidationService(string status = "succeeded", bool succeeded = true)
+        {
+            _status = status;
+            _succeeded = succeeded;
+        }
+
+        public DisposableWorkspaceValidationRequest? LastRequest { get; private set; }
+
+        public async Task<DisposableWorkspaceValidationResult> ValidateAsync(
+            DisposableWorkspaceValidationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            var validationPath = Path.Combine(request.WorkspacePath, ".irondev", "runs", request.RunId, "validation.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(validationPath)!);
+            await File.WriteAllTextAsync(
+                validationPath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        runId = request.RunId,
+                        workspacePath = request.WorkspacePath,
+                        profileId = request.ProfileId,
+                        status = _status,
+                        succeeded = _succeeded
+                    },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                    {
+                        WriteIndented = true
+                    }),
+                cancellationToken);
+
+            var errors = _succeeded ? Array.Empty<string>() : new[] { "Validation failed." };
+            var step = new DisposableWorkspaceValidationStep
+            {
+                CommandId = "dotnet-build",
+                Status = _status,
+                ExitCode = _succeeded ? 0 : 1,
+                Succeeded = _succeeded,
+                EvidencePaths = [validationPath],
+                Errors = errors
+            };
+
+            return new DisposableWorkspaceValidationResult
+            {
+                Status = _status,
+                Summary = _succeeded ? "Workspace validation completed." : "Workspace validation did not complete successfully.",
+                ExitCode = _succeeded ? 0 : 1,
+                Data = new DisposableWorkspaceValidationData
+                {
+                    RunId = request.RunId,
+                    WorkspacePath = request.WorkspacePath,
+                    ProfileId = request.ProfileId,
+                    Status = _status,
+                    Succeeded = _succeeded,
+                    Steps = [step],
+                    EvidencePaths = [validationPath],
+                    ValidationMetadataPath = validationPath,
+                    Errors = errors
+                },
+                Errors = errors
+            };
+        }
+    }
+
+    private sealed class MetadataCheckingValidationService : IDisposableWorkspaceValidationService
+    {
+        public DisposableWorkspaceValidationRequest? LastRequest { get; private set; }
+
+        public async Task<DisposableWorkspaceValidationResult> ValidateAsync(
+            DisposableWorkspaceValidationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            var workspaceMetadataPath = Path.Combine(request.WorkspacePath, ".irondev", "workspace.json");
+            using var workspaceMetadata = JsonDocument.Parse(await File.ReadAllTextAsync(workspaceMetadataPath, cancellationToken));
+            var metadataRunId = workspaceMetadata.RootElement.GetProperty("runId").GetString();
+            if (!string.Equals(metadataRunId, request.RunId, StringComparison.Ordinal))
+            {
+                var errors = new[] { $"Workspace runId mismatch. Metadata runId '{metadataRunId}' does not match requested runId '{request.RunId}'." };
+                return new DisposableWorkspaceValidationResult
+                {
+                    Status = "blocked",
+                    Summary = "Workspace validation was blocked.",
+                    ExitCode = 1,
+                    Data = new DisposableWorkspaceValidationData
+                    {
+                        RunId = request.RunId,
+                        WorkspacePath = request.WorkspacePath,
+                        ProfileId = request.ProfileId,
+                        Status = "blocked",
+                        Succeeded = false,
+                        Errors = errors
+                    },
+                    Errors = errors
+                };
+            }
+
+            var validationPath = Path.Combine(request.WorkspacePath, ".irondev", "runs", request.RunId, "validation.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(validationPath)!);
+            await File.WriteAllTextAsync(
+                validationPath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        runId = request.RunId,
+                        workspacePath = request.WorkspacePath,
+                        profileId = request.ProfileId,
+                        status = "succeeded",
+                        succeeded = true
+                    },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                    {
+                        WriteIndented = true
+                    }),
+                cancellationToken);
+
+            var step = new DisposableWorkspaceValidationStep
+            {
+                CommandId = "dotnet-build",
+                Status = "succeeded",
+                ExitCode = 0,
+                Succeeded = true,
+                EvidencePaths = [validationPath]
+            };
+            return new DisposableWorkspaceValidationResult
+            {
+                Status = "succeeded",
+                Summary = "Workspace validation completed.",
+                ExitCode = 0,
+                Data = new DisposableWorkspaceValidationData
+                {
+                    RunId = request.RunId,
+                    WorkspacePath = request.WorkspacePath,
+                    ProfileId = request.ProfileId,
+                    Status = "succeeded",
+                    Succeeded = true,
+                    Steps = [step],
+                    EvidencePaths = [validationPath],
+                    ValidationMetadataPath = validationPath
+                }
+            };
+        }
     }
 
     private static bool IsSha256Hex(string value)
