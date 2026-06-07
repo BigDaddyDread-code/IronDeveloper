@@ -308,6 +308,11 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
             blockers.Add($"Apply copy source path mismatch for {operation.RelativePath}.");
         if (!string.IsNullOrWhiteSpace(operation.WorkspacePath) && !PathsEqual(workspacePath, operation.WorkspacePath))
             blockers.Add($"Apply copy workspace path mismatch for {operation.RelativePath}.");
+        if (string.Equals(operation.Operation, "add", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(operation.Operation, "modify", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateParentDirectoriesWithinRoot(sourceRepo, sourcePath, "Source", blockers);
+        }
 
         var sourceFileExists = File.Exists(sourcePath);
         var workspaceFileExists = File.Exists(workspacePath);
@@ -387,6 +392,39 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
             blockers.Add($"Apply copy path must not target reserved workspace metadata: {relativePath}");
 
         return Path.Combine(segments);
+    }
+
+    private static void ValidateParentDirectoriesWithinRoot(
+        string root,
+        string filePath,
+        string label,
+        List<string> blockers)
+    {
+        var parent = Path.GetDirectoryName(NormalizePath(filePath));
+        if (string.IsNullOrWhiteSpace(parent))
+            return;
+
+        if (!PathsEqual(root, parent) && !IsSameOrInside(root, parent))
+        {
+            blockers.Add($"{label} parent path escapes expected root: {parent}");
+            return;
+        }
+
+        var current = parent;
+        while (!string.IsNullOrWhiteSpace(current) && !PathsEqual(root, current))
+        {
+            if (File.Exists(current))
+            {
+                blockers.Add($"{label} parent path is blocked by an existing file: {current}");
+                return;
+            }
+
+            var next = Path.GetDirectoryName(current);
+            if (string.IsNullOrWhiteSpace(next) || string.Equals(next, current, StringComparison.Ordinal))
+                break;
+
+            current = next;
+        }
     }
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)

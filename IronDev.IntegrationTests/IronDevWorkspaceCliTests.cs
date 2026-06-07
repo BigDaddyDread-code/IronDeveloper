@@ -2792,6 +2792,32 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceApplyCopy_NestedAddOperation_CreatesParentDirectoryAndAppliesFile()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-nested-add");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            Directory.CreateDirectory(Path.Combine(workspacePath, "src"));
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "src", "new.cs"), "namespace Demo;");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "src/new.cs")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 0);
+
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+            Assert.IsTrue(File.Exists(Path.Combine(sourceRepo, "src", "new.cs")));
+            Assert.AreEqual(
+                await ComputeSha256Async(Path.Combine(workspacePath, "src", "new.cs")),
+                await ComputeSha256Async(Path.Combine(sourceRepo, "src", "new.cs")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
     public async Task WorkspaceApplyCopy_ModifyOperation_AppliesFile()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-modify");
@@ -2874,6 +2900,37 @@ public sealed partial class IronDevCliTests
             Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
             Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, "new.txt")));
             Assert.AreEqual("drift", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyCopy_ParentPathBlockedByFile_BlocksBeforeCopy()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-parent-file");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "src"), "source path blocker");
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "good-target"), "valid add");
+            if (File.Exists(Path.Combine(workspacePath, "src")))
+                File.Delete(Path.Combine(workspacePath, "src"));
+            Directory.CreateDirectory(Path.Combine(workspacePath, "src"));
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "src", "new.cs"), "namespace Demo;");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "good-target"), ("add", "src/new.cs")]);
+
+            using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "parent path is blocked by an existing file");
+            Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, "good-target")));
+            Assert.IsTrue(File.Exists(Path.Combine(sourceRepo, "src")));
+            Assert.AreEqual("source path blocker", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "src")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
         }
         finally
         {
