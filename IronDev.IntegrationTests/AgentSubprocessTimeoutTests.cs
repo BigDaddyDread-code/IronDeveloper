@@ -96,7 +96,8 @@ public sealed class AgentSubprocessTimeoutTests
             DefaultModelProfile = "cheap-runner"
         };
         var resolver = new AgentModelResolver();
-        var agent = new SupervisorAgent(definition, resolver, repoRoot);
+        var fakeReader = new FakeRunReportContractReader(new Dictionary<string, RunReportContractReadResult>());
+        var agent = new SupervisorAgent(definition, resolver, repoRoot, fakeReader);
 
         var request = new AgentRequest
         {
@@ -160,7 +161,7 @@ public sealed class AgentSubprocessTimeoutTests
                 new AgentProcessRunResult(0, """{"thoughtLedger":{}}""", string.Empty, false, "thoughtLedger"),
                 new AgentProcessRunResult(0, """{"report":{"status":"Passed"}}""", string.Empty, false, "tester-run-plan")
             ]);
-        var agent = new SupervisorAgent(definition, resolver, repoRoot, null, fakeReader, fakeRunner);
+        var agent = new SupervisorAgent(definition, resolver, repoRoot, fakeReader, null, fakeRunner);
 
         var request = new AgentRequest
         {
@@ -183,12 +184,22 @@ public sealed class AgentSubprocessTimeoutTests
         Assert.AreEqual(1, fakeReader.Calls.Count);
         Assert.AreEqual(testerRunId, fakeReader.Calls[0]);
         Assert.IsNotNull(result.OutputJson);
-        Assert.IsTrue(result.OutputJson.Contains($"\"runId\":\"{testerRunId}\"", StringComparison.Ordinal));
-        Assert.IsTrue(result.OutputJson.Contains("\"traceId\":\"trace-run\"", StringComparison.Ordinal));
-        Assert.IsTrue(result.OutputJson.Contains($"\"runStatus\":\"{runStatus}\"", StringComparison.Ordinal));
-        Assert.IsTrue(result.OutputJson.Contains($"\"commandStatus\":\"{expectedCommandStatus}\"", StringComparison.Ordinal));
-        Assert.IsTrue(result.OutputJson.Contains("\"governance\":", StringComparison.Ordinal));
-        Assert.IsTrue(result.OutputJson.Contains("\"warnings\":", StringComparison.Ordinal));
+        using var document = JsonDocument.Parse(result.OutputJson);
+        var root = document.RootElement;
+        Assert.IsTrue(TryGetPropertyIgnoreCase(root, "tester", out var tester), "Expected tester section in output JSON.");
+        Assert.AreEqual(testerRunId, GetPropertyValueIgnoreCase(tester, "runId"));
+        Assert.AreEqual("trace-run", GetPropertyValueIgnoreCase(tester, "traceId"));
+        Assert.AreEqual(runStatus, GetPropertyValueIgnoreCase(tester, "runStatus"));
+        Assert.AreEqual(expectedCommandStatus, GetPropertyValueIgnoreCase(tester, "commandStatus"));
+        Assert.IsTrue(tester.TryGetProperty("governance", out var governance), "Expected governance section in tester output.");
+        Assert.IsTrue(
+            string.Equals(
+                runStatus == "PausedForApproval" ? "required" : "denied",
+                GetPropertyValueIgnoreCase(governance, "approvalDecision"),
+                StringComparison.OrdinalIgnoreCase),
+            "Expected approvalDecision to reflect the contract-derived decision.");
+        Assert.IsTrue(tester.TryGetProperty("warnings", out var warnings), "Expected warnings in tester output.");
+        Assert.AreEqual(JsonValueKind.Array, warnings.ValueKind);
         Assert.AreEqual(4, fakeRunner.Commands.Count);
     }
 
@@ -679,5 +690,32 @@ public sealed class AgentSubprocessTimeoutTests
         };
 
         return RunReportContractMapper.MapToReadResult(RunReportContractMapper.MapFromApiReport(report));
+    }
+
+    private static bool TryGetPropertyIgnoreCase(JsonElement element, string propertyName, out JsonElement value)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            value = default;
+            return false;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static string? GetPropertyValueIgnoreCase(JsonElement element, string propertyName)
+    {
+        Assert.IsTrue(TryGetPropertyIgnoreCase(element, propertyName, out var value), $"Expected property '{propertyName}' in JSON element.");
+        return value.GetString();
     }
 }
