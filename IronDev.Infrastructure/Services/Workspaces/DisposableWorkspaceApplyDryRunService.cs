@@ -86,6 +86,7 @@ public sealed class DisposableWorkspaceApplyDryRunService : IDisposableWorkspace
         var changedCount = facts.AddedFiles.Count + facts.ModifiedFiles.Count + facts.DeletedFiles.Count;
         if (changedCount == 0)
             blockers.Add("Diff evidence has no changed files.");
+        ValidateNoDuplicateOperations(facts, blockers);
 
         IReadOnlyList<DisposableWorkspaceApplyOperation> operations = [];
         if (blockers.Count == 0)
@@ -244,6 +245,42 @@ public sealed class DisposableWorkspaceApplyDryRunService : IDisposableWorkspace
         return operations;
     }
 
+    private static void ValidateNoDuplicateOperations(ArtifactFacts facts, List<string> blockers)
+    {
+        var seen = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        ValidateOperationPaths("add", facts.AddedFiles, seen, blockers);
+        ValidateOperationPaths("modify", facts.ModifiedFiles, seen, blockers);
+        ValidateOperationPaths("delete", facts.DeletedFiles, seen, blockers);
+    }
+
+    private static void ValidateOperationPaths(
+        string operation,
+        IReadOnlyList<string> paths,
+        Dictionary<string, string> seen,
+        List<string> blockers)
+    {
+        var operationSeen = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                blockers.Add($"Diff evidence contains an empty {operation} path.");
+                continue;
+            }
+
+            if (!operationSeen.Add(path))
+                blockers.Add($"Diff evidence contains duplicate {operation} operation for path: {path}");
+
+            if (seen.TryGetValue(path, out var existingOperation))
+            {
+                blockers.Add($"Diff evidence contains conflicting operations for path '{path}': {existingOperation} and {operation}.");
+                continue;
+            }
+
+            seen[path] = operation;
+        }
+    }
+
     private static async Task<DisposableWorkspaceApplyOperation> BuildOperationAsync(
         string operation,
         string relativePath,
@@ -261,11 +298,19 @@ public sealed class DisposableWorkspaceApplyDryRunService : IDisposableWorkspace
 
         var sourceExists = File.Exists(sourcePath);
         var workspaceExists = File.Exists(workspacePath);
-        if (operation == "add" && (!workspaceExists || sourceExists))
+        var sourceDirectoryExists = Directory.Exists(sourcePath);
+        var workspaceDirectoryExists = Directory.Exists(workspacePath);
+        if (operation == "add" && sourceDirectoryExists)
+            blockers.Add($"Add operation would conflict with an existing source directory: {relativePath}");
+        if ((operation == "add" || operation == "modify") && workspaceDirectoryExists)
+            blockers.Add($"Workspace path is a directory, not a file: {relativePath}");
+        if ((operation == "modify" || operation == "delete") && sourceDirectoryExists)
+            blockers.Add($"Source path is a directory, not a file: {relativePath}");
+        if (operation == "add" && (!workspaceExists || sourceExists || sourceDirectoryExists || workspaceDirectoryExists))
             blockers.Add($"Add operation filesystem state does not match diff: {relativePath}");
-        if (operation == "modify" && (!workspaceExists || !sourceExists))
+        if (operation == "modify" && (!workspaceExists || !sourceExists || sourceDirectoryExists || workspaceDirectoryExists))
             blockers.Add($"Modify operation filesystem state does not match diff: {relativePath}");
-        if (operation == "delete" && (!sourceExists || workspaceExists))
+        if (operation == "delete" && (!sourceExists || workspaceExists || sourceDirectoryExists || workspaceDirectoryExists))
             blockers.Add($"Delete operation filesystem state does not match diff: {relativePath}");
 
         var sourceSha = sourceExists ? await ComputeSha256Async(sourcePath, cancellationToken).ConfigureAwait(false) : null;
@@ -281,6 +326,8 @@ public sealed class DisposableWorkspaceApplyDryRunService : IDisposableWorkspace
             WorkspacePath = workspacePath,
             SourceExists = sourceExists,
             WorkspaceExists = workspaceExists,
+            SourceDirectoryExists = sourceDirectoryExists,
+            WorkspaceDirectoryExists = workspaceDirectoryExists,
             SourceSha256 = sourceSha,
             WorkspaceSha256 = workspaceSha
         };

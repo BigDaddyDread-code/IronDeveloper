@@ -2576,6 +2576,69 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceApplyDryRun_AddOperation_SourceDirectoryConflict_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-dry-run-directory-conflict");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            Directory.CreateDirectory(Path.Combine(sourceRepo, "conflict"));
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            if (Directory.Exists(Path.Combine(workspacePath, "conflict")))
+                Directory.Delete(Path.Combine(workspacePath, "conflict"), recursive: true);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "conflict"), "workspace file");
+            var sourceConflictStillDirectory = Directory.Exists(Path.Combine(sourceRepo, "conflict"));
+
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo, addedFiles: ["conflict"], modifiedFiles: []);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true);
+            await WriteApplyPreflightEvidenceAsync("run-1", workspacePath, sourceRepo);
+
+            using var doc = await RunWorkspaceApplyDryRunAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "source directory");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-dry-run.json")));
+            Assert.IsTrue(sourceConflictStillDirectory);
+            Assert.IsTrue(Directory.Exists(Path.Combine(sourceRepo, "conflict")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyDryRun_ConflictingDiffOperations_Block()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-dry-run-conflicting-diff");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "conflict.txt"), "workspace file");
+
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo, addedFiles: ["conflict.txt", "duplicate.txt", "duplicate.txt"], modifiedFiles: ["conflict.txt"]);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true);
+            await WriteApplyPreflightEvidenceAsync("run-1", workspacePath, sourceRepo);
+
+            using var doc = await RunWorkspaceApplyDryRunAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "conflicting operations");
+            AssertStringArrayContains(root.GetProperty("errors"), "duplicate add operation");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-dry-run.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
     public void DisposableWorkspaceApplyDryRunService_DoesNotExecuteProcessesPatchAgentsOrMutateSource()
     {
         var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(

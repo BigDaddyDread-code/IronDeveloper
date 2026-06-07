@@ -14,6 +14,8 @@ public sealed record DisposableWorkspaceApplyOperation
     public required string WorkspacePath { get; init; }
     public bool SourceExists { get; init; }
     public bool WorkspaceExists { get; init; }
+    public bool SourceDirectoryExists { get; init; }
+    public bool WorkspaceDirectoryExists { get; init; }
     public string? SourceSha256 { get; init; }
     public string? WorkspaceSha256 { get; init; }
 }
