@@ -26,6 +26,7 @@ public sealed record DisposableWorkspacePostApplyValidationData
 
     public required string ProfileId { get; init; }
 
+    public required string ValidationRunId { get; init; }
     public required string ValidationWorkspacePath { get; init; }
     public required bool ValidationWorkspacePrepared { get; init; }
 

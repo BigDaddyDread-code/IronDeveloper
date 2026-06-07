@@ -33,6 +33,7 @@ public sealed class DisposableWorkspacePostApplyValidationService : IDisposableW
     {
         var workspacePath = NormalizePath(request.WorkspacePath);
         var validationWorkspacePath = NormalizePath($"{workspacePath}-post-apply-validation");
+        var validationRunId = Path.GetFileName(validationWorkspacePath);
         var runDirectory = Path.Combine(workspacePath, ".irondev", "runs", request.RunId);
         var workspaceMetadataPath = Path.Combine(workspacePath, ".irondev", "workspace.json");
         var applyCopyPath = Path.Combine(runDirectory, "apply-copy.json");
@@ -135,7 +136,6 @@ public sealed class DisposableWorkspacePostApplyValidationService : IDisposableW
             return Blocked(request, workspacePath, facts.SourceRepo, validationWorkspacePath, validationWorkspacePrepared: false, validationStatus: "blocked", validationSucceeded: false, steps: [], workspaceMetadataPath, applyCopyPath, applyVerifyPath, applyDryRunPath, applyPreflightPath, promotionApprovalPath, promotionPackagePath, diffMetadataPath, postApplyValidationPath: null, blockers, warnings);
 
         var workspaceRoot = Path.GetDirectoryName(validationWorkspacePath);
-        var validationRunId = Path.GetFileName(validationWorkspacePath);
         if (string.IsNullOrWhiteSpace(workspaceRoot) || string.IsNullOrWhiteSpace(validationRunId))
         {
             blockers.Add("Post-apply validation workspace path could not be derived.");
@@ -165,7 +165,7 @@ public sealed class DisposableWorkspacePostApplyValidationService : IDisposableW
         var validationResult = await _validationService.ValidateAsync(
             new DisposableWorkspaceValidationRequest
             {
-                RunId = request.RunId,
+                RunId = validationRunId,
                 WorkspacePath = validationWorkspacePath,
                 ProfileId = request.ProfileId
             },
@@ -345,6 +345,7 @@ public sealed class DisposableWorkspacePostApplyValidationService : IDisposableW
                     sourceRepo = data.SourceRepo,
                     createdUtc,
                     profileId = data.ProfileId,
+                    validationRunId = data.ValidationRunId,
                     validationWorkspacePath = data.ValidationWorkspacePath,
                     validationWorkspacePrepared = data.ValidationWorkspacePrepared,
                     validationStatus = data.ValidationStatus,
@@ -447,6 +448,7 @@ public sealed class DisposableWorkspacePostApplyValidationService : IDisposableW
             WorkspacePath = workspacePath,
             SourceRepo = sourceRepo,
             ProfileId = request.ProfileId,
+            ValidationRunId = Path.GetFileName(validationWorkspacePath),
             ValidationWorkspacePath = validationWorkspacePath,
             ValidationWorkspacePrepared = validationWorkspacePrepared,
             ValidationStatus = validationStatus,

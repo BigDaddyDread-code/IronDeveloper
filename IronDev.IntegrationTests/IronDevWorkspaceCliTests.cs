@@ -3463,6 +3463,47 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspacePostApplyValidate_UsesPreparedValidationWorkspaceRunId()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-validation-run-id");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WritePostApplyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            var validationService = new MetadataCheckingValidationService();
+            var service = new DisposableWorkspacePostApplyValidationService(
+                new DisposableWorkspacePrepareService(new DisposableWorkspaceReadinessService()),
+                validationService);
+
+            var result = await service.ValidateAsync(new DisposableWorkspacePostApplyValidationRequest
+            {
+                RunId = "run-1",
+                WorkspacePath = workspacePath,
+                ProfileId = "dotnet-build-test"
+            });
+            var validationWorkspacePath = workspacePath + "-post-apply-validation";
+            var validationRunId = Path.GetFileName(validationWorkspacePath);
+            var validationMetadataPath = Path.Combine(validationWorkspacePath, ".irondev", "workspace.json");
+            using var validationMetadata = JsonDocument.Parse(await File.ReadAllTextAsync(validationMetadataPath));
+
+            Assert.AreEqual("succeeded", result.Status);
+            Assert.AreEqual(validationRunId, result.Data.ValidationRunId);
+            Assert.AreEqual(validationRunId, validationMetadata.RootElement.GetProperty("runId").GetString());
+            Assert.IsNotNull(validationService.LastRequest);
+            Assert.AreEqual(validationRunId, validationService.LastRequest.RunId);
+            Assert.IsTrue(File.Exists(Path.Combine(validationWorkspacePath, ".irondev", "runs", validationRunId, "validation.json")));
+            Assert.IsFalse(File.Exists(Path.Combine(validationWorkspacePath, ".irondev", "runs", "run-1", "validation.json")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(sourceRepo, ".irondev")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
     public async Task WorkspacePostApplyValidate_ValidationFailure_ReturnsFailedAndWritesEvidence()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-post-apply-validation-failed");
@@ -4363,6 +4404,86 @@ public sealed partial class IronDevCliTests
                     Errors = errors
                 },
                 Errors = errors
+            };
+        }
+    }
+
+    private sealed class MetadataCheckingValidationService : IDisposableWorkspaceValidationService
+    {
+        public DisposableWorkspaceValidationRequest? LastRequest { get; private set; }
+
+        public async Task<DisposableWorkspaceValidationResult> ValidateAsync(
+            DisposableWorkspaceValidationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            var workspaceMetadataPath = Path.Combine(request.WorkspacePath, ".irondev", "workspace.json");
+            using var workspaceMetadata = JsonDocument.Parse(await File.ReadAllTextAsync(workspaceMetadataPath, cancellationToken));
+            var metadataRunId = workspaceMetadata.RootElement.GetProperty("runId").GetString();
+            if (!string.Equals(metadataRunId, request.RunId, StringComparison.Ordinal))
+            {
+                var errors = new[] { $"Workspace runId mismatch. Metadata runId '{metadataRunId}' does not match requested runId '{request.RunId}'." };
+                return new DisposableWorkspaceValidationResult
+                {
+                    Status = "blocked",
+                    Summary = "Workspace validation was blocked.",
+                    ExitCode = 1,
+                    Data = new DisposableWorkspaceValidationData
+                    {
+                        RunId = request.RunId,
+                        WorkspacePath = request.WorkspacePath,
+                        ProfileId = request.ProfileId,
+                        Status = "blocked",
+                        Succeeded = false,
+                        Errors = errors
+                    },
+                    Errors = errors
+                };
+            }
+
+            var validationPath = Path.Combine(request.WorkspacePath, ".irondev", "runs", request.RunId, "validation.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(validationPath)!);
+            await File.WriteAllTextAsync(
+                validationPath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        runId = request.RunId,
+                        workspacePath = request.WorkspacePath,
+                        profileId = request.ProfileId,
+                        status = "succeeded",
+                        succeeded = true
+                    },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                    {
+                        WriteIndented = true
+                    }),
+                cancellationToken);
+
+            var step = new DisposableWorkspaceValidationStep
+            {
+                CommandId = "dotnet-build",
+                Status = "succeeded",
+                ExitCode = 0,
+                Succeeded = true,
+                EvidencePaths = [validationPath]
+            };
+            return new DisposableWorkspaceValidationResult
+            {
+                Status = "succeeded",
+                Summary = "Workspace validation completed.",
+                ExitCode = 0,
+                Data = new DisposableWorkspaceValidationData
+                {
+                    RunId = request.RunId,
+                    WorkspacePath = request.WorkspacePath,
+                    ProfileId = request.ProfileId,
+                    Status = "succeeded",
+                    Succeeded = true,
+                    Steps = [step],
+                    EvidencePaths = [validationPath],
+                    ValidationMetadataPath = validationPath
+                }
             };
         }
     }

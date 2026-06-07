@@ -1158,6 +1158,7 @@ public static class IronDevCli
                         WorkspacePath = workspacePath ?? string.Empty,
                         SourceRepo = string.Empty,
                         ProfileId = profileId ?? string.Empty,
+                        ValidationRunId = string.Empty,
                         ValidationWorkspacePath = string.Empty,
                         ValidationWorkspacePrepared = false,
                         ValidationStatus = "failed",
