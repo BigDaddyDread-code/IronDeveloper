@@ -434,6 +434,51 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task AgentRunSupervisor_MissingTesterContract_ReturnsFailedEnvelope()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var runner = new Func<string[], CancellationToken, Task<(int ExitCode, string Stdout, string Stderr)>>(async (_, _) =>
+        {
+            var stdout = BuildReplayRunnerSupervisorOutput(
+                commandStatus: "succeeded",
+                runStatus: "Completed",
+                approvalDecision: "not_required",
+                requiresHumanApproval: false,
+                exitCode: 0,
+                includeTester: false);
+
+            return (0, stdout, string.Empty);
+        });
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            runner: runner,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(1, result, error.ToString());
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual("failed", root.GetProperty("status").GetString());
+        var data = root.GetProperty("data");
+        Assert.AreEqual("Failed", data.GetProperty("agentStatus").GetString());
+        Assert.AreEqual("not_available", data.GetProperty("tester").GetProperty("commandStatus").GetString());
+        Assert.IsTrue(root.GetProperty("errors").GetArrayLength() > 0 || root.GetProperty("warnings").GetArrayLength() > 0);
+    }
+
+    [TestMethod]
     public async Task AgentRunSupervisor_JsonOutput_IsNotReplayRunnerProductEnvelope()
     {
         var output = new StringWriter();
@@ -698,8 +743,37 @@ public sealed class IronDevCliTests
         string runStatus,
         string approvalDecision,
         bool requiresHumanApproval,
-        int exitCode = 0)
+        int exitCode = 0,
+        bool includeTester = true)
     {
+        var loopReport = new Dictionary<string, object?>
+        {
+            ["supervisor"] = new
+            {
+                decision = "report_ready",
+                decisionReason = "report ready"
+            }
+        };
+
+        if (includeTester)
+        {
+            loopReport["tester"] = new
+            {
+                runId = "AgentRunProof001-tester",
+                traceId = "trace-supervisor-tester",
+                commandStatus,
+                runStatus,
+                governance = new
+                {
+                    decision = "derived",
+                    approvalDecision,
+                    blockedReason = commandStatus == "blocked" ? "AwaitingHumanApproval" : null,
+                    requiresHumanApproval
+                },
+                warnings = new[] { "run-contract bridge warning" }
+            };
+        }
+
         var root = JsonSerializer.Serialize(new
         {
             command = "agent supervisor run-goal",
@@ -709,29 +783,7 @@ public sealed class IronDevCliTests
             exitCode,
             commandsRun = new[] { "dotnet test" },
             evidencePaths = Array.Empty<string>(),
-            loopReport = new
-            {
-                supervisor = new
-                {
-                    decision = "report_ready",
-                    decisionReason = "report ready"
-                },
-                tester = new
-                {
-                    runId = "AgentRunProof001-tester",
-                    traceId = "trace-supervisor-tester",
-                    commandStatus,
-                    runStatus,
-                    governance = new
-                    {
-                        decision = "derived",
-                        approvalDecision,
-                        blockedReason = commandStatus == "blocked" ? "AwaitingHumanApproval" : null,
-                        requiresHumanApproval
-                    },
-                    warnings = new[] { "run-contract bridge warning" }
-                }
-            }
+            loopReport
         }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
         return root;

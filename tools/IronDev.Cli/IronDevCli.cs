@@ -651,9 +651,15 @@ public static class IronDevCli
             var supervisorDecision = TryGetString(supervisor, "decision") ?? "not_available";
             var supervisorDecisionReason = TryGetString(supervisor, "decisionReason") ?? "not_available";
 
-            var tester = loopReport.TryGetProperty("tester", out var testerElement)
+            var parseErrors = new List<string>();
+            var hasTester = loopReport.TryGetProperty("tester", out var testerElement);
+            var tester = hasTester
                 ? ParseAgentRunSupervisorTester(testerElement)
-                : new AgentRunSupervisorTesterData
+                : null;
+            if (!hasTester || tester is null)
+            {
+                parseErrors.Add("ReplayRunner output did not include loopReport.tester.");
+                tester = new AgentRunSupervisorTesterData
                 {
                     RunId = null,
                     TraceId = null,
@@ -668,6 +674,7 @@ public static class IronDevCli
                     },
                     Warnings = []
                 };
+            }
 
             return (
                 command,
@@ -680,7 +687,7 @@ public static class IronDevCli
                 supervisorDecision,
                 supervisorDecisionReason,
                 tester,
-                []);
+                parseErrors);
         }
         catch (JsonException)
         {
@@ -817,16 +824,18 @@ public static class IronDevCli
         string? runnerStatus,
         int runnerExitCode)
     {
+        if (string.Equals(testerCommandStatus, "succeeded", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(runnerStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) &&
+            runnerExitCode == 0)
+            return "succeeded";
+
         if (string.Equals(testerCommandStatus, "blocked", StringComparison.OrdinalIgnoreCase))
             return "blocked";
 
         if (string.Equals(testerCommandStatus, "failed", StringComparison.OrdinalIgnoreCase))
             return "failed";
 
-        if (string.Equals(runnerStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) && runnerExitCode == 0)
-            return "succeeded";
-
-        return runnerExitCode == 0 ? "succeeded" : "failed";
+        return "failed";
     }
 
     private static string ResolveSupervisorAgentStatus(
@@ -834,13 +843,15 @@ public static class IronDevCli
         string? runnerStatus,
         int runnerExitCode)
     {
-        if (string.Equals(runnerStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) && runnerExitCode == 0)
+        if (string.Equals(runnerStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) &&
+            runnerExitCode == 0 &&
+            string.Equals(testerCommandStatus, "succeeded", StringComparison.OrdinalIgnoreCase))
             return "Succeeded";
 
         if (string.Equals(testerCommandStatus, "blocked", StringComparison.OrdinalIgnoreCase))
             return "Blocked";
 
-        return runnerExitCode == 0 ? "Succeeded" : "Failed";
+        return "Failed";
     }
 
     private static AgentRunSupervisorTesterData ParseAgentRunSupervisorTester(JsonElement tester)
