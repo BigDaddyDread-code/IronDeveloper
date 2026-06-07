@@ -30,6 +30,7 @@ public static class IronDevCli
     private const string WorkspaceRunCommand = "workspace run";
     private const string WorkspaceValidateCommand = "workspace validate";
     private const string WorkspaceDiffCommand = "workspace diff";
+    private const string WorkspacePromotionPackageCommand = "workspace promotion-package";
 
     public static Task<int> RunAsync(
         string[] args,
@@ -179,6 +180,8 @@ public static class IronDevCli
             return await HandleWorkspaceValidateAsync(args, output, error, workspaceValidationService, cancellationToken);
         if (IsCommand(args, "workspace", "diff"))
             return await HandleWorkspaceDiffAsync(args, output, error, workspaceDiffService, cancellationToken);
+        if (IsCommand(args, "workspace", "promotion-package"))
+            return await HandleWorkspacePromotionPackageAsync(args, output, error, cancellationToken);
         if (args.Length >= 3 &&
             string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[1], "run", StringComparison.OrdinalIgnoreCase) &&
@@ -1000,6 +1003,105 @@ public static class IronDevCli
         {
             Status = result.Status,
             Command = WorkspaceDiffCommand,
+            TraceId = null,
+            Summary = result.Summary,
+            Data = result.Data,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        };
+
+        if (json)
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(resultEnvelope, JsonOptions));
+            return result.ExitCode;
+        }
+
+        await output.WriteLineAsync(resultEnvelope.Summary);
+        foreach (var resultError in resultEnvelope.Errors)
+            error.WriteLine(resultError);
+        foreach (var warning in resultEnvelope.Warnings)
+            error.WriteLine($"Warning: {warning}");
+
+        return result.ExitCode;
+    }
+
+    private static async Task<int> HandleWorkspacePromotionPackageAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var json = HasFlag(args, "--json");
+        var runId = GetOption(args, "--run-id");
+        var workspacePath = GetOption(args, "--workspace-path");
+
+        var validationErrors = new List<string>();
+        if (string.IsNullOrWhiteSpace(runId))
+            validationErrors.Add("Missing required option: --run-id <id>");
+        if (string.IsNullOrWhiteSpace(workspacePath))
+            validationErrors.Add("Missing required option: --workspace-path <path>");
+
+        if (validationErrors.Count > 0)
+        {
+            if (json)
+            {
+                var envelope = new DisposableWorkspacePromotionPackageEnvelope
+                {
+                    Status = "failed",
+                    Command = WorkspacePromotionPackageCommand,
+                    TraceId = null,
+                    Summary = "Workspace promotion package could not be started.",
+                    Data = new DisposableWorkspacePromotionPackageData
+                    {
+                        RunId = runId ?? string.Empty,
+                        WorkspacePath = workspacePath ?? string.Empty,
+                        SourceRepo = string.Empty,
+                        ValidationStatus = "not_available",
+                        ValidationSucceeded = false,
+                        DiffChanged = false,
+                        AddedFiles = [],
+                        ModifiedFiles = [],
+                        DeletedFiles = [],
+                        RequiresHumanApproval = true,
+                        CanApplyToSourceRepo = false,
+                        AutoPromotionAllowed = false,
+                        Recommendation = "not_ready_missing_evidence",
+                        RiskNotes = ["Promotion package evidence is missing or unsafe."],
+                        WorkspaceMetadataPath = null,
+                        ValidationMetadataPath = null,
+                        DiffMetadataPath = null,
+                        PromotionPackagePath = null,
+                        EvidencePaths = [],
+                        Errors = validationErrors,
+                        Warnings = []
+                    },
+                    Errors = validationErrors,
+                    Warnings = []
+                };
+                await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
+                return 2;
+            }
+
+            foreach (var errorMessage in validationErrors)
+                error.WriteLine(errorMessage);
+
+            PrintUsage(error);
+            return 2;
+        }
+
+        var service = new DisposableWorkspacePromotionPackageService();
+        var result = await service.CreateAsync(
+            new DisposableWorkspacePromotionPackageRequest
+            {
+                RunId = runId!,
+                WorkspacePath = workspacePath!
+            },
+            cancellationToken);
+
+        var resultEnvelope = new DisposableWorkspacePromotionPackageEnvelope
+        {
+            Status = result.Status,
+            Command = WorkspacePromotionPackageCommand,
             TraceId = null,
             Summary = result.Summary,
             Data = result.Data,
@@ -1957,6 +2059,7 @@ public static class IronDevCli
         error.WriteLine("  irondev workspace run --run-id <id> --workspace-path <path> --command <dotnet-build|dotnet-test> [--json]");
         error.WriteLine("  irondev workspace validate --run-id <id> --workspace-path <path> --profile <dotnet-build-test> [--json]");
         error.WriteLine("  irondev workspace diff --run-id <id> --workspace-path <path> [--json]");
+        error.WriteLine("  irondev workspace promotion-package --run-id <id> --workspace-path <path> [--json]");
         error.WriteLine("  irondev agent run supervisor --project <name> --query <text> --plan <path> --run-id <id> [--live-llm true|false] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev exercise chat-to-build --project-id <id> (--input <text> | --file <path>) [--title <title>] [--scenario-id <id>] [--expected-output <text>] [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev scenario list --project-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
