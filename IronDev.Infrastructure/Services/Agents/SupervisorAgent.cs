@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
+using IronDev.Core.RunReports;
 
 namespace IronDev.Infrastructure.Services.Agents;
 
@@ -11,18 +12,21 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly string _repoRoot;
     private readonly IAgentLlmClient? _llmClient;
     private readonly IAgentProcessRunner _processRunner;
+    private readonly IRunReportContractReader _runReportContractReader;
 
     public SupervisorAgent(
         AgentDefinition definition,
         IAgentModelResolver modelResolver,
         string repoRoot,
         IAgentLlmClient? llmClient = null,
+        IRunReportContractReader? runReportContractReader = null,
         IAgentProcessRunner? processRunner = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _repoRoot = repoRoot;
         _llmClient = llmClient;
+        _runReportContractReader = runReportContractReader ?? new NullRunReportContractReader();
         _processRunner = processRunner ?? new AgentProcessRunner();
     }
 
@@ -166,10 +170,11 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 ? $"TesterAgent skipped because ConscienceAgent decision was {conscienceDecision}."
                 : "TesterAgent skipped because RetrieverAgent failed.");
 
-        var testJson = TryParse(tests.Stdout);
-        var testsSucceeded = tests.ExitCode == 0 && ReadString(testJson, "status") == "Succeeded";
+        var testerRunId = $"{runId}-tester";
+        var testerReport = await ReadTesterRunReportAsync(tests, testerRunId, ct);
+        var testsSucceeded = testerReport is not null && testerReport.Status is "succeeded";
+        var testSummary = BuildTesterSummary(testerReport, testerRunId, TryParse(tests.Stdout));
         var status = memorySucceeded && conscienceAllows && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
-        var testSummary = ReadString(testJson, "summary");
         var decision = SelectDecision(memorySucceeded, conscienceAllows, testsSucceeded, conscienceDecision);
         var decisionReason = BuildDecisionReason(decision, memorySucceeded, conscienceAllows, testsSucceeded, conscienceDecision);
         var prompt = BuildPrompt(project, query, planPath, autonomyTier, decision, decisionReason, memorySucceeded, conscienceAllows, testsSucceeded);
@@ -220,6 +225,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                     $"conscienceDecision={conscienceDecision}",
                     $"conscienceAllows={conscienceAllows}",
                     $"testerSucceeded={testsSucceeded}",
+                    $"testerStatus={testerReport?.Status ?? "unknown"}",
                     string.IsNullOrWhiteSpace(topMemoryTitle) ? "topMemoryTitle=<none>" : $"topMemoryTitle={topMemoryTitle}",
                     string.IsNullOrWhiteSpace(testSummary) ? "testerSummary=<none>" : $"testerSummary={testSummary}"
                 }
@@ -247,7 +253,13 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             {
                 succeeded = testsSucceeded,
                 summary = testSummary,
-                report = ReadElement(testJson, "report")
+                runId = testerReport?.Data.RunId,
+                traceId = testerReport?.TraceId,
+                commandStatus = testerReport?.Status,
+                runStatus = testerReport?.Data.RunStatus,
+                governance = testerReport?.Data.Governance,
+                warnings = testerReport?.Warnings ?? [],
+                report = ReadElement(TryParse(tests.Stdout), "report")
             },
             governedAutonomy = new
             {
@@ -303,9 +315,48 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             ExitCode = status == AgentRunStatus.Succeeded ? 0 : 1,
             OutputJson = outputJson,
             CommandsRun = [memory.Command, conscience.Command, thoughtLedger.Command, tests.Command],
-            EvidencePaths = ExtractEvidencePaths(testJson),
+            EvidencePaths = ExtractEvidencePaths(testerReport, TryParse(tests.Stdout)),
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<RunReportContractReadResult?> ReadTesterRunReportAsync(
+        CommandRun tests,
+        string testerRunId,
+        CancellationToken ct)
+    {
+        if (tests.ExitCode != 0)
+            return null;
+
+        try
+        {
+            return await _runReportContractReader.ReadAsync(testerRunId, ct);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static string BuildTesterSummary(
+        RunReportContractReadResult? testerReport,
+        string testerRunId,
+        JsonElement? testJson)
+    {
+        if (testerReport is not null)
+        {
+            var governance = testerReport.Data.Governance;
+            return $"runId={testerReport.Data.RunId}, commandStatus={testerReport.Status}, runStatus={testerReport.Data.RunStatus}, governanceDecision={governance.Decision}";
+        }
+
+        if (testJson is null)
+            return $"No tester run report available for {testerRunId} and no parsed tester stdout.";
+
+        var status = ReadString(testJson, "status");
+        if (!string.IsNullOrWhiteSpace(status))
+            return $"TesterAgent returned status {status} without a contract report for {testerRunId}.";
+
+        return $"TesterAgent output could not be interpreted for {testerRunId}; no contract report was available.";
     }
 
     private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
@@ -496,8 +547,20 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         return value?.ValueKind == JsonValueKind.String ? value.Value.GetString() ?? string.Empty : string.Empty;
     }
 
-    private static IReadOnlyList<string> ExtractEvidencePaths(JsonElement? testJson)
+    private static IReadOnlyList<string> ExtractEvidencePaths(RunReportContractReadResult? testerReport, JsonElement? testJson)
     {
+        if (testerReport is not null)
+        {
+            var contractPaths = testerReport.Data.Evidence
+                .Select(item => item.Path)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(item => item!)
+                .ToArray();
+
+            if (contractPaths.Length > 0)
+                return contractPaths;
+        }
+
         var report = ReadElement(testJson, "report");
         var evidence = ReadElement(report, "evidence");
         if (evidence is null || evidence.Value.ValueKind != JsonValueKind.Array)
@@ -515,6 +578,40 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
     private static string JoinEvidence(IEnumerable<string> evidence) =>
         string.Join('|', evidence.Where(item => !string.IsNullOrWhiteSpace(item)));
+
+    private sealed class NullRunReportContractReader : IRunReportContractReader
+    {
+        public Task<RunReportContractReadResult> ReadAsync(string runId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new RunReportContractReadResult
+            {
+                Status = "failed",
+                Command = "runs report",
+                TraceId = null,
+                Summary = "No run report reader configured.",
+                Data = new RunReportContractData
+                {
+                    RunId = runId,
+                    RunStatus = "not_available",
+                    AgentName = null,
+                    TraceId = null,
+                    Governance = new RunReportGovernanceContractData
+                    {
+                        Decision = "not_available",
+                        ApprovalDecision = "not_available",
+                        BlockedReason = null,
+                        RequiresHumanApproval = false
+                    },
+                    ToolCalls = [],
+                    ProcessCommands = [],
+                    Evidence = [],
+                    EvidenceSummaryByPath = new Dictionary<string, string>(),
+                    Warnings = ["Run report reader is not available."]
+                },
+                Errors = ["Run report contract reader is unavailable."],
+                Warnings = ["Run report contract reader is not configured; blocked or failed status should be treated as non-success."],
+                ExitCode = 1
+            });
+    }
 
     private sealed record CommandRun(string Command, int ExitCode, string Stdout, string Stderr)
     {
