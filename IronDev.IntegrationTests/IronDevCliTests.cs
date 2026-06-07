@@ -727,6 +727,193 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceRun_UnknownCommand_ReturnsBlockedAndDoesNotStartProcess()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-unknown-command");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "powershell", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace run", root.GetProperty("command").GetString());
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+            AssertStringArrayContains(root.GetProperty("errors"), "not allowlisted");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "powershell")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_MissingMetadata_BlocksExecution()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-missing-metadata");
+        try
+        {
+            var workspacePath = Path.Combine(testRoot, "workspace");
+            Directory.CreateDirectory(workspacePath);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "dotnet-build", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "metadata");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_RunIdMismatch_BlocksExecution()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-runid-mismatch");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-a", sourceRepo);
+
+            using var doc = await RunWorkspaceCommandAsync("run-b", workspacePath, "dotnet-build", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "runId mismatch");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-b", "dotnet-build")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_DotnetBuildSucceedsInPreparedWorkspaceAndWritesEvidence()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-build-success");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedDotnetWorkspaceAsync(testRoot, "run-1", sourceRepo, brokenProgram: false);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "dotnet-build", expectedExitCode: 0);
+            var root = doc.RootElement;
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace run", root.GetProperty("command").GetString());
+            Assert.AreEqual(0, root.GetProperty("errors").GetArrayLength());
+
+            var data = root.GetProperty("data");
+            Assert.AreEqual("run-1", data.GetProperty("runId").GetString());
+            Assert.AreEqual("dotnet-build", data.GetProperty("commandId").GetString());
+            Assert.AreEqual(Path.GetFullPath(workspacePath), data.GetProperty("workingDirectory").GetString());
+            Assert.AreEqual(0, data.GetProperty("exitCode").GetInt32());
+            Assert.IsTrue(data.GetProperty("succeeded").GetBoolean());
+
+            var stdoutPath = data.GetProperty("stdoutPath").GetString()!;
+            var stderrPath = data.GetProperty("stderrPath").GetString()!;
+            var commandMetadataPath = data.GetProperty("commandMetadataPath").GetString()!;
+            Assert.IsTrue(File.Exists(stdoutPath));
+            Assert.IsTrue(File.Exists(stderrPath));
+            Assert.IsTrue(File.Exists(commandMetadataPath));
+            Assert.AreEqual(3, data.GetProperty("evidencePaths").GetArrayLength());
+
+            using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(commandMetadataPath));
+            var commandMetadata = metadata.RootElement;
+            Assert.AreEqual("run-1", commandMetadata.GetProperty("runId").GetString());
+            Assert.AreEqual("dotnet-build", commandMetadata.GetProperty("commandId").GetString());
+            Assert.AreEqual(Path.GetFullPath(workspacePath), commandMetadata.GetProperty("workingDirectory").GetString());
+            Assert.AreEqual("dotnet", commandMetadata.GetProperty("executable").GetString());
+            Assert.AreEqual(0, commandMetadata.GetProperty("exitCode").GetInt32());
+
+            Assert.AreEqual(string.Empty, await GetGitStatusAsync(sourceRepo));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_DotnetBuildFailureReturnsFailedEnvelopeAndEvidence()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-build-failure");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedDotnetWorkspaceAsync(testRoot, "run-1", sourceRepo, brokenProgram: true);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "dotnet-build", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("failed", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "non-zero exit code");
+
+            var data = root.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("succeeded").GetBoolean());
+            Assert.AreNotEqual(0, data.GetProperty("exitCode").GetInt32());
+            Assert.IsTrue(File.Exists(data.GetProperty("stdoutPath").GetString()!));
+            Assert.IsTrue(File.Exists(data.GetProperty("stderrPath").GetString()!));
+            Assert.IsTrue(File.Exists(data.GetProperty("commandMetadataPath").GetString()!));
+            Assert.AreEqual(3, data.GetProperty("evidencePaths").GetArrayLength());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_JsonOutput_UsesStandardEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-envelope");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "unknown-command", expectedExitCode: 1);
+            var root = doc.RootElement;
+            var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+            var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+            CollectionAssert.AreEqual(
+                expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+                topLevelProperties.OrderBy(item => item).ToArray());
+            Assert.AreEqual("workspace run", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void WorkspaceCommandService_MustUseAllowlistedNoShellExecution()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "IronDev.Infrastructure",
+            "Services",
+            "Workspaces",
+            "DisposableWorkspaceCommandService.cs"));
+
+        StringAssert.Contains(source, "UseShellExecute = false");
+        StringAssert.Contains(source, "ArgumentList");
+        Assert.IsFalse(source.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("-Command", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("IAgent", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("SupervisorAgent", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task AgentRunSupervisor_MissingRequiredOptions_WithJson_ReturnsFailureEnvelope()
     {
         var output = new StringWriter();
@@ -1420,6 +1607,32 @@ public sealed class IronDevCliTests
         return JsonDocument.Parse(output.ToString());
     }
 
+    private static async Task<JsonDocument> RunWorkspaceCommandAsync(
+        string runId,
+        string workspacePath,
+        string commandId,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "run",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--command", commandId,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
     private static string CreateTemporaryDirectory(string prefix)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
@@ -1459,6 +1672,70 @@ public sealed class IronDevCliTests
         return sourceRepo;
     }
 
+    private static async Task<string> CreatePreparedWorkspaceAsync(
+        string testRoot,
+        string runId,
+        string sourceRepo)
+    {
+        var workspacePath = Path.GetFullPath(Path.Combine(testRoot, "workspaces", runId));
+        Directory.CreateDirectory(Path.Combine(workspacePath, ".irondev"));
+        await WriteWorkspaceMetadataAsync(runId, sourceRepo, workspacePath);
+        return workspacePath;
+    }
+
+    private static async Task<string> CreatePreparedDotnetWorkspaceAsync(
+        string testRoot,
+        string runId,
+        string sourceRepo,
+        bool brokenProgram)
+    {
+        var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, runId, sourceRepo);
+        await File.WriteAllTextAsync(
+            Path.Combine(workspacePath, "TestApp.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <TargetFramework>net10.0</TargetFramework>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(
+            Path.Combine(workspacePath, "Program.cs"),
+            brokenProgram
+                ? "Console.WriteLine(\"broken\""
+                : "Console.WriteLine(\"hello from disposable workspace\");");
+        await RunDotnetForTestAsync(workspacePath, "restore", "--nologo");
+        return workspacePath;
+    }
+
+    private static async Task WriteWorkspaceMetadataAsync(
+        string runId,
+        string sourceRepo,
+        string workspacePath)
+    {
+        var metadataPath = Path.Combine(workspacePath, ".irondev", "workspace.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        await File.WriteAllTextAsync(
+            metadataPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    runId,
+                    sourceRepo = Path.GetFullPath(sourceRepo),
+                    workspacePath = Path.GetFullPath(workspacePath),
+                    createdUtc = DateTimeOffset.UtcNow,
+                    preparationMethod = "copy",
+                    sourceRepoMutated = false
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
+    }
+
     private static async Task RunGitForTestAsync(string workingDirectory, params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("git")
@@ -1480,6 +1757,30 @@ public sealed class IronDevCliTests
         {
             throw new InvalidOperationException(
                 $"git {string.Join(' ', arguments)} failed with exit code {process.ExitCode}: {await stdout} {await stderr}");
+        }
+    }
+
+    private static async Task RunDotnetForTestAsync(string workingDirectory, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start dotnet.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"dotnet {string.Join(' ', arguments)} failed with exit code {process.ExitCode}: {await stdout} {await stderr}");
         }
     }
 
