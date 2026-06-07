@@ -218,16 +218,25 @@ public sealed class DisposableWorkspaceApplyDryRunService : IDisposableWorkspace
         if (string.IsNullOrWhiteSpace(sourceRepo))
             blockers.Add("Workspace metadata is missing sourceRepo.");
 
+        var preflight = GetObjectOrSelf(applyPreflight, "preflight");
+
         return new ArtifactFacts(
             SourceRepo: sourceRepo,
-            ReadyForApply: GetBool(applyPreflight, "readyForApply") ?? false,
-            CanApplyNow: GetBool(applyPreflight, "canApplyNow") ?? true,
-            RequiresSeparateApplyCommand: GetBool(applyPreflight, "requiresSeparateApplyCommand") ?? false,
-            Recommendation: GetString(applyPreflight, "recommendation") ?? string.Empty,
+            ReadyForApply: GetBool(preflight, "readyForApply") ?? GetBool(applyPreflight, "readyForApply") ?? false,
+            CanApplyNow: GetBool(preflight, "canApplyNow") ?? GetBool(applyPreflight, "canApplyNow") ?? true,
+            RequiresSeparateApplyCommand: GetBool(preflight, "requiresSeparateApplyCommand") ?? GetBool(applyPreflight, "requiresSeparateApplyCommand") ?? false,
+            Recommendation: GetString(preflight, "recommendation") ?? GetString(applyPreflight, "recommendation") ?? string.Empty,
             AddedFiles: GetStringArray(diffEvidence, "addedFiles"),
             ModifiedFiles: GetStringArray(diffEvidence, "modifiedFiles"),
             DeletedFiles: GetStringArray(diffEvidence, "deletedFiles"));
     }
+
+    private static JsonElement GetObjectOrSelf(JsonElement element, string propertyName) =>
+        element.ValueKind == JsonValueKind.Object &&
+        element.TryGetProperty(propertyName, out var nested) &&
+        nested.ValueKind == JsonValueKind.Object
+            ? nested
+            : element;
 
     private static async Task<IReadOnlyList<DisposableWorkspaceApplyOperation>> BuildOperationsAsync(
         ArtifactFacts facts,
