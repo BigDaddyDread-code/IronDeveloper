@@ -712,6 +712,30 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public void SupervisorCliProofOutput_ShouldBeContractEnvelope()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var proofPath = Path.Combine(
+            repoRoot,
+            "tools",
+            "dogfood",
+            "proofs",
+            "supervisor-cli-proof",
+            "supervisor-cli-proof-001.json");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(proofPath));
+        var root = document.RootElement;
+        var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+        var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+        CollectionAssert.AreEqual(
+            expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+            topLevelProperties.OrderBy(item => item).ToArray());
+        Assert.AreEqual("agent run supervisor", root.GetProperty("command").GetString());
+        Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+    }
+
+    [TestMethod]
     public void IronDevApi_MustNotReferenceCliReplayRunnerOrPowerShellForTicketCreation()
     {
         var repoRoot = FindRepositoryRoot();
