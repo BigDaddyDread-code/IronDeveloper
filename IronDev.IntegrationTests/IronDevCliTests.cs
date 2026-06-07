@@ -1826,6 +1826,227 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspacePromotionPackage_MissingWorkspaceMetadata_BlocksPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-missing-metadata");
+        try
+        {
+            var workspacePath = Path.Combine(testRoot, "workspace");
+            Directory.CreateDirectory(workspacePath);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace promotion-package", root.GetProperty("command").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "metadata");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "promotion-package.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_MissingValidationPackage_BlocksPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-missing-validation");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteDiffPackageAsync("run-1", workspacePath, sourceRepo, changed: true, addedFiles: ["src/new.cs"]);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "validation");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "promotion-package.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_MissingDiffPackage_BlocksPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-missing-diff");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteValidationPackageAsync("run-1", workspacePath, "succeeded");
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "diff");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "promotion-package.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_ValidationSucceededAndDiffChanged_CreatesReadyForHumanReviewPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-ready");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var commandEvidencePath = Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-build", "stdout.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(commandEvidencePath)!);
+            await File.WriteAllTextAsync(commandEvidencePath, "build output");
+            await WriteValidationPackageAsync("run-1", workspacePath, "succeeded", [commandEvidencePath]);
+            await WriteDiffPackageAsync("run-1", workspacePath, sourceRepo, changed: true, addedFiles: ["src/new.cs"], modifiedFiles: ["README.md"]);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 0);
+            var root = doc.RootElement;
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace promotion-package", root.GetProperty("command").GetString());
+            Assert.AreEqual(JsonValueKind.Null, root.GetProperty("traceId").ValueKind);
+            Assert.AreEqual(JsonValueKind.Object, root.GetProperty("data").ValueKind);
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+
+            var data = root.GetProperty("data");
+            Assert.AreEqual("ready_for_human_review", data.GetProperty("recommendation").GetString());
+            Assert.IsTrue(data.GetProperty("requiresHumanApproval").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyToSourceRepo").GetBoolean());
+            Assert.IsFalse(data.GetProperty("autoPromotionAllowed").GetBoolean());
+            Assert.IsTrue(data.GetProperty("diffChanged").GetBoolean());
+            AssertStringArrayContains(data.GetProperty("addedFiles"), "src/new.cs");
+            AssertStringArrayContains(data.GetProperty("modifiedFiles"), "README.md");
+            AssertStringArrayContains(data.GetProperty("evidencePaths"), "workspace.json");
+            AssertStringArrayContains(data.GetProperty("evidencePaths"), "validation.json");
+            AssertStringArrayContains(data.GetProperty("evidencePaths"), "diff.json");
+            AssertStringArrayContains(data.GetProperty("evidencePaths"), "promotion-package.json");
+            AssertStringArrayContains(data.GetProperty("evidencePaths"), "stdout.txt");
+            Assert.IsTrue(File.Exists(data.GetProperty("promotionPackagePath").GetString()));
+            Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, ".irondev", "runs", "run-1", "promotion-package.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_ValidationFailed_CreatesNotReadyPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-validation-failed");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteValidationPackageAsync("run-1", workspacePath, "failed");
+            await WriteDiffPackageAsync("run-1", workspacePath, sourceRepo, changed: true, modifiedFiles: ["README.md"]);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            Assert.AreEqual("not_ready_validation_failed", data.GetProperty("recommendation").GetString());
+            Assert.IsTrue(data.GetProperty("requiresHumanApproval").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyToSourceRepo").GetBoolean());
+            AssertStringArrayContains(data.GetProperty("riskNotes"), "Validation did not succeed");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_NoChanges_CreatesNotReadyPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-no-changes");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteValidationPackageAsync("run-1", workspacePath, "succeeded");
+            await WriteDiffPackageAsync("run-1", workspacePath, sourceRepo, changed: false);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            Assert.AreEqual("not_ready_no_changes", data.GetProperty("recommendation").GetString());
+            AssertStringArrayContains(data.GetProperty("riskNotes"), "No changed files");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_DeletedFiles_AddsRiskNote()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-deleted-risk");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteValidationPackageAsync("run-1", workspacePath, "succeeded");
+            await WriteDiffPackageAsync("run-1", workspacePath, sourceRepo, changed: true, deletedFiles: ["old/file.cs"]);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            AssertStringArrayContains(data.GetProperty("deletedFiles"), "old/file.cs");
+            AssertStringArrayContains(data.GetProperty("riskNotes"), "Deleted files");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspacePromotionPackage_InvalidSourceWorkspaceRelationship_BlocksPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-promotion-invalid-relationship");
+        try
+        {
+            var workspacePath = Path.GetFullPath(Path.Combine(testRoot, "workspaces", "run-1"));
+            var nestedSourceRepo = Path.Combine(workspacePath, "nested-source");
+            Directory.CreateDirectory(nestedSourceRepo);
+            await WriteWorkspaceMetadataAsync("run-1", nestedSourceRepo, workspacePath);
+
+            using var doc = await RunWorkspacePromotionPackageAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "isolated");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "promotion-package.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void DisposableWorkspacePromotionPackageService_DoesNotExecuteProcessesPatchOrAgents()
+    {
+        var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "IronDev.Infrastructure", "Services", "Workspaces", "DisposableWorkspacePromotionPackageService.cs")));
+
+        Assert.IsFalse(serviceSource.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("\"git\"", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("patch", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("ApplyAsync", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("ApplyPatch", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("IAgent", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("SupervisorAgent", StringComparison.Ordinal));
+    }
+    [TestMethod]
     public async Task AgentRunSupervisor_JsonOutput_IsTypedContractEnvelope()
     {
         var output = new StringWriter();
@@ -2229,6 +2450,29 @@ public sealed class IronDevCliTests
         return JsonDocument.Parse(output.ToString());
     }
 
+    private static async Task<JsonDocument> RunWorkspacePromotionPackageAsync(
+        string runId,
+        string workspacePath,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "promotion-package",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
     private static async Task<JsonDocument> RunWorkspaceDiffAsync(
         string runId,
         string workspacePath,
@@ -2373,6 +2617,74 @@ public sealed class IronDevCliTests
         return workspacePath;
     }
 
+    private static async Task WriteValidationPackageAsync(
+        string runId,
+        string workspacePath,
+        string status,
+        IReadOnlyList<string>? evidencePaths = null)
+    {
+        var validationPath = Path.Combine(workspacePath, ".irondev", "runs", runId, "validation.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(validationPath)!);
+        await File.WriteAllTextAsync(
+            validationPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    runId,
+                    workspacePath = Path.GetFullPath(workspacePath),
+                    profileId = "dotnet-build-test",
+                    startedUtc = DateTimeOffset.UtcNow,
+                    completedUtc = DateTimeOffset.UtcNow,
+                    status,
+                    steps = new[]
+                    {
+                        new
+                        {
+                            commandId = "dotnet-build",
+                            status,
+                            exitCode = string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase) ? 0 : 1,
+                            succeeded = string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase),
+                            evidencePaths = evidencePaths ?? []
+                        }
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
+    }
+
+    private static async Task WriteDiffPackageAsync(
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        bool changed,
+        IReadOnlyList<string>? addedFiles = null,
+        IReadOnlyList<string>? modifiedFiles = null,
+        IReadOnlyList<string>? deletedFiles = null)
+    {
+        var diffPath = Path.Combine(workspacePath, ".irondev", "runs", runId, "diff.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(diffPath)!);
+        await File.WriteAllTextAsync(
+            diffPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    runId,
+                    workspacePath = Path.GetFullPath(workspacePath),
+                    sourceRepo = Path.GetFullPath(sourceRepo),
+                    createdUtc = DateTimeOffset.UtcNow,
+                    changed,
+                    addedFiles = addedFiles ?? [],
+                    modifiedFiles = modifiedFiles ?? [],
+                    deletedFiles = deletedFiles ?? [],
+                    unchangedFileCount = 0
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
+    }
     private static async Task WriteWorkspaceMetadataAsync(
         string runId,
         string sourceRepo,
