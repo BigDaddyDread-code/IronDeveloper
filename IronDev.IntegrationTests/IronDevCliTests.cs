@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -346,6 +347,233 @@ public sealed class IronDevCliTests
         Assert.AreEqual(0, data.GetProperty("processCommands").GetArrayLength());
         Assert.AreEqual(0, data.GetProperty("evidence").GetArrayLength());
         AssertArrayNotEmpty(root.GetProperty("errors"));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_MissingRequiredOptions_WithJson_ReturnsFailureEnvelope()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await IronDevCli.RunAsync(
+            ["workspace", "check", "--json"],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(2, result, error.ToString());
+        AssertJsonWasWritten(output);
+
+        using var doc = JsonDocument.Parse(output.ToString());
+        var root = doc.RootElement;
+        Assert.AreEqual("failed", root.GetProperty("status").GetString());
+        Assert.AreEqual("workspace check", root.GetProperty("command").GetString());
+        Assert.AreEqual(JsonValueKind.Object, root.GetProperty("data").ValueKind);
+        AssertArrayNotEmpty(root.GetProperty("errors"));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_ValidWorkspacePath_ReturnsSucceededReadyEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-valid");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            var output = new StringWriter();
+            var error = new StringWriter();
+            var result = await IronDevCli.RunAsync(
+                [
+                    "workspace", "check",
+                    "--run-id", "run-123",
+                    "--source-repo", sourceRepo,
+                    "--workspace-root", workspaceRoot,
+                    "--json"
+                ],
+                output,
+                error,
+                handler: null,
+                CancellationToken.None);
+
+            Assert.AreEqual(0, result, error.ToString());
+            using var doc = JsonDocument.Parse(output.ToString());
+            var root = doc.RootElement;
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace check", root.GetProperty("command").GetString());
+            Assert.AreEqual(JsonValueKind.Null, root.GetProperty("traceId").ValueKind);
+            Assert.AreEqual(0, root.GetProperty("errors").GetArrayLength());
+
+            var data = root.GetProperty("data");
+            Assert.AreEqual("run-123", data.GetProperty("runId").GetString());
+            Assert.AreEqual(Path.GetFullPath(sourceRepo), data.GetProperty("sourceRepo").GetString());
+            Assert.AreEqual(Path.GetFullPath(workspaceRoot), data.GetProperty("workspaceRoot").GetString());
+            Assert.AreEqual(Path.Combine(Path.GetFullPath(workspaceRoot), "run-123"), data.GetProperty("workspacePath").GetString());
+            Assert.IsTrue(data.GetProperty("sourceRepoExists").GetBoolean());
+            Assert.IsTrue(data.GetProperty("workspaceRootExists").GetBoolean());
+            Assert.IsFalse(data.GetProperty("workspacePathExists").GetBoolean());
+            Assert.IsFalse(data.GetProperty("isInsideSourceRepo").GetBoolean());
+            Assert.IsTrue(data.GetProperty("gitStatusClean").GetBoolean());
+            Assert.IsTrue(data.GetProperty("canCreateWorkspaceDirectory").GetBoolean());
+            Assert.IsTrue(data.GetProperty("ready").GetBoolean());
+            AssertArrayNotEmpty(data.GetProperty("checks"));
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspaceRoot, "run-123")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_WorkspaceInsideSourceRepo_ReturnsBlocked()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-inside-source");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspaceRoot = Path.Combine(sourceRepo, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspaceCheckAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            var data = root.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("ready").GetBoolean());
+            Assert.IsTrue(data.GetProperty("isInsideSourceRepo").GetBoolean());
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_WorkspaceRootSameAsSourceRepo_ReturnsBlocked()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-root-same");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+
+            using var doc = await RunWorkspaceCheckAsync("run-123", sourceRepo, sourceRepo, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            var data = root.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("ready").GetBoolean());
+            Assert.IsTrue(data.GetProperty("workspaceRootSameAsSourceRepo").GetBoolean());
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_MissingSourceRepo_ReturnsFailed()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-missing-source");
+        try
+        {
+            var sourceRepo = Path.Combine(testRoot, "missing-source");
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspaceCheckAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("failed", root.GetProperty("status").GetString());
+            var data = root.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("sourceRepoExists").GetBoolean());
+            Assert.IsFalse(data.GetProperty("ready").GetBoolean());
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_DirtyGitStatus_ReturnsBlocked()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-dirty");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(Path.Combine(sourceRepo, "dirty.txt"), "untracked");
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspaceCheckAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            var data = root.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("gitStatusClean").GetBoolean());
+            Assert.IsFalse(data.GetProperty("ready").GetBoolean());
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_NonEmptyWorkspacePath_ReturnsBlocked()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-nonempty");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            var workspacePath = Path.Combine(workspaceRoot, "run-123");
+            Directory.CreateDirectory(workspacePath);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "existing.txt"), "existing");
+
+            using var doc = await RunWorkspaceCheckAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            var data = root.GetProperty("data");
+            Assert.IsTrue(data.GetProperty("workspacePathExists").GetBoolean());
+            Assert.IsFalse(data.GetProperty("ready").GetBoolean());
+            AssertArrayNotEmpty(root.GetProperty("errors"));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCheck_JsonOutput_UsesStandardEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-check-envelope");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+
+            using var doc = await RunWorkspaceCheckAsync("run-123", sourceRepo, workspaceRoot, expectedExitCode: 0);
+            var root = doc.RootElement;
+            var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+            var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+            CollectionAssert.AreEqual(
+                expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+                topLevelProperties.OrderBy(item => item).ToArray());
+            Assert.AreEqual("workspace check", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
     }
 
     [TestMethod]
@@ -988,6 +1216,88 @@ public sealed class IronDevCliTests
         }
 
         throw new DirectoryNotFoundException("Could not find repository root.");
+    }
+
+    private static async Task<JsonDocument> RunWorkspaceCheckAsync(
+        string runId,
+        string sourceRepo,
+        string workspaceRoot,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "check",
+                "--run-id", runId,
+                "--source-repo", sourceRepo,
+                "--workspace-root", workspaceRoot,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
+    private static string CreateTemporaryDirectory(string prefix)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static async Task<string> CreateTemporaryGitRepositoryAsync(string testRoot)
+    {
+        var sourceRepo = Path.Combine(testRoot, "source");
+        Directory.CreateDirectory(sourceRepo);
+        await RunGitForTestAsync(sourceRepo, "init", "-q");
+        return sourceRepo;
+    }
+
+    private static async Task RunGitForTestAsync(string workingDirectory, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start git.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git {string.Join(' ', arguments)} failed with exit code {process.ExitCode}: {await stdout} {await stderr}");
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Best effort cleanup for temp test directories on Windows.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best effort cleanup for temp test directories on Windows.
+        }
     }
 
     private static SupervisorAgentRunResult BuildSupervisorRunResult(
