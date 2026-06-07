@@ -1013,6 +1013,207 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceValidate_UnknownProfile_ReturnsBlockedAndDoesNotRunCommands()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-validate-unknown-profile");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceValidateAsync("run-1", workspacePath, "arbitrary", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace validate", root.GetProperty("command").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "profile");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-build")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "validation.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceValidate_DotnetBuildTestProfileSucceedsAndWritesPackage()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-validate-success");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedDotnetTestWorkspaceAsync(testRoot, "run-1", sourceRepo, brokenBuild: false);
+
+            using var doc = await RunWorkspaceValidateAsync("run-1", workspacePath, "dotnet-build-test", expectedExitCode: 0);
+            var root = doc.RootElement;
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace validate", root.GetProperty("command").GetString());
+            Assert.AreEqual(0, root.GetProperty("errors").GetArrayLength());
+
+            var data = root.GetProperty("data");
+            Assert.AreEqual("run-1", data.GetProperty("runId").GetString());
+            Assert.AreEqual("dotnet-build-test", data.GetProperty("profileId").GetString());
+            Assert.AreEqual("succeeded", data.GetProperty("status").GetString());
+            Assert.IsTrue(data.GetProperty("succeeded").GetBoolean());
+
+            var steps = data.GetProperty("steps").EnumerateArray().ToArray();
+            Assert.AreEqual(2, steps.Length);
+            Assert.AreEqual("dotnet-build", steps[0].GetProperty("commandId").GetString());
+            Assert.AreEqual("succeeded", steps[0].GetProperty("status").GetString());
+            Assert.AreEqual("dotnet-test", steps[1].GetProperty("commandId").GetString());
+            Assert.AreEqual("succeeded", steps[1].GetProperty("status").GetString());
+
+            var validationMetadataPath = data.GetProperty("validationMetadataPath").GetString()!;
+            Assert.IsTrue(File.Exists(validationMetadataPath));
+            Assert.IsTrue(data.GetProperty("evidencePaths").GetArrayLength() >= 7);
+            Assert.IsTrue(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-build", "command.json")));
+            Assert.IsTrue(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-test", "command.json")));
+
+            using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(validationMetadataPath));
+            var metadataRoot = metadata.RootElement;
+            Assert.AreEqual("run-1", metadataRoot.GetProperty("runId").GetString());
+            Assert.AreEqual("dotnet-build-test", metadataRoot.GetProperty("profileId").GetString());
+            Assert.AreEqual("succeeded", metadataRoot.GetProperty("status").GetString());
+            Assert.AreEqual(2, metadataRoot.GetProperty("steps").GetArrayLength());
+
+            Assert.AreEqual(string.Empty, await GetGitStatusAsync(sourceRepo));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceValidate_BuildFailureStopsBeforeTest()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-validate-build-failure");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedDotnetTestWorkspaceAsync(testRoot, "run-1", sourceRepo, brokenBuild: true);
+
+            using var doc = await RunWorkspaceValidateAsync("run-1", workspacePath, "dotnet-build-test", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("failed", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "non-zero exit code");
+
+            var data = root.GetProperty("data");
+            var steps = data.GetProperty("steps").EnumerateArray().ToArray();
+            Assert.AreEqual(1, steps.Length);
+            Assert.AreEqual("dotnet-build", steps[0].GetProperty("commandId").GetString());
+            Assert.AreEqual("failed", steps[0].GetProperty("status").GetString());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-test", "command.json")));
+            Assert.IsTrue(File.Exists(data.GetProperty("validationMetadataPath").GetString()!));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceValidate_CommandBlockedStopsValidation()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-validate-command-blocked");
+        try
+        {
+            var workspacePath = Path.Combine(testRoot, "workspace");
+            Directory.CreateDirectory(workspacePath);
+            var commandService = new FakeWorkspaceCommandService
+            {
+                OnRunAsync = request => Task.FromResult(new DisposableWorkspaceCommandExecutionResult
+                {
+                    Status = "blocked",
+                    Summary = "Blocked by fake command service.",
+                    ExitCode = 1,
+                    Data = new DisposableWorkspaceCommandData
+                    {
+                        RunId = request.RunId,
+                        WorkspacePath = request.WorkspacePath,
+                        CommandId = request.CommandId,
+                        WorkingDirectory = request.WorkspacePath,
+                        ExitCode = -1,
+                        Succeeded = false,
+                        EvidencePaths = [],
+                        Errors = ["fake blocked command"],
+                        Warnings = []
+                    },
+                    Errors = ["fake blocked command"],
+                    Warnings = []
+                })
+            };
+            var service = new DisposableWorkspaceValidationService(commandService);
+
+            var result = await service.ValidateAsync(
+                new DisposableWorkspaceValidationRequest
+                {
+                    RunId = "run-1",
+                    WorkspacePath = workspacePath,
+                    ProfileId = "dotnet-build-test"
+                },
+                CancellationToken.None);
+
+            Assert.AreEqual("blocked", result.Status);
+            Assert.AreEqual(1, result.Data.Steps.Count);
+            Assert.AreEqual("dotnet-build", result.Data.Steps[0].CommandId);
+            CollectionAssert.AreEqual(new[] { "dotnet-build" }, commandService.CommandIds.ToArray());
+            Assert.IsTrue(File.Exists(result.Data.ValidationMetadataPath!));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceValidate_JsonOutput_UsesStandardEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-validate-envelope");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceValidateAsync("run-1", workspacePath, "unknown-profile", expectedExitCode: 1);
+            var root = doc.RootElement;
+            var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+            var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+            CollectionAssert.AreEqual(
+                expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+                topLevelProperties.OrderBy(item => item).ToArray());
+            Assert.AreEqual("workspace validate", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void WorkspaceValidationService_MustNotStartProcessesDirectly()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "IronDev.Infrastructure",
+            "Services",
+            "Workspaces",
+            "DisposableWorkspaceValidationService.cs"));
+
+        StringAssert.Contains(source, "IDisposableWorkspaceCommandService");
+        Assert.IsFalse(source.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("-Command", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
     public async Task AgentRunSupervisor_MissingRequiredOptions_WithJson_ReturnsFailureEnvelope()
     {
         var output = new StringWriter();
@@ -1732,6 +1933,32 @@ public sealed class IronDevCliTests
         return JsonDocument.Parse(output.ToString());
     }
 
+    private static async Task<JsonDocument> RunWorkspaceValidateAsync(
+        string runId,
+        string workspacePath,
+        string profileId,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "validate",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--profile", profileId,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
     private static string CreateTemporaryDirectory(string prefix)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
@@ -1806,6 +2033,37 @@ public sealed class IronDevCliTests
             brokenProgram
                 ? "Console.WriteLine(\"broken\""
                 : "Console.WriteLine(\"hello from disposable workspace\");");
+        await RunDotnetForTestAsync(workspacePath, "restore", "--nologo");
+        return workspacePath;
+    }
+
+    private static async Task<string> CreatePreparedDotnetTestWorkspaceAsync(
+        string testRoot,
+        string runId,
+        string sourceRepo,
+        bool brokenBuild)
+    {
+        var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, runId, sourceRepo);
+        await File.WriteAllTextAsync(
+            Path.Combine(workspacePath, "ValidationSample.Tests.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <LangVersion>latest</LangVersion>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="MSTest" Version="4.0.2" />
+              </ItemGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(
+            Path.Combine(workspacePath, "SampleTests.cs"),
+            brokenBuild
+                ? "using Microsoft.VisualStudio.TestTools.UnitTesting; [TestClass] public sealed class SampleTests { [TestMethod] public void Passes() { Assert.AreEqual(2, 1 + ); } }"
+                : "using Microsoft.VisualStudio.TestTools.UnitTesting; [TestClass] public sealed class SampleTests { [TestMethod] public void Passes() { Assert.AreEqual(2, 1 + 1); } }");
         await RunDotnetForTestAsync(workspacePath, "restore", "--nologo");
         return workspacePath;
     }
@@ -2084,6 +2342,23 @@ public sealed class IronDevCliTests
                 throw new InvalidOperationException("No fake supervisor service handler was configured.");
 
             return OnRunAsync(request, cancellationToken);
+        }
+    }
+
+    private sealed class FakeWorkspaceCommandService : IDisposableWorkspaceCommandService
+    {
+        public List<string> CommandIds { get; } = [];
+        public Func<DisposableWorkspaceCommandRequest, Task<DisposableWorkspaceCommandExecutionResult>>? OnRunAsync { get; set; }
+
+        public Task<DisposableWorkspaceCommandExecutionResult> RunAsync(
+            DisposableWorkspaceCommandRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CommandIds.Add(request.CommandId);
+            if (OnRunAsync is null)
+                throw new InvalidOperationException("No fake workspace command handler was configured.");
+
+            return OnRunAsync(request);
         }
     }
 
