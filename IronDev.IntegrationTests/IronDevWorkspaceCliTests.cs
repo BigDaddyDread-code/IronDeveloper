@@ -3909,6 +3909,263 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceFailurePackage_UnknownFailedStage_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-unknown-stage");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "banana", expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            Assert.IsFalse(File.Exists(GetFailurePackagePath(workspacePath, "run-1")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_MissingWorkspaceMetadata_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-missing-metadata");
+        try
+        {
+            var workspacePath = Path.Combine(testRoot, "workspace");
+            Directory.CreateDirectory(workspacePath);
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "apply-copy", expectedExitCode: 1);
+
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            Assert.IsFalse(File.Exists(GetFailurePackagePath(workspacePath, "run-1")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_EarlyFailureWithMissingLaterEvidence_Succeeds()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-early");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "apply-preflight", expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            var missingEvidence = data.GetProperty("missingEvidence");
+
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(missingEvidence, "apply-preflight.json");
+            AssertStringArrayContains(missingEvidence, "apply-dry-run.json");
+            AssertStringArrayContains(missingEvidence, "apply-copy.json");
+            AssertStringArrayContains(missingEvidence, "apply-verify.json");
+            AssertStringArrayContains(missingEvidence, "post-apply-validation.json");
+            AssertStringArrayContains(missingEvidence, "source-report.json");
+            Assert.IsFalse(data.GetProperty("sourceRepoMutated").GetBoolean());
+            Assert.AreEqual("safe_to_retry_after_fixing_blockers", data.GetProperty("recommendedNextAction").GetString());
+            Assert.IsTrue(File.Exists(GetFailurePackagePath(workspacePath, "run-1")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_ApplyCopyMutatedButNotVerified_IsCritical()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-critical");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteAppliedFilePairAsync(sourceRepo, workspacePath, "new.txt", "new file");
+            await WriteApplyCopyEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")], applied: false, sourceRepoMutated: true);
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "apply-copy", expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            var riskNotes = data.GetProperty("riskNotes");
+
+            Assert.AreEqual("critical", data.GetProperty("failureSeverity").GetString());
+            Assert.IsTrue(data.GetProperty("sourceRepoMutated").GetBoolean());
+            Assert.IsFalse(data.GetProperty("applyVerified").GetBoolean());
+            Assert.AreEqual("do_not_retry_until_source_reviewed", data.GetProperty("recommendedNextAction").GetString());
+            AssertStringArrayContains(riskNotes, "Source repository may contain applied changes.");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_VerifiedButPostApplyValidationFailed_IsHigh()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-high");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteAppliedFilePairAsync(sourceRepo, workspacePath, "new.txt", "new file");
+            await WriteApplyCopyEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")], applied: true, sourceRepoMutated: true);
+            await WriteApplyVerifyEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")], verified: true, sourceMatchesWorkspace: true, failedCount: 0);
+            await WritePostApplyValidationEvidenceAsync("run-1", workspacePath, sourceRepo, validationSucceeded: false, validationStatus: "failed");
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "post-apply-validate", expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+
+            Assert.AreEqual("high", data.GetProperty("failureSeverity").GetString());
+            Assert.AreEqual("fix_validation_failure", data.GetProperty("recommendedNextAction").GetString());
+            Assert.IsTrue(data.GetProperty("applyVerified").GetBoolean());
+            Assert.IsFalse(data.GetProperty("postApplyValidationSucceeded").GetBoolean());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_PreApplyFailure_IsWarningAndSafeToRetryAfterFixingBlockers()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-pre-apply");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteApplyPreflightEvidenceAsync("run-1", workspacePath, sourceRepo, readyForApply: false, recommendation: "not_ready_validation_failed");
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "apply-preflight", expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+
+            Assert.IsFalse(data.GetProperty("sourceRepoMutated").GetBoolean());
+            Assert.AreEqual("warning", data.GetProperty("failureSeverity").GetString());
+            Assert.AreEqual("safe_to_retry_after_fixing_blockers", data.GetProperty("recommendedNextAction").GetString());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_AggregatesErrorsWarningsAndBlockers()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-aggregates");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteWorkspaceEvidenceAsync(
+                "run-1",
+                workspacePath,
+                "validation.json",
+                new
+                {
+                    status = "blocked",
+                    errors = new[] { "error A" },
+                    warnings = new[] { "warning A" },
+                    data = new
+                    {
+                        blockers = new[] { "blocker A" }
+                    }
+                });
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "validate", expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+
+            AssertStringArrayContains(data.GetProperty("aggregatedErrors"), "error A");
+            AssertStringArrayContains(data.GetProperty("aggregatedWarnings"), "warning A");
+            AssertStringArrayContains(data.GetProperty("aggregatedBlockers"), "blocker A");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_UnreadableNonMetadataEvidence_DoesNotBlock()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-bad-json");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var badEvidencePath = Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-dry-run.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(badEvidencePath)!);
+            await File.WriteAllTextAsync(badEvidencePath, "{ bad json");
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "apply-dry-run", expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(data.GetProperty("aggregatedWarnings"), "could not be parsed");
+            Assert.IsTrue(File.Exists(GetFailurePackagePath(workspacePath, "run-1")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceFailurePackage_ReturnsStandardCliEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-failure-package-envelope");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+
+            using var doc = await RunWorkspaceFailurePackageAsync("run-1", workspacePath, "diff", expectedExitCode: 0);
+            var root = doc.RootElement;
+
+            Assert.IsTrue(root.TryGetProperty("status", out _));
+            Assert.IsTrue(root.TryGetProperty("command", out _));
+            Assert.IsTrue(root.TryGetProperty("traceId", out _));
+            Assert.IsTrue(root.TryGetProperty("summary", out _));
+            Assert.IsTrue(root.TryGetProperty("data", out _));
+            Assert.IsTrue(root.TryGetProperty("errors", out _));
+            Assert.IsTrue(root.TryGetProperty("warnings", out _));
+            Assert.AreEqual("workspace failure-package", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void DisposableWorkspaceFailurePackageService_DoesNotExecuteProcessesCopyDeletePatchAgentsOrGit()
+    {
+        var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "IronDev.Infrastructure", "Services", "Workspaces", "DisposableWorkspaceFailurePackageService.cs")));
+
+        Assert.IsFalse(serviceSource.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("\"git\"", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serviceSource.Contains("File.Copy", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("File.Delete", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("ApplyPatch", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("IAgent", StringComparison.Ordinal));
+        Assert.IsFalse(serviceSource.Contains("SupervisorAgent", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void DisposableWorkspacePostApplyValidationService_DoesNotDirectlyExecuteProcessesGitOrAgents()
     {
         var serviceSource = File.ReadAllText(Path.GetFullPath(Path.Combine(
@@ -4200,6 +4457,32 @@ public sealed partial class IronDevCliTests
         return JsonDocument.Parse(output.ToString());
     }
 
+    private static async Task<JsonDocument> RunWorkspaceFailurePackageAsync(
+        string runId,
+        string workspacePath,
+        string failedStage,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "failure-package",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--failed-stage", failedStage,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
     private static async Task WritePostApplyRequiredEvidenceAsync(
         string runId,
         string workspacePath,
@@ -4299,6 +4582,28 @@ public sealed partial class IronDevCliTests
 
     private static string GetSourceReportPath(string workspacePath, string runId) =>
         Path.Combine(workspacePath, ".irondev", "runs", runId, "source-report.json");
+
+    private static string GetFailurePackagePath(string workspacePath, string runId) =>
+        Path.Combine(workspacePath, ".irondev", "runs", runId, "failure-package.json");
+
+    private static async Task<string> WriteWorkspaceEvidenceAsync(
+        string runId,
+        string workspacePath,
+        string fileName,
+        object evidence)
+    {
+        var evidencePath = Path.Combine(workspacePath, ".irondev", "runs", runId, fileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(evidencePath)!);
+        await File.WriteAllTextAsync(
+            evidencePath,
+            JsonSerializer.Serialize(
+                evidence,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
+        return evidencePath;
+    }
 
     private static async Task WriteApplyVerifyEvidenceAsync(
         string runId,

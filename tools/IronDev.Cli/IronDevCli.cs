@@ -38,6 +38,7 @@ public static class IronDevCli
     private const string WorkspaceApplyVerifyCommand = "workspace apply-verify";
     private const string WorkspacePostApplyValidateCommand = "workspace post-apply-validate";
     private const string WorkspaceSourceReportCommand = "workspace source-report";
+    private const string WorkspaceFailurePackageCommand = "workspace failure-package";
 
     public static Task<int> RunAsync(
         string[] args,
@@ -203,6 +204,8 @@ public static class IronDevCli
             return await HandleWorkspacePostApplyValidateAsync(args, output, error, cancellationToken);
         if (IsCommand(args, "workspace", "source-report"))
             return await HandleWorkspaceSourceReportAsync(args, output, error, cancellationToken);
+        if (IsCommand(args, "workspace", "failure-package"))
+            return await HandleWorkspaceFailurePackageAsync(args, output, error, cancellationToken);
         if (args.Length >= 3 &&
             string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[1], "run", StringComparison.OrdinalIgnoreCase) &&
@@ -1290,6 +1293,101 @@ public static class IronDevCli
         {
             Status = result.Status,
             Command = WorkspaceSourceReportCommand,
+            TraceId = null,
+            Summary = result.Summary,
+            Data = result.Data,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        };
+
+        if (json)
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(resultEnvelope, JsonOptions));
+            return result.ExitCode;
+        }
+
+        await output.WriteLineAsync(resultEnvelope.Summary);
+        foreach (var resultError in resultEnvelope.Errors)
+            error.WriteLine(resultError);
+        foreach (var warning in resultEnvelope.Warnings)
+            error.WriteLine($"Warning: {warning}");
+
+        return result.ExitCode;
+    }
+
+    private static async Task<int> HandleWorkspaceFailurePackageAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var json = HasFlag(args, "--json");
+        var runId = GetOption(args, "--run-id");
+        var workspacePath = GetOption(args, "--workspace-path");
+        var failedStage = GetOption(args, "--failed-stage");
+
+        var validationErrors = new List<string>();
+        if (string.IsNullOrWhiteSpace(runId))
+            validationErrors.Add("Missing required option: --run-id <id>");
+        if (string.IsNullOrWhiteSpace(workspacePath))
+            validationErrors.Add("Missing required option: --workspace-path <path>");
+        if (string.IsNullOrWhiteSpace(failedStage))
+            validationErrors.Add("Missing required option: --failed-stage <stage>");
+
+        if (validationErrors.Count > 0)
+        {
+            if (json)
+            {
+                var envelope = new DisposableWorkspaceFailurePackageEnvelope
+                {
+                    Status = "failed",
+                    Command = WorkspaceFailurePackageCommand,
+                    TraceId = null,
+                    Summary = "Workspace failure package could not be started.",
+                    Data = new DisposableWorkspaceFailurePackageData
+                    {
+                        RunId = runId ?? string.Empty,
+                        WorkspacePath = workspacePath ?? string.Empty,
+                        SourceRepo = string.Empty,
+                        FailedStage = failedStage ?? string.Empty,
+                        SourceRepoMutated = false,
+                        ApplyCopyAttempted = false,
+                        ApplyCopySucceeded = false,
+                        ApplyVerified = false,
+                        PostApplyValidationSucceeded = false,
+                        FailureSeverity = "blocked",
+                        RecommendedNextAction = "inspect_evidence_before_retry",
+                        Errors = validationErrors
+                    },
+                    Errors = validationErrors,
+                    Warnings = []
+                };
+                await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
+            }
+            else
+            {
+                foreach (var validationError in validationErrors)
+                    error.WriteLine(validationError);
+                PrintUsage(error);
+            }
+
+            return 2;
+        }
+
+        var service = new DisposableWorkspaceFailurePackageService();
+        var result = await service.CreateAsync(
+            new DisposableWorkspaceFailurePackageRequest
+            {
+                RunId = runId!,
+                WorkspacePath = workspacePath!,
+                FailedStage = failedStage!
+            },
+            cancellationToken);
+
+        var resultEnvelope = new DisposableWorkspaceFailurePackageEnvelope
+        {
+            Status = result.Status,
+            Command = WorkspaceFailurePackageCommand,
             TraceId = null,
             Summary = result.Summary,
             Data = result.Data,
@@ -2729,6 +2827,7 @@ public static class IronDevCli
         error.WriteLine("  irondev workspace apply-verify --run-id <id> --workspace-path <path> [--json]");
         error.WriteLine("  irondev workspace post-apply-validate --run-id <id> --workspace-path <path> --profile <dotnet-build-test> [--json]");
         error.WriteLine("  irondev workspace source-report --run-id <id> --workspace-path <path> [--json]");
+        error.WriteLine("  irondev workspace failure-package --run-id <id> --workspace-path <path> --failed-stage <stage> [--json]");
         error.WriteLine("  irondev agent run supervisor --project <name> --query <text> --plan <path> --run-id <id> [--live-llm true|false] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev exercise chat-to-build --project-id <id> (--input <text> | --file <path>) [--title <title>] [--scenario-id <id>] [--expected-output <text>] [--report-dir <path>] [--repo-root <path>] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev scenario list --project-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
