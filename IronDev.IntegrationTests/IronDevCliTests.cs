@@ -482,6 +482,149 @@ public sealed class IronDevCliTests
         var governance = data.GetProperty("tester").GetProperty("governance");
         Assert.AreEqual(expectedApprovalDecision, governance.GetProperty("approvalDecision").GetString());
         Assert.AreEqual(expectedRequiresHumanApproval, governance.GetProperty("requiresHumanApproval").GetBoolean());
+
+        var failurePackage = data.GetProperty("failurePackage");
+        if (serviceStatus == "succeeded")
+        {
+            Assert.AreEqual(JsonValueKind.Null, failurePackage.ValueKind);
+        }
+        else
+        {
+            Assert.AreEqual(JsonValueKind.Object, failurePackage.ValueKind);
+            Assert.AreEqual("AgentRunProof001", failurePackage.GetProperty("runId").GetString());
+            Assert.AreEqual(serviceStatus, failurePackage.GetProperty("status").GetString());
+            Assert.AreEqual("report_ready", failurePackage.GetProperty("decision").GetString());
+            Assert.AreEqual(serviceStatus, failurePackage.GetProperty("testerCommandStatus").GetString());
+            AssertArrayNotEmpty(failurePackage.GetProperty("errors"));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(failurePackage.GetProperty("recommendedNextAction").GetString()));
+        }
+    }
+
+    [TestMethod]
+    public async Task AgentRunSupervisor_SucceededRun_HasNoFailurePackage()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var fakeService = new FakeSupervisorAgentRunService
+        {
+            OnRunAsync = (_, _) => Task.FromResult(BuildSupervisorRunResult(
+                "succeeded",
+                "succeeded",
+                "not_required",
+                false,
+                0,
+                "AgentRunProof001",
+                "IronDev",
+                "check current run health",
+                "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json"))
+        };
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            supervisorAgentRunService: fakeService,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(0, result, error.ToString());
+        using var doc = JsonDocument.Parse(output.ToString());
+        var data = doc.RootElement.GetProperty("data");
+        Assert.AreEqual(JsonValueKind.Null, data.GetProperty("failurePackage").ValueKind);
+    }
+
+    [TestMethod]
+    public async Task AgentRunSupervisor_BlockedRun_IncludesFailurePackageWithoutAutoPatchRecommendation()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var fakeService = new FakeSupervisorAgentRunService
+        {
+            OnRunAsync = (_, _) => Task.FromResult(BuildSupervisorRunResult(
+                "blocked",
+                "blocked",
+                "required",
+                true,
+                1,
+                "AgentRunProof001",
+                "IronDev",
+                "check current run health",
+                "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json"))
+        };
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            supervisorAgentRunService: fakeService,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(1, result, error.ToString());
+        using var doc = JsonDocument.Parse(output.ToString());
+        var failurePackage = doc.RootElement.GetProperty("data").GetProperty("failurePackage");
+        Assert.AreEqual("blocked", failurePackage.GetProperty("status").GetString());
+        Assert.AreEqual("AwaitingHumanApproval", failurePackage.GetProperty("blockedReason").GetString());
+        StringAssert.Contains(failurePackage.GetProperty("recommendedNextAction").GetString(), "Do not patch automatically");
+    }
+
+    [TestMethod]
+    public async Task AgentRunSupervisor_MissingTesterContract_FailurePackageRecommendsContractInspection()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var fakeService = new FakeSupervisorAgentRunService
+        {
+            OnRunAsync = (_, _) => Task.FromResult(BuildSupervisorRunResult(
+                "failed",
+                "not_available",
+                "not_available",
+                false,
+                1,
+                "AgentRunProof001",
+                "IronDev",
+                "check current run health",
+                "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json"))
+        };
+
+        var result = await IronDevCli.RunAsync(
+            [
+                "agent", "run", "supervisor",
+                "--project", "IronDev",
+                "--query", "check current run health",
+                "--plan", "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
+                "--run-id", "AgentRunProof001",
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            supervisorAgentRunService: fakeService,
+            cancellationToken: CancellationToken.None);
+
+        Assert.AreEqual(1, result, error.ToString());
+        using var doc = JsonDocument.Parse(output.ToString());
+        var data = doc.RootElement.GetProperty("data");
+        Assert.AreEqual("not_available", data.GetProperty("tester").GetProperty("commandStatus").GetString());
+        var recommendedNextAction = data.GetProperty("failurePackage").GetProperty("recommendedNextAction").GetString();
+        Assert.IsTrue(
+            recommendedNextAction?.Contains("tester run output", StringComparison.OrdinalIgnoreCase) == true ||
+            recommendedNextAction?.Contains("run-report contract", StringComparison.OrdinalIgnoreCase) == true,
+            $"Unexpected recommended next action: {recommendedNextAction}");
     }
 
     [TestMethod]
@@ -821,7 +964,11 @@ public sealed class IronDevCliTests
                     RunId = "AgentRunProof001-tester",
                     TraceId = "trace-supervisor-tester",
                     CommandStatus = commandStatus,
-                    RunStatus = commandStatus == "blocked" ? "PausedForApproval" : "Completed",
+                    RunStatus = commandStatus == "blocked"
+                        ? "PausedForApproval"
+                        : commandStatus == "not_available"
+                            ? "not_available"
+                            : "Completed",
                     Governance = new AgentRunSupervisorGovernanceData
                     {
                         Decision = "derived",
@@ -833,7 +980,32 @@ public sealed class IronDevCliTests
                 },
                 EvidencePaths = [],
                 CommandsRun = ["dotnet test"],
-                Warnings = []
+                Warnings = [],
+                FailurePackage = serviceStatus == "succeeded"
+                    ? null
+                    : new SupervisorFailurePackage
+                    {
+                        RunId = runId,
+                        Status = serviceStatus,
+                        Decision = "report_ready",
+                        DecisionReason = "Report is ready.",
+                        TesterCommandStatus = commandStatus,
+                        TesterRunStatus = commandStatus == "blocked"
+                            ? "PausedForApproval"
+                            : commandStatus == "not_available"
+                                ? "not_available"
+                                : "Completed",
+                        BlockedReason = commandStatus == "blocked" ? "AwaitingHumanApproval" : null,
+                        Warnings = [],
+                        Errors = ["Supervisor run failed."],
+                        EvidencePaths = [],
+                        CommandsRun = ["dotnet test"],
+                        RecommendedNextAction = commandStatus == "blocked"
+                            ? "Review approval/block reason before continuing. Do not patch automatically."
+                            : commandStatus == "not_available"
+                                ? "Inspect tester run output and restore a valid tester run-report contract before patching."
+                                : "Inspect tester evidence paths and produce a fix plan before patching."
+                    }
             },
             Errors = exitCode == 0 ? [] : ["Supervisor run failed."],
             Warnings = []

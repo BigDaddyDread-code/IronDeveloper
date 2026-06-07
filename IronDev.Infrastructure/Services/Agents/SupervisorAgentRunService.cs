@@ -99,6 +99,27 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
         if (status == "failed" && !string.IsNullOrWhiteSpace(agentResult.Summary))
             errors.Add(agentResult.Summary);
 
+        var governanceData = new AgentRunSupervisorGovernanceData
+        {
+            Decision = ReadString(governance, "decision") ?? "not_available",
+            ApprovalDecision = ReadString(governance, "approvalDecision") ?? "not_available",
+            BlockedReason = ReadString(governance, "blockedReason"),
+            RequiresHumanApproval = ReadBoolean(governance, "requiresHumanApproval")
+        };
+        var testerData = new AgentRunSupervisorTesterData
+        {
+            RunId = ReadString(tester, "runId"),
+            TraceId = ReadString(tester, "traceId"),
+            CommandStatus = testerCommandStatus,
+            RunStatus = ReadString(tester, "runStatus") ?? "not_available",
+            Governance = governanceData,
+            Warnings = warnings
+        };
+        var evidencePaths = agentResult.EvidencePaths;
+        var commandsRun = agentResult.CommandsRun;
+        var decision = ReadString(supervisor, "decision") ?? "not_available";
+        var decisionReason = ReadString(supervisor, "decisionReason") ?? "No supervisor decision reason was returned.";
+
         var data = new AgentRunSupervisorContractData
         {
             Agent = agentResult.AgentName,
@@ -108,26 +129,24 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
             PlanPath = request.PlanPath,
             AgentStatus = ResolveAgentStatus(status),
             ExitCode = status == "succeeded" ? 0 : Math.Max(agentResult.ExitCode, 1),
-            Decision = ReadString(supervisor, "decision") ?? "not_available",
-            DecisionReason = ReadString(supervisor, "decisionReason") ?? "No supervisor decision reason was returned.",
-            Tester = new AgentRunSupervisorTesterData
-            {
-                RunId = ReadString(tester, "runId"),
-                TraceId = ReadString(tester, "traceId"),
-                CommandStatus = testerCommandStatus,
-                RunStatus = ReadString(tester, "runStatus") ?? "not_available",
-                Governance = new AgentRunSupervisorGovernanceData
-                {
-                    Decision = ReadString(governance, "decision") ?? "not_available",
-                    ApprovalDecision = ReadString(governance, "approvalDecision") ?? "not_available",
-                    BlockedReason = ReadString(governance, "blockedReason"),
-                    RequiresHumanApproval = ReadBoolean(governance, "requiresHumanApproval")
-                },
-                Warnings = warnings
-            },
-            EvidencePaths = agentResult.EvidencePaths,
-            CommandsRun = agentResult.CommandsRun,
-            Warnings = warnings
+            Decision = decision,
+            DecisionReason = decisionReason,
+            Tester = testerData,
+            EvidencePaths = evidencePaths,
+            CommandsRun = commandsRun,
+            Warnings = warnings,
+            FailurePackage = status == "succeeded"
+                ? null
+                : BuildFailurePackage(
+                    request.RunId,
+                    status,
+                    decision,
+                    decisionReason,
+                    testerData,
+                    warnings,
+                    errors,
+                    evidencePaths,
+                    commandsRun)
         };
 
         return new SupervisorAgentRunResult
@@ -152,6 +171,22 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
         string summary,
         IReadOnlyList<string> errors)
     {
+        var testerData = new AgentRunSupervisorTesterData
+        {
+            RunId = null,
+            TraceId = null,
+            CommandStatus = "not_available",
+            RunStatus = "not_available",
+            Governance = new AgentRunSupervisorGovernanceData
+            {
+                Decision = "not_available",
+                ApprovalDecision = "not_available",
+                BlockedReason = null,
+                RequiresHumanApproval = false
+            },
+            Warnings = []
+        };
+
         var data = new AgentRunSupervisorContractData
         {
             Agent = AgentName,
@@ -163,24 +198,20 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
             ExitCode = 1,
             Decision = "not_available",
             DecisionReason = summary,
-            Tester = new AgentRunSupervisorTesterData
-            {
-                RunId = null,
-                TraceId = null,
-                CommandStatus = "not_available",
-                RunStatus = "not_available",
-                Governance = new AgentRunSupervisorGovernanceData
-                {
-                    Decision = "not_available",
-                    ApprovalDecision = "not_available",
-                    BlockedReason = null,
-                    RequiresHumanApproval = false
-                },
-                Warnings = []
-            },
+            Tester = testerData,
             EvidencePaths = [],
             CommandsRun = [],
-            Warnings = errors
+            Warnings = errors,
+            FailurePackage = BuildFailurePackage(
+                request.RunId,
+                "failed",
+                "not_available",
+                summary,
+                testerData,
+                errors,
+                errors,
+                [],
+                [])
         };
 
         return new SupervisorAgentRunResult
@@ -217,6 +248,52 @@ public sealed class SupervisorAgentRunService : ISupervisorAgentRunService
             "blocked" => "Blocked",
             _ => "Failed"
         };
+
+    private static SupervisorFailurePackage BuildFailurePackage(
+        string runId,
+        string status,
+        string decision,
+        string? decisionReason,
+        AgentRunSupervisorTesterData tester,
+        IReadOnlyList<string> warnings,
+        IReadOnlyList<string> errors,
+        IReadOnlyList<string> evidencePaths,
+        IReadOnlyList<string> commandsRun) =>
+        new()
+        {
+            RunId = runId,
+            Status = status,
+            Decision = decision,
+            DecisionReason = decisionReason,
+            TesterCommandStatus = tester.CommandStatus,
+            TesterRunStatus = tester.RunStatus,
+            BlockedReason = tester.Governance.BlockedReason,
+            Warnings = warnings,
+            Errors = errors,
+            EvidencePaths = evidencePaths,
+            CommandsRun = commandsRun,
+            RecommendedNextAction = ResolveRecommendedNextAction(status, tester)
+        };
+
+    private static string ResolveRecommendedNextAction(
+        string status,
+        AgentRunSupervisorTesterData tester)
+    {
+        if (string.Equals(tester.CommandStatus, "not_available", StringComparison.OrdinalIgnoreCase))
+            return "Inspect tester run output and restore a valid tester run-report contract before patching.";
+
+        if (string.Equals(tester.CommandStatus, "blocked", StringComparison.OrdinalIgnoreCase) ||
+            tester.Governance.RequiresHumanApproval ||
+            string.Equals(status, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Review approval/block reason before continuing. Do not patch automatically.";
+        }
+
+        if (string.Equals(tester.CommandStatus, "failed", StringComparison.OrdinalIgnoreCase))
+            return "Inspect tester evidence paths and produce a fix plan before patching.";
+
+        return "Inspect supervisor errors, warnings, and evidence paths before patching.";
+    }
 
     private static JsonElement? TryParse(string json)
     {
