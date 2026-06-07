@@ -2094,6 +2094,146 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceApplyPreflight_ApprovalMissingApprovedBy_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-preflight-missing-approved-by");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true, includeApprovedBy: false);
+
+            using var doc = await RunWorkspaceApplyPreflightAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data");
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "approvedBy");
+            Assert.IsFalse(data.GetProperty("readyForApply").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyNow").GetBoolean());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-preflight.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyPreflight_ApprovalMissingReason_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-preflight-missing-reason");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true, includeReason: false);
+
+            using var doc = await RunWorkspaceApplyPreflightAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data");
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "reason");
+            Assert.IsFalse(data.GetProperty("readyForApply").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyNow").GetBoolean());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-preflight.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyPreflight_ApprovalMissingPromotionPackagePath_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-preflight-missing-package-path");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true, includePromotionPackagePath: false);
+
+            using var doc = await RunWorkspaceApplyPreflightAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data");
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "promotionPackagePath");
+            Assert.IsFalse(data.GetProperty("readyForApply").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyNow").GetBoolean());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-preflight.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyPreflight_PromotionPackageMissingSourceRepo_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-preflight-package-missing-source");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo, includeSourceRepo: false);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true);
+
+            using var doc = await RunWorkspaceApplyPreflightAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data");
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "Promotion package is missing sourceRepo.");
+            Assert.IsFalse(data.GetProperty("readyForApply").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyNow").GetBoolean());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-preflight.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceApplyPreflight_DiffEvidenceMissingSourceRepo_Blocks()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-preflight-diff-missing-source");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            var packagePath = await WritePromotionPackageAsync("run-1", workspacePath, sourceRepo);
+            await WriteDiffEvidenceAsync("run-1", workspacePath, sourceRepo, includeSourceRepo: false);
+            await WriteApprovalEvidenceAsync("run-1", workspacePath, packagePath, decision: "approved", allowsApply: false, requiresSeparateApplyCommand: true);
+
+            using var doc = await RunWorkspaceApplyPreflightAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data");
+
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "Diff evidence is missing sourceRepo.");
+            Assert.IsFalse(data.GetProperty("readyForApply").GetBoolean());
+            Assert.IsFalse(data.GetProperty("canApplyNow").GetBoolean());
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-preflight.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
     public async Task WorkspaceApplyPreflight_UnsafePromotionPackageFlags_Block()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-preflight-unsafe-package");
@@ -2309,7 +2449,8 @@ public sealed partial class IronDevCliTests
         bool changed = true,
         IReadOnlyList<string>? addedFiles = null,
         IReadOnlyList<string>? modifiedFiles = null,
-        IReadOnlyList<string>? deletedFiles = null)
+        IReadOnlyList<string>? deletedFiles = null,
+        bool includeSourceRepo = true)
     {
         modifiedFiles ??= ["README.md"];
         addedFiles ??= [];
@@ -2323,7 +2464,7 @@ public sealed partial class IronDevCliTests
                 {
                     runId,
                     workspacePath = Path.GetFullPath(workspacePath),
-                    sourceRepo = Path.GetFullPath(sourceRepo),
+                    sourceRepo = includeSourceRepo ? Path.GetFullPath(sourceRepo) : null,
                     changed,
                     addedFiles,
                     modifiedFiles,
@@ -2345,7 +2486,10 @@ public sealed partial class IronDevCliTests
         string promotionPackagePath,
         string decision,
         bool allowsApply,
-        bool requiresSeparateApplyCommand)
+        bool requiresSeparateApplyCommand,
+        bool includeApprovedBy = true,
+        bool includeReason = true,
+        bool includePromotionPackagePath = true)
     {
         var approvalPath = Path.Combine(workspacePath, ".irondev", "runs", runId, "promotion-approval.json");
         Directory.CreateDirectory(Path.GetDirectoryName(approvalPath)!);
@@ -2357,10 +2501,10 @@ public sealed partial class IronDevCliTests
                     runId,
                     workspacePath = Path.GetFullPath(workspacePath),
                     decision,
-                    approvedBy = "Rob",
-                    reason = "Reviewed validation and diff package.",
+                    approvedBy = includeApprovedBy ? "Rob" : null,
+                    reason = includeReason ? "Reviewed validation and diff package." : null,
                     createdUtc = DateTimeOffset.UtcNow,
-                    promotionPackagePath = Path.GetFullPath(promotionPackagePath),
+                    promotionPackagePath = includePromotionPackagePath ? Path.GetFullPath(promotionPackagePath) : null,
                     promotionPackageSha256 = await ComputeSha256Async(promotionPackagePath),
                     approvalEvidencePath = approvalPath,
                     allowsApply,
@@ -2389,7 +2533,8 @@ public sealed partial class IronDevCliTests
         bool canApplyToSourceRepo = false,
         bool autoPromotionAllowed = false,
         bool validationSucceeded = true,
-        string recommendation = "ready_for_human_review")
+        string recommendation = "ready_for_human_review",
+        bool includeSourceRepo = true)
     {
         var packagePath = Path.Combine(workspacePath, ".irondev", "runs", runId, "promotion-package.json");
         Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
@@ -2400,7 +2545,7 @@ public sealed partial class IronDevCliTests
                 {
                     runId,
                     workspacePath = Path.GetFullPath(workspacePath),
-                    sourceRepo = Path.GetFullPath(sourceRepo),
+                    sourceRepo = includeSourceRepo ? Path.GetFullPath(sourceRepo) : null,
                     createdUtc = DateTimeOffset.UtcNow,
                     validation = new
                     {

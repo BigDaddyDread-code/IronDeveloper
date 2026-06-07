@@ -252,12 +252,18 @@ public sealed class DisposableWorkspaceApplyPreflightService : IDisposableWorksp
         var diffSourceRepo = NormalizeOptionalPath(GetString(diffEvidence, "sourceRepo"));
         if (string.IsNullOrWhiteSpace(sourceRepo))
             blockers.Add("Workspace metadata is missing sourceRepo.");
+        if (string.IsNullOrWhiteSpace(packageSourceRepo))
+            blockers.Add("Promotion package is missing sourceRepo.");
+        if (string.IsNullOrWhiteSpace(diffSourceRepo))
+            blockers.Add("Diff evidence is missing sourceRepo.");
         if (!string.IsNullOrWhiteSpace(packageSourceRepo) && !PathsEqual(sourceRepo, packageSourceRepo))
             blockers.Add("Promotion package sourceRepo does not match workspace metadata.");
         if (!string.IsNullOrWhiteSpace(diffSourceRepo) && !PathsEqual(sourceRepo, diffSourceRepo))
             blockers.Add("Diff evidence sourceRepo does not match workspace metadata.");
 
         var packagePathFromApproval = NormalizeOptionalPath(GetString(approvalEvidence, "promotionPackagePath"));
+        if (string.IsNullOrWhiteSpace(packagePathFromApproval))
+            blockers.Add("Approval evidence is missing promotionPackagePath.");
         if (!string.IsNullOrWhiteSpace(packagePathFromApproval) && !PathsEqual(packagePathFromApproval, promotionPackagePath))
             blockers.Add("Approval evidence promotion package path does not match current promotion package path.");
 
@@ -281,11 +287,18 @@ public sealed class DisposableWorkspaceApplyPreflightService : IDisposableWorksp
             warnings.Add("Diff evidence path field does not match the expected diff path; using the required artifact path.");
         }
 
+        var approvedBy = GetString(approvalEvidence, "approvedBy") ?? string.Empty;
+        var approvalReason = GetString(approvalEvidence, "reason") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(approvedBy))
+            blockers.Add("Approval evidence is missing approvedBy.");
+        if (string.IsNullOrWhiteSpace(approvalReason))
+            blockers.Add("Approval evidence is missing reason.");
+
         return new ArtifactFacts(
             SourceRepo: sourceRepo,
             ApprovalDecision: GetString(approvalEvidence, "decision") ?? string.Empty,
-            ApprovedBy: GetString(approvalEvidence, "approvedBy") ?? string.Empty,
-            ApprovalReason: GetString(approvalEvidence, "reason") ?? string.Empty,
+            ApprovedBy: approvedBy,
+            ApprovalReason: approvalReason,
             ApprovalPromotionPackageSha256: GetString(approvalEvidence, "promotionPackageSha256") ?? string.Empty,
             ApprovalAllowsApply: GetBool(approvalEvidence, "allowsApply") ?? true,
             ApprovalRequiresSeparateApplyCommand: GetBool(approvalEvidence, "requiresSeparateApplyCommand") ?? false,
