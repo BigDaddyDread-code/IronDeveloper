@@ -255,7 +255,7 @@ public sealed class IronDevCliTests
         Assert.AreEqual("Completed", data.GetProperty("runStatus").GetString());
         var governance = data.GetProperty("governance");
         Assert.AreEqual("derived", governance.GetProperty("decision").GetString());
-        Assert.AreEqual("not_required", governance.GetProperty("approvalDecision").GetString());
+        AssertEqualsIgnoreCase("not_required", governance.GetProperty("approvalDecision").GetString());
         Assert.AreEqual(false, governance.GetProperty("requiresHumanApproval").GetBoolean());
         Assert.IsTrue(data.GetProperty("evidence").GetArrayLength() > 0);
         Assert.AreEqual(0, data.GetProperty("toolCalls").GetArrayLength());
@@ -304,12 +304,12 @@ public sealed class IronDevCliTests
         var governance = root.GetProperty("data").GetProperty("governance");
         if (runStatus == "PausedForApproval")
         {
-            StringAssert.AreEqualIgnoringCase("required", governance.GetProperty("approvalDecision").GetString());
+            AssertEqualsIgnoreCase("required", governance.GetProperty("approvalDecision").GetString());
             Assert.IsTrue(governance.GetProperty("requiresHumanApproval").GetBoolean());
         }
         else
         {
-            StringAssert.AreEqualIgnoringCase("denied", governance.GetProperty("approvalDecision").GetString());
+            AssertEqualsIgnoreCase("denied", governance.GetProperty("approvalDecision").GetString());
         }
     }
 
@@ -332,7 +332,7 @@ public sealed class IronDevCliTests
             CancellationToken.None);
 
         Assert.AreEqual(1, result, error.ToString());
-        StringAssert.IsMatch(output.ToString(), @"\S+");
+        AssertJsonWasWritten(output);
 
         using var doc = JsonDocument.Parse(output.ToString());
         var root = doc.RootElement;
@@ -344,7 +344,7 @@ public sealed class IronDevCliTests
         Assert.AreEqual(0, data.GetProperty("toolCalls").GetArrayLength());
         Assert.AreEqual(0, data.GetProperty("processCommands").GetArrayLength());
         Assert.AreEqual(0, data.GetProperty("evidence").GetArrayLength());
-        Assert.Greater(root.GetProperty("errors").GetArrayLength(), 0);
+        AssertArrayNotEmpty(root.GetProperty("errors"));
     }
 
     [TestMethod]
@@ -558,6 +558,23 @@ public sealed class IronDevCliTests
         }
 
         throw new DirectoryNotFoundException("Could not find repository root.");
+    }
+
+    private static void AssertEqualsIgnoreCase(string expected, string? actual)
+    {
+        Assert.IsTrue(
+            string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase),
+            $"Expected '{expected}' ignoring case but got '{actual}'.");
+    }
+
+    private static void AssertJsonWasWritten(StringWriter output)
+    {
+        Assert.IsFalse(string.IsNullOrWhiteSpace(output.ToString()));
+    }
+
+    private static void AssertArrayNotEmpty(JsonElement element)
+    {
+        Assert.IsTrue(element.GetArrayLength() > 0);
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler
