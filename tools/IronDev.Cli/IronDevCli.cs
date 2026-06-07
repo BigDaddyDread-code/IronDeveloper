@@ -4,11 +4,14 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using IronDev.Client;
+using IronDev.Core.Agents;
 using IronDev.Core.ChatProbe;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
+using IronDev.Infrastructure.Services.Agents;
+using IronDev.Infrastructure.Services.RunReports;
 
 namespace IronDev.Cli;
 
@@ -26,7 +29,7 @@ public static class IronDevCli
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken) =>
-        RunAsync(args, output, error, handler: null, runner: null, cancellationToken);
+        RunAsync(args, output, error, handler: null, supervisorAgentRunService: null, cancellationToken);
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -35,7 +38,7 @@ public static class IronDevCli
         HttpMessageHandler? handler,
         CancellationToken cancellationToken)
     {
-        return await RunAsync(args, output, error, handler, runner: null, cancellationToken);
+        return await RunAsync(args, output, error, handler, supervisorAgentRunService: null, cancellationToken);
     }
 
     public static async Task<int> RunAsync(
@@ -43,7 +46,7 @@ public static class IronDevCli
         TextWriter output,
         TextWriter error,
         HttpMessageHandler? handler,
-        Func<string[], CancellationToken, Task<(int ExitCode, string Stdout, string Stderr)>>? runner,
+        ISupervisorAgentRunService? supervisorAgentRunService,
         CancellationToken cancellationToken)
     {
         if (args.Length == 0)
@@ -72,7 +75,7 @@ public static class IronDevCli
             string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[1], "run", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[2], "supervisor"))
-            return await HandleAgentRunSupervisorAsync(args, output, error, handler, runner, cancellationToken);
+            return await HandleAgentRunSupervisorAsync(args, output, error, handler, supervisorAgentRunService, cancellationToken);
         if (IsCommand(args, "exercise", "chat-to-build"))
             return await HandleExerciseChatToBuildAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "scenario", "list"))
@@ -442,11 +445,10 @@ public static class IronDevCli
         TextWriter output,
         TextWriter error,
         HttpMessageHandler? handler,
-        Func<string[], CancellationToken, Task<(int ExitCode, string Stdout, string Stderr)>>? runner,
+        ISupervisorAgentRunService? supervisorAgentRunService,
         CancellationToken cancellationToken)
     {
         var apiBaseUrl = ResolveApiBaseUrl(GetOption(args, "--api-base-url"), ReadEnvironment(), GetOption(args, "--config"));
-        var token = ResolveToken(GetOption(args, "--token"), ReadEnvironment(), GetOption(args, "--config"));
         var json = HasFlag(args, "--json");
 
         var project = GetOption(args, "--project");
@@ -532,416 +534,78 @@ public static class IronDevCli
             return 2;
         }
 
-        runner ??= async (runnerArgs, ct) => await RunReplayRunnerAsync(runnerArgs, apiBaseUrl, token, ct);
-        var argsToReplayRunner = BuildAgentRunSupervisorReplayArguments(
-            project!,
-            query!,
-            planPath!,
-            runId!,
-            liveLlm);
-        var replayResult = await runner(argsToReplayRunner, cancellationToken);
+        supervisorAgentRunService ??= await CreateSupervisorAgentRunServiceAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (supervisorAgentRunService is null)
+            return 1;
 
-        var parsed = ParseReplayRunnerSupervisorOutput(replayResult.Stdout);
-        if (parsed is null)
-        {
-            var parseFailure = new List<string> { "Could not parse ReplayRunner supervisor output as JSON." };
-            if (!string.IsNullOrWhiteSpace(replayResult.Stderr))
-                parseFailure.Add(replayResult.Stderr.Trim());
-
-            if (json)
+        var result = await supervisorAgentRunService.RunAsync(
+            new SupervisorAgentRunRequest
             {
-                var envelope = BuildAgentRunSupervisorFailureEnvelope(
-                    project!,
-                    query!,
-                    planPath!,
-                    runId!,
-                    parseFailure,
-                    replayResult.ExitCode);
-                await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
-                return Math.Clamp(replayResult.ExitCode, 1, int.MaxValue);
-            }
-
-            foreach (var failure in parseFailure)
-                error.WriteLine(failure);
-            return Math.Clamp(replayResult.ExitCode, 1, int.MaxValue);
-        }
-
-        var envelopeResult = BuildAgentRunSupervisorEnvelope(parsed.Value, project!, query!, planPath!, runId!, replayResult.ExitCode);
-        if (json)
-        {
-            await output.WriteLineAsync(JsonSerializer.Serialize(envelopeResult.Envelope, JsonOptions));
-            return envelopeResult.ExitCode;
-        }
-
-        await output.WriteLineAsync(envelopeResult.Envelope.Summary);
-        if (envelopeResult.Envelope.Errors.Count > 0)
-        {
-            foreach (var summaryError in envelopeResult.Envelope.Errors)
-                error.WriteLine(summaryError);
-        }
-
-        if (replayResult.Stderr is not null && !string.IsNullOrWhiteSpace(replayResult.Stderr))
-            error.WriteLine(replayResult.Stderr.Trim());
-
-        return envelopeResult.ExitCode;
-    }
-
-    private static async Task<(int ExitCode, string Stdout, string Stderr)> RunReplayRunnerAsync(
-        string[] args,
-        string apiBaseUrl,
-        string? token,
-        CancellationToken cancellationToken)
-    {
-        var repoRoot = FindRepositoryRoot();
-        var runnerProject = Path.Combine(repoRoot, "tools", "IronDev.ReplayRunner", "IronDev.ReplayRunner.csproj");
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            WorkingDirectory = repoRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
-        foreach (var arg in args)
-            startInfo.ArgumentList.Add(arg);
-
-        startInfo.Environment["IRONDEV_API_BASE_URL"] = apiBaseUrl;
-        if (!string.IsNullOrWhiteSpace(token))
-            startInfo.Environment["IRONDEV_API_TOKEN"] = token;
-
-        using var process = Process.Start(startInfo);
-        if (process is null)
-        {
-            return (1, string.Empty, "Failed to start ReplayRunner process.");
-        }
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-        return (process.ExitCode, stdout, stderr);
-    }
-
-    private static (string? Command, string? Agent, string? Status, int? ExitCode, string? Summary, IReadOnlyList<string> CommandsRun, IReadOnlyList<string> EvidencePaths, string? Decision, string? DecisionReason, AgentRunSupervisorTesterData? Tester, IReadOnlyList<string> Errors)? ParseReplayRunnerSupervisorOutput(string output)
-    {
-        if (string.IsNullOrWhiteSpace(output))
-            return null;
-
-        try
-        {
-            using var document = JsonDocument.Parse(output);
-            var root = document.RootElement;
-            if (!root.TryGetProperty("loopReport", out var loopReport))
-                return null;
-
-            var command = TryGetString(root, "command");
-            var status = TryGetString(root, "status");
-            var summary = TryGetString(root, "summary");
-            var exitCode = TryGetInt(root, "exitCode");
-            var evidencePaths = GetStringArray(root, "evidencePaths");
-            var commandsRun = GetStringArray(root, "commandsRun");
-
-            var supervisor = loopReport.TryGetProperty("supervisor", out var supervisorElement)
-                ? supervisorElement
-                : default;
-            var supervisorDecision = TryGetString(supervisor, "decision") ?? "not_available";
-            var supervisorDecisionReason = TryGetString(supervisor, "decisionReason") ?? "not_available";
-
-            var parseErrors = new List<string>();
-            var hasTester = loopReport.TryGetProperty("tester", out var testerElement);
-            var tester = hasTester
-                ? ParseAgentRunSupervisorTester(testerElement)
-                : null;
-            if (!hasTester || tester is null)
-            {
-                parseErrors.Add("ReplayRunner output did not include loopReport.tester.");
-                tester = new AgentRunSupervisorTesterData
-                {
-                    RunId = null,
-                    TraceId = null,
-                    CommandStatus = "not_available",
-                    RunStatus = "not_available",
-                    Governance = new AgentRunSupervisorGovernanceData
-                    {
-                        Decision = "not_available",
-                        ApprovalDecision = "not_available",
-                        BlockedReason = null,
-                        RequiresHumanApproval = false
-                    },
-                    Warnings = []
-                };
-            }
-
-            return (
-                command,
-                TryGetString(root, "agent"),
-                status,
-                exitCode,
-                summary,
-                commandsRun,
-                evidencePaths,
-                supervisorDecision,
-                supervisorDecisionReason,
-                tester,
-                parseErrors);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static (AgentRunSupervisorContractEnvelope Envelope, int ExitCode) BuildAgentRunSupervisorEnvelope(
-        (string? Command, string? Agent, string? Status, int? ExitCode, string? Summary, IReadOnlyList<string> CommandsRun, IReadOnlyList<string> EvidencePaths, string? Decision, string? DecisionReason, AgentRunSupervisorTesterData? Tester, IReadOnlyList<string> Errors) parsed,
-        string project,
-        string query,
-        string planPath,
-        string runId,
-        int runnerExitCode)
-    {
-        var commandStatus = parsed.Tester?.CommandStatus;
-        var status = BuildSupervisorEnvelopeStatus(commandStatus, parsed.Status, runnerExitCode);
-        var agentStatus = ResolveSupervisorAgentStatus(commandStatus, parsed.Status, runnerExitCode);
-
-        var warnings = new List<string>(parsed.Tester?.Warnings ?? []);
-        if (parsed.Errors.Count > 0)
-            warnings.AddRange(parsed.Errors);
-        if (!string.IsNullOrWhiteSpace(parsed.Summary))
-            warnings.Add(parsed.Summary!);
-
-        var errors = new List<string>();
-        if (parsed.Errors.Count > 0)
-            errors.AddRange(parsed.Errors);
-        if (runnerExitCode != 0 && status == "failed")
-            errors.Add($"ReplayRunner exited with code {runnerExitCode}.");
-
-        var data = new AgentRunSupervisorContractData
-        {
-            Agent = parsed.Agent ?? "SupervisorAgent",
-            RunId = runId,
-            Project = project,
-            Query = query,
-            PlanPath = planPath,
-            AgentStatus = agentStatus,
-            ExitCode = parsed.ExitCode ?? runnerExitCode,
-            Decision = parsed.Decision ?? "not_available",
-            DecisionReason = parsed.DecisionReason ?? "No decision information was returned.",
-            Tester = parsed.Tester ?? new AgentRunSupervisorTesterData
-            {
-                RunId = null,
-                TraceId = null,
-                CommandStatus = "not_available",
-                RunStatus = "not_available",
-                Governance = new AgentRunSupervisorGovernanceData
-                {
-                    Decision = "not_available",
-                    ApprovalDecision = "not_available",
-                    BlockedReason = null,
-                    RequiresHumanApproval = false
-                },
-                Warnings = []
+                Project = project!,
+                Query = query!,
+                PlanPath = planPath!,
+                RunId = runId!,
+                LiveLlm = liveLlm
             },
-            EvidencePaths = parsed.EvidencePaths,
-            CommandsRun = parsed.CommandsRun,
-            Warnings = warnings
-        };
-
-        var summary = status == "succeeded"
-            ? $"Supervisor run '{runId}' completed successfully."
-            : status == "blocked"
-                ? $"Supervisor run '{runId}' is blocked."
-                : $"Supervisor run '{runId}' failed.";
+            cancellationToken);
 
         var envelope = new AgentRunSupervisorContractEnvelope
         {
-            Status = status,
+            Status = result.Status,
             Command = AgentRunSupervisorCommand,
-            TraceId = data.Tester.TraceId,
-            Summary = summary,
-            Data = data,
-            Errors = errors,
-            Warnings = warnings
+            TraceId = result.TraceId,
+            Summary = result.Summary,
+            Data = result.Data,
+            Errors = result.Errors,
+            Warnings = result.Warnings
         };
 
-        return (envelope, status == "succeeded" ? 0 : 1);
-    }
-
-    private static AgentRunSupervisorContractEnvelope BuildAgentRunSupervisorFailureEnvelope(
-        string project,
-        string query,
-        string planPath,
-        string runId,
-        IReadOnlyList<string> errors,
-        int runnerExitCode)
-    {
-        return new AgentRunSupervisorContractEnvelope
+        if (json)
         {
-            Status = runnerExitCode == 0 ? "failed" : "failed",
-            Command = AgentRunSupervisorCommand,
-            TraceId = null,
-            Summary = $"Supervisor run '{runId}' could not be started.",
-            Data = new AgentRunSupervisorContractData
-            {
-                Agent = "SupervisorAgent",
-                RunId = runId,
-                Project = project,
-                Query = query,
-                PlanPath = planPath,
-                AgentStatus = "Failed",
-                ExitCode = runnerExitCode,
-                Decision = "not_available",
-                DecisionReason = "Could not parse ReplayRunner result.",
-                Tester = new AgentRunSupervisorTesterData
-                {
-                    RunId = null,
-                    TraceId = null,
-                    CommandStatus = "not_available",
-                    RunStatus = "not_available",
-                    Governance = new AgentRunSupervisorGovernanceData
-                    {
-                        Decision = "not_available",
-                        ApprovalDecision = "not_available",
-                        BlockedReason = null,
-                        RequiresHumanApproval = false
-                    },
-                    Warnings = []
-                },
-                EvidencePaths = [],
-                CommandsRun = [],
-                Warnings = errors
-            },
-            Errors = errors,
-            Warnings = errors
-        };
-    }
-
-    private static string BuildSupervisorEnvelopeStatus(
-        string? testerCommandStatus,
-        string? runnerStatus,
-        int runnerExitCode)
-    {
-        if (string.Equals(testerCommandStatus, "succeeded", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(runnerStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) &&
-            runnerExitCode == 0)
-            return "succeeded";
-
-        if (string.Equals(testerCommandStatus, "blocked", StringComparison.OrdinalIgnoreCase))
-            return "blocked";
-
-        if (string.Equals(testerCommandStatus, "failed", StringComparison.OrdinalIgnoreCase))
-            return "failed";
-
-        return "failed";
-    }
-
-    private static string ResolveSupervisorAgentStatus(
-        string? testerCommandStatus,
-        string? runnerStatus,
-        int runnerExitCode)
-    {
-        if (string.Equals(runnerStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) &&
-            runnerExitCode == 0 &&
-            string.Equals(testerCommandStatus, "succeeded", StringComparison.OrdinalIgnoreCase))
-            return "Succeeded";
-
-        if (string.Equals(testerCommandStatus, "blocked", StringComparison.OrdinalIgnoreCase))
-            return "Blocked";
-
-        return "Failed";
-    }
-
-    private static AgentRunSupervisorTesterData ParseAgentRunSupervisorTester(JsonElement tester)
-    {
-        var governance = ParseAgentRunSupervisorGovernance(tester);
-        return new AgentRunSupervisorTesterData
-        {
-            RunId = TryGetString(tester, "runId"),
-            TraceId = TryGetString(tester, "traceId"),
-            CommandStatus = TryGetString(tester, "commandStatus") ?? "not_available",
-            RunStatus = TryGetString(tester, "runStatus") ?? "not_available",
-            Governance = governance,
-            Warnings = GetStringArray(tester, "warnings")
-        };
-    }
-
-    private static AgentRunSupervisorGovernanceData ParseAgentRunSupervisorGovernance(JsonElement tester)
-    {
-        if (!tester.TryGetProperty("governance", out var governance) || governance.ValueKind != JsonValueKind.Object)
-        {
-            return new AgentRunSupervisorGovernanceData
-            {
-                Decision = "not_available",
-                ApprovalDecision = "not_available",
-                BlockedReason = null,
-                RequiresHumanApproval = false
-            };
+            await output.WriteLineAsync(JsonSerializer.Serialize(envelope, JsonOptions));
+            return result.ExitCode;
         }
 
-        return new AgentRunSupervisorGovernanceData
+        await output.WriteLineAsync(envelope.Summary);
+        if (envelope.Errors.Count > 0)
         {
-            Decision = TryGetString(governance, "decision") ?? "not_available",
-            ApprovalDecision = TryGetString(governance, "approvalDecision") ?? "not_available",
-            BlockedReason = TryGetString(governance, "blockedReason"),
-                RequiresHumanApproval = TryGetBoolean(governance, "requiresHumanApproval")
-        };
+            foreach (var summaryError in envelope.Errors)
+                error.WriteLine(summaryError);
+        }
+
+        if (result.ExitCode != 0 && !string.IsNullOrWhiteSpace(result.Summary))
+            error.WriteLine(result.Summary);
+
+        return result.ExitCode;
     }
 
-    private static int? TryGetInt(JsonElement root, string propertyName)
+    private static async Task<ISupervisorAgentRunService?> CreateSupervisorAgentRunServiceAsync(
+        string[] args,
+        string apiBaseUrl,
+        TextWriter error,
+        HttpMessageHandler? handler,
+        CancellationToken cancellationToken)
     {
-        if (!root.TryGetProperty(propertyName, out var value))
+        var client = await CreateReadyApiClientAsync(args, apiBaseUrl, error, handler, cancellationToken);
+        if (client is null)
             return null;
 
-        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var numberValue))
-            return numberValue;
-
-        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out numberValue))
-            return numberValue;
-
-        return null;
-    }
-
-    private static IReadOnlyList<string> GetStringArray(JsonElement root, string propertyName)
-    {
-        if (!root.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.Array)
-            return [];
-
-        var values = new List<string>();
-        foreach (var item in value.EnumerateArray())
-        {
-            if (item.ValueKind == JsonValueKind.String)
-                values.Add(item.GetString() ?? string.Empty);
-        }
-
-        return values;
-    }
-
-    private static bool TryGetBoolean(JsonElement root, string propertyName)
-    {
-        if (!root.TryGetProperty(propertyName, out var value))
-            return false;
-
-        if (value.ValueKind == JsonValueKind.True)
-            return true;
-        if (value.ValueKind == JsonValueKind.False)
-            return false;
-        if (value.ValueKind == JsonValueKind.String && bool.TryParse(value.GetString(), out var valueAsBoolean))
-            return valueAsBoolean;
-
-        return false;
+        return new SupervisorAgentRunService(
+            new AgentModelResolver(),
+            FindRepositoryRoot(),
+            new RunReportContractReader(client));
     }
 
     private static string FindRepositoryRoot()
     {
-        var baseDirectory = new DirectoryInfo(AppContext.BaseDirectory);
-        var directory = baseDirectory;
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) && File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) &&
+                File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+            {
                 return directory.FullName;
+            }
 
             directory = directory.Parent;
         }
@@ -949,50 +613,16 @@ public static class IronDevCli
         directory = new DirectoryInfo(Environment.CurrentDirectory);
         while (directory is not null)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) && File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) &&
+                File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+            {
                 return directory.FullName;
+            }
 
             directory = directory.Parent;
         }
 
         throw new DirectoryNotFoundException("Could not find repository root.");
-    }
-
-    private static string[] BuildAgentRunSupervisorReplayArguments(
-        string project,
-        string query,
-        string planPath,
-        string runId,
-        bool liveLlm)
-    {
-        var replayProject = Path.Combine(
-            "tools",
-            "IronDev.ReplayRunner",
-            "IronDev.ReplayRunner.csproj");
-
-        var arguments = new List<string>
-        {
-            "run",
-            "--project",
-            replayProject,
-            "--",
-            "agent",
-            "supervisor",
-            "run-goal",
-            "--project",
-            project,
-            "--query",
-            query,
-            "--plan",
-            planPath,
-            "--run-id",
-            runId
-        };
-
-        if (liveLlm)
-            arguments.Add("--live-llm");
-
-        return arguments.ToArray();
     }
 
     private static async Task<int> HandleRunStreamAsync(
@@ -2081,49 +1711,4 @@ public static class IronDevCli
         public string? ApiToken { get; init; }
     }
 
-    private sealed record AgentRunSupervisorContractEnvelope
-    {
-        public required string Status { get; init; }
-        public required string Command { get; init; }
-        public string? TraceId { get; init; }
-        public required string Summary { get; init; }
-        public required AgentRunSupervisorContractData Data { get; init; }
-        public IReadOnlyList<string> Errors { get; init; } = [];
-        public IReadOnlyList<string> Warnings { get; init; } = [];
-    }
-
-    private sealed record AgentRunSupervisorContractData
-    {
-        public required string Agent { get; init; }
-        public string? RunId { get; init; }
-        public required string Project { get; init; }
-        public required string Query { get; init; }
-        public required string PlanPath { get; init; }
-        public required string AgentStatus { get; init; }
-        public required int ExitCode { get; init; }
-        public required string Decision { get; init; }
-        public string? DecisionReason { get; init; }
-        public required AgentRunSupervisorTesterData Tester { get; init; }
-        public IReadOnlyList<string> EvidencePaths { get; init; } = [];
-        public IReadOnlyList<string> CommandsRun { get; init; } = [];
-        public IReadOnlyList<string> Warnings { get; init; } = [];
-    }
-
-    private sealed record AgentRunSupervisorTesterData
-    {
-        public string? RunId { get; init; }
-        public string? TraceId { get; init; }
-        public required string CommandStatus { get; init; }
-        public required string RunStatus { get; init; }
-        public required AgentRunSupervisorGovernanceData Governance { get; init; }
-        public IReadOnlyList<string> Warnings { get; init; } = [];
-    }
-
-    private sealed record AgentRunSupervisorGovernanceData
-    {
-        public required string Decision { get; init; }
-        public required string ApprovalDecision { get; init; }
-        public string? BlockedReason { get; init; }
-        public required bool RequiresHumanApproval { get; init; }
-    }
 }
