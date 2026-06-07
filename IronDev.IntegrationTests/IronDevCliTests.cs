@@ -1214,6 +1214,208 @@ public sealed class IronDevCliTests
     }
 
     [TestMethod]
+    public async Task WorkspaceDiff_MissingMetadata_BlocksDiff()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-missing-metadata");
+        try
+        {
+            var workspacePath = Path.Combine(testRoot, "workspace");
+            Directory.CreateDirectory(workspacePath);
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            Assert.AreEqual("workspace diff", root.GetProperty("command").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "metadata");
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "diff.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_RunIdMismatch_BlocksDiff()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-runid-mismatch");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-a", sourceRepo);
+
+            using var doc = await RunWorkspaceDiffAsync("run-b", workspacePath, expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "runId mismatch");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_NoChanges_ReturnsSucceededUnchanged()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-unchanged");
+        try
+        {
+            var (sourceRepo, workspacePath) = await PrepareTrackedWorkspaceForDiffAsync(testRoot, "run-1");
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 0);
+            var root = doc.RootElement;
+            Assert.AreEqual("succeeded", root.GetProperty("status").GetString());
+            var data = root.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("changed").GetBoolean());
+            Assert.AreEqual(0, data.GetProperty("addedFiles").GetArrayLength());
+            Assert.AreEqual(0, data.GetProperty("modifiedFiles").GetArrayLength());
+            Assert.AreEqual(0, data.GetProperty("deletedFiles").GetArrayLength());
+            Assert.IsTrue(data.GetProperty("unchangedFileCount").GetInt32() > 0);
+            Assert.IsTrue(File.Exists(data.GetProperty("diffMetadataPath").GetString()!));
+            Assert.AreEqual(1, data.GetProperty("evidencePaths").GetArrayLength());
+            Assert.AreEqual(string.Empty, await GetGitStatusAsync(sourceRepo));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_AddedFileIsDetected()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-added");
+        try
+        {
+            var (_, workspacePath) = await PrepareTrackedWorkspaceForDiffAsync(testRoot, "run-1");
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new-file.txt"), "new");
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            Assert.IsTrue(data.GetProperty("changed").GetBoolean());
+            AssertStringArrayContains(data.GetProperty("addedFiles"), "new-file.txt");
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_ModifiedFileIsDetected()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-modified");
+        try
+        {
+            var (_, workspacePath) = await PrepareTrackedWorkspaceForDiffAsync(testRoot, "run-1");
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "README.md"), "changed");
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            Assert.IsTrue(data.GetProperty("changed").GetBoolean());
+            AssertStringArrayContains(data.GetProperty("modifiedFiles"), "README.md");
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_DeletedFileIsDetected()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-deleted");
+        try
+        {
+            var (_, workspacePath) = await PrepareTrackedWorkspaceForDiffAsync(testRoot, "run-1");
+            File.Delete(Path.Combine(workspacePath, "README.md"));
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            Assert.IsTrue(data.GetProperty("changed").GetBoolean());
+            AssertStringArrayContains(data.GetProperty("deletedFiles"), "README.md");
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_IgnoresIronDevEvidence()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-ignore-evidence");
+        try
+        {
+            var (_, workspacePath) = await PrepareTrackedWorkspaceForDiffAsync(testRoot, "run-1");
+            var evidencePath = Path.Combine(workspacePath, ".irondev", "runs", "run-1", "validation.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(evidencePath)!);
+            await File.WriteAllTextAsync(evidencePath, "{}");
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 0);
+            var data = doc.RootElement.GetProperty("data");
+            Assert.IsFalse(data.GetProperty("changed").GetBoolean());
+            Assert.AreEqual(0, data.GetProperty("addedFiles").GetArrayLength());
+            Assert.AreEqual("succeeded", doc.RootElement.GetProperty("status").GetString());
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceDiff_JsonOutput_UsesStandardEnvelope()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-diff-envelope");
+        try
+        {
+            var (_, workspacePath) = await PrepareTrackedWorkspaceForDiffAsync(testRoot, "run-1");
+
+            using var doc = await RunWorkspaceDiffAsync("run-1", workspacePath, expectedExitCode: 0);
+            var root = doc.RootElement;
+            var expectedTopLevelKeys = new[] { "status", "command", "traceId", "summary", "data", "errors", "warnings" };
+            var topLevelProperties = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+            CollectionAssert.AreEqual(
+                expectedTopLevelKeys.OrderBy(item => item).ToArray(),
+                topLevelProperties.OrderBy(item => item).ToArray());
+            Assert.AreEqual("workspace diff", root.GetProperty("command").GetString());
+            Assert.IsFalse(root.TryGetProperty("loopReport", out _));
+            Assert.IsFalse(root.TryGetProperty("processRun", out _));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public void WorkspaceDiffService_MustNotExecuteProcesses()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "IronDev.Infrastructure",
+            "Services",
+            "Workspaces",
+            "DisposableWorkspaceDiffService.cs"));
+
+        Assert.IsFalse(source.Contains("ProcessStartInfo", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("Process.Start", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("\"git\"", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("RunGit", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("powershell", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("/bin/sh", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(source.Contains("IAgent", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task AgentRunSupervisor_MissingRequiredOptions_WithJson_ReturnsFailureEnvelope()
     {
         var output = new StringWriter();
@@ -1959,6 +2161,30 @@ public sealed class IronDevCliTests
         return JsonDocument.Parse(output.ToString());
     }
 
+    private static async Task<JsonDocument> RunWorkspaceDiffAsync(
+        string runId,
+        string workspacePath,
+        int expectedExitCode)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var result = await IronDevCli.RunAsync(
+            [
+                "workspace", "diff",
+                "--run-id", runId,
+                "--workspace-path", workspacePath,
+                "--json"
+            ],
+            output,
+            error,
+            handler: null,
+            CancellationToken.None);
+
+        Assert.AreEqual(expectedExitCode, result, error.ToString());
+        AssertJsonWasWritten(output);
+        return JsonDocument.Parse(output.ToString());
+    }
+
     private static string CreateTemporaryDirectory(string prefix)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
@@ -2007,6 +2233,17 @@ public sealed class IronDevCliTests
         Directory.CreateDirectory(Path.Combine(workspacePath, ".irondev"));
         await WriteWorkspaceMetadataAsync(runId, sourceRepo, workspacePath);
         return workspacePath;
+    }
+
+    private static async Task<(string SourceRepo, string WorkspacePath)> PrepareTrackedWorkspaceForDiffAsync(
+        string testRoot,
+        string runId)
+    {
+        var sourceRepo = await CreateTemporaryGitRepositoryWithTrackedFilesAsync(testRoot);
+        var workspaceRoot = Path.Combine(testRoot, "workspaces");
+        Directory.CreateDirectory(workspaceRoot);
+        using var doc = await RunWorkspacePrepareAsync(runId, sourceRepo, workspaceRoot, expectedExitCode: 0);
+        return (sourceRepo, doc.RootElement.GetProperty("data").GetProperty("workspacePath").GetString()!);
     }
 
     private static async Task<string> CreatePreparedDotnetWorkspaceAsync(
