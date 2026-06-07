@@ -9,6 +9,8 @@ using IronDev.Core.Agents;
 using IronDev.Core.RunReports;
 using IronDev.Cli;
 using IronDev.Core.Models;
+using IronDev.Core.Workspaces;
+using IronDev.Infrastructure.Services.Workspaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -784,6 +786,103 @@ public sealed class IronDevCliTests
             Assert.AreEqual("blocked", root.GetProperty("status").GetString());
             AssertStringArrayContains(root.GetProperty("errors"), "runId mismatch");
             Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-b", "dotnet-build")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_MetadataMissingSourceRepo_BlocksExecution()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-missing-source-repo");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteWorkspaceMetadataAsync("run-1", sourceRepo, workspacePath, includeSourceRepo: false);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "dotnet-build", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "missing sourceRepo");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-build")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_MetadataMissingWorkspacePath_BlocksExecution()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-missing-workspace-path");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteWorkspaceMetadataAsync("run-1", sourceRepo, workspacePath, includeWorkspacePath: false);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "dotnet-build", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "missing workspacePath");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-build")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_MetadataSourceRepoEqualsWorkspace_BlocksExecution()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-source-equals-workspace");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await WriteWorkspaceMetadataAsync("run-1", workspacePath, workspacePath);
+
+            using var doc = await RunWorkspaceCommandAsync("run-1", workspacePath, "dotnet-build", expectedExitCode: 1);
+            var root = doc.RootElement;
+            Assert.AreEqual("blocked", root.GetProperty("status").GetString());
+            AssertStringArrayContains(root.GetProperty("errors"), "isolated from the source repository");
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "dotnet-build")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task WorkspaceRun_CommandTimeoutFailsClosed()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-run-timeout");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedDotnetWorkspaceAsync(testRoot, "run-1", sourceRepo, brokenProgram: false);
+            var service = new DisposableWorkspaceCommandService(TimeSpan.Zero);
+
+            var result = await service.RunAsync(
+                new DisposableWorkspaceCommandRequest
+                {
+                    RunId = "run-1",
+                    WorkspacePath = workspacePath,
+                    CommandId = "dotnet-build"
+                },
+                CancellationToken.None);
+
+            Assert.AreEqual("failed", result.Status);
+            Assert.AreEqual(1, result.ExitCode);
+            Assert.AreEqual(-1, result.Data.ExitCode);
+            Assert.IsFalse(result.Data.Succeeded);
+            Assert.IsTrue(result.Errors.Any(error => error.Contains("timed out", StringComparison.OrdinalIgnoreCase)));
         }
         finally
         {
@@ -1714,22 +1813,28 @@ public sealed class IronDevCliTests
     private static async Task WriteWorkspaceMetadataAsync(
         string runId,
         string sourceRepo,
-        string workspacePath)
+        string workspacePath,
+        bool includeSourceRepo = true,
+        bool includeWorkspacePath = true)
     {
         var metadataPath = Path.Combine(workspacePath, ".irondev", "workspace.json");
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        var metadata = new Dictionary<string, object?>
+        {
+            ["runId"] = runId,
+            ["createdUtc"] = DateTimeOffset.UtcNow,
+            ["preparationMethod"] = "copy",
+            ["sourceRepoMutated"] = false
+        };
+        if (includeSourceRepo)
+            metadata["sourceRepo"] = Path.GetFullPath(sourceRepo);
+        if (includeWorkspacePath)
+            metadata["workspacePath"] = Path.GetFullPath(workspacePath);
+
         await File.WriteAllTextAsync(
             metadataPath,
             JsonSerializer.Serialize(
-                new
-                {
-                    runId,
-                    sourceRepo = Path.GetFullPath(sourceRepo),
-                    workspacePath = Path.GetFullPath(workspacePath),
-                    createdUtc = DateTimeOffset.UtcNow,
-                    preparationMethod = "copy",
-                    sourceRepoMutated = false
-                },
+                metadata,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)
                 {
                     WriteIndented = true

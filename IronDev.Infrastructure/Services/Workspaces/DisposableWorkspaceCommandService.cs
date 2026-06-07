@@ -8,6 +8,8 @@ namespace IronDev.Infrastructure.Services.Workspaces;
 
 public sealed class DisposableWorkspaceCommandService : IDisposableWorkspaceCommandService
 {
+    private static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromMinutes(5);
+
     private static readonly JsonSerializerOptions MetadataJsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -19,6 +21,13 @@ public sealed class DisposableWorkspaceCommandService : IDisposableWorkspaceComm
             ["dotnet-build"] = new("dotnet", ["build", "--no-restore"]),
             ["dotnet-test"] = new("dotnet", ["test", "--no-build"])
         };
+
+    private readonly TimeSpan _commandTimeout;
+
+    public DisposableWorkspaceCommandService(TimeSpan? commandTimeout = null)
+    {
+        _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
+    }
 
     public async Task<DisposableWorkspaceCommandExecutionResult> RunAsync(
         DisposableWorkspaceCommandRequest request,
@@ -80,30 +89,39 @@ public sealed class DisposableWorkspaceCommandService : IDisposableWorkspaceComm
             return Blocked(request, workspacePath, errors, warnings);
         }
 
-        if (!string.IsNullOrWhiteSpace(metadata.WorkspacePath) &&
-            !PathsEqual(workspacePath, metadata.WorkspacePath))
+        if (string.IsNullOrWhiteSpace(metadata.SourceRepo))
+        {
+            errors.Add("Workspace metadata is missing sourceRepo.");
+            return Blocked(request, workspacePath, errors, warnings);
+        }
+
+        if (string.IsNullOrWhiteSpace(metadata.WorkspacePath))
+        {
+            errors.Add("Workspace metadata is missing workspacePath.");
+            return Blocked(request, workspacePath, errors, warnings);
+        }
+
+        var metadataWorkspacePath = NormalizePath(metadata.WorkspacePath);
+        if (!PathsEqual(workspacePath, metadataWorkspacePath))
         {
             errors.Add("Workspace path does not match the prepared workspace metadata.");
             return Blocked(request, workspacePath, errors, warnings);
         }
 
-        if (!string.IsNullOrWhiteSpace(metadata.SourceRepo))
+        var sourceRepo = NormalizePath(metadata.SourceRepo);
+        if (PathsEqual(workspacePath, sourceRepo) || IsSameOrInside(sourceRepo, workspacePath))
         {
-            var sourceRepo = NormalizePath(metadata.SourceRepo);
-            if (PathsEqual(workspacePath, sourceRepo) || IsSameOrInside(sourceRepo, workspacePath))
-            {
-                errors.Add("Workspace path must be isolated from the source repository.");
-                return Blocked(request, workspacePath, errors, warnings);
-            }
-
-            if (IsSameOrInside(Path.Combine(sourceRepo, ".git"), workspacePath))
-            {
-                errors.Add("Workspace path must not be inside the source repository .git directory.");
-                return Blocked(request, workspacePath, errors, warnings);
-            }
+            errors.Add("Workspace path must be isolated from the source repository.");
+            return Blocked(request, workspacePath, errors, warnings);
         }
 
-        return await RunCommandAsync(request, workspacePath, command, errors, warnings, cancellationToken)
+        if (IsSameOrInside(Path.Combine(sourceRepo, ".git"), workspacePath))
+        {
+            errors.Add("Workspace path must not be inside the source repository .git directory.");
+            return Blocked(request, workspacePath, errors, warnings);
+        }
+
+        return await RunCommandAsync(request, workspacePath, command, _commandTimeout, errors, warnings, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -111,6 +129,7 @@ public sealed class DisposableWorkspaceCommandService : IDisposableWorkspaceComm
         DisposableWorkspaceCommandRequest request,
         string workspacePath,
         WorkspaceCommandDefinition command,
+        TimeSpan commandTimeout,
         List<string> errors,
         List<string> warnings,
         CancellationToken cancellationToken)
@@ -146,9 +165,30 @@ public sealed class DisposableWorkspaceCommandService : IDisposableWorkspaceComm
                 return Failed(request, workspacePath, -1, errors, warnings);
             }
 
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(commandTimeout);
+
             var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+                {
+                    warnings.Add($"Workspace command process kill failed after timeout: {ex.Message}");
+                }
+
+                errors.Add($"Workspace command '{request.CommandId}' timed out after {commandTimeout}.");
+                return Failed(request, workspacePath, -1, errors, warnings);
+            }
+
             stdout = await stdoutTask.ConfigureAwait(false);
             stderr = await stderrTask.ConfigureAwait(false);
             processExitCode = process.ExitCode;
