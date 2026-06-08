@@ -16,6 +16,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IWorkspaceApplyReportReader? _workspaceApplyReportReader;
     private readonly IWorkspaceApplyRecommendationService? _workspaceApplyRecommendationService;
     private readonly IWorkspaceApplyActionRequestService? _workspaceApplyActionRequestService;
+    private readonly IWorkspaceApplyActionReviewService? _workspaceApplyActionReviewService;
 
     public SupervisorAgent(
         AgentDefinition definition,
@@ -26,7 +27,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         IAgentProcessRunner? processRunner = null,
         IWorkspaceApplyReportReader? workspaceApplyReportReader = null,
         IWorkspaceApplyRecommendationService? workspaceApplyRecommendationService = null,
-        IWorkspaceApplyActionRequestService? workspaceApplyActionRequestService = null)
+        IWorkspaceApplyActionRequestService? workspaceApplyActionRequestService = null,
+        IWorkspaceApplyActionReviewService? workspaceApplyActionReviewService = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
@@ -39,6 +41,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         _workspaceApplyReportReader = workspaceApplyReportReader;
         _workspaceApplyRecommendationService = workspaceApplyRecommendationService;
         _workspaceApplyActionRequestService = workspaceApplyActionRequestService;
+        _workspaceApplyActionReviewService = workspaceApplyActionReviewService;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -186,6 +189,10 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         var workspaceApplyReport = await ReadWorkspaceApplyReportAsync(request, runId, ct);
         var workspaceApplyRecommendation = BuildWorkspaceApplyRecommendation(workspaceApplyReport);
         var workspaceApplyActionRequest = BuildWorkspaceApplyActionRequest(workspaceApplyReport, workspaceApplyRecommendation);
+        var workspaceApplyActionReview = BuildWorkspaceApplyActionReview(
+            workspaceApplyReport,
+            workspaceApplyRecommendation,
+            workspaceApplyActionRequest);
         var testsSucceeded = testerReport is not null && testerReport.Status is "succeeded";
         var testSummary = BuildTesterSummary(testerReport, testerRunId, TryParse(tests.Stdout));
         var status = memorySucceeded && conscienceAllows && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
@@ -278,6 +285,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             workspaceApply = workspaceApplyReport,
             workspaceApplyRecommendation,
             workspaceApplyActionRequest,
+            workspaceApplyActionReview,
             governedAutonomy = new
             {
                 tier = autonomyTier,
@@ -335,6 +343,50 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             EvidencePaths = ExtractEvidencePaths(testerReport, TryParse(tests.Stdout), workspaceApplyReport),
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private WorkspaceApplyActionReview? BuildWorkspaceApplyActionReview(
+        WorkspaceApplyReportSummary? workspaceApplyReport,
+        WorkspaceApplyRecommendation? workspaceApplyRecommendation,
+        WorkspaceApplyActionRequest? workspaceApplyActionRequest)
+    {
+        if (workspaceApplyReport is null || workspaceApplyRecommendation is null || workspaceApplyActionRequest is null)
+            return null;
+
+        try
+        {
+            var service = _workspaceApplyActionReviewService ?? new WorkspaceApplyActionReviewService();
+            return service.Create(new WorkspaceApplyActionReviewInput
+            {
+                Report = workspaceApplyReport,
+                Recommendation = workspaceApplyRecommendation,
+                ActionRequest = workspaceApplyActionRequest
+            });
+        }
+        catch (Exception exception)
+        {
+            return new WorkspaceApplyActionReview
+            {
+                ReviewStatus = WorkspaceApplyActionReviewStatuses.BlockedForEvidence,
+                Summary = "Workspace apply evidence is missing or inconsistent. More evidence is required before deciding next action.",
+                HumanReviewRequired = true,
+                ApprovalCanBeGrantedByThisPackage = false,
+                ExecutionCanStartFromThisPackage = false,
+                SourceRepoMayBeMutated = workspaceApplyReport.SourceRepoMutated,
+                RequestedAction = workspaceApplyActionRequest.RequestedAction,
+                RecommendedAction = workspaceApplyRecommendation.RecommendedAction,
+                ReviewChecklist =
+                [
+                    "Identify missing evidence.",
+                    "Do not infer success.",
+                    "Rerun only the appropriate governed command manually if needed."
+                ],
+                EvidencePaths = workspaceApplyActionRequest.EvidencePaths,
+                RiskNotes = workspaceApplyActionRequest.RiskNotes,
+                Blockers = [$"Workspace apply action review could not be produced: {exception.Message}"],
+                Warnings = workspaceApplyActionRequest.Warnings
+            };
+        }
     }
 
     private WorkspaceApplyActionRequest? BuildWorkspaceApplyActionRequest(
