@@ -1,4 +1,4 @@
-namespace IronDev.Core.Agents.Skills;
+﻿namespace IronDev.Core.Agents.Skills;
 
 public static class AgentSkillExecutionStatuses
 {
@@ -52,6 +52,51 @@ public sealed record AgentSkillWorkspaceApplyContextExecutionPayload
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
+}
+
+public sealed record AgentSkillWorkspaceApplyRecommendationExecutionPayload
+{
+    public required bool RecommendationAvailable { get; init; }
+
+    public required string RecommendedAction { get; init; }
+
+    public IReadOnlyList<string> Rationale { get; init; } = [];
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> RiskNotes { get; init; } = [];
+}
+
+public sealed record AgentSkillWorkspaceApplyActionRequestExecutionPayload
+{
+    public required bool ActionRequestAvailable { get; init; }
+
+    public required string RequestedAction { get; init; }
+
+    public required string RequestedByAgent { get; init; }
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> RiskNotes { get; init; } = [];
+}
+
+public sealed record AgentSkillWorkspaceApplyActionReviewExecutionPayload
+{
+    public required bool ActionReviewAvailable { get; init; }
+
+    public required string ReviewStatus { get; init; }
+
+    public required bool SourceRepoMayBeMutated { get; init; }
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> RiskNotes { get; init; } = [];
 }
 
 public sealed record AgentSkillExecutionResult

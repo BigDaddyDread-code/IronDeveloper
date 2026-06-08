@@ -1,4 +1,4 @@
-using IronDev.Core.Agents.ApprovalPolicy;
+﻿using IronDev.Core.Agents.ApprovalPolicy;
 using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
 
@@ -6,7 +6,13 @@ namespace IronDev.Infrastructure.Services.Agents.Skills;
 
 public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
 {
-    private const string SupportedSkillId = AgentSkillIds.WorkspaceReadApplyContext;
+    private static readonly IReadOnlySet<string> SupportedSkillIds = new HashSet<string>(StringComparer.Ordinal)
+    {
+        AgentSkillIds.WorkspaceReadApplyContext,
+        AgentSkillIds.WorkspaceRecommendApplyAction,
+        AgentSkillIds.WorkspaceCreateActionRequest,
+        AgentSkillIds.WorkspaceCreateActionReview
+    };
 
     private readonly IAgentWorkspaceApplyContextService _workspaceApplyContextService;
 
@@ -35,7 +41,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 ["Skill is unknown."]);
         }
 
-        if (!string.Equals(context.SkillId, SupportedSkillId, StringComparison.Ordinal))
+        if (!SupportedSkillIds.Contains(context.SkillId))
         {
             return Blocked(
                 context,
@@ -123,9 +129,21 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 },
                 cancellationToken).ConfigureAwait(false);
 
-            var payload = BuildPayload(workspaceContext);
-            var evidencePaths = Merge(context.EvidencePaths, payload.EvidencePaths);
-            var warnings = Merge(context.Warnings, payload.Warnings);
+            var payloadResult = BuildPayload(context, workspaceContext, request.RequestedByAgent);
+            if (payloadResult.Blockers.Count > 0)
+            {
+                return Blocked(
+                    context,
+                    executionId,
+                    AgentSkillExecutionStatuses.BlockedByContext,
+                    payloadResult.Summary,
+                    payloadResult.Blockers,
+                    Merge(context.EvidencePaths, payloadResult.EvidencePaths),
+                    Merge(context.Warnings, payloadResult.Warnings));
+            }
+
+            var evidencePaths = Merge(context.EvidencePaths, payloadResult.EvidencePaths);
+            var warnings = Merge(context.Warnings, payloadResult.Warnings);
 
             return new AgentSkillExecutionResult
             {
@@ -145,7 +163,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 MemoryWritten = false,
                 ApprovalGranted = false,
                 ShellCommandRun = false,
-                Payload = payload,
+                Payload = payloadResult.Payload,
                 EvidencePaths = evidencePaths,
                 Warnings = warnings,
                 Blockers = []
@@ -179,7 +197,24 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         }
     }
 
-    private static AgentSkillWorkspaceApplyContextExecutionPayload BuildPayload(AgentWorkspaceApplyContext context)
+    private static PayloadBuildResult BuildPayload(
+        AgentSkillRequestContext skillContext,
+        AgentWorkspaceApplyContext workspaceContext,
+        string requestedByAgent) =>
+        skillContext.SkillId switch
+        {
+            AgentSkillIds.WorkspaceReadApplyContext => BuildReadApplyContextPayload(workspaceContext),
+            AgentSkillIds.WorkspaceRecommendApplyAction => BuildRecommendationPayload(workspaceContext),
+            AgentSkillIds.WorkspaceCreateActionRequest => BuildActionRequestPayload(workspaceContext, requestedByAgent),
+            AgentSkillIds.WorkspaceCreateActionReview => BuildActionReviewPayload(workspaceContext),
+            _ => new PayloadBuildResult
+            {
+                Summary = "Skill is not supported by the read-only execution service.",
+                Blockers = [$"Unsupported read-only skill: {skillContext.SkillId}"]
+            }
+        };
+
+    private static PayloadBuildResult BuildReadApplyContextPayload(AgentWorkspaceApplyContext context)
     {
         var evidencePaths = Merge(
             context.EvidencePaths,
@@ -196,19 +231,125 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             context.WorkspaceApplyActionReview?.Warnings ?? [],
             context.WorkspaceApplyPolicyContext?.Warnings ?? []);
 
-        return new AgentSkillWorkspaceApplyContextExecutionPayload
+        return new PayloadBuildResult
         {
-            WorkspaceApplyContextAvailable = context.ContextAvailable,
-            RunId = context.RunId,
-            WorkspacePath = context.WorkspacePath,
-            Outcome = context.WorkspaceApply?.Outcome,
-            RecommendedAction = context.WorkspaceApplyRecommendation?.RecommendedAction,
-            RequestedAction = context.WorkspaceApplyActionRequest?.RequestedAction,
-            ReviewStatus = context.WorkspaceApplyActionReview?.ReviewStatus,
-            PolicyDecision = context.WorkspaceApplyPolicyContext?.Decision,
-            RiskTier = context.WorkspaceApplyPolicyContext?.RiskTier,
             EvidencePaths = evidencePaths,
-            Warnings = warnings
+            Warnings = warnings,
+            Payload = new AgentSkillWorkspaceApplyContextExecutionPayload
+            {
+                WorkspaceApplyContextAvailable = context.ContextAvailable,
+                RunId = context.RunId,
+                WorkspacePath = context.WorkspacePath,
+                Outcome = context.WorkspaceApply?.Outcome,
+                RecommendedAction = context.WorkspaceApplyRecommendation?.RecommendedAction,
+                RequestedAction = context.WorkspaceApplyActionRequest?.RequestedAction,
+                ReviewStatus = context.WorkspaceApplyActionReview?.ReviewStatus,
+                PolicyDecision = context.WorkspaceApplyPolicyContext?.Decision,
+                RiskTier = context.WorkspaceApplyPolicyContext?.RiskTier,
+                EvidencePaths = evidencePaths,
+                Warnings = warnings
+            }
+        };
+    }
+
+    private static PayloadBuildResult BuildRecommendationPayload(AgentWorkspaceApplyContext context)
+    {
+        if (context.WorkspaceApplyRecommendation is null)
+        {
+            return new PayloadBuildResult
+            {
+                Summary = "Workspace apply recommendation was not available.",
+                EvidencePaths = context.EvidencePaths,
+                Warnings = context.Warnings,
+                Blockers = ["Workspace apply recommendation was not available."]
+            };
+        }
+
+        var recommendation = context.WorkspaceApplyRecommendation;
+        var evidencePaths = Merge(context.EvidencePaths, recommendation.EvidencePaths);
+        var warnings = Merge(context.Warnings, recommendation.Warnings);
+
+        return new PayloadBuildResult
+        {
+            EvidencePaths = evidencePaths,
+            Warnings = warnings,
+            Payload = new AgentSkillWorkspaceApplyRecommendationExecutionPayload
+            {
+                RecommendationAvailable = true,
+                RecommendedAction = recommendation.RecommendedAction,
+                Rationale = [recommendation.Reason],
+                EvidencePaths = evidencePaths,
+                Warnings = warnings,
+                RiskNotes = recommendation.RiskNotes
+            }
+        };
+    }
+
+    private static PayloadBuildResult BuildActionRequestPayload(
+        AgentWorkspaceApplyContext context,
+        string requestedByAgent)
+    {
+        if (context.WorkspaceApplyActionRequest is null)
+        {
+            return new PayloadBuildResult
+            {
+                Summary = "Workspace apply action request was not available.",
+                EvidencePaths = context.EvidencePaths,
+                Warnings = context.Warnings,
+                Blockers = ["Workspace apply action request was not available."]
+            };
+        }
+
+        var actionRequest = context.WorkspaceApplyActionRequest;
+        var evidencePaths = Merge(context.EvidencePaths, actionRequest.EvidencePaths);
+        var warnings = Merge(context.Warnings, actionRequest.Warnings);
+
+        return new PayloadBuildResult
+        {
+            EvidencePaths = evidencePaths,
+            Warnings = warnings,
+            Payload = new AgentSkillWorkspaceApplyActionRequestExecutionPayload
+            {
+                ActionRequestAvailable = true,
+                RequestedAction = actionRequest.RequestedAction,
+                RequestedByAgent = requestedByAgent,
+                EvidencePaths = evidencePaths,
+                Warnings = warnings,
+                RiskNotes = actionRequest.RiskNotes
+            }
+        };
+    }
+
+    private static PayloadBuildResult BuildActionReviewPayload(AgentWorkspaceApplyContext context)
+    {
+        if (context.WorkspaceApplyActionReview is null)
+        {
+            return new PayloadBuildResult
+            {
+                Summary = "Workspace apply action review was not available.",
+                EvidencePaths = context.EvidencePaths,
+                Warnings = context.Warnings,
+                Blockers = ["Workspace apply action review was not available."]
+            };
+        }
+
+        var actionReview = context.WorkspaceApplyActionReview;
+        var evidencePaths = Merge(context.EvidencePaths, actionReview.EvidencePaths);
+        var warnings = Merge(context.Warnings, actionReview.Warnings);
+
+        return new PayloadBuildResult
+        {
+            EvidencePaths = evidencePaths,
+            Warnings = warnings,
+            Payload = new AgentSkillWorkspaceApplyActionReviewExecutionPayload
+            {
+                ActionReviewAvailable = true,
+                ReviewStatus = actionReview.ReviewStatus,
+                SourceRepoMayBeMutated = actionReview.SourceRepoMayBeMutated,
+                EvidencePaths = evidencePaths,
+                Warnings = warnings,
+                RiskNotes = actionReview.RiskNotes
+            }
         };
     }
 
@@ -245,7 +386,9 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         string executionId,
         string status,
         string summary,
-        IReadOnlyList<string> blockers) =>
+        IReadOnlyList<string> blockers,
+        IReadOnlyList<string>? evidencePaths = null,
+        IReadOnlyList<string>? warnings = null) =>
         new()
         {
             ExecutionId = executionId,
@@ -265,8 +408,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             ApprovalGranted = false,
             ShellCommandRun = false,
             Payload = null,
-            EvidencePaths = context.EvidencePaths,
-            Warnings = context.Warnings,
+            EvidencePaths = evidencePaths ?? context.EvidencePaths,
+            Warnings = warnings ?? context.Warnings,
             Blockers = blockers
         };
 
@@ -305,4 +448,17 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+
+    private sealed record PayloadBuildResult
+    {
+        public string Summary { get; init; } = "Read-only skill execution completed.";
+
+        public object? Payload { get; init; }
+
+        public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+        public IReadOnlyList<string> Warnings { get; init; } = [];
+
+        public IReadOnlyList<string> Blockers { get; init; } = [];
+    }
 }
