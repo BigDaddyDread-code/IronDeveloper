@@ -13,6 +13,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IAgentLlmClient? _llmClient;
     private readonly IAgentProcessRunner _processRunner;
     private readonly IRunReportContractReader _runReportContractReader;
+    private readonly IWorkspaceApplyReportReader? _workspaceApplyReportReader;
 
     public SupervisorAgent(
         AgentDefinition definition,
@@ -20,7 +21,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         string repoRoot,
         IRunReportContractReader runReportContractReader,
         IAgentLlmClient? llmClient = null,
-        IAgentProcessRunner? processRunner = null)
+        IAgentProcessRunner? processRunner = null,
+        IWorkspaceApplyReportReader? workspaceApplyReportReader = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
@@ -30,6 +32,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             nameof(runReportContractReader),
             "SupervisorAgent requires a real run report contract reader.");
         _processRunner = processRunner ?? new AgentProcessRunner();
+        _workspaceApplyReportReader = workspaceApplyReportReader;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -174,6 +177,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
         var testerRunId = $"{runId}-tester";
         var testerReport = await ReadTesterRunReportAsync(tests, testerRunId, ct);
+        var workspaceApplyReport = await ReadWorkspaceApplyReportAsync(request, runId, ct);
         var testsSucceeded = testerReport is not null && testerReport.Status is "succeeded";
         var testSummary = BuildTesterSummary(testerReport, testerRunId, TryParse(tests.Stdout));
         var status = memorySucceeded && conscienceAllows && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
@@ -263,6 +267,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 warnings = testerReport?.Warnings ?? [],
                 report = ReadElement(TryParse(tests.Stdout), "report")
             },
+            workspaceApply = workspaceApplyReport,
             governedAutonomy = new
             {
                 tier = autonomyTier,
@@ -317,9 +322,45 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             ExitCode = status == AgentRunStatus.Succeeded ? 0 : 1,
             OutputJson = outputJson,
             CommandsRun = [memory.Command, conscience.Command, thoughtLedger.Command, tests.Command],
-            EvidencePaths = ExtractEvidencePaths(testerReport, TryParse(tests.Stdout)),
+            EvidencePaths = ExtractEvidencePaths(testerReport, TryParse(tests.Stdout), workspaceApplyReport),
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<WorkspaceApplyReportSummary?> ReadWorkspaceApplyReportAsync(
+        AgentRequest request,
+        string defaultRunId,
+        CancellationToken ct)
+    {
+        var workspacePath = ReadOptionalInput(request, "workspace_apply_workspace_path");
+        if (string.IsNullOrWhiteSpace(workspacePath))
+            return null;
+
+        var reportRunId = ReadOptionalInput(request, "workspace_apply_run_id");
+        if (string.IsNullOrWhiteSpace(reportRunId))
+            reportRunId = defaultRunId;
+
+        try
+        {
+            var reader = _workspaceApplyReportReader ?? new WorkspaceApplyReportReader();
+            return await reader.ReadAsync(
+                new WorkspaceApplyReportRequest
+                {
+                    RunId = reportRunId,
+                    WorkspacePath = workspacePath
+                },
+                ct);
+        }
+        catch (Exception exception)
+        {
+            return new WorkspaceApplyReportSummary
+            {
+                RunId = reportRunId,
+                WorkspacePath = workspacePath,
+                Outcome = "unavailable",
+                Warnings = [$"Workspace apply report could not be read: {exception.Message}"]
+            };
+        }
     }
 
     private async Task<RunReportContractReadResult?> ReadTesterRunReportAsync(
@@ -475,6 +516,9 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         bool.TryParse(value, out var parsed) &&
         parsed;
 
+    private static string ReadOptionalInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) ? value : string.Empty;
+
     private static string BuildModelSummary(AgentLlmCallResult result)
     {
         if (!string.IsNullOrWhiteSpace(result.ResponseText))
@@ -549,8 +593,12 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         return value?.ValueKind == JsonValueKind.String ? value.Value.GetString() ?? string.Empty : string.Empty;
     }
 
-    private static IReadOnlyList<string> ExtractEvidencePaths(RunReportContractReadResult? testerReport, JsonElement? testJson)
+    private static IReadOnlyList<string> ExtractEvidencePaths(
+        RunReportContractReadResult? testerReport,
+        JsonElement? testJson,
+        WorkspaceApplyReportSummary? workspaceApplyReport)
     {
+        var paths = new List<string>();
         if (testerReport is not null)
         {
             var contractPaths = testerReport.Data.Evidence
@@ -559,20 +607,23 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 .Select(item => item!)
                 .ToArray();
 
-            if (contractPaths.Length > 0)
-                return contractPaths;
+            paths.AddRange(contractPaths);
         }
 
         var report = ReadElement(testJson, "report");
         var evidence = ReadElement(report, "evidence");
-        if (evidence is null || evidence.Value.ValueKind != JsonValueKind.Array)
-            return [];
+        if (evidence is not null && evidence.Value.ValueKind == JsonValueKind.Array)
+        {
+            paths.AddRange(evidence.Value.EnumerateArray()
+                .Select(item => item.TryGetProperty("path", out var path) ? path.GetString() : null)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Cast<string>());
+        }
 
-        return evidence.Value.EnumerateArray()
-            .Select(item => item.TryGetProperty("path", out var path) ? path.GetString() : null)
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Cast<string>()
-            .ToArray();
+        if (workspaceApplyReport is not null)
+            paths.AddRange(workspaceApplyReport.EvidencePaths);
+
+        return paths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static string QuoteIfNeeded(string value) =>
