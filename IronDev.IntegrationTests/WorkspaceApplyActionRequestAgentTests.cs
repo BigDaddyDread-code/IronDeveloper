@@ -4,6 +4,8 @@ using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
 using IronDev.Core.RunReports;
 using IronDev.Infrastructure.Services.Agents;
+using IronDev.Infrastructure.Services.Agents.WorkspaceApply;
+using IronDev.Infrastructure.Services.Agents.ApprovalPolicy;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -250,9 +252,7 @@ public sealed class WorkspaceApplyActionRequestAgentTests
             FindRepositoryRoot(),
             runReportReader,
             processRunner: processRunner,
-            workspaceApplyReportReader: workspaceApplyReportReader,
-            workspaceApplyRecommendationService: new WorkspaceApplyRecommendationService(),
-            workspaceApplyActionRequestService: new WorkspaceApplyActionRequestService());
+            workspaceApplyContextService: BuildWorkspaceApplyContextService(workspaceApplyReportReader));
     }
 
     private static FakeAgentProcessRunner BuildSuccessfulProcessRunner() =>
@@ -351,7 +351,15 @@ public sealed class WorkspaceApplyActionRequestAgentTests
 
         throw new DirectoryNotFoundException("Could not locate AIDeveloper repository root.");
     }
-
+    private static AgentWorkspaceApplyContextService? BuildWorkspaceApplyContextService(IWorkspaceApplyReportReader? workspaceApplyReportReader) =>
+        workspaceApplyReportReader is null
+            ? null
+            : new AgentWorkspaceApplyContextService(
+                workspaceApplyReportReader,
+                new WorkspaceApplyRecommendationService(),
+                new WorkspaceApplyActionRequestService(),
+                new WorkspaceApplyActionReviewService(),
+                new WorkspaceApplyPolicyContextService(new ProjectApprovalPolicyEvaluator()));
     private sealed class FakeWorkspaceApplyReportReader : IWorkspaceApplyReportReader
     {
         private readonly WorkspaceApplyReportSummary _summary;
