@@ -6,6 +6,11 @@ This proof is covered by the focused integration test:
 dotnet test IronDev.IntegrationTests\IronDev.IntegrationTests.csproj --filter "WorkspaceCopyOnlyApply"
 ```
 
+For the command boundary and evidence contract, see:
+
+- `Docs/agents/WORKSPACE_APPLY_SPINE.md`
+- `Docs/cli/WORKSPACE_COMMAND_BOUNDARY_INVENTORY.md`
+
 ## What it covers
 
 The test creates a tiny disposable .NET source repository, prepares a workspace through the product CLI, modifies the workspace with one added file and one modified file, then runs the governed copy-only apply spine through:
