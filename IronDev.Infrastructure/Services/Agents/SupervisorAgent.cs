@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
 using IronDev.Core.Agents;
-using IronDev.Core.Agents.ApprovalPolicy;
+using IronDev.Core.Agents.WorkspaceApply;
 using IronDev.Core.Interfaces;
 using IronDev.Core.RunReports;
-using IronDev.Infrastructure.Services.Agents.ApprovalPolicy;
+using IronDev.Infrastructure.Services.Agents.WorkspaceApply;
 
 namespace IronDev.Infrastructure.Services.Agents;
 
@@ -15,11 +15,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IAgentLlmClient? _llmClient;
     private readonly IAgentProcessRunner _processRunner;
     private readonly IRunReportContractReader _runReportContractReader;
-    private readonly IWorkspaceApplyReportReader? _workspaceApplyReportReader;
-    private readonly IWorkspaceApplyRecommendationService? _workspaceApplyRecommendationService;
-    private readonly IWorkspaceApplyActionRequestService? _workspaceApplyActionRequestService;
-    private readonly IWorkspaceApplyActionReviewService? _workspaceApplyActionReviewService;
-    private readonly IWorkspaceApplyPolicyContextService? _workspaceApplyPolicyContextService;
+    private readonly IAgentWorkspaceApplyContextService? _workspaceApplyContextService;
 
     public SupervisorAgent(
         AgentDefinition definition,
@@ -28,11 +24,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         IRunReportContractReader runReportContractReader,
         IAgentLlmClient? llmClient = null,
         IAgentProcessRunner? processRunner = null,
-        IWorkspaceApplyReportReader? workspaceApplyReportReader = null,
-        IWorkspaceApplyRecommendationService? workspaceApplyRecommendationService = null,
-        IWorkspaceApplyActionRequestService? workspaceApplyActionRequestService = null,
-        IWorkspaceApplyActionReviewService? workspaceApplyActionReviewService = null,
-        IWorkspaceApplyPolicyContextService? workspaceApplyPolicyContextService = null)
+        IAgentWorkspaceApplyContextService? workspaceApplyContextService = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
@@ -42,11 +34,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             nameof(runReportContractReader),
             "SupervisorAgent requires a real run report contract reader.");
         _processRunner = processRunner ?? new AgentProcessRunner();
-        _workspaceApplyReportReader = workspaceApplyReportReader;
-        _workspaceApplyRecommendationService = workspaceApplyRecommendationService;
-        _workspaceApplyActionRequestService = workspaceApplyActionRequestService;
-        _workspaceApplyActionReviewService = workspaceApplyActionReviewService;
-        _workspaceApplyPolicyContextService = workspaceApplyPolicyContextService;
+        _workspaceApplyContextService = workspaceApplyContextService;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -191,19 +179,12 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
         var testerRunId = $"{runId}-tester";
         var testerReport = await ReadTesterRunReportAsync(tests, testerRunId, ct);
-        var workspaceApplyReport = await ReadWorkspaceApplyReportAsync(request, runId, ct);
-        var workspaceApplyRecommendation = BuildWorkspaceApplyRecommendation(workspaceApplyReport);
-        var workspaceApplyActionRequest = BuildWorkspaceApplyActionRequest(workspaceApplyReport, workspaceApplyRecommendation);
-        var workspaceApplyActionReview = BuildWorkspaceApplyActionReview(
-            workspaceApplyReport,
-            workspaceApplyRecommendation,
-            workspaceApplyActionRequest);
-        var workspaceApplyPolicyContext = BuildWorkspaceApplyPolicyContext(
-            project,
-            workspaceApplyReport,
-            workspaceApplyRecommendation,
-            workspaceApplyActionRequest,
-            workspaceApplyActionReview);
+        var workspaceApplyContext = await BuildWorkspaceApplyContextAsync(request, project, runId, ct);
+        var workspaceApplyReport = workspaceApplyContext?.WorkspaceApply;
+        var workspaceApplyRecommendation = workspaceApplyContext?.WorkspaceApplyRecommendation;
+        var workspaceApplyActionRequest = workspaceApplyContext?.WorkspaceApplyActionRequest;
+        var workspaceApplyActionReview = workspaceApplyContext?.WorkspaceApplyActionReview;
+        var workspaceApplyPolicyContext = workspaceApplyContext?.WorkspaceApplyPolicyContext;
         var testsSucceeded = testerReport is not null && testerReport.Status is "succeeded";
         var testSummary = BuildTesterSummary(testerReport, testerRunId, TryParse(tests.Stdout));
         var status = memorySucceeded && conscienceAllows && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
@@ -357,174 +338,9 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         };
     }
 
-    private WorkspaceApplyPolicyContext? BuildWorkspaceApplyPolicyContext(
-        string project,
-        WorkspaceApplyReportSummary? workspaceApplyReport,
-        WorkspaceApplyRecommendation? workspaceApplyRecommendation,
-        WorkspaceApplyActionRequest? workspaceApplyActionRequest,
-        WorkspaceApplyActionReview? workspaceApplyActionReview)
-    {
-        if (workspaceApplyReport is null ||
-            workspaceApplyRecommendation is null ||
-            workspaceApplyActionRequest is null ||
-            workspaceApplyActionReview is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            var service = _workspaceApplyPolicyContextService ?? new WorkspaceApplyPolicyContextService(new ProjectApprovalPolicyEvaluator());
-            return service.Create(new WorkspaceApplyPolicyContextInput
-            {
-                ProjectId = project,
-                Report = workspaceApplyReport,
-                Recommendation = workspaceApplyRecommendation,
-                ActionRequest = workspaceApplyActionRequest,
-                ActionReview = workspaceApplyActionReview,
-                Policy = ProjectApprovalPolicy.CreateDefault(project)
-            });
-        }
-        catch (Exception exception)
-        {
-            return new WorkspaceApplyPolicyContext
-            {
-                Decision = ProjectApprovalDecisions.ApprovalRequired,
-                Reason = "Workspace apply policy context could not be produced.",
-                RiskTier = ProjectApprovalRiskTiers.WorkspaceReporting,
-                ActionType = WorkspaceApplyPolicyActionTypes.WorkspaceApplyActionReview,
-                RequestedAction = workspaceApplyActionRequest.RequestedAction,
-                HumanApprovalRequired = true,
-                AutomaticExecutionAllowed = false,
-                SourceMutationAllowed = false,
-                ExecutionCanStartFromPolicyContext = false,
-                ApprovalCanBeGrantedByPolicyContext = false,
-                MatchedRuleDescription = null,
-                EvidencePaths = workspaceApplyActionReview.EvidencePaths,
-                RiskNotes = workspaceApplyActionReview.RiskNotes,
-                Warnings = [$"Workspace apply policy context could not be produced: {exception.Message}"]
-            };
-        }
-    }
-
-    private WorkspaceApplyActionReview? BuildWorkspaceApplyActionReview(
-        WorkspaceApplyReportSummary? workspaceApplyReport,
-        WorkspaceApplyRecommendation? workspaceApplyRecommendation,
-        WorkspaceApplyActionRequest? workspaceApplyActionRequest)
-    {
-        if (workspaceApplyReport is null || workspaceApplyRecommendation is null || workspaceApplyActionRequest is null)
-            return null;
-
-        try
-        {
-            var service = _workspaceApplyActionReviewService ?? new WorkspaceApplyActionReviewService();
-            return service.Create(new WorkspaceApplyActionReviewInput
-            {
-                Report = workspaceApplyReport,
-                Recommendation = workspaceApplyRecommendation,
-                ActionRequest = workspaceApplyActionRequest
-            });
-        }
-        catch (Exception exception)
-        {
-            return new WorkspaceApplyActionReview
-            {
-                ReviewStatus = WorkspaceApplyActionReviewStatuses.BlockedForEvidence,
-                Summary = "Workspace apply evidence is missing or inconsistent. More evidence is required before deciding next action.",
-                HumanReviewRequired = true,
-                ApprovalCanBeGrantedByThisPackage = false,
-                ExecutionCanStartFromThisPackage = false,
-                SourceRepoMayBeMutated = workspaceApplyReport.SourceRepoMutated,
-                RequestedAction = workspaceApplyActionRequest.RequestedAction,
-                RecommendedAction = workspaceApplyRecommendation.RecommendedAction,
-                ReviewChecklist =
-                [
-                    "Identify missing evidence.",
-                    "Do not infer success.",
-                    "Rerun only the appropriate governed command manually if needed."
-                ],
-                EvidencePaths = workspaceApplyActionRequest.EvidencePaths,
-                RiskNotes = workspaceApplyActionRequest.RiskNotes,
-                Blockers = [$"Workspace apply action review could not be produced: {exception.Message}"],
-                Warnings = workspaceApplyActionRequest.Warnings
-            };
-        }
-    }
-
-    private WorkspaceApplyActionRequest? BuildWorkspaceApplyActionRequest(
-        WorkspaceApplyReportSummary? workspaceApplyReport,
-        WorkspaceApplyRecommendation? workspaceApplyRecommendation)
-    {
-        if (workspaceApplyReport is null || workspaceApplyRecommendation is null)
-            return null;
-
-        try
-        {
-            var service = _workspaceApplyActionRequestService ?? new WorkspaceApplyActionRequestService();
-            return service.Create(new WorkspaceApplyActionRequestInput
-            {
-                Report = workspaceApplyReport,
-                Recommendation = workspaceApplyRecommendation
-            });
-        }
-        catch (Exception exception)
-        {
-            return new WorkspaceApplyActionRequest
-            {
-                RequestedAction = WorkspaceApplyRequestedActions.CollectMissingEvidence,
-                Reason = "Workspace apply evidence is incomplete or inconsistent.",
-                HumanApprovalRequired = true,
-                AutomaticExecutionAllowed = false,
-                MutatesSourceRepo = false,
-                RequiresFreshHumanDecision = true,
-                SuggestedCommand = null,
-                SuggestedCommandArguments = [],
-                Preconditions =
-                [
-                    "identify missing evidence",
-                    "rerun only the appropriate governed command manually",
-                    "do not infer success"
-                ],
-                EvidencePaths = workspaceApplyReport.EvidencePaths,
-                RiskNotes = workspaceApplyReport.RiskNotes,
-                Warnings = [$"Workspace apply action request could not be produced: {exception.Message}"]
-            };
-        }
-    }
-
-    private WorkspaceApplyRecommendation? BuildWorkspaceApplyRecommendation(WorkspaceApplyReportSummary? workspaceApplyReport)
-    {
-        if (workspaceApplyReport is null)
-            return null;
-
-        try
-        {
-            var service = _workspaceApplyRecommendationService ?? new WorkspaceApplyRecommendationService();
-            return service.Recommend(new WorkspaceApplyRecommendationRequest
-            {
-                Report = workspaceApplyReport
-            });
-        }
-        catch (Exception exception)
-        {
-            return new WorkspaceApplyRecommendation
-            {
-                RecommendedAction = WorkspaceApplyRecommendedActions.CollectMissingEvidence,
-                Reason = "Workspace apply evidence is incomplete or inconsistent.",
-                HumanReviewRequired = true,
-                SafeToRetry = false,
-                SafeToCommitAfterReview = false,
-                SourceReviewRequiredBeforeRetry = true,
-                BlocksAutomaticExecution = true,
-                EvidencePaths = workspaceApplyReport.EvidencePaths,
-                RiskNotes = workspaceApplyReport.RiskNotes,
-                Warnings = [$"Workspace apply recommendation could not be produced: {exception.Message}"]
-            };
-        }
-    }
-
-    private async Task<WorkspaceApplyReportSummary?> ReadWorkspaceApplyReportAsync(
+    private async Task<AgentWorkspaceApplyContext?> BuildWorkspaceApplyContextAsync(
         AgentRequest request,
+        string project,
         string defaultRunId,
         CancellationToken ct)
     {
@@ -538,10 +354,11 @@ public sealed class SupervisorAgent : StaticIronDevAgent
 
         try
         {
-            var reader = _workspaceApplyReportReader ?? new WorkspaceApplyReportReader();
-            return await reader.ReadAsync(
-                new WorkspaceApplyReportRequest
+            var service = _workspaceApplyContextService ?? new AgentWorkspaceApplyContextService();
+            return await service.CreateAsync(
+                new AgentWorkspaceApplyContextRequest
                 {
+                    ProjectId = project,
                     RunId = reportRunId,
                     WorkspacePath = workspacePath
                 },
@@ -549,12 +366,23 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         }
         catch (Exception exception)
         {
-            return new WorkspaceApplyReportSummary
+            var workspaceApplyReport = new WorkspaceApplyReportSummary
             {
                 RunId = reportRunId,
                 WorkspacePath = workspacePath,
                 Outcome = "unavailable",
-                Warnings = [$"Workspace apply report could not be read: {exception.Message}"]
+                Warnings = [$"Workspace apply context could not be produced: {exception.Message}"]
+            };
+
+            return new AgentWorkspaceApplyContext
+            {
+                ProjectId = project,
+                RunId = reportRunId,
+                WorkspacePath = workspacePath,
+                WorkspaceApply = workspaceApplyReport,
+                ContextAvailable = false,
+                Warnings = workspaceApplyReport.Warnings,
+                EvidencePaths = []
             };
         }
     }
