@@ -1,6 +1,9 @@
 using System.Text.Json;
 using IronDev.Core.Agents;
+using IronDev.Core.Agents.ApprovalPolicy;
+using IronDev.Core.Agents.WorkspaceApply;
 using IronDev.Core.Interfaces;
+using IronDev.Infrastructure.Services.Agents.WorkspaceApply;
 
 namespace IronDev.Infrastructure.Services.Agents;
 
@@ -8,12 +11,18 @@ public sealed class CriticAgent : StaticIronDevAgent
 {
     private readonly IAgentModelResolver _modelResolver;
     private readonly IAgentLlmClient? _llmClient;
+    private readonly IAgentWorkspaceApplyContextService? _workspaceApplyContextService;
 
-    public CriticAgent(AgentDefinition definition, IAgentModelResolver modelResolver, IAgentLlmClient? llmClient = null)
+    public CriticAgent(
+        AgentDefinition definition,
+        IAgentModelResolver modelResolver,
+        IAgentLlmClient? llmClient = null,
+        IAgentWorkspaceApplyContextService? workspaceApplyContextService = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _llmClient = llmClient;
+        _workspaceApplyContextService = workspaceApplyContextService;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -52,6 +61,7 @@ public sealed class CriticAgent : StaticIronDevAgent
             : evidenceSufficient
                 ? "ask_for_likely_area"
                 : "request_more_evidence";
+        var workspaceApplyContext = await BuildWorkspaceApplyContextSummaryAsync(request, ct).ConfigureAwait(false);
 
         var review = new
         {
@@ -68,6 +78,7 @@ public sealed class CriticAgent : StaticIronDevAgent
             likelyAreas,
             evidencePaths,
             safetyRules,
+            workspaceApplyContext,
             llmIntelligence = new
             {
                 modelProfile = profile.Name,
@@ -83,7 +94,7 @@ public sealed class CriticAgent : StaticIronDevAgent
                 error = llmResult.WasSuccessful ? string.Empty : llmResult.ErrorMessage
             },
             risks = BuildRisks(package, evidenceSufficient, actionable),
-            boundary = "CriticAgent reviews failure-package evidence only. Live LLM output is advisory evidence and does not patch code, run tests, create tickets, mutate memory, or approve writes."
+            boundary = "CriticAgent reviews failure-package and workspace apply context evidence only. Live LLM output is advisory evidence and does not patch code, run tests, create tickets, mutate memory, approve writes, or execute workspace commands."
         };
 
         return new AgentResult
@@ -102,6 +113,162 @@ public sealed class CriticAgent : StaticIronDevAgent
             EvidencePaths = evidencePaths,
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<object?> BuildWorkspaceApplyContextSummaryAsync(AgentRequest request, CancellationToken ct)
+    {
+        var workspacePath = ReadOptionalInput(request, "workspace_apply_workspace_path");
+        if (string.IsNullOrWhiteSpace(workspacePath))
+            return null;
+
+        var runId = ReadOptionalInput(request, "workspace_apply_run_id") ??
+            request.DogfoodRunId ??
+            request.GoalId ??
+            "unknown-run";
+        var projectId = ReadOptionalInput(request, "project") ??
+            request.AgentName ??
+            AgentName;
+        var contextRequest = new AgentWorkspaceApplyContextRequest
+        {
+            ProjectId = projectId,
+            RunId = runId,
+            WorkspacePath = workspacePath
+        };
+
+        try
+        {
+            var service = _workspaceApplyContextService ?? new AgentWorkspaceApplyContextService();
+            var context = await service.CreateAsync(contextRequest, ct).ConfigureAwait(false);
+            return BuildWorkspaceApplyContextSummary(context);
+        }
+        catch (Exception exception)
+        {
+            return BuildUnavailableWorkspaceApplyContextSummary(
+                contextRequest,
+                $"Workspace apply context could not be produced: {exception.Message}");
+        }
+    }
+
+    private static object BuildWorkspaceApplyContextSummary(AgentWorkspaceApplyContext context)
+    {
+        var report = context.WorkspaceApply;
+        var recommendation = context.WorkspaceApplyRecommendation;
+        var actionRequest = context.WorkspaceApplyActionRequest;
+        var actionReview = context.WorkspaceApplyActionReview;
+        var policyContext = context.WorkspaceApplyPolicyContext;
+        var outcome = report?.Outcome ?? (context.ContextAvailable ? "unknown" : "unavailable");
+        var warnings = MergeDistinct(
+            context.Warnings,
+            report?.Warnings,
+            recommendation?.Warnings,
+            actionRequest?.Warnings,
+            actionReview?.Warnings,
+            policyContext?.Warnings);
+
+        if (!context.ContextAvailable)
+        {
+            warnings = MergeDistinct(
+                warnings,
+                ["Workspace apply context is unavailable; no usable source-report or failure-package was found."]);
+        }
+
+        return new
+        {
+            available = context.ContextAvailable,
+            outcome,
+            failedStage = report?.FailedStage,
+            failureSeverity = report?.FailureSeverity,
+            recommendedAction = recommendation?.RecommendedAction,
+            requestedAction = actionRequest?.RequestedAction,
+            reviewStatus = actionReview?.ReviewStatus,
+            policyDecision = policyContext?.Decision,
+            riskTier = policyContext?.RiskTier,
+            sourceRepoMayBeMutated = actionReview?.SourceRepoMayBeMutated ?? report?.SourceRepoMutated ?? false,
+            executionAllowedByThisAgent = false,
+            approvalAllowedByThisAgent = false,
+            sourceMutationAllowedByThisAgent = false,
+            evidencePaths = MergeDistinct(
+                context.EvidencePaths,
+                report?.EvidencePaths,
+                recommendation?.EvidencePaths,
+                actionRequest?.EvidencePaths,
+                actionReview?.EvidencePaths,
+                policyContext?.EvidencePaths),
+            warnings,
+            riskNotes = MergeDistinct(
+                report?.RiskNotes,
+                recommendation?.RiskNotes,
+                actionRequest?.RiskNotes,
+                actionReview?.RiskNotes,
+                policyContext?.RiskNotes),
+            interpretation = BuildWorkspaceApplyInterpretation(context)
+        };
+    }
+
+    private static object BuildUnavailableWorkspaceApplyContextSummary(
+        AgentWorkspaceApplyContextRequest request,
+        string warning)
+    {
+        return new
+        {
+            available = false,
+            outcome = "unavailable",
+            failedStage = (string?)null,
+            failureSeverity = (string?)null,
+            recommendedAction = WorkspaceApplyRecommendedActions.NoWorkspaceApplyReport,
+            requestedAction = WorkspaceApplyRequestedActions.NoActionAvailable,
+            reviewStatus = WorkspaceApplyActionReviewStatuses.BlockedForEvidence,
+            policyDecision = ProjectApprovalDecisions.ApprovalRequired,
+            riskTier = ProjectApprovalRiskTiers.WorkspaceReporting,
+            sourceRepoMayBeMutated = false,
+            executionAllowedByThisAgent = false,
+            approvalAllowedByThisAgent = false,
+            sourceMutationAllowedByThisAgent = false,
+            evidencePaths = Array.Empty<string>(),
+            warnings = new[] { warning, "Workspace apply context is unavailable; do not infer success." },
+            riskNotes = Array.Empty<string>(),
+            interpretation = new[]
+            {
+                $"No usable workspace apply report was available for run '{request.RunId}'.",
+                "CriticAgent cannot approve, execute, or mutate source."
+            }
+        };
+    }
+
+    private static IReadOnlyList<string> BuildWorkspaceApplyInterpretation(AgentWorkspaceApplyContext context)
+    {
+        var report = context.WorkspaceApply;
+        if (!context.ContextAvailable || string.Equals(report?.Outcome, "unavailable", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "No usable source-report or failure-package evidence was available.",
+                "Do not infer success from missing workspace apply context.",
+                "CriticAgent cannot approve, execute, or mutate source."
+            ];
+        }
+
+        if (string.Equals(report?.Outcome, "success", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Source report exists.",
+                report.ApplyVerified ? "Apply was verified." : "Apply verification was not proven.",
+                report.PostApplyValidationSucceeded ? "Post-apply validation passed." : "Post-apply validation was not proven.",
+                "Human review is still required before commit or pull request.",
+                "CriticAgent cannot approve, execute, or mutate source."
+            ];
+        }
+
+        return
+        [
+            $"Workspace apply outcome is {report?.Outcome ?? "unknown"}.",
+            string.IsNullOrWhiteSpace(report?.FailedStage) ? "Failed stage was not reported." : $"Failed stage: {report.FailedStage}.",
+            string.IsNullOrWhiteSpace(report?.FailureSeverity) ? "Failure severity was not reported." : $"Failure severity: {report.FailureSeverity}.",
+            report?.SourceRepoMutated == true ? "Source repository may already have been mutated; review source before retry." : "No source mutation was reported.",
+            "Do not retry automatically.",
+            "CriticAgent cannot approve, execute, or mutate source."
+        ];
     }
 
     private async Task<AgentLlmCallResult> ResolveLlmResultAsync(
@@ -173,6 +340,27 @@ public sealed class CriticAgent : StaticIronDevAgent
         request.Inputs.TryGetValue(key, out var value) &&
         bool.TryParse(value, out var parsed) &&
         parsed;
+
+    private static string? ReadOptionalInput(AgentRequest request, string key) =>
+        request.Inputs.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
+
+    private static IReadOnlyList<string> MergeDistinct(params IEnumerable<string>?[] values)
+    {
+        var merged = new List<string>();
+        foreach (var value in values)
+        {
+            if (value is null)
+                continue;
+
+            merged.AddRange(value.Where(item => !string.IsNullOrWhiteSpace(item)));
+        }
+
+        return merged
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
     private static string BuildModelSummary(AgentLlmCallResult result)
     {
