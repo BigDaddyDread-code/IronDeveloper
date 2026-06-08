@@ -14,6 +14,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IAgentProcessRunner _processRunner;
     private readonly IRunReportContractReader _runReportContractReader;
     private readonly IWorkspaceApplyReportReader? _workspaceApplyReportReader;
+    private readonly IWorkspaceApplyRecommendationService? _workspaceApplyRecommendationService;
 
     public SupervisorAgent(
         AgentDefinition definition,
@@ -22,7 +23,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         IRunReportContractReader runReportContractReader,
         IAgentLlmClient? llmClient = null,
         IAgentProcessRunner? processRunner = null,
-        IWorkspaceApplyReportReader? workspaceApplyReportReader = null)
+        IWorkspaceApplyReportReader? workspaceApplyReportReader = null,
+        IWorkspaceApplyRecommendationService? workspaceApplyRecommendationService = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
@@ -33,6 +35,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             "SupervisorAgent requires a real run report contract reader.");
         _processRunner = processRunner ?? new AgentProcessRunner();
         _workspaceApplyReportReader = workspaceApplyReportReader;
+        _workspaceApplyRecommendationService = workspaceApplyRecommendationService;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -178,6 +181,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         var testerRunId = $"{runId}-tester";
         var testerReport = await ReadTesterRunReportAsync(tests, testerRunId, ct);
         var workspaceApplyReport = await ReadWorkspaceApplyReportAsync(request, runId, ct);
+        var workspaceApplyRecommendation = BuildWorkspaceApplyRecommendation(workspaceApplyReport);
         var testsSucceeded = testerReport is not null && testerReport.Status is "succeeded";
         var testSummary = BuildTesterSummary(testerReport, testerRunId, TryParse(tests.Stdout));
         var status = memorySucceeded && conscienceAllows && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
@@ -268,6 +272,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
                 report = ReadElement(TryParse(tests.Stdout), "report")
             },
             workspaceApply = workspaceApplyReport,
+            workspaceApplyRecommendation,
             governedAutonomy = new
             {
                 tier = autonomyTier,
@@ -325,6 +330,37 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             EvidencePaths = ExtractEvidencePaths(testerReport, TryParse(tests.Stdout), workspaceApplyReport),
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private WorkspaceApplyRecommendation? BuildWorkspaceApplyRecommendation(WorkspaceApplyReportSummary? workspaceApplyReport)
+    {
+        if (workspaceApplyReport is null)
+            return null;
+
+        try
+        {
+            var service = _workspaceApplyRecommendationService ?? new WorkspaceApplyRecommendationService();
+            return service.Recommend(new WorkspaceApplyRecommendationRequest
+            {
+                Report = workspaceApplyReport
+            });
+        }
+        catch (Exception exception)
+        {
+            return new WorkspaceApplyRecommendation
+            {
+                RecommendedAction = WorkspaceApplyRecommendedActions.CollectMissingEvidence,
+                Reason = "Workspace apply evidence is incomplete or inconsistent.",
+                HumanReviewRequired = true,
+                SafeToRetry = false,
+                SafeToCommitAfterReview = false,
+                SourceReviewRequiredBeforeRetry = true,
+                BlocksAutomaticExecution = true,
+                EvidencePaths = workspaceApplyReport.EvidencePaths,
+                RiskNotes = workspaceApplyReport.RiskNotes,
+                Warnings = [$"Workspace apply recommendation could not be produced: {exception.Message}"]
+            };
+        }
     }
 
     private async Task<WorkspaceApplyReportSummary?> ReadWorkspaceApplyReportAsync(
