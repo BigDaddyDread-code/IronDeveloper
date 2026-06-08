@@ -15,6 +15,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
     private readonly IRunReportContractReader _runReportContractReader;
     private readonly IWorkspaceApplyReportReader? _workspaceApplyReportReader;
     private readonly IWorkspaceApplyRecommendationService? _workspaceApplyRecommendationService;
+    private readonly IWorkspaceApplyActionRequestService? _workspaceApplyActionRequestService;
 
     public SupervisorAgent(
         AgentDefinition definition,
@@ -24,7 +25,8 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         IAgentLlmClient? llmClient = null,
         IAgentProcessRunner? processRunner = null,
         IWorkspaceApplyReportReader? workspaceApplyReportReader = null,
-        IWorkspaceApplyRecommendationService? workspaceApplyRecommendationService = null)
+        IWorkspaceApplyRecommendationService? workspaceApplyRecommendationService = null,
+        IWorkspaceApplyActionRequestService? workspaceApplyActionRequestService = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
@@ -36,6 +38,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         _processRunner = processRunner ?? new AgentProcessRunner();
         _workspaceApplyReportReader = workspaceApplyReportReader;
         _workspaceApplyRecommendationService = workspaceApplyRecommendationService;
+        _workspaceApplyActionRequestService = workspaceApplyActionRequestService;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -182,6 +185,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
         var testerReport = await ReadTesterRunReportAsync(tests, testerRunId, ct);
         var workspaceApplyReport = await ReadWorkspaceApplyReportAsync(request, runId, ct);
         var workspaceApplyRecommendation = BuildWorkspaceApplyRecommendation(workspaceApplyReport);
+        var workspaceApplyActionRequest = BuildWorkspaceApplyActionRequest(workspaceApplyReport, workspaceApplyRecommendation);
         var testsSucceeded = testerReport is not null && testerReport.Status is "succeeded";
         var testSummary = BuildTesterSummary(testerReport, testerRunId, TryParse(tests.Stdout));
         var status = memorySucceeded && conscienceAllows && testsSucceeded ? AgentRunStatus.Succeeded : AgentRunStatus.Failed;
@@ -273,6 +277,7 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             },
             workspaceApply = workspaceApplyReport,
             workspaceApplyRecommendation,
+            workspaceApplyActionRequest,
             governedAutonomy = new
             {
                 tier = autonomyTier,
@@ -330,6 +335,47 @@ public sealed class SupervisorAgent : StaticIronDevAgent
             EvidencePaths = ExtractEvidencePaths(testerReport, TryParse(tests.Stdout), workspaceApplyReport),
             CompletedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private WorkspaceApplyActionRequest? BuildWorkspaceApplyActionRequest(
+        WorkspaceApplyReportSummary? workspaceApplyReport,
+        WorkspaceApplyRecommendation? workspaceApplyRecommendation)
+    {
+        if (workspaceApplyReport is null || workspaceApplyRecommendation is null)
+            return null;
+
+        try
+        {
+            var service = _workspaceApplyActionRequestService ?? new WorkspaceApplyActionRequestService();
+            return service.Create(new WorkspaceApplyActionRequestInput
+            {
+                Report = workspaceApplyReport,
+                Recommendation = workspaceApplyRecommendation
+            });
+        }
+        catch (Exception exception)
+        {
+            return new WorkspaceApplyActionRequest
+            {
+                RequestedAction = WorkspaceApplyRequestedActions.CollectMissingEvidence,
+                Reason = "Workspace apply evidence is incomplete or inconsistent.",
+                HumanApprovalRequired = true,
+                AutomaticExecutionAllowed = false,
+                MutatesSourceRepo = false,
+                RequiresFreshHumanDecision = true,
+                SuggestedCommand = null,
+                SuggestedCommandArguments = [],
+                Preconditions =
+                [
+                    "identify missing evidence",
+                    "rerun only the appropriate governed command manually",
+                    "do not infer success"
+                ],
+                EvidencePaths = workspaceApplyReport.EvidencePaths,
+                RiskNotes = workspaceApplyReport.RiskNotes,
+                Warnings = [$"Workspace apply action request could not be produced: {exception.Message}"]
+            };
+        }
     }
 
     private WorkspaceApplyRecommendation? BuildWorkspaceApplyRecommendation(WorkspaceApplyReportSummary? workspaceApplyReport)
