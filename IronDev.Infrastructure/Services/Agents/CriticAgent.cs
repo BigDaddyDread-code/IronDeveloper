@@ -1,8 +1,10 @@
 using System.Text.Json;
 using IronDev.Core.Agents;
 using IronDev.Core.Agents.ApprovalPolicy;
+using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
 using IronDev.Core.Interfaces;
+using IronDev.Infrastructure.Services.Agents.Skills;
 using IronDev.Infrastructure.Services.Agents.WorkspaceApply;
 
 namespace IronDev.Infrastructure.Services.Agents;
@@ -12,17 +14,20 @@ public sealed class CriticAgent : StaticIronDevAgent
     private readonly IAgentModelResolver _modelResolver;
     private readonly IAgentLlmClient? _llmClient;
     private readonly IAgentWorkspaceApplyContextService? _workspaceApplyContextService;
+    private readonly IAgentSkillRequestContextService? _skillRequestContextService;
 
     public CriticAgent(
         AgentDefinition definition,
         IAgentModelResolver modelResolver,
         IAgentLlmClient? llmClient = null,
-        IAgentWorkspaceApplyContextService? workspaceApplyContextService = null)
+        IAgentWorkspaceApplyContextService? workspaceApplyContextService = null,
+        IAgentSkillRequestContextService? skillRequestContextService = null)
         : base(definition, modelResolver)
     {
         _modelResolver = modelResolver;
         _llmClient = llmClient;
         _workspaceApplyContextService = workspaceApplyContextService;
+        _skillRequestContextService = skillRequestContextService;
     }
 
     public override async Task<AgentResult> RunAsync(AgentRequest request, CancellationToken ct = default)
@@ -62,6 +67,7 @@ public sealed class CriticAgent : StaticIronDevAgent
                 ? "ask_for_likely_area"
                 : "request_more_evidence";
         var workspaceApplyContext = await BuildWorkspaceApplyContextSummaryAsync(request, ct).ConfigureAwait(false);
+        var skillRequestContext = BuildSkillRequestContextSummary(request);
 
         var review = new
         {
@@ -79,6 +85,7 @@ public sealed class CriticAgent : StaticIronDevAgent
             evidencePaths,
             safetyRules,
             workspaceApplyContext,
+            skillRequestContext,
             llmIntelligence = new
             {
                 modelProfile = profile.Name,
@@ -147,6 +154,165 @@ public sealed class CriticAgent : StaticIronDevAgent
                 contextRequest,
                 $"Workspace apply context could not be produced: {exception.Message}");
         }
+    }
+
+    private object? BuildSkillRequestContextSummary(AgentRequest request)
+    {
+        var requestJson = ReadOptionalInput(request, "skill_request_package_json");
+        var reviewJson = ReadOptionalInput(request, "skill_request_review_json");
+        if (string.IsNullOrWhiteSpace(requestJson) && string.IsNullOrWhiteSpace(reviewJson))
+            return null;
+
+        if (string.IsNullOrWhiteSpace(requestJson) || string.IsNullOrWhiteSpace(reviewJson))
+        {
+            return BuildUnavailableSkillRequestContextSummary(
+                "Skill request context requires both skill_request_package_json and skill_request_review_json inputs.");
+        }
+
+        try
+        {
+            var requestPackage = JsonSerializer.Deserialize<AgentSkillRequestPackage>(requestJson, JsonOptions);
+            var reviewPackage = JsonSerializer.Deserialize<AgentSkillRequestReview>(reviewJson, JsonOptions);
+            if (requestPackage is null || reviewPackage is null)
+            {
+                return BuildUnavailableSkillRequestContextSummary(
+                    "Skill request context could not be produced: request or review JSON deserialized to null.");
+            }
+
+            var service = _skillRequestContextService ?? new AgentSkillRequestContextService();
+            var context = service.Create(new AgentSkillRequestContextInput
+            {
+                RequestPackage = requestPackage,
+                ReviewPackage = reviewPackage
+            });
+
+            return BuildSkillRequestContextSummary(context);
+        }
+        catch (Exception exception)
+        {
+            return BuildUnavailableSkillRequestContextSummary(
+                $"Skill request context could not be produced: {exception.Message}");
+        }
+    }
+
+    private static object BuildSkillRequestContextSummary(AgentSkillRequestContext context)
+    {
+        var interpretation = MergeDistinct(
+            context.Interpretation,
+            BuildCriticSkillRequestContextInterpretation(context));
+
+        return new
+        {
+            available = true,
+            contextId = context.ContextId,
+            requestId = context.RequestId,
+            reviewId = context.ReviewId,
+            skillId = context.SkillId,
+            purpose = context.Purpose,
+            skillKnown = context.SkillKnown,
+            decision = context.Decision,
+            reviewStatus = context.ReviewStatus,
+            riskTier = context.RiskTier,
+            category = context.Category,
+            humanReviewRequired = context.HumanReviewRequired,
+            humanApprovalRequired = context.HumanApprovalRequired,
+            policyAllowed = context.PolicyAllowed,
+            policyBlocked = context.PolicyBlocked,
+            dangerousCapability = context.DangerousCapability,
+            recommendedNextAction = context.RecommendedNextAction,
+            executionAllowedByThisAgent = false,
+            approvalAllowedByThisAgent = false,
+            sourceMutationAllowedByThisAgent = false,
+            workspaceMutationAllowedByThisAgent = false,
+            externalSystemAllowedByThisAgent = false,
+            createsTicketAllowedByThisAgent = false,
+            writesMemoryAllowedByThisAgent = false,
+            evidencePaths = context.EvidencePaths,
+            parametersSummary = context.ParametersSummary,
+            blockers = context.Blockers,
+            warnings = context.Warnings,
+            interpretation
+        };
+    }
+
+    private static object BuildUnavailableSkillRequestContextSummary(string warning) =>
+        new
+        {
+            available = false,
+            contextId = (string?)null,
+            requestId = (string?)null,
+            reviewId = (string?)null,
+            skillId = (string?)null,
+            purpose = (string?)null,
+            skillKnown = false,
+            decision = (string?)null,
+            reviewStatus = (string?)null,
+            riskTier = (string?)null,
+            category = (string?)null,
+            humanReviewRequired = true,
+            humanApprovalRequired = false,
+            policyAllowed = false,
+            policyBlocked = true,
+            dangerousCapability = false,
+            recommendedNextAction = AgentSkillRequestContextRecommendedActions.CollectMissingEvidence,
+            executionAllowedByThisAgent = false,
+            approvalAllowedByThisAgent = false,
+            sourceMutationAllowedByThisAgent = false,
+            workspaceMutationAllowedByThisAgent = false,
+            externalSystemAllowedByThisAgent = false,
+            createsTicketAllowedByThisAgent = false,
+            writesMemoryAllowedByThisAgent = false,
+            evidencePaths = Array.Empty<string>(),
+            parametersSummary = Array.Empty<string>(),
+            blockers = new[] { "Skill request context is missing or inconsistent." },
+            warnings = new[] { warning },
+            interpretation = new[]
+            {
+                "Skill request context is unavailable.",
+                "Skill request context is missing or inconsistent.",
+                "Regenerate coherent request/review/context evidence before continuing.",
+                "CriticAgent cannot approve, execute, or mutate state."
+            }
+        };
+
+    private static IReadOnlyList<string> BuildCriticSkillRequestContextInterpretation(AgentSkillRequestContext context)
+    {
+        var interpretation = new List<string>();
+
+        if (string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.ReviewRequest, StringComparison.Ordinal))
+        {
+            interpretation.Add("Project policy allows this low-risk skill request.");
+            interpretation.Add("CriticAgent can review the context only.");
+            interpretation.Add("CriticAgent cannot execute, approve, or mutate state.");
+        }
+        else if (string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.RequestSeparateApproval, StringComparison.Ordinal))
+        {
+            interpretation.Add("A separate approval flow is required before any future execution path can exist.");
+            interpretation.Add("This CriticAgent output is not approval evidence.");
+        }
+        else if (string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.StopBlockedByPolicy, StringComparison.Ordinal))
+        {
+            interpretation.Add("Project policy blocks this skill request.");
+            interpretation.Add("Do not execute this skill.");
+        }
+        else if (string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.StopUnknownSkill, StringComparison.Ordinal))
+        {
+            interpretation.Add("The requested skill is unknown.");
+            interpretation.Add("Do not infer or invent a replacement skill.");
+        }
+        else if (string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.StopDangerousCapability, StringComparison.Ordinal))
+        {
+            interpretation.Add("This request involves a dangerous capability.");
+            interpretation.Add("A separate approval/execution flow would be required later.");
+            interpretation.Add("This CriticAgent output cannot approve or execute it.");
+        }
+        else if (string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.CollectMissingEvidence, StringComparison.Ordinal))
+        {
+            interpretation.Add("Skill request context is missing or inconsistent.");
+            interpretation.Add("Regenerate coherent request/review/context evidence before continuing.");
+        }
+
+        return interpretation.ToArray();
     }
 
     private static object BuildWorkspaceApplyContextSummary(AgentWorkspaceApplyContext context)
@@ -361,6 +527,11 @@ public sealed class CriticAgent : StaticIronDevAgent
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private static string BuildModelSummary(AgentLlmCallResult result)
     {

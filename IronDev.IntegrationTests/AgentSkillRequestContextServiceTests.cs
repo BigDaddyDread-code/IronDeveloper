@@ -178,15 +178,17 @@ public sealed class AgentSkillRequestContextServiceTests
     }
 
     [TestMethod]
-    public void AgentSkillRequestContext_NoAgentsAreWiredToSkillRequestContext()
+    public void AgentSkillRequestContext_OnlyCriticAgentIsWiredToSkillRequestContext()
     {
         var agentsDirectory = Path.Combine(FindRepositoryRoot(), "IronDev.Infrastructure", "Services", "Agents");
-        var agentSources = Directory
+        var wiredAgentFiles = Directory
             .EnumerateFiles(agentsDirectory, "*.cs", SearchOption.TopDirectoryOnly)
-            .Select(File.ReadAllText)
+            .Where(path => File.ReadAllText(path).Contains("IAgentSkillRequestContextService", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.IsFalse(agentSources.Any(source => source.Contains("IAgentSkillRequestContextService", StringComparison.Ordinal)));
+        CollectionAssert.AreEqual(new[] { "CriticAgent.cs" }, wiredAgentFiles);
     }
 
     private static AgentSkillRequestContext BuildContext(
