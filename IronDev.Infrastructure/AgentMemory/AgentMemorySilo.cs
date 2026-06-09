@@ -2,11 +2,11 @@
 
 namespace IronDev.Infrastructure.AgentMemory;
 
-public sealed class AgentMemorySilo : IAgentMemorySilo
+internal sealed class AgentMemorySilo : IAgentMemorySilo
 {
     private readonly IAgentLocalMemoryStore _store;
 
-    public AgentMemorySilo(
+    internal AgentMemorySilo(
         AgentMemoryScope scope,
         IAgentLocalMemoryStore store)
     {

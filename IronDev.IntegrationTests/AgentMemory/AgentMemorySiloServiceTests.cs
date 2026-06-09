@@ -263,6 +263,17 @@ public sealed class AgentMemorySiloServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public void AgentMemorySilo_ConcreteImplementationIsNotPublic()
+    {
+        var siloType = typeof(AgentMemorySiloService).Assembly.GetType("IronDev.Infrastructure.AgentMemory.AgentMemorySilo");
+
+        Assert.IsNotNull(siloType);
+        Assert.IsTrue(siloType.IsNotPublic, "Concrete AgentMemorySilo must not be public; callers must use IAgentMemorySiloService.");
+        Assert.IsFalse(siloType.GetConstructors(BindingFlags.Public | BindingFlags.Instance).Any(),
+            "Concrete AgentMemorySilo must not expose a public constructor that accepts AgentMemoryScope.");
+    }
+
+    [TestMethod]
     public void AgentMemorySiloService_ExposesNoCrossAgentOrCampaignWideOperations()
     {
         var siloMethodNames = typeof(IAgentMemorySilo).GetMethods().Select(method => method.Name).ToArray();
