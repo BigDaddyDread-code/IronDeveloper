@@ -8,60 +8,93 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests;
 
 [TestClass]
-public sealed class AgentSkillExecutionServiceTests
+public sealed class AgentReportingIntentSkillExecutionServiceTests
 {
     [TestMethod]
-    public async Task AgentSkillExecution_AllowedReadApplyContext_ExecutesReadOnly()
-    {
-        var workspaceContext = BuildWorkspaceApplyContext();
-        var fake = new FakeAgentWorkspaceApplyContextService(workspaceContext);
-        var service = new AgentSkillExecutionService(fake);
-
-        var result = await service.ExecuteAsync(BuildExecutionRequest());
-
-        Assert.AreEqual(AgentSkillExecutionStatuses.Succeeded, result.Status);
-        Assert.IsTrue(result.Executed);
-        Assert.IsTrue(result.ReadOnlyExecution);
-        AssertNoAuthorityFlags(result);
-        Assert.IsInstanceOfType(result.Payload, typeof(AgentSkillWorkspaceApplyContextExecutionPayload));
-        var payload = (AgentSkillWorkspaceApplyContextExecutionPayload)result.Payload!;
-        Assert.IsTrue(payload.WorkspaceApplyContextAvailable);
-        Assert.AreEqual("success", payload.Outcome);
-        Assert.AreEqual(WorkspaceApplyRecommendedActions.HumanReviewOrCommit, payload.RecommendedAction);
-        Assert.AreEqual(WorkspaceApplyRequestedActions.HumanReviewSourceChanges, payload.RequestedAction);
-        Assert.AreEqual(WorkspaceApplyActionReviewStatuses.ReadyForHumanReview, payload.ReviewStatus);
-        Assert.AreEqual(ProjectApprovalDecisions.ApprovalRequired, payload.PolicyDecision);
-        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspaceReporting, payload.RiskTier);
-        CollectionAssert.Contains(result.EvidencePaths.ToArray(), "context.json");
-        CollectionAssert.Contains(result.EvidencePaths.ToArray(), "source-report.json");
-        Assert.AreEqual(1, fake.CallCount);
-        Assert.AreEqual("IronDev", fake.LastRequest!.ProjectId);
-        Assert.AreEqual("run-1", fake.LastRequest.RunId);
-        Assert.AreEqual("C:\\workspaces\\run-1", fake.LastRequest.WorkspacePath);
-    }
-
-    [TestMethod]
-    public async Task AgentSkillExecution_UnsupportedKnownSkill_BlocksWithoutReadingWorkspaceContext()
+    public async Task AgentReportingIntentSkillExecution_RecommendApplyAction_ExecutesReadOnlyPayload()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
 
-        var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { SkillId = AgentSkillIds.WorkspaceCheck }));
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceRecommendApplyAction));
+
+        AssertSucceededReadOnly(result);
+        Assert.IsInstanceOfType(result.Payload, typeof(AgentSkillWorkspaceApplyRecommendationExecutionPayload));
+        var payload = (AgentSkillWorkspaceApplyRecommendationExecutionPayload)result.Payload!;
+        Assert.IsTrue(payload.RecommendationAvailable);
+        Assert.AreEqual(WorkspaceApplyRecommendedActions.HumanReviewOrCommit, payload.RecommendedAction);
+        CollectionAssert.Contains(payload.Rationale.ToArray(), "Source changes were applied and verified.");
+        CollectionAssert.Contains(payload.EvidencePaths.ToArray(), "source-report.json");
+        CollectionAssert.Contains(payload.RiskNotes.ToArray(), "Human review required.");
+        Assert.AreEqual(1, fake.CallCount);
+    }
+
+    [TestMethod]
+    public async Task AgentReportingIntentSkillExecution_RequestApplyAction_ExecutesReadOnlyPayload()
+    {
+        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
+        var service = new AgentSkillExecutionService(fake);
+
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionRequest));
+
+        AssertSucceededReadOnly(result);
+        Assert.IsInstanceOfType(result.Payload, typeof(AgentSkillWorkspaceApplyActionRequestExecutionPayload));
+        var payload = (AgentSkillWorkspaceApplyActionRequestExecutionPayload)result.Payload!;
+        Assert.IsTrue(payload.ActionRequestAvailable);
+        Assert.AreEqual(WorkspaceApplyRequestedActions.HumanReviewSourceChanges, payload.RequestedAction);
+        Assert.AreEqual("CriticAgent", payload.RequestedByAgent);
+        Assert.IsFalse(result.ApprovalGranted);
+        Assert.IsFalse(result.SourceMutated);
+        Assert.IsFalse(result.WorkspaceMutated);
+        Assert.AreEqual(1, fake.CallCount);
+    }
+
+    [TestMethod]
+    public async Task AgentReportingIntentSkillExecution_ReviewApplyAction_ExecutesReadOnlyPayload()
+    {
+        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
+        var service = new AgentSkillExecutionService(fake);
+
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionReview));
+
+        AssertSucceededReadOnly(result);
+        Assert.IsInstanceOfType(result.Payload, typeof(AgentSkillWorkspaceApplyActionReviewExecutionPayload));
+        var payload = (AgentSkillWorkspaceApplyActionReviewExecutionPayload)result.Payload!;
+        Assert.IsTrue(payload.ActionReviewAvailable);
+        Assert.AreEqual(WorkspaceApplyActionReviewStatuses.ReadyForHumanReview, payload.ReviewStatus);
+        Assert.IsTrue(payload.SourceRepoMayBeMutated);
+        Assert.IsFalse(result.ApprovalGranted);
+        Assert.IsFalse(result.SourceMutated);
+        Assert.IsFalse(result.WorkspaceMutated);
+        Assert.AreEqual(1, fake.CallCount);
+    }
+
+    [DataTestMethod]
+    [DataRow(AgentSkillIds.WorkspaceCheck)]
+    [DataRow(AgentSkillIds.WorkspacePrepare)]
+    [DataRow(AgentSkillIds.WorkspaceValidate)]
+    [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
+    public async Task AgentReportingIntentSkillExecution_UnsupportedWorkspaceSkillsRemainBlocked(string skillId)
+    {
+        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
+        var service = new AgentSkillExecutionService(fake);
+
+        var result = await service.ExecuteAsync(BuildExecutionRequest(skillId));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.BlockedUnsupportedSkill, result.Status);
         Assert.IsFalse(result.Executed);
+        AssertNoAuthorityFlags(result);
         Assert.AreEqual(0, fake.CallCount);
     }
 
     [TestMethod]
-    public async Task AgentSkillExecution_UnknownSkill_BlocksUnknownWithoutReadingWorkspaceContext()
+    public async Task AgentReportingIntentSkillExecution_UnknownSkillRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { SkillKnown = false, SkillId = "missing.skill" }));
+            BuildAllowedContext("missing.skill") with { SkillKnown = false }));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.BlockedUnknownSkill, result.Status);
         Assert.IsFalse(result.Executed);
@@ -69,13 +102,13 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [TestMethod]
-    public async Task AgentSkillExecution_PolicyBlocked_BlocksWithoutReadingWorkspaceContext()
+    public async Task AgentReportingIntentSkillExecution_PolicyBlockedRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with
+            BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction) with
             {
                 Decision = ProjectApprovalDecisions.BlockedByPolicy,
                 PolicyAllowed = false,
@@ -88,13 +121,13 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [TestMethod]
-    public async Task AgentSkillExecution_DangerousCapability_BlocksWithoutReadingWorkspaceContext()
+    public async Task AgentReportingIntentSkillExecution_DangerousContextRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with
+            BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction) with
             {
                 DangerousCapability = true,
                 RiskTier = ProjectApprovalRiskTiers.SourceMutation
@@ -106,13 +139,13 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [TestMethod]
-    public async Task AgentSkillExecution_ApprovalRequired_BlocksByContext()
+    public async Task AgentReportingIntentSkillExecution_ApprovalRequiredRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with
+            BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction) with
             {
                 HumanApprovalRequired = true,
                 ReviewStatus = AgentSkillRequestReviewStatuses.ApprovalRequired,
@@ -125,28 +158,22 @@ public sealed class AgentSkillExecutionServiceTests
         Assert.AreEqual(0, fake.CallCount);
     }
 
-    [TestMethod]
-    public async Task AgentSkillExecution_NotReadyForHumanReview_BlocksByContext()
+    [DataTestMethod]
+    [DataRow("review")]
+    [DataRow("action")]
+    public async Task AgentReportingIntentSkillExecution_ContextNotReadyRemainsBlocked(string badContext)
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
+        var context = BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction);
+        context = badContext switch
+        {
+            "review" => context with { ReviewStatus = AgentSkillRequestReviewStatuses.ApprovalRequired },
+            "action" => context with { RecommendedNextAction = AgentSkillRequestContextRecommendedActions.CollectMissingEvidence },
+            _ => context
+        };
 
-        var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { ReviewStatus = AgentSkillRequestReviewStatuses.ApprovalRequired }));
-
-        Assert.AreEqual(AgentSkillExecutionStatuses.BlockedByContext, result.Status);
-        Assert.IsFalse(result.Executed);
-        Assert.AreEqual(0, fake.CallCount);
-    }
-
-    [TestMethod]
-    public async Task AgentSkillExecution_WrongRecommendedAction_BlocksByContext()
-    {
-        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake);
-
-        var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { RecommendedNextAction = AgentSkillRequestContextRecommendedActions.CollectMissingEvidence }));
+        var result = await service.ExecuteAsync(BuildExecutionRequest(context));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.BlockedByContext, result.Status);
         Assert.IsFalse(result.Executed);
@@ -154,17 +181,35 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow("source")]
-    [DataRow("workspace")]
-    [DataRow("external")]
-    [DataRow("ticket")]
-    [DataRow("memory")]
-    public async Task AgentSkillExecution_MutationWriteOrExternalFlags_BlockByContext(string flag)
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "source")]
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "workspace")]
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "external")]
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "ticket")]
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "memory")]
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "approval")]
+    [DataRow(AgentSkillIds.WorkspaceRecommendApplyAction, "execution")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "source")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "workspace")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "external")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "ticket")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "memory")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "approval")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionRequest, "execution")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "source")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "workspace")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "external")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "ticket")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "memory")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "approval")]
+    [DataRow(AgentSkillIds.WorkspaceCreateActionReview, "execution")]
+    public async Task AgentReportingIntentSkillExecution_AuthorityFlagsBlockSupportedReportingIntentSkills(
+        string skillId,
+        string flag)
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
         var service = new AgentSkillExecutionService(fake);
 
-        var result = await service.ExecuteAsync(BuildExecutionRequest(BuildContextWithFlag(flag)));
+        var result = await service.ExecuteAsync(BuildExecutionRequest(BuildContextWithFlag(skillId, flag)));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.BlockedByContext, result.Status);
         Assert.IsFalse(result.Executed);
@@ -173,7 +218,58 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [TestMethod]
-    public async Task AgentSkillExecution_WorkspaceContextReadFailure_ReturnsFailedWithoutMutation()
+    public async Task AgentReportingIntentSkillExecution_MissingRecommendation_BlocksRecommendSkill()
+    {
+        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext() with
+        {
+            WorkspaceApplyRecommendation = null
+        });
+        var service = new AgentSkillExecutionService(fake);
+
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceRecommendApplyAction));
+
+        Assert.AreEqual(AgentSkillExecutionStatuses.BlockedByContext, result.Status);
+        Assert.IsFalse(result.Executed);
+        Assert.IsTrue(result.Blockers.Contains("Workspace apply recommendation was not available."));
+        Assert.AreEqual(1, fake.CallCount);
+    }
+
+    [TestMethod]
+    public async Task AgentReportingIntentSkillExecution_MissingActionRequest_BlocksRequestSkill()
+    {
+        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext() with
+        {
+            WorkspaceApplyActionRequest = null
+        });
+        var service = new AgentSkillExecutionService(fake);
+
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionRequest));
+
+        Assert.AreEqual(AgentSkillExecutionStatuses.BlockedByContext, result.Status);
+        Assert.IsFalse(result.Executed);
+        Assert.IsTrue(result.Blockers.Contains("Workspace apply action request was not available."));
+        Assert.AreEqual(1, fake.CallCount);
+    }
+
+    [TestMethod]
+    public async Task AgentReportingIntentSkillExecution_MissingActionReview_BlocksReviewSkill()
+    {
+        var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext() with
+        {
+            WorkspaceApplyActionReview = null
+        });
+        var service = new AgentSkillExecutionService(fake);
+
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionReview));
+
+        Assert.AreEqual(AgentSkillExecutionStatuses.BlockedByContext, result.Status);
+        Assert.IsFalse(result.Executed);
+        Assert.IsTrue(result.Blockers.Contains("Workspace apply action review was not available."));
+        Assert.AreEqual(1, fake.CallCount);
+    }
+
+    [TestMethod]
+    public async Task AgentReportingIntentSkillExecution_ReadFailure_ReturnsFailedWithoutMutation()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext())
         {
@@ -181,7 +277,7 @@ public sealed class AgentSkillExecutionServiceTests
         };
         var service = new AgentSkillExecutionService(fake);
 
-        var result = await service.ExecuteAsync(BuildExecutionRequest());
+        var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceRecommendApplyAction));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.Failed, result.Status);
         Assert.IsFalse(result.Executed);
@@ -192,21 +288,7 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [TestMethod]
-    public async Task AgentSkillExecution_ExecutionIdIsStable()
-    {
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext()));
-        var first = await service.ExecuteAsync(BuildExecutionRequest());
-        var second = await service.ExecuteAsync(BuildExecutionRequest());
-        var different = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { ContextId = "skill-context-other" }));
-
-        Assert.AreEqual(first.ExecutionId, second.ExecutionId);
-        Assert.AreNotEqual(first.ExecutionId, different.ExecutionId);
-        Assert.AreEqual("skill-execution-skill-context-1-workspace-read_apply_context", first.ExecutionId);
-    }
-
-    [TestMethod]
-    public void AgentSkillExecutionService_HasNoMutationExternalOrProcessDependencies()
+    public void AgentReportingIntentSkillExecutionService_HasNoMutationExternalOrProcessDependencies()
     {
         var source = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -231,7 +313,7 @@ public sealed class AgentSkillExecutionServiceTests
     }
 
     [TestMethod]
-    public void AgentSkillExecutionService_IsNotWiredIntoAgents()
+    public void AgentReportingIntentSkillExecutionService_IsNotWiredIntoAgents()
     {
         var agentsDirectory = Path.Combine(FindRepositoryRoot(), "IronDev.Infrastructure", "Services", "Agents");
         var wiredAgentFiles = Directory
@@ -244,10 +326,13 @@ public sealed class AgentSkillExecutionServiceTests
         CollectionAssert.AreEqual(Array.Empty<string>(), wiredAgentFiles);
     }
 
-    private static AgentSkillExecutionRequest BuildExecutionRequest(AgentSkillRequestContext? context = null) =>
+    private static AgentSkillExecutionRequest BuildExecutionRequest(string skillId) =>
+        BuildExecutionRequest(BuildAllowedContext(skillId));
+
+    private static AgentSkillExecutionRequest BuildExecutionRequest(AgentSkillRequestContext context) =>
         new()
         {
-            SkillRequestContext = context ?? BuildAllowedContext(),
+            SkillRequestContext = context,
             RequestedByAgent = "CriticAgent",
             ProjectId = "IronDev",
             RunId = "run-1",
@@ -260,9 +345,9 @@ public sealed class AgentSkillExecutionServiceTests
             }
         };
 
-    private static AgentSkillRequestContext BuildContextWithFlag(string flag)
+    private static AgentSkillRequestContext BuildContextWithFlag(string skillId, string flag)
     {
-        var context = BuildAllowedContext();
+        var context = BuildAllowedContext(skillId);
         return flag switch
         {
             "source" => context with { SourceMutationAllowed = true },
@@ -270,19 +355,21 @@ public sealed class AgentSkillExecutionServiceTests
             "external" => context with { ExternalSystemAllowed = true },
             "ticket" => context with { CreatesTicketAllowed = true },
             "memory" => context with { WritesMemoryAllowed = true },
+            "approval" => context with { ApprovalCanBeGrantedByContext = true },
+            "execution" => context with { ExecutionCanStartFromContext = true },
             _ => throw new ArgumentOutOfRangeException(nameof(flag), flag, "Unknown test flag.")
         };
     }
 
-    private static AgentSkillRequestContext BuildAllowedContext() =>
+    private static AgentSkillRequestContext BuildAllowedContext(string skillId) =>
         new()
         {
-            ContextId = "skill-context-1",
+            ContextId = $"skill-context-{skillId.Replace('.', '-')}",
             RequestId = "skill-request-1",
             ReviewId = "skill-review-1",
             ProjectId = "IronDev",
             AgentName = "CriticAgent",
-            SkillId = AgentSkillIds.WorkspaceReadApplyContext,
+            SkillId = skillId,
             Purpose = "Read governed workspace apply context.",
             SkillKnown = true,
             Decision = ProjectApprovalDecisions.AllowedByPolicy,
@@ -388,6 +475,14 @@ public sealed class AgentSkillExecutionServiceTests
             Warnings = ["Human review is still required."]
         };
 
+    private static void AssertSucceededReadOnly(AgentSkillExecutionResult result)
+    {
+        Assert.AreEqual(AgentSkillExecutionStatuses.Succeeded, result.Status);
+        Assert.IsTrue(result.Executed);
+        Assert.IsTrue(result.ReadOnlyExecution);
+        AssertNoAuthorityFlags(result);
+    }
+
     private static void AssertNoAuthorityFlags(AgentSkillExecutionResult result)
     {
         Assert.IsFalse(result.SourceMutated);
@@ -429,14 +524,11 @@ public sealed class AgentSkillExecutionServiceTests
 
         public bool ThrowOnCreate { get; init; }
 
-        public AgentWorkspaceApplyContextRequest? LastRequest { get; private set; }
-
         public Task<AgentWorkspaceApplyContext> CreateAsync(
             AgentWorkspaceApplyContextRequest request,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
-            LastRequest = request;
             if (ThrowOnCreate)
                 throw new InvalidOperationException("Synthetic workspace context failure.");
 
