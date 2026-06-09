@@ -29,7 +29,11 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
 
         var consistencyWarnings = new List<string>();
         var consistencyBlockers = new List<string>();
+        var requestMemoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(request.MemoryContext);
+        var reviewMemoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(review.MemoryContext);
+        var memoryContext = requestMemoryContext ?? reviewMemoryContext;
         var isConsistent = IsConsistent(request, review, consistencyWarnings);
+        isConsistent = IsMemoryConsistent(requestMemoryContext, reviewMemoryContext, consistencyWarnings) && isConsistent;
         if (!isConsistent)
             consistencyBlockers.Add("Inconsistent request/review package.");
 
@@ -65,12 +69,20 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
             CreatesTicketAllowed = request.CreatesTicketAllowed && review.CreatesTicketAllowed,
             WritesMemoryAllowed = request.WritesMemoryAllowed && review.WritesMemoryAllowed,
             RecommendedNextAction = recommendedNextAction,
-            EvidencePaths = Merge(request.EvidencePaths, review.EvidencePaths),
+            EvidencePaths = Merge(
+                request.EvidencePaths,
+                review.EvidencePaths,
+                AgentSkillMemoryContextEvidence.EvidencePaths(memoryContext)),
             ParametersSummary = Merge(request.ParametersSummary, review.ParametersSummary),
             ReviewChecklist = Merge(request.ReviewChecklist, review.ReviewChecklist),
             Blockers = Merge(consistencyBlockers, review.Blockers),
-            Warnings = Merge(request.Warnings, review.Warnings, consistencyWarnings),
-            Interpretation = BuildInterpretation(recommendedNextAction, dangerousCapability)
+            Warnings = Merge(
+                request.Warnings,
+                review.Warnings,
+                consistencyWarnings,
+                AgentSkillMemoryContextEvidence.Warnings(memoryContext)),
+            Interpretation = BuildInterpretation(recommendedNextAction, dangerousCapability),
+            MemoryContext = memoryContext
         };
     }
 
@@ -86,6 +98,27 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
         AddMismatch(warnings, request.Purpose, review.Purpose, "purpose");
 
         return warnings.Count == 0;
+    }
+
+    private static bool IsMemoryConsistent(
+        AgentSkillMemoryContext? requestMemoryContext,
+        AgentSkillMemoryContext? reviewMemoryContext,
+        List<string> warnings)
+    {
+        if (requestMemoryContext is null && reviewMemoryContext is null)
+            return true;
+
+        if (requestMemoryContext is null || reviewMemoryContext is null)
+        {
+            warnings.Add("Request/review package mismatch for memory context.");
+            return false;
+        }
+
+        if (string.Equals(requestMemoryContext.BindingId, reviewMemoryContext.BindingId, StringComparison.Ordinal))
+            return true;
+
+        warnings.Add("Request/review package mismatch for memory context bindingId.");
+        return false;
     }
 
     private static void AddMismatch(

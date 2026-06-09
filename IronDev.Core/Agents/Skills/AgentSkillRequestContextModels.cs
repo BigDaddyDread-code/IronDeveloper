@@ -50,4 +50,5 @@ public sealed record AgentSkillRequestContext
     public IReadOnlyList<string> Blockers { get; init; } = [];
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public IReadOnlyList<string> Interpretation { get; init; } = [];
+    public AgentSkillMemoryContext? MemoryContext { get; init; }
 }
