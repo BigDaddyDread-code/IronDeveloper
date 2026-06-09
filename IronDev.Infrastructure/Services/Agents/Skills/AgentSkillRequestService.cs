@@ -22,6 +22,10 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
         ArgumentException.ThrowIfNullOrWhiteSpace(input.Purpose);
         ArgumentNullException.ThrowIfNull(input.Policy);
 
+        var memoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(input.MemoryContext);
+        var memoryEvidencePaths = AgentSkillMemoryContextEvidence.EvidencePaths(memoryContext);
+        var memoryWarnings = AgentSkillMemoryContextEvidence.Warnings(memoryContext);
+
         var evaluation = _skillPolicyEvaluator.Evaluate(new AgentSkillPolicyEvaluationRequest
         {
             ProjectId = input.ProjectId,
@@ -57,14 +61,17 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             CreatesTicketAllowed = evaluation.CreatesTicketAllowed,
             WritesMemoryAllowed = evaluation.WritesMemoryAllowed,
             MatchedRuleDescription = evaluation.MatchedRuleDescription,
-            EvidencePaths = input.EvidencePaths,
+            EvidencePaths = AgentSkillMemoryContextEvidence.Merge(input.EvidencePaths, memoryEvidencePaths),
             ParametersSummary = input.ParametersSummary,
-            Warnings = evaluation.Warnings,
-            ReviewChecklist = BuildReviewChecklist(evaluation)
+            Warnings = AgentSkillMemoryContextEvidence.Merge(evaluation.Warnings, memoryWarnings),
+            ReviewChecklist = BuildReviewChecklist(evaluation, memoryContext),
+            MemoryContext = memoryContext
         };
     }
 
-    private static IReadOnlyList<string> BuildReviewChecklist(AgentSkillPolicyEvaluation evaluation)
+    private static IReadOnlyList<string> BuildReviewChecklist(
+        AgentSkillPolicyEvaluation evaluation,
+        AgentSkillMemoryContext? memoryContext)
     {
         var checklist = new List<string>();
 
@@ -102,6 +109,7 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
         }
 
         AddDangerousBoundaryChecklist(evaluation, checklist);
+        AddMemoryChecklist(memoryContext, checklist);
         checklist.Add("Execution cannot start from this request package.");
         checklist.Add("Approval cannot be granted by this request package.");
 
@@ -109,6 +117,21 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static void AddMemoryChecklist(
+        AgentSkillMemoryContext? memoryContext,
+        List<string> checklist)
+    {
+        if (memoryContext is null)
+            return;
+
+        checklist.Add("Treat memory context as evidence only.");
+        checklist.Add("Do not treat memory context as approval authority.");
+        checklist.Add("Do not treat memory context as execution authority.");
+
+        if (memoryContext.Items.Any(item => item.IsStale))
+            checklist.Add("Review stale memory context before relying on it.");
     }
 
     private static void AddDangerousBoundaryChecklist(

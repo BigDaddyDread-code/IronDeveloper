@@ -21,9 +21,10 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
         ArgumentException.ThrowIfNullOrWhiteSpace(request.RiskTier);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Category);
 
+        var memoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(request.MemoryContext);
         var reviewStatus = ResolveReviewStatus(request);
         var blockers = BuildBlockers(request, reviewStatus);
-        var checklist = BuildReviewChecklist(request, reviewStatus);
+        var checklist = BuildReviewChecklist(request, reviewStatus, memoryContext);
 
         return new AgentSkillRequestReview
         {
@@ -52,7 +53,10 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             ParametersSummary = request.ParametersSummary,
             ReviewChecklist = checklist,
             Blockers = blockers,
-            Warnings = request.Warnings
+            Warnings = AgentSkillMemoryContextEvidence.Merge(
+                request.Warnings,
+                AgentSkillMemoryContextEvidence.Warnings(memoryContext)),
+            MemoryContext = memoryContext
         };
     }
 
@@ -123,7 +127,8 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
 
     private static IReadOnlyList<string> BuildReviewChecklist(
         AgentSkillRequestPackage request,
-        string reviewStatus)
+        string reviewStatus,
+        AgentSkillMemoryContext? memoryContext)
     {
         var checklist = new List<string>();
 
@@ -163,6 +168,7 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
         }
 
         AddDangerousBoundaryChecklist(request, checklist);
+        AddMemoryChecklist(memoryContext, checklist);
         checklist.Add("Approval cannot be granted by this review package.");
         checklist.Add("Execution cannot start from this review package.");
 
@@ -171,6 +177,21 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static void AddMemoryChecklist(
+        AgentSkillMemoryContext? memoryContext,
+        List<string> checklist)
+    {
+        if (memoryContext is null)
+            return;
+
+        checklist.Add("Treat memory context as evidence only.");
+        checklist.Add("Memory context cannot approve this skill request.");
+        checklist.Add("Memory context cannot execute this skill request.");
+
+        if (memoryContext.Items.Any(item => item.IsStale))
+            checklist.Add("Review stale memory context warnings.");
     }
 
     private static void AddDangerousBoundaryChecklist(

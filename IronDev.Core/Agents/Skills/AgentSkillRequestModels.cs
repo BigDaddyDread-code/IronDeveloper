@@ -16,6 +16,7 @@ public sealed record AgentSkillRequestInput
     public string? SourceRepo { get; init; }
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
     public IReadOnlyList<string> ParametersSummary { get; init; } = [];
+    public AgentSkillMemoryContext? MemoryContext { get; init; }
 }
 
 public sealed record AgentSkillRequestPackage
@@ -45,4 +46,5 @@ public sealed record AgentSkillRequestPackage
     public IReadOnlyList<string> ParametersSummary { get; init; } = [];
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public IReadOnlyList<string> ReviewChecklist { get; init; } = [];
+    public AgentSkillMemoryContext? MemoryContext { get; init; }
 }

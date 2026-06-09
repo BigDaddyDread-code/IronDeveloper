@@ -41,4 +41,5 @@ public sealed record AgentSkillRequestReview
     public IReadOnlyList<string> ReviewChecklist { get; init; } = [];
     public IReadOnlyList<string> Blockers { get; init; } = [];
     public IReadOnlyList<string> Warnings { get; init; } = [];
+    public AgentSkillMemoryContext? MemoryContext { get; init; }
 }
