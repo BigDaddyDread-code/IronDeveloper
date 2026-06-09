@@ -2,7 +2,6 @@ using IronDev.Core.Agents.ApprovalPolicy;
 using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
 using IronDev.Core.Workspaces;
-using IronDev.Infrastructure.Services.Workspaces;
 
 namespace IronDev.Infrastructure.Services.Agents.Skills;
 
@@ -14,7 +13,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         AgentSkillIds.WorkspaceRecommendApplyAction,
         AgentSkillIds.WorkspaceCreateActionRequest,
         AgentSkillIds.WorkspaceCreateActionReview,
-        AgentSkillIds.WorkspaceCheck,AgentSkillIds.WorkspaceCheck,
+        AgentSkillIds.WorkspaceCheck,
         AgentSkillIds.WorkspacePrepare,
         AgentSkillIds.WorkspaceValidate
     };
@@ -24,31 +23,18 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
     private readonly IAgentWorkspacePrepareService _workspacePrepareService;
     private readonly IDisposableWorkspaceValidationService _workspaceValidationService;
 
-    public AgentSkillExecutionService(IAgentWorkspaceApplyContextService workspaceApplyContextService)
-        : this(workspaceApplyContextService, new AgentWorkspaceCheckService())
-    {
-    }
-
     public AgentSkillExecutionService(
         IAgentWorkspaceApplyContextService workspaceApplyContextService,
-        IAgentWorkspaceCheckService workspaceCheckService)
-        : this(
-            workspaceApplyContextService,
-            workspaceCheckService,
-            new AgentWorkspacePrepareService(workspaceCheckService),
-            new DisposableWorkspaceValidationService(new DisposableWorkspaceCommandService()))
+        IDisposableWorkspaceValidationService workspaceValidationService)
+        : this(workspaceApplyContextService, new AgentWorkspaceCheckService(), workspaceValidationService)
     {
     }
 
     public AgentSkillExecutionService(
         IAgentWorkspaceApplyContextService workspaceApplyContextService,
         IAgentWorkspaceCheckService workspaceCheckService,
-        IAgentWorkspacePrepareService workspacePrepareService)
-        : this(
-            workspaceApplyContextService,
-            workspaceCheckService,
-            workspacePrepareService,
-            new DisposableWorkspaceValidationService(new DisposableWorkspaceCommandService()))
+        IDisposableWorkspaceValidationService workspaceValidationService)
+        : this(workspaceApplyContextService, workspaceCheckService, new AgentWorkspacePrepareService(workspaceCheckService), workspaceValidationService)
     {
     }
 

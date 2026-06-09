@@ -361,6 +361,8 @@ public sealed class AgentWorkspaceValidateSkillExecutionServiceTests
         Assert.IsFalse(source.Contains("ProcessStartInfo", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("Process.Start", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IDisposableWorkspaceCommandService", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("new DisposableWorkspaceCommandService", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("new DisposableWorkspaceValidationService", StringComparison.Ordinal));
     }
 
     [TestMethod]
