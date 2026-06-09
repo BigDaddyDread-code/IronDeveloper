@@ -148,6 +148,21 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             checklist.Add("Validation process execution must stay behind the governed validation service.");
             checklist.Add("Source repository mutation is not allowed from this request package.");
         }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspaceReporting, StringComparison.Ordinal) &&
+                 string.Equals(evaluation.SkillId, AgentSkillIds.WorkspaceDiff, StringComparison.Ordinal) &&
+                 evaluation.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to disposable workspace diff evidence.");
+            checklist.Add("Source repository mutation is not allowed from this request package.");
+        }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePackaging, StringComparison.Ordinal) &&
+                 string.Equals(evaluation.SkillId, AgentSkillIds.WorkspacePromotionPackage, StringComparison.Ordinal) &&
+                 evaluation.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to promotion package evidence.");
+            checklist.Add("Promotion package creation does not approve or apply source changes.");
+            checklist.Add("Source repository mutation is not allowed from this request package.");
+        }
         else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal))
         {
             checklist.Add("Workspace mutation is not allowed from this request package.");
@@ -155,6 +170,10 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
         else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspaceValidation, StringComparison.Ordinal))
         {
             checklist.Add("Workspace validation is not allowed from this request package.");
+        }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePackaging, StringComparison.Ordinal))
+        {
+            checklist.Add("Workspace promotion package creation is not allowed from this request package.");
         }
     }
 

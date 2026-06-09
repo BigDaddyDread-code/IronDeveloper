@@ -99,6 +99,42 @@ public sealed class AgentSkillRequestServiceTests
     }
 
     [TestMethod]
+    public void AgentSkillRequest_WorkspaceDiff_AllowsDiffEvidenceButCannotExecuteFromRequest()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspaceReporting,
+            AgentSkillIds.WorkspaceDiff,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var package = BuildService().Create(BuildInput(AgentSkillIds.WorkspaceDiff, policy));
+
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, package.Decision);
+        Assert.IsTrue(package.WorkspaceMutationAllowed);
+        Assert.IsFalse(package.SourceMutationAllowed);
+        Assert.IsFalse(package.ExecutionCanStartFromRequest);
+        AssertChecklistContains(package, "Workspace mutation is limited to disposable workspace diff evidence.");
+    }
+
+    [TestMethod]
+    public void AgentSkillRequest_WorkspacePromotionPackage_AllowsPackageEvidenceButCannotExecuteFromRequest()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspacePromotionPackage,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var package = BuildService().Create(BuildInput(AgentSkillIds.WorkspacePromotionPackage, policy));
+
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, package.Decision);
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspacePackaging, package.RiskTier);
+        Assert.IsTrue(package.WorkspaceMutationAllowed);
+        Assert.IsFalse(package.SourceMutationAllowed);
+        Assert.IsFalse(package.ExecutionCanStartFromRequest);
+        AssertChecklistContains(package, "Workspace mutation is limited to promotion package evidence.");
+        AssertChecklistContains(package, "Promotion package creation does not approve or apply source changes.");
+    }
+
+    [TestMethod]
     public void AgentSkillRequest_ApplyCopy_CannotMutateSource()
     {
         var policy = PolicyWithRule(

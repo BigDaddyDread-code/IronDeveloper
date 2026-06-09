@@ -14,7 +14,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_RecommendApplyAction_ExecutesReadOnlyPayload()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceRecommendApplyAction));
 
@@ -33,7 +33,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_RequestApplyAction_ExecutesReadOnlyPayload()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionRequest));
 
@@ -53,7 +53,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_ReviewApplyAction_ExecutesReadOnlyPayload()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionReview));
 
@@ -74,7 +74,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_UnsupportedWorkspaceSkillsRemainBlocked(string skillId)
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(skillId));
 
@@ -88,7 +88,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_UnknownSkillRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext("missing.skill") with { SkillKnown = false }));
@@ -102,7 +102,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_PolicyBlockedRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction) with
@@ -121,7 +121,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_DangerousContextRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction) with
@@ -139,7 +139,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_ApprovalRequiredRemainsBlocked()
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction) with
@@ -161,7 +161,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     public async Task AgentReportingIntentSkillExecution_ContextNotReadyRemainsBlocked(string badContext)
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
         var context = BuildAllowedContext(AgentSkillIds.WorkspaceRecommendApplyAction);
         context = badContext switch
         {
@@ -204,7 +204,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         string flag)
     {
         var fake = new FakeAgentWorkspaceApplyContextService(BuildWorkspaceApplyContext());
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(BuildContextWithFlag(skillId, flag)));
 
@@ -221,7 +221,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         {
             WorkspaceApplyRecommendation = null
         });
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceRecommendApplyAction));
 
@@ -238,7 +238,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         {
             WorkspaceApplyActionRequest = null
         });
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionRequest));
 
@@ -255,7 +255,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         {
             WorkspaceApplyActionReview = null
         });
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceCreateActionReview));
 
@@ -272,7 +272,7 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         {
             ThrowOnCreate = true
         };
-        var service = new AgentSkillExecutionService(fake, new AgentSkillExecutionTestValidationService());
+        var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(AgentSkillIds.WorkspaceRecommendApplyAction));
 

@@ -241,8 +241,16 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
             string.Equals(skill.SkillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal) &&
             string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspaceValidation, StringComparison.Ordinal) &&
             skill.CanExecuteProcess;
+        var allowedDiff =
+            string.Equals(skill.SkillId, AgentSkillIds.WorkspaceDiff, StringComparison.Ordinal) &&
+            string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspaceReporting, StringComparison.Ordinal) &&
+            !skill.CanExecuteProcess;
+        var allowedPromotionPackage =
+            string.Equals(skill.SkillId, AgentSkillIds.WorkspacePromotionPackage, StringComparison.Ordinal) &&
+            string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspacePackaging, StringComparison.Ordinal) &&
+            !skill.CanExecuteProcess;
 
-        return (allowedPrepare || allowedValidate) &&
+        return (allowedPrepare || allowedValidate || allowedDiff || allowedPromotionPackage) &&
             skill.CanMutateWorkspace &&
             !skill.CanMutateSource &&
             !skill.CanUseExternalSystem &&

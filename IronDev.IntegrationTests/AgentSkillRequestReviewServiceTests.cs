@@ -64,6 +64,43 @@ public sealed class AgentSkillRequestReviewServiceTests
         CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Workspace mutation is limited to disposable workspace validation evidence.");
         CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Validation process execution must stay behind the governed validation service.");
     }
+
+    [TestMethod]
+    public void AgentSkillRequestReview_WorkspaceDiff_IsReadyButCannotExecuteFromReview()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspaceReporting,
+            AgentSkillIds.WorkspaceDiff,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var review = BuildReview(BuildRequest(AgentSkillIds.WorkspaceDiff, policy));
+
+        Assert.AreEqual(AgentSkillRequestReviewStatuses.ReadyForHumanReview, review.ReviewStatus);
+        Assert.IsFalse(review.HumanApprovalRequired);
+        Assert.IsFalse(review.ExecutionCanStartFromReview);
+        Assert.IsFalse(review.SourceMutationAllowed);
+        Assert.IsTrue(review.WorkspaceMutationAllowed);
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Workspace mutation is limited to disposable workspace diff evidence.");
+    }
+
+    [TestMethod]
+    public void AgentSkillRequestReview_WorkspacePromotionPackage_IsReadyButCannotExecuteFromReview()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspacePromotionPackage,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var review = BuildReview(BuildRequest(AgentSkillIds.WorkspacePromotionPackage, policy));
+
+        Assert.AreEqual(AgentSkillRequestReviewStatuses.ReadyForHumanReview, review.ReviewStatus);
+        Assert.IsFalse(review.HumanApprovalRequired);
+        Assert.IsFalse(review.ExecutionCanStartFromReview);
+        Assert.IsFalse(review.SourceMutationAllowed);
+        Assert.IsTrue(review.WorkspaceMutationAllowed);
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Workspace mutation is limited to promotion package evidence.");
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Promotion package creation does not approve or apply source changes.");
+    }
     [TestMethod]
     public void AgentSkillRequestReview_SourceMutationRequest_BlocksForDangerousCapability()
     {

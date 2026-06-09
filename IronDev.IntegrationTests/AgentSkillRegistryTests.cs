@@ -167,6 +167,7 @@ public sealed class AgentSkillRegistryTests
         AgentSkillIds.WorkspacePrepare,
         AgentSkillIds.WorkspaceValidate,
         AgentSkillIds.WorkspaceDiff,
+        AgentSkillIds.WorkspacePromotionPackage,
         AgentSkillIds.WorkspaceFailurePackage,
         AgentSkillIds.WorkspaceSourceReport,
         AgentSkillIds.WorkspaceApplyCopy,
@@ -187,4 +188,24 @@ public sealed class AgentSkillRegistryTests
         AgentSkillIds.WorkspaceEvaluatePolicyContext,
         AgentSkillIds.MemorySearch
     ];
+
+    [TestMethod]
+    public void AgentSkillRegistry_DiffAndPromotionPackageAreWorkspaceLocalOnly()
+    {
+        var registry = new StaticAgentSkillRegistry();
+        var diff = RequireSkill(registry, AgentSkillIds.WorkspaceDiff);
+        var package = RequireSkill(registry, AgentSkillIds.WorkspacePromotionPackage);
+
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspaceReporting, diff.RiskTier);
+        Assert.IsTrue(diff.CanMutateWorkspace);
+        Assert.IsFalse(diff.CanMutateSource);
+        Assert.IsFalse(diff.CanExecuteProcess);
+
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspacePackaging, package.RiskTier);
+        Assert.IsTrue(package.CanReadEvidence);
+        Assert.IsTrue(package.CanMutateWorkspace);
+        Assert.IsFalse(package.CanMutateSource);
+        Assert.IsFalse(package.CanExecuteProcess);
+        Assert.IsTrue(package.RequiresHumanApproval);
+    }
 }
