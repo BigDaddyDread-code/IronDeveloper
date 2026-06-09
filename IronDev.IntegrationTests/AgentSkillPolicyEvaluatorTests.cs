@@ -81,7 +81,7 @@ public sealed class AgentSkillPolicyEvaluatorTests
     }
 
     [TestMethod]
-    public void AgentSkillPolicy_WorkspacePrepare_CannotAutoMutateWorkspace()
+    public void AgentSkillPolicy_WorkspacePrepare_AllowsGovernedWorkspaceMutationWhenPolicyAllows()
     {
         var policy = PolicyWithRule(
             ProjectApprovalRiskTiers.WorkspacePreparation,
@@ -90,10 +90,11 @@ public sealed class AgentSkillPolicyEvaluatorTests
 
         var result = BuildEvaluator().Evaluate(BuildRequest(AgentSkillIds.WorkspacePrepare, policy));
 
-        Assert.AreEqual(ProjectApprovalDecisions.ApprovalRequired, result.Decision);
-        Assert.IsFalse(result.WorkspaceMutationAllowed);
-        Assert.IsFalse(result.SkillExecutionAllowedByPolicy);
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, result.Decision);
+        Assert.IsTrue(result.WorkspaceMutationAllowed);
+        Assert.IsTrue(result.SkillExecutionAllowedByPolicy);
         Assert.IsFalse(result.AutomaticExecutionAllowed);
+        Assert.IsFalse(result.SourceMutationAllowed);
     }
 
     [TestMethod]

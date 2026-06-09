@@ -143,7 +143,7 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
         }
         else if (string.Equals(recommendedNextAction, AgentSkillRequestContextRecommendedActions.ReviewRequest, StringComparison.Ordinal))
         {
-            interpretation.Add("Project policy allows this low-risk skill request.");
+            interpretation.Add("Project policy allows this governed skill request.");
             interpretation.Add("This context still cannot execute it.");
         }
         else if (string.Equals(recommendedNextAction, AgentSkillRequestContextRecommendedActions.CollectMissingEvidence, StringComparison.Ordinal))

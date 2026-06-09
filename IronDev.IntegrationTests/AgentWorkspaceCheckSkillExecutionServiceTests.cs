@@ -154,7 +154,6 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspacePrepare)]
     [DataRow(AgentSkillIds.WorkspaceValidate)]
     [DataRow("workspace.diff")]
     [DataRow("workspace.promotion_package")]

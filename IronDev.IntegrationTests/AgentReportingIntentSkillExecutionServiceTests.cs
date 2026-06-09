@@ -70,7 +70,6 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspacePrepare)]
     [DataRow(AgentSkillIds.WorkspaceValidate)]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
     public async Task AgentReportingIntentSkillExecution_UnsupportedWorkspaceSkillsRemainBlocked(string skillId)
