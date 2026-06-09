@@ -32,8 +32,12 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
         var requestMemoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(request.MemoryContext);
         var reviewMemoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(review.MemoryContext);
         var memoryContext = requestMemoryContext ?? reviewMemoryContext;
+        var requestPlanContext = AgentSkillPlanContextEvidence.SanitizeEvidenceOnly(request.PlanContext);
+        var reviewPlanContext = AgentSkillPlanContextEvidence.SanitizeEvidenceOnly(review.PlanContext);
+        var planContext = requestPlanContext ?? reviewPlanContext;
         var isConsistent = IsConsistent(request, review, consistencyWarnings);
         isConsistent = IsMemoryConsistent(requestMemoryContext, reviewMemoryContext, consistencyWarnings) && isConsistent;
+        isConsistent = IsPlanConsistent(requestPlanContext, reviewPlanContext, consistencyWarnings) && isConsistent;
         if (!isConsistent)
             consistencyBlockers.Add("Inconsistent request/review package.");
 
@@ -72,7 +76,8 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
             EvidencePaths = Merge(
                 request.EvidencePaths,
                 review.EvidencePaths,
-                AgentSkillMemoryContextEvidence.EvidencePaths(memoryContext)),
+                AgentSkillMemoryContextEvidence.EvidencePaths(memoryContext),
+                AgentSkillPlanContextEvidence.EvidencePaths(planContext)),
             ParametersSummary = Merge(request.ParametersSummary, review.ParametersSummary),
             ReviewChecklist = Merge(request.ReviewChecklist, review.ReviewChecklist),
             Blockers = Merge(consistencyBlockers, review.Blockers),
@@ -80,9 +85,11 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
                 request.Warnings,
                 review.Warnings,
                 consistencyWarnings,
-                AgentSkillMemoryContextEvidence.Warnings(memoryContext)),
+                AgentSkillMemoryContextEvidence.Warnings(memoryContext),
+                AgentSkillPlanContextEvidence.Warnings(planContext)),
             Interpretation = BuildInterpretation(recommendedNextAction, dangerousCapability),
-            MemoryContext = memoryContext
+            MemoryContext = memoryContext,
+            PlanContext = planContext
         };
     }
 
@@ -118,6 +125,47 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
             return true;
 
         warnings.Add("Request/review package mismatch for memory context bindingId.");
+        return false;
+    }
+
+    private static bool IsPlanConsistent(
+        AgentSkillPlanContext? requestPlanContext,
+        AgentSkillPlanContext? reviewPlanContext,
+        List<string> warnings)
+    {
+        if (requestPlanContext is null && reviewPlanContext is null)
+            return true;
+
+        if (requestPlanContext is null || reviewPlanContext is null)
+        {
+            warnings.Add("Request/review package mismatch for plan context.");
+            warnings.Add("Inconsistent request/review plan context.");
+            return false;
+        }
+
+        var isConsistent = true;
+        isConsistent = AddPlanMismatch(warnings, requestPlanContext.BindingId, reviewPlanContext.BindingId, "bindingId") && isConsistent;
+        isConsistent = AddPlanMismatch(warnings, requestPlanContext.PlanId, reviewPlanContext.PlanId, "planId") && isConsistent;
+        isConsistent = AddPlanMismatch(warnings, requestPlanContext.CurrentStepId ?? string.Empty, reviewPlanContext.CurrentStepId ?? string.Empty, "currentStepId") && isConsistent;
+        isConsistent = AddPlanMismatch(warnings, requestPlanContext.SkillId, reviewPlanContext.SkillId, "skillId") && isConsistent;
+        isConsistent = AddPlanMismatch(warnings, requestPlanContext.RequestedAction, reviewPlanContext.RequestedAction, "requestedAction") && isConsistent;
+
+        if (!isConsistent)
+            warnings.Add("Inconsistent request/review plan context.");
+
+        return isConsistent;
+    }
+
+    private static bool AddPlanMismatch(
+        List<string> warnings,
+        string requestValue,
+        string reviewValue,
+        string fieldName)
+    {
+        if (string.Equals(requestValue, reviewValue, StringComparison.Ordinal))
+            return true;
+
+        warnings.Add($"Request/review plan context mismatch for {fieldName}.");
         return false;
     }
 

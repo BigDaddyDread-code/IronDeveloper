@@ -25,6 +25,9 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
         var memoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(input.MemoryContext);
         var memoryEvidencePaths = AgentSkillMemoryContextEvidence.EvidencePaths(memoryContext);
         var memoryWarnings = AgentSkillMemoryContextEvidence.Warnings(memoryContext);
+        var planContext = AgentSkillPlanContextEvidence.SanitizeEvidenceOnly(input.PlanContext);
+        var planEvidencePaths = AgentSkillPlanContextEvidence.EvidencePaths(planContext);
+        var planWarnings = AgentSkillPlanContextEvidence.Warnings(planContext);
 
         var evaluation = _skillPolicyEvaluator.Evaluate(new AgentSkillPolicyEvaluationRequest
         {
@@ -61,17 +64,19 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             CreatesTicketAllowed = evaluation.CreatesTicketAllowed,
             WritesMemoryAllowed = evaluation.WritesMemoryAllowed,
             MatchedRuleDescription = evaluation.MatchedRuleDescription,
-            EvidencePaths = AgentSkillMemoryContextEvidence.Merge(input.EvidencePaths, memoryEvidencePaths),
+            EvidencePaths = AgentSkillMemoryContextEvidence.Merge(input.EvidencePaths, memoryEvidencePaths, planEvidencePaths),
             ParametersSummary = input.ParametersSummary,
-            Warnings = AgentSkillMemoryContextEvidence.Merge(evaluation.Warnings, memoryWarnings),
-            ReviewChecklist = BuildReviewChecklist(evaluation, memoryContext),
-            MemoryContext = memoryContext
+            Warnings = AgentSkillMemoryContextEvidence.Merge(evaluation.Warnings, memoryWarnings, planWarnings),
+            ReviewChecklist = BuildReviewChecklist(evaluation, memoryContext, planContext),
+            MemoryContext = memoryContext,
+            PlanContext = planContext
         };
     }
 
     private static IReadOnlyList<string> BuildReviewChecklist(
         AgentSkillPolicyEvaluation evaluation,
-        AgentSkillMemoryContext? memoryContext)
+        AgentSkillMemoryContext? memoryContext,
+        AgentSkillPlanContext? planContext)
     {
         var checklist = new List<string>();
 
@@ -110,6 +115,7 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
 
         AddDangerousBoundaryChecklist(evaluation, checklist);
         AddMemoryChecklist(memoryContext, checklist);
+        AddPlanChecklist(planContext, checklist);
         checklist.Add("Execution cannot start from this request package.");
         checklist.Add("Approval cannot be granted by this request package.");
 
@@ -117,6 +123,21 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static void AddPlanChecklist(
+        AgentSkillPlanContext? planContext,
+        List<string> checklist)
+    {
+        if (planContext is null)
+            return;
+
+        checklist.Add("Review plan context as evidence only.");
+        checklist.Add("Confirm the plan step matches the requested skill.");
+        checklist.Add("Confirm dependency evidence is present or explicitly missing.");
+        checklist.Add("Do not treat plan context as approval.");
+        checklist.Add("Do not treat plan context as execution authority.");
+        checklist.Add("Do not let plan context override project policy.");
     }
 
     private static void AddMemoryChecklist(
