@@ -22,9 +22,10 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Category);
 
         var memoryContext = AgentSkillMemoryContextEvidence.SanitizeEvidenceOnly(request.MemoryContext);
+        var planContext = AgentSkillPlanContextEvidence.SanitizeEvidenceOnly(request.PlanContext);
         var reviewStatus = ResolveReviewStatus(request);
         var blockers = BuildBlockers(request, reviewStatus);
-        var checklist = BuildReviewChecklist(request, reviewStatus, memoryContext);
+        var checklist = BuildReviewChecklist(request, reviewStatus, memoryContext, planContext);
 
         return new AgentSkillRequestReview
         {
@@ -55,8 +56,10 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             Blockers = blockers,
             Warnings = AgentSkillMemoryContextEvidence.Merge(
                 request.Warnings,
-                AgentSkillMemoryContextEvidence.Warnings(memoryContext)),
-            MemoryContext = memoryContext
+                AgentSkillMemoryContextEvidence.Warnings(memoryContext),
+                AgentSkillPlanContextEvidence.Warnings(planContext)),
+            MemoryContext = memoryContext,
+            PlanContext = planContext
         };
     }
 
@@ -128,7 +131,8 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
     private static IReadOnlyList<string> BuildReviewChecklist(
         AgentSkillRequestPackage request,
         string reviewStatus,
-        AgentSkillMemoryContext? memoryContext)
+        AgentSkillMemoryContext? memoryContext,
+        AgentSkillPlanContext? planContext)
     {
         var checklist = new List<string>();
 
@@ -169,6 +173,7 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
 
         AddDangerousBoundaryChecklist(request, checklist);
         AddMemoryChecklist(memoryContext, checklist);
+        AddPlanChecklist(planContext, checklist);
         checklist.Add("Approval cannot be granted by this review package.");
         checklist.Add("Execution cannot start from this review package.");
 
@@ -177,6 +182,21 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static void AddPlanChecklist(
+        AgentSkillPlanContext? planContext,
+        List<string> checklist)
+    {
+        if (planContext is null)
+            return;
+
+        checklist.Add("Review plan context as evidence only.");
+        checklist.Add("Confirm the plan step matches the requested skill.");
+        checklist.Add("Confirm dependency evidence is present or explicitly missing.");
+        checklist.Add("Do not treat plan context as approval.");
+        checklist.Add("Do not treat plan context as execution authority.");
+        checklist.Add("Do not let plan context override project policy.");
     }
 
     private static void AddMemoryChecklist(
