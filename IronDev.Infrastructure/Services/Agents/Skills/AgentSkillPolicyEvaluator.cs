@@ -79,7 +79,7 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
                 warnings: policyResult.Warnings);
         }
 
-        if (IsAllowedWorkspacePrepare(skill, policyResult))
+        if (IsAllowedWorkspaceMutationSkill(skill, policyResult))
         {
             return Build(
                 skill,
@@ -230,15 +230,24 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
         !skill.CanCreateTicket &&
         !skill.CanUseExternalSystem;
 
-    private static bool IsAllowedWorkspacePrepare(
+    private static bool IsAllowedWorkspaceMutationSkill(
         AgentSkillDefinition skill,
-        ProjectApprovalEvaluationResult policyResult) =>
-        string.Equals(skill.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) &&
-        string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal) &&
-        skill.CanMutateWorkspace &&
-        !skill.CanMutateSource &&
-        !skill.CanUseExternalSystem &&
-        !skill.CanCreateTicket &&
-        !skill.CanWriteMemory &&
-        string.Equals(policyResult.Decision, ProjectApprovalDecisions.AllowedByPolicy, StringComparison.Ordinal);
+        ProjectApprovalEvaluationResult policyResult)
+    {
+        var allowedPrepare =
+            string.Equals(skill.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) &&
+            string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal);
+        var allowedValidate =
+            string.Equals(skill.SkillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal) &&
+            string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspaceValidation, StringComparison.Ordinal) &&
+            skill.CanExecuteProcess;
+
+        return (allowedPrepare || allowedValidate) &&
+            skill.CanMutateWorkspace &&
+            !skill.CanMutateSource &&
+            !skill.CanUseExternalSystem &&
+            !skill.CanCreateTicket &&
+            !skill.CanWriteMemory &&
+            string.Equals(policyResult.Decision, ProjectApprovalDecisions.AllowedByPolicy, StringComparison.Ordinal);
+    }
 }

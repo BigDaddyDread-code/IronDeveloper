@@ -1,4 +1,4 @@
-﻿using IronDev.Core.Agents;
+using IronDev.Core.Agents;
 using IronDev.Core.Agents.ApprovalPolicy;
 using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
@@ -70,7 +70,6 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceValidate)]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
     public async Task AgentReportingIntentSkillExecution_UnsupportedWorkspaceSkillsRemainBlocked(string skillId)
     {
@@ -303,7 +302,6 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         Assert.IsFalse(source.Contains("IDisposableWorkspaceApplyCopyService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IDisposableWorkspaceCommandService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IDisposableWorkspacePrepareService", StringComparison.Ordinal));
-        Assert.IsFalse(source.Contains("IDisposableWorkspaceValidationService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IGitHub", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("ITicket", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IMemory", StringComparison.Ordinal));

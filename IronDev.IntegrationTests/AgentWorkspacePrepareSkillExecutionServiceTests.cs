@@ -227,7 +227,6 @@ public sealed class AgentWorkspacePrepareSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceValidate)]
     [DataRow(AgentSkillIds.WorkspaceDiff)]
     [DataRow(AgentSkillIds.WorkspacePromotionPackage)]
     [DataRow(AgentSkillIds.WorkspaceFailurePackage)]
@@ -304,7 +303,6 @@ public sealed class AgentWorkspacePrepareSkillExecutionServiceTests
         Assert.IsFalse(combined.Contains("ProcessStartInfo", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("Process.Start", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IDisposableWorkspaceCommandService", StringComparison.Ordinal));
-        Assert.IsFalse(combined.Contains("IDisposableWorkspaceValidationService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IDisposableWorkspaceApplyCopyService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IGitHub", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("ITicket", StringComparison.Ordinal));

@@ -1,4 +1,4 @@
-﻿using IronDev.Core.Agents;
+using IronDev.Core.Agents;
 using IronDev.Core.Agents.ApprovalPolicy;
 using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
@@ -47,7 +47,7 @@ public sealed class AgentSkillExecutionServiceTests
         var service = new AgentSkillExecutionService(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { SkillId = AgentSkillIds.WorkspaceValidate }));
+            BuildAllowedContext() with { SkillId = AgentSkillIds.WorkspaceDiff }));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.BlockedUnsupportedSkill, result.Status);
         Assert.IsFalse(result.Executed);
@@ -223,8 +223,7 @@ public sealed class AgentSkillExecutionServiceTests
         Assert.IsFalse(source.Contains("IDisposableWorkspaceApplyCopyService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IDisposableWorkspaceCommandService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IDisposableWorkspacePrepareService", StringComparison.Ordinal));
-        Assert.IsFalse(source.Contains("IDisposableWorkspaceValidationService", StringComparison.Ordinal));
-        Assert.IsFalse(source.Contains("IGitHub", StringComparison.Ordinal));
+                Assert.IsFalse(source.Contains("IGitHub", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("ITicket", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IMemory", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("MemoryService", StringComparison.Ordinal));

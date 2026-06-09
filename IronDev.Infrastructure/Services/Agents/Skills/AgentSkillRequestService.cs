@@ -140,9 +140,21 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             checklist.Add("Workspace mutation is limited to disposable workspace preparation.");
             checklist.Add("Source repository mutation is not allowed from this request package.");
         }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspaceValidation, StringComparison.Ordinal) &&
+                 string.Equals(evaluation.SkillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal) &&
+                 evaluation.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to disposable workspace validation evidence.");
+            checklist.Add("Validation process execution must stay behind the governed validation service.");
+            checklist.Add("Source repository mutation is not allowed from this request package.");
+        }
         else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal))
         {
             checklist.Add("Workspace mutation is not allowed from this request package.");
+        }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspaceValidation, StringComparison.Ordinal))
+        {
+            checklist.Add("Workspace validation is not allowed from this request package.");
         }
     }
 

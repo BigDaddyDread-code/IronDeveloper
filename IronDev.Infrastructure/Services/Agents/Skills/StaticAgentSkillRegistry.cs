@@ -124,6 +124,7 @@ public sealed class StaticAgentSkillRegistry : IAgentSkillRegistry
             AgentSkillCategories.WorkspaceCommand,
             ProjectApprovalRiskTiers.WorkspaceValidation,
             canExecuteProcess: true,
+            canMutateWorkspace: true,
             requiresHumanApproval: true,
             readsEvidenceTypes: ["workspace-metadata"],
             producesEvidenceTypes: ["validation"],
