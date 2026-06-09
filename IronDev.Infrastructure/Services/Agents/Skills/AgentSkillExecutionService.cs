@@ -1346,15 +1346,26 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
     private static List<string> ValidateContext(AgentSkillRequestContext context)
     {
         var blockers = new List<string>();
+        var approvedExecutionContext = IsApprovedExecutionContext(context);
 
         if (!context.PolicyAllowed)
             blockers.Add("PolicyAllowed must be true.");
-        if (!string.Equals(context.ReviewStatus, AgentSkillRequestReviewStatuses.ReadyForHumanReview, StringComparison.Ordinal))
-            blockers.Add("ReviewStatus must be ready_for_human_review.");
-        if (!string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.ReviewRequest, StringComparison.Ordinal))
-            blockers.Add("RecommendedNextAction must be review_request.");
-        if (context.ExecutionCanStartFromContext)
-            blockers.Add("ExecutionCanStartFromContext must remain false; the context is not execution authority.");
+        if (approvedExecutionContext)
+        {
+            if (!string.Equals(context.ReviewStatus, AgentSkillRequestReviewStatuses.ApprovedForExecution, StringComparison.Ordinal))
+                blockers.Add("ReviewStatus must be approved_for_execution for approved execution.");
+            if (!string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.ExecuteApprovedRequest, StringComparison.Ordinal))
+                blockers.Add("RecommendedNextAction must be execute_approved_request for approved execution.");
+        }
+        else
+        {
+            if (!string.Equals(context.ReviewStatus, AgentSkillRequestReviewStatuses.ReadyForHumanReview, StringComparison.Ordinal))
+                blockers.Add("ReviewStatus must be ready_for_human_review.");
+            if (!string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.ReviewRequest, StringComparison.Ordinal))
+                blockers.Add("RecommendedNextAction must be review_request.");
+            if (context.ExecutionCanStartFromContext)
+                blockers.Add("ExecutionCanStartFromContext is only allowed for valid approved non-source-mutating contexts.");
+        }
         if (context.ApprovalCanBeGrantedByContext)
             blockers.Add("ApprovalCanBeGrantedByContext must remain false; the context cannot grant approval.");
         if (context.SourceMutationAllowed)
@@ -1381,6 +1392,20 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
 
         return blockers;
     }
+
+    private static bool IsApprovedExecutionContext(AgentSkillRequestContext context) =>
+        context.ExecutionCanStartFromContext &&
+        context.ApprovalEvidence is { BindingValid: true, AllowsExecution: true } &&
+        string.Equals(context.ReviewStatus, AgentSkillRequestReviewStatuses.ApprovedForExecution, StringComparison.Ordinal) &&
+        string.Equals(context.RecommendedNextAction, AgentSkillRequestContextRecommendedActions.ExecuteApprovedRequest, StringComparison.Ordinal) &&
+        IsApprovalExecutableSkill(context.SkillId);
+
+    private static bool IsApprovalExecutableSkill(string skillId) =>
+        string.Equals(skillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) ||
+        string.Equals(skillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal) ||
+        string.Equals(skillId, AgentSkillIds.WorkspaceDiff, StringComparison.Ordinal) ||
+        string.Equals(skillId, AgentSkillIds.WorkspacePromotionPackage, StringComparison.Ordinal) ||
+        string.Equals(skillId, AgentSkillIds.WorkspaceFailurePackage, StringComparison.Ordinal);
 
     private static AgentSkillExecutionResult Blocked(
         AgentSkillRequestContext context,

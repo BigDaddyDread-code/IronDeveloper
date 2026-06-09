@@ -6,6 +6,18 @@ namespace IronDev.Infrastructure.Services.Agents.Skills;
 
 public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextService
 {
+    private readonly IAgentSkillApprovalEvidenceBinder _approvalEvidenceBinder;
+
+    public AgentSkillRequestContextService()
+        : this(new AgentSkillApprovalEvidenceBinder())
+    {
+    }
+
+    public AgentSkillRequestContextService(IAgentSkillApprovalEvidenceBinder approvalEvidenceBinder)
+    {
+        _approvalEvidenceBinder = approvalEvidenceBinder ?? throw new ArgumentNullException(nameof(approvalEvidenceBinder));
+    }
+
     public AgentSkillRequestContext Create(AgentSkillRequestContextInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -42,9 +54,31 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
             consistencyBlockers.Add("Inconsistent request/review package.");
 
         var dangerousCapability = IsDangerousCapability(request, review);
+        var approvalEvidenceBinding = review.ApprovalEvidence is null
+            ? null
+            : _approvalEvidenceBinder.Bind(new AgentSkillApprovalEvidenceBindingRequest
+            {
+                RequestPackage = request,
+                ReviewPackage = review,
+                ApprovalEvidence = review.ApprovalEvidence
+            });
+        var approvalEnablesExecution =
+            isConsistent &&
+            approvalEvidenceBinding is { BindingValid: true, AllowsExecution: true } &&
+            !dangerousCapability &&
+            !string.Equals(request.Decision, ProjectApprovalDecisions.BlockedByPolicy, StringComparison.Ordinal);
+        var reviewStatus = approvalEnablesExecution
+            ? AgentSkillRequestReviewStatuses.ApprovedForExecution
+            : review.ReviewStatus;
         var recommendedNextAction = isConsistent
-            ? ResolveRecommendedNextAction(review.ReviewStatus)
+            ? approvalEnablesExecution
+                ? AgentSkillRequestContextRecommendedActions.ExecuteApprovedRequest
+                : ResolveRecommendedNextAction(review.ReviewStatus)
             : AgentSkillRequestContextRecommendedActions.CollectMissingEvidence;
+        var policyAllowed =
+            isConsistent &&
+            (string.Equals(request.Decision, ProjectApprovalDecisions.AllowedByPolicy, StringComparison.Ordinal) ||
+             approvalEnablesExecution);
 
         return new AgentSkillRequestContext
         {
@@ -57,18 +91,20 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
             Purpose = request.Purpose,
             SkillKnown = request.SkillKnown,
             Decision = request.Decision,
-            ReviewStatus = review.ReviewStatus,
+            ReviewStatus = reviewStatus,
             RiskTier = request.RiskTier,
             Category = request.Category,
             HumanReviewRequired = true,
-            HumanApprovalRequired = isConsistent && review.HumanApprovalRequired,
-            PolicyAllowed = isConsistent && string.Equals(request.Decision, ProjectApprovalDecisions.AllowedByPolicy, StringComparison.Ordinal),
+            HumanApprovalRequired = isConsistent && review.HumanApprovalRequired && !approvalEnablesExecution,
+            PolicyAllowed = policyAllowed,
             PolicyBlocked = !isConsistent || string.Equals(request.Decision, ProjectApprovalDecisions.BlockedByPolicy, StringComparison.Ordinal),
             DangerousCapability = dangerousCapability,
-            ExecutionCanStartFromContext = false,
+            ExecutionCanStartFromContext = approvalEnablesExecution,
             ApprovalCanBeGrantedByContext = false,
             SourceMutationAllowed = request.SourceMutationAllowed && review.SourceMutationAllowed,
-            WorkspaceMutationAllowed = request.WorkspaceMutationAllowed && review.WorkspaceMutationAllowed,
+            WorkspaceMutationAllowed = approvalEnablesExecution
+                ? approvalEvidenceBinding!.AllowsWorkspaceMutation
+                : request.WorkspaceMutationAllowed && review.WorkspaceMutationAllowed,
             ExternalSystemAllowed = request.ExternalSystemAllowed && review.ExternalSystemAllowed,
             CreatesTicketAllowed = request.CreatesTicketAllowed && review.CreatesTicketAllowed,
             WritesMemoryAllowed = request.WritesMemoryAllowed && review.WritesMemoryAllowed,
@@ -77,19 +113,22 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
                 request.EvidencePaths,
                 review.EvidencePaths,
                 AgentSkillMemoryContextEvidence.EvidencePaths(memoryContext),
-                AgentSkillPlanContextEvidence.EvidencePaths(planContext)),
+                AgentSkillPlanContextEvidence.EvidencePaths(planContext),
+                approvalEvidenceBinding?.EvidencePaths ?? []),
             ParametersSummary = Merge(request.ParametersSummary, review.ParametersSummary),
             ReviewChecklist = Merge(request.ReviewChecklist, review.ReviewChecklist),
-            Blockers = Merge(consistencyBlockers, review.Blockers),
+            Blockers = Merge(consistencyBlockers, review.Blockers, approvalEvidenceBinding?.Blockers ?? []),
             Warnings = Merge(
                 request.Warnings,
                 review.Warnings,
                 consistencyWarnings,
                 AgentSkillMemoryContextEvidence.Warnings(memoryContext),
-                AgentSkillPlanContextEvidence.Warnings(planContext)),
+                AgentSkillPlanContextEvidence.Warnings(planContext),
+                approvalEvidenceBinding?.Warnings ?? []),
             Interpretation = BuildInterpretation(recommendedNextAction, dangerousCapability),
             MemoryContext = memoryContext,
-            PlanContext = planContext
+            PlanContext = planContext,
+            ApprovalEvidence = approvalEvidenceBinding
         };
     }
 
@@ -190,6 +229,8 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
                 AgentSkillRequestContextRecommendedActions.StopDangerousCapability,
             AgentSkillRequestReviewStatuses.ApprovalRequired =>
                 AgentSkillRequestContextRecommendedActions.RequestSeparateApproval,
+            AgentSkillRequestReviewStatuses.ApprovedForExecution =>
+                AgentSkillRequestContextRecommendedActions.ExecuteApprovedRequest,
             AgentSkillRequestReviewStatuses.ReadyForHumanReview =>
                 AgentSkillRequestContextRecommendedActions.ReviewRequest,
             _ =>
@@ -221,6 +262,11 @@ public sealed class AgentSkillRequestContextService : IAgentSkillRequestContextS
         else if (string.Equals(recommendedNextAction, AgentSkillRequestContextRecommendedActions.RequestSeparateApproval, StringComparison.Ordinal))
         {
             interpretation.Add("This skill request requires separate approval evidence before any future execution path can exist.");
+        }
+        else if (string.Equals(recommendedNextAction, AgentSkillRequestContextRecommendedActions.ExecuteApprovedRequest, StringComparison.Ordinal))
+        {
+            interpretation.Add("Explicit approval evidence is bound to this non-source-mutating skill request.");
+            interpretation.Add("This context can start execution but still cannot grant approval.");
         }
         else if (string.Equals(recommendedNextAction, AgentSkillRequestContextRecommendedActions.ReviewRequest, StringComparison.Ordinal))
         {

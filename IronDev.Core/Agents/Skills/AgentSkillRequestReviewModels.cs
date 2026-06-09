@@ -4,6 +4,7 @@ public static class AgentSkillRequestReviewStatuses
 {
     public const string ReadyForHumanReview = "ready_for_human_review";
     public const string ApprovalRequired = "approval_required";
+    public const string ApprovedForExecution = "approved_for_execution";
     public const string BlockedByPolicy = "blocked_by_policy";
     public const string BlockedForUnknownSkill = "blocked_for_unknown_skill";
     public const string BlockedForDangerousCapability = "blocked_for_dangerous_capability";
@@ -12,6 +13,7 @@ public static class AgentSkillRequestReviewStatuses
 public sealed record AgentSkillRequestReviewInput
 {
     public required AgentSkillRequestPackage RequestPackage { get; init; }
+    public AgentSkillApprovalEvidence? ApprovalEvidence { get; init; }
 }
 
 public sealed record AgentSkillRequestReview
@@ -43,4 +45,5 @@ public sealed record AgentSkillRequestReview
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public AgentSkillMemoryContext? MemoryContext { get; init; }
     public AgentSkillPlanContext? PlanContext { get; init; }
+    public AgentSkillApprovalEvidence? ApprovalEvidence { get; init; }
 }

@@ -6,6 +6,7 @@ public static class AgentSkillRequestContextRecommendedActions
     public const string ReviewRequest = "review_request";
     public const string CollectMissingEvidence = "collect_missing_evidence";
     public const string RequestSeparateApproval = "request_separate_approval";
+    public const string ExecuteApprovedRequest = "execute_approved_request";
     public const string StopBlockedByPolicy = "stop_blocked_by_policy";
     public const string StopUnknownSkill = "stop_unknown_skill";
     public const string StopDangerousCapability = "stop_dangerous_capability";
@@ -52,4 +53,5 @@ public sealed record AgentSkillRequestContext
     public IReadOnlyList<string> Interpretation { get; init; } = [];
     public AgentSkillMemoryContext? MemoryContext { get; init; }
     public AgentSkillPlanContext? PlanContext { get; init; }
+    public AgentSkillApprovalEvidenceBinding? ApprovalEvidence { get; init; }
 }
