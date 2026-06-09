@@ -62,7 +62,7 @@ public sealed class AgentSkillRequestServiceTests
     }
 
     [TestMethod]
-    public void AgentSkillRequest_WorkspaceValidate_RequiresApprovalAndCannotExecute()
+    public void AgentSkillRequest_WorkspaceValidate_AllowsWorkspaceValidationButCannotExecuteFromRequest()
     {
         var policy = PolicyWithRule(
             ProjectApprovalRiskTiers.WorkspaceValidation,
@@ -71,14 +71,16 @@ public sealed class AgentSkillRequestServiceTests
 
         var package = BuildService().Create(BuildInput(AgentSkillIds.WorkspaceValidate, policy));
 
-        Assert.AreEqual(ProjectApprovalDecisions.ApprovalRequired, package.Decision);
-        Assert.IsTrue(package.HumanApprovalRequired);
-        Assert.IsFalse(package.SkillExecutionAllowedByPolicy);
-        Assert.IsFalse(package.AutomaticExecutionAllowedByPolicy);
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, package.Decision);
+        Assert.IsFalse(package.HumanApprovalRequired);
+        Assert.IsTrue(package.SkillExecutionAllowedByPolicy);
         Assert.IsFalse(package.ExecutionCanStartFromRequest);
         Assert.IsFalse(package.ApprovalCanBeGrantedByRequest);
+        Assert.IsFalse(package.SourceMutationAllowed);
+        Assert.IsTrue(package.WorkspaceMutationAllowed);
+        CollectionAssert.Contains(package.ReviewChecklist.ToArray(), "Workspace mutation is limited to disposable workspace validation evidence.");
+        CollectionAssert.Contains(package.ReviewChecklist.ToArray(), "Validation process execution must stay behind the governed validation service.");
     }
-
     [TestMethod]
     public void AgentSkillRequest_WorkspacePrepare_AllowsDisposableWorkspaceMutationButCannotExecuteFromRequest()
     {

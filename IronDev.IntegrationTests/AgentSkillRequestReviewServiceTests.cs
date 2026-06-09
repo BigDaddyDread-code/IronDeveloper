@@ -46,22 +46,24 @@ public sealed class AgentSkillRequestReviewServiceTests
     }
 
     [TestMethod]
-    public void AgentSkillRequestReview_ApprovalRequiredValidationRequest_RemainsApprovalRequired()
+    public void AgentSkillRequestReview_WorkspaceValidate_IsReadyButCannotExecuteFromReview()
     {
         var policy = PolicyWithRule(
             ProjectApprovalRiskTiers.WorkspaceValidation,
             AgentSkillIds.WorkspaceValidate,
             ProjectApprovalModes.AlwaysAllow);
+
         var review = BuildReview(BuildRequest(AgentSkillIds.WorkspaceValidate, policy));
 
-        Assert.AreEqual(AgentSkillRequestReviewStatuses.ApprovalRequired, review.ReviewStatus);
-        Assert.IsTrue(review.HumanApprovalRequired);
-        CollectionAssert.Contains(
-            review.ReviewChecklist.ToArray(),
-            "Obtain separate approval evidence in a later explicit flow.");
+        Assert.AreEqual(AgentSkillRequestReviewStatuses.ReadyForHumanReview, review.ReviewStatus);
+        Assert.IsFalse(review.HumanApprovalRequired);
         Assert.IsFalse(review.ExecutionCanStartFromReview);
+        Assert.IsFalse(review.ApprovalCanBeGrantedByReview);
+        Assert.IsFalse(review.SourceMutationAllowed);
+        Assert.IsTrue(review.WorkspaceMutationAllowed);
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Workspace mutation is limited to disposable workspace validation evidence.");
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Validation process execution must stay behind the governed validation service.");
     }
-
     [TestMethod]
     public void AgentSkillRequestReview_SourceMutationRequest_BlocksForDangerousCapability()
     {

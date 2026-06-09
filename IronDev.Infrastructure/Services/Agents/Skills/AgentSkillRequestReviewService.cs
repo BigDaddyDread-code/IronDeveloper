@@ -203,6 +203,14 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             checklist.Add("Workspace mutation is limited to disposable workspace preparation.");
             checklist.Add("Source repository mutation is not allowed from this review package.");
         }
+        else if (string.Equals(request.RiskTier, ProjectApprovalRiskTiers.WorkspaceValidation, StringComparison.Ordinal) &&
+                 string.Equals(request.SkillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal) &&
+                 request.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to disposable workspace validation evidence.");
+            checklist.Add("Validation process execution must stay behind the governed validation service.");
+            checklist.Add("Source repository mutation is not allowed from this review package.");
+        }
     }
 
     private static bool IsDangerousCapability(AgentSkillRequestPackage request) =>

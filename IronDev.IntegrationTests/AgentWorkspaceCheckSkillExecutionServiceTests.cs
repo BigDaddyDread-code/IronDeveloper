@@ -15,7 +15,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
         var applyContext = new FakeAgentWorkspaceApplyContextService();
-        var service = new AgentSkillExecutionService(applyContext, workspaceCheck);
+        var service = new AgentSkillExecutionService(applyContext, workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest());
 
@@ -44,7 +44,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
             readyForPrepare: false,
             blockers: ["Workspace path already exists: C:\\workspaces\\run-1"],
             warnings: ["Workspace check completed but the workspace is not ready for prepare."]));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest());
 
@@ -65,7 +65,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
             workspacePath: "C:\\workspaces\\from-parameters",
             sourceRepo: "C:\\repo\\from-parameters",
             readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
         var request = BuildExecutionRequest() with
         {
             RunId = null,
@@ -95,7 +95,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
             workspacePath: "C:\\workspaces\\from-context",
             sourceRepo: "C:\\repo\\from-context",
             readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
         var context = BuildAllowedContext() with
         {
             ParametersSummary =
@@ -129,7 +129,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_MissingRequiredInput_BlocksBeforeCheck(string missing)
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
         var context = BuildAllowedContext() with
         {
             ProjectId = missing == "projectId" ? string.Empty : "IronDev",
@@ -154,7 +154,6 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceValidate)]
     [DataRow("workspace.diff")]
     [DataRow("workspace.promotion_package")]
     [DataRow("workspace.failure_package")]
@@ -166,7 +165,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_UnsupportedSkillsRemainBlocked(string skillId)
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(BuildAllowedContext(skillId)));
 
@@ -180,7 +179,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_UnknownSkillRemainsBlocked()
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext("workspace.check.missing") with { SkillKnown = false }));
@@ -195,7 +194,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_PolicyBlockedRemainsBlocked()
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext() with
@@ -215,7 +214,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_DangerousCapabilityRemainsBlocked()
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext() with
@@ -234,7 +233,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_ApprovalRequiredRemainsBlocked()
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
             BuildAllowedContext() with
@@ -256,7 +255,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_ContextNotReadyRemainsBlocked(string badContext)
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
         var context = BuildAllowedContext();
         context = badContext switch
         {
@@ -284,7 +283,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     public async Task AgentWorkspaceCheckSkillExecution_AuthorityFlagsRemainBlocked(string flag)
     {
         var workspaceCheck = new FakeAgentWorkspaceCheckService(BuildCheckResult(readyForPrepare: true));
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(BuildContextWithFlag(flag)));
 
@@ -301,7 +300,7 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
         {
             ThrowOnCheck = true
         };
-        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck);
+        var service = new AgentSkillExecutionService(new FakeAgentWorkspaceApplyContextService(), workspaceCheck, new AgentSkillExecutionTestValidationService());
 
         var result = await service.ExecuteAsync(BuildExecutionRequest());
 
@@ -340,7 +339,6 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
         Assert.IsFalse(combined.Contains("IDisposableWorkspaceApplyCopyService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IDisposableWorkspaceCommandService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IDisposableWorkspacePrepareService", StringComparison.Ordinal));
-        Assert.IsFalse(combined.Contains("IDisposableWorkspaceValidationService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IDisposableWorkspaceDiffService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IDisposableWorkspacePromotionPackageService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IGitHub", StringComparison.Ordinal));

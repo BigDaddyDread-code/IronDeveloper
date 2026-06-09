@@ -1,4 +1,4 @@
-﻿namespace IronDev.Core.Agents.Skills;
+namespace IronDev.Core.Agents.Skills;
 
 public static class AgentSkillExecutionStatuses
 {
@@ -99,6 +99,55 @@ public sealed record AgentSkillWorkspaceApplyActionReviewExecutionPayload
     public IReadOnlyList<string> RiskNotes { get; init; } = [];
 }
 
+public sealed record AgentSkillWorkspaceValidateExecutionPayload
+{
+    public required bool ValidationAttempted { get; init; }
+
+    public required bool ValidationSucceeded { get; init; }
+
+    public required string ProjectId { get; init; }
+
+    public required string RunId { get; init; }
+
+    public required string WorkspacePath { get; init; }
+
+    public required string ProfileId { get; init; }
+
+    public required string ValidationStatus { get; init; }
+
+    public required int ExitCode { get; init; }
+
+    public required bool MetadataWritten { get; init; }
+
+    public string? ValidationMetadataPath { get; init; }
+
+    public IReadOnlyList<AgentSkillWorkspaceValidationStepPayload> Steps { get; init; } = [];
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> Blockers { get; init; } = [];
+}
+
+public sealed record AgentSkillWorkspaceValidationStepPayload
+{
+    public required string CommandId { get; init; }
+
+    public required string Status { get; init; }
+
+    public required int ExitCode { get; init; }
+
+    public required bool Succeeded { get; init; }
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
 public sealed record AgentSkillExecutionResult
 {
     public required string ExecutionId { get; init; }

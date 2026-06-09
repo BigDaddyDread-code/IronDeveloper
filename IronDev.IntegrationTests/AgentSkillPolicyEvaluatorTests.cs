@@ -62,7 +62,7 @@ public sealed class AgentSkillPolicyEvaluatorTests
     }
 
     [TestMethod]
-    public void AgentSkillPolicy_WorkspaceValidate_RequiresApprovalEvenIfPolicyAllows()
+    public void AgentSkillPolicy_WorkspaceValidate_AllowsGovernedWorkspaceValidationWhenPolicyAllows()
     {
         var policy = PolicyWithRule(
             ProjectApprovalRiskTiers.WorkspaceValidation,
@@ -71,15 +71,16 @@ public sealed class AgentSkillPolicyEvaluatorTests
 
         var result = BuildEvaluator().Evaluate(BuildRequest(AgentSkillIds.WorkspaceValidate, policy));
 
-        Assert.AreEqual(ProjectApprovalDecisions.ApprovalRequired, result.Decision);
-        Assert.IsTrue(result.HumanApprovalRequired);
-        Assert.IsFalse(result.SkillExecutionAllowedByPolicy);
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, result.Decision);
+        Assert.IsFalse(result.HumanApprovalRequired);
+        Assert.IsTrue(result.SkillExecutionAllowedByPolicy);
         Assert.IsFalse(result.AutomaticExecutionAllowed);
-        Assert.IsTrue(
-            result.Reason.Contains("process execution", StringComparison.OrdinalIgnoreCase) ||
-            result.Warnings.Any(item => item.Contains("process execution", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(result.SourceMutationAllowed);
+        Assert.IsTrue(result.WorkspaceMutationAllowed);
+        Assert.IsFalse(result.ExternalSystemAllowed);
+        Assert.IsFalse(result.CreatesTicketAllowed);
+        Assert.IsFalse(result.WritesMemoryAllowed);
     }
-
     [TestMethod]
     public void AgentSkillPolicy_WorkspacePrepare_AllowsGovernedWorkspaceMutationWhenPolicyAllows()
     {
