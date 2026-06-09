@@ -11,14 +11,24 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         AgentSkillIds.WorkspaceReadApplyContext,
         AgentSkillIds.WorkspaceRecommendApplyAction,
         AgentSkillIds.WorkspaceCreateActionRequest,
-        AgentSkillIds.WorkspaceCreateActionReview
+        AgentSkillIds.WorkspaceCreateActionReview,
+        AgentSkillIds.WorkspaceCheck
     };
 
     private readonly IAgentWorkspaceApplyContextService _workspaceApplyContextService;
+    private readonly IAgentWorkspaceCheckService _workspaceCheckService;
 
     public AgentSkillExecutionService(IAgentWorkspaceApplyContextService workspaceApplyContextService)
+        : this(workspaceApplyContextService, new AgentWorkspaceCheckService())
+    {
+    }
+
+    public AgentSkillExecutionService(
+        IAgentWorkspaceApplyContextService workspaceApplyContextService,
+        IAgentWorkspaceCheckService workspaceCheckService)
     {
         _workspaceApplyContextService = workspaceApplyContextService ?? throw new ArgumentNullException(nameof(workspaceApplyContextService));
+        _workspaceCheckService = workspaceCheckService ?? throw new ArgumentNullException(nameof(workspaceCheckService));
     }
 
     public async Task<AgentSkillExecutionResult> ExecuteAsync(
@@ -99,14 +109,27 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             request.WorkspacePath,
             TryGetParameter(request.Parameters, "workspacePath"),
             TryGetSummaryParameter(context.ParametersSummary, "workspacePath"));
+        var sourceRepo = FirstNonEmpty(
+            request.SourceRepo,
+            TryGetParameter(request.Parameters, "sourceRepo"),
+            TryGetSummaryParameter(context.ParametersSummary, "sourceRepo"));
 
         var requestBlockers = new List<string>();
+        var workspaceCheckSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspaceCheck, StringComparison.Ordinal);
         if (string.IsNullOrWhiteSpace(projectId))
-            requestBlockers.Add("ProjectId is required for workspace apply context execution.");
+            requestBlockers.Add(workspaceCheckSkill
+                ? "ProjectId is required for workspace check execution."
+                : "ProjectId is required for workspace apply context execution.");
         if (string.IsNullOrWhiteSpace(runId))
-            requestBlockers.Add("RunId is required for workspace apply context execution.");
+            requestBlockers.Add(workspaceCheckSkill
+                ? "RunId is required for workspace check execution."
+                : "RunId is required for workspace apply context execution.");
         if (string.IsNullOrWhiteSpace(workspacePath))
-            requestBlockers.Add("WorkspacePath is required for workspace apply context execution.");
+            requestBlockers.Add(workspaceCheckSkill
+                ? "WorkspacePath is required for workspace check execution."
+                : "WorkspacePath is required for workspace apply context execution.");
+        if (workspaceCheckSkill && string.IsNullOrWhiteSpace(sourceRepo))
+            requestBlockers.Add("SourceRepo is required for workspace check execution.");
 
         if (requestBlockers.Count > 0)
         {
@@ -114,8 +137,22 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 context,
                 executionId,
                 AgentSkillExecutionStatuses.BlockedByContext,
-                "Workspace apply context request is incomplete.",
+                workspaceCheckSkill
+                    ? "Workspace check request is incomplete."
+                    : "Workspace apply context request is incomplete.",
                 requestBlockers);
+        }
+
+        if (workspaceCheckSkill)
+        {
+            return await ExecuteWorkspaceCheckAsync(
+                context,
+                executionId,
+                projectId!,
+                runId!,
+                workspacePath!,
+                sourceRepo!,
+                cancellationToken).ConfigureAwait(false);
         }
 
         try
@@ -192,6 +229,98 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 Payload = null,
                 EvidencePaths = context.EvidencePaths,
                 Warnings = Merge(context.Warnings, [$"Workspace apply context read failed: {exception.Message}"]),
+                Blockers = []
+            };
+        }
+    }
+
+    private async Task<AgentSkillExecutionResult> ExecuteWorkspaceCheckAsync(
+        AgentSkillRequestContext context,
+        string executionId,
+        string projectId,
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var check = await _workspaceCheckService.CheckAsync(
+                new AgentWorkspaceCheckRequest
+                {
+                    ProjectId = projectId,
+                    RunId = runId,
+                    WorkspacePath = workspacePath,
+                    SourceRepo = sourceRepo,
+                    EvidencePaths = context.EvidencePaths
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            var evidencePaths = Merge(context.EvidencePaths, check.EvidencePaths);
+            var warnings = Merge(context.Warnings, check.Warnings);
+
+            return new AgentSkillExecutionResult
+            {
+                ExecutionId = executionId,
+                ContextId = context.ContextId,
+                RequestId = context.RequestId,
+                ReviewId = context.ReviewId,
+                SkillId = context.SkillId,
+                Status = AgentSkillExecutionStatuses.Succeeded,
+                Summary = "Workspace check skill execution completed.",
+                Executed = true,
+                ReadOnlyExecution = true,
+                SourceMutated = false,
+                WorkspaceMutated = false,
+                ExternalSystemCalled = false,
+                TicketCreated = false,
+                MemoryWritten = false,
+                ApprovalGranted = false,
+                ShellCommandRun = false,
+                Payload = new AgentSkillWorkspaceCheckExecutionPayload
+                {
+                    CheckAvailable = check.CheckAvailable,
+                    ProjectId = check.ProjectId,
+                    RunId = check.RunId,
+                    WorkspacePath = check.WorkspacePath,
+                    SourceRepo = check.SourceRepo,
+                    SourceRepoExists = check.SourceRepoExists,
+                    WorkspacePathExists = check.WorkspacePathExists,
+                    WorkspaceInsideAllowedRoot = check.WorkspaceInsideAllowedRoot,
+                    SourceAndWorkspaceAreDistinct = check.SourceAndWorkspaceAreDistinct,
+                    ReadyForPrepare = check.ReadyForPrepare,
+                    EvidencePaths = evidencePaths,
+                    Warnings = warnings,
+                    Blockers = check.Blockers
+                },
+                EvidencePaths = evidencePaths,
+                Warnings = warnings,
+                Blockers = []
+            };
+        }
+        catch (Exception exception)
+        {
+            return new AgentSkillExecutionResult
+            {
+                ExecutionId = executionId,
+                ContextId = context.ContextId,
+                RequestId = context.RequestId,
+                ReviewId = context.ReviewId,
+                SkillId = context.SkillId,
+                Status = AgentSkillExecutionStatuses.Failed,
+                Summary = "Read-only skill execution failed while running workspace check.",
+                Executed = false,
+                ReadOnlyExecution = true,
+                SourceMutated = false,
+                WorkspaceMutated = false,
+                ExternalSystemCalled = false,
+                TicketCreated = false,
+                MemoryWritten = false,
+                ApprovalGranted = false,
+                ShellCommandRun = false,
+                Payload = null,
+                EvidencePaths = context.EvidencePaths,
+                Warnings = Merge(context.Warnings, [$"Workspace check failed: {exception.Message}"]),
                 Blockers = []
             };
         }

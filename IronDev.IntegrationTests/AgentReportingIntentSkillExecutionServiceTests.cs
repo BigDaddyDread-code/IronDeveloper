@@ -70,7 +70,6 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceCheck)]
     [DataRow(AgentSkillIds.WorkspacePrepare)]
     [DataRow(AgentSkillIds.WorkspaceValidate)]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
