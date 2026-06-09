@@ -59,7 +59,8 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
                 AgentSkillMemoryContextEvidence.Warnings(memoryContext),
                 AgentSkillPlanContextEvidence.Warnings(planContext)),
             MemoryContext = memoryContext,
-            PlanContext = planContext
+            PlanContext = planContext,
+            ApprovalEvidence = input.ApprovalEvidence
         };
     }
 
