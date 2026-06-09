@@ -13,14 +13,16 @@ internal static class AgentSkillExecutionTestServices
         IAgentWorkspacePrepareService? workspacePrepare = null,
         IDisposableWorkspaceValidationService? validation = null,
         IDisposableWorkspaceDiffService? diff = null,
-        IDisposableWorkspacePromotionPackageService? promotionPackage = null) =>
+        IDisposableWorkspacePromotionPackageService? promotionPackage = null,
+        IDisposableWorkspaceFailurePackageService? failurePackage = null) =>
         new(
             workspaceApplyContextService ?? new AgentSkillExecutionThrowingApplyContextService(),
             workspaceCheck ?? new AgentSkillExecutionThrowingWorkspaceCheckService(),
             workspacePrepare ?? new AgentSkillExecutionThrowingWorkspacePrepareService(),
             validation ?? new AgentSkillExecutionTestValidationService(),
             diff ?? new AgentSkillExecutionTestDiffService(),
-            promotionPackage ?? new AgentSkillExecutionTestPromotionPackageService());
+            promotionPackage ?? new AgentSkillExecutionTestPromotionPackageService(),
+            failurePackage ?? new AgentSkillExecutionTestFailurePackageService());
 }
 
 internal sealed class AgentSkillExecutionTestDiffService : IDisposableWorkspaceDiffService
@@ -84,6 +86,43 @@ internal sealed class AgentSkillExecutionTestPromotionPackageService : IDisposab
                 Warnings = []
             },
             Errors = ["Test promotion package service should not be called by this test."],
+            Warnings = []
+        });
+    }
+}
+
+internal sealed class AgentSkillExecutionTestFailurePackageService : IDisposableWorkspaceFailurePackageService
+{
+    public int CallCount { get; private set; }
+
+    public Task<DisposableWorkspaceFailurePackageResult> CreateAsync(
+        DisposableWorkspaceFailurePackageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        return Task.FromResult(new DisposableWorkspaceFailurePackageResult
+        {
+            Status = "blocked",
+            Summary = "Test failure package service should not be called by this test.",
+            ExitCode = 1,
+            Data = new DisposableWorkspaceFailurePackageData
+            {
+                RunId = request.RunId,
+                WorkspacePath = request.WorkspacePath,
+                SourceRepo = string.Empty,
+                FailedStage = request.FailedStage,
+                SourceRepoMutated = false,
+                ApplyCopyAttempted = false,
+                ApplyCopySucceeded = false,
+                ApplyVerified = false,
+                PostApplyValidationSucceeded = false,
+                FailureSeverity = "blocked",
+                RecommendedNextAction = "inspect_evidence_before_retry",
+                EvidencePaths = [],
+                Errors = ["Test failure package service should not be called by this test."],
+                Warnings = []
+            },
+            Errors = ["Test failure package service should not be called by this test."],
             Warnings = []
         });
     }

@@ -154,7 +154,6 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow("workspace.failure_package")]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
     [DataRow("git.commit")]
     [DataRow("github.pull_request.create")]

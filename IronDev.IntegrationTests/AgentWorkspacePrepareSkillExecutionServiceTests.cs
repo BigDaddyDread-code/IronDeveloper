@@ -227,7 +227,6 @@ public sealed class AgentWorkspacePrepareSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceFailurePackage)]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
     public async Task AgentWorkspacePrepareSkillExecution_UnsupportedWorkspaceSkillsRemainBlocked(string skillId)
     {

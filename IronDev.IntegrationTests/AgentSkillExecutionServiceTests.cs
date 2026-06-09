@@ -47,7 +47,7 @@ public sealed class AgentSkillExecutionServiceTests
         var service = AgentSkillExecutionTestServices.Create(fake);
 
         var result = await service.ExecuteAsync(BuildExecutionRequest(
-            BuildAllowedContext() with { SkillId = AgentSkillIds.WorkspaceFailurePackage }));
+            BuildAllowedContext() with { SkillId = AgentSkillIds.WorkspaceSourceReport }));
 
         Assert.AreEqual(AgentSkillExecutionStatuses.BlockedUnsupportedSkill, result.Status);
         Assert.IsFalse(result.Executed);

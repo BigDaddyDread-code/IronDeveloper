@@ -137,6 +137,25 @@ public sealed class AgentSkillPolicyEvaluatorTests
     }
 
     [TestMethod]
+    public void AgentSkillPolicy_WorkspaceFailurePackage_AllowsGovernedWorkspacePackageMutationWhenPolicyAllows()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspaceFailurePackage,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var result = BuildEvaluator().Evaluate(BuildRequest(AgentSkillIds.WorkspaceFailurePackage, policy));
+
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, result.Decision);
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspacePackaging, result.RiskTier);
+        Assert.IsTrue(result.SkillExecutionAllowedByPolicy);
+        Assert.IsFalse(result.AutomaticExecutionAllowed);
+        Assert.IsTrue(result.WorkspaceMutationAllowed);
+        Assert.IsFalse(result.SourceMutationAllowed);
+        Assert.IsFalse(result.ExternalSystemAllowed);
+    }
+
+    [TestMethod]
     public void AgentSkillPolicy_ApplyCopy_CannotAutoAllow()
     {
         var policy = PolicyWithRule(

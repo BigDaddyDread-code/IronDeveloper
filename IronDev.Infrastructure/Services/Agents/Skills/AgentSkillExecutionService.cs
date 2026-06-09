@@ -17,7 +17,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         AgentSkillIds.WorkspacePrepare,
         AgentSkillIds.WorkspaceValidate,
         AgentSkillIds.WorkspaceDiff,
-        AgentSkillIds.WorkspacePromotionPackage
+        AgentSkillIds.WorkspacePromotionPackage,
+        AgentSkillIds.WorkspaceFailurePackage
     };
 
     private readonly IAgentWorkspaceApplyContextService _workspaceApplyContextService;
@@ -26,6 +27,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
     private readonly IDisposableWorkspaceValidationService _workspaceValidationService;
     private readonly IDisposableWorkspaceDiffService _workspaceDiffService;
     private readonly IDisposableWorkspacePromotionPackageService _workspacePromotionPackageService;
+    private readonly IDisposableWorkspaceFailurePackageService _workspaceFailurePackageService;
 
     public AgentSkillExecutionService(
         IAgentWorkspaceApplyContextService workspaceApplyContextService,
@@ -33,7 +35,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         IAgentWorkspacePrepareService workspacePrepareService,
         IDisposableWorkspaceValidationService workspaceValidationService,
         IDisposableWorkspaceDiffService workspaceDiffService,
-        IDisposableWorkspacePromotionPackageService workspacePromotionPackageService)
+        IDisposableWorkspacePromotionPackageService workspacePromotionPackageService,
+        IDisposableWorkspaceFailurePackageService workspaceFailurePackageService)
     {
         _workspaceApplyContextService = workspaceApplyContextService ?? throw new ArgumentNullException(nameof(workspaceApplyContextService));
         _workspaceCheckService = workspaceCheckService ?? throw new ArgumentNullException(nameof(workspaceCheckService));
@@ -41,6 +44,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         _workspaceValidationService = workspaceValidationService ?? throw new ArgumentNullException(nameof(workspaceValidationService));
         _workspaceDiffService = workspaceDiffService ?? throw new ArgumentNullException(nameof(workspaceDiffService));
         _workspacePromotionPackageService = workspacePromotionPackageService ?? throw new ArgumentNullException(nameof(workspacePromotionPackageService));
+        _workspaceFailurePackageService = workspaceFailurePackageService ?? throw new ArgumentNullException(nameof(workspaceFailurePackageService));
     }
 
     public async Task<AgentSkillExecutionResult> ExecuteAsync(
@@ -131,6 +135,17 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         var sourceReportPath = FirstNonEmpty(
             TryGetParameter(request.Parameters, "sourceReportPath"),
             TryGetSummaryParameter(context.ParametersSummary, "sourceReportPath"));
+        var promotionPackagePath = FirstNonEmpty(
+            TryGetParameter(request.Parameters, "promotionPackagePath"),
+            TryGetSummaryParameter(context.ParametersSummary, "promotionPackagePath"));
+        var failedStage = FirstNonEmpty(
+            TryGetParameter(request.Parameters, "failedStage"),
+            TryGetSummaryParameter(context.ParametersSummary, "failedStage"),
+            "validate");
+        var failureReason = FirstNonEmpty(
+            TryGetParameter(request.Parameters, "failureReason"),
+            TryGetSummaryParameter(context.ParametersSummary, "failureReason"),
+            "workspace execution failed or was blocked");
 
         var requestBlockers = new List<string>();
         var workspaceCheckSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspaceCheck, StringComparison.Ordinal);
@@ -138,8 +153,9 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         var workspaceValidateSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal);
         var workspaceDiffSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspaceDiff, StringComparison.Ordinal);
         var workspacePromotionPackageSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspacePromotionPackage, StringComparison.Ordinal);
-        var workspaceCommandSkill = workspaceCheckSkill || workspacePrepareSkill || workspaceValidateSkill || workspaceDiffSkill || workspacePromotionPackageSkill;
-        var sourceRepoRequiredSkill = workspaceCheckSkill || workspacePrepareSkill || workspaceDiffSkill || workspacePromotionPackageSkill;
+        var workspaceFailurePackageSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspaceFailurePackage, StringComparison.Ordinal);
+        var workspaceCommandSkill = workspaceCheckSkill || workspacePrepareSkill || workspaceValidateSkill || workspaceDiffSkill || workspacePromotionPackageSkill || workspaceFailurePackageSkill;
+        var sourceRepoRequiredSkill = workspaceCheckSkill || workspacePrepareSkill || workspaceDiffSkill || workspacePromotionPackageSkill || workspaceFailurePackageSkill;
         var profileId = FirstNonEmpty(
             TryGetParameter(request.Parameters, "profileId"),
             TryGetSummaryParameter(context.ParametersSummary, "profileId"),
@@ -197,7 +213,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 workspaceCommandSkill
                     ? $"{context.SkillId} request is incomplete."
                     : "Workspace apply context request is incomplete.",
-                requestBlockers);
+                requestBlockers,
+                readOnlyExecution: !workspaceFailurePackageSkill);
         }
 
         if (workspaceCheckSkill)
@@ -259,6 +276,23 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 sourceRepo!,
                 validationReportPath!,
                 sourceReportPath!,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (workspaceFailurePackageSkill)
+        {
+            return await ExecuteWorkspaceFailurePackageAsync(
+                context,
+                executionId,
+                projectId!,
+                runId!,
+                workspacePath!,
+                sourceRepo!,
+                failedStage!,
+                failureReason!,
+                validationReportPath,
+                sourceReportPath,
+                promotionPackagePath,
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -858,6 +892,110 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         }
     }
 
+    private async Task<AgentSkillExecutionResult> ExecuteWorkspaceFailurePackageAsync(
+        AgentSkillRequestContext context,
+        string executionId,
+        string projectId,
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        string failedStage,
+        string failureReason,
+        string? validationReportPath,
+        string? sourceReportPath,
+        string? promotionPackagePath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var package = await _workspaceFailurePackageService.CreateAsync(
+                new DisposableWorkspaceFailurePackageRequest
+                {
+                    RunId = runId,
+                    WorkspacePath = workspacePath,
+                    FailedStage = failedStage
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            var metadataWritten =
+                !string.IsNullOrWhiteSpace(package.Data.FailurePackagePath) &&
+                package.Data.EvidencePaths.Contains(package.Data.FailurePackagePath, StringComparer.OrdinalIgnoreCase);
+            var evidencePaths = Merge(context.EvidencePaths, package.Data.EvidencePaths);
+            var warnings = Merge(context.Warnings, package.Warnings, package.Data.Warnings, package.Data.AggregatedWarnings);
+            var errors = Merge(package.Errors, package.Data.Errors, package.Data.AggregatedErrors, package.Data.AggregatedBlockers);
+            var status = MapWorkspaceResultStatus(package.Status);
+            var packageAttempted = metadataWritten || status != AgentSkillExecutionStatuses.BlockedByContext;
+            var payload = BuildFailurePackagePayload(
+                package,
+                projectId,
+                sourceRepo,
+                failureReason,
+                validationReportPath,
+                sourceReportPath,
+                promotionPackagePath,
+                evidencePaths,
+                warnings,
+                status == AgentSkillExecutionStatuses.BlockedByContext ? errors : [],
+                metadataWritten,
+                packageAttempted);
+
+            return new AgentSkillExecutionResult
+            {
+                ExecutionId = executionId,
+                ContextId = context.ContextId,
+                RequestId = context.RequestId,
+                ReviewId = context.ReviewId,
+                SkillId = context.SkillId,
+                Status = status,
+                Summary = status switch
+                {
+                    AgentSkillExecutionStatuses.Succeeded => "Workspace failure package skill execution completed.",
+                    AgentSkillExecutionStatuses.BlockedByContext => "Workspace failure package skill execution was blocked before writing package evidence.",
+                    _ => "Workspace failure package skill execution failed."
+                },
+                Executed = status == AgentSkillExecutionStatuses.Succeeded,
+                ReadOnlyExecution = false,
+                SourceMutated = false,
+                WorkspaceMutated = metadataWritten || status == AgentSkillExecutionStatuses.Failed,
+                ExternalSystemCalled = false,
+                TicketCreated = false,
+                MemoryWritten = false,
+                ApprovalGranted = false,
+                ShellCommandRun = false,
+                Payload = payload,
+                EvidencePaths = evidencePaths,
+                Warnings = warnings,
+                Blockers = status == AgentSkillExecutionStatuses.BlockedByContext ? errors : []
+            };
+        }
+        catch (Exception exception)
+        {
+            return new AgentSkillExecutionResult
+            {
+                ExecutionId = executionId,
+                ContextId = context.ContextId,
+                RequestId = context.RequestId,
+                ReviewId = context.ReviewId,
+                SkillId = context.SkillId,
+                Status = AgentSkillExecutionStatuses.Failed,
+                Summary = "Workspace failure package skill execution failed after package creation was called.",
+                Executed = false,
+                ReadOnlyExecution = false,
+                SourceMutated = false,
+                WorkspaceMutated = true,
+                ExternalSystemCalled = false,
+                TicketCreated = false,
+                MemoryWritten = false,
+                ApprovalGranted = false,
+                ShellCommandRun = false,
+                Payload = null,
+                EvidencePaths = context.EvidencePaths,
+                Warnings = Merge(context.Warnings, [$"Workspace failure package failed: {exception.Message}"]),
+                Blockers = []
+            };
+        }
+    }
+
     private static AgentSkillWorkspaceValidateExecutionPayload BuildValidatePayload(
         DisposableWorkspaceValidationResult validation,
         string projectId,
@@ -963,6 +1101,45 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             EvidencePaths = evidencePaths,
             RiskNotes = package.Data.RiskNotes,
             Errors = Merge(package.Errors, package.Data.Errors),
+            Warnings = warnings,
+            Blockers = blockers
+        };
+
+    private static AgentSkillWorkspaceFailurePackageExecutionPayload BuildFailurePackagePayload(
+        DisposableWorkspaceFailurePackageResult package,
+        string projectId,
+        string sourceRepo,
+        string failureReason,
+        string? validationReportPath,
+        string? sourceReportPath,
+        string? promotionPackagePath,
+        IReadOnlyList<string> evidencePaths,
+        IReadOnlyList<string> warnings,
+        IReadOnlyList<string> blockers,
+        bool metadataWritten,
+        bool packageAttempted) =>
+        new()
+        {
+            PackageAttempted = packageAttempted,
+            PackageCreated = string.Equals(package.Status, "succeeded", StringComparison.OrdinalIgnoreCase),
+            MetadataWritten = metadataWritten,
+            ProjectId = projectId,
+            RunId = package.Data.RunId,
+            WorkspacePath = package.Data.WorkspacePath,
+            SourceRepo = FirstNonEmpty(package.Data.SourceRepo, sourceRepo) ?? string.Empty,
+            FailureReason = failureReason,
+            FailurePackagePath = package.Data.FailurePackagePath,
+            WorkspaceMetadataPath = package.Data.WorkspaceMetadataPath,
+            ValidationReportPath = validationReportPath,
+            SourceReportPath = sourceReportPath,
+            PromotionPackagePath = promotionPackagePath,
+            RequiresHumanReview = true,
+            CanRetryAutomatically = false,
+            CanApplyToSourceRepo = false,
+            RecommendedNextAction = package.Data.RecommendedNextAction,
+            EvidencePaths = evidencePaths,
+            RiskNotes = package.Data.RiskNotes,
+            Errors = Merge(package.Errors, package.Data.Errors, package.Data.AggregatedErrors),
             Warnings = warnings,
             Blockers = blockers
         };
@@ -1185,7 +1362,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         if (string.Equals(context.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) ||
             string.Equals(context.SkillId, AgentSkillIds.WorkspaceValidate, StringComparison.Ordinal) ||
             string.Equals(context.SkillId, AgentSkillIds.WorkspaceDiff, StringComparison.Ordinal) ||
-            string.Equals(context.SkillId, AgentSkillIds.WorkspacePromotionPackage, StringComparison.Ordinal))
+            string.Equals(context.SkillId, AgentSkillIds.WorkspacePromotionPackage, StringComparison.Ordinal) ||
+            string.Equals(context.SkillId, AgentSkillIds.WorkspaceFailurePackage, StringComparison.Ordinal))
         {
             if (!context.WorkspaceMutationAllowed)
                 blockers.Add($"WorkspaceMutationAllowed must be true for {context.SkillId} execution.");

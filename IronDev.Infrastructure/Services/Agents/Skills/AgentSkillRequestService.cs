@@ -163,6 +163,14 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
             checklist.Add("Promotion package creation does not approve or apply source changes.");
             checklist.Add("Source repository mutation is not allowed from this request package.");
         }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePackaging, StringComparison.Ordinal) &&
+                 string.Equals(evaluation.SkillId, AgentSkillIds.WorkspaceFailurePackage, StringComparison.Ordinal) &&
+                 evaluation.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to failure package evidence.");
+            checklist.Add("Failure package creation does not retry, repair, approve, or apply source changes.");
+            checklist.Add("Source repository mutation is not allowed from this request package.");
+        }
         else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal))
         {
             checklist.Add("Workspace mutation is not allowed from this request package.");
@@ -173,7 +181,7 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
         }
         else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePackaging, StringComparison.Ordinal))
         {
-            checklist.Add("Workspace promotion package creation is not allowed from this request package.");
+            checklist.Add("Workspace package creation is not allowed from this request package.");
         }
     }
 
