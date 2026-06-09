@@ -19,6 +19,7 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
     {
         await base.TestInitialize();
         await DropAgentMemorySchemaAsync();
+        await ApplyAgentMemoryMigrationAsync();
         _store = new SqlAgentLocalMemoryStore(
             ServiceProvider.GetRequiredService<IDbConnectionFactory>(),
             new AgentMemoryContractValidator());
@@ -38,10 +39,8 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
     }
 
     [TestMethod]
-    public async Task SqlAgentLocalMemoryStore_CreatesRequiredTablesIndexesTriggersAndView()
+    public async Task SqlAgentLocalMemoryMigration_CreatesRequiredTablesIndexesTriggersAndView()
     {
-        await _store.EnsureSchemaAsync();
-
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
 
@@ -57,7 +56,8 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
                 OBJECT_ID('agent.vwAgentLocalMemoryCurrentState', 'V'),
                 OBJECT_ID('agent.TR_AgentLocalMemoryItem_BlockUpdateDelete', 'TR'),
                 OBJECT_ID('agent.TR_AgentLocalMemoryEvidenceRef_BlockUpdateDelete', 'TR'),
-                OBJECT_ID('agent.TR_AgentLocalMemoryEvent_BlockUpdateDelete', 'TR')
+                OBJECT_ID('agent.TR_AgentLocalMemoryEvent_BlockUpdateDelete', 'TR'),
+                OBJECT_ID('agent.TR_AgentLocalMemoryEvent_ValidateInsert', 'TR')
             );
             """);
 
@@ -74,8 +74,25 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
             );
             """);
 
-        Assert.AreEqual(7, objectCount);
+        Assert.AreEqual(8, objectCount);
         Assert.AreEqual(4, indexCount);
+    }
+
+    [TestMethod]
+    public void SqlAgentLocalMemoryStore_DoesNotOwnSchemaCreation()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "IronDev.Infrastructure",
+            "AgentMemory",
+            "SqlAgentLocalMemoryStore.cs"));
+
+        Assert.IsFalse(source.Contains("EnsureSchemaAsync", StringComparison.Ordinal),
+            "Runtime memory store must not expose schema bootstrap methods.");
+        Assert.IsFalse(source.Contains("CREATE TABLE", StringComparison.OrdinalIgnoreCase),
+            "Runtime memory store must not own database DDL.");
+        Assert.IsFalse(source.Contains("CREATE TRIGGER", StringComparison.OrdinalIgnoreCase),
+            "Runtime memory store must not own database DDL.");
     }
 
     [TestMethod]
@@ -148,6 +165,77 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
             {
                 EvidenceRefs = Array.Empty<EvidenceRef>()
             }));
+    }
+
+    [TestMethod]
+    public async Task SqlAgentLocalMemoryMigration_BlocksCandidatePatternCreatedEventWithoutEvidence()
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        await connection.ExecuteAsync(
+            """
+            INSERT INTO agent.AgentLocalMemoryItem
+            (
+                MemoryItemId,
+                TenantId,
+                ProjectId,
+                CampaignId,
+                RunId,
+                AgentId,
+                MemoryType,
+                AuthorityLevel,
+                Title,
+                Summary,
+                Confidence,
+                CreatedAtUtc,
+                KnownLimitations
+            )
+            VALUES
+            (
+                'memory-candidate-direct',
+                'tenant-1',
+                'project-1',
+                'campaign-1',
+                'run-1',
+                'builder-agent',
+                6,
+                2,
+                'Direct candidate',
+                'Direct SQL tried to create candidate memory without evidence.',
+                0.8,
+                @CreatedAtUtc,
+                'Direct SQL is not the governed store path.'
+            );
+            """,
+            new { CreatedAtUtc = Now.UtcDateTime });
+
+        await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync(
+            """
+            INSERT INTO agent.AgentLocalMemoryEvent
+            (
+                MemoryEventId,
+                MemoryItemId,
+                EventType,
+                EventReason,
+                CreatedAtUtc,
+                CreatedByAgentId
+            )
+            VALUES
+            (
+                'event-direct-created',
+                'memory-candidate-direct',
+                1,
+                'Direct Created event without evidence.',
+                @CreatedAtUtc,
+                'builder-agent'
+            );
+            """,
+            new { CreatedAtUtc = Now.UtcDateTime }));
+
+        var createdEventCount = await connection.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM agent.AgentLocalMemoryEvent WHERE MemoryItemId = 'memory-candidate-direct';");
+        Assert.AreEqual(0, createdEventCount);
     }
 
     [TestMethod]
@@ -240,46 +328,110 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
     }
 
     [TestMethod]
-    public async Task SqlAgentLocalMemoryStore_CanAppendLifecycleEventsAndReconstructHistory()
+    public async Task SqlAgentLocalMemoryStore_CanAppendValidLifecycleEventsAndReadScopedHistory()
     {
         var item = BuildMemoryItem();
         await _store.CreateAsync(item);
-        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Superseded, 1));
-        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Expired, 2));
-        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Invalidated, 3));
-        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.ProposedForReview, 4));
+        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.ProposedForReview, 1));
+        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Invalidated, 2));
 
-        await using var connection = new SqlConnection(ConnectionString);
-        await connection.OpenAsync();
-
-        var eventTypes = (await connection.QueryAsync<int>(
-            """
-            SELECT EventType
-            FROM agent.AgentLocalMemoryEvent
-            WHERE MemoryItemId = @MemoryItemId
-            ORDER BY CreatedAtUtc, MemoryEventId;
-            """,
-            new { item.MemoryItemId })).ToArray();
-
-        var latest = await connection.QuerySingleAsync<int>(
-            "SELECT CurrentEventType FROM agent.vwAgentLocalMemoryCurrentState WHERE MemoryItemId = @MemoryItemId;",
-            new { item.MemoryItemId });
+        var history = await _store.GetEventHistoryAsync(item.Scope, item.MemoryItemId);
+        var hiddenHistory = await _store.GetEventHistoryAsync(item.Scope with { AgentId = "critic-agent" }, item.MemoryItemId);
+        var loaded = await _store.GetOwnMemoryItemAsync(item.Scope, item.MemoryItemId);
 
         CollectionAssert.AreEqual(
             new[]
             {
-                (int)AgentLocalMemoryEventType.Created,
-                (int)AgentLocalMemoryEventType.Superseded,
-                (int)AgentLocalMemoryEventType.Expired,
-                (int)AgentLocalMemoryEventType.Invalidated,
-                (int)AgentLocalMemoryEventType.ProposedForReview
+                AgentLocalMemoryEventType.Created,
+                AgentLocalMemoryEventType.ProposedForReview,
+                AgentLocalMemoryEventType.Invalidated
             },
-            eventTypes);
-        Assert.AreEqual((int)AgentLocalMemoryEventType.ProposedForReview, latest);
+            history.Select(item => item.EventType).ToArray());
+        Assert.IsEmpty(hiddenHistory);
+        Assert.IsNotNull(loaded);
+        Assert.AreEqual(MemoryLifecycleStatus.Invalidated, loaded.Status);
+    }
+
+    [TestMethod]
+    public async Task SqlAgentLocalMemoryStore_AllowsOnlyDefinedLifecycleTransitions()
+    {
+        var superseded = BuildMemoryItem("memory-superseded");
+        await _store.CreateAsync(superseded);
+        await _store.AddEventAsync(superseded.Scope, BuildEvent(superseded.MemoryItemId, AgentLocalMemoryEventType.Superseded, 1));
+
+        var expired = BuildMemoryItem("memory-expired");
+        await _store.CreateAsync(expired);
+        await _store.AddEventAsync(expired.Scope, BuildEvent(expired.MemoryItemId, AgentLocalMemoryEventType.Expired, 1));
+        await _store.AddEventAsync(expired.Scope, BuildEvent(expired.MemoryItemId, AgentLocalMemoryEventType.Invalidated, 2));
+
+        var proposed = BuildMemoryItem("memory-proposed");
+        await _store.CreateAsync(proposed);
+        await _store.AddEventAsync(proposed.Scope, BuildEvent(proposed.MemoryItemId, AgentLocalMemoryEventType.ProposedForReview, 1));
+        await _store.AddEventAsync(proposed.Scope, BuildEvent(proposed.MemoryItemId, AgentLocalMemoryEventType.Expired, 2));
+
+        Assert.AreEqual(MemoryLifecycleStatus.Superseded, (await _store.GetOwnMemoryItemAsync(superseded.Scope, superseded.MemoryItemId))!.Status);
+        Assert.AreEqual(MemoryLifecycleStatus.Invalidated, (await _store.GetOwnMemoryItemAsync(expired.Scope, expired.MemoryItemId))!.Status);
+        Assert.AreEqual(MemoryLifecycleStatus.Expired, (await _store.GetOwnMemoryItemAsync(proposed.Scope, proposed.MemoryItemId))!.Status);
+    }
+
+    [TestMethod]
+    public async Task SqlAgentLocalMemoryStore_BlocksCreatedAppendAndTerminalReactivation()
+    {
+        var item = BuildMemoryItem();
+        await _store.CreateAsync(item);
+        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Superseded, 1));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Created, 2)));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Expired, 3)));
+
+        var loaded = await _store.GetOwnMemoryItemAsync(item.Scope, item.MemoryItemId);
+        var history = await _store.GetEventHistoryAsync(item.Scope, item.MemoryItemId);
+
+        Assert.IsNotNull(loaded);
+        Assert.AreEqual(MemoryLifecycleStatus.Superseded, loaded.Status);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                AgentLocalMemoryEventType.Created,
+                AgentLocalMemoryEventType.Superseded
+            },
+            history.Select(memoryEvent => memoryEvent.EventType).ToArray());
+    }
+
+    [TestMethod]
+    public async Task SqlAgentLocalMemoryStore_BlocksInvalidProposedForReviewTransitions()
+    {
+        var item = BuildMemoryItem();
+        await _store.CreateAsync(item);
+        await _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.ProposedForReview, 1));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            _store.AddEventAsync(item.Scope, BuildEvent(item.MemoryItemId, AgentLocalMemoryEventType.Superseded, 2)));
 
         var loaded = await _store.GetOwnMemoryItemAsync(item.Scope, item.MemoryItemId);
         Assert.IsNotNull(loaded);
         Assert.AreEqual(MemoryLifecycleStatus.ProposedForReview, loaded.Status);
+    }
+
+    [TestMethod]
+    public async Task SqlAgentLocalMemoryStore_QueryOwnMemoryExcludesTimeExpiredMemoryByDefault()
+    {
+        var expiredByTime = BuildMemoryItem("memory-time-expired") with
+        {
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-2),
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+
+        await _store.CreateAsync(expiredByTime);
+
+        var activeOnly = await _store.QueryOwnMemoryAsync(expiredByTime.Scope, new AgentLocalMemoryQuery());
+        var withExpired = await _store.QueryOwnMemoryAsync(expiredByTime.Scope, new AgentLocalMemoryQuery { IncludeExpired = true });
+
+        Assert.IsFalse(activeOnly.Any(item => item.MemoryItemId == expiredByTime.MemoryItemId));
+        Assert.IsTrue(withExpired.Any(item => item.MemoryItemId == expiredByTime.MemoryItemId));
     }
 
     [TestMethod]
@@ -356,6 +508,9 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
             Assert.IsFalse(methodNames.Any(name => name.Contains(forbidden, StringComparison.OrdinalIgnoreCase)),
                 $"Agent local memory store must not expose forbidden method '{forbidden}'.");
         }
+
+        Assert.IsTrue(methodNames.Contains(nameof(IAgentLocalMemoryStore.GetEventHistoryAsync)),
+            "Agent local memory store must expose scoped event history for audits.");
     }
 
     private async Task AssertSqlFailsAsync(string sql)
@@ -366,6 +521,13 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
         await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync(sql));
     }
 
+    private async Task ApplyAgentMemoryMigrationAsync()
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(await File.ReadAllTextAsync(Path.Combine(FindRepositoryRoot(), "Database", "migrate_agent_local_memory.sql")));
+    }
+
     private async Task DropAgentMemorySchemaAsync()
     {
         await using var connection = new SqlConnection(ConnectionString);
@@ -374,6 +536,8 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
             """
             IF OBJECT_ID('agent.vwAgentLocalMemoryCurrentState', 'V') IS NOT NULL
                 DROP VIEW agent.vwAgentLocalMemoryCurrentState;
+            IF OBJECT_ID('agent.TR_AgentLocalMemoryEvent_ValidateInsert', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentLocalMemoryEvent_ValidateInsert;
             IF OBJECT_ID('agent.TR_AgentLocalMemoryEvidenceRef_BlockUpdateDelete', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentLocalMemoryEvidenceRef_BlockUpdateDelete;
             IF OBJECT_ID('agent.TR_AgentLocalMemoryEvent_BlockUpdateDelete', 'TR') IS NOT NULL
@@ -389,6 +553,21 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
             IF SCHEMA_ID('agent') IS NOT NULL
                 DROP SCHEMA agent;
             """);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root for agent memory tests.");
     }
 
     private static AgentLocalMemoryItem BuildMemoryItem(string memoryItemId = "memory-1") =>
@@ -451,4 +630,3 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
             CapturedAt = Now
         };
 }
-

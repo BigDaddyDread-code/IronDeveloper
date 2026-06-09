@@ -8,18 +8,8 @@ namespace IronDev.Infrastructure.AgentMemory;
 
 public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
 {
-    private static readonly AgentLocalMemoryEventType[] LocalEventTypes =
-    [
-        AgentLocalMemoryEventType.Created,
-        AgentLocalMemoryEventType.Superseded,
-        AgentLocalMemoryEventType.Expired,
-        AgentLocalMemoryEventType.Invalidated,
-        AgentLocalMemoryEventType.ProposedForReview
-    ];
-
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IAgentMemoryContractValidator _validator;
-    private int _schemaEnsured;
 
     public SqlAgentLocalMemoryStore(
         IDbConnectionFactory connectionFactory,
@@ -36,8 +26,6 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         ArgumentNullException.ThrowIfNull(item);
         ThrowIfInvalid(_validator.Validate(item));
         ThrowIfNotLocalAuthority(item.AuthorityLevel);
-
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
 
         using var connection = _connectionFactory.CreateConnection();
         await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -147,17 +135,24 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(memoryEvent);
         ThrowIfInvalidScope(scope);
-        ThrowIfInvalidLocalEvent(memoryEvent);
+        ThrowIfInvalidAppendEvent(memoryEvent);
 
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
         await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
 
         var owner = await connection.QuerySingleOrDefaultAsync<MemoryOwnerRow>(new CommandDefinition(
             """
-            SELECT TOP (1) TenantId, ProjectId, CampaignId, RunId, AgentId
-            FROM agent.AgentLocalMemoryItem
-            WHERE MemoryItemId = @MemoryItemId;
+            SELECT TOP (1)
+                i.TenantId,
+                i.ProjectId,
+                i.CampaignId,
+                i.RunId,
+                i.AgentId,
+                v.CurrentEventType
+            FROM agent.AgentLocalMemoryItem i
+            LEFT JOIN agent.vwAgentLocalMemoryCurrentState v
+                ON v.MemoryItemId = i.MemoryItemId
+            WHERE i.MemoryItemId = @MemoryItemId;
             """,
             new { memoryEvent.MemoryItemId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -167,6 +162,8 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
 
         if (!ScopeMatches(scope, owner))
             throw new InvalidOperationException("Memory event scope does not match the target memory item scope.");
+
+        ThrowIfInvalidLifecycleTransition(ToLifecycleStatus(owner.CurrentEventType), memoryEvent.EventType);
 
         using var transaction = connection.BeginTransaction();
         try
@@ -190,7 +187,6 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         ArgumentNullException.ThrowIfNull(query);
         ThrowIfInvalidScope(scope);
 
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
         var take = Math.Clamp(query.Take <= 0 ? 50 : query.Take, 1, 500);
 
@@ -224,7 +220,15 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
               AND (@AuthorityLevel IS NULL OR AuthorityLevel = @AuthorityLevel)
               AND (@CreatedAfter IS NULL OR CreatedAtUtc >= @CreatedAfter)
               AND (@CreatedBefore IS NULL OR CreatedAtUtc <= @CreatedBefore)
-              AND (@IncludeExpired = 1 OR ISNULL(CurrentEventType, 1) <> 3)
+              AND
+              (
+                  @IncludeExpired = 1
+                  OR
+                  (
+                      ISNULL(CurrentEventType, 1) <> @ExpiredEventType
+                      AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME())
+                  )
+              )
             ORDER BY CreatedAtUtc DESC, MemoryItemId DESC;
             """,
             new
@@ -239,6 +243,7 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
                 CreatedAfter = query.CreatedAfter?.UtcDateTime,
                 CreatedBefore = query.CreatedBefore?.UtcDateTime,
                 IncludeExpired = query.IncludeExpired,
+                ExpiredEventType = (int)AgentLocalMemoryEventType.Expired,
                 Take = take
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
@@ -257,7 +262,6 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         if (string.IsNullOrWhiteSpace(memoryItemId))
             return null;
 
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
 
         var row = await connection.QuerySingleOrDefaultAsync<MemoryItemRow>(new CommandDefinition(
@@ -306,181 +310,56 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         return hydrated.SingleOrDefault();
     }
 
-    public async Task EnsureSchemaAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AgentLocalMemoryEventRecord>> GetEventHistoryAsync(
+        AgentMemoryScope scope,
+        string memoryItemId,
+        CancellationToken cancellationToken = default)
     {
-        if (Volatile.Read(ref _schemaEnsured) == 1)
-            return;
+        ArgumentNullException.ThrowIfNull(scope);
+        ThrowIfInvalidScope(scope);
+
+        if (string.IsNullOrWhiteSpace(memoryItemId))
+            return Array.Empty<AgentLocalMemoryEventRecord>();
 
         using var connection = _connectionFactory.CreateConnection();
-        const string sql = """
-            IF SCHEMA_ID('agent') IS NULL
-                EXEC('CREATE SCHEMA agent');
 
-            IF OBJECT_ID('agent.AgentLocalMemoryItem', 'U') IS NULL
-            BEGIN
-                CREATE TABLE agent.AgentLocalMemoryItem
-                (
-                    MemoryItemId NVARCHAR(80) NOT NULL,
-                    TenantId NVARCHAR(80) NOT NULL,
-                    ProjectId NVARCHAR(80) NOT NULL,
-                    CampaignId NVARCHAR(80) NOT NULL,
-                    RunId NVARCHAR(80) NOT NULL,
-                    AgentId NVARCHAR(120) NOT NULL,
-                    MemoryType INT NOT NULL,
-                    AuthorityLevel INT NOT NULL,
-                    Title NVARCHAR(240) NOT NULL,
-                    Summary NVARCHAR(MAX) NOT NULL,
-                    Confidence DECIMAL(5,4) NOT NULL,
-                    CreatedAtUtc DATETIME2(7) NOT NULL,
-                    ExpiresAtUtc DATETIME2(7) NULL,
-                    SupersedesMemoryItemId NVARCHAR(80) NULL,
-                    KnownLimitations NVARCHAR(MAX) NULL,
-                    ContentJson NVARCHAR(MAX) NULL,
-                    ContentHashSha256 VARBINARY(32) NULL,
-                    CONSTRAINT PK_AgentLocalMemoryItem PRIMARY KEY (MemoryItemId),
-                    CONSTRAINT CK_AgentLocalMemoryItem_Confidence CHECK (Confidence >= 0 AND Confidence <= 1),
-                    CONSTRAINT CK_AgentLocalMemoryItem_LocalAuthority CHECK (AuthorityLevel IN (1, 2)),
-                    CONSTRAINT CK_AgentLocalMemoryItem_MemoryType CHECK (MemoryType IN (1, 2, 3, 4, 5, 6)),
-                    CONSTRAINT CK_AgentLocalMemoryItem_CandidatePatternLimitations CHECK
-                    (
-                        MemoryType <> 6
-                        OR (KnownLimitations IS NOT NULL AND LEN(LTRIM(RTRIM(KnownLimitations))) > 0)
-                    ),
-                    CONSTRAINT FK_AgentLocalMemoryItem_Supersedes FOREIGN KEY (SupersedesMemoryItemId)
-                        REFERENCES agent.AgentLocalMemoryItem (MemoryItemId)
-                );
-            END
+        var rows = (await connection.QueryAsync<EventRow>(new CommandDefinition(
+            """
+            SELECT
+                e.MemoryEventId,
+                e.MemoryItemId,
+                e.EventType,
+                e.EventReason,
+                e.CreatedAtUtc,
+                e.CreatedByAgentId,
+                e.CreatedByUserId,
+                e.CorrelationId,
+                e.DecisionId,
+                e.ThoughtLedgerEntryId,
+                e.EventJson
+            FROM agent.AgentLocalMemoryEvent e
+            INNER JOIN agent.AgentLocalMemoryItem i
+                ON i.MemoryItemId = e.MemoryItemId
+            WHERE e.MemoryItemId = @MemoryItemId
+              AND i.TenantId = @TenantId
+              AND i.ProjectId = @ProjectId
+              AND i.CampaignId = @CampaignId
+              AND i.RunId = @RunId
+              AND i.AgentId = @AgentId
+            ORDER BY e.CreatedAtUtc, e.MemoryEventId;
+            """,
+            new
+            {
+                MemoryItemId = memoryItemId,
+                scope.TenantId,
+                scope.ProjectId,
+                scope.CampaignId,
+                scope.RunId,
+                scope.AgentId
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
 
-            IF OBJECT_ID('agent.AgentLocalMemoryEvidenceRef', 'U') IS NULL
-            BEGIN
-                CREATE TABLE agent.AgentLocalMemoryEvidenceRef
-                (
-                    EvidenceRefRowId BIGINT IDENTITY(1,1) NOT NULL,
-                    MemoryItemId NVARCHAR(80) NOT NULL,
-                    EvidenceId NVARCHAR(120) NOT NULL,
-                    EvidenceType INT NOT NULL,
-                    SourceId NVARCHAR(160) NOT NULL,
-                    SourceUri NVARCHAR(1024) NULL,
-                    Summary NVARCHAR(MAX) NULL,
-                    CapturedAtUtc DATETIME2(7) NULL,
-                    CONSTRAINT PK_AgentLocalMemoryEvidenceRef PRIMARY KEY (EvidenceRefRowId),
-                    CONSTRAINT FK_AgentLocalMemoryEvidenceRef_MemoryItem FOREIGN KEY (MemoryItemId)
-                        REFERENCES agent.AgentLocalMemoryItem (MemoryItemId),
-                    CONSTRAINT UQ_AgentLocalMemoryEvidenceRef_MemoryItem_Evidence UNIQUE (MemoryItemId, EvidenceId),
-                    CONSTRAINT CK_AgentLocalMemoryEvidenceRef_EvidenceType CHECK (EvidenceType BETWEEN 1 AND 12)
-                );
-            END
-
-            IF OBJECT_ID('agent.AgentLocalMemoryEvent', 'U') IS NULL
-            BEGIN
-                CREATE TABLE agent.AgentLocalMemoryEvent
-                (
-                    MemoryEventId NVARCHAR(80) NOT NULL,
-                    MemoryItemId NVARCHAR(80) NOT NULL,
-                    EventType INT NOT NULL,
-                    EventReason NVARCHAR(MAX) NULL,
-                    CreatedAtUtc DATETIME2(7) NOT NULL,
-                    CreatedByAgentId NVARCHAR(120) NULL,
-                    CreatedByUserId NVARCHAR(120) NULL,
-                    CorrelationId NVARCHAR(120) NULL,
-                    DecisionId NVARCHAR(120) NULL,
-                    ThoughtLedgerEntryId NVARCHAR(120) NULL,
-                    EventJson NVARCHAR(MAX) NULL,
-                    CONSTRAINT PK_AgentLocalMemoryEvent PRIMARY KEY (MemoryEventId),
-                    CONSTRAINT FK_AgentLocalMemoryEvent_MemoryItem FOREIGN KEY (MemoryItemId)
-                        REFERENCES agent.AgentLocalMemoryItem (MemoryItemId),
-                    CONSTRAINT CK_AgentLocalMemoryEvent_EventType CHECK (EventType IN (1, 2, 3, 4, 5, 6, 7))
-                );
-            END
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AgentLocalMemoryItem_Scope' AND object_id = OBJECT_ID('agent.AgentLocalMemoryItem'))
-                CREATE INDEX IX_AgentLocalMemoryItem_Scope ON agent.AgentLocalMemoryItem(TenantId, ProjectId, CampaignId, RunId, AgentId, CreatedAtUtc);
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AgentLocalMemoryItem_CampaignAgent' AND object_id = OBJECT_ID('agent.AgentLocalMemoryItem'))
-                CREATE INDEX IX_AgentLocalMemoryItem_CampaignAgent ON agent.AgentLocalMemoryItem(TenantId, ProjectId, CampaignId, AgentId, CreatedAtUtc);
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AgentLocalMemoryEvent_MemoryItem_CreatedAt' AND object_id = OBJECT_ID('agent.AgentLocalMemoryEvent'))
-                CREATE INDEX IX_AgentLocalMemoryEvent_MemoryItem_CreatedAt ON agent.AgentLocalMemoryEvent(MemoryItemId, CreatedAtUtc);
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AgentLocalMemoryEvidenceRef_MemoryItem' AND object_id = OBJECT_ID('agent.AgentLocalMemoryEvidenceRef'))
-                CREATE INDEX IX_AgentLocalMemoryEvidenceRef_MemoryItem ON agent.AgentLocalMemoryEvidenceRef(MemoryItemId);
-
-            IF OBJECT_ID('agent.TR_AgentLocalMemoryItem_BlockUpdateDelete', 'TR') IS NULL
-                EXEC('
-                    CREATE TRIGGER agent.TR_AgentLocalMemoryItem_BlockUpdateDelete
-                    ON agent.AgentLocalMemoryItem
-                    AFTER UPDATE, DELETE
-                    AS
-                    BEGIN
-                        SET NOCOUNT ON;
-                        THROW 51001, ''AgentLocalMemoryItem is append-only. Use memory events instead of update/delete.'', 1;
-                    END');
-
-            IF OBJECT_ID('agent.TR_AgentLocalMemoryEvidenceRef_BlockUpdateDelete', 'TR') IS NULL
-                EXEC('
-                    CREATE TRIGGER agent.TR_AgentLocalMemoryEvidenceRef_BlockUpdateDelete
-                    ON agent.AgentLocalMemoryEvidenceRef
-                    AFTER UPDATE, DELETE
-                    AS
-                    BEGIN
-                        SET NOCOUNT ON;
-                        THROW 51002, ''AgentLocalMemoryEvidenceRef is append-only. Evidence cannot be silently changed.'', 1;
-                    END');
-
-            IF OBJECT_ID('agent.TR_AgentLocalMemoryEvent_BlockUpdateDelete', 'TR') IS NULL
-                EXEC('
-                    CREATE TRIGGER agent.TR_AgentLocalMemoryEvent_BlockUpdateDelete
-                    ON agent.AgentLocalMemoryEvent
-                    AFTER UPDATE, DELETE
-                    AS
-                    BEGIN
-                        SET NOCOUNT ON;
-                        THROW 51003, ''AgentLocalMemoryEvent is append-only. Events cannot be updated or deleted.'', 1;
-                    END');
-
-            IF OBJECT_ID('agent.vwAgentLocalMemoryCurrentState', 'V') IS NULL
-                EXEC('
-                    CREATE VIEW agent.vwAgentLocalMemoryCurrentState
-                    AS
-                    WITH LatestEvent AS
-                    (
-                        SELECT
-                            e.MemoryItemId,
-                            e.EventType,
-                            e.CreatedAtUtc,
-                            ROW_NUMBER() OVER
-                            (
-                                PARTITION BY e.MemoryItemId
-                                ORDER BY e.CreatedAtUtc DESC, e.MemoryEventId DESC
-                            ) AS rn
-                        FROM agent.AgentLocalMemoryEvent e
-                    )
-                    SELECT
-                        i.MemoryItemId,
-                        i.TenantId,
-                        i.ProjectId,
-                        i.CampaignId,
-                        i.RunId,
-                        i.AgentId,
-                        i.MemoryType,
-                        i.AuthorityLevel,
-                        i.Title,
-                        i.Summary,
-                        i.Confidence,
-                        i.CreatedAtUtc,
-                        i.ExpiresAtUtc,
-                        i.SupersedesMemoryItemId,
-                        i.KnownLimitations,
-                        le.EventType AS CurrentEventType,
-                        le.CreatedAtUtc AS CurrentEventAtUtc
-                    FROM agent.AgentLocalMemoryItem i
-                    LEFT JOIN LatestEvent le
-                        ON i.MemoryItemId = le.MemoryItemId
-                       AND le.rn = 1');
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        Volatile.Write(ref _schemaEnsured, 1);
+        return rows.Select(ToEvent).ToArray();
     }
 
     private static async Task InsertEvidenceAsync(
@@ -535,7 +414,7 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         AgentLocalMemoryEventRecord memoryEvent,
         CancellationToken cancellationToken)
     {
-        ThrowIfInvalidLocalEvent(memoryEvent);
+        ThrowIfInvalidEventIdentity(memoryEvent);
 
         const string sql = """
             INSERT INTO agent.AgentLocalMemoryEvent
@@ -650,6 +529,22 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
             CapturedAt = row.CapturedAtUtc is null ? null : ToUtc(row.CapturedAtUtc.Value)
         };
 
+    private static AgentLocalMemoryEventRecord ToEvent(EventRow row) =>
+        new()
+        {
+            MemoryEventId = row.MemoryEventId,
+            MemoryItemId = row.MemoryItemId,
+            EventType = (AgentLocalMemoryEventType)row.EventType,
+            EventReason = row.EventReason,
+            CreatedAt = ToUtc(row.CreatedAtUtc),
+            CreatedByAgentId = row.CreatedByAgentId,
+            CreatedByUserId = row.CreatedByUserId,
+            CorrelationId = row.CorrelationId,
+            DecisionId = row.DecisionId,
+            ThoughtLedgerEntryId = row.ThoughtLedgerEntryId,
+            EventJson = row.EventJson
+        };
+
     private static MemoryLifecycleStatus ToLifecycleStatus(int? eventType) =>
         eventType switch
         {
@@ -691,16 +586,47 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         throw new InvalidOperationException("Local agent memory can only be created as ObservedOnly or CandidatePattern.");
     }
 
-    private static void ThrowIfInvalidLocalEvent(AgentLocalMemoryEventRecord memoryEvent)
+    private static void ThrowIfInvalidEventIdentity(AgentLocalMemoryEventRecord memoryEvent)
     {
         if (string.IsNullOrWhiteSpace(memoryEvent.MemoryEventId))
             throw new InvalidOperationException("Memory event ID is required.");
 
         if (string.IsNullOrWhiteSpace(memoryEvent.MemoryItemId))
             throw new InvalidOperationException("Memory event item ID is required.");
+    }
 
-        if (!LocalEventTypes.Contains(memoryEvent.EventType))
+    private static void ThrowIfInvalidAppendEvent(AgentLocalMemoryEventRecord memoryEvent)
+    {
+        ThrowIfInvalidEventIdentity(memoryEvent);
+
+        if (memoryEvent.EventType == AgentLocalMemoryEventType.Created)
+            throw new InvalidOperationException("Created memory events are inserted only by CreateAsync and cannot be appended as lifecycle transitions.");
+
+        if (memoryEvent.EventType is AgentLocalMemoryEventType.Rejected or AgentLocalMemoryEventType.Accepted)
             throw new InvalidOperationException("Local agent memory cannot append Rejected or Accepted lifecycle events.");
+
+        if (memoryEvent.EventType is not (AgentLocalMemoryEventType.Superseded or AgentLocalMemoryEventType.Expired or AgentLocalMemoryEventType.Invalidated or AgentLocalMemoryEventType.ProposedForReview))
+            throw new InvalidOperationException($"Unsupported local memory lifecycle event '{memoryEvent.EventType}'.");
+    }
+
+    private static void ThrowIfInvalidLifecycleTransition(MemoryLifecycleStatus currentStatus, AgentLocalMemoryEventType nextEventType)
+    {
+        var allowed = currentStatus switch
+        {
+            MemoryLifecycleStatus.Active => nextEventType is
+                AgentLocalMemoryEventType.Superseded or
+                AgentLocalMemoryEventType.Expired or
+                AgentLocalMemoryEventType.Invalidated or
+                AgentLocalMemoryEventType.ProposedForReview,
+            MemoryLifecycleStatus.ProposedForReview => nextEventType is
+                AgentLocalMemoryEventType.Expired or
+                AgentLocalMemoryEventType.Invalidated,
+            MemoryLifecycleStatus.Expired => nextEventType == AgentLocalMemoryEventType.Invalidated,
+            _ => false
+        };
+
+        if (!allowed)
+            throw new InvalidOperationException($"Invalid local memory lifecycle transition from {currentStatus} to {nextEventType}.");
     }
 
     private static bool ScopeMatches(AgentMemoryScope scope, MemoryOwnerRow owner) =>
@@ -731,6 +657,7 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         public string CampaignId { get; set; } = string.Empty;
         public string RunId { get; set; } = string.Empty;
         public string AgentId { get; set; } = string.Empty;
+        public int? CurrentEventType { get; set; }
     }
 
     private sealed class MemoryItemRow : MemoryOwnerRow
@@ -745,7 +672,6 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         public DateTime? ExpiresAtUtc { get; set; }
         public string? SupersedesMemoryItemId { get; set; }
         public string? KnownLimitations { get; set; }
-        public int? CurrentEventType { get; set; }
         public DateTime? CurrentEventAtUtc { get; set; }
     }
 
@@ -758,5 +684,20 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
         public string? SourceUri { get; set; }
         public string? Summary { get; set; }
         public DateTime? CapturedAtUtc { get; set; }
+    }
+
+    private sealed class EventRow
+    {
+        public string MemoryEventId { get; set; } = string.Empty;
+        public string MemoryItemId { get; set; } = string.Empty;
+        public int EventType { get; set; }
+        public string? EventReason { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public string? CreatedByAgentId { get; set; }
+        public string? CreatedByUserId { get; set; }
+        public string? CorrelationId { get; set; }
+        public string? DecisionId { get; set; }
+        public string? ThoughtLedgerEntryId { get; set; }
+        public string? EventJson { get; set; }
     }
 }

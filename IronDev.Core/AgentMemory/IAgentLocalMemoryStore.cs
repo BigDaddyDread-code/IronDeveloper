@@ -1,4 +1,4 @@
-namespace IronDev.Core.AgentMemory;
+﻿namespace IronDev.Core.AgentMemory;
 
 public interface IAgentLocalMemoryStore
 {
@@ -17,6 +17,11 @@ public interface IAgentLocalMemoryStore
         CancellationToken cancellationToken = default);
 
     Task<AgentLocalMemoryItem?> GetOwnMemoryItemAsync(
+        AgentMemoryScope scope,
+        string memoryItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AgentLocalMemoryEventRecord>> GetEventHistoryAsync(
         AgentMemoryScope scope,
         string memoryItemId,
         CancellationToken cancellationToken = default);
