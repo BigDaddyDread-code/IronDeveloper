@@ -195,6 +195,7 @@ public sealed class AgentSkillRegistryTests
         var registry = new StaticAgentSkillRegistry();
         var diff = RequireSkill(registry, AgentSkillIds.WorkspaceDiff);
         var package = RequireSkill(registry, AgentSkillIds.WorkspacePromotionPackage);
+        var failurePackage = RequireSkill(registry, AgentSkillIds.WorkspaceFailurePackage);
 
         Assert.AreEqual(ProjectApprovalRiskTiers.WorkspaceReporting, diff.RiskTier);
         Assert.IsTrue(diff.CanMutateWorkspace);
@@ -207,5 +208,12 @@ public sealed class AgentSkillRegistryTests
         Assert.IsFalse(package.CanMutateSource);
         Assert.IsFalse(package.CanExecuteProcess);
         Assert.IsTrue(package.RequiresHumanApproval);
+
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspacePackaging, failurePackage.RiskTier);
+        Assert.IsTrue(failurePackage.CanReadEvidence);
+        Assert.IsTrue(failurePackage.CanMutateWorkspace);
+        Assert.IsFalse(failurePackage.CanMutateSource);
+        Assert.IsFalse(failurePackage.CanExecuteProcess);
+        Assert.IsTrue(failurePackage.RequiresHumanApproval);
     }
 }

@@ -226,6 +226,14 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             checklist.Add("Promotion package creation does not approve or apply source changes.");
             checklist.Add("Source repository mutation is not allowed from this review package.");
         }
+        else if (string.Equals(request.RiskTier, ProjectApprovalRiskTiers.WorkspacePackaging, StringComparison.Ordinal) &&
+                 string.Equals(request.SkillId, AgentSkillIds.WorkspaceFailurePackage, StringComparison.Ordinal) &&
+                 request.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to failure package evidence.");
+            checklist.Add("Failure package creation does not retry, repair, approve, or apply source changes.");
+            checklist.Add("Source repository mutation is not allowed from this review package.");
+        }
     }
 
     private static bool IsDangerousCapability(AgentSkillRequestPackage request) =>

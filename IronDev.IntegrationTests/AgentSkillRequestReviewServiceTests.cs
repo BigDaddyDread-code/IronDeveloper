@@ -101,6 +101,26 @@ public sealed class AgentSkillRequestReviewServiceTests
         CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Workspace mutation is limited to promotion package evidence.");
         CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Promotion package creation does not approve or apply source changes.");
     }
+
+    [TestMethod]
+    public void AgentSkillRequestReview_WorkspaceFailurePackage_IsReadyButCannotExecuteFromReview()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspaceFailurePackage,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var review = BuildReview(BuildRequest(AgentSkillIds.WorkspaceFailurePackage, policy));
+
+        Assert.AreEqual(AgentSkillRequestReviewStatuses.ReadyForHumanReview, review.ReviewStatus);
+        Assert.IsFalse(review.HumanApprovalRequired);
+        Assert.IsFalse(review.ExecutionCanStartFromReview);
+        Assert.IsFalse(review.SourceMutationAllowed);
+        Assert.IsTrue(review.WorkspaceMutationAllowed);
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Workspace mutation is limited to failure package evidence.");
+        CollectionAssert.Contains(review.ReviewChecklist.ToArray(), "Failure package creation does not retry, repair, approve, or apply source changes.");
+    }
+
     [TestMethod]
     public void AgentSkillRequestReview_SourceMutationRequest_BlocksForDangerousCapability()
     {

@@ -244,6 +244,54 @@ public sealed record AgentSkillWorkspacePromotionPackageExecutionPayload
 
     public IReadOnlyList<string> Blockers { get; init; } = [];
 }
+
+public sealed record AgentSkillWorkspaceFailurePackageExecutionPayload
+{
+    public required bool PackageAttempted { get; init; }
+
+    public required bool PackageCreated { get; init; }
+
+    public required bool MetadataWritten { get; init; }
+
+    public required string ProjectId { get; init; }
+
+    public required string RunId { get; init; }
+
+    public required string WorkspacePath { get; init; }
+
+    public required string SourceRepo { get; init; }
+
+    public required string FailureReason { get; init; }
+
+    public string? FailurePackagePath { get; init; }
+
+    public string? WorkspaceMetadataPath { get; init; }
+
+    public string? ValidationReportPath { get; init; }
+
+    public string? SourceReportPath { get; init; }
+
+    public string? PromotionPackagePath { get; init; }
+
+    public required bool RequiresHumanReview { get; init; }
+
+    public required bool CanRetryAutomatically { get; init; }
+
+    public required bool CanApplyToSourceRepo { get; init; }
+
+    public required string RecommendedNextAction { get; init; }
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> RiskNotes { get; init; } = [];
+
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> Blockers { get; init; } = [];
+}
+
 public sealed record AgentSkillExecutionResult
 {
     public required string ExecutionId { get; init; }

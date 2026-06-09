@@ -135,6 +135,25 @@ public sealed class AgentSkillRequestServiceTests
     }
 
     [TestMethod]
+    public void AgentSkillRequest_WorkspaceFailurePackage_AllowsPackageEvidenceButCannotExecuteFromRequest()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspaceFailurePackage,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var package = BuildService().Create(BuildInput(AgentSkillIds.WorkspaceFailurePackage, policy));
+
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, package.Decision);
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspacePackaging, package.RiskTier);
+        Assert.IsTrue(package.WorkspaceMutationAllowed);
+        Assert.IsFalse(package.SourceMutationAllowed);
+        Assert.IsFalse(package.ExecutionCanStartFromRequest);
+        AssertChecklistContains(package, "Workspace mutation is limited to failure package evidence.");
+        AssertChecklistContains(package, "Failure package creation does not retry, repair, approve, or apply source changes.");
+    }
+
+    [TestMethod]
     public void AgentSkillRequest_ApplyCopy_CannotMutateSource()
     {
         var policy = PolicyWithRule(

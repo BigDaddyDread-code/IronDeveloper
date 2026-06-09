@@ -162,11 +162,13 @@ public sealed class StaticAgentSkillRegistry : IAgentSkillRegistry
             "Create workspace failure package",
             "Creates an advisory failure package from available workspace spine evidence.",
             AgentSkillCategories.WorkspaceApply,
-            ProjectApprovalRiskTiers.WorkspaceReporting,
+            ProjectApprovalRiskTiers.WorkspacePackaging,
             canReadEvidence: true,
+            canMutateWorkspace: true,
+            requiresHumanApproval: true,
             readsEvidenceTypes: ["workspace-metadata", "validation", "diff", "apply-copy", "apply-verify", "post-apply-validation"],
             producesEvidenceTypes: ["failure-package"],
-            inputContract: "runId, workspacePath, failedStage",
+            inputContract: "runId, workspacePath, sourceRepo, failedStage, failureReason",
             outputContract: "DisposableWorkspaceFailurePackageResult"),
 
         Definition(

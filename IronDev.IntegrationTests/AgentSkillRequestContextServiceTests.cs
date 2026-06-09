@@ -135,6 +135,24 @@ public sealed class AgentSkillRequestContextServiceTests
     }
 
     [TestMethod]
+    public void AgentSkillRequestContext_WorkspaceFailurePackage_AllowsPackageEvidenceButNotExecutionAuthority()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspaceFailurePackage,
+            ProjectApprovalModes.AlwaysAllow);
+        var context = BuildContext(AgentSkillIds.WorkspaceFailurePackage, policy);
+
+        Assert.IsTrue(context.PolicyAllowed);
+        Assert.AreEqual(AgentSkillRequestContextRecommendedActions.ReviewRequest, context.RecommendedNextAction);
+        Assert.IsFalse(context.ExecutionCanStartFromContext);
+        Assert.IsFalse(context.ApprovalCanBeGrantedByContext);
+        Assert.IsFalse(context.SourceMutationAllowed);
+        Assert.IsTrue(context.WorkspaceMutationAllowed);
+        Assert.IsFalse(context.DangerousCapability);
+    }
+
+    [TestMethod]
     public void AgentSkillRequestContext_DangerousSourceMutation_StopsDangerousCapability()
     {
         var context = BuildContext(BuildApprovalRequiredRequest(

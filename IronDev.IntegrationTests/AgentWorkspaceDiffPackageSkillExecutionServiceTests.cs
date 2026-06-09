@@ -227,7 +227,6 @@ public sealed class AgentWorkspaceDiffPackageSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceFailurePackage)]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
     [DataRow(AgentSkillIds.GitCommit)]
     [DataRow(AgentSkillIds.GitHubPullRequestCreate)]
