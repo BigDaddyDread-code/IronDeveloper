@@ -12,11 +12,13 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         AgentSkillIds.WorkspaceRecommendApplyAction,
         AgentSkillIds.WorkspaceCreateActionRequest,
         AgentSkillIds.WorkspaceCreateActionReview,
-        AgentSkillIds.WorkspaceCheck
+        AgentSkillIds.WorkspaceCheck,
+        AgentSkillIds.WorkspacePrepare
     };
 
     private readonly IAgentWorkspaceApplyContextService _workspaceApplyContextService;
     private readonly IAgentWorkspaceCheckService _workspaceCheckService;
+    private readonly IAgentWorkspacePrepareService _workspacePrepareService;
 
     public AgentSkillExecutionService(IAgentWorkspaceApplyContextService workspaceApplyContextService)
         : this(workspaceApplyContextService, new AgentWorkspaceCheckService())
@@ -26,9 +28,18 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
     public AgentSkillExecutionService(
         IAgentWorkspaceApplyContextService workspaceApplyContextService,
         IAgentWorkspaceCheckService workspaceCheckService)
+        : this(workspaceApplyContextService, workspaceCheckService, new AgentWorkspacePrepareService(workspaceCheckService))
+    {
+    }
+
+    public AgentSkillExecutionService(
+        IAgentWorkspaceApplyContextService workspaceApplyContextService,
+        IAgentWorkspaceCheckService workspaceCheckService,
+        IAgentWorkspacePrepareService workspacePrepareService)
     {
         _workspaceApplyContextService = workspaceApplyContextService ?? throw new ArgumentNullException(nameof(workspaceApplyContextService));
         _workspaceCheckService = workspaceCheckService ?? throw new ArgumentNullException(nameof(workspaceCheckService));
+        _workspacePrepareService = workspacePrepareService ?? throw new ArgumentNullException(nameof(workspacePrepareService));
     }
 
     public async Task<AgentSkillExecutionResult> ExecuteAsync(
@@ -116,20 +127,22 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
 
         var requestBlockers = new List<string>();
         var workspaceCheckSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspaceCheck, StringComparison.Ordinal);
+        var workspacePrepareSkill = string.Equals(context.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal);
+        var workspaceCommandSkill = workspaceCheckSkill || workspacePrepareSkill;
         if (string.IsNullOrWhiteSpace(projectId))
-            requestBlockers.Add(workspaceCheckSkill
-                ? "ProjectId is required for workspace check execution."
+            requestBlockers.Add(workspaceCommandSkill
+                ? $"ProjectId is required for {context.SkillId} execution."
                 : "ProjectId is required for workspace apply context execution.");
         if (string.IsNullOrWhiteSpace(runId))
-            requestBlockers.Add(workspaceCheckSkill
-                ? "RunId is required for workspace check execution."
+            requestBlockers.Add(workspaceCommandSkill
+                ? $"RunId is required for {context.SkillId} execution."
                 : "RunId is required for workspace apply context execution.");
         if (string.IsNullOrWhiteSpace(workspacePath))
-            requestBlockers.Add(workspaceCheckSkill
-                ? "WorkspacePath is required for workspace check execution."
+            requestBlockers.Add(workspaceCommandSkill
+                ? $"WorkspacePath is required for {context.SkillId} execution."
                 : "WorkspacePath is required for workspace apply context execution.");
-        if (workspaceCheckSkill && string.IsNullOrWhiteSpace(sourceRepo))
-            requestBlockers.Add("SourceRepo is required for workspace check execution.");
+        if (workspaceCommandSkill && string.IsNullOrWhiteSpace(sourceRepo))
+            requestBlockers.Add($"SourceRepo is required for {context.SkillId} execution.");
 
         if (requestBlockers.Count > 0)
         {
@@ -137,8 +150,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 context,
                 executionId,
                 AgentSkillExecutionStatuses.BlockedByContext,
-                workspaceCheckSkill
-                    ? "Workspace check request is incomplete."
+                workspaceCommandSkill
+                    ? $"{context.SkillId} request is incomplete."
                     : "Workspace apply context request is incomplete.",
                 requestBlockers);
         }
@@ -146,6 +159,18 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         if (workspaceCheckSkill)
         {
             return await ExecuteWorkspaceCheckAsync(
+                context,
+                executionId,
+                projectId!,
+                runId!,
+                workspacePath!,
+                sourceRepo!,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (workspacePrepareSkill)
+        {
+            return await ExecuteWorkspacePrepareAsync(
                 context,
                 executionId,
                 projectId!,
@@ -326,6 +351,137 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         }
     }
 
+    private async Task<AgentSkillExecutionResult> ExecuteWorkspacePrepareAsync(
+        AgentSkillRequestContext context,
+        string executionId,
+        string projectId,
+        string runId,
+        string workspacePath,
+        string sourceRepo,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var prepare = await _workspacePrepareService.PrepareAsync(
+                new AgentWorkspacePrepareRequest
+                {
+                    ProjectId = projectId,
+                    RunId = runId,
+                    WorkspacePath = workspacePath,
+                    SourceRepo = sourceRepo,
+                    EvidencePaths = context.EvidencePaths
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            var evidencePaths = Merge(context.EvidencePaths, prepare.EvidencePaths);
+            var warnings = Merge(context.Warnings, prepare.Warnings);
+            var payload = BuildPreparePayload(prepare, evidencePaths, warnings);
+
+            if (!prepare.Prepared)
+            {
+                return new AgentSkillExecutionResult
+                {
+                    ExecutionId = executionId,
+                    ContextId = context.ContextId,
+                    RequestId = context.RequestId,
+                    ReviewId = context.ReviewId,
+                    SkillId = context.SkillId,
+                    Status = prepare.PrepareAttempted
+                        ? AgentSkillExecutionStatuses.Failed
+                        : AgentSkillExecutionStatuses.BlockedByContext,
+                    Summary = prepare.PrepareAttempted
+                        ? "Workspace prepare skill execution failed after prepare started."
+                        : "Workspace prepare skill execution was blocked before workspace mutation.",
+                    Executed = false,
+                    ReadOnlyExecution = false,
+                    SourceMutated = false,
+                    WorkspaceMutated = prepare.PrepareAttempted,
+                    ExternalSystemCalled = false,
+                    TicketCreated = false,
+                    MemoryWritten = false,
+                    ApprovalGranted = false,
+                    ShellCommandRun = false,
+                    Payload = payload,
+                    EvidencePaths = evidencePaths,
+                    Warnings = warnings,
+                    Blockers = prepare.Blockers
+                };
+            }
+
+            return new AgentSkillExecutionResult
+            {
+                ExecutionId = executionId,
+                ContextId = context.ContextId,
+                RequestId = context.RequestId,
+                ReviewId = context.ReviewId,
+                SkillId = context.SkillId,
+                Status = AgentSkillExecutionStatuses.Succeeded,
+                Summary = "Workspace prepare skill execution completed.",
+                Executed = true,
+                ReadOnlyExecution = false,
+                SourceMutated = false,
+                WorkspaceMutated = true,
+                ExternalSystemCalled = false,
+                TicketCreated = false,
+                MemoryWritten = false,
+                ApprovalGranted = false,
+                ShellCommandRun = false,
+                Payload = payload,
+                EvidencePaths = evidencePaths,
+                Warnings = warnings,
+                Blockers = []
+            };
+        }
+        catch (Exception exception)
+        {
+            return new AgentSkillExecutionResult
+            {
+                ExecutionId = executionId,
+                ContextId = context.ContextId,
+                RequestId = context.RequestId,
+                ReviewId = context.ReviewId,
+                SkillId = context.SkillId,
+                Status = AgentSkillExecutionStatuses.Failed,
+                Summary = "Workspace prepare skill execution failed after prepare was called.",
+                Executed = false,
+                ReadOnlyExecution = false,
+                SourceMutated = false,
+                WorkspaceMutated = true,
+                ExternalSystemCalled = false,
+                TicketCreated = false,
+                MemoryWritten = false,
+                ApprovalGranted = false,
+                ShellCommandRun = false,
+                Payload = null,
+                EvidencePaths = context.EvidencePaths,
+                Warnings = Merge(context.Warnings, [$"Workspace prepare failed: {exception.Message}"]),
+                Blockers = []
+            };
+        }
+    }
+
+    private static AgentSkillWorkspacePrepareExecutionPayload BuildPreparePayload(
+        AgentWorkspacePrepareResult prepare,
+        IReadOnlyList<string> evidencePaths,
+        IReadOnlyList<string> warnings) =>
+        new()
+        {
+            PrepareAttempted = prepare.PrepareAttempted,
+            Prepared = prepare.Prepared,
+            ProjectId = prepare.ProjectId,
+            RunId = prepare.RunId,
+            WorkspacePath = prepare.WorkspacePath,
+            SourceRepo = prepare.SourceRepo,
+            SourceRepoExists = prepare.SourceRepoExists,
+            WorkspacePathExists = prepare.WorkspacePathExists,
+            SourceAndWorkspaceAreDistinct = prepare.SourceAndWorkspaceAreDistinct,
+            FilesCopied = prepare.FilesCopied,
+            DirectoriesCreated = prepare.DirectoriesCreated,
+            EvidencePaths = evidencePaths,
+            Warnings = warnings,
+            Blockers = prepare.Blockers
+        };
+
     private static PayloadBuildResult BuildPayload(
         AgentSkillRequestContext skillContext,
         AgentWorkspaceApplyContext workspaceContext,
@@ -498,8 +654,15 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             blockers.Add("ApprovalCanBeGrantedByContext must remain false; the context cannot grant approval.");
         if (context.SourceMutationAllowed)
             blockers.Add("Source mutation is not allowed for read-only skill execution.");
-        if (context.WorkspaceMutationAllowed)
+        if (string.Equals(context.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal))
+        {
+            if (!context.WorkspaceMutationAllowed)
+                blockers.Add("WorkspaceMutationAllowed must be true for workspace.prepare execution.");
+        }
+        else if (context.WorkspaceMutationAllowed)
+        {
             blockers.Add("Workspace mutation is not allowed for read-only skill execution.");
+        }
         if (context.ExternalSystemAllowed)
             blockers.Add("External system access is not allowed for read-only skill execution.");
         if (context.CreatesTicketAllowed)

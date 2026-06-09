@@ -63,6 +63,24 @@ public sealed class AgentSkillRequestContextServiceTests
     }
 
     [TestMethod]
+    public void AgentSkillRequestContext_WorkspacePrepare_AllowsDisposableWorkspaceMutationButNotExecutionAuthority()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePreparation,
+            AgentSkillIds.WorkspacePrepare,
+            ProjectApprovalModes.AlwaysAllow);
+        var context = BuildContext(AgentSkillIds.WorkspacePrepare, policy);
+
+        Assert.IsTrue(context.PolicyAllowed);
+        Assert.AreEqual(AgentSkillRequestContextRecommendedActions.ReviewRequest, context.RecommendedNextAction);
+        Assert.IsFalse(context.ExecutionCanStartFromContext);
+        Assert.IsFalse(context.ApprovalCanBeGrantedByContext);
+        Assert.IsFalse(context.SourceMutationAllowed);
+        Assert.IsTrue(context.WorkspaceMutationAllowed);
+        Assert.IsFalse(context.DangerousCapability);
+    }
+
+    [TestMethod]
     public void AgentSkillRequestContext_DangerousSourceMutation_StopsDangerousCapability()
     {
         var context = BuildContext(BuildApprovalRequiredRequest(

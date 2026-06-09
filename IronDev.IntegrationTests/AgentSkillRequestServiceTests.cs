@@ -80,7 +80,7 @@ public sealed class AgentSkillRequestServiceTests
     }
 
     [TestMethod]
-    public void AgentSkillRequest_WorkspacePrepare_CannotMutateWorkspace()
+    public void AgentSkillRequest_WorkspacePrepare_AllowsDisposableWorkspaceMutationButCannotExecuteFromRequest()
     {
         var policy = PolicyWithRule(
             ProjectApprovalRiskTiers.WorkspacePreparation,
@@ -89,9 +89,11 @@ public sealed class AgentSkillRequestServiceTests
 
         var package = BuildService().Create(BuildInput(AgentSkillIds.WorkspacePrepare, policy));
 
-        Assert.IsFalse(package.WorkspaceMutationAllowed);
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, package.Decision);
+        Assert.IsTrue(package.WorkspaceMutationAllowed);
+        Assert.IsFalse(package.SourceMutationAllowed);
         Assert.IsFalse(package.ExecutionCanStartFromRequest);
-        AssertChecklistContains(package, "Workspace mutation is not allowed from this request package.");
+        AssertChecklistContains(package, "Workspace mutation is limited to disposable workspace preparation.");
     }
 
     [TestMethod]

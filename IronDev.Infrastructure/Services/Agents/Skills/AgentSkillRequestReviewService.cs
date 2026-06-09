@@ -90,7 +90,7 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             AgentSkillRequestReviewStatuses.ApprovalRequired =>
                 "This skill request requires separate human approval before any future execution path can exist.",
             AgentSkillRequestReviewStatuses.ReadyForHumanReview =>
-                "Project policy allows this low-risk skill request, but the review package cannot execute it.",
+                "Project policy allows this skill request, but the review package cannot execute it.",
             AgentSkillRequestReviewStatuses.BlockedForDangerousCapability =>
                 "This request involves a dangerous capability and cannot proceed from this review package.",
             _ =>
@@ -195,6 +195,14 @@ public sealed class AgentSkillRequestReviewService : IAgentSkillRequestReviewSer
             string.Equals(request.Category, AgentSkillCategories.External, StringComparison.Ordinal) ||
             request.SkillId.StartsWith("github.", StringComparison.OrdinalIgnoreCase))
             checklist.Add("External system access is not allowed from this review package.");
+
+        if (string.Equals(request.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal) &&
+            string.Equals(request.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) &&
+            request.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to disposable workspace preparation.");
+            checklist.Add("Source repository mutation is not allowed from this review package.");
+        }
     }
 
     private static bool IsDangerousCapability(AgentSkillRequestPackage request) =>

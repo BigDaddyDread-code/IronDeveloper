@@ -133,8 +133,17 @@ public sealed class AgentSkillRequestService : IAgentSkillRequestService
         if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.MemoryWrite, StringComparison.Ordinal))
             checklist.Add("Memory writes are not allowed from this request package.");
 
-        if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal))
+        if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal) &&
+            string.Equals(evaluation.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) &&
+            evaluation.WorkspaceMutationAllowed)
+        {
+            checklist.Add("Workspace mutation is limited to disposable workspace preparation.");
+            checklist.Add("Source repository mutation is not allowed from this request package.");
+        }
+        else if (string.Equals(evaluation.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal))
+        {
             checklist.Add("Workspace mutation is not allowed from this request package.");
+        }
     }
 
     private static bool IsLowRisk(string riskTier) =>

@@ -79,6 +79,20 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
                 warnings: policyResult.Warnings);
         }
 
+        if (IsAllowedWorkspacePrepare(skill, policyResult))
+        {
+            return Build(
+                skill,
+                policyResult,
+                ProjectApprovalDecisions.AllowedByPolicy,
+                policyResult.Reason,
+                humanApprovalRequired: false,
+                skillExecutionAllowedByPolicy: true,
+                automaticExecutionAllowed: false,
+                warnings: policyResult.Warnings,
+                workspaceMutationAllowed: true);
+        }
+
         var blockers = DescribeNonExecutableReasons(skill);
         if (skill.RequiresHumanApproval || blockers.Count > 0)
         {
@@ -142,6 +156,27 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
         bool skillExecutionAllowedByPolicy,
         bool automaticExecutionAllowed,
         IReadOnlyList<string> warnings) =>
+        Build(
+            skill,
+            policyResult,
+            decision,
+            reason,
+            humanApprovalRequired,
+            skillExecutionAllowedByPolicy,
+            automaticExecutionAllowed,
+            warnings,
+            workspaceMutationAllowed: false);
+
+    private static AgentSkillPolicyEvaluation Build(
+        AgentSkillDefinition skill,
+        ProjectApprovalEvaluationResult policyResult,
+        string decision,
+        string reason,
+        bool humanApprovalRequired,
+        bool skillExecutionAllowedByPolicy,
+        bool automaticExecutionAllowed,
+        IReadOnlyList<string> warnings,
+        bool workspaceMutationAllowed) =>
         new()
         {
             SkillId = skill.SkillId,
@@ -154,7 +189,7 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
             AutomaticExecutionAllowed = automaticExecutionAllowed,
             SkillExecutionAllowedByPolicy = skillExecutionAllowedByPolicy,
             SourceMutationAllowed = false,
-            WorkspaceMutationAllowed = false,
+            WorkspaceMutationAllowed = workspaceMutationAllowed,
             ExternalSystemAllowed = false,
             CreatesTicketAllowed = false,
             WritesMemoryAllowed = false,
@@ -194,4 +229,16 @@ public sealed class AgentSkillPolicyEvaluator : IAgentSkillPolicyEvaluator
         !skill.CanWriteMemory &&
         !skill.CanCreateTicket &&
         !skill.CanUseExternalSystem;
+
+    private static bool IsAllowedWorkspacePrepare(
+        AgentSkillDefinition skill,
+        ProjectApprovalEvaluationResult policyResult) =>
+        string.Equals(skill.SkillId, AgentSkillIds.WorkspacePrepare, StringComparison.Ordinal) &&
+        string.Equals(skill.RiskTier, ProjectApprovalRiskTiers.WorkspacePreparation, StringComparison.Ordinal) &&
+        skill.CanMutateWorkspace &&
+        !skill.CanMutateSource &&
+        !skill.CanUseExternalSystem &&
+        !skill.CanCreateTicket &&
+        !skill.CanWriteMemory &&
+        string.Equals(policyResult.Decision, ProjectApprovalDecisions.AllowedByPolicy, StringComparison.Ordinal);
 }
