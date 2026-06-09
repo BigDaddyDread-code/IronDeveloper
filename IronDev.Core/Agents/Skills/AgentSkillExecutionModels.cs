@@ -148,6 +148,102 @@ public sealed record AgentSkillWorkspaceValidationStepPayload
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
 }
+
+public sealed record AgentSkillWorkspaceDiffExecutionPayload
+{
+    public required bool DiffAttempted { get; init; }
+
+    public required bool DiffSucceeded { get; init; }
+
+    public required bool MetadataWritten { get; init; }
+
+    public required string ProjectId { get; init; }
+
+    public required string RunId { get; init; }
+
+    public required string WorkspacePath { get; init; }
+
+    public required string SourceRepo { get; init; }
+
+    public required bool Changed { get; init; }
+
+    public int AddedCount { get; init; }
+
+    public int ModifiedCount { get; init; }
+
+    public int DeletedCount { get; init; }
+
+    public int UnchangedFileCount { get; init; }
+
+    public string? DiffMetadataPath { get; init; }
+
+    public IReadOnlyList<string> AddedFiles { get; init; } = [];
+
+    public IReadOnlyList<string> ModifiedFiles { get; init; } = [];
+
+    public IReadOnlyList<string> DeletedFiles { get; init; } = [];
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> Blockers { get; init; } = [];
+}
+
+public sealed record AgentSkillWorkspacePromotionPackageExecutionPayload
+{
+    public required bool PackageAttempted { get; init; }
+
+    public required bool PackageCreated { get; init; }
+
+    public required bool MetadataWritten { get; init; }
+
+    public required string ProjectId { get; init; }
+
+    public required string RunId { get; init; }
+
+    public required string WorkspacePath { get; init; }
+
+    public required string SourceRepo { get; init; }
+
+    public string? ValidationReportPath { get; init; }
+
+    public string? SourceReportPath { get; init; }
+
+    public required string ValidationStatus { get; init; }
+
+    public required bool ValidationSucceeded { get; init; }
+
+    public required bool DiffChanged { get; init; }
+
+    public int AddedCount { get; init; }
+
+    public int ModifiedCount { get; init; }
+
+    public int DeletedCount { get; init; }
+
+    public required bool RequiresHumanApproval { get; init; }
+
+    public required bool CanApplyToSourceRepo { get; init; }
+
+    public required bool AutoPromotionAllowed { get; init; }
+
+    public required string Recommendation { get; init; }
+
+    public string? PromotionPackagePath { get; init; }
+
+    public IReadOnlyList<string> EvidencePaths { get; init; } = [];
+
+    public IReadOnlyList<string> RiskNotes { get; init; } = [];
+
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> Blockers { get; init; } = [];
+}
 public sealed record AgentSkillExecutionResult
 {
     public required string ExecutionId { get; init; }

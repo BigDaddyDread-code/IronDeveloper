@@ -96,7 +96,45 @@ public sealed class AgentSkillRequestContextServiceTests
         Assert.IsFalse(context.SourceMutationAllowed);
         Assert.IsTrue(context.WorkspaceMutationAllowed);
         Assert.IsFalse(context.DangerousCapability);
-    }[TestMethod]
+    }
+
+    [TestMethod]
+    public void AgentSkillRequestContext_WorkspaceDiff_AllowsDisposableWorkspaceDiffButNotExecutionAuthority()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspaceReporting,
+            AgentSkillIds.WorkspaceDiff,
+            ProjectApprovalModes.AlwaysAllow);
+        var context = BuildContext(AgentSkillIds.WorkspaceDiff, policy);
+
+        Assert.IsTrue(context.PolicyAllowed);
+        Assert.AreEqual(AgentSkillRequestContextRecommendedActions.ReviewRequest, context.RecommendedNextAction);
+        Assert.IsFalse(context.ExecutionCanStartFromContext);
+        Assert.IsFalse(context.ApprovalCanBeGrantedByContext);
+        Assert.IsFalse(context.SourceMutationAllowed);
+        Assert.IsTrue(context.WorkspaceMutationAllowed);
+        Assert.IsFalse(context.DangerousCapability);
+    }
+
+    [TestMethod]
+    public void AgentSkillRequestContext_WorkspacePromotionPackage_AllowsPackageEvidenceButNotExecutionAuthority()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspacePromotionPackage,
+            ProjectApprovalModes.AlwaysAllow);
+        var context = BuildContext(AgentSkillIds.WorkspacePromotionPackage, policy);
+
+        Assert.IsTrue(context.PolicyAllowed);
+        Assert.AreEqual(AgentSkillRequestContextRecommendedActions.ReviewRequest, context.RecommendedNextAction);
+        Assert.IsFalse(context.ExecutionCanStartFromContext);
+        Assert.IsFalse(context.ApprovalCanBeGrantedByContext);
+        Assert.IsFalse(context.SourceMutationAllowed);
+        Assert.IsTrue(context.WorkspaceMutationAllowed);
+        Assert.IsFalse(context.DangerousCapability);
+    }
+
+    [TestMethod]
     public void AgentSkillRequestContext_DangerousSourceMutation_StopsDangerousCapability()
     {
         var context = BuildContext(BuildApprovalRequiredRequest(

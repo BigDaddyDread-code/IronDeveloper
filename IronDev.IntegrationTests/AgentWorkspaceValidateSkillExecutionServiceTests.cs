@@ -293,8 +293,6 @@ public sealed class AgentWorkspaceValidateSkillExecutionServiceTests
     }
 
     [DataTestMethod]
-    [DataRow(AgentSkillIds.WorkspaceDiff)]
-    [DataRow(AgentSkillIds.WorkspacePromotionPackage)]
     [DataRow(AgentSkillIds.WorkspaceFailurePackage)]
     [DataRow(AgentSkillIds.WorkspaceApplyCopy)]
     public async Task AgentWorkspaceValidateSkillExecution_UnsupportedWorkspaceSkillsRemainBlocked(string skillId)
@@ -396,11 +394,11 @@ public sealed class AgentWorkspaceValidateSkillExecutionServiceTests
     }
 
     private static AgentSkillExecutionService BuildService(FakeDisposableWorkspaceValidationService validation) =>
-        new(
+        AgentSkillExecutionTestServices.Create(
             new FakeAgentWorkspaceApplyContextService(),
-            new FakeAgentWorkspaceCheckService(),
-            new FakeAgentWorkspacePrepareService(),
-            validation);
+            workspaceCheck: new FakeAgentWorkspaceCheckService(),
+            workspacePrepare: new FakeAgentWorkspacePrepareService(),
+            validation: validation);
 
     private static AgentSkillExecutionRequest BuildExecutionRequest() =>
         BuildExecutionRequest(BuildAllowedContext());

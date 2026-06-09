@@ -137,9 +137,10 @@ public sealed class StaticAgentSkillRegistry : IAgentSkillRegistry
             "Compares source and disposable workspace file hashes without process execution.",
             AgentSkillCategories.WorkspaceCommand,
             ProjectApprovalRiskTiers.WorkspaceReporting,
+            canMutateWorkspace: true,
             readsEvidenceTypes: ["workspace-metadata"],
             producesEvidenceTypes: ["diff"],
-            inputContract: "runId, workspacePath",
+            inputContract: "runId, workspacePath, sourceRepo",
             outputContract: "DisposableWorkspaceDiffResult"),
 
         Definition(
@@ -147,11 +148,13 @@ public sealed class StaticAgentSkillRegistry : IAgentSkillRegistry
             "Create workspace promotion package",
             "Packages validation and diff evidence for human review.",
             AgentSkillCategories.WorkspaceApply,
-            ProjectApprovalRiskTiers.WorkspaceReporting,
+            ProjectApprovalRiskTiers.WorkspacePackaging,
             canReadEvidence: true,
+            canMutateWorkspace: true,
+            requiresHumanApproval: true,
             readsEvidenceTypes: ["workspace-metadata", "validation", "diff"],
             producesEvidenceTypes: ["promotion-package"],
-            inputContract: "runId, workspacePath",
+            inputContract: "runId, workspacePath, sourceRepo, validationReportPath, sourceReportPath",
             outputContract: "DisposableWorkspacePromotionPackageResult"),
 
         Definition(

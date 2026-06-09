@@ -99,6 +99,44 @@ public sealed class AgentSkillPolicyEvaluatorTests
     }
 
     [TestMethod]
+    public void AgentSkillPolicy_WorkspaceDiff_AllowsGovernedWorkspaceReportingMutationWhenPolicyAllows()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspaceReporting,
+            AgentSkillIds.WorkspaceDiff,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var result = BuildEvaluator().Evaluate(BuildRequest(AgentSkillIds.WorkspaceDiff, policy));
+
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, result.Decision);
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspaceReporting, result.RiskTier);
+        Assert.IsTrue(result.SkillExecutionAllowedByPolicy);
+        Assert.IsFalse(result.AutomaticExecutionAllowed);
+        Assert.IsTrue(result.WorkspaceMutationAllowed);
+        Assert.IsFalse(result.SourceMutationAllowed);
+        Assert.IsFalse(result.ExternalSystemAllowed);
+    }
+
+    [TestMethod]
+    public void AgentSkillPolicy_WorkspacePromotionPackage_AllowsGovernedWorkspacePackageMutationWhenPolicyAllows()
+    {
+        var policy = PolicyWithRule(
+            ProjectApprovalRiskTiers.WorkspacePackaging,
+            AgentSkillIds.WorkspacePromotionPackage,
+            ProjectApprovalModes.AlwaysAllow);
+
+        var result = BuildEvaluator().Evaluate(BuildRequest(AgentSkillIds.WorkspacePromotionPackage, policy));
+
+        Assert.AreEqual(ProjectApprovalDecisions.AllowedByPolicy, result.Decision);
+        Assert.AreEqual(ProjectApprovalRiskTiers.WorkspacePackaging, result.RiskTier);
+        Assert.IsTrue(result.SkillExecutionAllowedByPolicy);
+        Assert.IsFalse(result.AutomaticExecutionAllowed);
+        Assert.IsTrue(result.WorkspaceMutationAllowed);
+        Assert.IsFalse(result.SourceMutationAllowed);
+        Assert.IsFalse(result.ExternalSystemAllowed);
+    }
+
+    [TestMethod]
     public void AgentSkillPolicy_ApplyCopy_CannotAutoAllow()
     {
         var policy = PolicyWithRule(

@@ -20,6 +20,7 @@ public static class ProjectApprovalRiskTiers
     public const string WorkspacePreparation = "workspace_preparation";
     public const string WorkspaceValidation = "workspace_validation";
     public const string WorkspaceReporting = "workspace_reporting";
+    public const string WorkspacePackaging = "workspace_packaging";
     public const string WorkspaceIntent = "workspace_intent";
     public const string SourceMutation = "source_mutation";
     public const string GitOperation = "git_operation";
@@ -33,6 +34,7 @@ public static class ProjectApprovalRiskTiers
         WorkspacePreparation,
         WorkspaceValidation,
         WorkspaceReporting,
+        WorkspacePackaging,
         WorkspaceIntent,
         SourceMutation,
         GitOperation,
@@ -95,6 +97,7 @@ public sealed record ProjectApprovalPolicy
             [
                 new ProjectApprovalPolicyRule { RiskTier = ProjectApprovalRiskTiers.ReadOnly, Mode = ProjectApprovalModes.AlwaysAllow },
                 new ProjectApprovalPolicyRule { RiskTier = ProjectApprovalRiskTiers.WorkspaceReporting, Mode = ProjectApprovalModes.AlwaysAllow },
+                new ProjectApprovalPolicyRule { RiskTier = ProjectApprovalRiskTiers.WorkspacePackaging, Mode = ProjectApprovalModes.AskEveryTime },
                 new ProjectApprovalPolicyRule { RiskTier = ProjectApprovalRiskTiers.WorkspaceIntent, Mode = ProjectApprovalModes.AlwaysAllow },
                 new ProjectApprovalPolicyRule { RiskTier = ProjectApprovalRiskTiers.WorkspacePreparation, Mode = ProjectApprovalModes.AskEveryTime },
                 new ProjectApprovalPolicyRule { RiskTier = ProjectApprovalRiskTiers.WorkspaceValidation, Mode = ProjectApprovalModes.AskEveryTime },
