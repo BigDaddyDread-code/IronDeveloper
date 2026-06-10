@@ -179,6 +179,226 @@ public static class AgentSpecialisationCatalog
             Evidence("PackageRestoreLog", "Package restore evidence when package resolution is involved.")
         ]);
 
+    public static AgentSpecialisationDefinition RepeatedFailureModeDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.repeated-failure-mode-detector",
+        name: "RepeatedFailureModeDetector",
+        description: "Detects repeated failure patterns that may justify a memory-improvement proposal draft.",
+        purposes:
+        [
+            "Find repeated test failures across runs.",
+            "Find repeated build failures across runs.",
+            "Find repeated implementation mistakes that appear in audit or run evidence.",
+            "Find repeated missing-validation patterns without treating the pattern as authority."
+        ],
+        inputTypes:
+        [
+            "AgentRunAuditEnvelope",
+            "RunReport",
+            "TestReport",
+            "BuildReport",
+            "CriticReviewResult",
+            "MemoryInfluenceRecord",
+            "Ticket",
+            "HumanInstruction"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("AgentRunAuditEnvelope", "Agent-run audit evidence for repeated failure detection."),
+            Evidence("RunReport", "Run report evidence for repeated failure detection."),
+            Evidence("TestReport", "Test evidence when repeated failures involve tests."),
+            Evidence("BuildReport", "Build evidence when repeated failures involve build or compile behaviour."),
+            Evidence("CriticReviewResult", "Critic review evidence when repeated failure analysis references prior review findings.")
+        ]);
+
+    public static AgentSpecialisationDefinition RepeatedGovernanceBlockDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.repeated-governance-block-detector",
+        name: "RepeatedGovernanceBlockDetector",
+        description: "Detects repeated governance block patterns that may justify a memory-improvement proposal draft.",
+        purposes:
+        [
+            "Find repeated blocked execution attempts.",
+            "Find repeated missing evidence patterns in governed requests.",
+            "Find repeated boundary mistakes without weakening the boundary.",
+            "Find repeated policy-context misunderstandings while preserving governance as separate authority."
+        ],
+        inputTypes:
+        [
+            "AgentRunAuditEnvelope",
+            "AgentBoundaryDecision",
+            "MemoryExecutionAudit",
+            "MemoryExecutionGateResult",
+            "ConscienceMemoryGovernanceResult",
+            "RunReport",
+            "CriticReviewResult",
+            "HumanInstruction"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("AgentRunAuditEnvelope", "Agent-run audit evidence for governance-block pattern detection."),
+            Evidence("AgentBoundaryDecision", "Boundary decision evidence for repeated governance-block detection."),
+            Evidence("MemoryExecutionGateResult", "Memory execution gate evidence for repeated governance-block detection."),
+            Evidence("ConscienceMemoryGovernanceResult", "Conscience memory governance evidence for repeated governance-block detection."),
+            Evidence("RunReport", "Run report evidence when blocked behaviour appears in run output.")
+        ]);
+
+    public static AgentSpecialisationDefinition RepeatedManualCorrectionDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.repeated-manual-correction-detector",
+        name: "RepeatedManualCorrectionDetector",
+        description: "Detects repeated human correction patterns that may justify a memory-improvement proposal draft.",
+        purposes:
+        [
+            "Find repeated human corrections across related runs.",
+            "Find repeated clarification patterns that show weak local assumptions.",
+            "Find repeated review corrections that should become proposal evidence.",
+            "Describe correction patterns without claiming to represent a human decision."
+        ],
+        inputTypes:
+        [
+            "HumanCorrection",
+            "HumanInstruction",
+            "AgentRunAuditEnvelope",
+            "CriticReviewResult",
+            "MemoryImprovementDetectionResult",
+            "MemoryImprovementProposalDraft",
+            "RunReport",
+            "Ticket"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("HumanCorrection", "Human correction evidence for repeated manual correction detection."),
+            Evidence("HumanInstruction", "Human instruction evidence for repeated manual correction detection."),
+            Evidence("CriticReviewResult", "Critic review evidence when corrections are review-related."),
+            Evidence("AgentRunAuditEnvelope", "Agent-run audit evidence when corrections are tied to runs."),
+            Evidence("RunReport", "Run report evidence when corrections are tied to run outcomes.")
+        ]);
+
+    public static AgentSpecialisationDefinition StaleMemoryDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.stale-memory-detector",
+        name: "StaleMemoryDetector",
+        description: "Detects memory evidence that may be stale and should be reviewed through a memory-improvement proposal draft.",
+        purposes:
+        [
+            "Find memory evidence contradicted by newer run evidence.",
+            "Find memory evidence that repeatedly fails to explain current behaviour.",
+            "Find memory evidence that needs verification before further use.",
+            "Describe stale-memory risk without changing memory authority."
+        ],
+        inputTypes:
+        [
+            "CollectiveMemoryCandidate",
+            "MemoryItemReference",
+            "MemoryInfluenceRecord",
+            "RetrievalCandidate",
+            "AgentRunAuditEnvelope",
+            "RunReport",
+            "DecisionRecord",
+            "HumanCorrection",
+            "HumanInstruction"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("CollectiveMemoryCandidate", "Memory candidate evidence for stale-memory detection."),
+            Evidence("MemoryItemReference", "Memory item reference evidence for stale-memory detection."),
+            Evidence("MemoryInfluenceRecord", "Influence record evidence showing where memory affected a decision."),
+            Evidence("RunReport", "Newer run report evidence for stale-memory comparison."),
+            Evidence("HumanCorrection", "Human correction evidence when stale-memory risk was surfaced by correction.")
+        ]);
+
+    public static AgentSpecialisationDefinition ContradictionDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.contradiction-detector",
+        name: "ContradictionDetector",
+        description: "Detects contradictory memory evidence that may justify a memory-improvement proposal draft.",
+        purposes:
+        [
+            "Find contradictory memory candidates.",
+            "Find contradictory proposal drafts.",
+            "Find evidence conflicts between run outcomes, review findings, and memory influence.",
+            "Describe the contradiction without resolving it as authority."
+        ],
+        inputTypes:
+        [
+            "MemoryItemReference",
+            "CollectiveMemoryCandidate",
+            "MemoryImprovementProposalDraft",
+            "MemoryInfluenceRecord",
+            "RetrievalCandidate",
+            "AgentRunAuditEnvelope",
+            "DecisionRecord",
+            "CriticReviewResult",
+            "HumanCorrection",
+            "HumanInstruction"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("MemoryItemReference", "Memory item reference evidence for contradiction detection."),
+            Evidence("CollectiveMemoryCandidate", "Memory candidate evidence for contradiction detection."),
+            Evidence("ConflictingEvidenceReference", "Conflicting evidence reference for contradiction detection."),
+            Evidence("CriticReviewResult", "Critic review evidence when contradiction appears in review output."),
+            Evidence("DecisionRecord", "Decision record evidence when contradiction appears in decision history.")
+        ]);
+
+    public static AgentSpecialisationDefinition RetrievalMissDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.retrieval-miss-detector",
+        name: "RetrievalMissDetector",
+        description: "Detects memory retrieval misses that may justify a memory-improvement proposal draft.",
+        purposes:
+        [
+            "Find queries that should have surfaced relevant memory but did not.",
+            "Find repeated retrieval gaps in related runs.",
+            "Find weak retrieval evidence without creating retrieval authority.",
+            "Describe missing-evidence patterns for later human review."
+        ],
+        inputTypes:
+        [
+            "RetrievalQuery",
+            "RetrievalCandidate",
+            "RetrievalResult",
+            "AgentRunAuditEnvelope",
+            "MemoryInfluenceRecord",
+            "CriticReviewResult",
+            "HumanCorrection",
+            "RunReport",
+            "HumanInstruction"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("RetrievalQuery", "Retrieval query evidence for retrieval-miss detection."),
+            Evidence("RetrievalResult", "Retrieval result evidence for retrieval-miss detection."),
+            Evidence("RetrievalCandidate", "Retrieved candidate evidence for retrieval-miss comparison."),
+            Evidence("AgentRunAuditEnvelope", "Agent-run audit evidence when retrieval misses are tied to runs."),
+            Evidence("HumanCorrection", "Human correction evidence when retrieval miss was noticed by correction.")
+        ]);
+
+    public static AgentSpecialisationDefinition DuplicateProposalDetector { get; } = BuildMemoryImprovementProfile(
+        specialisationId: "builtin.memory.duplicate-proposal-detector",
+        name: "DuplicateProposalDetector",
+        description: "Detects duplicate or overlapping memory-improvement proposal drafts.",
+        purposes:
+        [
+            "Find repeated proposal drafts for the same pattern.",
+            "Find overlapping proposal drafts that should be reviewed together.",
+            "Find proposal noise before human review.",
+            "Describe duplicate proposal risk without persisting or resolving proposals."
+        ],
+        inputTypes:
+        [
+            "MemoryImprovementProposalDraft",
+            "MemoryImprovementDetectionResult",
+            "MemoryImprovementProposal",
+            "AgentRunAuditEnvelope",
+            "RunReport",
+            "HumanCorrection",
+            "HumanInstruction"
+        ],
+        evidenceRequirements:
+        [
+            Evidence("MemoryImprovementProposalDraft", "Proposal draft evidence for duplicate proposal detection."),
+            Evidence("MemoryImprovementProposal", "Proposal evidence for duplicate proposal detection."),
+            Evidence("MemoryImprovementDetectionResult", "Detection result evidence for duplicate proposal detection."),
+            Evidence("AgentRunAuditEnvelope", "Agent-run audit evidence when duplicate proposals are tied to runs."),
+            Evidence("HumanCorrection", "Human correction evidence when duplicate proposal risk was noticed by correction.")
+        ]);
+
     public static IReadOnlyList<AgentSpecialisationDefinition> CriticProfiles { get; } =
     [
         CodeReviewCritic,
@@ -188,9 +408,21 @@ public static class AgentSpecialisationCatalog
         BuildFailureCritic
     ];
 
+    public static IReadOnlyList<AgentSpecialisationDefinition> MemoryImprovementProfiles { get; } =
+    [
+        RepeatedFailureModeDetector,
+        RepeatedGovernanceBlockDetector,
+        RepeatedManualCorrectionDetector,
+        StaleMemoryDetector,
+        ContradictionDetector,
+        RetrievalMissDetector,
+        DuplicateProposalDetector
+    ];
+
     public static IReadOnlyList<AgentSpecialisationDefinition> All { get; } =
     [
-        .. CriticProfiles
+        .. CriticProfiles,
+        .. MemoryImprovementProfiles
     ];
 
     public static AgentSpecialisationDefinition? GetById(string specialisationId) =>
@@ -243,7 +475,54 @@ public static class AgentSpecialisationCatalog
             AuthorityBoundary = AgentSpecialisationAuthorityBoundary.None
         };
 
+    private static AgentSpecialisationDefinition BuildMemoryImprovementProfile(
+        string specialisationId,
+        string name,
+        string description,
+        IReadOnlyList<string> purposes,
+        IReadOnlyList<string> inputTypes,
+        IReadOnlyList<AgentSpecialisationEvidenceRequirement> evidenceRequirements) =>
+        new()
+        {
+            SpecialisationId = specialisationId,
+            Name = name,
+            Description = description,
+            Kind = AgentSpecialisationKind.MemoryImprovementDetection,
+            AppliesToAgentId = AgentDefinitionCatalog.MemoryImprovementAgent.AgentId,
+            RequiredAgentKind = AgentKind.ProposalAgent,
+            RequiredExecutionMode = AgentExecutionMode.ProposalOnly,
+            RequiredCapabilities =
+            [
+                AgentCapability.CreateMemoryProposal,
+                AgentCapability.CreateReport
+            ],
+            ForbiddenCapabilities = CommonMemoryImprovementForbiddenCapabilities(),
+            Purposes = purposes,
+            InputRequirements = inputTypes.Select(type => Input(type, $"{type} evidence for memory-improvement detection."))
+                .ToArray(),
+            EvidenceRequirements = evidenceRequirements,
+            OutputRequirements =
+            [
+                ProposalOnlyMemoryImprovementDetectionOutput(),
+                ProposalOnlyMemoryImprovementDraftOutput()
+            ],
+            ValidationRequirements = CommonMemoryImprovementValidationRequirements(),
+            ForbiddenBehaviours = CommonMemoryImprovementForbiddenBehaviours(),
+            AuthorityBoundary = AgentSpecialisationAuthorityBoundary.None
+        };
+
     private static AgentCapability[] CommonCriticForbiddenCapabilities() =>
+    [
+        AgentCapability.RunTool,
+        AgentCapability.MutateSource,
+        AgentCapability.CallExternalSystem,
+        AgentCapability.PromoteCollectiveMemory,
+        AgentCapability.RepresentHumanApproval,
+        AgentCapability.RepresentHumanPromotionDecision,
+        AgentCapability.BlockExecution
+    ];
+
+    private static AgentCapability[] CommonMemoryImprovementForbiddenCapabilities() =>
     [
         AgentCapability.RunTool,
         AgentCapability.MutateSource,
@@ -273,12 +552,44 @@ public static class AgentSpecialisationCatalog
         Forbidden("StorePrivateReasoning")
     ];
 
+    private static AgentSpecialisationForbiddenBehaviour[] CommonMemoryImprovementForbiddenBehaviours() =>
+    [
+        ForbiddenMemory("RunTool"),
+        ForbiddenMemory("MutateSource"),
+        ForbiddenMemory("CallExternalSystem"),
+        ForbiddenMemory("PromoteCollectiveMemory"),
+        ForbiddenMemory("RepresentHumanApproval"),
+        ForbiddenMemory("RepresentHumanPromotionDecision"),
+        ForbiddenMemory("OverridePolicy"),
+        ForbiddenMemory("BypassGovernance"),
+        ForbiddenMemory("CreateAuthority"),
+        ForbiddenMemory("CreateRuntimeAction"),
+        ForbiddenMemory("StoreRawPrompt"),
+        ForbiddenMemory("StoreRawCompletion"),
+        ForbiddenMemory("StoreChainOfThought"),
+        ForbiddenMemory("StoreScratchpad"),
+        ForbiddenMemory("StorePrivateReasoning"),
+        ForbiddenMemory("PersistMemoryProposal"),
+        ForbiddenMemory("CreateCollectiveMemory"),
+        ForbiddenMemory("AcceptCollectiveMemory"),
+        ForbiddenMemory("WriteWeaviateIndex")
+    ];
+
     private static AgentSpecialisationValidationRequirement[] CommonCriticValidationRequirements() =>
     [
         Validation("AgentDefinitionValidator", "Validates base agent identity and authority boundary."),
         Validation("AgentRunAuditEnvelopeValidator", "Validates durable audit envelope safety."),
         Validation("ThoughtLedgerSafetyValidator", "Validates thought-ledger evidence safety."),
         Validation("CriticReviewResultValidator", "Validates typed critic output."),
+        Validation("AgentSpecialisationValidator", "Validates specialisation contract safety.")
+    ];
+
+    private static AgentSpecialisationValidationRequirement[] CommonMemoryImprovementValidationRequirements() =>
+    [
+        Validation("AgentDefinitionValidator", "Validates base agent identity and authority boundary."),
+        Validation("AgentRunAuditEnvelopeValidator", "Validates durable audit envelope safety."),
+        Validation("ThoughtLedgerSafetyValidator", "Validates thought-ledger evidence safety."),
+        Validation("MemoryImprovementDetectionResultValidator", "Validates typed memory-improvement detection output."),
         Validation("AgentSpecialisationValidator", "Validates specialisation contract safety.")
     ];
 
@@ -289,6 +600,30 @@ public static class AgentSpecialisationCatalog
             Description = "Review-only critic result for human review.",
             RequiresHumanReview = true,
             MustBeReviewOnly = true,
+            MayCreateAuthority = false,
+            MayCreateRuntimeAction = false,
+            MayPromoteMemory = false
+        };
+
+    private static AgentSpecialisationOutputRequirement ProposalOnlyMemoryImprovementDetectionOutput() =>
+        new()
+        {
+            OutputType = "MemoryImprovementDetectionResult",
+            Description = "Proposal-only memory-improvement detection result for human review.",
+            RequiresHumanReview = true,
+            MustBeProposalOnly = true,
+            MayCreateAuthority = false,
+            MayCreateRuntimeAction = false,
+            MayPromoteMemory = false
+        };
+
+    private static AgentSpecialisationOutputRequirement ProposalOnlyMemoryImprovementDraftOutput() =>
+        new()
+        {
+            OutputType = "MemoryImprovementProposalDraft",
+            Description = "Proposal-only memory-improvement draft for human review.",
+            RequiresHumanReview = true,
+            MustBeProposalOnly = true,
             MayCreateAuthority = false,
             MayCreateRuntimeAction = false,
             MayPromoteMemory = false
@@ -333,6 +668,14 @@ public static class AgentSpecialisationCatalog
         {
             Behaviour = behaviour,
             Reason = $"{behaviour} is outside this critic profile boundary.",
+            Required = true
+        };
+
+    private static AgentSpecialisationForbiddenBehaviour ForbiddenMemory(string behaviour) =>
+        new()
+        {
+            Behaviour = behaviour,
+            Reason = $"{behaviour} is outside this memory-improvement profile boundary.",
             Required = true
         };
 }
