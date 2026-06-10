@@ -304,7 +304,10 @@ public sealed class AgentReportingIntentSkillExecutionServiceTests
         Assert.IsFalse(source.Contains("IDisposableWorkspacePrepareService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("IGitHub", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("ITicket", StringComparison.Ordinal));
-        Assert.IsFalse(source.Contains("IMemory", StringComparison.Ordinal));
+        Assert.IsTrue(source.Contains("IMemoryExecutionGate", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("IAgentMemorySilo", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("IMemoryIndexingService", StringComparison.Ordinal));
+        Assert.IsFalse(source.Contains("IMemoryImprovementProposalService", StringComparison.Ordinal));
         Assert.IsFalse(source.Contains("MemoryService", StringComparison.Ordinal));
     }
 

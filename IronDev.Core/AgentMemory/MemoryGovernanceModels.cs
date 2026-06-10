@@ -57,7 +57,9 @@ public enum MemoryGovernanceIssueCode
     CandidatePatternCannotJustifyExternalEffect = 71,
     LowConfidenceMemoryUse = 72,
     SourceMutationRequiresApprovalBeyondMemory = 73,
-    ExternalEffectRequiresApprovalBeyondMemory = 74
+    ExternalEffectRequiresApprovalBeyondMemory = 74,
+
+    GovernanceResultMismatch = 90
 }
 
 public sealed record MemoryGovernanceReferencedArtifact

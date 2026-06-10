@@ -1,3 +1,5 @@
+using IronDev.Core.AgentMemory.Execution;
+
 namespace IronDev.Core.Agents.Skills;
 
 public static class AgentSkillExecutionStatuses
@@ -8,6 +10,7 @@ public static class AgentSkillExecutionStatuses
     public const string BlockedUnknownSkill = "blocked_unknown_skill";
     public const string BlockedDangerousCapability = "blocked_dangerous_capability";
     public const string BlockedUnsupportedSkill = "blocked_unsupported_skill";
+    public const string BlockedByMemory = "blocked_by_memory";
     public const string Failed = "failed";
 }
 
@@ -24,6 +27,8 @@ public sealed record AgentSkillExecutionRequest
     public string? WorkspacePath { get; init; }
 
     public string? SourceRepo { get; init; }
+
+    public MemoryBackedExecutionContext? MemoryExecutionContext { get; init; }
 
     public IReadOnlyDictionary<string, string> Parameters { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -327,6 +332,8 @@ public sealed record AgentSkillExecutionResult
     public required bool ShellCommandRun { get; init; }
 
     public object? Payload { get; init; }
+
+    public MemoryExecutionEvidence? MemoryEvidence { get; init; }
 
     public IReadOnlyList<string> EvidencePaths { get; init; } = [];
 
