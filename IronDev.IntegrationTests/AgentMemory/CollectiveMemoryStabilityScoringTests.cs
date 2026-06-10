@@ -272,6 +272,9 @@ public sealed class CollectiveMemoryStabilityScoringTests
     {
         foreach (var file in EnumerateProductionFiles().Where(file => !IsUnderDirectory(file, Path.Combine("IronDev.Core", "AgentMemory", "Collective"))))
         {
+            if (file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryRetrievalService.cs"), StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var text = File.ReadAllText(file);
 
             Assert.IsFalse(text.Contains("ICollectiveMemoryStabilityScorer", StringComparison.Ordinal),

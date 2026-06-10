@@ -82,11 +82,14 @@ public sealed class CollectiveMemoryContractTests
     {
         var forbiddenTypeNames = new[]
         {
-            "ICollectiveMemoryRetrievalService",
-            "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
+            "RuntimeCollectiveMemoryRetrieval",
+            "CollectiveMemoryRuntimeRetriever",
+            "CollectiveMemoryToolExecution",
+            "CollectiveMemoryConscienceIntegration",
             "SqlCollectiveMemoryStabilityStore",
-            "RuntimeCollectiveMemoryScorer"
+            "RuntimeCollectiveMemoryScorer",
+            "AutoCollectiveMemoryRetrieval"
         };
 
         var assemblies = new[]
@@ -111,14 +114,17 @@ public sealed class CollectiveMemoryContractTests
     {
         var forbiddenTokens = new[]
         {
-            "ICollectiveMemoryRetrievalService",
-            "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
+            "RuntimeCollectiveMemoryRetrieval",
+            "CollectiveMemoryRuntimeRetriever",
+            "CollectiveMemoryToolExecution",
+            "CollectiveMemoryConscienceIntegration",
             "RetrievalBoost",
             "SqlCollectiveMemoryStabilityStore",
             "migrate_collective_memory_stability",
             "usp_CollectiveMemoryStability",
-            "RuntimeCollectiveMemoryScorer"
+            "RuntimeCollectiveMemoryScorer",
+            "AutoCollectiveMemoryRetrieval"
         };
 
         var productionFiles = EnumerateProductionFiles();
@@ -147,14 +153,20 @@ public sealed class CollectiveMemoryContractTests
         {
             var text = File.ReadAllText(file);
 
-            Assert.IsFalse(text.Contains("ICollectiveMemoryRetrievalService", StringComparison.Ordinal),
-                $"Collective memory retrieval token found in {file}.");
-            Assert.IsFalse(text.Contains("CollectiveMemoryRetrievalService", StringComparison.Ordinal),
-                $"Collective memory retrieval token found in {file}.");
             Assert.IsFalse(text.Contains("WeaviateCollectiveMemory", StringComparison.Ordinal),
                 $"Collective memory Weaviate token found in {file}.");
+            Assert.IsFalse(text.Contains("RuntimeCollectiveMemoryRetrieval", StringComparison.Ordinal),
+                $"Collective memory runtime retrieval token found in {file}.");
+            Assert.IsFalse(text.Contains("CollectiveMemoryRuntimeRetriever", StringComparison.Ordinal),
+                $"Collective memory runtime retriever token found in {file}.");
+            Assert.IsFalse(text.Contains("CollectiveMemoryToolExecution", StringComparison.Ordinal),
+                $"Collective memory tool execution token found in {file}.");
+            Assert.IsFalse(text.Contains("CollectiveMemoryConscienceIntegration", StringComparison.Ordinal),
+                $"Collective memory Conscience integration token found in {file}.");
             Assert.IsFalse(text.Contains("RetrievalBoost", StringComparison.Ordinal),
                 $"Collective memory retrieval boost token found in {file}.");
+            Assert.IsFalse(text.Contains("AutoCollectiveMemoryRetrieval", StringComparison.Ordinal),
+                $"Collective memory automatic retrieval token found in {file}.");
             Assert.IsFalse(text.Contains("SqlCollectiveMemoryStabilityStore", StringComparison.Ordinal),
                 $"Collective memory stability store token found in {file}.");
             Assert.IsFalse(text.Contains("migrate_collective_memory_stability", StringComparison.Ordinal),
@@ -173,6 +185,7 @@ public sealed class CollectiveMemoryContractTests
             .Where(file => !IsUnderDirectory(file, Path.Combine("IronDev.Core", "AgentMemory", "Collective")))
             .Where(file => !file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryStore.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(file => !file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryPromotionService.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(file => !file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryRetrievalService.cs"), StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         foreach (var file in runtimeFiles)
