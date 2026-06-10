@@ -250,6 +250,118 @@ public sealed class MemoryStoredProcedurePermissionTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task StoredProc_InfluenceRejectsMalformedEvidenceRefs()
+    {
+        await CreateRuntimeMemoryAsync("memory-influence-malformed");
+
+        await ExpectSqlFailsAsync(
+            """
+            EXECUTE AS USER = 'IronDevMemoryRuntimeTestUser';
+            EXEC agent.usp_AgentMemoryInfluence_Create
+                @InfluenceId = 'influence-malformed',
+                @MemoryItemId = 'memory-influence-malformed',
+                @TenantId = 'tenant-1',
+                @ProjectId = 'project-1',
+                @CampaignId = 'campaign-1',
+                @RunId = 'run-1',
+                @AgentId = 'builder-agent',
+                @DecisionId = 'decision-malformed',
+                @InfluenceType = 1,
+                @InfluenceSummary = 'Malformed evidence should be rejected.',
+                @EvidenceRefsJson = '[{}]',
+                @Confidence = 0.8,
+                @CreatedAtUtc = '2026-06-10T00:00:00';
+            REVERT;
+            """);
+
+        Assert.AreEqual(0, await QuerySingleAsync<int>("SELECT COUNT(*) FROM agent.AgentMemoryInfluenceRecord WHERE InfluenceId = 'influence-malformed';"));
+    }
+
+    [TestMethod]
+    public async Task StoredProc_HandoffRejectsMalformedEvidenceRefs()
+    {
+        await CreateRuntimeMemoryAsync("memory-handoff-malformed");
+
+        await ExpectSqlFailsAsync(
+            """
+            EXECUTE AS USER = 'IronDevMemoryRuntimeTestUser';
+            EXEC agent.usp_AgentMemoryHandoff_Create
+                @HandoffMemorySliceId = 'handoff-malformed',
+                @TenantId = 'tenant-1',
+                @ProjectId = 'project-1',
+                @CampaignId = 'campaign-1',
+                @RunId = 'run-1',
+                @SourceAgentId = 'builder-agent',
+                @TargetAgentId = 'tester-agent',
+                @MemoryItemIdsJson = '["memory-handoff-malformed"]',
+                @MemorySnapshotsJson = '[{"memoryItemId":"memory-handoff-malformed"}]',
+                @Summary = 'Malformed evidence should be rejected.',
+                @AllowedUse = 1,
+                @EvidenceRefsJson = '[{}]',
+                @Confidence = 0.8,
+                @CreatedAtUtc = '2026-06-10T00:00:00';
+            REVERT;
+            """);
+
+        Assert.AreEqual(0, await QuerySingleAsync<int>("SELECT COUNT(*) FROM agent.AgentMemoryHandoffSlice WHERE HandoffMemorySliceId = 'handoff-malformed';"));
+    }
+
+    [TestMethod]
+    public async Task StoredProc_ProposalRejectsMalformedEvidenceRefs()
+    {
+        await CreateRuntimeMemoryAsync("memory-proposal-malformed");
+
+        await ExpectSqlFailsAsync(
+            """
+            EXECUTE AS USER = 'IronDevMemoryRuntimeTestUser';
+            EXEC agent.usp_MemoryImprovementProposal_Create
+                @ProposalId = 'proposal-malformed',
+                @TenantId = 'tenant-1',
+                @ProjectId = 'project-1',
+                @CampaignId = 'campaign-1',
+                @RunId = 'run-1',
+                @AgentId = 'builder-agent',
+                @ProposalType = 1,
+                @Title = 'Malformed evidence proposal',
+                @Summary = 'Malformed evidence should be rejected.',
+                @SourcesJson = '[{"memoryItemId":"memory-proposal-malformed"}]',
+                @EvidenceRefsJson = '[{}]',
+                @Confidence = 0.8,
+                @ProposedByAgentId = 'builder-agent',
+                @CreatedAtUtc = '2026-06-10T00:00:00';
+            REVERT;
+            """);
+
+        Assert.AreEqual(0, await QuerySingleAsync<int>("SELECT COUNT(*) FROM agent.AgentMemoryImprovementProposal WHERE ProposalId = 'proposal-malformed';"));
+    }
+
+    [TestMethod]
+    public async Task StoredProc_IndexQueueRejectsMalformedEvidenceRefs()
+    {
+        await ExpectSqlFailsAsync(
+            """
+            EXECUTE AS USER = 'IronDevMemoryRuntimeTestUser';
+            EXEC agent.usp_MemoryIndexQueue_Create
+                @IndexRecordId = 'index-malformed',
+                @TenantId = 'tenant-1',
+                @ProjectId = 'project-1',
+                @CampaignId = 'campaign-1',
+                @RunId = 'run-1',
+                @AgentId = 'builder-agent',
+                @ArtifactType = 1,
+                @ArtifactId = 'artifact-malformed',
+                @AuthorityLevel = 1,
+                @Title = 'Malformed evidence index',
+                @Summary = 'Malformed evidence should be rejected.',
+                @EvidenceRefsJson = '[{}]',
+                @CreatedAtUtc = '2026-06-10T00:00:00';
+            REVERT;
+            """);
+
+        Assert.AreEqual(0, await QuerySingleAsync<int>("SELECT COUNT(*) FROM agent.AgentMemoryIndexQueue WHERE IndexRecordId = 'index-malformed';"));
+    }
+
+    [TestMethod]
     public void MemoryStoredProcedurePermission_RuntimeStoresDoNotContainDirectGovernedWritesOrRuntimeDdl()
     {
         var files = Directory.GetFiles(Path.Combine(FindRepositoryRoot(), "IronDev.Infrastructure", "AgentMemory"), "*.cs");
@@ -425,6 +537,28 @@ public sealed class MemoryStoredProcedurePermissionTests : IntegrationTestBase
         await connection.OpenAsync();
         return await connection.QuerySingleAsync<T>(sql);
     }
+
+    private async Task CreateRuntimeMemoryAsync(string memoryItemId) =>
+        await ExecuteSqlAsync(
+            $$"""
+            EXECUTE AS USER = 'IronDevMemoryRuntimeTestUser';
+            EXEC agent.usp_AgentLocalMemory_Create
+                @MemoryItemId = '{{memoryItemId}}',
+                @TenantId = 'tenant-1',
+                @ProjectId = 'project-1',
+                @CampaignId = 'campaign-1',
+                @RunId = 'run-1',
+                @AgentId = 'builder-agent',
+                @MemoryType = 3,
+                @AuthorityLevel = 1,
+                @Title = 'Procedure evidence seed',
+                @Summary = 'Seed memory for procedure evidence-shape tests.',
+                @Confidence = 0.9,
+                @CreatedAtUtc = '2026-06-10T00:00:00',
+                @CreatedByAgentId = 'builder-agent',
+                @EvidenceRefsJson = '[{"evidenceId":"evidence-{{memoryItemId}}","evidenceType":1,"sourceId":"source-{{memoryItemId}}"}]';
+            REVERT;
+            """);
 
     private async Task ExpectSqlFailsAsync(string sql)
     {
