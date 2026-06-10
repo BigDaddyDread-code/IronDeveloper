@@ -25,8 +25,9 @@ public sealed class AgentMemoryInfluenceRecordTests : IntegrationTestBase
         var connectionFactory = ServiceProvider.GetRequiredService<IDbConnectionFactory>();
         var store = new SqlAgentLocalMemoryStore(connectionFactory, new AgentMemoryContractValidator());
         var influenceStore = new SqlAgentMemoryInfluenceStore(connectionFactory);
+        var handoffStore = new SqlAgentMemoryHandoffStore(connectionFactory);
 
-        _siloService = new AgentMemorySiloService(store, influenceStore);
+        _siloService = new AgentMemorySiloService(store, influenceStore, handoffStore);
     }
 
     [TestCleanup]
@@ -452,6 +453,12 @@ public sealed class AgentMemoryInfluenceRecordTests : IntegrationTestBase
                 DROP TRIGGER agent.TR_AgentMemoryInfluenceRecord_ValidateScope;
             IF OBJECT_ID('agent.TR_AgentMemoryInfluenceRecord_BlockUpdateDelete', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentMemoryInfluenceRecord_BlockUpdateDelete;
+            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory;
+            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete;
+            IF OBJECT_ID('agent.AgentMemoryHandoffSlice', 'U') IS NOT NULL
+                DROP TABLE agent.AgentMemoryHandoffSlice;
             IF OBJECT_ID('agent.AgentMemoryInfluenceRecord', 'U') IS NOT NULL
                 DROP TABLE agent.AgentMemoryInfluenceRecord;
             IF OBJECT_ID('agent.vwAgentLocalMemoryCurrentState', 'V') IS NOT NULL

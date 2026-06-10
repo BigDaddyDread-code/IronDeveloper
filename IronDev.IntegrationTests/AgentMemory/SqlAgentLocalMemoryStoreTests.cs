@@ -534,6 +534,18 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory;
+            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete;
+            IF OBJECT_ID('agent.AgentMemoryHandoffSlice', 'U') IS NOT NULL
+                DROP TABLE agent.AgentMemoryHandoffSlice;
+            IF OBJECT_ID('agent.TR_AgentMemoryInfluenceRecord_ValidateScope', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryInfluenceRecord_ValidateScope;
+            IF OBJECT_ID('agent.TR_AgentMemoryInfluenceRecord_BlockUpdateDelete', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryInfluenceRecord_BlockUpdateDelete;
+            IF OBJECT_ID('agent.AgentMemoryInfluenceRecord', 'U') IS NOT NULL
+                DROP TABLE agent.AgentMemoryInfluenceRecord;
             IF OBJECT_ID('agent.vwAgentLocalMemoryCurrentState', 'V') IS NOT NULL
                 DROP VIEW agent.vwAgentLocalMemoryCurrentState;
             IF OBJECT_ID('agent.TR_AgentLocalMemoryEvent_ValidateInsert', 'TR') IS NOT NULL
