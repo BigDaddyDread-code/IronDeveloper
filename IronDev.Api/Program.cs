@@ -4,6 +4,7 @@ using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
 using IronDev.Core.Chat;
 using IronDev.Core;
+using IronDev.Core.Agents.Audit;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
@@ -147,6 +148,8 @@ builder.Services.AddScoped<IPatchProposalService, PatchProposalService>();
 builder.Services.AddScoped<IPromotionPackageService, PromotionPackageService>();
 builder.Services.AddScoped<IControlledWriteApprovalService, ControlledWriteApprovalService>();
 builder.Services.AddScoped<IControlledWorktreeApplyService, ControlledWorktreeApplyService>();
+builder.Services.AddSingleton<IAgentRunAuditEnvelopeReadRepository, InMemoryAgentRunAuditEnvelopeReadRepository>();
+builder.Services.AddSingleton<IAgentRunAuditQueryService, AgentRunAuditQueryService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
