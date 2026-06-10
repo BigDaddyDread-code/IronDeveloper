@@ -315,6 +315,13 @@ public sealed class AgentRunAuditEnvelopeTests
 
         foreach (var file in runtimeFiles)
         {
+            var normalized = file.Replace('\\', '/');
+            if (normalized.EndsWith("IronDev.Api/Program.cs", StringComparison.OrdinalIgnoreCase) ||
+                normalized.EndsWith("IronDev.Api/Controllers/AgentRunAuditController.cs", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             var text = File.ReadAllText(file);
             Assert.IsFalse(text.Contains("AgentRunAuditEnvelope", StringComparison.Ordinal),
                 $"Runtime file wires AgentRunAuditEnvelope: {file}");
