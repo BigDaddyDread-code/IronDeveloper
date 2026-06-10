@@ -5,6 +5,8 @@ using Dapper;
 using IronDev.Core.AgentMemory;
 using IronDev.Core.AgentMemory.Evaluation;
 using IronDev.Core.AgentMemory.Execution;
+using IronDev.Core.Agents.ApprovalPolicy;
+using IronDev.Core.Agents.Skills;
 using IronDev.Data;
 using IronDev.Infrastructure.AgentMemory;
 using Microsoft.Data.SqlClient;
@@ -60,7 +62,8 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
             (MemoryEvaluationScenarioId.AppendOnlyMutationBlocked, nameof(MemoryEvaluationScenarioId.AppendOnlyMutationBlocked), RunAppendOnlyMutationBlockedAsync),
             (MemoryEvaluationScenarioId.RunReportDoesNotLeakOtherRun, nameof(MemoryEvaluationScenarioId.RunReportDoesNotLeakOtherRun), RunRunReportDoesNotLeakOtherRunAsync),
             (MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices, nameof(MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices), RunSiloDoesNotExposeGovernanceOrIndexingServicesAsync),
-            (MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate, nameof(MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate), RunMemoryBackedExecutionCannotBypassGateAsync)
+            (MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate, nameof(MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate), RunMemoryBackedExecutionCannotBypassGateAsync),
+            (MemoryEvaluationScenarioId.MemoryBackedExecutionProducesAuditPackage, nameof(MemoryEvaluationScenarioId.MemoryBackedExecutionProducesAuditPackage), RunMemoryBackedExecutionProducesAuditPackageAsync)
         };
 
         var results = new List<MemoryEvaluationScenarioResult>();
@@ -160,6 +163,7 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
             proposalService,
             new SqlAgentMemoryRunReportService(_connectionFactory),
             new SqlConscienceMemoryGovernanceService(_connectionFactory),
+            new SqlMemoryExecutionAuditStore(_connectionFactory),
             queueStore,
             new MemoryIndexingService(new SqlMemoryIndexProjectionBuilder(_connectionFactory), queueStore, indexer),
             indexer);
@@ -302,6 +306,67 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         Ensure(result.Evidence.IssueCodes.Contains(MemoryGovernanceIssueCode.MemoryExpired), "Memory execution gate evidence did not include MemoryExpired.");
 
         return ["Memory execution gate evaluated real Conscience result", "Expired memory-backed execution blocked before policy", "MemoryExpired issue captured in execution evidence"];
+    }
+
+    private async Task<IReadOnlyList<string>> RunMemoryBackedExecutionProducesAuditPackageAsync(HarnessServices services, CancellationToken cancellationToken)
+    {
+        var silo = OpenSilo(services, "builder-agent");
+        await silo.CreateAsync(BuildMemoryDraft("memory-execution-audit"), cancellationToken).ConfigureAwait(false);
+        await silo.RecordInfluenceAsync(BuildInfluenceDraft("influence-execution-audit", "memory-execution-audit", "decision-execution-audit"), cancellationToken).ConfigureAwait(false);
+
+        var gate = new MemoryExecutionGate(services.Governance);
+        var context = new MemoryBackedExecutionContext
+        {
+            Scope = BuildScope(),
+            ActionType = MemoryGovernanceActionType.ToolCallJustification,
+            DecisionId = "decision-execution-audit",
+            ReferencedArtifacts =
+            [
+                new MemoryBackedExecutionReference
+                {
+                    MemoryItemId = "memory-execution-audit",
+                    InfluenceId = "influence-execution-audit",
+                    DecisionId = "decision-execution-audit",
+                    ThoughtLedgerEntryId = "thought-execution-audit"
+                }
+            ],
+            RequestedAt = Now.AddMinutes(6),
+            ToolName = "workspace.validate",
+            CorrelationId = "correlation-1"
+        };
+        var gateResult = await gate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
+        Ensure(gateResult.MayProceedToPolicyGate, "Memory execution gate did not allow audit scenario to proceed.");
+
+        await services.ExecutionAuditStore.AppendAsync(new MemoryExecutionAuditDraft
+        {
+            Request = BuildAuditExecutionRequest(context),
+            Result = BuildAuditExecutionResult(gateResult.Evidence),
+            GateResult = gateResult,
+            Outcome = MemoryExecutionAuditOutcome.ExecutedSucceeded,
+            CreatedAt = Now.AddMinutes(7)
+        }, cancellationToken).ConfigureAwait(false);
+
+        var records = await services.ExecutionAuditStore.QueryAsync(new MemoryExecutionAuditQuery
+        {
+            TenantId = "tenant-1",
+            ProjectId = "project-1",
+            CampaignId = "campaign-1",
+            RunId = "run-1",
+            AgentId = "builder-agent",
+            DecisionId = "decision-execution-audit",
+            MemoryItemId = "memory-execution-audit",
+            InfluenceId = "influence-execution-audit"
+        }, cancellationToken).ConfigureAwait(false);
+
+        Ensure(records.Count == 1, $"Expected one memory execution audit record, found {records.Count}.");
+        var audit = records.Single();
+        Ensure(audit.Outcome == MemoryExecutionAuditOutcome.ExecutedSucceeded, $"Expected audit outcome ExecutedSucceeded, got {audit.Outcome}.");
+        Ensure(audit.GovernanceCheckId == gateResult.GovernanceResult!.GovernanceCheckId, "Audit did not preserve governance check ID.");
+        Ensure(audit.DecisionId == "decision-execution-audit", "Audit did not preserve execution decision ID.");
+        Ensure(audit.MemoryItemIds.Contains("memory-execution-audit"), "Audit did not preserve memory item reference.");
+        Ensure(audit.InfluenceIds.Contains("influence-execution-audit"), "Audit did not preserve influence reference.");
+
+        return ["Memory-backed execution wrote durable audit package", "Audit links decision/governance/memory/influence", "Audit outcome captured execution success"];
     }
 
     private async Task<IReadOnlyList<string>> RunProposalAcceptedDoesNotPromoteMemoryAsync(HarnessServices services, CancellationToken cancellationToken)
@@ -581,6 +646,7 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_influence.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_handoff.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_improvement_proposals.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_execution_audit.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_indexing.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -590,6 +656,12 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(
             """
+            IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_ValidateInsert', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryExecutionAudit_ValidateInsert;
+            IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_BlockUpdateDelete', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryExecutionAudit_BlockUpdateDelete;
+            IF OBJECT_ID('agent.AgentMemoryExecutionAudit', 'U') IS NOT NULL
+                DROP TABLE agent.AgentMemoryExecutionAudit;
             IF OBJECT_ID('agent.TR_AgentMemoryIndexEvent_ValidateInsert', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentMemoryIndexEvent_ValidateInsert;
             IF OBJECT_ID('agent.TR_AgentMemoryIndexQueue_ValidateProjection', 'TR') IS NOT NULL
@@ -829,6 +901,82 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
             InfluenceRecordRequired = influenceRequired
         };
 
+    private static AgentSkillExecutionRequest BuildAuditExecutionRequest(MemoryBackedExecutionContext memoryContext) =>
+        new()
+        {
+            SkillRequestContext = new AgentSkillRequestContext
+            {
+                ContextId = "skill-context-execution-audit",
+                RequestId = "skill-request-execution-audit",
+                ReviewId = "skill-review-execution-audit",
+                ProjectId = "IronDev",
+                AgentName = "BuilderAgent",
+                SkillId = AgentSkillIds.WorkspaceValidate,
+                Purpose = "Validate disposable workspace using memory-backed context.",
+                SkillKnown = true,
+                Decision = ProjectApprovalDecisions.AllowedByPolicy,
+                ReviewStatus = AgentSkillRequestReviewStatuses.ApprovedForExecution,
+                RiskTier = ProjectApprovalRiskTiers.WorkspaceValidation,
+                Category = AgentSkillCategories.WorkspaceCommand,
+                HumanReviewRequired = true,
+                HumanApprovalRequired = false,
+                PolicyAllowed = true,
+                PolicyBlocked = false,
+                DangerousCapability = false,
+                ExecutionCanStartFromContext = true,
+                ApprovalCanBeGrantedByContext = false,
+                SourceMutationAllowed = false,
+                WorkspaceMutationAllowed = true,
+                ExternalSystemAllowed = false,
+                CreatesTicketAllowed = false,
+                WritesMemoryAllowed = false,
+                RecommendedNextAction = AgentSkillRequestContextRecommendedActions.ExecuteApprovedRequest,
+                EvidencePaths = ["workspace-validation-context.json"],
+                ParametersSummary = ["runId=run-1", "workspacePath=C:\\workspaces\\run-1"],
+                ReviewChecklist = ["Confirm memory-backed execution audit is durable."],
+                Blockers = [],
+                Warnings = [],
+                Interpretation = ["Approved non-source-mutating workspace command."]
+            },
+            RequestedByAgent = "BuilderAgent",
+            ProjectId = "IronDev",
+            RunId = "run-1",
+            WorkspacePath = "C:\\workspaces\\run-1",
+            SourceRepo = "C:\\repo\\IronDeveloper",
+            MemoryExecutionContext = memoryContext,
+            Parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["runId"] = "run-1",
+                ["workspacePath"] = "C:\\workspaces\\run-1"
+            }
+        };
+
+    private static AgentSkillExecutionResult BuildAuditExecutionResult(MemoryExecutionEvidence evidence) =>
+        new()
+        {
+            ExecutionId = "skill-execution-audit-1",
+            ContextId = "skill-context-execution-audit",
+            RequestId = "skill-request-execution-audit",
+            ReviewId = "skill-review-execution-audit",
+            SkillId = AgentSkillIds.WorkspaceValidate,
+            Status = AgentSkillExecutionStatuses.Succeeded,
+            Summary = "Workspace validation completed.",
+            Executed = true,
+            ReadOnlyExecution = false,
+            SourceMutated = false,
+            WorkspaceMutated = true,
+            ExternalSystemCalled = false,
+            TicketCreated = false,
+            MemoryWritten = false,
+            ApprovalGranted = false,
+            ShellCommandRun = false,
+            Payload = null,
+            MemoryEvidence = evidence,
+            EvidencePaths = ["workspace-validation.json"],
+            Warnings = [],
+            Blockers = []
+        };
+
     private static MemoryGovernanceCheckRequest BuildInfluenceOnlyRequest(
         string influenceId,
         MemoryGovernanceActionType actionType) =>
@@ -1010,6 +1158,7 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         SqlMemoryImprovementProposalService ProposalService,
         SqlAgentMemoryRunReportService RunReportService,
         SqlConscienceMemoryGovernanceService Governance,
+        SqlMemoryExecutionAuditStore ExecutionAuditStore,
         SqlMemoryIndexQueueStore QueueStore,
         MemoryIndexingService IndexingService,
         FakeWeaviateMemoryIndexer Indexer);

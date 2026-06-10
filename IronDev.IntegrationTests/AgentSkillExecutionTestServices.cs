@@ -16,7 +16,8 @@ internal static class AgentSkillExecutionTestServices
         IDisposableWorkspaceDiffService? diff = null,
         IDisposableWorkspacePromotionPackageService? promotionPackage = null,
         IDisposableWorkspaceFailurePackageService? failurePackage = null,
-        IMemoryExecutionGate? memoryExecutionGate = null) =>
+        IMemoryExecutionGate? memoryExecutionGate = null,
+        IMemoryExecutionAuditStore? memoryExecutionAuditStore = null) =>
         new(
             workspaceApplyContextService ?? new AgentSkillExecutionThrowingApplyContextService(),
             workspaceCheck ?? new AgentSkillExecutionThrowingWorkspaceCheckService(),
@@ -25,7 +26,68 @@ internal static class AgentSkillExecutionTestServices
             diff ?? new AgentSkillExecutionTestDiffService(),
             promotionPackage ?? new AgentSkillExecutionTestPromotionPackageService(),
             failurePackage ?? new AgentSkillExecutionTestFailurePackageService(),
-            memoryExecutionGate);
+            memoryExecutionGate,
+            memoryExecutionAuditStore ?? new AgentSkillExecutionTestMemoryExecutionAuditStore());
+}
+
+internal sealed class AgentSkillExecutionTestMemoryExecutionAuditStore : IMemoryExecutionAuditStore
+{
+    public List<MemoryExecutionAuditRecord> Records { get; } = [];
+
+    public Task<MemoryExecutionAuditRecord> AppendAsync(
+        MemoryExecutionAuditDraft draft,
+        CancellationToken cancellationToken = default)
+    {
+        var context = draft.Request.MemoryExecutionContext ?? throw new InvalidOperationException("Memory context is required.");
+        var result = draft.Result;
+        var evidence = result.MemoryEvidence ?? throw new InvalidOperationException("Memory evidence is required.");
+        var record = new MemoryExecutionAuditRecord
+        {
+            AuditId = $"test-audit-{Guid.NewGuid():N}",
+            Scope = context.Scope,
+            ExecutionId = result.ExecutionId,
+            ContextId = result.ContextId,
+            RequestId = result.RequestId,
+            ReviewId = result.ReviewId,
+            SkillId = result.SkillId,
+            DecisionId = context.DecisionId,
+            ActionType = context.ActionType,
+            Outcome = draft.Outcome,
+            ExecutionStatus = result.Status,
+            GateDecision = draft.GateResult.Decision,
+            GovernanceDecision = evidence.GovernanceDecision,
+            GovernanceCheckId = evidence.GovernanceCheckId,
+            Executed = result.Executed,
+            SourceMutated = result.SourceMutated,
+            WorkspaceMutated = result.WorkspaceMutated,
+            ExternalSystemCalled = result.ExternalSystemCalled,
+            TicketCreated = result.TicketCreated,
+            MemoryWritten = result.MemoryWritten,
+            ApprovalGranted = result.ApprovalGranted,
+            ShellCommandRun = result.ShellCommandRun,
+            ToolName = context.ToolName,
+            AffectedArtifactType = context.AffectedArtifactType,
+            AffectedArtifactId = context.AffectedArtifactId,
+            ThoughtLedgerEntryId = context.ReferencedArtifacts.Select(item => item.ThoughtLedgerEntryId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            CorrelationId = context.CorrelationId,
+            Summary = result.Summary,
+            MemoryItemIds = evidence.MemoryItemIds,
+            InfluenceIds = evidence.InfluenceIds,
+            HandoffMemorySliceIds = evidence.HandoffMemorySliceIds,
+            EvidencePaths = result.EvidencePaths,
+            Blockers = result.Blockers,
+            Warnings = result.Warnings,
+            IssueCodes = evidence.IssueCodes,
+            CreatedAt = draft.CreatedAt
+        };
+        Records.Add(record);
+        return Task.FromResult(record);
+    }
+
+    public Task<IReadOnlyList<MemoryExecutionAuditRecord>> QueryAsync(
+        MemoryExecutionAuditQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MemoryExecutionAuditRecord>>(Records);
 }
 
 internal sealed class AgentSkillExecutionTestDiffService : IDisposableWorkspaceDiffService
