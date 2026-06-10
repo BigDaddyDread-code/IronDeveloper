@@ -12,6 +12,7 @@ using IronDev.Core.Promotion;
 using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
+using IronDev.Infrastructure.AgentRunAudit;
 using IronDev.Data;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.DependencyInjection;
@@ -148,8 +149,9 @@ builder.Services.AddScoped<IPatchProposalService, PatchProposalService>();
 builder.Services.AddScoped<IPromotionPackageService, PromotionPackageService>();
 builder.Services.AddScoped<IControlledWriteApprovalService, ControlledWriteApprovalService>();
 builder.Services.AddScoped<IControlledWorktreeApplyService, ControlledWorktreeApplyService>();
-builder.Services.AddSingleton<IAgentRunAuditEnvelopeReadRepository, InMemoryAgentRunAuditEnvelopeReadRepository>();
-builder.Services.AddSingleton<IAgentRunAuditQueryService, AgentRunAuditQueryService>();
+builder.Services.AddScoped<IAgentRunAuditEnvelopeStore, SqlAgentRunAuditEnvelopeStore>();
+builder.Services.AddScoped<IAgentRunAuditEnvelopeReadRepository, SqlAgentRunAuditEnvelopeReadRepository>();
+builder.Services.AddScoped<IAgentRunAuditQueryService, AgentRunAuditQueryService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
