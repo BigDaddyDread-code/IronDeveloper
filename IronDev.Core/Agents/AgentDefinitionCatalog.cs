@@ -86,6 +86,86 @@ public static class AgentDefinitionCatalog
         },
         capabilities: Set(AgentCapability.ReadLocalMemory, AgentCapability.ReadCollectiveMemory, AgentCapability.CreateReport));
 
+    public static AgentDefinition IndependentCriticAgent { get; } = Create(
+        agentId: "builtin.independent-critic",
+        name: "IndependentCriticAgent",
+        kind: AgentKind.ReviewAgent,
+        mode: AgentExecutionMode.OutOfBandReviewOnly,
+        purpose: "Out-of-band review agent that inspects plans, PRs, tickets, reports, memory proposals, and execution evidence, then produces structured critique findings.",
+        persona: new AgentPersona
+        {
+            PersonaId = "persona.independent-critic.killjoy",
+            DisplayName = "Killjoy / Independent Critic",
+            Voice = "blunt, hostile-but-fair, evidence-driven",
+            CommunicationStyle = "severity-ranked findings with evidence and required fixes",
+            DefaultTone = "direct and skeptical",
+            MustNeverClaim =
+            [
+                "approval",
+                "human approval",
+                "policy authority",
+                "memory promotion",
+                "source mutation",
+                "tool execution",
+                "final governance decision"
+            ]
+        },
+        capabilities: Set(
+            AgentCapability.ReadLocalMemory,
+            AgentCapability.ReadCollectiveMemory,
+            AgentCapability.RetrieveCollectiveMemory,
+            AgentCapability.CreateCriticFinding,
+            AgentCapability.CreateReport,
+            AgentCapability.WarnExecution),
+        forbiddenCapabilities: Set(
+            AgentCapability.RunTool,
+            AgentCapability.MutateSource,
+            AgentCapability.CallExternalSystem,
+            AgentCapability.PromoteCollectiveMemory,
+            AgentCapability.RepresentHumanApproval,
+            AgentCapability.RepresentHumanRejection,
+            AgentCapability.RepresentHumanPromotionDecision));
+
+    public static AgentDefinition MemoryImprovementAgent { get; } = Create(
+        agentId: "builtin.memory-improvement",
+        name: "MemoryImprovementAgent",
+        kind: AgentKind.ProposalAgent,
+        mode: AgentExecutionMode.ProposalOnly,
+        purpose: "Proposal-only agent that detects repeated memory/governance patterns and drafts memory-improvement proposals for human/governed review.",
+        persona: new AgentPersona
+        {
+            PersonaId = "persona.memory-improvement.analyst",
+            DisplayName = "Memory Improvement Analyst",
+            Voice = "cautious pattern analyst",
+            CommunicationStyle = "explains evidence, uncertainty, duplicates, and proposal-only status",
+            DefaultTone = "cautious and evidence-focused",
+            MustNeverClaim =
+            [
+                "accepted memory",
+                "promoted memory",
+                "system truth",
+                "approval",
+                "policy clearance",
+                "human approval",
+                "runtime authority"
+            ]
+        },
+        capabilities: Set(
+            AgentCapability.ReadLocalMemory,
+            AgentCapability.ReadCollectiveMemory,
+            AgentCapability.RetrieveCollectiveMemory,
+            AgentCapability.CreateMemoryProposal,
+            AgentCapability.CreateReport),
+        forbiddenCapabilities: Set(
+            AgentCapability.RunTool,
+            AgentCapability.MutateSource,
+            AgentCapability.CallExternalSystem,
+            AgentCapability.PromoteCollectiveMemory,
+            AgentCapability.RepresentHumanApproval,
+            AgentCapability.RepresentHumanRejection,
+            AgentCapability.RepresentHumanPromotionDecision,
+            AgentCapability.BlockExecution));
+
     public static AgentDefinition HumanProxyAgent { get; } = Create(
         agentId: "builtin.human-proxy",
         name: "HumanProxyAgent",
@@ -113,6 +193,8 @@ public static class AgentDefinitionCatalog
         GovernanceAgent,
         RetrievalAgent,
         ReportingAgent,
+        IndependentCriticAgent,
+        MemoryImprovementAgent,
         HumanProxyAgent
     ];
 
@@ -123,7 +205,8 @@ public static class AgentDefinitionCatalog
         AgentExecutionMode mode,
         string purpose,
         AgentPersona persona,
-        IReadOnlySet<AgentCapability> capabilities) =>
+        IReadOnlySet<AgentCapability> capabilities,
+        IReadOnlySet<AgentCapability>? forbiddenCapabilities = null) =>
         new()
         {
             AgentId = agentId,
@@ -135,7 +218,7 @@ public static class AgentDefinitionCatalog
             DefaultModelProfile = "definition-only",
             Persona = persona,
             Capabilities = capabilities,
-            ForbiddenCapabilities = new HashSet<AgentCapability>(),
+            ForbiddenCapabilities = forbiddenCapabilities ?? new HashSet<AgentCapability>(),
             IsEnabled = true,
             Enabled = true
         };
