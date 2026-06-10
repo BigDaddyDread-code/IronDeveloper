@@ -258,6 +258,21 @@ public sealed class SqlAgentMemoryInfluenceStore : IAgentMemoryInfluenceStore
         if (draft.EvidenceRefs is null || draft.EvidenceRefs.Count == 0)
             throw new InvalidOperationException("Memory influence requires evidence.");
 
+        foreach (var evidenceRef in draft.EvidenceRefs)
+        {
+            if (evidenceRef is null)
+                throw new InvalidOperationException("Memory influence evidence refs cannot contain null entries.");
+
+            if (string.IsNullOrWhiteSpace(evidenceRef.EvidenceId))
+                throw new InvalidOperationException("Memory influence evidence refs require an evidence ID.");
+
+            if (!Enum.IsDefined(evidenceRef.EvidenceType))
+                throw new InvalidOperationException($"Unsupported memory influence evidence type '{evidenceRef.EvidenceType}'.");
+
+            if (string.IsNullOrWhiteSpace(evidenceRef.SourceId))
+                throw new InvalidOperationException("Memory influence evidence refs require a source ID.");
+        }
+
         if (draft.Confidence < 0 || draft.Confidence > 1)
             throw new InvalidOperationException("Memory influence confidence must be between 0 and 1.");
 

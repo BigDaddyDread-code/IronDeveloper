@@ -104,8 +104,9 @@ IF OBJECT_ID('agent.TR_AgentMemoryInfluenceRecord_ValidateScope', 'TR') IS NULL
                 INNER JOIN agent.vwAgentLocalMemoryCurrentState s
                     ON s.MemoryItemId = r.MemoryItemId
                 WHERE ISNULL(s.CurrentEventType, 1) IN (2, 3, 4, 6, 7)
+                   OR (s.ExpiresAtUtc IS NOT NULL AND s.ExpiresAtUtc <= SYSUTCDATETIME())
             )
             BEGIN
-                THROW 51022, ''Terminal local memory cannot be recorded as active influence.'', 1;
+                THROW 51022, ''Terminal or time-expired local memory cannot be recorded as active influence.'', 1;
             END
         END');

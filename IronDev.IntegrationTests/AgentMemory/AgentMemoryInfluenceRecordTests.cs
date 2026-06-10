@@ -231,6 +231,9 @@ public sealed class AgentMemoryInfluenceRecordTests : IntegrationTestBase
             BuildInfluenceDraft("influence-missing-decision", "memory-validation") with { DecisionId = "" },
             BuildInfluenceDraft("influence-missing-summary", "memory-validation") with { InfluenceSummary = "" },
             BuildInfluenceDraft("influence-missing-evidence", "memory-validation") with { EvidenceRefs = Array.Empty<EvidenceRef>() },
+            BuildInfluenceDraft("influence-missing-evidence-id", "memory-validation") with { EvidenceRefs = [BuildEvidence("")] },
+            BuildInfluenceDraft("influence-unsupported-evidence-type", "memory-validation") with { EvidenceRefs = [BuildEvidence("bad-type") with { EvidenceType = (EvidenceType)999 }] },
+            BuildInfluenceDraft("influence-missing-evidence-source", "memory-validation") with { EvidenceRefs = [BuildEvidence("missing-source") with { SourceId = "" }] },
             BuildInfluenceDraft("influence-low-confidence", "memory-validation") with { Confidence = -0.1m },
             BuildInfluenceDraft("influence-high-confidence", "memory-validation") with { Confidence = 1.1m },
             BuildInfluenceDraft("influence-unsupported-type", "memory-validation") with { InfluenceType = (MemoryInfluenceType)999 }
@@ -339,6 +342,25 @@ public sealed class AgentMemoryInfluenceRecordTests : IntegrationTestBase
             connection,
             "influence-direct-terminal",
             "memory-direct-terminal"));
+    }
+
+    [TestMethod]
+    public async Task AgentMemoryInfluence_DirectSqlTimeExpiredMemoryBlocked()
+    {
+        var silo = _siloService.Open(BuildContext());
+        await silo.CreateAsync(BuildMemoryDraft("memory-direct-time-expired") with
+        {
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-2),
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1)
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        await Assert.ThrowsExactlyAsync<SqlException>(() => InsertDirectInfluenceAsync(
+            connection,
+            "influence-direct-time-expired",
+            "memory-direct-time-expired"));
     }
 
     private static async Task InsertDirectInfluenceAsync(
