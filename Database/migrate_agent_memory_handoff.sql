@@ -28,6 +28,7 @@ BEGIN
         Confidence DECIMAL(5,4) NOT NULL,
         InfluenceIdsJson NVARCHAR(MAX) NULL,
         DecisionId NVARCHAR(120) NULL,
+        ThoughtLedgerEntryId NVARCHAR(120) NULL,
         CorrelationId NVARCHAR(120) NULL,
         CreatedAtUtc DATETIME2(7) NOT NULL,
         ExpiresAtUtc DATETIME2(7) NULL,
@@ -55,6 +56,9 @@ BEGIN
         CONSTRAINT CK_AgentMemoryHandoffSlice_SummaryRequired CHECK (LEN(LTRIM(RTRIM(Summary))) > 0)
     );
 END
+
+IF COL_LENGTH('agent.AgentMemoryHandoffSlice', 'ThoughtLedgerEntryId') IS NULL
+    ALTER TABLE agent.AgentMemoryHandoffSlice ADD ThoughtLedgerEntryId NVARCHAR(120) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AgentMemoryHandoffSlice_Incoming' AND object_id = OBJECT_ID('agent.AgentMemoryHandoffSlice'))
     CREATE INDEX IX_AgentMemoryHandoffSlice_Incoming
