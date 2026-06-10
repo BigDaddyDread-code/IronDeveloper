@@ -66,83 +66,30 @@ public sealed class SqlAgentMemoryInfluenceStore : IAgentMemoryInfluenceStore
         if (status is not (MemoryLifecycleStatus.Active or MemoryLifecycleStatus.ProposedForReview))
             throw new InvalidOperationException($"Cannot record influence from terminal memory status '{status}'.");
 
-        const string sql = """
-            INSERT INTO agent.AgentMemoryInfluenceRecord
-            (
-                InfluenceId,
-                TenantId,
-                ProjectId,
-                CampaignId,
-                RunId,
-                AgentId,
-                MemoryItemId,
-                DecisionId,
-                InfluenceType,
-                InfluenceSummary,
-                Confidence,
-                MemoryAuthorityLevelAtInfluence,
-                MemoryLifecycleStatusAtInfluence,
-                AffectedArtifactType,
-                AffectedArtifactId,
-                EvidenceRefsJson,
-                CreatedAtUtc,
-                ThoughtLedgerEntryId,
-                CorrelationId,
-                InfluenceJson,
-                ContentHashSha256
-            )
-            VALUES
-            (
-                @InfluenceId,
-                @TenantId,
-                @ProjectId,
-                @CampaignId,
-                @RunId,
-                @AgentId,
-                @MemoryItemId,
-                @DecisionId,
-                @InfluenceType,
-                @InfluenceSummary,
-                @Confidence,
-                @MemoryAuthorityLevelAtInfluence,
-                @MemoryLifecycleStatusAtInfluence,
-                @AffectedArtifactType,
-                @AffectedArtifactId,
-                @EvidenceRefsJson,
-                @CreatedAtUtc,
-                @ThoughtLedgerEntryId,
-                @CorrelationId,
-                @InfluenceJson,
-                @ContentHashSha256
-            );
-            """;
-
         await connection.ExecuteAsync(new CommandDefinition(
-            sql,
+            "agent.usp_AgentMemoryInfluence_Create",
             new
             {
                 draft.InfluenceId,
+                draft.MemoryItemId,
                 scope.TenantId,
                 scope.ProjectId,
                 scope.CampaignId,
                 scope.RunId,
                 scope.AgentId,
-                draft.MemoryItemId,
                 draft.DecisionId,
                 InfluenceType = (int)draft.InfluenceType,
                 draft.InfluenceSummary,
-                draft.Confidence,
-                MemoryAuthorityLevelAtInfluence = memory.AuthorityLevel,
-                MemoryLifecycleStatusAtInfluence = (int)status,
-                draft.AffectedArtifactType,
-                draft.AffectedArtifactId,
                 EvidenceRefsJson = JsonSerializer.Serialize(draft.EvidenceRefs, JsonOptions),
+                draft.Confidence,
                 CreatedAtUtc = draft.CreatedAt.UtcDateTime,
                 draft.ThoughtLedgerEntryId,
                 draft.CorrelationId,
                 draft.InfluenceJson,
-                ContentHashSha256 = (byte[]?)null
+                draft.AffectedArtifactType,
+                draft.AffectedArtifactId
             },
+            commandType: CommandType.StoredProcedure,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 

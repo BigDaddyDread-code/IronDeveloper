@@ -38,98 +38,31 @@ public sealed partial class SqlMemoryIndexQueueStore : IMemoryIndexQueueStore
 
         using var connection = _connectionFactory.CreateConnection();
         await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
-        using var transaction = connection.BeginTransaction();
-
-        try
-        {
-            const string insertSql = """
-                INSERT INTO agent.AgentMemoryIndexQueue
-                (
-                    IndexRecordId,
-                    TenantId,
-                    ProjectId,
-                    CampaignId,
-                    RunId,
-                    AgentId,
-                    ArtifactType,
-                    ArtifactId,
-                    AuthorityLevel,
-                    Title,
-                    Summary,
-                    EvidenceRefsJson,
-                    MetadataJson,
-                    SourceHashSha256,
-                    DecisionId,
-                    ThoughtLedgerEntryId,
-                    CorrelationId,
-                    CreatedAtUtc
-                )
-                VALUES
-                (
-                    @IndexRecordId,
-                    @TenantId,
-                    @ProjectId,
-                    @CampaignId,
-                    @RunId,
-                    @AgentId,
-                    @ArtifactType,
-                    @ArtifactId,
-                    @AuthorityLevel,
-                    @Title,
-                    @Summary,
-                    @EvidenceRefsJson,
-                    @MetadataJson,
-                    @SourceHashSha256,
-                    @DecisionId,
-                    @ThoughtLedgerEntryId,
-                    @CorrelationId,
-                    @CreatedAtUtc
-                );
-                """;
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                insertSql,
-                new
-                {
-                    projection.IndexRecordId,
-                    projection.TenantId,
-                    projection.ProjectId,
-                    projection.CampaignId,
-                    projection.RunId,
-                    projection.AgentId,
-                    ArtifactType = (int)projection.ArtifactType,
-                    projection.ArtifactId,
-                    AuthorityLevel = (int)projection.AuthorityLevel,
-                    projection.Title,
-                    projection.Summary,
-                    EvidenceRefsJson = JsonSerializer.Serialize(projection.EvidenceRefs, JsonOptions),
-                    MetadataJson = projection.Metadata is null ? null : JsonSerializer.Serialize(projection.Metadata, JsonOptions),
-                    projection.SourceHashSha256,
-                    projection.DecisionId,
-                    projection.ThoughtLedgerEntryId,
-                    projection.CorrelationId,
-                    CreatedAtUtc = projection.CreatedAt.UtcDateTime
-                },
-                transaction,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
-
-            await InsertEventAsync(
-                connection,
-                transaction,
+        await connection.ExecuteAsync(new CommandDefinition(
+            "agent.usp_MemoryIndexQueue_Create",
+            new
+            {
                 projection.IndexRecordId,
-                MemoryIndexEventType.Queued,
-                weaviateObjectId: null,
-                error: null,
-                createdAt: projection.CreatedAt,
-                cancellationToken).ConfigureAwait(false);
-
-            transaction.Commit();
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
-        }
+                projection.TenantId,
+                projection.ProjectId,
+                projection.CampaignId,
+                projection.RunId,
+                projection.AgentId,
+                ArtifactType = (int)projection.ArtifactType,
+                projection.ArtifactId,
+                AuthorityLevel = (int)projection.AuthorityLevel,
+                projection.Title,
+                projection.Summary,
+                EvidenceRefsJson = JsonSerializer.Serialize(projection.EvidenceRefs, JsonOptions),
+                MetadataJson = projection.Metadata is null ? null : JsonSerializer.Serialize(projection.Metadata, JsonOptions),
+                projection.SourceHashSha256,
+                projection.DecisionId,
+                projection.ThoughtLedgerEntryId,
+                projection.CorrelationId,
+                CreatedAtUtc = projection.CreatedAt.UtcDateTime
+            },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public Task<IReadOnlyList<MemoryIndexQueueRecord>> QueryPendingAsync(
@@ -166,15 +99,19 @@ public sealed partial class SqlMemoryIndexQueueStore : IMemoryIndexQueueStore
         if (exists != 1)
             throw new InvalidOperationException("Memory index queue record does not exist.");
 
-        await InsertEventAsync(
-            connection,
-            transaction: null,
-            indexRecordId,
-            eventType,
-            weaviateObjectId,
-            error,
-            DateTimeOffset.UtcNow,
-            cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "agent.usp_MemoryIndexEvent_Add",
+            new
+            {
+                IndexEventId = $"index-event-{Guid.NewGuid():N}",
+                IndexRecordId = indexRecordId,
+                EventType = (int)eventType,
+                WeaviateObjectId = weaviateObjectId,
+                Error = error,
+                CreatedAtUtc = DateTimeOffset.UtcNow.UtcDateTime
+            },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public Task<IReadOnlyList<MemoryIndexQueueRecord>> QueryAsync(
@@ -264,52 +201,6 @@ public sealed partial class SqlMemoryIndexQueueStore : IMemoryIndexQueueStore
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
 
         return rows.Select(ToRecord).ToArray();
-    }
-
-    private static async Task InsertEventAsync(
-        IDbConnection connection,
-        IDbTransaction? transaction,
-        string indexRecordId,
-        MemoryIndexEventType eventType,
-        string? weaviateObjectId,
-        string? error,
-        DateTimeOffset createdAt,
-        CancellationToken cancellationToken)
-    {
-        const string sql = """
-            INSERT INTO agent.AgentMemoryIndexEvent
-            (
-                IndexEventId,
-                IndexRecordId,
-                EventType,
-                WeaviateObjectId,
-                Error,
-                CreatedAtUtc
-            )
-            VALUES
-            (
-                @IndexEventId,
-                @IndexRecordId,
-                @EventType,
-                @WeaviateObjectId,
-                @Error,
-                @CreatedAtUtc
-            );
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            sql,
-            new
-            {
-                IndexEventId = $"index-event-{Guid.NewGuid():N}",
-                IndexRecordId = indexRecordId,
-                EventType = (int)eventType,
-                WeaviateObjectId = weaviateObjectId,
-                Error = error,
-                CreatedAtUtc = createdAt.UtcDateTime
-            },
-            transaction,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public static void ThrowIfUnsafeProjection(MemoryIndexProjection projection)

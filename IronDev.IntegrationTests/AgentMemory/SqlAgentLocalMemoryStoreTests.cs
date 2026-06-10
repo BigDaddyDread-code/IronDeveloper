@@ -526,6 +526,7 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         await connection.ExecuteAsync(await File.ReadAllTextAsync(Path.Combine(FindRepositoryRoot(), "Database", "migrate_agent_local_memory.sql")));
+        await connection.ExecuteAsync(await File.ReadAllTextAsync(Path.Combine(FindRepositoryRoot(), "Database", "migrate_agent_memory_stored_procedures.sql")));
     }
 
     private async Task DropAgentMemorySchemaAsync()
@@ -534,6 +535,24 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID('agent.usp_MemoryExecutionAudit_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryExecutionAudit_Create;
+            IF OBJECT_ID('agent.usp_MemoryIndexEvent_Add', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryIndexEvent_Add;
+            IF OBJECT_ID('agent.usp_MemoryIndexQueue_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryIndexQueue_Create;
+            IF OBJECT_ID('agent.usp_MemoryImprovementProposal_AddEvent', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryImprovementProposal_AddEvent;
+            IF OBJECT_ID('agent.usp_MemoryImprovementProposal_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryImprovementProposal_Create;
+            IF OBJECT_ID('agent.usp_AgentMemoryHandoff_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentMemoryHandoff_Create;
+            IF OBJECT_ID('agent.usp_AgentMemoryInfluence_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentMemoryInfluence_Create;
+            IF OBJECT_ID('agent.usp_AgentLocalMemory_AddEvent', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentLocalMemory_AddEvent;
+            IF OBJECT_ID('agent.usp_AgentLocalMemory_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentLocalMemory_Create;
             IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_ValidateInsert', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentMemoryExecutionAudit_ValidateInsert;
             IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_BlockUpdateDelete', 'TR') IS NOT NULL

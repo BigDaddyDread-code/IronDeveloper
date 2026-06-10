@@ -124,59 +124,8 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                 throw new InvalidOperationException("Handoff influence IDs must belong to the source agent scope.");
         }
 
-        const string insertSql = """
-            INSERT INTO agent.AgentMemoryHandoffSlice
-            (
-                HandoffMemorySliceId,
-                TenantId,
-                ProjectId,
-                CampaignId,
-                RunId,
-                SourceAgentId,
-                TargetAgentId,
-                MemoryItemIdsJson,
-                MemorySnapshotsJson,
-                Summary,
-                AllowedUse,
-                EvidenceRefsJson,
-                Confidence,
-                InfluenceIdsJson,
-                DecisionId,
-                ThoughtLedgerEntryId,
-                CorrelationId,
-                CreatedAtUtc,
-                ExpiresAtUtc,
-                HandoffJson,
-                ContentHashSha256
-            )
-            VALUES
-            (
-                @HandoffMemorySliceId,
-                @TenantId,
-                @ProjectId,
-                @CampaignId,
-                @RunId,
-                @SourceAgentId,
-                @TargetAgentId,
-                @MemoryItemIdsJson,
-                @MemorySnapshotsJson,
-                @Summary,
-                @AllowedUse,
-                @EvidenceRefsJson,
-                @Confidence,
-                @InfluenceIdsJson,
-                @DecisionId,
-                @ThoughtLedgerEntryId,
-                @CorrelationId,
-                @CreatedAtUtc,
-                @ExpiresAtUtc,
-                @HandoffJson,
-                @ContentHashSha256
-            );
-            """;
-
         await connection.ExecuteAsync(new CommandDefinition(
-            insertSql,
+            "agent.usp_AgentMemoryHandoff_Create",
             new
             {
                 draft.HandoffMemorySliceId,
@@ -192,15 +141,15 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                 AllowedUse = (int)draft.AllowedUse,
                 EvidenceRefsJson = JsonSerializer.Serialize(draft.EvidenceRefs, JsonOptions),
                 draft.Confidence,
+                CreatedAtUtc = draft.CreatedAt.UtcDateTime,
                 InfluenceIdsJson = influenceIds is null || influenceIds.Length == 0 ? null : JsonSerializer.Serialize(influenceIds, JsonOptions),
                 draft.DecisionId,
                 draft.ThoughtLedgerEntryId,
                 draft.CorrelationId,
-                CreatedAtUtc = draft.CreatedAt.UtcDateTime,
-                ExpiresAtUtc = draft.ExpiresAt?.UtcDateTime,
                 draft.HandoffJson,
-                ContentHashSha256 = (byte[]?)null
+                ExpiresAtUtc = draft.ExpiresAt?.UtcDateTime
             },
+            commandType: CommandType.StoredProcedure,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
