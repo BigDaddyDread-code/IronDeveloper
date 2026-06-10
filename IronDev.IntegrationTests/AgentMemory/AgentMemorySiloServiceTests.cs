@@ -25,8 +25,10 @@ public sealed class AgentMemorySiloServiceTests : IntegrationTestBase
         var store = new SqlAgentLocalMemoryStore(
             ServiceProvider.GetRequiredService<IDbConnectionFactory>(),
             new AgentMemoryContractValidator());
+        var influenceStore = new SqlAgentMemoryInfluenceStore(
+            ServiceProvider.GetRequiredService<IDbConnectionFactory>());
 
-        _siloService = new AgentMemorySiloService(store);
+        _siloService = new AgentMemorySiloService(store, influenceStore);
     }
 
     [TestCleanup]
