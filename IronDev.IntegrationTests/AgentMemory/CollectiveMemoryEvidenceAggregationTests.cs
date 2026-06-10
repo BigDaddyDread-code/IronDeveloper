@@ -406,14 +406,17 @@ public sealed class CollectiveMemoryEvidenceAggregationTests
     {
         var forbiddenTokens = new[]
         {
-            "ICollectiveMemoryRetrievalService",
-            "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
+            "RuntimeCollectiveMemoryRetrieval",
+            "CollectiveMemoryRuntimeRetriever",
+            "CollectiveMemoryToolExecution",
+            "CollectiveMemoryConscienceIntegration",
             "RetrievalBoost",
             "SqlCollectiveMemoryStabilityStore",
             "migrate_collective_memory_stability",
             "usp_CollectiveMemoryStability",
-            "RuntimeCollectiveMemoryScorer"
+            "RuntimeCollectiveMemoryScorer",
+            "AutoCollectiveMemoryRetrieval"
         };
 
         foreach (var file in EnumerateProductionFiles())
@@ -440,14 +443,20 @@ public sealed class CollectiveMemoryEvidenceAggregationTests
         {
             var text = File.ReadAllText(file);
 
-            Assert.IsFalse(text.Contains("ICollectiveMemoryRetrievalService", StringComparison.Ordinal),
-                $"Collective evidence aggregation retrieval token found in {file}.");
-            Assert.IsFalse(text.Contains("CollectiveMemoryRetrievalService", StringComparison.Ordinal),
-                $"Collective evidence aggregation retrieval token found in {file}.");
             Assert.IsFalse(text.Contains("WeaviateCollectiveMemory", StringComparison.Ordinal),
                 $"Collective evidence aggregation Weaviate token found in {file}.");
+            Assert.IsFalse(text.Contains("RuntimeCollectiveMemoryRetrieval", StringComparison.Ordinal),
+                $"Collective evidence aggregation runtime retrieval token found in {file}.");
+            Assert.IsFalse(text.Contains("CollectiveMemoryRuntimeRetriever", StringComparison.Ordinal),
+                $"Collective evidence aggregation runtime retriever token found in {file}.");
+            Assert.IsFalse(text.Contains("CollectiveMemoryToolExecution", StringComparison.Ordinal),
+                $"Collective evidence aggregation tool execution token found in {file}.");
+            Assert.IsFalse(text.Contains("CollectiveMemoryConscienceIntegration", StringComparison.Ordinal),
+                $"Collective evidence aggregation Conscience integration token found in {file}.");
             Assert.IsFalse(text.Contains("RetrievalBoost", StringComparison.Ordinal),
                 $"Collective evidence aggregation retrieval boost token found in {file}.");
+            Assert.IsFalse(text.Contains("AutoCollectiveMemoryRetrieval", StringComparison.Ordinal),
+                $"Collective evidence aggregation automatic retrieval token found in {file}.");
             Assert.IsFalse(text.Contains("SqlCollectiveMemoryStabilityStore", StringComparison.Ordinal),
                 $"Collective evidence aggregation stability store token found in {file}.");
             Assert.IsFalse(text.Contains("migrate_collective_memory_stability", StringComparison.Ordinal),

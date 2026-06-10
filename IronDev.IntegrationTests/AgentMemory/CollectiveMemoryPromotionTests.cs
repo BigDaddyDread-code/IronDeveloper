@@ -425,12 +425,15 @@ public sealed class CollectiveMemoryPromotionTests : IntegrationTestBase
     {
         var forbiddenTypeNames = new[]
         {
-            "ICollectiveMemoryRetrievalService",
-            "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
+            "RuntimeCollectiveMemoryRetrieval",
+            "CollectiveMemoryRuntimeRetriever",
+            "CollectiveMemoryToolExecution",
+            "CollectiveMemoryConscienceIntegration",
             "RetrievalBoost",
             "SqlCollectiveMemoryStabilityStore",
-            "RuntimeCollectiveMemoryScorer"
+            "RuntimeCollectiveMemoryScorer",
+            "AutoCollectiveMemoryRetrieval"
         };
 
         var typeNames = new[]
@@ -686,14 +689,17 @@ public sealed class CollectiveMemoryPromotionTests : IntegrationTestBase
     {
         var forbiddenTokens = new[]
         {
-            "ICollectiveMemoryRetrievalService",
-            "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
+            "RuntimeCollectiveMemoryRetrieval",
+            "CollectiveMemoryRuntimeRetriever",
+            "CollectiveMemoryToolExecution",
+            "CollectiveMemoryConscienceIntegration",
             "RetrievalBoost",
             "SqlCollectiveMemoryStabilityStore",
             "migrate_collective_memory_stability",
             "usp_CollectiveMemoryStability",
-            "RuntimeCollectiveMemoryScorer"
+            "RuntimeCollectiveMemoryScorer",
+            "AutoCollectiveMemoryRetrieval"
         };
 
         foreach (var file in EnumerateProductionFiles())
@@ -746,6 +752,7 @@ public sealed class CollectiveMemoryPromotionTests : IntegrationTestBase
             .Where(file => !file.EndsWith(Path.Combine("IronDev.Core", "AgentMemory", "Collective", "CollectiveMemoryPromotionModels.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(file => !file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryStore.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(file => !file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryPromotionService.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(file => !file.EndsWith(Path.Combine("IronDev.Infrastructure", "AgentMemory", "SqlCollectiveMemoryRetrievalService.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(file => !file.Contains(Path.Combine("IronDev.Core", "AgentMemory", "Collective"), StringComparison.OrdinalIgnoreCase));
 
     private static string FindRepositoryRoot()
