@@ -349,13 +349,18 @@ public sealed class ManualMemoryImprovementAgentTests
 
         foreach (var file in runtimeFiles)
         {
-            var text = File.ReadAllText(file);
+            var text = RemoveStoredManualMemoryWrapperNames(File.ReadAllText(file));
             Assert.IsFalse(text.Contains("ManualMemoryImprovementAgentService", StringComparison.Ordinal),
                 $"Runtime file wires ManualMemoryImprovementAgentService: {file}");
             Assert.IsFalse(text.Contains("IManualMemoryImprovementAgentService", StringComparison.Ordinal),
                 $"Runtime file wires IManualMemoryImprovementAgentService: {file}");
         }
     }
+
+    private static string RemoveStoredManualMemoryWrapperNames(string text) =>
+        text
+            .Replace("IStoredManualMemoryImprovementAgentService", string.Empty, StringComparison.Ordinal)
+            .Replace("StoredManualMemoryImprovementAgentService", string.Empty, StringComparison.Ordinal);
 
     private static ManualMemoryImprovementDetectionResult Detect(ManualMemoryImprovementDetectionRequest request) =>
         new ManualMemoryImprovementAgentService().Detect(request, DetectedAt);

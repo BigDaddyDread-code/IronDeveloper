@@ -330,13 +330,18 @@ public sealed class ManualIndependentCriticAgentTests
 
         foreach (var file in runtimeFiles)
         {
-            var text = File.ReadAllText(file);
+            var text = RemoveStoredManualCriticWrapperNames(File.ReadAllText(file));
             Assert.IsFalse(text.Contains("ManualIndependentCriticAgentService", StringComparison.Ordinal),
                 $"Runtime file wires ManualIndependentCriticAgentService: {file}");
             Assert.IsFalse(text.Contains("IManualIndependentCriticAgentService", StringComparison.Ordinal),
                 $"Runtime file wires IManualIndependentCriticAgentService: {file}");
         }
     }
+
+    private static string RemoveStoredManualCriticWrapperNames(string text) =>
+        text
+            .Replace("IStoredManualIndependentCriticAgentService", string.Empty, StringComparison.Ordinal)
+            .Replace("StoredManualIndependentCriticAgentService", string.Empty, StringComparison.Ordinal);
 
     private static ManualCriticReviewResult Review(ManualCriticReviewRequest request) =>
         new ManualIndependentCriticAgentService().Review(request, ReviewedAt);
