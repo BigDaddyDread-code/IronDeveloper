@@ -29,8 +29,90 @@ public enum AgentApprovalDecision
     Invalid
 }
 
+public enum AgentKind
+{
+    ImplementationAgent = 1,
+    TestingAgent = 2,
+    ReviewAgent = 3,
+    GovernanceAgent = 4,
+    ProposalAgent = 5,
+    RetrievalAgent = 6,
+    ReportingAgent = 7,
+    HumanProxyAgent = 8
+}
+
+public enum AgentExecutionMode
+{
+    PassiveAnalysisOnly = 1,
+    ProposalOnly = 2,
+    OutOfBandReviewOnly = 3,
+    GovernanceCheckOnly = 4,
+    RetrievalOnly = 5,
+    ReportingOnly = 6,
+    ToolExecution = 7,
+    SourceMutation = 8,
+    ExternalEffect = 9,
+    HumanAuthorityProxy = 10
+}
+
+public enum AgentCapability
+{
+    ReadLocalMemory = 1,
+    WriteLocalMemory = 2,
+    RecordMemoryInfluence = 3,
+    CreateHandoff = 4,
+
+    ReadCollectiveMemory = 10,
+    RetrieveCollectiveMemory = 11,
+    CreateMemoryProposal = 12,
+    PromoteCollectiveMemory = 13,
+
+    RunTool = 20,
+    MutateSource = 21,
+    CallExternalSystem = 22,
+
+    BlockExecution = 30,
+    WarnExecution = 31,
+
+    CreateReport = 40,
+    CreateCriticFinding = 41,
+    CreateTestReport = 42,
+
+    RepresentHumanApproval = 50,
+    RepresentHumanRejection = 51,
+    RepresentHumanPromotionDecision = 52
+}
+
+public sealed record AgentPersona
+{
+    public required string PersonaId { get; init; }
+    public required string DisplayName { get; init; }
+    public required string Voice { get; init; }
+    public required string CommunicationStyle { get; init; }
+    public required string DefaultTone { get; init; }
+    public IReadOnlyList<string> MustSayWhenRelevant { get; init; } = [];
+    public IReadOnlyList<string> MustNeverClaim { get; init; } = [];
+}
+
+public sealed record AgentDefinitionValidationIssue
+{
+    public required string Code { get; init; }
+    public required string Severity { get; init; }
+    public required string Message { get; init; }
+}
+
 public sealed class AgentDefinition
 {
+    public string AgentId { get; init; } = string.Empty;
+    public AgentKind Kind { get; init; }
+    public AgentExecutionMode ExecutionMode { get; init; }
+    public AgentPersona? Persona { get; init; }
+    public IReadOnlySet<AgentCapability>? Capabilities { get; init; } = new HashSet<AgentCapability>();
+    public IReadOnlySet<AgentCapability>? ForbiddenCapabilities { get; init; } = new HashSet<AgentCapability>();
+    public string? Description { get; init; }
+    public string? Owner { get; init; }
+    public bool IsEnabled { get; init; } = true;
+
     public required string Name { get; init; }
     public required string Purpose { get; init; }
     public required string DefaultModelProfile { get; init; }
