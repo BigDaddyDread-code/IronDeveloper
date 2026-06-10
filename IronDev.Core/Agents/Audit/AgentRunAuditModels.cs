@@ -50,7 +50,10 @@ public enum AgentBoundaryDecisionType
     Handoff = 6,
     Output = 7,
     Evidence = 8,
-    Safety = 9
+    Safety = 9,
+    AgentDefinition = 10,
+    OutputValidation = 11,
+    ThoughtLedgerSafety = 12
 }
 
 public enum ThoughtLedgerEntryType
