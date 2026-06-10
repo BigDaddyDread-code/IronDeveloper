@@ -221,6 +221,70 @@ public sealed class ConscienceMemoryGovernanceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task ConscienceMemoryGovernance_InfluenceOnlyForExpiredMemory_Blocks()
+    {
+        var builder = OpenSilo("builder-agent");
+        await builder.CreateAsync(BuildMemoryDraft("memory-influence-expired"));
+        await builder.RecordInfluenceAsync(BuildInfluenceDraft("influence-expired", "memory-influence-expired", "decision-1"));
+        await builder.AddEventAsync(BuildEventDraft("memory-influence-expired", AgentLocalMemoryEventType.Expired, 1));
+
+        var result = await _governance.CheckAsync(BuildInfluenceOnlyRequest(
+            "influence-expired",
+            MemoryGovernanceActionType.ToolCallJustification));
+
+        AssertBlockedWith(result, MemoryGovernanceIssueCode.MemoryExpired);
+    }
+
+    [TestMethod]
+    public async Task ConscienceMemoryGovernance_InfluenceOnlyForInvalidatedMemory_Blocks()
+    {
+        var builder = OpenSilo("builder-agent");
+        await builder.CreateAsync(BuildMemoryDraft("memory-influence-invalidated"));
+        await builder.RecordInfluenceAsync(BuildInfluenceDraft("influence-invalidated", "memory-influence-invalidated", "decision-1"));
+        await builder.AddEventAsync(BuildEventDraft("memory-influence-invalidated", AgentLocalMemoryEventType.Invalidated, 1));
+
+        var result = await _governance.CheckAsync(BuildInfluenceOnlyRequest(
+            "influence-invalidated",
+            MemoryGovernanceActionType.ToolCallJustification));
+
+        AssertBlockedWith(result, MemoryGovernanceIssueCode.MemoryInvalidated);
+    }
+
+    [TestMethod]
+    public async Task ConscienceMemoryGovernance_InfluenceOnlyForTimeExpiredMemory_Blocks()
+    {
+        var builder = OpenSilo("builder-agent");
+        await builder.CreateAsync(BuildMemoryDraft("memory-influence-time-expired") with
+        {
+            ExpiresAt = Now.AddYears(1)
+        });
+        await builder.RecordInfluenceAsync(BuildInfluenceDraft("influence-time-expired", "memory-influence-time-expired", "decision-1"));
+
+        var result = await _governance.CheckAsync(BuildInfluenceOnlyRequest(
+            "influence-time-expired",
+            MemoryGovernanceActionType.ToolCallJustification) with
+        {
+            RequestedAt = Now.AddYears(2)
+        });
+
+        AssertBlockedWith(result, MemoryGovernanceIssueCode.MemoryExpired);
+    }
+
+    [TestMethod]
+    public async Task ConscienceMemoryGovernance_InfluenceOnlyForCandidatePatternSourceMutation_Blocks()
+    {
+        var builder = OpenSilo("builder-agent");
+        await builder.CreateAsync(BuildCandidatePatternDraft("memory-influence-candidate"));
+        await builder.RecordInfluenceAsync(BuildInfluenceDraft("influence-candidate", "memory-influence-candidate", "decision-1"));
+
+        var result = await _governance.CheckAsync(BuildInfluenceOnlyRequest(
+            "influence-candidate",
+            MemoryGovernanceActionType.SourceMutation));
+
+        AssertBlockedWith(result, MemoryGovernanceIssueCode.CandidatePatternCannotJustifyExternalEffect);
+    }
+
+    [TestMethod]
     public async Task ConscienceMemoryGovernance_InfluenceMismatches_DoNotSatisfyRequirement()
     {
         var builder = OpenSilo("builder-agent");
@@ -476,6 +540,31 @@ public sealed class ConscienceMemoryGovernanceTests : IntegrationTestBase
             AffectedArtifactId = actionType == MemoryGovernanceActionType.SourceMutation ? "file.cs" : null,
             CorrelationId = "correlation-1",
             InfluenceRecordRequired = influenceRequired
+        };
+
+    private static MemoryGovernanceCheckRequest BuildInfluenceOnlyRequest(
+        string influenceId,
+        MemoryGovernanceActionType actionType,
+        AgentMemoryScope? scope = null) =>
+        new()
+        {
+            Scope = scope ?? BuildScope(),
+            ActionType = actionType,
+            DecisionId = "decision-1",
+            ReferencedArtifacts =
+            [
+                new MemoryGovernanceReferencedArtifact
+                {
+                    InfluenceId = influenceId,
+                    DecisionId = "decision-1",
+                    ThoughtLedgerEntryId = "thought-request-1"
+                }
+            ],
+            RequestedAt = Now,
+            ToolName = actionType == MemoryGovernanceActionType.ToolCallJustification ? "test.run" : null,
+            AffectedArtifactType = actionType == MemoryGovernanceActionType.SourceMutation ? "source" : null,
+            AffectedArtifactId = actionType == MemoryGovernanceActionType.SourceMutation ? "file.cs" : null,
+            CorrelationId = "correlation-1"
         };
 
     private static MemoryGovernanceCheckRequest BuildHandoffRequest(

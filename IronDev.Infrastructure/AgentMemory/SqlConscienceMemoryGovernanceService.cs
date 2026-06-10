@@ -33,8 +33,8 @@ public sealed class SqlConscienceMemoryGovernanceService : IConscienceMemoryGove
 
         using var connection = _connectionFactory.CreateConnection();
 
-        var memoryRows = await LoadMemoryRowsAsync(connection, request, cancellationToken).ConfigureAwait(false);
         var influenceRows = await LoadInfluenceRowsAsync(connection, request, cancellationToken).ConfigureAwait(false);
+        var memoryRows = await LoadMemoryRowsAsync(connection, request, influenceRows, cancellationToken).ConfigureAwait(false);
         var handoffRows = await LoadHandoffRowsAsync(connection, request, cancellationToken).ConfigureAwait(false);
 
         var memoryById = memoryRows.ToDictionary(row => row.MemoryItemId, StringComparer.Ordinal);
@@ -50,7 +50,7 @@ public sealed class SqlConscienceMemoryGovernanceService : IConscienceMemoryGove
 
             if (!string.IsNullOrWhiteSpace(artifact.InfluenceId))
             {
-                ValidateInfluenceReference(request, artifact, influenceById, issues);
+                ValidateInfluenceReference(request, artifact, influenceById, memoryById, issues);
             }
 
             if (!string.IsNullOrWhiteSpace(artifact.HandoffMemorySliceId))
@@ -128,11 +128,13 @@ public sealed class SqlConscienceMemoryGovernanceService : IConscienceMemoryGove
     private async Task<IReadOnlyList<MemoryRow>> LoadMemoryRowsAsync(
         System.Data.IDbConnection connection,
         MemoryGovernanceCheckRequest request,
+        IReadOnlyList<InfluenceRow> influenceRows,
         CancellationToken cancellationToken)
     {
         var memoryItemIds = request.ReferencedArtifacts
             .Where(artifact => !string.IsNullOrWhiteSpace(artifact.MemoryItemId))
             .Select(artifact => artifact.MemoryItemId!.Trim())
+            .Concat(influenceRows.Select(row => row.MemoryItemId))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -462,6 +464,7 @@ public sealed class SqlConscienceMemoryGovernanceService : IConscienceMemoryGove
         MemoryGovernanceCheckRequest request,
         MemoryGovernanceReferencedArtifact artifact,
         IReadOnlyDictionary<string, InfluenceRow> influenceById,
+        IReadOnlyDictionary<string, MemoryRow> memoryById,
         List<MemoryGovernanceIssue> issues)
     {
         var influenceId = artifact.InfluenceId!.Trim();
@@ -502,6 +505,22 @@ public sealed class SqlConscienceMemoryGovernanceService : IConscienceMemoryGove
                 Summary = "Referenced influence record does not match the referenced memory item."
             });
         }
+
+        if (!memoryById.TryGetValue(influence.MemoryItemId, out var memory))
+        {
+            issues.Add(new MemoryGovernanceIssue
+            {
+                Code = MemoryGovernanceIssueCode.MemoryNotFoundInScope,
+                Severity = MemoryGovernanceIssueSeverity.Critical,
+                MemoryItemId = influence.MemoryItemId,
+                InfluenceId = influence.InfluenceId,
+                Summary = "Referenced influence memory was not found in the acting agent memory scope."
+            });
+            return;
+        }
+
+        ValidateMemoryStatus(request, memory, issues);
+        ValidateMemoryTypeActionRules(request, memory, issues);
     }
 
     private static void ValidateHandoffReference(
