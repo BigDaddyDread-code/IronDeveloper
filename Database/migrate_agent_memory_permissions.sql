@@ -58,3 +58,23 @@ DENY ALTER ON SCHEMA::agent TO IronDevMemoryRuntimeRole;
 -- Do not grant CONTROL on the agent schema. An explicit DENY CONTROL at schema
 -- scope also denies EXECUTE on procedures in the schema, which would block the
 -- approved runtime procedure boundary above.
+IF OBJECT_ID('agent.usp_CollectiveMemory_CreateFromManualPromotion', 'P') IS NOT NULL
+    GRANT EXECUTE ON OBJECT::agent.usp_CollectiveMemory_CreateFromManualPromotion TO IronDevMemoryRuntimeRole;
+
+IF OBJECT_ID('agent.usp_CollectiveMemory_AddEvent', 'P') IS NOT NULL
+    GRANT EXECUTE ON OBJECT::agent.usp_CollectiveMemory_AddEvent TO IronDevMemoryRuntimeRole;
+
+IF OBJECT_ID('agent.CollectiveMemoryItem', 'U') IS NOT NULL
+BEGIN
+    GRANT SELECT ON OBJECT::agent.CollectiveMemoryItem TO IronDevMemoryRuntimeRole;
+    DENY INSERT, UPDATE, DELETE ON OBJECT::agent.CollectiveMemoryItem TO IronDevMemoryRuntimeRole;
+END
+
+IF OBJECT_ID('agent.CollectiveMemoryEvent', 'U') IS NOT NULL
+BEGIN
+    GRANT SELECT ON OBJECT::agent.CollectiveMemoryEvent TO IronDevMemoryRuntimeRole;
+    DENY INSERT, UPDATE, DELETE ON OBJECT::agent.CollectiveMemoryEvent TO IronDevMemoryRuntimeRole;
+END
+
+IF OBJECT_ID('agent.vwCollectiveMemoryCurrentState', 'V') IS NOT NULL
+    GRANT SELECT ON OBJECT::agent.vwCollectiveMemoryCurrentState TO IronDevMemoryRuntimeRole;
