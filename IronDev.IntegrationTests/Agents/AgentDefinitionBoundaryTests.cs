@@ -299,8 +299,6 @@ public sealed class AgentDefinitionBoundaryTests
             "AgentToolRouter",
             "ExecuteAgentAsync",
             "RunAgentAsync",
-            "MemoryImprovementAgent",
-            "IndependentCriticAgent",
             "WeaviateAgent",
             "AgentPromptRunner",
             "ICollectiveMemoryRetrievalService",
