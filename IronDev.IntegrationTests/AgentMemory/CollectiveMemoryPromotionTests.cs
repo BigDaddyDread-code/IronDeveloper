@@ -428,10 +428,9 @@ public sealed class CollectiveMemoryPromotionTests : IntegrationTestBase
             "ICollectiveMemoryRetrievalService",
             "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
-            "CollectiveMemoryAttractor",
-            "AttractorScore",
-            "StabilityScore",
-            "RetrievalBoost"
+            "RetrievalBoost",
+            "SqlCollectiveMemoryStabilityStore",
+            "RuntimeCollectiveMemoryScorer"
         };
 
         var typeNames = new[]
@@ -690,10 +689,11 @@ public sealed class CollectiveMemoryPromotionTests : IntegrationTestBase
             "ICollectiveMemoryRetrievalService",
             "CollectiveMemoryRetrievalService",
             "WeaviateCollectiveMemory",
-            "CollectiveMemoryAttractor",
-            "AttractorScore",
-            "StabilityScore",
-            "RetrievalBoost"
+            "RetrievalBoost",
+            "SqlCollectiveMemoryStabilityStore",
+            "migrate_collective_memory_stability",
+            "usp_CollectiveMemoryStability",
+            "RuntimeCollectiveMemoryScorer"
         };
 
         foreach (var file in EnumerateProductionFiles())
