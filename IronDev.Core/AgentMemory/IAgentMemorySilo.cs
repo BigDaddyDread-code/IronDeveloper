@@ -39,4 +39,16 @@ public interface IAgentMemorySilo
     Task<IReadOnlyList<MemoryInfluenceRecord>> GetInfluencesForDecisionAsync(
         string decisionId,
         CancellationToken cancellationToken = default);
+
+    Task CreateHandoffAsync(
+        HandoffMemorySliceDraft draft,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<HandoffMemorySliceRecord>> QueryIncomingHandoffsAsync(
+        HandoffMemorySliceQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<HandoffMemorySliceRecord>> QueryOutgoingHandoffsAsync(
+        HandoffMemorySliceQuery query,
+        CancellationToken cancellationToken = default);
 }

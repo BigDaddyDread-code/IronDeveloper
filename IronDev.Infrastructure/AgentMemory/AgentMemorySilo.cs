@@ -6,15 +6,18 @@ internal sealed class AgentMemorySilo : IAgentMemorySilo
 {
     private readonly IAgentLocalMemoryStore _store;
     private readonly IAgentMemoryInfluenceStore _influenceStore;
+    private readonly IAgentMemoryHandoffStore _handoffStore;
 
     internal AgentMemorySilo(
         AgentMemoryScope scope,
         IAgentLocalMemoryStore store,
-        IAgentMemoryInfluenceStore influenceStore)
+        IAgentMemoryInfluenceStore influenceStore,
+        IAgentMemoryHandoffStore handoffStore)
     {
         Scope = scope ?? throw new ArgumentNullException(nameof(scope));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _influenceStore = influenceStore ?? throw new ArgumentNullException(nameof(influenceStore));
+        _handoffStore = handoffStore ?? throw new ArgumentNullException(nameof(handoffStore));
     }
 
     public AgentMemoryScope Scope { get; }
@@ -102,4 +105,19 @@ internal sealed class AgentMemorySilo : IAgentMemorySilo
         string decisionId,
         CancellationToken cancellationToken = default) =>
         _influenceStore.QueryAsync(Scope, new MemoryInfluenceQuery { DecisionId = decisionId }, cancellationToken);
+
+    public Task CreateHandoffAsync(
+        HandoffMemorySliceDraft draft,
+        CancellationToken cancellationToken = default) =>
+        _handoffStore.CreateAsync(Scope, draft, cancellationToken);
+
+    public Task<IReadOnlyList<HandoffMemorySliceRecord>> QueryIncomingHandoffsAsync(
+        HandoffMemorySliceQuery query,
+        CancellationToken cancellationToken = default) =>
+        _handoffStore.QueryIncomingAsync(Scope, query, cancellationToken);
+
+    public Task<IReadOnlyList<HandoffMemorySliceRecord>> QueryOutgoingHandoffsAsync(
+        HandoffMemorySliceQuery query,
+        CancellationToken cancellationToken = default) =>
+        _handoffStore.QueryOutgoingAsync(Scope, query, cancellationToken);
 }

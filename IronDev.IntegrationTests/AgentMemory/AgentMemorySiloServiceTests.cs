@@ -27,8 +27,10 @@ public sealed class AgentMemorySiloServiceTests : IntegrationTestBase
             new AgentMemoryContractValidator());
         var influenceStore = new SqlAgentMemoryInfluenceStore(
             ServiceProvider.GetRequiredService<IDbConnectionFactory>());
+        var handoffStore = new SqlAgentMemoryHandoffStore(
+            ServiceProvider.GetRequiredService<IDbConnectionFactory>());
 
-        _siloService = new AgentMemorySiloService(store, influenceStore);
+        _siloService = new AgentMemorySiloService(store, influenceStore, handoffStore);
     }
 
     [TestCleanup]
@@ -315,6 +317,12 @@ public sealed class AgentMemorySiloServiceTests : IntegrationTestBase
             """
             IF OBJECT_ID('agent.vwAgentLocalMemoryCurrentState', 'V') IS NOT NULL
                 DROP VIEW agent.vwAgentLocalMemoryCurrentState;
+            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory;
+            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete;
+            IF OBJECT_ID('agent.AgentMemoryHandoffSlice', 'U') IS NOT NULL
+                DROP TABLE agent.AgentMemoryHandoffSlice;
             IF OBJECT_ID('agent.TR_AgentLocalMemoryEvent_ValidateInsert', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentLocalMemoryEvent_ValidateInsert;
             IF OBJECT_ID('agent.TR_AgentLocalMemoryEvidenceRef_BlockUpdateDelete', 'TR') IS NOT NULL

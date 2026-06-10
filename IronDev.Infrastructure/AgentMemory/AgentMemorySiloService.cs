@@ -6,13 +6,16 @@ public sealed class AgentMemorySiloService : IAgentMemorySiloService
 {
     private readonly IAgentLocalMemoryStore _store;
     private readonly IAgentMemoryInfluenceStore _influenceStore;
+    private readonly IAgentMemoryHandoffStore _handoffStore;
 
     public AgentMemorySiloService(
         IAgentLocalMemoryStore store,
-        IAgentMemoryInfluenceStore influenceStore)
+        IAgentMemoryInfluenceStore influenceStore,
+        IAgentMemoryHandoffStore handoffStore)
     {
         _store = store;
         _influenceStore = influenceStore;
+        _handoffStore = handoffStore;
     }
 
     public IAgentMemorySilo Open(AgentMemorySiloContext context)
@@ -29,7 +32,7 @@ public sealed class AgentMemorySiloService : IAgentMemorySiloService
             AgentId = context.AgentId
         };
 
-        return new AgentMemorySilo(scope, _store, _influenceStore);
+        return new AgentMemorySilo(scope, _store, _influenceStore, _handoffStore);
     }
 
     private static void ThrowIfInvalid(AgentMemorySiloContext context)
