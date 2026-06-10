@@ -193,7 +193,8 @@ public sealed class AgentDefinitionValidator : IAgentDefinitionValidator
                     AgentCapability.CallExternalSystem,
                     AgentCapability.PromoteCollectiveMemory,
                     AgentCapability.RepresentHumanApproval,
-                    AgentCapability.RepresentHumanPromotionDecision),
+                    AgentCapability.RepresentHumanPromotionDecision,
+                    AgentCapability.BlockExecution),
 
             AgentExecutionMode.GovernanceCheckOnly =>
                 Set(
@@ -332,7 +333,8 @@ public sealed class AgentDefinitionValidator : IAgentDefinitionValidator
                     AgentCapability.MutateSource,
                     AgentCapability.PromoteCollectiveMemory,
                     AgentCapability.RepresentHumanApproval,
-                    AgentCapability.RepresentHumanPromotionDecision),
+                    AgentCapability.RepresentHumanPromotionDecision,
+                    AgentCapability.BlockExecution),
 
             AgentKind.GovernanceAgent =>
                 Set(
