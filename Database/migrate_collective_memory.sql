@@ -380,6 +380,10 @@ BEGIN
     IF @CreatedByUserId IS NULL AND @CreatedByAgentId IS NULL
         THROW 51122, ''Collective memory manual promotion requires an actor.'', 1;
 
+    IF @DecisionEventType = 2
+       AND NULLIF(LTRIM(RTRIM(ISNULL(@CreatedByUserId, N''''))), N'''') IS NULL
+        THROW 51131, ''Accepted collective memory requires an explicit human/governance user actor.'', 1;
+
     IF @DecisionEventType NOT IN (2, 3)
         THROW 51123, ''Collective memory manual promotion supports Accepted or Rejected decision events only.'', 1;
 

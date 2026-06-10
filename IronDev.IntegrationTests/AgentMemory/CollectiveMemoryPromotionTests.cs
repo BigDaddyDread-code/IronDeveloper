@@ -152,6 +152,53 @@ public sealed class CollectiveMemoryPromotionTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task CollectiveMemoryPermissions_RuntimeCannotCreateAcceptedCollectiveMemoryWithAgentOnlyActor()
+    {
+        await DropAgentSchemaObjectsAsync();
+        await ApplyFullMemoryMigrationsAsync();
+        await EnsureRuntimeTestUserAsync();
+
+        await using var connection = new SqlConnection(ConnectionString);
+
+        await AssertSqlFailsAsync(connection, () => ExecuteAsRuntimeAsync(connection,
+            """
+            EXEC agent.usp_CollectiveMemory_CreateFromManualPromotion
+                @CollectiveMemoryId = N'collective-agent-only-accepted',
+                @TenantId = N'tenant-1',
+                @ProjectId = N'project-1',
+                @KnowledgeDomainId = N'memory-governance',
+                @ComponentId = N'collective-memory',
+                @RepositoryId = N'IronDeveloper',
+                @MemoryType = 2,
+                @AuthorityLevel = 3,
+                @Title = N'Agent-only accepted memory must fail',
+                @Summary = N'Accepted CollectiveMemory cannot be created by an agent-only actor.',
+                @SourcesJson = N'[{ "sourceType": 7, "sourceId": "human-decision-1" }]',
+                @EvidenceRefsJson = N'[{ "evidenceId": "evidence-1", "evidenceType": 4, "sourceId": "human-decision-1" }]',
+                @ContradictionsJson = N'[]',
+                @SupersedesJson = N'[]',
+                @Confidence = 0.8000,
+                @CreatedAtUtc = '2026-06-10T00:00:00',
+                @LastReviewedAtUtc = '2026-06-10T00:00:00',
+                @DecisionId = N'decision-agent-only-1',
+                @CreatedEventId = N'collective-agent-only-accepted-created',
+                @DecisionEventId = N'collective-agent-only-accepted-event',
+                @DecisionEventType = 2,
+                @Reason = N'Agent-only accepted promotion must be denied.',
+                @CreatedByUserId = NULL,
+                @CreatedByAgentId = N'some-agent';
+            """));
+
+        var itemCount = await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM agent.CollectiveMemoryItem WHERE CollectiveMemoryId = N'collective-agent-only-accepted'");
+        var eventCount = await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM agent.CollectiveMemoryEvent WHERE CollectiveMemoryId = N'collective-agent-only-accepted'");
+
+        Assert.AreEqual(0, itemCount);
+        Assert.AreEqual(0, eventCount);
+    }
+
+    [TestMethod]
     public async Task ManualAccept_ReadyAggregateCreatesAcceptedCollectiveMemoryWithAuditEvents()
     {
         var service = CreatePromotionService();
