@@ -5,10 +5,14 @@ namespace IronDev.Infrastructure.AgentMemory;
 public sealed class AgentMemorySiloService : IAgentMemorySiloService
 {
     private readonly IAgentLocalMemoryStore _store;
+    private readonly IAgentMemoryInfluenceStore _influenceStore;
 
-    public AgentMemorySiloService(IAgentLocalMemoryStore store)
+    public AgentMemorySiloService(
+        IAgentLocalMemoryStore store,
+        IAgentMemoryInfluenceStore influenceStore)
     {
         _store = store;
+        _influenceStore = influenceStore;
     }
 
     public IAgentMemorySilo Open(AgentMemorySiloContext context)
@@ -25,7 +29,7 @@ public sealed class AgentMemorySiloService : IAgentMemorySiloService
             AgentId = context.AgentId
         };
 
-        return new AgentMemorySilo(scope, _store);
+        return new AgentMemorySilo(scope, _store, _influenceStore);
     }
 
     private static void ThrowIfInvalid(AgentMemorySiloContext context)

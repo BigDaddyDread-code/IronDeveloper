@@ -23,4 +23,20 @@ public interface IAgentMemorySilo
     Task<IReadOnlyList<AgentLocalMemoryEventRecord>> GetEventHistoryAsync(
         string memoryItemId,
         CancellationToken cancellationToken = default);
+
+    Task RecordInfluenceAsync(
+        MemoryInfluenceDraft draft,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MemoryInfluenceRecord>> QueryInfluencesAsync(
+        MemoryInfluenceQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MemoryInfluenceRecord>> GetInfluencesForMemoryAsync(
+        string memoryItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MemoryInfluenceRecord>> GetInfluencesForDecisionAsync(
+        string decisionId,
+        CancellationToken cancellationToken = default);
 }

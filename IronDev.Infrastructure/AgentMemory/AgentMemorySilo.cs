@@ -5,13 +5,16 @@ namespace IronDev.Infrastructure.AgentMemory;
 internal sealed class AgentMemorySilo : IAgentMemorySilo
 {
     private readonly IAgentLocalMemoryStore _store;
+    private readonly IAgentMemoryInfluenceStore _influenceStore;
 
     internal AgentMemorySilo(
         AgentMemoryScope scope,
-        IAgentLocalMemoryStore store)
+        IAgentLocalMemoryStore store,
+        IAgentMemoryInfluenceStore influenceStore)
     {
         Scope = scope ?? throw new ArgumentNullException(nameof(scope));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _influenceStore = influenceStore ?? throw new ArgumentNullException(nameof(influenceStore));
     }
 
     public AgentMemoryScope Scope { get; }
@@ -79,4 +82,24 @@ internal sealed class AgentMemorySilo : IAgentMemorySilo
         string memoryItemId,
         CancellationToken cancellationToken = default) =>
         _store.GetEventHistoryAsync(Scope, memoryItemId, cancellationToken);
+
+    public Task RecordInfluenceAsync(
+        MemoryInfluenceDraft draft,
+        CancellationToken cancellationToken = default) =>
+        _influenceStore.RecordAsync(Scope, draft, cancellationToken);
+
+    public Task<IReadOnlyList<MemoryInfluenceRecord>> QueryInfluencesAsync(
+        MemoryInfluenceQuery query,
+        CancellationToken cancellationToken = default) =>
+        _influenceStore.QueryAsync(Scope, query, cancellationToken);
+
+    public Task<IReadOnlyList<MemoryInfluenceRecord>> GetInfluencesForMemoryAsync(
+        string memoryItemId,
+        CancellationToken cancellationToken = default) =>
+        _influenceStore.QueryAsync(Scope, new MemoryInfluenceQuery { MemoryItemId = memoryItemId }, cancellationToken);
+
+    public Task<IReadOnlyList<MemoryInfluenceRecord>> GetInfluencesForDecisionAsync(
+        string decisionId,
+        CancellationToken cancellationToken = default) =>
+        _influenceStore.QueryAsync(Scope, new MemoryInfluenceQuery { DecisionId = decisionId }, cancellationToken);
 }

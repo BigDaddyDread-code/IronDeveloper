@@ -338,8 +338,11 @@ public sealed class AgentMemoryContractValidatorTests
             Scope = BuildScope(),
             DecisionId = "decision-1",
             InfluenceType = MemoryInfluenceType.ToolCallJustified,
+            InfluenceSummary = "Memory justified the selected tool call.",
             EvidenceRefs = [BuildEvidence()],
             Confidence = 0.7m,
+            MemoryAuthorityLevelAtInfluence = MemoryAuthorityLevel.ObservedOnly,
+            MemoryStatusAtInfluence = MemoryLifecycleStatus.Active,
             CreatedAt = Now
         };
 

@@ -1,10 +1,8 @@
 ﻿namespace IronDev.Core.AgentMemory;
 
-public sealed record MemoryInfluenceRecord
+public sealed record MemoryInfluenceDraft
 {
     public required string InfluenceId { get; init; }
-
-    public required AgentMemoryScope Scope { get; init; }
 
     public required string MemoryItemId { get; init; }
 
@@ -17,10 +15,6 @@ public sealed record MemoryInfluenceRecord
     public required IReadOnlyList<EvidenceRef> EvidenceRefs { get; init; }
 
     public required decimal Confidence { get; init; }
-
-    public required MemoryAuthorityLevel MemoryAuthorityLevelAtInfluence { get; init; }
-
-    public required MemoryLifecycleStatus MemoryStatusAtInfluence { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
 
