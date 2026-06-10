@@ -142,6 +142,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                 Confidence,
                 InfluenceIdsJson,
                 DecisionId,
+                ThoughtLedgerEntryId,
                 CorrelationId,
                 CreatedAtUtc,
                 ExpiresAtUtc,
@@ -165,6 +166,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                 @Confidence,
                 @InfluenceIdsJson,
                 @DecisionId,
+                @ThoughtLedgerEntryId,
                 @CorrelationId,
                 @CreatedAtUtc,
                 @ExpiresAtUtc,
@@ -192,6 +194,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                 draft.Confidence,
                 InfluenceIdsJson = influenceIds is null || influenceIds.Length == 0 ? null : JsonSerializer.Serialize(influenceIds, JsonOptions),
                 draft.DecisionId,
+                draft.ThoughtLedgerEntryId,
                 draft.CorrelationId,
                 CreatedAtUtc = draft.CreatedAt.UtcDateTime,
                 ExpiresAtUtc = draft.ExpiresAt?.UtcDateTime,
@@ -253,6 +256,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                       Confidence,
                       InfluenceIdsJson,
                       DecisionId,
+                      ThoughtLedgerEntryId,
                       CorrelationId,
                       CreatedAtUtc,
                       ExpiresAtUtc,
@@ -287,6 +291,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                       Confidence,
                       InfluenceIdsJson,
                       DecisionId,
+                      ThoughtLedgerEntryId,
                       CorrelationId,
                       CreatedAtUtc,
                       ExpiresAtUtc,
@@ -346,6 +351,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
                 ? null
                 : JsonSerializer.Deserialize<IReadOnlyList<string>>(row.InfluenceIdsJson, JsonOptions),
             DecisionId = row.DecisionId,
+            ThoughtLedgerEntryId = row.ThoughtLedgerEntryId,
             CorrelationId = row.CorrelationId,
             HandoffJson = row.HandoffJson
         };
@@ -477,6 +483,7 @@ public sealed class SqlAgentMemoryHandoffStore : IAgentMemoryHandoffStore
         public decimal Confidence { get; set; }
         public string? InfluenceIdsJson { get; set; }
         public string? DecisionId { get; set; }
+        public string? ThoughtLedgerEntryId { get; set; }
         public string? CorrelationId { get; set; }
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? ExpiresAtUtc { get; set; }

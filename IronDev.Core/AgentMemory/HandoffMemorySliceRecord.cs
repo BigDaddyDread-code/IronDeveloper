@@ -36,6 +36,8 @@ public sealed record HandoffMemorySliceRecord
 
     public string? DecisionId { get; init; }
 
+    public string? ThoughtLedgerEntryId { get; init; }
+
     public string? CorrelationId { get; init; }
 
     public string? HandoffJson { get; init; }
