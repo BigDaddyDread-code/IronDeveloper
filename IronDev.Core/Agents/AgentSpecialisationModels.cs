@@ -660,6 +660,40 @@ public sealed class AgentSpecialisationValidator
             yield return purpose;
         }
 
+        foreach (var requirement in definition.InputRequirements)
+        {
+            yield return requirement.InputType;
+            yield return requirement.Description;
+
+            foreach (var referenceType in requirement.AllowedAuthorityReferenceTypes)
+            {
+                yield return referenceType;
+            }
+        }
+
+        foreach (var requirement in definition.OutputRequirements)
+        {
+            yield return requirement.OutputType;
+            yield return requirement.Description;
+        }
+
+        foreach (var requirement in definition.EvidenceRequirements)
+        {
+            yield return requirement.EvidenceType;
+            yield return requirement.Description;
+
+            foreach (var evidenceType in requirement.AllowedAuthorityEvidenceTypes)
+            {
+                yield return evidenceType;
+            }
+        }
+
+        foreach (var requirement in definition.ValidationRequirements)
+        {
+            yield return requirement.ValidatorName;
+            yield return requirement.Description;
+        }
+
         foreach (var behaviour in definition.ForbiddenBehaviours)
         {
             yield return behaviour.Behaviour;
