@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using IronDev.Core.AgentMemory;
 using IronDev.Data;
 using IronDev.Infrastructure.AgentMemory;
@@ -534,7 +534,12 @@ public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
-            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory', 'TR') IS NOT NULL
+            IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_ValidateInsert', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryExecutionAudit_ValidateInsert;
+            IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_BlockUpdateDelete', 'TR') IS NOT NULL
+                DROP TRIGGER agent.TR_AgentMemoryExecutionAudit_BlockUpdateDelete;
+            IF OBJECT_ID('agent.AgentMemoryExecutionAudit', 'U') IS NOT NULL
+                DROP TABLE agent.AgentMemoryExecutionAudit;            IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_ValidateSourceMemory;
             IF OBJECT_ID('agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentMemoryHandoffSlice_BlockUpdateDelete;

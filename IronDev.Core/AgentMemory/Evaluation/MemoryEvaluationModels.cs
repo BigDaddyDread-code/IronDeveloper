@@ -18,7 +18,8 @@ public enum MemoryEvaluationScenarioId
     AppendOnlyMutationBlocked = 14,
     RunReportDoesNotLeakOtherRun = 15,
     SiloDoesNotExposeGovernanceOrIndexingServices = 16,
-    MemoryBackedExecutionCannotBypassGate = 17
+    MemoryBackedExecutionCannotBypassGate = 17,
+    MemoryBackedExecutionProducesAuditPackage = 18
 }
 
 public sealed record MemoryEvaluationScenarioResult

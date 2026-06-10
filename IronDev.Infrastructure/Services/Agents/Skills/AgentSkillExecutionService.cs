@@ -31,6 +31,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
     private readonly IDisposableWorkspacePromotionPackageService _workspacePromotionPackageService;
     private readonly IDisposableWorkspaceFailurePackageService _workspaceFailurePackageService;
     private readonly IMemoryExecutionGate? _memoryExecutionGate;
+    private readonly IMemoryExecutionAuditStore? _memoryExecutionAuditStore;
 
     public AgentSkillExecutionService(
         IAgentWorkspaceApplyContextService workspaceApplyContextService,
@@ -40,7 +41,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         IDisposableWorkspaceDiffService workspaceDiffService,
         IDisposableWorkspacePromotionPackageService workspacePromotionPackageService,
         IDisposableWorkspaceFailurePackageService workspaceFailurePackageService,
-        IMemoryExecutionGate? memoryExecutionGate = null)
+        IMemoryExecutionGate? memoryExecutionGate = null,
+        IMemoryExecutionAuditStore? memoryExecutionAuditStore = null)
     {
         _workspaceApplyContextService = workspaceApplyContextService ?? throw new ArgumentNullException(nameof(workspaceApplyContextService));
         _workspaceCheckService = workspaceCheckService ?? throw new ArgumentNullException(nameof(workspaceCheckService));
@@ -50,6 +52,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         _workspacePromotionPackageService = workspacePromotionPackageService ?? throw new ArgumentNullException(nameof(workspacePromotionPackageService));
         _workspaceFailurePackageService = workspaceFailurePackageService ?? throw new ArgumentNullException(nameof(workspaceFailurePackageService));
         _memoryExecutionGate = memoryExecutionGate;
+        _memoryExecutionAuditStore = memoryExecutionAuditStore;
     }
 
     public async Task<AgentSkillExecutionResult> ExecuteAsync(
@@ -59,33 +62,24 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.SkillRequestContext);
 
+        var gateCapture = new MemoryExecutionGateCapture();
+        var result = await ExecuteCoreAsync(request, gateCapture, cancellationToken).ConfigureAwait(false);
+        return await AppendMemoryExecutionAuditAsync(request, result, gateCapture.Result, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<AgentSkillExecutionResult> ExecuteCoreAsync(
+        AgentSkillExecutionRequest request,
+        MemoryExecutionGateCapture gateCapture,
+        CancellationToken cancellationToken)
+    {
         var context = request.SkillRequestContext;
         var executionId = BuildExecutionId(context);
-
-        if (!context.SkillKnown)
-        {
-            return Blocked(
-                context,
-                executionId,
-                AgentSkillExecutionStatuses.BlockedUnknownSkill,
-                "Skill is not known to the governed skill registry.",
-                ["Skill is unknown."]);
-        }
-
-        if (!SupportedSkillIds.Contains(context.SkillId))
-        {
-            return Blocked(
-                context,
-                executionId,
-                AgentSkillExecutionStatuses.BlockedUnsupportedSkill,
-                "Skill is not supported by the read-only execution service.",
-                [$"Unsupported read-only skill: {context.SkillId}"]);
-        }
-
         MemoryExecutionEvidence? memoryEvidence = null;
+
         if (request.MemoryExecutionContext is not null)
         {
             var memoryGate = await EvaluateMemoryGateAsync(request.MemoryExecutionContext, cancellationToken).ConfigureAwait(false);
+            gateCapture.Result = memoryGate;
             memoryEvidence = memoryGate.Evidence;
             if (!memoryGate.MayProceedToPolicyGate)
             {
@@ -105,6 +99,28 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             {
                 Warnings = Merge(context.Warnings, BuildMemoryGateWarnings(memoryGate))
             };
+        }
+
+        if (!context.SkillKnown)
+        {
+            return Blocked(
+                context,
+                executionId,
+                AgentSkillExecutionStatuses.BlockedUnknownSkill,
+                "Skill is not known to the governed skill registry.",
+                ["Skill is unknown."],
+                memoryEvidence: memoryEvidence);
+        }
+
+        if (!SupportedSkillIds.Contains(context.SkillId))
+        {
+            return Blocked(
+                context,
+                executionId,
+                AgentSkillExecutionStatuses.BlockedUnsupportedSkill,
+                "Skill is not supported by the read-only execution service.",
+                [$"Unsupported read-only skill: {context.SkillId}"],
+                memoryEvidence: memoryEvidence);
         }
 
         if (context.PolicyBlocked ||
@@ -1482,6 +1498,95 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             Blockers = blockers
         };
 
+    private async Task<AgentSkillExecutionResult> AppendMemoryExecutionAuditAsync(
+        AgentSkillExecutionRequest request,
+        AgentSkillExecutionResult result,
+        MemoryExecutionGateResult? memoryGate,
+        CancellationToken cancellationToken)
+    {
+        if (request.MemoryExecutionContext is null)
+            return result;
+
+        if (_memoryExecutionAuditStore is null)
+        {
+            return FailMemoryExecutionAudit(
+                result,
+                "Memory-backed skill execution failed because durable memory execution audit is not configured.");
+        }
+
+        if (memoryGate is null)
+        {
+            return FailMemoryExecutionAudit(
+                result,
+                "Memory-backed skill execution failed because memory gate evidence was not captured for audit.");
+        }
+
+        try
+        {
+            await _memoryExecutionAuditStore.AppendAsync(
+                new MemoryExecutionAuditDraft
+                {
+                    Request = request,
+                    Result = result,
+                    GateResult = memoryGate,
+                    Outcome = MapMemoryExecutionAuditOutcome(request.SkillRequestContext, result)
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            return result;
+        }
+        catch (Exception exception)
+        {
+            return FailMemoryExecutionAudit(
+                result,
+                $"Memory-backed skill execution failed because durable memory execution audit could not be written: {exception.Message}");
+        }
+    }
+
+    private static AgentSkillExecutionResult FailMemoryExecutionAudit(
+        AgentSkillExecutionResult result,
+        string warning) =>
+        result with
+        {
+            Status = AgentSkillExecutionStatuses.Failed,
+            Summary = "Memory-backed skill execution cannot be accepted without durable execution audit.",
+            Warnings = Merge(result.Warnings, [warning]),
+            Blockers = Merge(result.Blockers, ["Durable memory execution audit is required for memory-backed execution."])
+        };
+
+    private static MemoryExecutionAuditOutcome MapMemoryExecutionAuditOutcome(
+        AgentSkillRequestContext context,
+        AgentSkillExecutionResult result)
+    {
+        if (string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedByMemory, StringComparison.Ordinal))
+            return MemoryExecutionAuditOutcome.BlockedByMemory;
+
+        if (string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedByPolicy, StringComparison.Ordinal))
+            return MemoryExecutionAuditOutcome.BlockedByPolicy;
+
+        if (string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedByContext, StringComparison.Ordinal) &&
+            context.HumanApprovalRequired)
+        {
+            return MemoryExecutionAuditOutcome.BlockedByApproval;
+        }
+
+        if (string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedByContext, StringComparison.Ordinal) ||
+            string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedUnknownSkill, StringComparison.Ordinal) ||
+            string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedUnsupportedSkill, StringComparison.Ordinal) ||
+            string.Equals(result.Status, AgentSkillExecutionStatuses.BlockedDangerousCapability, StringComparison.Ordinal))
+        {
+            return MemoryExecutionAuditOutcome.BlockedByContext;
+        }
+
+        if (string.Equals(result.Status, AgentSkillExecutionStatuses.Succeeded, StringComparison.Ordinal))
+            return MemoryExecutionAuditOutcome.ExecutedSucceeded;
+
+        if (string.Equals(result.Status, AgentSkillExecutionStatuses.Failed, StringComparison.Ordinal) && result.Executed)
+            return MemoryExecutionAuditOutcome.ExecutedFailed;
+
+        return MemoryExecutionAuditOutcome.ExecutedBlockedByTool;
+    }
+
     private async Task<MemoryExecutionGateResult> EvaluateMemoryGateAsync(
         MemoryBackedExecutionContext context,
         CancellationToken cancellationToken)
@@ -1594,5 +1699,10 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         public IReadOnlyList<string> Warnings { get; init; } = [];
 
         public IReadOnlyList<string> Blockers { get; init; } = [];
+    }
+
+    private sealed class MemoryExecutionGateCapture
+    {
+        public MemoryExecutionGateResult? Result { get; set; }
     }
 }
