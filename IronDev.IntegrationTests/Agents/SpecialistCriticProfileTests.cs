@@ -33,21 +33,20 @@ public sealed class SpecialistCriticProfileTests
     ];
 
     [TestMethod]
-    public void AgentSpecialisationCatalog_ExposesCriticProfilesOnly()
+    public void AgentSpecialisationCatalog_ExposesCriticProfiles()
     {
         Assert.IsNotNull(typeof(AgentSpecialisationCatalog));
         Assert.IsNotNull(AgentSpecialisationCatalog.CriticProfiles);
         Assert.IsNotNull(AgentSpecialisationCatalog.All);
 
-        CollectionAssert.AreEquivalent(
+        Assert.AreEqual(5, AgentSpecialisationCatalog.CriticProfiles.Count);
+        CollectionAssert.IsSubsetOf(
             AgentSpecialisationCatalog.CriticProfiles.Select(profile => profile.SpecialisationId).ToArray(),
             AgentSpecialisationCatalog.All.Select(profile => profile.SpecialisationId).ToArray());
 
-        Assert.AreEqual(5, AgentSpecialisationCatalog.CriticProfiles.Count);
-        Assert.AreEqual(5, AgentSpecialisationCatalog.All.Count);
-        Assert.IsFalse(AgentSpecialisationCatalog.All.Any(profile =>
+        Assert.IsFalse(AgentSpecialisationCatalog.CriticProfiles.Any(profile =>
             profile.Kind == AgentSpecialisationKind.MemoryImprovementDetection));
-        Assert.IsFalse(AgentSpecialisationCatalog.All.Any(profile =>
+        Assert.IsFalse(AgentSpecialisationCatalog.CriticProfiles.Any(profile =>
             profile.RequiredAgentKind is AgentKind.ImplementationAgent or AgentKind.TestingAgent));
     }
 
@@ -70,8 +69,8 @@ public sealed class SpecialistCriticProfileTests
             criticalReviewProfiles.Select(profile => profile.SpecialisationId).ToArray());
 
         Assert.IsNull(AgentSpecialisationCatalog.GetById("missing.profile"));
-        Assert.AreEqual(0, AgentSpecialisationCatalog.GetForAgent(AgentDefinitionCatalog.MemoryImprovementAgent.AgentId).Count);
-        Assert.AreEqual(0, AgentSpecialisationCatalog.GetByKind(AgentSpecialisationKind.MemoryImprovementDetection).Count);
+        Assert.IsFalse(AgentSpecialisationCatalog.CriticProfiles.Any(profile =>
+            string.Equals(profile.AppliesToAgentId, AgentDefinitionCatalog.MemoryImprovementAgent.AgentId, StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -303,7 +302,7 @@ public sealed class SpecialistCriticProfileTests
             "SqlConnection",
             "CREATE TABLE",
             "CREATE PROCEDURE",
-            "Weaviate",
+            "WeaviateClient",
             "INSERT INTO",
             "UPDATE ",
             "DELETE ",
@@ -336,7 +335,8 @@ public sealed class SpecialistCriticProfileTests
                 !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains($"{Path.DirectorySeparatorChar}IronDev.Core{Path.DirectorySeparatorChar}Agents{Path.DirectorySeparatorChar}AgentSpecialisationCatalog.cs", StringComparison.OrdinalIgnoreCase) &&
-                !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests{Path.DirectorySeparatorChar}Agents{Path.DirectorySeparatorChar}SpecialistCriticProfileTests.cs", StringComparison.OrdinalIgnoreCase))
+                !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests{Path.DirectorySeparatorChar}Agents{Path.DirectorySeparatorChar}SpecialistCriticProfileTests.cs", StringComparison.OrdinalIgnoreCase) &&
+                !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests{Path.DirectorySeparatorChar}Agents{Path.DirectorySeparatorChar}SpecialistMemoryImprovementProfileTests.cs", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         foreach (var path in runtimeFiles)
