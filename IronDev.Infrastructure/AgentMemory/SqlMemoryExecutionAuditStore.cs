@@ -43,97 +43,8 @@ public sealed class SqlMemoryExecutionAuditStore : IMemoryExecutionAuditStore
         using var connection = _connectionFactory.CreateConnection();
         await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
 
-        const string sql = """
-            INSERT INTO agent.AgentMemoryExecutionAudit
-            (
-                AuditId,
-                TenantId,
-                ProjectId,
-                CampaignId,
-                RunId,
-                AgentId,
-                ExecutionId,
-                ContextId,
-                RequestId,
-                ReviewId,
-                SkillId,
-                DecisionId,
-                ActionType,
-                Outcome,
-                ExecutionStatus,
-                GateDecision,
-                GovernanceDecision,
-                GovernanceCheckId,
-                Executed,
-                SourceMutated,
-                WorkspaceMutated,
-                ExternalSystemCalled,
-                TicketCreated,
-                MemoryWritten,
-                ApprovalGranted,
-                ShellCommandRun,
-                ToolName,
-                AffectedArtifactType,
-                AffectedArtifactId,
-                ThoughtLedgerEntryId,
-                CorrelationId,
-                Summary,
-                MemoryItemIdsJson,
-                InfluenceIdsJson,
-                HandoffMemorySliceIdsJson,
-                EvidencePathsJson,
-                BlockersJson,
-                WarningsJson,
-                IssueCodesJson,
-                CreatedAtUtc
-            )
-            VALUES
-            (
-                @AuditId,
-                @TenantId,
-                @ProjectId,
-                @CampaignId,
-                @RunId,
-                @AgentId,
-                @ExecutionId,
-                @ContextId,
-                @RequestId,
-                @ReviewId,
-                @SkillId,
-                @DecisionId,
-                @ActionType,
-                @Outcome,
-                @ExecutionStatus,
-                @GateDecision,
-                @GovernanceDecision,
-                @GovernanceCheckId,
-                @Executed,
-                @SourceMutated,
-                @WorkspaceMutated,
-                @ExternalSystemCalled,
-                @TicketCreated,
-                @MemoryWritten,
-                @ApprovalGranted,
-                @ShellCommandRun,
-                @ToolName,
-                @AffectedArtifactType,
-                @AffectedArtifactId,
-                @ThoughtLedgerEntryId,
-                @CorrelationId,
-                @Summary,
-                @MemoryItemIdsJson,
-                @InfluenceIdsJson,
-                @HandoffMemorySliceIdsJson,
-                @EvidencePathsJson,
-                @BlockersJson,
-                @WarningsJson,
-                @IssueCodesJson,
-                @CreatedAtUtc
-            );
-            """;
-
         await connection.ExecuteAsync(new CommandDefinition(
-            sql,
+            "agent.usp_MemoryExecutionAudit_Create",
             new
             {
                 record.AuditId,
@@ -177,6 +88,7 @@ public sealed class SqlMemoryExecutionAuditStore : IMemoryExecutionAuditStore
                 IssueCodesJson = JsonSerializer.Serialize(record.IssueCodes.Select(code => (int)code).ToArray(), JsonOptions),
                 CreatedAtUtc = record.CreatedAt.UtcDateTime
             },
+            commandType: CommandType.StoredProcedure,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return record;

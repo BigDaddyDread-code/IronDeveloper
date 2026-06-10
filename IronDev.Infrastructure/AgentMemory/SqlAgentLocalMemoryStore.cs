@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Data.Common;
+using System.Text.Json;
 using Dapper;
 using IronDev.Core.AgentMemory;
 using IronDev.Data;
@@ -8,6 +9,7 @@ namespace IronDev.Infrastructure.AgentMemory;
 
 public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IAgentMemoryContractValidator _validator;
 
@@ -29,102 +31,36 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
 
         using var connection = _connectionFactory.CreateConnection();
         await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
-        using var transaction = connection.BeginTransaction();
 
-        try
-        {
-            const string insertItem = """
-                INSERT INTO agent.AgentLocalMemoryItem
-                (
-                    MemoryItemId,
-                    TenantId,
-                    ProjectId,
-                    CampaignId,
-                    RunId,
-                    AgentId,
-                    MemoryType,
-                    AuthorityLevel,
-                    Title,
-                    Summary,
-                    Confidence,
-                    CreatedAtUtc,
-                    ExpiresAtUtc,
-                    SupersedesMemoryItemId,
-                    KnownLimitations,
-                    ContentJson,
-                    ContentHashSha256
-                )
-                VALUES
-                (
-                    @MemoryItemId,
-                    @TenantId,
-                    @ProjectId,
-                    @CampaignId,
-                    @RunId,
-                    @AgentId,
-                    @MemoryType,
-                    @AuthorityLevel,
-                    @Title,
-                    @Summary,
-                    @Confidence,
-                    @CreatedAtUtc,
-                    @ExpiresAtUtc,
-                    @SupersedesMemoryItemId,
-                    @KnownLimitations,
-                    @ContentJson,
-                    @ContentHashSha256
-                );
-                """;
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                insertItem,
-                new
-                {
-                    item.MemoryItemId,
-                    item.Scope.TenantId,
-                    item.Scope.ProjectId,
-                    item.Scope.CampaignId,
-                    item.Scope.RunId,
-                    item.Scope.AgentId,
-                    MemoryType = (int)item.MemoryType,
-                    AuthorityLevel = (int)item.AuthorityLevel,
-                    item.Title,
-                    item.Summary,
-                    item.Confidence,
-                    CreatedAtUtc = item.CreatedAt.UtcDateTime,
-                    ExpiresAtUtc = item.ExpiresAt?.UtcDateTime,
-                    item.SupersedesMemoryItemId,
-                    item.KnownLimitations,
-                    ContentJson = (string?)null,
-                    ContentHashSha256 = (byte[]?)null
-                },
-                transaction,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
-
-            foreach (var evidence in item.EvidenceRefs ?? Array.Empty<EvidenceRef>())
+        await connection.ExecuteAsync(new CommandDefinition(
+            "agent.usp_AgentLocalMemory_Create",
+            new
             {
-                await InsertEvidenceAsync(connection, transaction, item.MemoryItemId, evidence, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            var createdEvent = new AgentLocalMemoryEventRecord
-            {
-                MemoryEventId = $"memevt-created-{Guid.NewGuid():N}",
-                MemoryItemId = item.MemoryItemId,
-                EventType = AgentLocalMemoryEventType.Created,
-                EventReason = "Memory item created.",
-                CreatedAt = item.CreatedAt,
-                CreatedByAgentId = item.Scope.AgentId
-            };
-
-            await InsertEventAsync(connection, transaction, createdEvent, cancellationToken).ConfigureAwait(false);
-            transaction.Commit();
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
-        }
+                item.MemoryItemId,
+                item.Scope.TenantId,
+                item.Scope.ProjectId,
+                item.Scope.CampaignId,
+                item.Scope.RunId,
+                item.Scope.AgentId,
+                MemoryType = (int)item.MemoryType,
+                AuthorityLevel = (int)item.AuthorityLevel,
+                item.Title,
+                item.Summary,
+                item.Confidence,
+                CreatedAtUtc = item.CreatedAt.UtcDateTime,
+                CreatedByAgentId = item.Scope.AgentId,
+                EvidenceRefsJson = JsonSerializer.Serialize(item.EvidenceRefs ?? Array.Empty<EvidenceRef>(), JsonOptions),
+                MemoryJson = (string?)null,
+                ExpiresAtUtc = item.ExpiresAt?.UtcDateTime,
+                WorkflowId = (string?)null,
+                TicketId = (string?)null,
+                CorrelationId = (string?)null,
+                ThoughtLedgerEntryId = (string?)null,
+                item.SupersedesMemoryItemId,
+                item.KnownLimitations
+            },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public async Task AddEventAsync(
@@ -165,17 +101,29 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
 
         ThrowIfInvalidLifecycleTransition(ToLifecycleStatus(owner.CurrentEventType), memoryEvent.EventType);
 
-        using var transaction = connection.BeginTransaction();
-        try
-        {
-            await InsertEventAsync(connection, transaction, memoryEvent, cancellationToken).ConfigureAwait(false);
-            transaction.Commit();
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
-        }
+        await connection.ExecuteAsync(new CommandDefinition(
+            "agent.usp_AgentLocalMemory_AddEvent",
+            new
+            {
+                memoryEvent.MemoryEventId,
+                memoryEvent.MemoryItemId,
+                scope.TenantId,
+                scope.ProjectId,
+                scope.CampaignId,
+                scope.RunId,
+                scope.AgentId,
+                EventType = (int)memoryEvent.EventType,
+                memoryEvent.EventReason,
+                CreatedAtUtc = memoryEvent.CreatedAt.UtcDateTime,
+                memoryEvent.CreatedByAgentId,
+                memoryEvent.CreatedByUserId,
+                memoryEvent.DecisionId,
+                memoryEvent.ThoughtLedgerEntryId,
+                memoryEvent.CorrelationId,
+                memoryEvent.EventJson
+            },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<AgentLocalMemoryItem>> QueryOwnMemoryAsync(
@@ -360,111 +308,6 @@ public sealed class SqlAgentLocalMemoryStore : IAgentLocalMemoryStore
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
 
         return rows.Select(ToEvent).ToArray();
-    }
-
-    private static async Task InsertEvidenceAsync(
-        IDbConnection connection,
-        IDbTransaction transaction,
-        string memoryItemId,
-        EvidenceRef evidence,
-        CancellationToken cancellationToken)
-    {
-        const string sql = """
-            INSERT INTO agent.AgentLocalMemoryEvidenceRef
-            (
-                MemoryItemId,
-                EvidenceId,
-                EvidenceType,
-                SourceId,
-                SourceUri,
-                Summary,
-                CapturedAtUtc
-            )
-            VALUES
-            (
-                @MemoryItemId,
-                @EvidenceId,
-                @EvidenceType,
-                @SourceId,
-                @SourceUri,
-                @Summary,
-                @CapturedAtUtc
-            );
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            sql,
-            new
-            {
-                MemoryItemId = memoryItemId,
-                evidence.EvidenceId,
-                EvidenceType = (int)evidence.EvidenceType,
-                evidence.SourceId,
-                evidence.SourceUri,
-                evidence.Summary,
-                CapturedAtUtc = evidence.CapturedAt?.UtcDateTime
-            },
-            transaction,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
-    }
-
-    private static async Task InsertEventAsync(
-        IDbConnection connection,
-        IDbTransaction transaction,
-        AgentLocalMemoryEventRecord memoryEvent,
-        CancellationToken cancellationToken)
-    {
-        ThrowIfInvalidEventIdentity(memoryEvent);
-
-        const string sql = """
-            INSERT INTO agent.AgentLocalMemoryEvent
-            (
-                MemoryEventId,
-                MemoryItemId,
-                EventType,
-                EventReason,
-                CreatedAtUtc,
-                CreatedByAgentId,
-                CreatedByUserId,
-                CorrelationId,
-                DecisionId,
-                ThoughtLedgerEntryId,
-                EventJson
-            )
-            VALUES
-            (
-                @MemoryEventId,
-                @MemoryItemId,
-                @EventType,
-                @EventReason,
-                @CreatedAtUtc,
-                @CreatedByAgentId,
-                @CreatedByUserId,
-                @CorrelationId,
-                @DecisionId,
-                @ThoughtLedgerEntryId,
-                @EventJson
-            );
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            sql,
-            new
-            {
-                memoryEvent.MemoryEventId,
-                memoryEvent.MemoryItemId,
-                EventType = (int)memoryEvent.EventType,
-                memoryEvent.EventReason,
-                CreatedAtUtc = memoryEvent.CreatedAt.UtcDateTime,
-                memoryEvent.CreatedByAgentId,
-                memoryEvent.CreatedByUserId,
-                memoryEvent.CorrelationId,
-                memoryEvent.DecisionId,
-                memoryEvent.ThoughtLedgerEntryId,
-                memoryEvent.EventJson
-            },
-            transaction,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private static async Task<IReadOnlyList<AgentLocalMemoryItem>> HydrateAsync(

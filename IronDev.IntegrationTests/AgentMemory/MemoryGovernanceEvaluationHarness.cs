@@ -648,6 +648,7 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_improvement_proposals.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_execution_audit.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_indexing.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(await File.ReadAllTextAsync(Path.Combine(_repositoryRoot, "Database", "migrate_agent_memory_stored_procedures.sql"), cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private async Task DropAgentMemorySchemaAsync(CancellationToken cancellationToken)
@@ -656,6 +657,24 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(
             """
+            IF OBJECT_ID('agent.usp_MemoryExecutionAudit_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryExecutionAudit_Create;
+            IF OBJECT_ID('agent.usp_MemoryIndexEvent_Add', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryIndexEvent_Add;
+            IF OBJECT_ID('agent.usp_MemoryIndexQueue_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryIndexQueue_Create;
+            IF OBJECT_ID('agent.usp_MemoryImprovementProposal_AddEvent', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryImprovementProposal_AddEvent;
+            IF OBJECT_ID('agent.usp_MemoryImprovementProposal_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_MemoryImprovementProposal_Create;
+            IF OBJECT_ID('agent.usp_AgentMemoryHandoff_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentMemoryHandoff_Create;
+            IF OBJECT_ID('agent.usp_AgentMemoryInfluence_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentMemoryInfluence_Create;
+            IF OBJECT_ID('agent.usp_AgentLocalMemory_AddEvent', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentLocalMemory_AddEvent;
+            IF OBJECT_ID('agent.usp_AgentLocalMemory_Create', 'P') IS NOT NULL
+                DROP PROCEDURE agent.usp_AgentLocalMemory_Create;
             IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_ValidateInsert', 'TR') IS NOT NULL
                 DROP TRIGGER agent.TR_AgentMemoryExecutionAudit_ValidateInsert;
             IF OBJECT_ID('agent.TR_AgentMemoryExecutionAudit_BlockUpdateDelete', 'TR') IS NOT NULL

@@ -39,107 +39,31 @@ public sealed class SqlMemoryImprovementProposalService : IMemoryImprovementProp
         await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
         await ValidateSourcesAsync(connection, draft.Scope, draft.Sources, cancellationToken).ConfigureAwait(false);
 
-        using var transaction = connection.BeginTransaction();
-        try
-        {
-            const string insertProposalSql = """
-                INSERT INTO agent.AgentMemoryImprovementProposal
-                (
-                    ProposalId,
-                    TenantId,
-                    ProjectId,
-                    CampaignId,
-                    RunId,
-                    AgentId,
-                    ProposalType,
-                    Title,
-                    Summary,
-                    SourcesJson,
-                    EvidenceRefsJson,
-                    Confidence,
-                    ProposedByAgentId,
-                    ProposedByUserId,
-                    CreatedAtUtc,
-                    ThoughtLedgerEntryId,
-                    CorrelationId,
-                    ProposalJson,
-                    ContentHashSha256
-                )
-                VALUES
-                (
-                    @ProposalId,
-                    @TenantId,
-                    @ProjectId,
-                    @CampaignId,
-                    @RunId,
-                    @AgentId,
-                    @ProposalType,
-                    @Title,
-                    @Summary,
-                    @SourcesJson,
-                    @EvidenceRefsJson,
-                    @Confidence,
-                    @ProposedByAgentId,
-                    @ProposedByUserId,
-                    @CreatedAtUtc,
-                    @ThoughtLedgerEntryId,
-                    @CorrelationId,
-                    @ProposalJson,
-                    @ContentHashSha256
-                );
-                """;
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                insertProposalSql,
-                new
-                {
-                    draft.ProposalId,
-                    draft.Scope.TenantId,
-                    draft.Scope.ProjectId,
-                    draft.Scope.CampaignId,
-                    draft.Scope.RunId,
-                    draft.Scope.AgentId,
-                    ProposalType = (int)draft.ProposalType,
-                    draft.Title,
-                    draft.Summary,
-                    SourcesJson = JsonSerializer.Serialize(draft.Sources, JsonOptions),
-                    EvidenceRefsJson = JsonSerializer.Serialize(draft.EvidenceRefs, JsonOptions),
-                    draft.Confidence,
-                    draft.ProposedByAgentId,
-                    draft.ProposedByUserId,
-                    CreatedAtUtc = draft.CreatedAt.UtcDateTime,
-                    draft.ThoughtLedgerEntryId,
-                    draft.CorrelationId,
-                    draft.ProposalJson,
-                    ContentHashSha256 = (byte[]?)null
-                },
-                transaction,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
-
-            await InsertEventAsync(
-                connection,
-                transaction,
-                new MemoryImprovementProposalEventDraft
-                {
-                    ProposalEventId = $"proposal-submitted-{Guid.NewGuid():N}",
-                    ProposalId = draft.ProposalId,
-                    EventType = MemoryImprovementProposalEventType.Submitted,
-                    CreatedAt = draft.CreatedAt,
-                    Reason = "Memory improvement proposal submitted.",
-                    CreatedByAgentId = draft.ProposedByAgentId,
-                    CreatedByUserId = draft.ProposedByUserId,
-                    ThoughtLedgerEntryId = draft.ThoughtLedgerEntryId,
-                    CorrelationId = draft.CorrelationId
-                },
-                cancellationToken).ConfigureAwait(false);
-
-            transaction.Commit();
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
-        }
+        await connection.ExecuteAsync(new CommandDefinition(
+            "agent.usp_MemoryImprovementProposal_Create",
+            new
+            {
+                draft.ProposalId,
+                draft.Scope.TenantId,
+                draft.Scope.ProjectId,
+                draft.Scope.CampaignId,
+                draft.Scope.RunId,
+                draft.Scope.AgentId,
+                ProposalType = (int)draft.ProposalType,
+                draft.Title,
+                draft.Summary,
+                SourcesJson = JsonSerializer.Serialize(draft.Sources, JsonOptions),
+                EvidenceRefsJson = JsonSerializer.Serialize(draft.EvidenceRefs, JsonOptions),
+                draft.Confidence,
+                draft.ProposedByAgentId,
+                draft.ProposedByUserId,
+                CreatedAtUtc = draft.CreatedAt.UtcDateTime,
+                draft.ThoughtLedgerEntryId,
+                draft.CorrelationId,
+                draft.ProposalJson
+            },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public async Task AddEventAsync(
@@ -165,17 +89,28 @@ public sealed class SqlMemoryImprovementProposalService : IMemoryImprovementProp
         var currentStatus = await LoadCurrentStatusAsync(connection, draft.ProposalId, cancellationToken).ConfigureAwait(false);
         ThrowIfInvalidLifecycleTransition(currentStatus, draft.EventType);
 
-        using var transaction = connection.BeginTransaction();
-        try
-        {
-            await InsertEventAsync(connection, transaction, draft, cancellationToken).ConfigureAwait(false);
-            transaction.Commit();
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
-        }
+        await connection.ExecuteAsync(new CommandDefinition(
+            "agent.usp_MemoryImprovementProposal_AddEvent",
+            new
+            {
+                draft.ProposalEventId,
+                draft.ProposalId,
+                scope.TenantId,
+                scope.ProjectId,
+                scope.CampaignId,
+                scope.RunId,
+                scope.AgentId,
+                EventType = (int)draft.EventType,
+                draft.Reason,
+                CreatedAtUtc = draft.CreatedAt.UtcDateTime,
+                draft.CreatedByUserId,
+                draft.CreatedByAgentId,
+                draft.ThoughtLedgerEntryId,
+                draft.CorrelationId,
+                draft.EventJson
+            },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<MemoryImprovementProposalRecord>> QueryAsync(
@@ -296,60 +231,6 @@ public sealed class SqlMemoryImprovementProposalService : IMemoryImprovementProp
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return rows.Select(ToEventRecord).ToArray();
-    }
-
-    private static async Task InsertEventAsync(
-        IDbConnection connection,
-        IDbTransaction transaction,
-        MemoryImprovementProposalEventDraft draft,
-        CancellationToken cancellationToken)
-    {
-        const string sql = """
-            INSERT INTO agent.AgentMemoryImprovementProposalEvent
-            (
-                ProposalEventId,
-                ProposalId,
-                EventType,
-                Reason,
-                CreatedAtUtc,
-                CreatedByUserId,
-                CreatedByAgentId,
-                ThoughtLedgerEntryId,
-                CorrelationId,
-                EventJson
-            )
-            VALUES
-            (
-                @ProposalEventId,
-                @ProposalId,
-                @EventType,
-                @Reason,
-                @CreatedAtUtc,
-                @CreatedByUserId,
-                @CreatedByAgentId,
-                @ThoughtLedgerEntryId,
-                @CorrelationId,
-                @EventJson
-            );
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            sql,
-            new
-            {
-                draft.ProposalEventId,
-                draft.ProposalId,
-                EventType = (int)draft.EventType,
-                draft.Reason,
-                CreatedAtUtc = draft.CreatedAt.UtcDateTime,
-                draft.CreatedByUserId,
-                draft.CreatedByAgentId,
-                draft.ThoughtLedgerEntryId,
-                draft.CorrelationId,
-                draft.EventJson
-            },
-            transaction,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private static async Task<ProposalRow?> LoadProposalAsync(
