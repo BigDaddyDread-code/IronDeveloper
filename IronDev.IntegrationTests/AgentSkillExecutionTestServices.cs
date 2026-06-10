@@ -1,3 +1,4 @@
+using IronDev.Core.AgentMemory.Execution;
 using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
 using IronDev.Core.Workspaces;
@@ -14,7 +15,8 @@ internal static class AgentSkillExecutionTestServices
         IDisposableWorkspaceValidationService? validation = null,
         IDisposableWorkspaceDiffService? diff = null,
         IDisposableWorkspacePromotionPackageService? promotionPackage = null,
-        IDisposableWorkspaceFailurePackageService? failurePackage = null) =>
+        IDisposableWorkspaceFailurePackageService? failurePackage = null,
+        IMemoryExecutionGate? memoryExecutionGate = null) =>
         new(
             workspaceApplyContextService ?? new AgentSkillExecutionThrowingApplyContextService(),
             workspaceCheck ?? new AgentSkillExecutionThrowingWorkspaceCheckService(),
@@ -22,7 +24,8 @@ internal static class AgentSkillExecutionTestServices
             validation ?? new AgentSkillExecutionTestValidationService(),
             diff ?? new AgentSkillExecutionTestDiffService(),
             promotionPackage ?? new AgentSkillExecutionTestPromotionPackageService(),
-            failurePackage ?? new AgentSkillExecutionTestFailurePackageService());
+            failurePackage ?? new AgentSkillExecutionTestFailurePackageService(),
+            memoryExecutionGate);
 }
 
 internal sealed class AgentSkillExecutionTestDiffService : IDisposableWorkspaceDiffService

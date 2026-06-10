@@ -17,7 +17,8 @@ public enum MemoryEvaluationScenarioId
     RawReasoningRejectedEverywhere = 13,
     AppendOnlyMutationBlocked = 14,
     RunReportDoesNotLeakOtherRun = 15,
-    SiloDoesNotExposeGovernanceOrIndexingServices = 16
+    SiloDoesNotExposeGovernanceOrIndexingServices = 16,
+    MemoryBackedExecutionCannotBypassGate = 17
 }
 
 public sealed record MemoryEvaluationScenarioResult

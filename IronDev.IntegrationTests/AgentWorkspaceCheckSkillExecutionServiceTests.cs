@@ -338,7 +338,10 @@ public sealed class AgentWorkspaceCheckSkillExecutionServiceTests
         Assert.IsFalse(combined.Contains("IDisposableWorkspacePrepareService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IGitHub", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("ITicket", StringComparison.Ordinal));
-        Assert.IsFalse(combined.Contains("IMemory", StringComparison.Ordinal));
+        Assert.IsTrue(combined.Contains("IMemoryExecutionGate", StringComparison.Ordinal));
+        Assert.IsFalse(combined.Contains("IAgentMemorySilo", StringComparison.Ordinal));
+        Assert.IsFalse(combined.Contains("IMemoryIndexingService", StringComparison.Ordinal));
+        Assert.IsFalse(combined.Contains("IMemoryImprovementProposalService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("MemoryService", StringComparison.Ordinal));
     }
 

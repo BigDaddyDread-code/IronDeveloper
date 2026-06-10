@@ -4,6 +4,7 @@ using System.Text.Json;
 using Dapper;
 using IronDev.Core.AgentMemory;
 using IronDev.Core.AgentMemory.Evaluation;
+using IronDev.Core.AgentMemory.Execution;
 using IronDev.Data;
 using IronDev.Infrastructure.AgentMemory;
 using Microsoft.Data.SqlClient;
@@ -58,7 +59,8 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
             (MemoryEvaluationScenarioId.RawReasoningRejectedEverywhere, nameof(MemoryEvaluationScenarioId.RawReasoningRejectedEverywhere), RunRawReasoningRejectedEverywhereAsync),
             (MemoryEvaluationScenarioId.AppendOnlyMutationBlocked, nameof(MemoryEvaluationScenarioId.AppendOnlyMutationBlocked), RunAppendOnlyMutationBlockedAsync),
             (MemoryEvaluationScenarioId.RunReportDoesNotLeakOtherRun, nameof(MemoryEvaluationScenarioId.RunReportDoesNotLeakOtherRun), RunRunReportDoesNotLeakOtherRunAsync),
-            (MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices, nameof(MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices), RunSiloDoesNotExposeGovernanceOrIndexingServicesAsync)
+            (MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices, nameof(MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices), RunSiloDoesNotExposeGovernanceOrIndexingServicesAsync),
+            (MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate, nameof(MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate), RunMemoryBackedExecutionCannotBypassGateAsync)
         };
 
         var results = new List<MemoryEvaluationScenarioResult>();
@@ -264,6 +266,42 @@ public sealed class MemoryGovernanceEvaluationHarness : IMemoryGovernanceEvaluat
         EnsureIssue(result, MemoryGovernanceDecision.Block, MemoryGovernanceIssueCode.HandoffNotAddressedToAgent);
 
         return ["CriticAgent use of TesterAgent handoff blocked", "Conscience issue HandoffNotAddressedToAgent observed"];
+    }
+
+    private async Task<IReadOnlyList<string>> RunMemoryBackedExecutionCannotBypassGateAsync(HarnessServices services, CancellationToken cancellationToken)
+    {
+        var silo = OpenSilo(services, "builder-agent");
+        await silo.CreateAsync(BuildMemoryDraft("memory-execution-expired"), cancellationToken).ConfigureAwait(false);
+        await silo.RecordInfluenceAsync(BuildInfluenceDraft("influence-execution-expired", "memory-execution-expired", "decision-execution"), cancellationToken).ConfigureAwait(false);
+        await silo.AddEventAsync(BuildEventDraft("memory-execution-expired", AgentLocalMemoryEventType.Expired, 1), cancellationToken).ConfigureAwait(false);
+
+        var gate = new MemoryExecutionGate(services.Governance);
+        var result = await gate.EvaluateAsync(new MemoryBackedExecutionContext
+        {
+            Scope = BuildScope(),
+            ActionType = MemoryGovernanceActionType.ToolCallJustification,
+            DecisionId = "decision-execution",
+            ReferencedArtifacts =
+            [
+                new MemoryBackedExecutionReference
+                {
+                    MemoryItemId = "memory-execution-expired",
+                    InfluenceId = "influence-execution-expired",
+                    DecisionId = "decision-execution",
+                    ThoughtLedgerEntryId = "thought-execution-gate"
+                }
+            ],
+            RequestedAt = Now.AddMinutes(6),
+            ToolName = "workspace.validate",
+            CorrelationId = "correlation-1"
+        }, cancellationToken).ConfigureAwait(false);
+
+        Ensure(result.Decision == MemoryExecutionGateDecision.Blocked, $"Expected memory execution gate to block, got {result.Decision}.");
+        Ensure(!result.MayProceedToPolicyGate, "Memory execution gate allowed policy evaluation after expired memory.");
+        Ensure(result.Evidence.IsMemoryBacked, "Memory execution gate did not mark evidence as memory-backed.");
+        Ensure(result.Evidence.IssueCodes.Contains(MemoryGovernanceIssueCode.MemoryExpired), "Memory execution gate evidence did not include MemoryExpired.");
+
+        return ["Memory execution gate evaluated real Conscience result", "Expired memory-backed execution blocked before policy", "MemoryExpired issue captured in execution evidence"];
     }
 
     private async Task<IReadOnlyList<string>> RunProposalAcceptedDoesNotPromoteMemoryAsync(HarnessServices services, CancellationToken cancellationToken)

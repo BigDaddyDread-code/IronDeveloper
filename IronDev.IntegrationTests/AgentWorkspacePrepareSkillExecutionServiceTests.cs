@@ -303,7 +303,10 @@ public sealed class AgentWorkspacePrepareSkillExecutionServiceTests
         Assert.IsFalse(combined.Contains("IDisposableWorkspaceApplyCopyService", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("IGitHub", StringComparison.Ordinal));
         Assert.IsFalse(combined.Contains("ITicket", StringComparison.Ordinal));
-        Assert.IsFalse(combined.Contains("IMemory", StringComparison.Ordinal));
+        Assert.IsTrue(executionSource.Contains("IMemoryExecutionGate", StringComparison.Ordinal));
+        Assert.IsFalse(combined.Contains("IAgentMemorySilo", StringComparison.Ordinal));
+        Assert.IsFalse(combined.Contains("IMemoryIndexingService", StringComparison.Ordinal));
+        Assert.IsFalse(combined.Contains("IMemoryImprovementProposalService", StringComparison.Ordinal));
     }
 
     [TestMethod]

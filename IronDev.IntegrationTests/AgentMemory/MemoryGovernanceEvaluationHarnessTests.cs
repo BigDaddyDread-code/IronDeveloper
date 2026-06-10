@@ -16,7 +16,7 @@ public sealed class MemoryGovernanceEvaluationHarnessTests : IntegrationTestBase
         var report = MemoryGovernanceEvaluationHarness.FormatReport(result);
 
         Console.WriteLine(report);
-        Assert.AreEqual(16, result.ScenarioCount, report);
+        Assert.AreEqual(17, result.ScenarioCount, report);
         Assert.AreEqual(0, result.FailedCount, report);
         Assert.AreEqual(result.ScenarioCount, result.PassedCount, report);
         Assert.IsTrue(result.Scenarios.All(item => item.Passed), report);
@@ -74,12 +74,13 @@ public sealed class MemoryGovernanceEvaluationHarnessTests : IntegrationTestBase
     {
         var scenarioIds = Enum.GetValues<MemoryEvaluationScenarioId>();
 
-        Assert.HasCount(16, scenarioIds);
+        Assert.HasCount(17, scenarioIds);
         Assert.IsTrue(scenarioIds.Contains(MemoryEvaluationScenarioId.InfluenceOnlyExpiredMemoryBlocked));
         Assert.IsTrue(scenarioIds.Contains(MemoryEvaluationScenarioId.WeaviateDoesNotIndexRawLocalMemory));
         Assert.IsTrue(scenarioIds.Contains(MemoryEvaluationScenarioId.SourceMutationNeverAllowedByMemoryAlone));
         Assert.IsTrue(scenarioIds.Contains(MemoryEvaluationScenarioId.AppendOnlyMutationBlocked));
         Assert.IsTrue(scenarioIds.Contains(MemoryEvaluationScenarioId.SiloDoesNotExposeGovernanceOrIndexingServices));
+        Assert.IsTrue(scenarioIds.Contains(MemoryEvaluationScenarioId.MemoryBackedExecutionCannotBypassGate));
     }
 
     private MemoryGovernanceEvaluationHarness BuildHarness()

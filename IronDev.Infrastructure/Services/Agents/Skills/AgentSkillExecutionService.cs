@@ -1,3 +1,5 @@
+using IronDev.Core.AgentMemory;
+using IronDev.Core.AgentMemory.Execution;
 using IronDev.Core.Agents.ApprovalPolicy;
 using IronDev.Core.Agents.Skills;
 using IronDev.Core.Agents.WorkspaceApply;
@@ -28,6 +30,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
     private readonly IDisposableWorkspaceDiffService _workspaceDiffService;
     private readonly IDisposableWorkspacePromotionPackageService _workspacePromotionPackageService;
     private readonly IDisposableWorkspaceFailurePackageService _workspaceFailurePackageService;
+    private readonly IMemoryExecutionGate? _memoryExecutionGate;
 
     public AgentSkillExecutionService(
         IAgentWorkspaceApplyContextService workspaceApplyContextService,
@@ -36,7 +39,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         IDisposableWorkspaceValidationService workspaceValidationService,
         IDisposableWorkspaceDiffService workspaceDiffService,
         IDisposableWorkspacePromotionPackageService workspacePromotionPackageService,
-        IDisposableWorkspaceFailurePackageService workspaceFailurePackageService)
+        IDisposableWorkspaceFailurePackageService workspaceFailurePackageService,
+        IMemoryExecutionGate? memoryExecutionGate = null)
     {
         _workspaceApplyContextService = workspaceApplyContextService ?? throw new ArgumentNullException(nameof(workspaceApplyContextService));
         _workspaceCheckService = workspaceCheckService ?? throw new ArgumentNullException(nameof(workspaceCheckService));
@@ -45,6 +49,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         _workspaceDiffService = workspaceDiffService ?? throw new ArgumentNullException(nameof(workspaceDiffService));
         _workspacePromotionPackageService = workspacePromotionPackageService ?? throw new ArgumentNullException(nameof(workspacePromotionPackageService));
         _workspaceFailurePackageService = workspaceFailurePackageService ?? throw new ArgumentNullException(nameof(workspaceFailurePackageService));
+        _memoryExecutionGate = memoryExecutionGate;
     }
 
     public async Task<AgentSkillExecutionResult> ExecuteAsync(
@@ -77,6 +82,31 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 [$"Unsupported read-only skill: {context.SkillId}"]);
         }
 
+        MemoryExecutionEvidence? memoryEvidence = null;
+        if (request.MemoryExecutionContext is not null)
+        {
+            var memoryGate = await EvaluateMemoryGateAsync(request.MemoryExecutionContext, cancellationToken).ConfigureAwait(false);
+            memoryEvidence = memoryGate.Evidence;
+            if (!memoryGate.MayProceedToPolicyGate)
+            {
+                return Blocked(
+                    context,
+                    executionId,
+                    AgentSkillExecutionStatuses.BlockedByMemory,
+                    memoryGate.Summary,
+                    Merge(
+                        memoryGate.Issues.Select(issue => issue.Summary),
+                        ["Memory-backed execution was blocked before policy evaluation."]),
+                    warnings: context.Warnings,
+                    memoryEvidence: memoryEvidence);
+            }
+
+            context = context with
+            {
+                Warnings = Merge(context.Warnings, BuildMemoryGateWarnings(memoryGate))
+            };
+        }
+
         if (context.PolicyBlocked ||
             string.Equals(context.Decision, ProjectApprovalDecisions.BlockedByPolicy, StringComparison.Ordinal))
         {
@@ -85,7 +115,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 executionId,
                 AgentSkillExecutionStatuses.BlockedByPolicy,
                 "Skill execution was blocked by project policy.",
-                Merge(["Project policy blocks this skill."], context.Blockers));
+                Merge(["Project policy blocks this skill."], context.Blockers),
+                memoryEvidence: memoryEvidence);
         }
 
         if (context.DangerousCapability)
@@ -95,7 +126,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 executionId,
                 AgentSkillExecutionStatuses.BlockedDangerousCapability,
                 "Skill has a dangerous capability and cannot be executed by this read-only service.",
-                ["Dangerous skill capability is not executable by this service."]);
+                ["Dangerous skill capability is not executable by this service."],
+                memoryEvidence: memoryEvidence);
         }
 
         if (context.HumanApprovalRequired)
@@ -105,7 +137,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 executionId,
                 AgentSkillExecutionStatuses.BlockedByContext,
                 "Skill request context requires separate human approval.",
-                ["Human approval is required before execution."]);
+                ["Human approval is required before execution."],
+                memoryEvidence: memoryEvidence);
         }
 
         var contextBlockers = ValidateContext(context);
@@ -116,7 +149,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 executionId,
                 AgentSkillExecutionStatuses.BlockedByContext,
                 "Skill request context is not ready for read-only execution.",
-                contextBlockers);
+                contextBlockers,
+                memoryEvidence: memoryEvidence);
         }
 
         var projectId = FirstNonEmpty(request.ProjectId, context.ProjectId);
@@ -203,7 +237,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                         context.EvidencePaths,
                         context.Warnings,
                         requestBlockers),
-                    readOnlyExecution: false);
+                    readOnlyExecution: false,
+                    memoryEvidence: memoryEvidence);
             }
 
             return Blocked(
@@ -214,60 +249,61 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                     ? $"{context.SkillId} request is incomplete."
                     : "Workspace apply context request is incomplete.",
                 requestBlockers,
-                readOnlyExecution: !workspaceFailurePackageSkill);
+                readOnlyExecution: !workspaceFailurePackageSkill,
+                memoryEvidence: memoryEvidence);
         }
 
         if (workspaceCheckSkill)
         {
-            return await ExecuteWorkspaceCheckAsync(
+            return AttachMemoryEvidence(await ExecuteWorkspaceCheckAsync(
                 context,
                 executionId,
                 projectId!,
                 runId!,
                 workspacePath!,
                 sourceRepo!,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false), memoryEvidence);
         }
 
         if (workspacePrepareSkill)
         {
-            return await ExecuteWorkspacePrepareAsync(
+            return AttachMemoryEvidence(await ExecuteWorkspacePrepareAsync(
                 context,
                 executionId,
                 projectId!,
                 runId!,
                 workspacePath!,
                 sourceRepo!,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false), memoryEvidence);
         }
 
         if (workspaceValidateSkill)
         {
-            return await ExecuteWorkspaceValidateAsync(
+            return AttachMemoryEvidence(await ExecuteWorkspaceValidateAsync(
                 context,
                 executionId,
                 projectId!,
                 runId!,
                 workspacePath!,
                 profileId!,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false), memoryEvidence);
         }
 
         if (workspaceDiffSkill)
         {
-            return await ExecuteWorkspaceDiffAsync(
+            return AttachMemoryEvidence(await ExecuteWorkspaceDiffAsync(
                 context,
                 executionId,
                 projectId!,
                 runId!,
                 workspacePath!,
                 sourceRepo!,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false), memoryEvidence);
         }
 
         if (workspacePromotionPackageSkill)
         {
-            return await ExecuteWorkspacePromotionPackageAsync(
+            return AttachMemoryEvidence(await ExecuteWorkspacePromotionPackageAsync(
                 context,
                 executionId,
                 projectId!,
@@ -276,12 +312,12 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 sourceRepo!,
                 validationReportPath!,
                 sourceReportPath!,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false), memoryEvidence);
         }
 
         if (workspaceFailurePackageSkill)
         {
-            return await ExecuteWorkspaceFailurePackageAsync(
+            return AttachMemoryEvidence(await ExecuteWorkspaceFailurePackageAsync(
                 context,
                 executionId,
                 projectId!,
@@ -293,7 +329,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 validationReportPath,
                 sourceReportPath,
                 promotionPackagePath,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false), memoryEvidence);
         }
 
         try
@@ -317,7 +353,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                     payloadResult.Summary,
                     payloadResult.Blockers,
                     Merge(context.EvidencePaths, payloadResult.EvidencePaths),
-                    Merge(context.Warnings, payloadResult.Warnings));
+                    Merge(context.Warnings, payloadResult.Warnings),
+                    memoryEvidence: memoryEvidence);
             }
 
             var evidencePaths = Merge(context.EvidencePaths, payloadResult.EvidencePaths);
@@ -342,6 +379,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 ApprovalGranted = false,
                 ShellCommandRun = false,
                 Payload = payloadResult.Payload,
+                MemoryEvidence = memoryEvidence,
                 EvidencePaths = evidencePaths,
                 Warnings = warnings,
                 Blockers = []
@@ -368,6 +406,7 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
                 ApprovalGranted = false,
                 ShellCommandRun = false,
                 Payload = null,
+                MemoryEvidence = memoryEvidence,
                 EvidencePaths = context.EvidencePaths,
                 Warnings = Merge(context.Warnings, [$"Workspace apply context read failed: {exception.Message}"]),
                 Blockers = []
@@ -1416,7 +1455,8 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
         IReadOnlyList<string>? evidencePaths = null,
         IReadOnlyList<string>? warnings = null,
         object? payload = null,
-        bool readOnlyExecution = true) =>
+        bool readOnlyExecution = true,
+        MemoryExecutionEvidence? memoryEvidence = null) =>
         new()
         {
             ExecutionId = executionId,
@@ -1436,10 +1476,76 @@ public sealed class AgentSkillExecutionService : IAgentSkillExecutionService
             ApprovalGranted = false,
             ShellCommandRun = false,
             Payload = payload,
+            MemoryEvidence = memoryEvidence,
             EvidencePaths = evidencePaths ?? context.EvidencePaths,
             Warnings = warnings ?? context.Warnings,
             Blockers = blockers
         };
+
+    private async Task<MemoryExecutionGateResult> EvaluateMemoryGateAsync(
+        MemoryBackedExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        if (_memoryExecutionGate is not null)
+            return await _memoryExecutionGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
+
+        var issue = new MemoryGovernanceIssue
+        {
+            Code = MemoryGovernanceIssueCode.GovernanceResultMismatch,
+            Severity = MemoryGovernanceIssueSeverity.Critical,
+            Summary = "Memory-backed execution requires IMemoryExecutionGate to be configured."
+        };
+
+        return new MemoryExecutionGateResult
+        {
+            Decision = MemoryExecutionGateDecision.Blocked,
+            MayProceedToPolicyGate = false,
+            Summary = "Memory-backed execution cannot proceed because the memory execution gate is not configured.",
+            Issues = [issue],
+            Evidence = new MemoryExecutionEvidence
+            {
+                IsMemoryBacked = true,
+                DecisionId = context.DecisionId,
+                GateDecision = MemoryExecutionGateDecision.Blocked,
+                IssueCodes = [issue.Code],
+                MemoryItemIds = context.ReferencedArtifacts
+                    .Select(reference => reference.MemoryItemId)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray(),
+                InfluenceIds = context.ReferencedArtifacts
+                    .Select(reference => reference.InfluenceId)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray(),
+                HandoffMemorySliceIds = context.ReferencedArtifacts
+                    .Select(reference => reference.HandoffMemorySliceId)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray()
+            }
+        };
+    }
+
+    private static AgentSkillExecutionResult AttachMemoryEvidence(
+        AgentSkillExecutionResult result,
+        MemoryExecutionEvidence? memoryEvidence) =>
+        memoryEvidence is null
+            ? result
+            : result with { MemoryEvidence = memoryEvidence };
+
+    private static IReadOnlyList<string> BuildMemoryGateWarnings(MemoryExecutionGateResult result)
+    {
+        if (result.Decision != MemoryExecutionGateDecision.WarningRequiresOuterApproval)
+            return [];
+
+        return Merge(
+            [result.Summary],
+            result.Issues.Select(issue => issue.Summary));
+    }
 
     private static string BuildExecutionId(AgentSkillRequestContext context) =>
         Sanitize($"skill-execution-{context.ContextId}-{context.SkillId}");
