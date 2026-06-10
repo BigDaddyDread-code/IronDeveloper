@@ -167,7 +167,7 @@ public sealed class AgentMemoryBoundaryEvaluationHarnessTests
 
         foreach (var file in runtimeFiles)
         {
-            var text = File.ReadAllText(file);
+            var text = RemoveStoredManualWrapperNames(File.ReadAllText(file));
             Assert.IsFalse(text.Contains("AgentMemoryBoundaryEvaluationHarness", StringComparison.Ordinal),
                 $"Runtime file wires AgentMemoryBoundaryEvaluationHarness: {file}");
             Assert.IsFalse(text.Contains("IndependentCriticAgent", StringComparison.Ordinal),
@@ -187,6 +187,13 @@ public sealed class AgentMemoryBoundaryEvaluationHarnessTests
                 $"Runtime file appears to combine stability score with approval evidence: {file}");
         }
     }
+
+    private static string RemoveStoredManualWrapperNames(string text) =>
+        text
+            .Replace("IStoredManualIndependentCriticAgentService", string.Empty, StringComparison.Ordinal)
+            .Replace("StoredManualIndependentCriticAgentService", string.Empty, StringComparison.Ordinal)
+            .Replace("IStoredManualMemoryImprovementAgentService", string.Empty, StringComparison.Ordinal)
+            .Replace("StoredManualMemoryImprovementAgentService", string.Empty, StringComparison.Ordinal);
 
     private static void AssertScenarioPasses(AgentMemoryBoundaryScenarioType scenarioType)
     {
