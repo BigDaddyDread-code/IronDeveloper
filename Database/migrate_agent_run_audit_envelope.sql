@@ -51,6 +51,36 @@ BEGIN
     );
 END
 
+IF OBJECT_ID('agent.AgentRunAuditEnvelope', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_AgentRunAuditEnvelope_NoRawPrivateReasoning' AND parent_object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
+    ALTER TABLE agent.AgentRunAuditEnvelope WITH CHECK
+        ADD CONSTRAINT CK_AgentRunAuditEnvelope_NoRawPrivateReasoning CHECK (HasRawPrivateReasoning = 0);
+
+IF OBJECT_ID('agent.AgentRunAuditEnvelope', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_AgentRunAuditEnvelope_NoAuthorityClaim' AND parent_object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
+    ALTER TABLE agent.AgentRunAuditEnvelope WITH CHECK
+        ADD CONSTRAINT CK_AgentRunAuditEnvelope_NoAuthorityClaim CHECK (HasAuthorityClaim = 0);
+
+IF OBJECT_ID('agent.AgentRunAuditEnvelope', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_AgentRunAuditEnvelope_NoApprovalClaim' AND parent_object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
+    ALTER TABLE agent.AgentRunAuditEnvelope WITH CHECK
+        ADD CONSTRAINT CK_AgentRunAuditEnvelope_NoApprovalClaim CHECK (HasApprovalClaim = 0);
+
+IF OBJECT_ID('agent.AgentRunAuditEnvelope', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_AgentRunAuditEnvelope_NoMemoryPromotionClaim' AND parent_object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
+    ALTER TABLE agent.AgentRunAuditEnvelope WITH CHECK
+        ADD CONSTRAINT CK_AgentRunAuditEnvelope_NoMemoryPromotionClaim CHECK (HasMemoryPromotionClaim = 0);
+
+IF OBJECT_ID('agent.AgentRunAuditEnvelope', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_AgentRunAuditEnvelope_NoRuntimeActionOutput' AND parent_object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
+    ALTER TABLE agent.AgentRunAuditEnvelope WITH CHECK
+        ADD CONSTRAINT CK_AgentRunAuditEnvelope_NoRuntimeActionOutput CHECK (HasRuntimeActionOutput = 0);
+
+IF OBJECT_ID('agent.AgentRunAuditEnvelope', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_AgentRunAuditEnvelope_NoAuthorityCreatingOutput' AND parent_object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
+    ALTER TABLE agent.AgentRunAuditEnvelope WITH CHECK
+        ADD CONSTRAINT CK_AgentRunAuditEnvelope_NoAuthorityCreatingOutput CHECK (HasAuthorityCreatingOutput = 0);
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AgentRunAuditEnvelope_ProjectCreated' AND object_id = OBJECT_ID('agent.AgentRunAuditEnvelope'))
     CREATE INDEX IX_AgentRunAuditEnvelope_ProjectCreated
         ON agent.AgentRunAuditEnvelope(ProjectId, CreatedAtUtc DESC, AgentRunId ASC);

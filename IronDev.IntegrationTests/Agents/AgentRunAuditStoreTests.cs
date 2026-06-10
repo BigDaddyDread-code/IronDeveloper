@@ -125,6 +125,25 @@ public sealed class AgentRunAuditStoreTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task AgentRunAuditStore_DirectSqlUnsafeSafetyFlagsAreBlocked()
+    {
+        var unsafeFlags = new[]
+        {
+            "HasRawPrivateReasoning",
+            "HasAuthorityClaim",
+            "HasApprovalClaim",
+            "HasMemoryPromotionClaim",
+            "HasRuntimeActionOutput",
+            "HasAuthorityCreatingOutput"
+        };
+
+        foreach (var flag in unsafeFlags)
+            await ExpectSqlFailsAsync(BuildUnsafeFlagInsertSql($"agent-run-direct-{flag}", flag));
+
+        Assert.AreEqual(0, CountRows());
+    }
+
+    [TestMethod]
     public async Task AgentRunAuditStore_ReadRepositoryDeserializesEnvelopeJsonInsteadOfProjectedColumns()
     {
         var envelope = BuildEnvelope("1", "agent-run-json-source");
@@ -434,6 +453,74 @@ public sealed class AgentRunAuditStoreTests : IntegrationTestBase
         Assert.Fail($"Expected SQL mutation to fail but it succeeded: {sql}");
     }
 
+    private static string BuildUnsafeFlagInsertSql(string agentRunId, string unsafeFlag)
+    {
+        if (!AllowedUnsafeFlagNames.Contains(unsafeFlag))
+            throw new ArgumentOutOfRangeException(nameof(unsafeFlag), unsafeFlag, "Unsupported unsafe audit flag.");
+
+        static int Flag(string current, string expected) =>
+            string.Equals(current, expected, StringComparison.Ordinal) ? 1 : 0;
+
+        var envelopeJson = $"{{\"agentRunId\":\"{agentRunId}\",\"unsafeFlag\":\"{unsafeFlag}\"}}";
+
+        return $"""
+            INSERT INTO agent.AgentRunAuditEnvelope
+            (
+                TenantId,
+                ProjectId,
+                CampaignId,
+                RunId,
+                AgentRunId,
+                AgentId,
+                AgentName,
+                AgentKind,
+                ExecutionMode,
+                Status,
+                TriggerType,
+                CreatedAtUtc,
+                CompletedAtUtc,
+                HasRawPrivateReasoning,
+                HasAuthorityClaim,
+                HasApprovalClaim,
+                HasMemoryPromotionClaim,
+                HasRuntimeActionOutput,
+                HasAuthorityCreatingOutput,
+                HasBlockedCapabilityAttempt,
+                HasBoundaryBlock,
+                EnvelopeSha256,
+                EnvelopeJson,
+                AppendedAtUtc
+            )
+            VALUES
+            (
+                N'tenant-1',
+                N'1',
+                N'campaign-1',
+                N'run-{agentRunId}',
+                N'{agentRunId}',
+                N'critic-agent',
+                N'IndependentCriticAgent',
+                1,
+                1,
+                3,
+                1,
+                SYSUTCDATETIME(),
+                SYSUTCDATETIME(),
+                {Flag(unsafeFlag, "HasRawPrivateReasoning")},
+                {Flag(unsafeFlag, "HasAuthorityClaim")},
+                {Flag(unsafeFlag, "HasApprovalClaim")},
+                {Flag(unsafeFlag, "HasMemoryPromotionClaim")},
+                {Flag(unsafeFlag, "HasRuntimeActionOutput")},
+                {Flag(unsafeFlag, "HasAuthorityCreatingOutput")},
+                0,
+                0,
+                '{new string('d', 64)}',
+                N'{envelopeJson}',
+                SYSUTCDATETIME()
+            );
+            """;
+    }
+
     private async Task ApplyAgentRunAuditMigrationAsync()
     {
         await using var connection = new SqlConnection(ConnectionString);
@@ -462,6 +549,16 @@ public sealed class AgentRunAuditStoreTests : IntegrationTestBase
         Assert.AreEqual(64, value.Length);
         Assert.IsTrue(value.All(Uri.IsHexDigit));
     }
+
+    private static readonly IReadOnlySet<string> AllowedUnsafeFlagNames = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "HasRawPrivateReasoning",
+        "HasAuthorityClaim",
+        "HasApprovalClaim",
+        "HasMemoryPromotionClaim",
+        "HasRuntimeActionOutput",
+        "HasAuthorityCreatingOutput"
+    };
 
     private static JsonSerializerOptions CreateJsonOptions()
     {
