@@ -26,9 +26,9 @@ public sealed class LanguageRuntimeRegistry : ILanguageRuntimeRegistry
                 EvidenceRequirements = ["dotnet build success", "dotnet test success", "real repo mutation count zero"],
                 KnownRisks = ["Generated UI can compile while remaining shallow; product review still required."]
             },
-            Placeholder("java-maven", "Java", "Maven", "mvn test", "mvn test", [".java", ".xml", ".properties"], ["pom.xml"]),
-            Placeholder("typescript-node", "TypeScript", "Node", "npm test", "npm test", [".ts", ".tsx", ".js", ".json"], ["package.json", "tsconfig.json"]),
-            Placeholder("python-pytest", "Python", "Pytest", "python -m pytest", "python -m pytest", [".py", ".toml", ".txt"], ["pyproject.toml", "requirements.txt"])
+            UnavailableRuntime("java-maven", "Java", "Maven", "mvn test", "mvn test", [".java", ".xml", ".properties"], ["pom.xml"]),
+            UnavailableRuntime("typescript-node", "TypeScript", "Node", "npm test", "npm test", [".ts", ".tsx", ".js", ".json"], ["package.json", "tsconfig.json"]),
+            UnavailableRuntime("python-pytest", "Python", "Pytest", "python -m pytest", "python -m pytest", [".py", ".toml", ".txt"], ["pyproject.toml", "requirements.txt"])
         ];
     }
 
@@ -59,7 +59,7 @@ public sealed class LanguageRuntimeRegistry : ILanguageRuntimeRegistry
     private static bool ContainsAnyProjectFile(string workspacePath, IReadOnlyList<string> filePatterns) =>
         filePatterns.Any(pattern => Directory.EnumerateFiles(workspacePath, pattern, SearchOption.AllDirectories).Any());
 
-    private static LanguageRuntimeProfile Placeholder(
+    private static LanguageRuntimeProfile UnavailableRuntime(
         string id,
         string language,
         string stack,

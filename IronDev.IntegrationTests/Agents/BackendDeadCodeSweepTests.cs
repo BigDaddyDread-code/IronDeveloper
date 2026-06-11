@@ -28,7 +28,10 @@ public sealed class BackendDeadCodeSweepTests
             Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "BuilderProposalService.cs"),
             Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "BuilderContextService.cs"),
             Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "CodePatchService.cs"),
-            Path.Combine(repoRoot, "IronDev.Core", "Builder", "DraftTicketDtos.cs")
+            Path.Combine(repoRoot, "IronDev.Core", "Builder", "DraftTicketDtos.cs"),
+            Path.Combine(repoRoot, "IronDev.Core", "Interfaces", "IBuilderServices.cs"),
+            Path.Combine(repoRoot, "IronDev.Infrastructure", "Services", "Promotion", "LanguageRuntimeRegistry.cs"),
+            Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "DraftTicketService.cs")
         };
 
         var forbiddenMarkers = new[]
@@ -37,7 +40,9 @@ public sealed class BackendDeadCodeSweepTests
             "derive from LLM if possible",
             "stub implementation",
             "Phase 4B placeholder",
-            "stub or LLM"
+            "stub or LLM",
+            "Stub: returns",
+            "Placeholder("
         };
 
         foreach (var path in targetFiles)
