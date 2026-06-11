@@ -45,7 +45,7 @@ public sealed class SqlCollectiveMemoryRetrievalService : ICollectiveMemoryRetri
             {
                 RetrievalId = retrievalId,
                 Query = query,
-                Candidates = [],
+                Matches = [],
                 Issues = issues,
                 RetrievedAt = retrievedAt
             };
@@ -89,7 +89,7 @@ public sealed class SqlCollectiveMemoryRetrievalService : ICollectiveMemoryRetri
             },
             cancellationToken: cancellationToken))).ToArray();
 
-        var candidates = new List<CollectiveMemoryRetrievalCandidate>();
+        var matches = new List<CollectiveMemoryRetrievalMatch>();
 
         foreach (var row in rows)
         {
@@ -125,9 +125,9 @@ public sealed class SqlCollectiveMemoryRetrievalService : ICollectiveMemoryRetri
 
             var rank = Rank(item, stabilityScore, query, retrievedAt);
 
-            candidates.Add(new CollectiveMemoryRetrievalCandidate
+            matches.Add(new CollectiveMemoryRetrievalMatch
             {
-                RetrievalCandidateId = $"{retrievalId}-{item.CollectiveMemoryId}",
+                RetrievalMatchId = $"{retrievalId}-{item.CollectiveMemoryId}",
                 Memory = item,
                 RankScore = rank.Score,
                 RankReason = rank.Reason,
@@ -146,9 +146,9 @@ public sealed class SqlCollectiveMemoryRetrievalService : ICollectiveMemoryRetri
         {
             RetrievalId = retrievalId,
             Query = query with { Take = take },
-            Candidates = candidates
-                .OrderByDescending(candidate => candidate.RankScore)
-                .ThenBy(candidate => candidate.Memory.CollectiveMemoryId, StringComparer.Ordinal)
+            Matches = matches
+                .OrderByDescending(match => match.RankScore)
+                .ThenBy(match => match.Memory.CollectiveMemoryId, StringComparer.Ordinal)
                 .Take(take)
                 .ToArray(),
             Issues = issues,
