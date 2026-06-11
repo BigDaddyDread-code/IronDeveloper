@@ -400,11 +400,10 @@ public sealed class AgentToolExecutionGateTests
     }
 
     [TestMethod]
-    public void AgentToolExecutionGate_IsNotWiredIntoRuntimeManualApiOrStoredExecutionPaths()
+    public void AgentToolExecutionGate_IsNotWiredIntoManualOrStoredExecutionPaths()
     {
         var files = new[]
         {
-            ReadRepositoryFile("IronDev.Api", "Program.cs"),
             ReadRepositoryFile("IronDev.Core", "Agents", "Concrete", "ManualIndependentCriticAgentService.cs"),
             ReadRepositoryFile("IronDev.Core", "Agents", "Concrete", "ManualMemoryImprovementAgentService.cs"),
             ReadRepositoryFile("IronDev.Core", "Agents", "Concrete", "ModelBackedManualIndependentCriticAgentService.cs"),

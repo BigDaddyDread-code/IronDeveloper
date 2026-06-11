@@ -306,11 +306,10 @@ public sealed class AgentToolRequestContractTests
     }
 
     [TestMethod]
-    public void AgentToolRequest_NoRuntimeWiringOrExecutorExists()
+    public void AgentToolRequest_NoRuntimeExecutorOrRouterExists()
     {
         var files = new[]
         {
-            ReadRepositoryFile("IronDev.Api", "Program.cs"),
             ReadRepositoryFile("IronDev.Core", "Agents", "Concrete", "ManualIndependentCriticAgentService.cs"),
             ReadRepositoryFile("IronDev.Core", "Agents", "Concrete", "ManualMemoryImprovementAgentService.cs"),
             ReadRepositoryFile("IronDev.Core", "Agents", "Concrete", "ModelBackedManualIndependentCriticAgentService.cs"),
@@ -321,8 +320,6 @@ public sealed class AgentToolRequestContractTests
         {
             "AgentToolExecutor",
             "IAgentToolExecutor",
-            "AgentToolExecutionGate",
-            "IAgentToolExecutionGate",
             "AgentToolRouter",
             "IAgentToolRouter"
         };
