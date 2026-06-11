@@ -274,12 +274,22 @@ public sealed class AgentRunAuditEnvelopeValidator
             }
 
             if (DangerousExecutionCapabilities.Contains(use.Capability) &&
+                !IsAllowedControlledTestingRunTool(definition, use) &&
                 use.Outcome == AgentCapabilityUseOutcome.Allowed)
             {
                 AddError(issues, DangerousCapabilityAllowed, $"Dangerous capability '{use.Capability}' cannot be allowed by an audit envelope.");
             }
         }
     }
+
+    private static bool IsAllowedControlledTestingRunTool(
+        AgentDefinition definition,
+        AgentCapabilityUseRecord use) =>
+        use.Capability == AgentCapability.RunTool &&
+        use.Outcome == AgentCapabilityUseOutcome.Allowed &&
+        string.Equals(definition.AgentId, AgentDefinitionCatalog.TestingAgent.AgentId, StringComparison.Ordinal) &&
+        definition.Kind == AgentKind.TestingAgent &&
+        definition.ExecutionMode == AgentExecutionMode.ToolExecution;
 
     private static void ValidateBoundaryDecisions(
         string agentRunId,
