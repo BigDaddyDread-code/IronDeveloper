@@ -53,6 +53,17 @@ public sealed class BackendSqlCleanupTests
     }
 
     [TestMethod]
+    public void InlineSqlCleanupFiles_DoNotContainHiddenOrBidirectionalUnicode()
+    {
+        AssertAsciiAndNoFormatControls(
+            "Docs/BACKEND_INLINE_SQL_INVENTORY.md",
+            ReadRepositoryFile("Docs", "BACKEND_INLINE_SQL_INVENTORY.md"));
+        AssertAsciiAndNoFormatControls(
+            "IronDev.IntegrationTests/AgentMemory/AgentMemorySchemaTestSupport.cs",
+            ReadRepositoryFile("IronDev.IntegrationTests", "AgentMemory", "AgentMemorySchemaTestSupport.cs"));
+    }
+
+    [TestMethod]
     public void AgentMemorySchemaSupport_DropsIndexEventsBeforeAgentSchema()
     {
         var source = ReadRepositoryFile("IronDev.IntegrationTests", "AgentMemory", "AgentMemorySchemaTestSupport.cs");
@@ -151,6 +162,17 @@ public sealed class BackendSqlCleanupTests
 
     private static string ReadRepositoryFile(params string[] pathParts) =>
         File.ReadAllText(Path.Combine(RepositoryRoot(), Path.Combine(pathParts)));
+
+    private static void AssertAsciiAndNoFormatControls(string path, string source)
+    {
+        for (var index = 0; index < source.Length; index++)
+        {
+            var current = source[index];
+            var category = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(current);
+            if (current > 127 || category == System.Globalization.UnicodeCategory.Format)
+                Assert.Fail($"{path} contains hidden or non-ASCII Unicode at index {index}: U+{(int)current:X4}.");
+        }
+    }
 
     private static string RepositoryRoot()
     {
