@@ -35,6 +35,8 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
 
         var boundary = json.RootElement.GetProperty("boundary");
         AssertRequestOnlyBoundary(boundary);
+        Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
+            warning.GetString()?.Contains("non-durable API-local inspection cache", StringComparison.OrdinalIgnoreCase) == true));
 
         var data = json.RootElement.GetProperty("data");
         Assert.IsTrue(data.GetProperty("requestOnly").GetBoolean());
@@ -225,6 +227,9 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
         AssertRequestOnlyBoundary(json.RootElement.GetProperty("boundary"));
+        Assert.IsFalse(json.RootElement.GetProperty("boundary").GetProperty("durable").GetBoolean());
+        Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
+            warning.GetString()?.Contains("SQL-backed durable tool request storage is not provided", StringComparison.OrdinalIgnoreCase) == true));
         AssertNoMisleadingAuthorityLanguage(text);
     }
 
@@ -295,6 +300,9 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
         StringAssert.Contains(text, "Tool request is a request form, not execution permission.");
         StringAssert.Contains(text, "Tool request is not approval.");
         StringAssert.Contains(text, "Tool request is not tool execution.");
+        StringAssert.Contains(text, "non-durable API-local request inspection record");
+        StringAssert.Contains(text, "This does not yet satisfy durable SQL source-of-truth storage for tool requests.");
+        StringAssert.Contains(text, "\"durable\": false");
         StringAssert.Contains(text, "Audit evidence is not approval.");
         StringAssert.Contains(text, "Gate is not executor.");
         StringAssert.Contains(text, "Endpoint access is not execution permission.");
@@ -429,6 +437,7 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
     private static void AssertRequestOnlyBoundary(JsonElement boundary)
     {
         Assert.IsFalse(boundary.GetProperty("toolRequestIsExecutionPermission").GetBoolean());
+        Assert.IsFalse(boundary.GetProperty("durable").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("toolExecuted").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("requestApproved").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("auditIsApproval").GetBoolean());
