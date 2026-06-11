@@ -20,6 +20,41 @@ public sealed class BackendDeadCodeSweepTests
     }
 
     [TestMethod]
+    public void BackendDeadCodeSweep_RemovesStaleTodoAndPlaceholderMarkersFromTouchedBackendFiles()
+    {
+        var repoRoot = FindRepoRoot();
+        var targetFiles = new[]
+        {
+            Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "BuilderProposalService.cs"),
+            Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "BuilderContextService.cs"),
+            Path.Combine(repoRoot, "IronDev.Infrastructure", "Builder", "CodePatchService.cs"),
+            Path.Combine(repoRoot, "IronDev.Core", "Builder", "DraftTicketDtos.cs")
+        };
+
+        var forbiddenMarkers = new[]
+        {
+            "TODO:",
+            "derive from LLM if possible",
+            "stub implementation",
+            "Phase 4B placeholder",
+            "stub or LLM"
+        };
+
+        foreach (var path in targetFiles)
+        {
+            Assert.IsTrue(File.Exists(path), $"Expected cleanup target file to exist: {path}");
+            var text = File.ReadAllText(path);
+
+            foreach (var marker in forbiddenMarkers)
+            {
+                Assert.IsFalse(
+                    text.Contains(marker, StringComparison.OrdinalIgnoreCase),
+                    $"Stale cleanup marker '{marker}' remains in {Path.GetRelativePath(repoRoot, path)}");
+            }
+        }
+    }
+
+    [TestMethod]
     public void BackendDeadCodeSweep_DoesNotWireManualDogfoodOrManualLoopServicesIntoRuntimeSurfaces()
     {
         var repoRoot = FindRepoRoot();
