@@ -319,7 +319,8 @@ public sealed class AgentRunAuditEnvelopeTests
             if (normalized.EndsWith("IronDev.Api/Program.cs", StringComparison.OrdinalIgnoreCase) ||
                 normalized.EndsWith("IronDev.Api/Controllers/AgentRunAuditController.cs", StringComparison.OrdinalIgnoreCase) ||
                 normalized.EndsWith("IronDev.Api/Controllers/AgentRunsV1Controller.cs", StringComparison.OrdinalIgnoreCase) ||
-                normalized.EndsWith("IronDev.Api/Controllers/ManualCriticReviewsV1Controller.cs", StringComparison.OrdinalIgnoreCase))
+                normalized.EndsWith("IronDev.Api/Controllers/ManualCriticReviewsV1Controller.cs", StringComparison.OrdinalIgnoreCase) ||
+                normalized.EndsWith("IronDev.Api/Controllers/ManualMemoryImprovementsV1Controller.cs", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
