@@ -20,6 +20,8 @@ irondev critic review create
 irondev critic review get <agentRunId>
 irondev memory-improvements create
 irondev memory-improvements get <agentRunId>
+irondev tool-requests create
+irondev tool-requests get <toolRequestId>
 ```
 
 `api ping` performs a safe health check against the configured API base URL. It must not call mutating endpoints.
@@ -29,6 +31,8 @@ Agent-run commands are read-only API clients over the PR58 Agent Run API. They d
 Manual critic commands are API clients over the PR59 Manual Critic API. `critic review create` may request the API to create manual critic audit evidence, but that evidence is advisory only. `critic review get` is read-only inspection. Neither command is governance, approval, execution permission, source apply, memory promotion, tool execution, GitHub review submission, or a local critic implementation.
 
 Manual memory-improvement commands are API clients over the PR60 Manual Memory Improvement API. They may request and inspect memory-improvement proposals. They do not promote memory, create accepted memory, write CollectiveMemory, write vector/index authority, approve requests, apply source, execute tools, or expose hidden reasoning.
+
+Tool request commands are API clients over the PR61 Tool Request API. They may create and inspect request forms. They do not approve requests, execute tools, evaluate gates, apply source, promote memory, append tool execution audit, or expose hidden reasoning. While PR61 remains API-local, tool requests created through the CLI are non-durable request inspection records, not SQL source-of-truth records or durable execution evidence.
 
 ## Configuration
 
@@ -108,3 +112,5 @@ PR65 adds only the read-only agent-run inspection commands from PR58.
 PR66 adds only the Manual Critic API commands from PR59. Manual memory improvement, tool request, tool gate, and dogfood loop CLI commands remain separate slices.
 
 PR67 adds only the Manual Memory Improvement API commands from PR60. Tool request, tool gate, and dogfood loop CLI commands remain separate slices.
+
+PR68 adds only the Tool Request API commands from PR61. Tool gate and dogfood loop CLI commands remain separate slices.
