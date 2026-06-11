@@ -24,6 +24,15 @@ public interface IIronDevApiClient
         string agentRunId,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> CreateManualCriticReviewAsync(
+        ManualCriticReviewCreateRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetManualCriticReviewAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
