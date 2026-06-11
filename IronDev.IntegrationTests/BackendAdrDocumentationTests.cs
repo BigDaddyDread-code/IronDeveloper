@@ -14,7 +14,8 @@ public sealed class BackendAdrDocumentationTests
         "Docs/ADR/ADR-004-proposal-review-apply-boundary.md",
         "Docs/ADR/ADR-005-tool-request-audit-execution-boundary.md",
         "Docs/ADR/ADR-006-critic-gate-governance-boundary.md",
-        "Docs/ADR/ADR-007-human-review-required-for-apply-and-promotion.md"
+        "Docs/ADR/ADR-007-human-review-required-for-apply-and-promotion.md",
+        "Docs/ADR/ADR-008-api-surface-exposure-rules.md"
     ];
 
     [TestMethod]
@@ -39,7 +40,8 @@ public sealed class BackendAdrDocumentationTests
             "ADR-004-proposal-review-apply-boundary.md",
             "ADR-005-tool-request-audit-execution-boundary.md",
             "ADR-006-critic-gate-governance-boundary.md",
-            "ADR-007-human-review-required-for-apply-and-promotion.md"
+            "ADR-007-human-review-required-for-apply-and-promotion.md",
+            "ADR-008-api-surface-exposure-rules.md"
         })
         {
             StringAssert.Contains(index, expected);
