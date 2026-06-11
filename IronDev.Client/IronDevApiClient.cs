@@ -19,6 +19,37 @@ public sealed class IronDevApiClient : IIronDevApiClient
         _httpClient = httpClient;
     }
 
+    public async Task<IronDevApiResponse<JsonElement?>> PingAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
+        var body = response.Content is null
+            ? null
+            : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        var warnings = ExtractStringArray(body, "warnings");
+        var errors = response.IsSuccessStatusCode
+            ? Array.Empty<IronDevApiError>()
+            : new[]
+            {
+                new IronDevApiError(
+                    "IRONDEV_API_NON_SUCCESS",
+                    string.IsNullOrWhiteSpace(body)
+                        ? $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}."
+                        : $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}.")
+            };
+
+        var data = TryParseJson(body);
+
+        return new IronDevApiResponse<JsonElement?>(
+            response.IsSuccessStatusCode,
+            (int)response.StatusCode,
+            response.IsSuccessStatusCode ? "succeeded" : "failed",
+            data,
+            warnings,
+            errors,
+            body);
+    }
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
@@ -231,5 +262,55 @@ public sealed class IronDevApiClient : IIronDevApiClient
             return parsed;
 
         return parsed with { EventType = eventType };
+    }
+
+    private static JsonElement? TryParseJson(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<string> ExtractStringArray(string? body, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return Array.Empty<string>();
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty(propertyName, out var property) ||
+                property.ValueKind != JsonValueKind.Array)
+            {
+                return Array.Empty<string>();
+            }
+
+            var values = new List<string>();
+            foreach (var item in property.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    var value = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        values.Add(value);
+                }
+            }
+
+            return values;
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<string>();
+        }
     }
 }

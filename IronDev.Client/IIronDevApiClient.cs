@@ -8,6 +8,8 @@ namespace IronDev.Client;
 
 public interface IIronDevApiClient
 {
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> PingAsync(CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
