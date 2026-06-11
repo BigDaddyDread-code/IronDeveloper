@@ -126,9 +126,11 @@ public sealed class BackendEntityTableInventoryTests
     [TestMethod]
     public void EntityTableInventory_DoesNotContainHiddenOrBidirectionalUnicode()
     {
-        AssertAsciiAndNoFormatControls(
-            "Docs/BACKEND_ENTITY_TABLE_INVENTORY.md",
-            ReadRepositoryFile("Docs", "BACKEND_ENTITY_TABLE_INVENTORY.md"));
+        const string inventoryPath = "Docs/BACKEND_ENTITY_TABLE_INVENTORY.md";
+        var absolutePath = Path.Combine(RepositoryRoot(), inventoryPath);
+
+        AssertAsciiBytesAndNoBom(inventoryPath, File.ReadAllBytes(absolutePath));
+        AssertAsciiAndNoFormatControls(inventoryPath, File.ReadAllText(absolutePath));
     }
 
     private static string ReadRepositoryFile(params string[] pathParts) =>
@@ -142,6 +144,18 @@ public sealed class BackendEntityTableInventoryTests
             var category = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(current);
             if (current > 127 || category == System.Globalization.UnicodeCategory.Format)
                 Assert.Fail($"{path} contains hidden or non-ASCII Unicode at index {index}: U+{(int)current:X4}.");
+        }
+    }
+
+    private static void AssertAsciiBytesAndNoBom(string path, byte[] bytes)
+    {
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            Assert.Fail($"{path} must not contain a UTF-8 byte-order mark.");
+
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            if (bytes[index] > 127)
+                Assert.Fail($"{path} contains non-ASCII byte at offset {index}: 0x{bytes[index]:X2}.");
         }
     }
 
