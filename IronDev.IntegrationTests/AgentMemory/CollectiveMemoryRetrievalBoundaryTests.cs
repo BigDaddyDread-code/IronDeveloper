@@ -35,7 +35,7 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
     public void CollectiveMemoryRetrievalContractTypesExist()
     {
         Assert.IsNotNull(typeof(CollectiveMemoryRetrievalQuery));
-        Assert.IsNotNull(typeof(CollectiveMemoryRetrievalCandidate));
+        Assert.IsNotNull(typeof(CollectiveMemoryRetrievalMatch));
         Assert.IsNotNull(typeof(CollectiveMemoryRetrievalResult));
         Assert.IsNotNull(typeof(CollectiveMemoryRetrievalIssue));
         Assert.IsNotNull(typeof(CollectiveMemoryRetrievalMode));
@@ -51,8 +51,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
 
         var result = await CreateService().RetrieveAsync(BuildQuery(text: "SQL governed"));
 
-        Assert.AreEqual(1, result.Candidates.Count);
-        Assert.AreEqual("accepted-sql-authority", result.Candidates[0].Memory.CollectiveMemoryId);
+        Assert.AreEqual(1, result.Matches.Count);
+        Assert.AreEqual("accepted-sql-authority", result.Matches[0].Memory.CollectiveMemoryId);
     }
 
     [TestMethod]
@@ -62,8 +62,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
 
         var result = await CreateService().RetrieveAsync(BuildQuery(text: "Reviewed"));
 
-        Assert.AreEqual(1, result.Candidates.Count);
-        Assert.AreEqual(CollectiveMemoryAuthorityLevel.Reviewed, result.Candidates[0].Memory.AuthorityLevel);
+        Assert.AreEqual(1, result.Matches.Count);
+        Assert.AreEqual(CollectiveMemoryAuthorityLevel.Reviewed, result.Matches[0].Memory.AuthorityLevel);
     }
 
     [TestMethod]
@@ -79,7 +79,7 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
 
         CollectionAssert.AreEquivalent(
             new[] { "accepted-memory" },
-            result.Candidates.Select(candidate => candidate.Memory.CollectiveMemoryId).ToArray());
+            result.Matches.Select(match => match.Memory.CollectiveMemoryId).ToArray());
     }
 
     [TestMethod]
@@ -91,8 +91,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
             text: "Candidate retrieval",
             authorityFilter: CollectiveMemoryRetrievalAuthorityFilter.IncludeCandidates));
 
-        Assert.AreEqual(1, result.Candidates.Count);
-        Assert.AreEqual(CollectiveMemoryAuthorityLevel.Candidate, result.Candidates[0].Memory.AuthorityLevel);
+        Assert.AreEqual(1, result.Matches.Count);
+        Assert.AreEqual(CollectiveMemoryAuthorityLevel.Candidate, result.Matches[0].Memory.AuthorityLevel);
     }
 
     [TestMethod]
@@ -107,7 +107,7 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
 
         CollectionAssert.AreEquivalent(
             new[] { "deprecated-memory", "rejected-memory" },
-            result.Candidates.Select(candidate => candidate.Memory.CollectiveMemoryId).Order(StringComparer.Ordinal).ToArray());
+            result.Matches.Select(match => match.Memory.CollectiveMemoryId).Order(StringComparer.Ordinal).ToArray());
     }
 
     [TestMethod]
@@ -119,8 +119,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
 
         var result = await CreateService().RetrieveAsync(BuildQuery(text: "Scoped"));
 
-        Assert.AreEqual(1, result.Candidates.Count);
-        Assert.AreEqual("tenant-one-memory", result.Candidates[0].Memory.CollectiveMemoryId);
+        Assert.AreEqual(1, result.Matches.Count);
+        Assert.AreEqual("tenant-one-memory", result.Matches[0].Memory.CollectiveMemoryId);
     }
 
     [TestMethod]
@@ -135,8 +135,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
             text: "Optional scope",
             scope: BuildScope() with { KnowledgeDomainId = "domain-1", ComponentId = "component-1", RepositoryId = "repo-1" }));
 
-        Assert.AreEqual(1, result.Candidates.Count);
-        Assert.AreEqual("domain-match", result.Candidates[0].Memory.CollectiveMemoryId);
+        Assert.AreEqual(1, result.Matches.Count);
+        Assert.AreEqual("domain-match", result.Matches[0].Memory.CollectiveMemoryId);
     }
 
     [TestMethod]
@@ -145,28 +145,28 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
         await InsertMemoryAsync("accepted-memory", title: "Ranked memory", authority: CollectiveMemoryAuthorityLevel.Accepted, eventType: CollectiveMemoryEventType.Accepted);
 
         var result = await CreateService().RetrieveAsync(BuildQuery(text: "Ranked", take: 500));
-        var candidate = result.Candidates.Single();
+        var match = result.Matches.Single();
 
         Assert.AreEqual(50, result.Query.Take);
-        Assert.IsTrue(candidate.RankScore is >= 0m and <= 1m);
-        Assert.IsFalse(string.IsNullOrWhiteSpace(candidate.RankReason));
-        CollectionAssert.Contains(candidate.SourceIds.ToArray(), "source-accepted-memory-1");
-        CollectionAssert.Contains(candidate.EvidenceIds.ToArray(), "evidence-accepted-memory-1");
+        Assert.IsTrue(match.RankScore is >= 0m and <= 1m);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(match.RankReason));
+        CollectionAssert.Contains(match.SourceIds.ToArray(), "source-accepted-memory-1");
+        CollectionAssert.Contains(match.EvidenceIds.ToArray(), "evidence-accepted-memory-1");
     }
 
     [TestMethod]
-    public async Task CandidateAlwaysCarriesAdvisoryAuthorityFlagsAndWarnings()
+    public async Task RetrievalMatchAlwaysCarriesAdvisoryAuthorityFlagsAndWarnings()
     {
         await InsertMemoryAsync("accepted-memory", title: "Advisory memory", authority: CollectiveMemoryAuthorityLevel.Accepted, eventType: CollectiveMemoryEventType.Accepted);
 
-        var candidate = (await CreateService().RetrieveAsync(BuildQuery(text: "Advisory"))).Candidates.Single();
+        var match = (await CreateService().RetrieveAsync(BuildQuery(text: "Advisory"))).Matches.Single();
 
-        Assert.IsFalse(candidate.IsAuthoritativeForAction);
-        Assert.IsTrue(candidate.RequiresConscienceBeforeUse);
-        Assert.IsTrue(candidate.RequiresPolicyApprovalForAction);
-        Assert.IsTrue(candidate.Warnings.Any(warning => warning.Contains("advisory only", StringComparison.OrdinalIgnoreCase)));
-        Assert.IsTrue(candidate.Warnings.Any(warning => warning.Contains("does not grant policy approval", StringComparison.OrdinalIgnoreCase)));
-        Assert.IsTrue(candidate.Warnings.Any(warning => warning.Contains("does not grant tool execution approval", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(match.IsAuthoritativeForAction);
+        Assert.IsTrue(match.RequiresConscienceBeforeUse);
+        Assert.IsTrue(match.RequiresPolicyApprovalForAction);
+        Assert.IsTrue(match.Warnings.Any(warning => warning.Contains("advisory only", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(match.Warnings.Any(warning => warning.Contains("does not grant policy approval", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(match.Warnings.Any(warning => warning.Contains("does not grant tool execution approval", StringComparison.OrdinalIgnoreCase)));
     }
 
     [TestMethod]
@@ -177,8 +177,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
 
         var result = await CreateService().RetrieveAsync(BuildQuery(text: "Ranking comparison", includeContradicted: true));
 
-        Assert.AreEqual("strong-memory", result.Candidates[0].Memory.CollectiveMemoryId);
-        Assert.IsTrue(result.Candidates[0].RankScore > result.Candidates[1].RankScore);
+        Assert.AreEqual("strong-memory", result.Matches[0].Memory.CollectiveMemoryId);
+        Assert.IsTrue(result.Matches[0].RankScore > result.Matches[1].RankScore);
     }
 
     [TestMethod]
@@ -191,7 +191,7 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
             text: "Authority ranking",
             authorityFilter: CollectiveMemoryRetrievalAuthorityFilter.IncludeCandidates));
 
-        Assert.AreEqual("accepted-memory", result.Candidates[0].Memory.CollectiveMemoryId);
+        Assert.AreEqual("accepted-memory", result.Matches[0].Memory.CollectiveMemoryId);
     }
 
     [TestMethod]
@@ -199,10 +199,10 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
     {
         await InsertMemoryAsync("contradicted-memory", title: "Contradicted memory", authority: CollectiveMemoryAuthorityLevel.Accepted, eventType: CollectiveMemoryEventType.Accepted, contradictions: [BuildContradiction("contradicted-memory", weight: 5m)]);
 
-        var candidate = (await CreateService().RetrieveAsync(BuildQuery(text: "Contradicted", includeContradicted: true))).Candidates.Single();
+        var match = (await CreateService().RetrieveAsync(BuildQuery(text: "Contradicted", includeContradicted: true))).Matches.Single();
 
-        Assert.IsTrue(candidate.Warnings.Any(warning => warning.Contains("contradiction pressure", StringComparison.OrdinalIgnoreCase)));
-        Assert.IsTrue(candidate.Warnings.Any(warning => warning.Contains("Unknown or Unstable", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(match.Warnings.Any(warning => warning.Contains("contradiction pressure", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(match.Warnings.Any(warning => warning.Contains("Unknown or Unstable", StringComparison.OrdinalIgnoreCase)));
     }
 
     [TestMethod]
@@ -216,8 +216,8 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
             authorityFilter: CollectiveMemoryRetrievalAuthorityFilter.IncludeCandidates,
             minimumStabilityBand: CollectiveMemoryStabilityBand.Stable));
 
-        Assert.AreEqual(1, result.Candidates.Count);
-        Assert.AreEqual("stable-memory", result.Candidates[0].Memory.CollectiveMemoryId);
+        Assert.AreEqual(1, result.Matches.Count);
+        Assert.AreEqual("stable-memory", result.Matches[0].Memory.CollectiveMemoryId);
     }
 
     [TestMethod]
@@ -228,9 +228,9 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
         var defaultResult = await CreateService().RetrieveAsync(BuildQuery(text: "Expired retrieval"));
         var includedResult = await CreateService().RetrieveAsync(BuildQuery(text: "Expired retrieval", includeExpired: true));
 
-        Assert.AreEqual(0, defaultResult.Candidates.Count);
-        Assert.AreEqual(1, includedResult.Candidates.Count);
-        Assert.AreEqual("expired-memory", includedResult.Candidates[0].Memory.CollectiveMemoryId);
+        Assert.AreEqual(0, defaultResult.Matches.Count);
+        Assert.AreEqual(1, includedResult.Matches.Count);
+        Assert.AreEqual("expired-memory", includedResult.Matches[0].Memory.CollectiveMemoryId);
     }
 
     [TestMethod]
@@ -274,7 +274,7 @@ public sealed class CollectiveMemoryRetrievalBoundaryTests : IntegrationTestBase
                 "ICollectiveMemoryRetrievalService",
                 "SqlCollectiveMemoryRetrievalService",
                 "CollectiveMemoryRetrievalResult",
-                "CollectiveMemoryRetrievalCandidate"
+                "CollectiveMemoryRetrievalMatch"
             })
             {
                 Assert.IsFalse(text.Contains(token, StringComparison.Ordinal),

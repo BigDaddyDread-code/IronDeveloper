@@ -41,9 +41,9 @@ public sealed record CollectiveMemoryRetrievalQuery
     public int Take { get; init; } = 10;
 }
 
-public sealed record CollectiveMemoryRetrievalCandidate
+public sealed record CollectiveMemoryRetrievalMatch
 {
-    public required string RetrievalCandidateId { get; init; }
+    public required string RetrievalMatchId { get; init; }
 
     public required CollectiveMemoryItem Memory { get; init; }
 
@@ -74,7 +74,7 @@ public sealed record CollectiveMemoryRetrievalResult
 
     public required CollectiveMemoryRetrievalQuery Query { get; init; }
 
-    public required IReadOnlyList<CollectiveMemoryRetrievalCandidate> Candidates { get; init; }
+    public required IReadOnlyList<CollectiveMemoryRetrievalMatch> Matches { get; init; }
 
     public required IReadOnlyList<CollectiveMemoryRetrievalIssue> Issues { get; init; }
 
