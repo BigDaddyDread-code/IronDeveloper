@@ -1,9 +1,11 @@
 using System.Text;
+using IronDev.Api.Controllers;
 using IronDev.AI;
 using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
 using IronDev.Core.Chat;
 using IronDev.Core;
+using IronDev.Core.Agents;
 using IronDev.Core.Agents.Audit;
 using IronDev.Core.Agents.Concrete;
 using IronDev.Core.Auth;
@@ -158,6 +160,8 @@ builder.Services.AddScoped<IManualMemoryImprovementAgentService, ManualMemoryImp
 builder.Services.AddScoped<ManualAgentExecutionStoreValidator>();
 builder.Services.AddScoped<IStoredManualIndependentCriticAgentService, StoredManualIndependentCriticAgentService>();
 builder.Services.AddScoped<IStoredManualMemoryImprovementAgentService, StoredManualMemoryImprovementAgentService>();
+builder.Services.AddSingleton<AgentToolRequestValidator>();
+builder.Services.AddSingleton<IToolRequestApiStore, InMemoryToolRequestApiStore>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
