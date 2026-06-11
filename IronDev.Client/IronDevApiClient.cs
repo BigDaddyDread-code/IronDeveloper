@@ -79,6 +79,43 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => GetJsonEnvelopeAsync($"api/v1/manual-critic/reviews/{Uri.EscapeDataString(agentRunId)}?projectId={projectId}", cancellationToken);
 
+    public Task<IronDevApiResponse<JsonElement?>> CreateManualMemoryImprovementAsync(
+        ManualMemoryImprovementCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var summary = string.IsNullOrWhiteSpace(request.Focus)
+            ? $"Manual memory-improvement proposal for agent run {request.TargetAgentRunId}."
+            : request.Focus.Trim();
+    var content = string.IsNullOrWhiteSpace(request.Reason)
+        ? "Manual memory-improvement proposal requested from the IronDev CLI. This creates proposal-only evidence for human review."
+            : request.Reason.Trim();
+
+        var body = new
+        {
+            projectId = request.ProjectId,
+            sourceType = "AgentRunAuditEnvelope",
+            sourceId = request.TargetAgentRunId,
+            summary,
+            content,
+            evidenceRefs = request.EvidenceRefs.Count == 0
+                ? [$"agent-run-audit:{request.TargetAgentRunId}"]
+                : request.EvidenceRefs,
+        context = "Manual memory-improvement CLI request. Proposal-only evidence for human review.",
+            candidateType = "RepeatedManualCorrection",
+            correlationId = request.CorrelationId
+        };
+
+        return PostJsonEnvelopeAsync("api/v1/manual-memory-improvements", body, cancellationToken);
+    }
+
+    public Task<IronDevApiResponse<JsonElement?>> GetManualMemoryImprovementAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/manual-memory-improvements/{Uri.EscapeDataString(agentRunId)}?projectId={projectId}", cancellationToken);
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
