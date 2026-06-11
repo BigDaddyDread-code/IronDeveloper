@@ -27,14 +27,14 @@ The validation basis for this report is the current Block E cleanup stack.
 
 | Validation lane | Current result | Freeze impact |
 | --------------- | -------------- | ------------- |
-| Focused PR 55 contract band | Passing in PR 55: 47/47 | Supports freeze |
-| Backend PR 42-54 regression band | Passing in PR 55: 194/194 | Supports freeze |
-| API integration lane | 45/46 passing in PR 55 | Accepted exception: chat wording assertion |
-| Full solution | Failing in documented broad lanes | Accepted exceptions where boundary safety is not undermined |
-| Build | Passing in PR 55 | Supports freeze |
-| git diff --check | Passing with CRLF warning only | Supports freeze |
+| PR 56 focused contract band | Passed: 55/55 | Supports freeze |
+| PR 42-55 backend regression band | Passed: 194/194 | Supports freeze |
+| API integration lane | Failed: 1, Passed: 45, Total: 46 | Accepted exception: chat wording assertion at EndpointContractTests.cs:189 |
+| Full solution | Failed in named broad lanes | Accepted exceptions where boundary safety is not undermined |
+| Build | Passed: 0 errors, 400 warnings | Supports freeze |
+| git diff --check | Passed | Supports freeze |
 
-The PR 56 pull request body records the exact validation commands and latest counts for this branch.
+The PR 56 pull request body records the exact validation commands. This report records the latest validation counts directly so the freeze artifact is self-contained.
 
 ## Contract Inventory Summary
 
