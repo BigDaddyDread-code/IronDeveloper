@@ -39,6 +39,46 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => GetJsonEnvelopeAsync($"api/v1/agent-runs/{Uri.EscapeDataString(agentRunId)}/audit?projectId={projectId}", cancellationToken);
 
+    public Task<IronDevApiResponse<JsonElement?>> CreateManualCriticReviewAsync(
+        ManualCriticReviewCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var summary = string.IsNullOrWhiteSpace(request.Focus)
+            ? $"Manual critic review for agent run {request.TargetAgentRunId}."
+            : request.Focus.Trim();
+        var content = string.IsNullOrWhiteSpace(request.Reason)
+            ? "Manual critic review requested from the IronDev CLI. This creates advisory critic evidence only."
+            : request.Reason.Trim();
+        var context = string.IsNullOrWhiteSpace(request.ReviewKind)
+            ? "Manual critic CLI request. Critic review is not governance, approval, source apply, memory promotion, or tool execution."
+            : $"Review kind: {request.ReviewKind.Trim()}. Critic review is not governance, approval, source apply, memory promotion, or tool execution.";
+
+        var body = new
+        {
+            projectId = request.ProjectId,
+            subjectType = "AgentRun",
+            subjectId = request.TargetAgentRunId,
+            summary,
+            content,
+            evidenceRefs = request.EvidenceRefs.Count == 0
+                ? [$"agent-run:{request.TargetAgentRunId}"]
+                : request.EvidenceRefs,
+            context,
+            severityHint = "Medium",
+            correlationId = request.CorrelationId
+        };
+
+        return PostJsonEnvelopeAsync("api/v1/manual-critic/reviews", body, cancellationToken);
+    }
+
+    public Task<IronDevApiResponse<JsonElement?>> GetManualCriticReviewAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/manual-critic/reviews/{Uri.EscapeDataString(agentRunId)}?projectId={projectId}", cancellationToken);
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
@@ -197,6 +237,33 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        var body = response.Content is null
+            ? null
+            : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        var warnings = ExtractStringArray(body, "warnings");
+        var errors = response.IsSuccessStatusCode
+            ? Array.Empty<IronDevApiError>()
+            : ExtractErrors(body, response);
+        var status = ExtractStatus(body, response.IsSuccessStatusCode ? "succeeded" : "failed");
+        var data = TryParseJson(body);
+
+        return new IronDevApiResponse<JsonElement?>(
+            response.IsSuccessStatusCode,
+            (int)response.StatusCode,
+            status,
+            data,
+            warnings,
+            errors,
+            body);
+    }
+
+    private async Task<IronDevApiResponse<JsonElement?>> PostJsonEnvelopeAsync<TRequest>(
+        string path,
+        TRequest request,
+        CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(path, request, JsonOptions, cancellationToken).ConfigureAwait(false);
         var body = response.Content is null
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

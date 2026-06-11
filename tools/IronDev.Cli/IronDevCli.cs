@@ -182,6 +182,9 @@ public static class IronDevCli
         if (IronDevCliAgentRuns.IsAgentRunsCommand(args))
             return await IronDevCliAgentRuns.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliManualCritic.IsCriticCommand(args))
+            return await IronDevCliManualCritic.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
+
         if (IsCommand(args, "ticket", "create"))
             return await HandleTicketCreateAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "ticket", "list"))
@@ -2833,6 +2836,8 @@ public static class IronDevCli
         error.WriteLine("  irondev agent-runs list --project-id <id> [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev agent-runs get <agentRunId> --project-id <id> [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev agent-runs audit <agentRunId> --project-id <id> [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev critic review create --project-id <id> --target-agent-run-id <id> [--review-kind <kind>] [--focus <text>] [--reason <text>] [--evidence-ref <ref>] [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev critic review get <agentRunId> --project-id <id> [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev ticket create --project-id <id> --file <ticket.json> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket list --project-id <id> [--take 50] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket show --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
