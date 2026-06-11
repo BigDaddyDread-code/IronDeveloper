@@ -5,7 +5,6 @@ public sealed class CollectiveMemoryStabilityScorer : ICollectiveMemoryStability
     public const string InputRequired = "CMEM_STABILITY_INPUT_REQUIRED";
     public const string StabilityRunIdRequired = "CMEM_STABILITY_RUN_ID_REQUIRED";
     public const string MemoryRequired = "CMEM_STABILITY_MEMORY_REQUIRED";
-    public const string MemoryInvalid = "CMEM_STABILITY_MEMORY_INVALID";
     public const string EvidenceAggregateRequired = "CMEM_STABILITY_EVIDENCE_AGGREGATE_REQUIRED";
     public const string AggregateMemoryIdMismatch = "CMEM_STABILITY_AGGREGATE_MEMORY_ID_MISMATCH";
     public const string AggregateScopeMismatch = "CMEM_STABILITY_AGGREGATE_SCOPE_MISMATCH";

@@ -156,7 +156,6 @@ public sealed class ManualRealRunMemoryImprovementValidator
     public const string RealRunMemoryThoughtLedgerInvalid = "REAL_RUN_MEMORY_THOUGHT_LEDGER_INVALID";
     public const string RealRunMemoryPromotionForbidden = "REAL_RUN_MEMORY_PROMOTION_FORBIDDEN";
     public const string RealRunIndexWriteForbidden = "REAL_RUN_MEMORY_INDEX_WRITE_FORBIDDEN";
-    public const string RealRunMemoryRuntimeWiringForbidden = "REAL_RUN_MEMORY_RUNTIME_WIRING_FORBIDDEN";
 
     private static readonly IReadOnlySet<string> AllowedPatternTypes = new HashSet<string>(StringComparer.Ordinal)
     {

@@ -50,18 +50,6 @@ public sealed record ManualDogfoodHarnessScenarioResult
     public bool CreatesPullRequest { get; init; }
 }
 
-public sealed record ManualDogfoodHarnessStageResult
-{
-    public required string StageId { get; init; }
-    public required string StageName { get; init; }
-    public required bool Succeeded { get; init; }
-    public IReadOnlyList<string> EvidenceRefs { get; init; } = [];
-    public bool CreatesAuthority { get; init; }
-    public bool MutatesSource { get; init; }
-    public bool AppliesPatch { get; init; }
-    public bool PromotesMemory { get; init; }
-}
-
 public sealed record ManualDogfoodHarnessSummary
 {
     public required string Title { get; init; }
@@ -120,7 +108,6 @@ public sealed class ManualDogfoodHarnessValidator
     public const string DogfoodHarnessScenarioUnsafe = "DOGFOOD_HARNESS_SCENARIO_UNSAFE";
     public const string DogfoodHarnessAuditInvalid = "DOGFOOD_HARNESS_AUDIT_INVALID";
     public const string DogfoodHarnessThoughtLedgerInvalid = "DOGFOOD_HARNESS_THOUGHT_LEDGER_INVALID";
-    public const string DogfoodHarnessRuntimeWiringForbidden = "DOGFOOD_HARNESS_RUNTIME_WIRING_FORBIDDEN";
     public const string DogfoodHarnessSourceMutationForbidden = "DOGFOOD_HARNESS_SOURCE_MUTATION_FORBIDDEN";
     public const string DogfoodHarnessMemoryPromotionForbidden = "DOGFOOD_HARNESS_MEMORY_PROMOTION_FORBIDDEN";
     public const string DogfoodHarnessIndexWriteForbidden = "DOGFOOD_HARNESS_INDEX_WRITE_FORBIDDEN";
