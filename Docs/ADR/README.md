@@ -24,6 +24,7 @@ These records document current backend decisions. They do not introduce new beha
 | [ADR-005](ADR-005-tool-request-audit-execution-boundary.md) | Tool request, audit, gate, and execution remain separate. | Audit is not approval; gate is not executor. |
 | [ADR-006](ADR-006-critic-gate-governance-boundary.md) | Critic, gate, and governance remain separate. | Critic is not governance. |
 | [ADR-007](ADR-007-human-review-required-for-apply-and-promotion.md) | Human review remains required for source apply and memory promotion. | Advisory or safety signals cannot replace human approval. |
+| [ADR-008](ADR-008-api-surface-exposure-rules.md) | API exposes frozen backend contracts only. | API/CLI transport cannot create authority or hidden execution. |
 
 ## Core invariants
 
