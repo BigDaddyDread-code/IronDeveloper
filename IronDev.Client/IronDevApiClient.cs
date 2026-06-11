@@ -88,8 +88,8 @@ public sealed class IronDevApiClient : IIronDevApiClient
         var summary = string.IsNullOrWhiteSpace(request.Focus)
             ? $"Manual memory-improvement proposal for agent run {request.TargetAgentRunId}."
             : request.Focus.Trim();
-    var content = string.IsNullOrWhiteSpace(request.Reason)
-        ? "Manual memory-improvement proposal requested from the IronDev CLI. This creates proposal-only evidence for human review."
+        var content = string.IsNullOrWhiteSpace(request.Reason)
+            ? "Manual memory-improvement proposal requested from the IronDev CLI. This creates proposal-only evidence for human review."
             : request.Reason.Trim();
 
         var body = new
@@ -102,7 +102,7 @@ public sealed class IronDevApiClient : IIronDevApiClient
             evidenceRefs = request.EvidenceRefs.Count == 0
                 ? [$"agent-run-audit:{request.TargetAgentRunId}"]
                 : request.EvidenceRefs,
-        context = "Manual memory-improvement CLI request. Proposal-only evidence for human review.",
+            context = "Manual memory-improvement CLI request. Proposal-only evidence for human review.",
             candidateType = "RepeatedManualCorrection",
             correlationId = request.CorrelationId
         };
@@ -115,6 +115,47 @@ public sealed class IronDevApiClient : IIronDevApiClient
         string agentRunId,
         CancellationToken cancellationToken = default)
         => GetJsonEnvelopeAsync($"api/v1/manual-memory-improvements/{Uri.EscapeDataString(agentRunId)}?projectId={projectId}", cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> CreateToolRequestAsync(
+        ToolRequestCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var summary = string.IsNullOrWhiteSpace(request.Summary)
+            ? $"Tool request form for {request.ToolKind}."
+            : request.Summary.Trim();
+
+        var payload = new
+        {
+            runId = request.RunId,
+            inputRefs = request.InputRefs,
+            policyRefs = request.PolicyRefs,
+            riskLevel = request.RiskLevel,
+            dryRunRequired = request.DryRunRequired
+        };
+
+        var body = new
+        {
+            projectId = request.ProjectId,
+            requestedTool = request.ToolKind,
+            requestKind = request.RequestKind,
+            summary,
+            payload,
+            evidenceRefs = request.EvidenceRefs,
+            correlationId = request.CorrelationId,
+            reason = request.Reason,
+            requestedByAgentRunId = request.RunId
+        };
+
+        return PostJsonEnvelopeAsync("api/v1/tool-requests", body, cancellationToken);
+    }
+
+    public Task<IronDevApiResponse<JsonElement?>> GetToolRequestAsync(
+        int projectId,
+        string toolRequestId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/tool-requests/{Uri.EscapeDataString(toolRequestId)}?projectId={projectId}", cancellationToken);
 
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {

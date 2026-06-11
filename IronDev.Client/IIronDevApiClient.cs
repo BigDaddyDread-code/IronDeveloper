@@ -42,6 +42,15 @@ public interface IIronDevApiClient
         string agentRunId,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> CreateToolRequestAsync(
+        ToolRequestCreateRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetToolRequestAsync(
+        int projectId,
+        string toolRequestId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
