@@ -162,6 +162,8 @@ builder.Services.AddScoped<IStoredManualIndependentCriticAgentService, StoredMan
 builder.Services.AddScoped<IStoredManualMemoryImprovementAgentService, StoredManualMemoryImprovementAgentService>();
 builder.Services.AddSingleton<AgentToolRequestValidator>();
 builder.Services.AddSingleton<IToolRequestApiStore, InMemoryToolRequestApiStore>();
+builder.Services.AddSingleton<IAgentToolExecutionGate, AgentToolExecutionGate>();
+builder.Services.AddSingleton<IToolGateApiStore, InMemoryToolGateApiStore>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
