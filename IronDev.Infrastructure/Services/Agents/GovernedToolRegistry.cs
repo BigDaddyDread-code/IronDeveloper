@@ -38,7 +38,7 @@ public sealed class GovernedToolRegistry
             ?? _runtimeProfiles.First(profile => string.Equals(profile.Runtime, runtime, StringComparison.OrdinalIgnoreCase));
     }
 
-    public async Task<AgentToolResult> RunAsync(AgentToolRequest request, CancellationToken ct = default)
+    public async Task<AgentToolResult> RunAsync(GovernedAgentToolRequest request, CancellationToken ct = default)
     {
         var started = DateTimeOffset.UtcNow;
         if (!TryGetCapability(request.ToolName, out var capability))
@@ -65,7 +65,7 @@ public sealed class GovernedToolRegistry
     }
 
     private async Task<AgentToolResult> RunMemorySearchAsync(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
@@ -115,7 +115,7 @@ public sealed class GovernedToolRegistry
     }
 
     private Task<AgentToolResult> RunCodeSearchAsync(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
@@ -150,7 +150,7 @@ public sealed class GovernedToolRegistry
             capability.Boundary));
     }
 
-    private AgentToolResult RunTraceRead(AgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
+    private AgentToolResult RunTraceRead(GovernedAgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
     {
         var runsRoot = Path.Combine(_repoRoot, "tools", "dogfood", "runs");
         var reports = Directory.Exists(runsRoot)
@@ -174,7 +174,7 @@ public sealed class GovernedToolRegistry
             capability.Boundary);
     }
 
-    private AgentToolResult RunFailureLatest(AgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
+    private AgentToolResult RunFailureLatest(GovernedAgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
     {
         var runsRoot = Path.Combine(_repoRoot, "tools", "dogfood", "runs");
         var failures = Directory.Exists(runsRoot)
@@ -198,7 +198,7 @@ public sealed class GovernedToolRegistry
     }
 
     private async Task<AgentToolResult> RunTestPlanAsync(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
@@ -217,7 +217,7 @@ public sealed class GovernedToolRegistry
     }
 
     private async Task<AgentToolResult> RunQualityGateAsync(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         GovernedAgentToolCapability capability,
         DateTimeOffset started,
         CancellationToken ct)
@@ -235,7 +235,7 @@ public sealed class GovernedToolRegistry
         return ProcessBackedResult(request, capability, started, run, $"Quality gate {planPath} exit={run.ExitCode}.");
     }
 
-    private AgentToolResult RunProjectBuildProfile(AgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
+    private AgentToolResult RunProjectBuildProfile(GovernedAgentToolRequest request, GovernedAgentToolCapability capability, DateTimeOffset started)
     {
         var profile = ResolveRuntimeProfile(request.Project, request.Runtime);
         return Succeeded(
@@ -254,7 +254,7 @@ public sealed class GovernedToolRegistry
     }
 
     private AgentToolResult ProcessBackedResult(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         GovernedAgentToolCapability capability,
         DateTimeOffset started,
         ProcessRun run,
@@ -297,7 +297,7 @@ public sealed class GovernedToolRegistry
     }
 
     private static AgentToolResult Succeeded(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         DateTimeOffset started,
         string summary,
         IReadOnlyDictionary<string, string> data,
@@ -318,7 +318,7 @@ public sealed class GovernedToolRegistry
         };
 
     private static AgentToolResult Failed(
-        AgentToolRequest request,
+        GovernedAgentToolRequest request,
         DateTimeOffset started,
         string summary,
         string boundary,
@@ -336,7 +336,7 @@ public sealed class GovernedToolRegistry
             Boundary = boundary
         };
 
-    private static AgentToolResult Blocked(AgentToolRequest request, DateTimeOffset started, string summary) =>
+    private static AgentToolResult Blocked(GovernedAgentToolRequest request, DateTimeOffset started, string summary) =>
         new()
         {
             RequestId = request.RequestId,
@@ -444,7 +444,7 @@ public sealed class GovernedToolRegistry
         }
     ];
 
-    private static string ReadParameter(AgentToolRequest request, string key, string fallback) =>
+    private static string ReadParameter(GovernedAgentToolRequest request, string key, string fallback) =>
         request.Parameters.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
             : fallback;

@@ -279,7 +279,7 @@ public sealed class GovernedToolArchitectureTests
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
         Assert.IsNotNull(method);
 
-        var requests = (IReadOnlyList<AgentToolRequest>)method.Invoke(
+        var requests = (IReadOnlyList<GovernedAgentToolRequest>)method.Invoke(
             null,
             ["IronDev", "Review governed tool path", "test-run", "dotnet"])!;
 

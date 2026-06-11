@@ -99,7 +99,7 @@ public sealed class GovernedPlannerCriticLoopService
         await File.WriteAllTextAsync(Path.Combine(runRoot, "report.md"), BuildMarkdown(result), ct);
     }
 
-    private static IReadOnlyList<AgentToolRequest> BuildPlannerToolRequests(string project, string goal, string runId, string runtime) =>
+    private static IReadOnlyList<GovernedAgentToolRequest> BuildPlannerToolRequests(string project, string goal, string runId, string runtime) =>
     [
         Request("tool-001-memory", "PlannerAgent", "memory.search", project, goal, "Find accepted project memory before planning.", runtime, new Dictionary<string, string> { ["query"] = goal }),
         Request("tool-002-code", "PlannerAgent", "code.search", project, goal, "Find nearby code/docs vocabulary before planning.", runtime, new Dictionary<string, string> { ["query"] = goal }),
@@ -118,7 +118,7 @@ public sealed class GovernedPlannerCriticLoopService
         Request("tool-007-runtime", "SupervisorAgent", "project.build", project, goal, "Resolve runtime profile without executing a build.", runtime, new Dictionary<string, string>())
     ];
 
-    private static AgentToolRequest Request(
+    private static GovernedAgentToolRequest Request(
         string id,
         string agent,
         string tool,
@@ -143,7 +143,7 @@ public sealed class GovernedPlannerCriticLoopService
         string project,
         string goal,
         string runtime,
-        IReadOnlyList<AgentToolRequest> requests,
+        IReadOnlyList<GovernedAgentToolRequest> requests,
         IReadOnlyList<ProjectRuntimeProfile> runtimeProfiles) =>
         new
         {
@@ -205,7 +205,7 @@ public sealed class GovernedPlannerCriticLoopService
             boundary = "Revised plan is advisory. It does not execute writes or self-approve."
         };
 
-    private static HumanEscalationGate BuildEscalation(EvidenceValidationResult validation, IReadOnlyList<AgentToolRequest> requests)
+    private static HumanEscalationGate BuildEscalation(EvidenceValidationResult validation, IReadOnlyList<GovernedAgentToolRequest> requests)
     {
         var mutationRequested = requests.Any(request => request.RequiresMutation);
         if (mutationRequested)

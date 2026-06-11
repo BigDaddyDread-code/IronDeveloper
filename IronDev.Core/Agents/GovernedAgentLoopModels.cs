@@ -22,7 +22,7 @@ public sealed record ProjectRuntimeProfile
     public string Boundary { get; init; } = string.Empty;
 }
 
-public sealed record AgentToolRequest
+public sealed record GovernedAgentToolRequest
 {
     public required string RequestId { get; init; }
     public required string RequestedBy { get; init; }
@@ -92,7 +92,7 @@ public sealed record AgentLoopTrace
     public required string Goal { get; init; }
     public string Runtime { get; init; } = "dotnet";
     public IReadOnlyList<AgentLoopStageTrace> Stages { get; init; } = [];
-    public IReadOnlyList<AgentToolRequest> ToolRequests { get; init; } = [];
+    public IReadOnlyList<GovernedAgentToolRequest> ToolRequests { get; init; } = [];
     public IReadOnlyList<AgentToolResult> ToolResults { get; init; } = [];
     public EvidenceValidationResult? EvidenceValidation { get; init; }
     public HumanEscalationGate? HumanEscalation { get; init; }
