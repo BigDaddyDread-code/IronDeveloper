@@ -179,6 +179,26 @@ public sealed class AgentRunsApiContractTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task AgentRunsApi_DoesNotExposeRawPrivateReasoning_WhenAuditEnvelopeJsonContainsPrivateReasoning()
+    {
+        await InsertEnvelopeDirectlyAsync(BuildEnvelopeWithPrivateReasoning("agent-run-private-1", 591, RunOneCreatedAt));
+        using var client = await AuthedClientAsync();
+
+        var detail = await client.GetAsync("/api/v1/agent-runs/agent-run-private-1?projectId=591");
+        var audit = await client.GetAsync("/api/v1/agent-runs/agent-run-private-1/audit?projectId=591");
+        var detailText = await detail.Content.ReadAsStringAsync();
+        var auditText = await audit.Content.ReadAsStringAsync();
+
+        Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode, detailText);
+        Assert.AreEqual(HttpStatusCode.OK, audit.StatusCode, auditText);
+        StringAssert.Contains(detailText, "[redacted: sensitive audit text]");
+        AssertNoPrivateReasoningLeak(detailText);
+        AssertNoPrivateReasoningLeak(auditText);
+        AssertNoMisleadingAuthorityLanguage(detailText);
+        AssertNoMisleadingAuthorityLanguage(auditText);
+    }
+
+    [TestMethod]
     public void AgentRunsApi_ControllerDoesNotExposeWriteExecutionOrPromotionPaths()
     {
         var text = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.Api", "Controllers", "AgentRunsV1Controller.cs"));
@@ -345,6 +365,79 @@ public sealed class AgentRunsApiContractTests : ApiTestBase
         };
     }
 
+    private static AgentRunAuditEnvelope BuildEnvelopeWithPrivateReasoning(string agentRunId, int projectId, DateTimeOffset createdAt)
+    {
+        const string privateText = "PRIVATE_MARKER chain-of-thought hidden reasoning raw prompt scratchpad private reasoning";
+        var envelope = BuildEnvelope(agentRunId, projectId, createdAt);
+
+        return envelope with
+        {
+            Run = envelope.Run with
+            {
+                RequestSummary = privateText,
+                Purpose = privateText
+            },
+            Inputs =
+            [
+                envelope.Inputs[0] with
+                {
+                    Source = privateText,
+                    Summary = privateText,
+                    ContainsRawPrivateReasoning = true
+                }
+            ],
+            Outputs =
+            [
+                envelope.Outputs[0] with
+                {
+                    Summary = privateText,
+                    EvidenceRefs = [privateText],
+                    ContainsRawPrivateReasoning = true
+                }
+            ],
+            CapabilityUses =
+            [
+                envelope.CapabilityUses[0] with
+                {
+                    Summary = privateText,
+                    BoundaryDecisionId = $"boundary-{agentRunId}",
+                    EvidenceRef = privateText
+                }
+            ],
+            BoundaryDecisions =
+            [
+                envelope.BoundaryDecisions[0] with
+                {
+                    Reason = privateText,
+                    SourceRefId = privateText,
+                    EvidenceRefs = [privateText]
+                }
+            ],
+            ThoughtLedger =
+            [
+                envelope.ThoughtLedger[0] with
+                {
+                    Summary = privateText,
+                    EvidenceRefs = [privateText],
+                    Assumptions = [privateText],
+                    RejectedAlternatives = [privateText],
+                    Risks = [privateText],
+                    RequiredFollowUps = [privateText],
+                    ContainsRawPrivateReasoning = true
+                }
+            ],
+            Steps =
+            [
+                envelope.Steps[0] with
+                {
+                    Summary = privateText,
+                    EvidenceRefs = [privateText],
+                    ContainsRawPrivateReasoning = true
+                }
+            ]
+        };
+    }
+
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)
     {
         var text = await response.Content.ReadAsStringAsync();
@@ -369,6 +462,22 @@ public sealed class AgentRunsApiContractTests : ApiTestBase
             Assert.IsFalse(text.Contains(token, StringComparison.OrdinalIgnoreCase), $"Response contained misleading authority language: {token}");
     }
 
+    private static void AssertNoPrivateReasoningLeak(string text)
+    {
+        var forbidden = new[]
+        {
+            "PRIVATE_MARKER",
+            "chain-of-thought",
+            "hidden reasoning",
+            "raw prompt",
+            "scratchpad",
+            "private reasoning"
+        };
+
+        foreach (var token in forbidden)
+            Assert.IsFalse(text.Contains(token, StringComparison.OrdinalIgnoreCase), $"Response contained private reasoning marker: {token}");
+    }
+
     private static async Task<int> CountAuditRowsAsync()
     {
         await using var connection = new SqlConnection(ConnectionString);
@@ -378,6 +487,90 @@ public sealed class AgentRunsApiContractTests : ApiTestBase
             ELSE
                 SELECT COUNT(*) FROM agent.AgentRunAuditEnvelope;
             """);
+    }
+
+    private static async Task InsertEnvelopeDirectlyAsync(AgentRunAuditEnvelope envelope)
+    {
+        var json = JsonSerializer.Serialize(envelope);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            """
+            INSERT INTO agent.AgentRunAuditEnvelope
+            (
+                TenantId,
+                ProjectId,
+                CampaignId,
+                RunId,
+                AgentRunId,
+                AgentId,
+                AgentName,
+                AgentKind,
+                ExecutionMode,
+                Status,
+                TriggerType,
+                CreatedAtUtc,
+                CompletedAtUtc,
+                HasRawPrivateReasoning,
+                HasAuthorityClaim,
+                HasApprovalClaim,
+                HasMemoryPromotionClaim,
+                HasRuntimeActionOutput,
+                HasAuthorityCreatingOutput,
+                HasBlockedCapabilityAttempt,
+                HasBoundaryBlock,
+                EnvelopeSha256,
+                EnvelopeJson,
+                AppendedAtUtc
+            )
+            VALUES
+            (
+                @TenantId,
+                @ProjectId,
+                @CampaignId,
+                @RunId,
+                @AgentRunId,
+                @AgentId,
+                @AgentName,
+                @AgentKind,
+                @ExecutionMode,
+                @Status,
+                @TriggerType,
+                @CreatedAtUtc,
+                @CompletedAtUtc,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                @EnvelopeSha256,
+                @EnvelopeJson,
+                @AppendedAtUtc
+            );
+            """,
+            new
+            {
+                envelope.Run.TenantId,
+                envelope.Run.ProjectId,
+                envelope.Run.CampaignId,
+                envelope.Run.RunId,
+                envelope.Run.AgentRunId,
+                envelope.Run.AgentId,
+                envelope.Run.AgentName,
+                AgentKind = (int)envelope.AgentDefinitionSnapshot.Kind,
+                ExecutionMode = (int)envelope.AgentDefinitionSnapshot.ExecutionMode,
+                Status = (int)envelope.Run.Status,
+                TriggerType = (int)envelope.Run.TriggerType,
+                CreatedAtUtc = envelope.Run.CreatedAtUtc.UtcDateTime,
+                CompletedAtUtc = envelope.Run.CompletedAtUtc?.UtcDateTime,
+                EnvelopeSha256 = new string('d', 64),
+                EnvelopeJson = json,
+                AppendedAtUtc = DateTimeOffset.UtcNow.UtcDateTime
+            });
     }
 
     private static async Task DropAgentRunAuditSchemaAsync()
