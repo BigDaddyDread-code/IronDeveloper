@@ -19,36 +19,25 @@ public sealed class IronDevApiClient : IIronDevApiClient
         _httpClient = httpClient;
     }
 
-    public async Task<IronDevApiResponse<JsonElement?>> PingAsync(CancellationToken cancellationToken = default)
-    {
-        using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
-        var body = response.Content is null
-            ? null
-            : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+    public Task<IronDevApiResponse<JsonElement?>> PingAsync(CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync("health", cancellationToken);
 
-        var warnings = ExtractStringArray(body, "warnings");
-        var errors = response.IsSuccessStatusCode
-            ? Array.Empty<IronDevApiError>()
-            : new[]
-            {
-                new IronDevApiError(
-                    "IRONDEV_API_NON_SUCCESS",
-                    string.IsNullOrWhiteSpace(body)
-                        ? $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}."
-                        : $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}.")
-            };
+    public Task<IronDevApiResponse<JsonElement?>> ListAgentRunsAsync(
+        AgentRunListQuery query,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildAgentRunListPath(query), cancellationToken);
 
-        var data = TryParseJson(body);
+    public Task<IronDevApiResponse<JsonElement?>> GetAgentRunAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/agent-runs/{Uri.EscapeDataString(agentRunId)}?projectId={projectId}", cancellationToken);
 
-        return new IronDevApiResponse<JsonElement?>(
-            response.IsSuccessStatusCode,
-            (int)response.StatusCode,
-            response.IsSuccessStatusCode ? "succeeded" : "failed",
-            data,
-            warnings,
-            errors,
-            body);
-    }
+    public Task<IronDevApiResponse<JsonElement?>> GetAgentRunAuditAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/agent-runs/{Uri.EscapeDataString(agentRunId)}/audit?projectId={projectId}", cancellationToken);
 
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
@@ -203,6 +192,32 @@ public sealed class IronDevApiClient : IIronDevApiClient
         return await ReadRequiredAsync<T>(response, cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task<IronDevApiResponse<JsonElement?>> GetJsonEnvelopeAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        var body = response.Content is null
+            ? null
+            : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        var warnings = ExtractStringArray(body, "warnings");
+        var errors = response.IsSuccessStatusCode
+            ? Array.Empty<IronDevApiError>()
+            : ExtractErrors(body, response);
+        var status = ExtractStatus(body, response.IsSuccessStatusCode ? "succeeded" : "failed");
+        var data = TryParseJson(body);
+
+        return new IronDevApiResponse<JsonElement?>(
+            response.IsSuccessStatusCode,
+            (int)response.StatusCode,
+            status,
+            data,
+            warnings,
+            errors,
+            body);
+    }
+
     private async Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.PostAsJsonAsync(path, request, JsonOptions, cancellationToken).ConfigureAwait(false);
@@ -312,5 +327,103 @@ public sealed class IronDevApiClient : IIronDevApiClient
         {
             return Array.Empty<string>();
         }
+    }
+
+    private static IReadOnlyList<IronDevApiError> ExtractErrors(string? body, HttpResponseMessage response)
+    {
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+                if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                    document.RootElement.TryGetProperty("errors", out var errors) &&
+                    errors.ValueKind == JsonValueKind.Array)
+                {
+                    var values = new List<IronDevApiError>();
+                    foreach (var item in errors.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.Object)
+                        {
+                            var code = item.TryGetProperty("code", out var codeProperty) && codeProperty.ValueKind == JsonValueKind.String
+                                ? codeProperty.GetString()
+                                : null;
+                            var message = item.TryGetProperty("message", out var messageProperty) && messageProperty.ValueKind == JsonValueKind.String
+                                ? messageProperty.GetString()
+                                : null;
+
+                            values.Add(new IronDevApiError(
+                                string.IsNullOrWhiteSpace(code) ? "IRONDEV_API_NON_SUCCESS" : code,
+                                string.IsNullOrWhiteSpace(message) ? $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}." : message));
+                        }
+                    }
+
+                    if (values.Count > 0)
+                        return values;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return
+        [
+            new IronDevApiError(
+                "IRONDEV_API_NON_SUCCESS",
+                $"IronDev API returned {(int)response.StatusCode} {response.ReasonPhrase}.")
+        ];
+    }
+
+    private static string ExtractStatus(string? body, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return fallback;
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("status", out var status) &&
+                status.ValueKind == JsonValueKind.String)
+            {
+                var value = status.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return fallback;
+    }
+
+    private static string BuildAgentRunListPath(AgentRunListQuery query)
+    {
+        var parameters = new List<KeyValuePair<string, string>>
+        {
+            new("projectId", query.ProjectId.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        };
+
+        Add(parameters, "agentId", query.AgentId);
+        Add(parameters, "agentKind", query.AgentKind);
+        Add(parameters, "status", query.Status);
+        Add(parameters, "triggerType", query.TriggerType);
+        Add(parameters, "createdAfterUtc", query.CreatedAfterUtc);
+        Add(parameters, "createdBeforeUtc", query.CreatedBeforeUtc);
+        Add(parameters, "runId", query.RunId);
+        Add(parameters, "correlationId", query.CorrelationId);
+        Add(parameters, "take", query.Take?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Add(parameters, "skip", query.Skip?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        return "api/v1/agent-runs?" + string.Join("&", parameters.Select(parameter =>
+            $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value)}"));
+    }
+
+    private static void Add(List<KeyValuePair<string, string>> parameters, string name, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            parameters.Add(new KeyValuePair<string, string>(name, value));
     }
 }

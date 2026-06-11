@@ -13,9 +13,14 @@ irondev --help
 irondev --version
 irondev config show
 irondev api ping
+irondev agent-runs list
+irondev agent-runs get <agentRunId>
+irondev agent-runs audit <agentRunId>
 ```
 
 `api ping` performs a safe health check against the configured API base URL. It must not call mutating endpoints.
+
+Agent-run commands are read-only API clients over the PR58 Agent Run API. They do not execute agents, append audit, approve requests, apply source, promote memory, or expose hidden reasoning.
 
 ## Configuration
 
@@ -89,3 +94,5 @@ The CLI foundation must not:
 - bypass API contracts
 
 The foundation intentionally does not expose PR58-PR63 domain commands. Those commands get separate API/CLI slices after the foundation is stable.
+
+PR65 adds only the read-only agent-run inspection commands from PR58. Manual critic, manual memory improvement, tool request, tool gate, and dogfood loop CLI commands remain out of scope for this foundation document.

@@ -10,6 +10,20 @@ public interface IIronDevApiClient
 {
     Task<IronDevApiResponse<System.Text.Json.JsonElement?>> PingAsync(CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListAgentRunsAsync(
+        AgentRunListQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetAgentRunAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetAgentRunAuditAsync(
+        int projectId,
+        string agentRunId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
