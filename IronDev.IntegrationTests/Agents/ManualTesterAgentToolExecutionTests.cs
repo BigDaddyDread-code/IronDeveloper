@@ -9,10 +9,7 @@ namespace IronDev.IntegrationTests.Agents;
 [TestClass]
 public sealed class ManualTesterAgentToolExecutionTests
 {
-    private static readonly DateTimeOffset RequestedAt = new(2026, 6, 11, 13, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset GateEvaluatedAt = new(2026, 6, 11, 12, 55, 0, TimeSpan.Zero);
-
-    [TestMethod]
+        [TestMethod]
     public void ManualTesterAgentToolExecutionContracts_ExposeExpectedTypes()
     {
         Assert.IsNotNull(typeof(IManualTesterAgentToolExecutionService));
@@ -32,9 +29,9 @@ public sealed class ManualTesterAgentToolExecutionTests
     [TestMethod]
     public void ManualTesterAgentToolExecution_ValidGatedTestRunExecutesScriptedExecutor()
     {
-        var executor = SuccessExecutor();
+        var executor = BackendManualToolExecutionFixtures.ScriptedTestExecutorSucceedsWithEvidence();
         var service = new ManualTesterAgentToolExecutionService(executor);
-        var request = ValidExecutionRequest();
+        var request = BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval();
 
         var result = service.Execute(request);
 
@@ -77,7 +74,7 @@ public sealed class ManualTesterAgentToolExecutionTests
         });
         var service = new ManualTesterAgentToolExecutionService(executor);
 
-        var result = service.Execute(ValidExecutionRequest());
+        var result = service.Execute(BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval());
 
         Assert.AreEqual(1, executor.CallCount);
         Assert.IsFalse(result.Succeeded);
@@ -94,7 +91,7 @@ public sealed class ManualTesterAgentToolExecutionTests
     [TestMethod]
     public void ManualTesterAgentToolExecution_GateRejectionsPreventExecutorCall()
     {
-        var baseRequest = ValidExecutionRequest();
+        var baseRequest = BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval();
         var unsafeGateCases = new[]
         {
             baseRequest.GateDecision with { Decision = AgentToolExecutionGateDecisionType.Blocked, GrantsExecution = false, RequiresExecutor = false },
@@ -114,7 +111,7 @@ public sealed class ManualTesterAgentToolExecutionTests
 
         foreach (var gate in unsafeGateCases)
         {
-            var executor = SuccessExecutor();
+            var executor = BackendManualToolExecutionFixtures.ScriptedTestExecutorSucceedsWithEvidence();
             var service = new ManualTesterAgentToolExecutionService(executor);
             var result = service.Execute(baseRequest with { GateDecision = gate });
 
@@ -130,7 +127,7 @@ public sealed class ManualTesterAgentToolExecutionTests
     [TestMethod]
     public void ManualTesterAgentToolExecution_RequestRejectionsPreventExecutorCall()
     {
-        var baseRequest = ValidExecutionRequest();
+        var baseRequest = BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval();
         var cases = new[]
         {
             baseRequest with { ManualExecutionId = string.Empty },
@@ -138,7 +135,7 @@ public sealed class ManualTesterAgentToolExecutionTests
             baseRequest with { TestPlanRef = string.Empty },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ToolKind = AgentToolKind.BuildRun } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { RequestType = AgentToolRequestType.BuildExecutionRequest } },
-            baseRequest with { ToolRequest = baseRequest.ToolRequest with { Actor = ValidActor(AgentDefinitionCatalog.IndependentCriticAgent) } },
+            baseRequest with { ToolRequest = baseRequest.ToolRequest with { Actor = BackendAgentToolRequestFixtures.ActorFor(AgentDefinitionCatalog.IndependentCriticAgent) } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ClaimsApproval = true } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ClaimsExecutionPermission = true } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ContainsExecutionResult = true } },
@@ -152,7 +149,7 @@ public sealed class ManualTesterAgentToolExecutionTests
 
         foreach (var request in cases)
         {
-            var executor = SuccessExecutor();
+            var executor = BackendManualToolExecutionFixtures.ScriptedTestExecutorSucceedsWithEvidence();
             var result = new ManualTesterAgentToolExecutionService(executor).Execute(request);
 
             Assert.AreEqual(0, executor.CallCount);
@@ -192,7 +189,7 @@ public sealed class ManualTesterAgentToolExecutionTests
         foreach (var testCase in cases)
         {
             var executor = new ScriptedTestRunPlanExecutor(_ => testCase);
-            var result = new ManualTesterAgentToolExecutionService(executor).Execute(ValidExecutionRequest());
+            var result = new ManualTesterAgentToolExecutionService(executor).Execute(BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval());
 
             Assert.AreEqual(1, executor.CallCount);
             Assert.IsFalse(result.Succeeded);
@@ -208,14 +205,14 @@ public sealed class ManualTesterAgentToolExecutionTests
         var validator = new ManualTesterAgentToolExecutionValidator();
         var cases = new[]
         {
-            SafeOutput() with { ContainsRawPrivateReasoning = true },
-            SafeOutput() with { MutatesSource = true },
-            SafeOutput() with { CallsExternalSystem = true },
-            SafeOutput() with { SubmitsGitHubReview = true },
-            SafeOutput() with { PromotesMemory = true },
-            SafeOutput() with { CreatesCollectiveMemory = true },
-            SafeOutput() with { WritesWeaviate = true },
-            SafeOutput() with { EvidenceRefs = [] }
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { ContainsRawPrivateReasoning = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { MutatesSource = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { CallsExternalSystem = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { SubmitsGitHubReview = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { PromotesMemory = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { CreatesCollectiveMemory = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { WritesWeaviate = true },
+            BackendManualToolExecutionFixtures.TesterOutputWithoutDangerousFlags() with { EvidenceRefs = [] }
         };
 
         foreach (var output in cases)
@@ -225,7 +222,7 @@ public sealed class ManualTesterAgentToolExecutionTests
     [TestMethod]
     public void AgentRunAuditEnvelopeValidator_AllowsRunToolOnlyForBuiltInTestingAgent()
     {
-        var valid = new ManualTesterAgentToolExecutionService(SuccessExecutor()).Execute(ValidExecutionRequest()).AuditEnvelope!;
+        var valid = new ManualTesterAgentToolExecutionService(BackendManualToolExecutionFixtures.ScriptedTestExecutorSucceedsWithEvidence()).Execute(BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval()).AuditEnvelope!;
         AssertNoAuditIssues(valid);
 
         var invalid = valid with
@@ -320,140 +317,6 @@ public sealed class ManualTesterAgentToolExecutionTests
                 Assert.IsFalse(source.Contains(token, StringComparison.Ordinal), $"Forbidden active token found in manual tester execution production file: {token}");
         }
     }
-
-    private static ManualTesterAgentToolExecutionRequest ValidExecutionRequest()
-    {
-        var toolRequest = ValidToolRequest();
-        return new ManualTesterAgentToolExecutionRequest
-        {
-            ManualExecutionId = "manual-test-execution-1",
-            ToolRequest = toolRequest,
-            GateDecision = AllowedGate(toolRequest),
-            RequestedByUserId = "user-1",
-            TestPlanRef = "test-plan-1",
-            TestPlanPath = "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
-            WorkingDirectory = "workspace/run-1",
-            Parameters = new Dictionary<string, string> { ["filter"] = "IronDevCliTests" },
-            RequestedAtUtc = RequestedAt
-        };
-    }
-
-    private static AgentToolRequest ValidToolRequest() =>
-        new()
-        {
-            ToolRequestId = "tool-request-test-run-1",
-            Status = AgentToolRequestStatus.PendingGate,
-            RequestType = AgentToolRequestType.TestExecutionRequest,
-            ToolKind = AgentToolKind.TestRun,
-            RiskLevel = AgentToolRiskLevel.Medium,
-            Scope = new AgentToolRequestScope
-            {
-                TenantId = "tenant-1",
-                ProjectId = "project-1",
-                CampaignId = "campaign-1",
-                RunId = "run-1",
-                AgentRunId = "agent-run-1",
-                CorrelationId = "correlation-1"
-            },
-            Actor = ValidActor(AgentDefinitionCatalog.TestingAgent),
-            Purpose = "Run the controlled scripted test plan.",
-            Inputs =
-            [
-                new AgentToolRequestInput
-                {
-                    InputId = "input-test-plan-1",
-                    RefType = "TestPlanRef",
-                    RefId = "test-plan-1",
-                    Source = "test",
-                    Summary = "Sanitised test plan reference.",
-                    EvidenceRefs = ["evidence-test-plan-1"],
-                    IsSanitised = true
-                }
-            ],
-            Evidence =
-            [
-                new AgentToolRequestEvidence
-                {
-                    EvidenceId = "evidence-test-plan-1",
-                    RefType = "RunReport",
-                    RefId = "run-report-1",
-                    Summary = "Evidence supports requesting this test run.",
-                    SupportsNeedForTool = true
-                }
-            ],
-            ApprovalRequirement = new AgentToolRequestApprovalRequirement
-            {
-                RequiresGovernanceGate = true,
-                Reason = "Test execution requires gate metadata."
-            },
-            RequestedAtUtc = RequestedAt
-        };
-
-    private static AgentToolRequestActor ValidActor(AgentDefinition agent) =>
-        new()
-        {
-            AgentId = agent.AgentId,
-            AgentName = agent.Name,
-            AgentKind = agent.Kind,
-            ExecutionMode = agent.ExecutionMode,
-            DeclaredCapabilities = agent.Capabilities?.ToArray() ?? [],
-            ForbiddenCapabilities = agent.ForbiddenCapabilities?.ToArray() ?? []
-        };
-
-    private static AgentToolExecutionGateDecision AllowedGate(AgentToolRequest request)
-    {
-        var result = new AgentToolExecutionGate().Evaluate(new AgentToolExecutionGateRequest
-        {
-            ToolRequest = request,
-            PolicyContext = new AgentToolExecutionGatePolicyContext
-            {
-                PolicyKnown = true,
-                AllowsToolRequest = true,
-                AllowsToolExecution = true,
-                AllowsTestExecution = true,
-                PolicyRefs = ["policy:test-execution"]
-            },
-            ApprovalContext = new AgentToolExecutionGateApprovalContext
-            {
-                HasGovernanceGateApproval = true,
-                GovernanceGateDecisionId = "governance-gate-1",
-                ApprovalRefs = ["governance-gate-1"]
-            },
-            EvaluatedAtUtc = GateEvaluatedAt
-        });
-
-        Assert.IsTrue(result.Succeeded);
-        Assert.IsNotNull(result.Decision);
-        Assert.AreEqual(AgentToolExecutionGateDecisionType.Allowed, result.Decision.Decision);
-        return result.Decision;
-    }
-
-    private static ScriptedTestRunPlanExecutor SuccessExecutor() =>
-        new(request => new TestRunPlanExecutionResult
-        {
-            Succeeded = true,
-            ExecutionId = request.ExecutionId,
-            ExitCode = 0,
-            Summary = "Scripted test-plan executor completed successfully.",
-            Outcome = "passed",
-            TestsPassed = 9,
-            TestsFailed = 0,
-            TestsSkipped = 1,
-            Duration = TimeSpan.FromSeconds(2),
-            EvidenceRefs = ["test-result-1", request.TestPlanRef]
-        });
-
-    private static ManualTesterAgentToolExecutionOutput SafeOutput() =>
-        new()
-        {
-            OutputId = "output-1",
-            Summary = "Safe test output.",
-            ExitCode = 0,
-            Outcome = "passed",
-            TestsPassed = 1,
-            Duration = TimeSpan.FromMilliseconds(1),
-            EvidenceRefs = ["evidence-1"]
-        };
 
     private static void AssertOutputHasNoDangerousFlags(ManualTesterAgentToolExecutionOutput output)
     {
