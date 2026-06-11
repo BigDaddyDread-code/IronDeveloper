@@ -9,10 +9,7 @@ namespace IronDev.IntegrationTests.Agents;
 [TestClass]
 public sealed class ManualImplementationPatchProposalTests
 {
-    private static readonly DateTimeOffset RequestedAt = new(2026, 6, 11, 15, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset GateEvaluatedAt = new(2026, 6, 11, 14, 55, 0, TimeSpan.Zero);
-
-    [TestMethod]
+        [TestMethod]
     public void ManualImplementationPatchProposalContracts_ExposeExpectedTypes()
     {
         Assert.IsNotNull(typeof(IManualImplementationAgentPatchProposalService));
@@ -36,9 +33,9 @@ public sealed class ManualImplementationPatchProposalTests
     [TestMethod]
     public void ManualImplementationPatchProposal_ValidGatedPatchProposalInvokesGeneratorAndReturnsSafeAudit()
     {
-        var generator = SuccessGenerator();
+        var generator = BackendManualToolExecutionFixtures.ScriptedPatchProposalGeneratorReturnsProposalOnlyPackage();
         var service = new ManualImplementationAgentPatchProposalService(generator);
-        var request = ValidProposalRequest();
+        var request = BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource();
 
         var result = service.Propose(request);
 
@@ -89,7 +86,7 @@ public sealed class ManualImplementationPatchProposalTests
         });
         var service = new ManualImplementationAgentPatchProposalService(generator);
 
-        var result = service.Propose(ValidProposalRequest());
+        var result = service.Propose(BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource());
 
         Assert.AreEqual(1, generator.CallCount);
         Assert.IsFalse(result.Succeeded);
@@ -102,7 +99,7 @@ public sealed class ManualImplementationPatchProposalTests
     [TestMethod]
     public void ManualImplementationPatchProposal_GateRejectionsPreventGeneratorCall()
     {
-        var baseRequest = ValidProposalRequest();
+        var baseRequest = BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource();
         var unsafeGateCases = new[]
         {
             baseRequest.GateDecision with { Decision = AgentToolExecutionGateDecisionType.Blocked, GrantsExecution = false, RequiresExecutor = false },
@@ -122,7 +119,7 @@ public sealed class ManualImplementationPatchProposalTests
 
         foreach (var gate in unsafeGateCases)
         {
-            var generator = SuccessGenerator();
+            var generator = BackendManualToolExecutionFixtures.ScriptedPatchProposalGeneratorReturnsProposalOnlyPackage();
             var service = new ManualImplementationAgentPatchProposalService(generator);
             var result = service.Propose(baseRequest with { GateDecision = gate });
 
@@ -138,7 +135,7 @@ public sealed class ManualImplementationPatchProposalTests
     [TestMethod]
     public void ManualImplementationPatchProposal_RequestRejectionsPreventGeneratorCall()
     {
-        var baseRequest = ValidProposalRequest();
+        var baseRequest = BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource();
         var cases = new[]
         {
             baseRequest with { ManualProposalId = string.Empty },
@@ -148,21 +145,21 @@ public sealed class ManualImplementationPatchProposalTests
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ToolKind = AgentToolKind.TestRun } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { RequestType = AgentToolRequestType.TestExecutionRequest } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { RiskLevel = AgentToolRiskLevel.High } },
-            baseRequest with { ToolRequest = baseRequest.ToolRequest with { Actor = ValidActor(AgentDefinitionCatalog.TestingAgent) } },
+            baseRequest with { ToolRequest = baseRequest.ToolRequest with { Actor = BackendAgentToolRequestFixtures.ActorFor(AgentDefinitionCatalog.TestingAgent) } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ClaimsApproval = true } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ClaimsExecutionPermission = true } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { ContainsExecutionResult = true } },
             baseRequest with { ToolRequest = baseRequest.ToolRequest with { IsExecutableWithoutGate = true } },
-            baseRequest with { Inputs = [ValidInput() with { IsAuthoritativeForAction = true }] },
-            baseRequest with { Inputs = [ValidInput() with { ContainsRawPrivateReasoning = true }] },
-            baseRequest with { Inputs = [ValidInput() with { ContainsSecret = true, IsSanitised = false }] },
+            baseRequest with { Inputs = [BackendManualToolExecutionFixtures.SanitisedIssuePatchProposalInput() with { IsAuthoritativeForAction = true }] },
+            baseRequest with { Inputs = [BackendManualToolExecutionFixtures.SanitisedIssuePatchProposalInput() with { ContainsRawPrivateReasoning = true }] },
+            baseRequest with { Inputs = [BackendManualToolExecutionFixtures.SanitisedIssuePatchProposalInput() with { ContainsSecret = true, IsSanitised = false }] },
             baseRequest with { Parameters = new Dictionary<string, string> { ["filter"] = "A && B" } },
             baseRequest with { Parameters = new Dictionary<string, string> { ["password"] = "not-allowed" } }
         };
 
         foreach (var request in cases)
         {
-            var generator = SuccessGenerator();
+            var generator = BackendManualToolExecutionFixtures.ScriptedPatchProposalGeneratorReturnsProposalOnlyPackage();
             var result = new ManualImplementationAgentPatchProposalService(generator).Propose(request);
 
             Assert.AreEqual(0, generator.CallCount);
@@ -179,20 +176,20 @@ public sealed class ManualImplementationPatchProposalTests
     {
         var cases = new[]
         {
-            SafePackage() with { AppliesPatch = true },
-            SafePackage() with { MutatesSource = true },
-            SafePackage() with { CreatesAuthority = true },
-            SafePackage() with { AppliesCleanlyClaimed = true },
-            SafePackage() with { EvidenceRefs = [] },
-            SafePackage() with { FileChanges = [] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { Path = "..\\outside.cs" }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { WritesFile = true }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { DeletesFile = true }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { AppliesPatch = true }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { Hunks = [] }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { Hunks = [SafeHunk() with { ClaimsApplied = true }] }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { Hunks = [SafeHunk() with { ContainsSecret = true }] }] },
-            SafePackage() with { FileChanges = [SafeFileChange() with { Hunks = [SafeHunk() with { EvidenceRefs = [] }] }] }
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { AppliesPatch = true },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { MutatesSource = true },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { CreatesAuthority = true },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { AppliesCleanlyClaimed = true },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { EvidenceRefs = [] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { Path = "..\\outside.cs" }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { WritesFile = true }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { DeletesFile = true }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { AppliesPatch = true }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { Hunks = [] }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { Hunks = [BackendManualToolExecutionFixtures.ProposedPatchHunkThatIsNotApplied() with { ClaimsApplied = true }] }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { Hunks = [BackendManualToolExecutionFixtures.ProposedPatchHunkThatIsNotApplied() with { ContainsSecret = true }] }] },
+            BackendManualToolExecutionFixtures.PatchProposalPackageThatDoesNotApply() with { FileChanges = [BackendManualToolExecutionFixtures.ProposedFileChangeThatDoesNotWrite() with { Hunks = [BackendManualToolExecutionFixtures.ProposedPatchHunkThatIsNotApplied() with { EvidenceRefs = [] }] }] }
         };
 
         foreach (var package in cases)
@@ -205,7 +202,7 @@ public sealed class ManualImplementationPatchProposalTests
                 EvidenceRefs = ["evidence-package-1"]
             });
 
-            var result = new ManualImplementationAgentPatchProposalService(generator).Propose(ValidProposalRequest());
+            var result = new ManualImplementationAgentPatchProposalService(generator).Propose(BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource());
 
             Assert.AreEqual(1, generator.CallCount);
             Assert.IsFalse(result.Succeeded);
@@ -221,19 +218,19 @@ public sealed class ManualImplementationPatchProposalTests
         var validator = new ManualImplementationPatchProposalValidator();
         var cases = new[]
         {
-            SafeOutput() with { ContainsRawPrivateReasoning = true },
-            SafeOutput() with { MutatesSource = true },
-            SafeOutput() with { AppliesPatch = true },
-            SafeOutput() with { WritesFiles = true },
-            SafeOutput() with { DeletesFiles = true },
-            SafeOutput() with { RunsGit = true },
-            SafeOutput() with { CallsExternalSystem = true },
-            SafeOutput() with { SubmitsGitHubReview = true },
-            SafeOutput() with { CreatesPullRequest = true },
-            SafeOutput() with { PromotesMemory = true },
-            SafeOutput() with { CreatesCollectiveMemory = true },
-            SafeOutput() with { WritesWeaviate = true },
-            SafeOutput() with { EvidenceRefs = [] }
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { ContainsRawPrivateReasoning = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { MutatesSource = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { AppliesPatch = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { WritesFiles = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { DeletesFiles = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { RunsGit = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { CallsExternalSystem = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { SubmitsGitHubReview = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { CreatesPullRequest = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { PromotesMemory = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { CreatesCollectiveMemory = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { WritesWeaviate = true },
+            BackendManualToolExecutionFixtures.PatchProposalOutputThatDoesNotApplySource() with { EvidenceRefs = [] }
         };
 
         foreach (var output in cases)
@@ -243,7 +240,7 @@ public sealed class ManualImplementationPatchProposalTests
     [TestMethod]
     public void ManualImplementationPatchProposal_ImplementationAgentDoesNotNeedSourceMutationPermission()
     {
-        var request = ValidProposalRequest();
+        var request = BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource();
 
         Assert.IsFalse(request.GateDecision.MutatesSource);
         Assert.IsFalse(request.GateDecision.ExecutesTool);
@@ -253,7 +250,7 @@ public sealed class ManualImplementationPatchProposalTests
         Assert.IsFalse(request.GateDecision.WritesWeaviate);
         Assert.IsTrue(request.ToolRequest.Actor.DeclaredCapabilities.Contains(AgentCapability.CreateReport));
 
-        var result = new ManualImplementationAgentPatchProposalService(SuccessGenerator()).Propose(request);
+        var result = new ManualImplementationAgentPatchProposalService(BackendManualToolExecutionFixtures.ScriptedPatchProposalGeneratorReturnsProposalOnlyPackage()).Propose(request);
 
         Assert.IsTrue(result.Succeeded, FormatIssues(result.Issues));
         AssertCapability(result.AuditEnvelope!, AgentCapability.CreateReport, AgentCapabilityUseOutcome.Allowed);
@@ -342,177 +339,6 @@ public sealed class ManualImplementationPatchProposalTests
                 Assert.IsFalse(source.Contains(token, StringComparison.Ordinal), $"Forbidden active token found in manual implementation proposal production file: {token}");
         }
     }
-
-    private static ManualImplementationPatchProposalRequest ValidProposalRequest()
-    {
-        var toolRequest = ValidToolRequest();
-        return new ManualImplementationPatchProposalRequest
-        {
-            ManualProposalId = "manual-implementation-proposal-1",
-            ToolRequest = toolRequest,
-            GateDecision = AllowedGate(toolRequest),
-            RequestedByUserId = "user-1",
-            ProposalGoal = "Draft a safe proposal for the implementation issue.",
-            Inputs = [ValidInput()],
-            Parameters = new Dictionary<string, string> { ["scope"] = "single-file" },
-            RequestedAtUtc = RequestedAt
-        };
-    }
-
-    private static AgentToolRequest ValidToolRequest() =>
-        new()
-        {
-            ToolRequestId = "tool-request-patch-proposal-1",
-            Status = AgentToolRequestStatus.PendingGate,
-            RequestType = AgentToolRequestType.PatchProposalRequest,
-            ToolKind = AgentToolKind.PatchProposal,
-            RiskLevel = AgentToolRiskLevel.Medium,
-            Scope = new AgentToolRequestScope
-            {
-                TenantId = "tenant-1",
-                ProjectId = "project-1",
-                CampaignId = "campaign-1",
-                RunId = "run-1",
-                AgentRunId = "agent-run-implementation-1",
-                CorrelationId = "correlation-1"
-            },
-            Actor = ValidActor(AgentDefinitionCatalog.ImplementationAgent),
-            Purpose = "Request a proposal-only implementation patch.",
-            Inputs =
-            [
-                new AgentToolRequestInput
-                {
-                    InputId = "input-issue-1",
-                    RefType = "Issue",
-                    RefId = "issue-1",
-                    Source = "test",
-                    Summary = "Sanitised implementation issue.",
-                    EvidenceRefs = ["evidence-issue-1"],
-                    IsSanitised = true
-                }
-            ],
-            Evidence =
-            [
-                new AgentToolRequestEvidence
-                {
-                    EvidenceId = "evidence-issue-1",
-                    RefType = "RunReport",
-                    RefId = "run-report-1",
-                    Summary = "Evidence supports requesting this patch proposal.",
-                    SupportsNeedForTool = true
-                }
-            ],
-            RequestedAtUtc = RequestedAt
-        };
-
-    private static PatchProposalInputRef ValidInput() =>
-        new()
-        {
-            InputRefId = "proposal-input-1",
-            RefType = "Issue",
-            RefId = "issue-1",
-            Source = "test",
-            Summary = "Sanitised implementation issue.",
-            EvidenceRefs = ["evidence-issue-1"],
-            IsSanitised = true
-        };
-
-    private static AgentToolRequestActor ValidActor(AgentDefinition agent) =>
-        new()
-        {
-            AgentId = agent.AgentId,
-            AgentName = agent.Name,
-            AgentKind = agent.Kind,
-            ExecutionMode = agent.ExecutionMode,
-            DeclaredCapabilities = agent.Capabilities?.ToArray() ?? [],
-            ForbiddenCapabilities = agent.ForbiddenCapabilities?.ToArray() ?? []
-        };
-
-    private static AgentToolExecutionGateDecision AllowedGate(AgentToolRequest request)
-    {
-        var result = new AgentToolExecutionGate().Evaluate(new AgentToolExecutionGateRequest
-        {
-            ToolRequest = request,
-            PolicyContext = new AgentToolExecutionGatePolicyContext
-            {
-                PolicyKnown = true,
-                AllowsToolRequest = true,
-                AllowsPatchProposal = true,
-                PolicyRefs = ["policy:patch-proposal"]
-            },
-            EvaluatedAtUtc = GateEvaluatedAt
-        });
-
-        Assert.IsTrue(result.Succeeded);
-        Assert.IsNotNull(result.Decision);
-        Assert.AreEqual(AgentToolExecutionGateDecisionType.Allowed, result.Decision.Decision);
-        return result.Decision;
-    }
-
-    private static ScriptedPatchProposalGenerator SuccessGenerator() =>
-        new(_ => new PatchProposalGenerationResult
-        {
-            Succeeded = true,
-            Summary = "Scripted patch proposal generator produced proposal-only evidence.",
-            Proposal = SafePackage(),
-            EvidenceRefs = ["evidence-package-1"]
-        });
-
-    private static ManualImplementationPatchProposalOutput SafeOutput() =>
-        new()
-        {
-            OutputId = "output-1",
-            Proposal = SafePackage(),
-            Summary = "Safe proposal output.",
-            EvidenceRefs = ["evidence-1"]
-        };
-
-    private static PatchProposalPackage SafePackage() =>
-        new()
-        {
-            PatchProposalId = "patch-proposal-1",
-            Title = "Safe proposal",
-            Summary = "Proposal-only implementation package.",
-            Rationale = "Evidence supports a human-reviewed proposal.",
-            EvidenceRefs = ["evidence-package-1"],
-            IsProposalOnly = true,
-            RequiresHumanReview = true,
-            RequiresValidation = true,
-            AppliesCleanlyClaimed = false,
-            CreatesAuthority = false,
-            CreatesRuntimeAction = false,
-            MutatesSource = false,
-            AppliesPatch = false,
-            FileChanges = [SafeFileChange()]
-        };
-
-    private static ProposedFileChange SafeFileChange() =>
-        new()
-        {
-            FileChangeId = "file-change-1",
-            Path = "src/example.cs",
-            ChangeKind = "Modify",
-            Summary = "Describe a proposed file change.",
-            EvidenceRefs = ["evidence-file-1"],
-            IsProposalOnly = true,
-            WritesFile = false,
-            DeletesFile = false,
-            AppliesPatch = false,
-            Hunks = [SafeHunk()]
-        };
-
-    private static ProposedPatchHunk SafeHunk() =>
-        new()
-        {
-            HunkId = "hunk-1",
-            Summary = "Describe a proposed hunk.",
-            BeforeSnippet = "before",
-            AfterSnippet = "after",
-            EvidenceRefs = ["evidence-hunk-1"],
-            ContainsRawPrivateReasoning = false,
-            ContainsSecret = false,
-            ClaimsApplied = false
-        };
 
     private static void AssertOutputHasNoDangerousFlags(ManualImplementationPatchProposalOutput output)
     {

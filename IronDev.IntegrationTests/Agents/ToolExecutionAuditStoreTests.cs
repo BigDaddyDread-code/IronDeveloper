@@ -14,9 +14,7 @@ namespace IronDev.IntegrationTests.Agents;
 [TestClass]
 public sealed class ToolExecutionAuditStoreTests : IntegrationTestBase
 {
-    private static readonly DateTimeOffset RequestedAt = new(2026, 6, 11, 1, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset GateEvaluatedAt = RequestedAt.AddSeconds(1);
-    private static readonly DateTimeOffset CreatedAt = RequestedAt.AddSeconds(2);
+    private static readonly DateTimeOffset CreatedAt = new(2026, 6, 11, 1, 0, 2, TimeSpan.Zero);
 
     private SqlToolExecutionAuditStore _store = default!;
 
@@ -105,10 +103,11 @@ public sealed class ToolExecutionAuditStoreTests : IntegrationTestBase
     [TestMethod]
     public void ToolExecutionAuditFactory_RejectsIncompleteOrUnsafeManualResults()
     {
-        var blockedTester = new ManualTesterAgentToolExecutionService(SuccessExecutor())
-            .Execute(ValidTesterRequest() with
+        var testerRequest = BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval();
+        var blockedTester = new ManualTesterAgentToolExecutionService(BackendManualToolExecutionFixtures.ScriptedTestExecutorSucceedsWithEvidence())
+            .Execute(testerRequest with
             {
-                GateDecision = AllowedGate(ValidTesterToolRequest()) with
+                GateDecision = testerRequest.GateDecision with
                 {
                     Decision = AgentToolExecutionGateDecisionType.Blocked,
                     GrantsExecution = false
@@ -128,7 +127,7 @@ public sealed class ToolExecutionAuditStoreTests : IntegrationTestBase
                     Message = "No proposal was produced."
                 }
             ]
-        })).Propose(ValidImplementationRequest());
+        })).Propose(BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource());
 
         ExpectArgumentException(() => ToolExecutionAuditRecordFactory.FromManualTesterResult(blockedTester, CreatedAt));
         ExpectArgumentException(() => ToolExecutionAuditRecordFactory.FromManualImplementationPatchProposalResult(failedImplementation, CreatedAt));
@@ -299,7 +298,7 @@ public sealed class ToolExecutionAuditStoreTests : IntegrationTestBase
     }
 
     private static ManualTesterAgentToolExecutionResult SuccessfulTesterResult() =>
-        new ManualTesterAgentToolExecutionService(SuccessExecutor()).Execute(ValidTesterRequest());
+        new ManualTesterAgentToolExecutionService(BackendManualToolExecutionFixtures.ScriptedTestExecutorSucceedsWithEvidence()).Execute(BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval());
 
     private static ManualTesterAgentToolExecutionResult FailedTesterResult()
     {
@@ -316,263 +315,11 @@ public sealed class ToolExecutionAuditStoreTests : IntegrationTestBase
             EvidenceRefs = ["test-failure-1", request.TestPlanRef]
         });
 
-        return new ManualTesterAgentToolExecutionService(executor).Execute(ValidTesterRequest() with { ManualExecutionId = "manual-test-execution-failed" });
+        return new ManualTesterAgentToolExecutionService(executor).Execute(BackendManualToolExecutionFixtures.TesterExecutionRequestWithGovernanceGateApproval() with { ManualExecutionId = "manual-test-execution-failed" });
     }
 
     private static ManualImplementationPatchProposalResult SuccessfulImplementationResult() =>
-        new ManualImplementationAgentPatchProposalService(SuccessGenerator()).Propose(ValidImplementationRequest());
-
-    private static ManualTesterAgentToolExecutionRequest ValidTesterRequest()
-    {
-        var toolRequest = ValidTesterToolRequest();
-        return new ManualTesterAgentToolExecutionRequest
-        {
-            ManualExecutionId = "manual-test-execution-1",
-            ToolRequest = toolRequest,
-            GateDecision = AllowedGate(toolRequest),
-            RequestedByUserId = "user-1",
-            TestPlanRef = "test-plan-1",
-            TestPlanPath = "tools/dogfood/test-agent-plans/irondev-code-standards-alpha.json",
-            WorkingDirectory = "workspace/run-1",
-            Parameters = new Dictionary<string, string> { ["filter"] = "IronDevCliTests" },
-            RequestedAtUtc = RequestedAt
-        };
-    }
-
-    private static AgentToolRequest ValidTesterToolRequest() =>
-        new()
-        {
-            ToolRequestId = "tool-request-test-run-1",
-            Status = AgentToolRequestStatus.PendingGate,
-            RequestType = AgentToolRequestType.TestExecutionRequest,
-            ToolKind = AgentToolKind.TestRun,
-            RiskLevel = AgentToolRiskLevel.Medium,
-            Scope = new AgentToolRequestScope
-            {
-                TenantId = "tenant-1",
-                ProjectId = "project-1",
-                CampaignId = "campaign-1",
-                RunId = "run-1",
-                AgentRunId = "agent-run-1",
-                CorrelationId = "correlation-1"
-            },
-            Actor = ValidActor(AgentDefinitionCatalog.TestingAgent),
-            Purpose = "Run the controlled scripted test plan.",
-            Inputs =
-            [
-                new AgentToolRequestInput
-                {
-                    InputId = "input-test-plan-1",
-                    RefType = "TestPlanRef",
-                    RefId = "test-plan-1",
-                    Source = "test",
-                    Summary = "Sanitised test plan reference.",
-                    EvidenceRefs = ["evidence-test-plan-1"],
-                    IsSanitised = true
-                }
-            ],
-            Evidence =
-            [
-                new AgentToolRequestEvidence
-                {
-                    EvidenceId = "evidence-test-plan-1",
-                    RefType = "RunReport",
-                    RefId = "run-report-1",
-                    Summary = "Evidence supports requesting this test run.",
-                    SupportsNeedForTool = true
-                }
-            ],
-            ApprovalRequirement = new AgentToolRequestApprovalRequirement
-            {
-                RequiresGovernanceGate = true,
-                Reason = "Test execution requires gate metadata."
-            },
-            RequestedAtUtc = RequestedAt
-        };
-
-    private static ManualImplementationPatchProposalRequest ValidImplementationRequest()
-    {
-        var toolRequest = ValidImplementationToolRequest();
-        return new ManualImplementationPatchProposalRequest
-        {
-            ManualProposalId = "manual-implementation-proposal-1",
-            ToolRequest = toolRequest,
-            GateDecision = AllowedGate(toolRequest),
-            RequestedByUserId = "user-1",
-            ProposalGoal = "Draft a safe proposal for the implementation issue.",
-            Inputs =
-            [
-                new PatchProposalInputRef
-                {
-                    InputRefId = "proposal-input-1",
-                    RefType = "Issue",
-                    RefId = "issue-1",
-                    Source = "test",
-                    Summary = "Sanitised implementation issue.",
-                    EvidenceRefs = ["evidence-issue-1"],
-                    IsSanitised = true
-                }
-            ],
-            Parameters = new Dictionary<string, string> { ["scope"] = "single-file" },
-            RequestedAtUtc = RequestedAt
-        };
-    }
-
-    private static AgentToolRequest ValidImplementationToolRequest() =>
-        new()
-        {
-            ToolRequestId = "tool-request-patch-proposal-1",
-            Status = AgentToolRequestStatus.PendingGate,
-            RequestType = AgentToolRequestType.PatchProposalRequest,
-            ToolKind = AgentToolKind.PatchProposal,
-            RiskLevel = AgentToolRiskLevel.Medium,
-            Scope = new AgentToolRequestScope
-            {
-                TenantId = "tenant-1",
-                ProjectId = "project-1",
-                CampaignId = "campaign-1",
-                RunId = "run-1",
-                AgentRunId = "agent-run-implementation-1",
-                CorrelationId = "correlation-1"
-            },
-            Actor = ValidActor(AgentDefinitionCatalog.ImplementationAgent),
-            Purpose = "Request a proposal-only implementation patch.",
-            Inputs =
-            [
-                new AgentToolRequestInput
-                {
-                    InputId = "input-issue-1",
-                    RefType = "Issue",
-                    RefId = "issue-1",
-                    Source = "test",
-                    Summary = "Sanitised implementation issue.",
-                    EvidenceRefs = ["evidence-issue-1"],
-                    IsSanitised = true
-                }
-            ],
-            Evidence =
-            [
-                new AgentToolRequestEvidence
-                {
-                    EvidenceId = "evidence-issue-1",
-                    RefType = "RunReport",
-                    RefId = "run-report-1",
-                    Summary = "Evidence supports requesting this patch proposal.",
-                    SupportsNeedForTool = true
-                }
-            ],
-            RequestedAtUtc = RequestedAt
-        };
-
-    private static AgentToolRequestActor ValidActor(AgentDefinition agent) =>
-        new()
-        {
-            AgentId = agent.AgentId,
-            AgentName = agent.Name,
-            AgentKind = agent.Kind,
-            ExecutionMode = agent.ExecutionMode,
-            DeclaredCapabilities = agent.Capabilities?.ToArray() ?? [],
-            ForbiddenCapabilities = agent.ForbiddenCapabilities?.ToArray() ?? []
-        };
-
-    private static AgentToolExecutionGateDecision AllowedGate(AgentToolRequest request)
-    {
-        var gateRequest = new AgentToolExecutionGateRequest
-        {
-            ToolRequest = request,
-            PolicyContext = new AgentToolExecutionGatePolicyContext
-            {
-                PolicyKnown = true,
-                AllowsToolRequest = true,
-                AllowsToolExecution = true,
-                AllowsTestExecution = request.ToolKind == AgentToolKind.TestRun,
-                AllowsPatchProposal = request.ToolKind == AgentToolKind.PatchProposal,
-                PolicyRefs = [$"policy:{request.ToolKind}"]
-            },
-            ApprovalContext = request.ToolKind == AgentToolKind.TestRun
-                ? new AgentToolExecutionGateApprovalContext
-                {
-                    HasGovernanceGateApproval = true,
-                    GovernanceGateDecisionId = "governance-gate-1",
-                    ApprovalRefs = ["governance-gate-1"]
-                }
-                : new AgentToolExecutionGateApprovalContext(),
-            EvaluatedAtUtc = GateEvaluatedAt
-        };
-
-        var result = new AgentToolExecutionGate().Evaluate(gateRequest);
-        Assert.IsTrue(result.Succeeded);
-        Assert.IsNotNull(result.Decision);
-        Assert.AreEqual(AgentToolExecutionGateDecisionType.Allowed, result.Decision.Decision);
-        return result.Decision;
-    }
-
-    private static ScriptedTestRunPlanExecutor SuccessExecutor() =>
-        new(request => new TestRunPlanExecutionResult
-        {
-            Succeeded = true,
-            ExecutionId = request.ExecutionId,
-            ExitCode = 0,
-            Summary = "Scripted test-plan executor completed successfully.",
-            Outcome = "passed",
-            TestsPassed = 9,
-            TestsSkipped = 1,
-            Duration = TimeSpan.FromSeconds(2),
-            EvidenceRefs = ["test-result-1", request.TestPlanRef]
-        });
-
-    private static ScriptedPatchProposalGenerator SuccessGenerator() =>
-        new(_ => new PatchProposalGenerationResult
-        {
-            Succeeded = true,
-            Summary = "Scripted patch proposal generator produced proposal-only evidence.",
-            Proposal = new PatchProposalPackage
-            {
-                PatchProposalId = "patch-proposal-1",
-                Title = "Safe proposal",
-                Summary = "Proposal-only implementation package.",
-                Rationale = "Evidence supports a human-reviewed proposal.",
-                EvidenceRefs = ["evidence-package-1"],
-                IsProposalOnly = true,
-                RequiresHumanReview = true,
-                RequiresValidation = true,
-                AppliesCleanlyClaimed = false,
-                CreatesAuthority = false,
-                CreatesRuntimeAction = false,
-                MutatesSource = false,
-                AppliesPatch = false,
-                FileChanges =
-                [
-                    new ProposedFileChange
-                    {
-                        FileChangeId = "file-change-1",
-                        Path = "src/example.cs",
-                        ChangeKind = "Modify",
-                        Summary = "Describe a proposed file change.",
-                        EvidenceRefs = ["evidence-file-1"],
-                        IsProposalOnly = true,
-                        WritesFile = false,
-                        DeletesFile = false,
-                        AppliesPatch = false,
-                        Hunks =
-                        [
-                            new ProposedPatchHunk
-                            {
-                                HunkId = "hunk-1",
-                                Summary = "Describe a proposed hunk.",
-                                BeforeSnippet = "before",
-                                AfterSnippet = "after",
-                                EvidenceRefs = ["evidence-hunk-1"],
-                                ContainsRawPrivateReasoning = false,
-                                ContainsSecret = false,
-                                ClaimsApplied = false
-                            }
-                        ]
-                    }
-                ]
-            },
-            EvidenceRefs = ["evidence-package-1"]
-        });
+        new ManualImplementationAgentPatchProposalService(BackendManualToolExecutionFixtures.ScriptedPatchProposalGeneratorReturnsProposalOnlyPackage()).Propose(BackendManualToolExecutionFixtures.PatchProposalRequestThatDoesNotApplySource());
 
     private static ToolExecutionAuditRecord RehashPayload(ToolExecutionAuditRecord record) =>
         record with { PayloadSha256 = ToolExecutionAuditRecordFactory.Sha256(record.PayloadJson) };
