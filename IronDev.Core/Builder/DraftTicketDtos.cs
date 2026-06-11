@@ -11,7 +11,7 @@ namespace IronDev.Core.Builder;
 public sealed class DraftTicket
 {
     // ── Source linkage (memory-only in Phase 1–3) ──────────────────────────
-    // TODO: persist SourceChatSessionId when schema supports a LinkedChatSessionId column.
+    // Source chat linkage remains transient until storage schema links chat sessions.
     public long   SourceChatSessionId { get; set; }
     public long   SourceMessageId     { get; set; }
     public string SourceMessageText   { get; set; } = string.Empty;
@@ -36,7 +36,7 @@ public sealed class DraftTicket
     public string BuildValidation  { get; set; } = string.Empty;
 
     // ── Generation metadata ────────────────────────────────────────────────
-    /// <summary>True if this draft was produced by a service call (stub or LLM).</summary>
+    /// <summary>True if this draft was produced by a drafting service.</summary>
     public bool   IsGenerated    { get; set; }
     /// <summary>Human-readable note about how the draft was generated.</summary>
     public string GenerationNote { get; set; } = string.Empty;

@@ -72,7 +72,7 @@ public sealed class BuilderContextService : IBuilderContextService
         }
         catch (NotImplementedException)
         {
-            // Phase 2: stub implementation — safe to continue without plan
+            // Plan lookup is optional; continue without linked plan context.
         }
 
         // ── 4. Load recent decisions (limit 5, graceful) ───────────────────

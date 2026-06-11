@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using IronDev.Core.Builder;
 using IronDev.Core.Models;
 
-// Note: ChatTicketContext is a legacy UI compatibility model; forward clients use API DTOs.
+// Note: ChatTicketContext is a UI compatibility model; forward clients use API DTOs.
 // IDraftTicketService is defined here in Core to keep the interface layer clean;
 // the concrete service in Infrastructure references the Agent assembly.
 // The ViewModel (also in Agent) depends only on this interface.
@@ -134,15 +134,15 @@ public interface IBuildResultMemoryService
 /// Does NOT persist anything — the draft is held in ViewModel memory
 /// until the user explicitly approves via ApproveDraftCommand.
 ///
-/// Phase 1-3: stub implementation (no LLM).
-/// Phase 4: real LLM implementation.
+/// Current implementation is deterministic; a later LLM implementation must keep
+/// this approval boundary.
 /// </summary>
 public interface IDraftTicketService
 {
     /// <summary>
     /// Generates a complete DraftTicket from the supplied chat context.
-    /// Stub: returns a deterministic draft derived from the context fields.
-    /// LLM phase: calls ILLMService and parses structured JSON response.
+    /// Deterministic implementation derives the draft from context fields.
+    /// Any LLM-backed implementation must parse structured JSON and preserve the same non-persistence boundary.
     /// </summary>
     Task<DraftTicket> GenerateDraftAsync(
         int    projectId,

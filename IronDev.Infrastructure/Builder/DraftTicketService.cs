@@ -708,7 +708,7 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
         //   "[JsonPropertyName("acceptanceCriteria")] public List<string>? AcceptanceCriteriaArray"
         // to the same key "acceptanceCriteria" — a fatal duplicate that throws
         // "The JSON property name for '...AcceptanceCriteriaArray' collides with another property".
-        // Fix: give the string variant a distinct name so it is only used for legacy string-shape responses.
+        // Give the string variant a distinct name so it is only used for compatibility string-shape responses.
         [JsonPropertyName("acceptanceCriteriaText")]
         public string?       AcceptanceCriteriaText  { get; set; }
 
@@ -730,7 +730,7 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
         [JsonPropertyName("linkedSymbols")]
         public List<string>? LinkedSymbolsList   { get; set; }
 
-        // implementationPlan — array (new schema) or string (legacy)
+        // implementationPlan — array (new schema) or compatibility string shape
         [JsonPropertyName("implementationPlan")]
         public object?       ImplementationPlanRaw { get; set; }
 
@@ -746,7 +746,7 @@ Be concise, professional, and extremely specific to this {{projectName}} codebas
         [JsonPropertyName("testPlan")]
         public TestPlanJsonNested? TestPlan      { get; set; }
 
-        // Legacy flat test fields (kept for backward compat with old LLM responses)
+        // Compatibility flat test fields kept for older structured responses.
         public string?       UnitTests           { get; set; }
         public string?       IntegrationTests    { get; set; }
         public string?       ManualTests         { get; set; }

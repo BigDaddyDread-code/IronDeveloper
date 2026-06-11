@@ -198,14 +198,14 @@ public sealed class CodePatchService : ICodePatchService
         return count;
     }
 
-    // ── Apply (Phase 4B placeholder) ──────────────────────────────────────────
+    // Apply is intentionally disabled until validation and developer approval are available.
 
     public Task<PatchApplyResult> ApplyPatchesAsync(
         string projectPath,
         IReadOnlyList<FileChangeProposal> changes,
         CancellationToken cancellationToken = default)
     {
-        // Phase 4B: write files after validation + developer approval.
+        // Write-file apply remains disabled in this service.
         return Task.FromResult(PatchApplyResult.Failure(
             "ApplyPatchesAsync is not enabled yet — Phase 4B required."));
     }

@@ -190,7 +190,6 @@ public sealed class ManualTestFailureRepairProposalLoopValidator
     public const string TestFailureLoopAuditInvalid = "TEST_FAILURE_LOOP_AUDIT_INVALID";
     public const string TestFailureLoopToolAuditRejected = "TEST_FAILURE_LOOP_TOOL_AUDIT_REJECTED";
     public const string TestFailureLoopThoughtLedgerInvalid = "TEST_FAILURE_LOOP_THOUGHT_LEDGER_INVALID";
-    public const string TestFailureLoopRuntimeWiringForbidden = "TEST_FAILURE_LOOP_RUNTIME_WIRING_FORBIDDEN";
 
     private static readonly IReadOnlyList<string> RawPrivateReasoningMarkers =
     [

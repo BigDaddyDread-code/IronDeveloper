@@ -426,7 +426,7 @@ public sealed class BuilderProposalService : IBuilderProposalService
                 Description = change.ChangeReason,
                 Diff        = change.Patch,
                 FullContentAfter = change.FullContentAfter,
-                IsNewFile   = false, // TODO: derive from LLM if possible
+                IsNewFile   = false,
                 IsDeletion  = false,
                 IsValid     = true
             });
