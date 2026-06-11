@@ -153,6 +153,9 @@ builder.Services.AddScoped<IControlledWorktreeApplyService, ControlledWorktreeAp
 builder.Services.AddScoped<IAgentRunAuditEnvelopeStore, SqlAgentRunAuditEnvelopeStore>();
 builder.Services.AddScoped<IAgentRunAuditEnvelopeReadRepository, SqlAgentRunAuditEnvelopeReadRepository>();
 builder.Services.AddScoped<IAgentRunAuditQueryService, AgentRunAuditQueryService>();
+builder.Services.AddScoped<IManualIndependentCriticAgentService, ManualIndependentCriticAgentService>();
+builder.Services.AddScoped<IManualMemoryImprovementAgentService, ManualMemoryImprovementAgentService>();
+builder.Services.AddScoped<ManualAgentExecutionStoreValidator>();
 builder.Services.AddScoped<IStoredManualIndependentCriticAgentService, StoredManualIndependentCriticAgentService>();
 builder.Services.AddScoped<IStoredManualMemoryImprovementAgentService, StoredManualMemoryImprovementAgentService>();
 
