@@ -268,3 +268,14 @@ PR78 adds the sixth Block G manifest-covered governance ledger:
 | `IronDev.Api/Controllers/SqlDogfoodLoopApiStore.cs` | API/governance bridge | Yes | Yes | Dogfood Loop API stores durable receipt evidence through `IDogfoodReceiptStore`; it does not create approval, execution permission, policy satisfaction, source apply, workflow continuation, A2A handoff, or memory promotion. |
 
 Dogfood receipts are evidence only. They do not approve release readiness, satisfy policy, continue workflow, execute tools, apply source, create A2A handoff, or promote memory.
+
+## PR79 durable ThoughtLedger governance event reference update
+
+PR79 adds the seventh Block G manifest-covered governance ledger:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_thoughtledger_governance_event_reference.sql` | governance | Yes | Yes | Creates `governance.ThoughtLedgerGovernanceEventReference`, stored procedures, validation triggers, and a FK to existing `governance.GovernanceEvent`. |
+| `IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_ThoughtLedgerGovernanceEventReference_*` stored procedures only; no runtime schema creation. |
+
+ThoughtLedger governance event references are evidence links only. They preserve the ThoughtLedger entry ID exactly as text because no durable ThoughtLedger table exists yet. They do not approve, authorize, execute, satisfy policy, continue workflow, apply source, approve release, create dogfood receipts, create A2A handoffs, or promote memory.

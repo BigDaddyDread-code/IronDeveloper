@@ -163,3 +163,20 @@ Forbidden PR78 runtime SQL shape:
 - Inline `UPDATE` or `DELETE` against `governance.DogfoodReceipt`.
 - Runtime DDL for dogfood receipt tables, triggers, or stored procedures.
 - Treating a dogfood receipt as release approval, policy satisfaction, execution permission, source apply, workflow continuation, A2A handoff, or memory promotion.
+
+## PR79 ThoughtLedger governance reference SQL boundary
+
+ThoughtLedger governance reference writes are stored-procedure-only through `governance.usp_ThoughtLedgerGovernanceEventReference_Record`. Runtime code must not insert, update, delete, or create `governance.ThoughtLedgerGovernanceEventReference` directly.
+
+Allowed PR79 runtime SQL shape:
+
+- `SqlThoughtLedgerGovernanceEventReferenceStore` calls `governance.usp_ThoughtLedgerGovernanceEventReference_Record`.
+- `SqlThoughtLedgerGovernanceEventReferenceStore` calls read procedures for get/list operations.
+- Migration and smoke scripts own schema setup and verification.
+
+Forbidden PR79 runtime SQL shape:
+
+- Inline `INSERT INTO governance.ThoughtLedgerGovernanceEventReference`.
+- Inline `UPDATE` or `DELETE` against `governance.ThoughtLedgerGovernanceEventReference`.
+- Runtime DDL for ThoughtLedger governance reference tables, triggers, or stored procedures.
+- Treating a ThoughtLedger governance reference as approval, execution permission, policy satisfaction, workflow continuation, source apply, release approval, dogfood receipt creation, A2A handoff creation, or memory promotion.

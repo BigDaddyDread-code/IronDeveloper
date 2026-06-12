@@ -30,5 +30,10 @@
             "path": "Database/migrate_dogfood_receipt.sql",
             "description": "Creates durable DogfoodReceipt table and stored procedures linked to GovernanceEvent and optional governance evidence records."
         }
+        ,{
+            "id": "2026-06-block-g-thoughtledger-governance-event-reference",
+            "path": "Database/migrate_thoughtledger_governance_event_reference.sql",
+            "description": "Creates durable ThoughtLedgerGovernanceEventReference table and stored procedures linking ThoughtLedger entry IDs to GovernanceEvent records as evidence only."
+        }
     ]
 }

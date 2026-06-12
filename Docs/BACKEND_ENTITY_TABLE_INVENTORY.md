@@ -145,3 +145,11 @@ No entity, model, mapping, table, stored procedure, DTO, API/CLI/UI contract, or
 - No active table was dropped.
 - No uncertain artifact was deleted.
 - No column, FK, index, stored procedure result shape, repository behavior, API/CLI/UI contract, or runtime capability was changed.
+
+## PR79 entity/table addition
+
+| Persistence concept | SQL schema/table | C# entity/model class | Repository/service owner | Stored procedure owner | Test coverage | Status | Changed in this PR | Behaviour unchanged |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ThoughtLedger governance event reference | `governance.ThoughtLedgerGovernanceEventReference` | `ThoughtLedgerGovernanceEventReference`, `ThoughtLedgerGovernanceEventReferenceReadModel`, `ThoughtLedgerGovernanceEventReferenceSummary` | `SqlThoughtLedgerGovernanceEventReferenceStore` | `governance.usp_ThoughtLedgerGovernanceEventReference_*` | `ThoughtLedgerGovernanceReferenceStoreTests`, migration verifier, smoke script | Active | Yes | Yes |
+
+This table preserves `ThoughtLedgerEntryId` as an exact text identity because there is no durable ThoughtLedger table in this slice. The table links ThoughtLedger entries to existing `governance.GovernanceEvent` rows as evidence only. It is not approval, execution permission, policy satisfaction, workflow continuation, source apply, release approval, dogfood receipt creation, A2A handoff creation, or memory promotion.

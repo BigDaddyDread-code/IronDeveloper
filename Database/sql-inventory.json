@@ -916,5 +916,50 @@
             "verifiedByScript": true,
             "notes": "Runtime uses stored procedures; no runtime schema creation and no execution, approval, source apply, workflow, or memory promotion authority."
         }
+        ,{
+            "id": "database.migrate-thoughtledger-governance-event-reference",
+            "path": "Database/migrate_thoughtledger_governance_event_reference.sql",
+            "kind": "migration-script",
+            "bucket": "required-runtime-schema",
+            "ownerArea": "governance",
+            "objectsCreated": [
+                "governance.ThoughtLedgerGovernanceEventReference",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_Record",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_GetById",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation"
+            ],
+            "objectsCalled": [],
+            "referencedBy": [
+                "IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs",
+                "Database/migrations.json",
+                "Database/verify-migrations.ps1"
+            ],
+            "appliedByManifest": true,
+            "verifiedByScript": true,
+            "notes": "PR79 durable ThoughtLedger-to-governance-event reference ledger; evidence only, not approval, execution permission, policy satisfaction, workflow progress, source apply, release approval, A2A handoff, dogfood receipt creation, or memory promotion."
+        },
+        {
+            "id": "runtime.thoughtledger-governance-event-reference-store",
+            "path": "IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs",
+            "kind": "runtime-store",
+            "bucket": "stored-procedure-runtime",
+            "ownerArea": "governance",
+            "objectsCreated": [],
+            "objectsCalled": [
+                "governance.usp_ThoughtLedgerGovernanceEventReference_Record",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_GetById",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent",
+                "governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation"
+            ],
+            "referencedBy": [
+                "durable ThoughtLedger governance event reference repository"
+            ],
+            "appliedByManifest": true,
+            "verifiedByScript": true,
+            "notes": "Runtime uses stored procedures; no runtime schema creation and no approval, execution, policy, workflow, source apply, release, dogfood, A2A, or memory promotion authority."
+        }
     ]
 }
