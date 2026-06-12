@@ -51,6 +51,15 @@ public interface IIronDevApiClient
         string toolRequestId,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> CreateDogfoodLoopAsync(
+        DogfoodLoopCreateRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetDogfoodLoopAsync(
+        int projectId,
+        string dogfoodLoopId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
