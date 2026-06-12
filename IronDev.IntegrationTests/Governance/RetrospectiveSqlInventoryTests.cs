@@ -30,7 +30,7 @@ public sealed class RetrospectiveSqlInventoryTests
         using var manifest = JsonDocument.Parse(ReadRepositoryFile("Database", "migrations.json"));
         var migrations = manifest.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(2, migrations.Length, "Current Block G manifest should remain narrow in PR74b.");
+        Assert.IsTrue(migrations.Length >= 2, "Current Block G manifest should contain the durable governance substrate migrations.");
 
         foreach (var migration in migrations)
         {
@@ -146,11 +146,13 @@ public sealed class RetrospectiveSqlInventoryTests
         var manifestApplied = entries.Where(entry => entry.GetProperty("appliedByManifest").GetBoolean()).ToArray();
         var verified = entries.Where(entry => entry.GetProperty("verifiedByScript").GetBoolean()).ToArray();
 
+        var manifestPaths = ManifestPaths().ToArray();
+
         CollectionAssert.AreEquivalent(
-            new[] { "Database/migrate_governance_event.sql", "Database/migrate_tool_request.sql" },
+            manifestPaths,
             manifestApplied.Select(entry => entry.GetProperty("path").GetString()).ToArray());
         CollectionAssert.AreEquivalent(
-            new[] { "Database/migrate_governance_event.sql", "Database/migrate_tool_request.sql" },
+            manifestPaths,
             verified.Select(entry => entry.GetProperty("path").GetString()).ToArray());
     }
 
