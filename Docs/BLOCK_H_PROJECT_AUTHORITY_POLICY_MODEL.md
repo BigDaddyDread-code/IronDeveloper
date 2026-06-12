@@ -138,3 +138,26 @@ ReadyForReview approval packages do not override missing policy.
 Sensitive scopes require explicit human approval rules.
 
 PR87 is tests and documentation only. It adds no SQL, API, CLI, runtime wiring, workflow runner, A2A handoff, source apply, memory promotion, release approval, execution engine, or policy activation path.
+
+## PR88 Approval Is Not Gate/Receipt/Critic Test Pack
+
+Approval is explicit.
+Approval cannot be inferred from gate decisions, policy decisions, dogfood receipts, critic output, validation output, model output, retrieval output, approval packages, policy profiles, ThoughtLedger references, or governance events.
+ReadyForReview is not Approved.
+NoPolicyBlock is not Approved.
+Dogfood Passed is not ReleaseApproved.
+Experimental is not Free.
+Gate Passed is not Approved.
+
+Gate decisions are evidence, not approval decisions.
+Policy decisions are evidence, not approval decisions.
+Dogfood receipts are evidence, not release approval.
+Critic and code standards reviews are recommendations, not approval.
+Approval requirement evaluations describe requirements; they do not satisfy requirements.
+Approval packages gather evidence for review; they do not approve anything.
+ThoughtLedger references and governance events preserve provenance; they do not transfer authority.
+Validation output and run reports are evidence; they do not approve release, source apply, or memory promotion.
+Model output, retrieval matches, workflow routes, and A2A handoff evidence remain advisory or evidentiary only.
+An explicit approval decision record is still not execution, source mutation, memory promotion, workflow continuation, or release approval.
+
+PR88 is tests and documentation only. It adds no SQL, API, CLI, runtime wiring, workflow runner, A2A handoff, LangGraph runtime, source apply, memory promotion, release approval, execution engine, approval lookup, approval satisfaction checker, or policy activation path.
