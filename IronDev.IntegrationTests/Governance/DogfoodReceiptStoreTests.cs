@@ -441,4 +441,3 @@ public sealed class DogfoodReceiptStoreTests : IntegrationTestBase
         throw new InvalidOperationException("Could not find repository root.");
     }
 }
-

@@ -319,4 +319,3 @@ public sealed class ToolRequestValidator
         "submit github review"
     ];
 }
-

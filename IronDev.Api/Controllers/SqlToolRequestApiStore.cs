@@ -106,4 +106,3 @@ public sealed class SqlToolRequestApiStore : IToolRequestApiStore
         return new Guid(bytes);
     }
 }
-

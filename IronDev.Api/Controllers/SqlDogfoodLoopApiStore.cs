@@ -166,5 +166,3 @@ public sealed class SqlDogfoodLoopApiStore : IDogfoodLoopApiStore
         public bool ContainsRawPrivateReasoning { get; init; }
     }
 }
-
-
