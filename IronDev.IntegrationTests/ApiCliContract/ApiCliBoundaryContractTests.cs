@@ -87,8 +87,8 @@ public sealed class ApiCliBoundaryContractTests
     public void ApiCliContract_NonDurableBoundaries_AreVisibleForTemporaryApiCaches()
     {
         AssertNonDurable(ApiCliContractTestSupport.ToolRequestEnvelope(), "tool request");
-        AssertNonDurable(ApiCliContractTestSupport.DogfoodLoopEnvelope(), "dogfood loop");
-        AssertNonDurable(ApiCliContractTestSupport.ToolGateEnvelope(), "tool gate");
+        AssertDurableDogfoodReceipt(ApiCliContractTestSupport.DogfoodLoopEnvelope());
+        AssertDurableGateDecision(ApiCliContractTestSupport.ToolGateEnvelope());
     }
 
     [TestMethod]
@@ -180,6 +180,29 @@ public sealed class ApiCliBoundaryContractTests
             _ => throw new ArgumentOutOfRangeException(nameof(envelopeName), envelopeName, null)
         };
     }
+    private static void AssertDurableGateDecision(string envelope)
+    {
+        using var document = JsonDocument.Parse(envelope);
+        var data = document.RootElement.GetProperty("data");
+        Assert.IsTrue(data.GetProperty("durable").GetBoolean(), "tool gate");
+        Assert.IsTrue(data.GetProperty("gateDecisionDurable").GetBoolean(), "tool gate");
+        Assert.IsFalse(data.GetProperty("gateIsExecutor").GetBoolean(), "tool gate");
+        Assert.IsFalse(data.GetProperty("toolExecuted").GetBoolean(), "tool gate");
+        Assert.IsFalse(data.GetProperty("sourceApplied").GetBoolean(), "tool gate");
+        Assert.IsFalse(data.GetProperty("memoryPromoted").GetBoolean(), "tool gate");
+        StringAssert.Contains(envelope, "durable SQL-backed");
+    }
+    private static void AssertDurableDogfoodReceipt(string envelope)
+    {
+        using var document = JsonDocument.Parse(envelope);
+        var data = document.RootElement.GetProperty("data");
+        Assert.IsTrue(data.GetProperty("durable").GetBoolean(), "dogfood loop");
+        Assert.IsFalse(data.GetProperty("releaseApproval").GetBoolean(), "dogfood loop");
+        Assert.IsFalse(data.GetProperty("autonomousWorkflow").GetBoolean(), "dogfood loop");
+        Assert.IsFalse(data.GetProperty("sourceApplied").GetBoolean(), "dogfood loop");
+        Assert.IsFalse(data.GetProperty("memoryPromoted").GetBoolean(), "dogfood loop");
+        StringAssert.Contains(envelope, "durable SQL-backed evidence");
+    }
 
     private static void AssertNonDurable(string envelope, string name)
     {
@@ -198,4 +221,3 @@ public sealed class ApiCliBoundaryContractTests
 
     private sealed record AuthorityCase(string Name, string[] Args);
 }
-

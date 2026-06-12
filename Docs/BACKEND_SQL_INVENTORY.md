@@ -154,3 +154,128 @@ Result-shape changes:
 - Critic remains distinct from governance.
 - Memory safe remains distinct from promotion.
 - No FK or constraint was weakened.
+
+# PR74b retrospective SQL inventory and runtime dependency map
+
+PR 74b is truth-finding, not schema cleanup. It updates this existing SQL inventory with the current Block G migration manifest view and separates required runtime schema from runtime queries, test fixtures, local/dev utilities, legacy artifacts, and future migration candidates.
+
+No schema, stored procedure shape, API, CLI, UI, runtime behavior, persistence behavior, authority, workflow, A2A, LangGraph path, source apply, or memory promotion changes are made by PR74b.
+
+## 1. Summary
+
+- `Database/sql-inventory.json` is the machine-readable retrospective inventory.
+- `Database/migrations.json` currently applies the Block G governance event, durable tool request, durable tool gate decision, and durable approval decision migrations.
+- `Database/verify-migrations.ps1` currently verifies the Block G governance, tool-request, tool-gate-decision, and approval-decision objects and constraints.
+- Older runtime SQL remains inventoried as required runtime schema, but mostly `appliedByManifest: false` and `verifiedByScript: false`.
+- Existing runtime DDL candidates remain explicit migration-discipline debt; they are not fixed in this PR.
+
+## 2. Required runtime schema
+
+Current manifest-covered runtime schema:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_governance_event.sql` | governance | Yes | Yes | Creates `governance.GovernanceEvent` and governance event procedures. |
+| `Database/migrate_tool_request.sql` | tool-request | Yes | Yes | Creates `governance.ToolRequest`, tool request procedures, and `FK_ToolRequest_GovernanceEvent`. |
+| `Database/migrate_tool_gate_decision.sql` | tool-gate-decision | Yes | Yes | Creates `governance.ToolGateDecision`, gate decision procedures, `FK_ToolGateDecision_ToolRequest`, and `FK_ToolGateDecision_GovernanceEvent`. |
+| `Database/migrate_approval_decision.sql` | approval-decision | Yes | Yes | Creates `governance.ApprovalDecision`, approval decision procedures, `FK_ApprovalDecision_GovernanceEvent`, `FK_ApprovalDecision_Supersedes`, and SQL insert validation for sensitive human-only scopes plus private-reasoning evidence rejection. |
+
+Runtime schema not yet covered by the current PR74a manifest includes agent memory, agent run audit, collective memory, tool execution audit, project documents, project profiles, chat, ticket, code indexing, project context, and decision lookup migrations. Those are intentionally listed in `Database/sql-inventory.json` as required runtime schema with manifest/verify coverage set to false unless currently proven.
+
+## 3. Required runtime stored procedures
+
+Current Block G stored procedure dependencies:
+
+| Procedure | Called by | Covered by manifest | Verified |
+| --- | --- | --- | --- |
+| `governance.AppendGovernanceEvent` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.GetGovernanceEvent` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsForProject` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsForCorrelation` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsForSubject` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsCausedBy` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.usp_ToolRequest_Create` | `SqlToolRequestStore` | Yes | Yes |
+| `governance.usp_ToolRequest_GetById` | `SqlToolRequestStore` | Yes | Yes |
+| `governance.usp_ToolRequest_ListForProject` | `SqlToolRequestStore` | Yes | Yes |
+| `governance.usp_ToolRequest_ListForCorrelation` | `SqlToolRequestStore` | Yes | Yes |
+
+Older stored procedure surfaces remain inventoried, including `agent.usp_*`, collective memory procedures, and `toolaudit.*` audit procedures. They are active but outside the current Block G manifest proof.
+
+## 4. Required runtime inline SQL
+
+Runtime inline SQL remains present in application services such as project, ticket, project memory/context, project document, semantic memory, and legacy run stores. These are required runtime queries or legacy bootstrap DDL candidates and are separately documented in `Docs/BACKEND_INLINE_SQL_INVENTORY.md`.
+
+The new Block G governance/tool-request/tool-gate-decision/approval-decision stores use stored procedures for governed writes/reads and do not create schema at runtime.
+
+## 5. Required test SQL
+
+Required test SQL includes `IntegrationTestBase`, `ApiTestBase`, agent memory schema helpers, API audit seed helpers, and specific SQL-heavy integration tests. These are test fixtures and must not be mistaken for production migration ownership.
+
+## 6. Local/dev utility SQL
+
+Local/dev utility SQL includes `Database/local_dev_setup.sql`, `Database/rebuild_db.sql`, `Database/seed_dev_data.sql`, `Database/setup_irondev_record.sql`, `tools/localtest/localtest-seed.sql`, and localtest reset scripts.
+
+These are useful developer workflows, not runtime migration proof.
+
+## 7. Legacy or unused SQL
+
+Legacy or uncertain SQL remains in place. Examples include `Database/update_schema_v1_indexing.sql` and `Docs/migrations/*.sql`. They are inventoried, not deleted.
+
+## 8. Future migration candidates
+
+Future migration candidates include legacy runtime DDL/bootstrap services and older active runtime schema scripts not yet represented in the ordered migration manifest and verification script.
+
+Candidate areas:
+
+- Run and run-event stores.
+- Ticket/project memory/project document bootstrap DDL.
+- Semantic memory cache/index bootstrap DDL.
+- Agent memory, audit, collective memory, and tool audit migrations outside the current Block G manifest.
+
+## 9. Known gaps
+
+- The current ordered manifest is intentionally narrow and covers PR72/73/74/75/76 Block G governance/tool-request/tool-gate-decision/approval-decision migrations.
+- Older active SQL still needs migration-ownership decisions.
+- Runtime DDL candidates remain explicit debt.
+- This PR does not prove real DB API smoke behavior; PR74c remains necessary.
+
+## 10. Next cleanup candidates
+
+- Expand ordered migration discipline beyond Block G after ownership is confirmed.
+- Move remaining runtime bootstrap DDL behind migrations without changing runtime result shapes.
+- Decide whether historical docs migrations should remain, move, or be retired after freeze.
+- Add PR74c API smoke receipt against a migrated database.
+
+## PR77 durable policy decision event update
+
+PR77 adds the fifth Block G manifest-covered governance ledger:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_policy_decision_event.sql` | governance | Yes | Yes | Creates `governance.PolicyDecisionEvent`, stored procedures, validation triggers, and optional links to tool request, tool gate decision, and approval decision evidence. |
+| `IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_PolicyDecisionEvent_*` stored procedures only; no runtime schema creation and no API/CLI endpoint. |
+
+Policy decision events are evidence only. They do not approve, execute, satisfy policy, continue workflow, apply source, create A2A handoff, create dogfood receipt, or promote memory.
+
+## PR78 durable dogfood receipt update
+
+PR78 adds the sixth Block G manifest-covered governance ledger:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_dogfood_receipt.sql` | governance | Yes | Yes | Creates `governance.DogfoodReceipt`, stored procedures, validation triggers, and optional links to tool request, tool gate decision, approval decision, and policy decision evidence. |
+| `IronDev.Infrastructure/Governance/SqlDogfoodReceiptStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_DogfoodReceipt_*` stored procedures only; no runtime schema creation. |
+| `IronDev.Api/Controllers/SqlDogfoodLoopApiStore.cs` | API/governance bridge | Yes | Yes | Dogfood Loop API stores durable receipt evidence through `IDogfoodReceiptStore`; it does not create approval, execution permission, policy satisfaction, source apply, workflow continuation, A2A handoff, or memory promotion. |
+
+Dogfood receipts are evidence only. They do not approve release readiness, satisfy policy, continue workflow, execute tools, apply source, create A2A handoff, or promote memory.
+
+## PR79 durable ThoughtLedger governance event reference update
+
+PR79 adds the seventh Block G manifest-covered governance ledger:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_thoughtledger_governance_event_reference.sql` | governance | Yes | Yes | Creates `governance.ThoughtLedgerGovernanceEventReference`, stored procedures, validation triggers, and a FK to existing `governance.GovernanceEvent`. |
+| `IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_ThoughtLedgerGovernanceEventReference_*` stored procedures only; no runtime schema creation. |
+
+ThoughtLedger governance event references are evidence links only. They preserve the ThoughtLedger entry ID exactly as text because no durable ThoughtLedger table exists yet. They do not approve, authorize, execute, satisfy policy, continue workflow, apply source, approve release, create dogfood receipts, create A2A handoffs, or promote memory.

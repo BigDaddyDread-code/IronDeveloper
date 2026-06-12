@@ -19,16 +19,15 @@ public sealed class ToolGateApiContractTests : ApiTestBase
     {
         using var client = await AuthedClientAsync();
         var requestId = await CreateToolRequestAsync(client, 901, "gate-only");
-        var store = GateStore();
-        var before = store.Count();
+        var before = GateStoreCount();
 
         var response = await client.PostAsJsonAsync("/api/v1/tool-gates/evaluations", ValidGateRequest(901, requestId).ToBody());
         var json = await ReadJsonAsync(response);
-        var after = store.Count();
+        var after = GateStoreCount();
         var text = json.RootElement.ToString();
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
-        Assert.AreEqual(before + 1, after, "POST may create only a non-durable gate preview.");
+        Assert.AreEqual(before + 1, after, "POST may create only durable gate decision evidence.");
         Assert.AreEqual("succeeded", json.RootElement.GetProperty("status").GetString());
         Assert.IsTrue(json.RootElement.GetProperty("mutationOccurred").GetBoolean());
         AssertGateOnlyBoundary(json.RootElement.GetProperty("boundary"));
@@ -36,12 +35,12 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         var data = json.RootElement.GetProperty("data");
         Assert.AreEqual(requestId, data.GetProperty("toolRequestId").GetString());
         Assert.AreEqual("allowed_by_gate", data.GetProperty("decision").GetString());
-        Assert.IsFalse(data.GetProperty("durable").GetBoolean());
-        Assert.IsFalse(data.GetProperty("requestDurable").GetBoolean());
-        Assert.IsFalse(data.GetProperty("gateDecisionDurable").GetBoolean());
+        Assert.IsTrue(data.GetProperty("durable").GetBoolean());
+        Assert.IsTrue(data.GetProperty("requestDurable").GetBoolean());
+        Assert.IsTrue(data.GetProperty("gateDecisionDurable").GetBoolean());
         Assert.IsTrue(data.GetProperty("requiresSeparateExecutor").GetBoolean());
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
-            warning.GetString()?.Contains("non-durable API-local preview cache", StringComparison.OrdinalIgnoreCase) == true));
+            warning.GetString()?.Contains("durable SQL-backed gate decision evidence", StringComparison.OrdinalIgnoreCase) == true));
         AssertNoMisleadingAuthorityLanguage(text);
     }
 
@@ -53,15 +52,15 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         var evaluate = await client.PostAsJsonAsync("/api/v1/tool-gates/evaluations", ValidGateRequest(902, requestId).ToBody());
         var evaluateJson = await ReadJsonAsync(evaluate);
         var gateDecisionId = evaluateJson.RootElement.GetProperty("gateDecisionId").GetString();
-        var before = GateStore().Count();
+        var before = GateStoreCount();
 
         var response = await client.GetAsync($"/api/v1/tool-gates/evaluations/{gateDecisionId}?projectId=902");
         var json = await ReadJsonAsync(response);
-        var after = GateStore().Count();
+        var after = GateStoreCount();
         var text = json.RootElement.ToString();
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
-        Assert.AreEqual(before, after, "GET must not create gate preview records.");
+        Assert.AreEqual(before, after, "GET must not create gate decision records.");
         Assert.AreEqual("succeeded", json.RootElement.GetProperty("status").GetString());
         Assert.IsFalse(json.RootElement.GetProperty("mutationOccurred").GetBoolean());
         AssertGateOnlyBoundary(json.RootElement.GetProperty("boundary"));
@@ -202,22 +201,14 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, text);
         AssertNoPrivateReasoningLeak(text);
     }
-
     [TestMethod]
-    public async Task ToolGateApi_DoesNotExposeHiddenReasoning_WhenStoredGateContainsPrivateReasoning()
+    public void ToolGateApi_DurableStoreRejectsHiddenReasoningRecords()
     {
-        GateStore().Save(BuildPrivateGatePreview("tool-gate-private-1", "tool-request-private-1", 912));
-        using var client = await AuthedClientAsync();
+        var before = GateStoreCount();
 
-        var response = await client.GetAsync("/api/v1/tool-gates/evaluations/tool-gate-private-1?projectId=912");
-        var text = await response.Content.ReadAsStringAsync();
-
-        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
-        StringAssert.Contains(text, "[redacted: sensitive tool-gate text]");
-        AssertNoPrivateReasoningLeak(text);
-        AssertNoMisleadingAuthorityLanguage(text);
+        Assert.ThrowsException<ArgumentException>(() => SaveGateDecision(BuildPrivateGatePreview("tool-gate-private-1", "tool-request-private-1", 912)));
+        Assert.AreEqual(before, GateStoreCount());
     }
-
     [TestMethod]
     public async Task ToolGateApi_SourceMutationRequestRequiresApprovalButDoesNotApprove()
     {
@@ -309,11 +300,11 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         StringAssert.Contains(text, "API response status is not governance.");
         StringAssert.Contains(text, "Human review remains required for source apply.");
         StringAssert.Contains(text, "Human review remains required for memory promotion.");
-        StringAssert.Contains(text, "This API operates on non-durable API-local request inspection data");
-        StringAssert.Contains(text, "does not yet provide durable SQL source-of-truth gate decisions");
-        StringAssert.Contains(text, "\"durable\": false");
-        StringAssert.Contains(text, "\"requestDurable\": false");
-        StringAssert.Contains(text, "\"gateDecisionDurable\": false");
+        StringAssert.Contains(text, "This API reads durable SQL-backed tool request records");
+        StringAssert.Contains(text, "records durable SQL-backed gate decision evidence");
+        StringAssert.Contains(text, "\"durable\": true");
+        StringAssert.Contains(text, "\"requestDurable\": true");
+        StringAssert.Contains(text, "\"gateDecisionDurable\": true");
     }
 
     private static async Task<HttpClient> AuthedClientAsync()
@@ -323,8 +314,17 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         return GetAuthedClient(tenantToken);
     }
 
-    private static IToolGateApiStore GateStore() =>
-        Factory.Services.GetRequiredService<IToolGateApiStore>();
+    private static int GateStoreCount()
+    {
+        using var scope = Factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IToolGateApiStore>().Count();
+    }
+
+    private static void SaveGateDecision(ToolGateApiStoredDecision decision)
+    {
+        using var scope = Factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IToolGateApiStore>().Save(decision);
+    }
 
     private static async Task<string> CreateToolRequestAsync(HttpClient client, int projectId, string correlationId)
     {
@@ -499,7 +499,7 @@ public sealed class ToolGateApiContractTests : ApiTestBase
             CorrelationId = privateText,
             CreatedAtUtc = CreatedAt,
             ContainsRawPrivateReasoning = true,
-            Warnings = ["Stored gate preview contains private reasoning and must be redacted."]
+            Warnings = ["Stored gate decision evidence contains private reasoning and must be rejected."]
         };
     }
 
@@ -517,9 +517,9 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         Assert.IsFalse(boundary.GetProperty("modelOutputIsAuthority").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("endpointAccessIsExecutionPermission").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("apiResponseStatusIsGovernance").GetBoolean());
-        Assert.IsFalse(boundary.GetProperty("durable").GetBoolean());
-        Assert.IsFalse(boundary.GetProperty("requestDurable").GetBoolean());
-        Assert.IsFalse(boundary.GetProperty("gateDecisionDurable").GetBoolean());
+        Assert.IsTrue(boundary.GetProperty("durable").GetBoolean());
+        Assert.IsTrue(boundary.GetProperty("requestDurable").GetBoolean());
+        Assert.IsTrue(boundary.GetProperty("gateDecisionDurable").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("humanReviewRequiredForSourceApply").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("humanReviewRequiredForMemoryPromotion").GetBoolean());
     }
@@ -546,10 +546,7 @@ public sealed class ToolGateApiContractTests : ApiTestBase
             "gatePassIsHumanApproval\":true",
             "apiResponseStatusIsGovernance\":true",
             "endpointAccessIsExecutionPermission\":true",
-            "modelOutputIsAuthority\":true",
-            "durable\":true",
-            "requestDurable\":true",
-            "gateDecisionDurable\":true"
+            "modelOutputIsAuthority\":true"
         };
 
         foreach (var token in forbidden)

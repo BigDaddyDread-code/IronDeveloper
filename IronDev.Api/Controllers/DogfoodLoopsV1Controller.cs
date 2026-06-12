@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -111,7 +110,8 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
 
         var receipt = BuildReceipt(request, tenantId.ToString());
         var stored = _store.Save(receipt);
-        var response = ToCreateResponseDto(receipt);
+        var durableReceipt = receipt with { Durable = true };
+        var response = ToCreateResponseDto(durableReceipt);
 
         return Ok(Envelope(
             stored.Created ? "receipt_created" : "receipt_found",
@@ -122,7 +122,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
             evidenceId: receipt.EvidenceId,
             mutationOccurred: stored.Created,
             humanApprovalRequired: true,
-            warnings: SafeWarnings(receipt)));
+            warnings: SafeWarnings(durableReceipt)));
     }
 
     [HttpGet("{dogfoodLoopId}")]
@@ -284,7 +284,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
             ReferencedCriticReviews = request.CriticReviewRunIds.Select(id => Reference("critic_review", id, durable: false, "Caller-supplied critic review reference; not verified by Dogfood Loop API v1.")).ToArray(),
             ReferencedMemoryImprovements = request.MemoryImprovementRunIds.Select(id => Reference("memory_improvement", id, durable: false, "Caller-supplied memory-improvement reference; not verified by Dogfood Loop API v1.")).ToArray(),
             ReferencedToolRequests = request.ToolRequestIds.Select(id => Reference("tool_request_preview", id, durable: false, "PR61 tool request API records are non-durable API-local inspection cache entries.")).ToArray(),
-            ReferencedGateDecisions = request.ToolGateDecisionIds.Select(id => Reference("tool_gate_preview", id, durable: false, "PR62 tool gate API records are non-durable API-local preview cache entries.")).ToArray(),
+            ReferencedGateDecisions = request.ToolGateDecisionIds.Select(id => Reference("tool_gate_decision", id, durable: true, "PR75 tool gate API records are durable SQL-backed gate decision evidence.")).ToArray(),
             EvidenceRefs = evidenceRefs,
             Durable = false,
             ContainsNonDurableReferences = containsNonDurable,
@@ -512,8 +512,8 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
         "Dogfood receipt is not release approval.",
         "Dogfood loop is not autonomous workflow.",
         "Dogfood receipt is not tool execution, source apply, memory promotion, governance authority, or release readiness.",
-        "This API uses non-durable API-local receipt data and does not provide SQL source-of-truth dogfood receipts.",
-        "PR61 tool request and PR62 gate preview references are non-durable API-local records until durable SQL stores exist.",
+        "Dogfood Loop API v1 stores durable SQL-backed dogfood receipt evidence linked to the governance event spine.",
+        "Dogfood loop receipts are durable SQL-backed evidence, but caller-supplied references remain non-authoritative unless their own backend records exist.",
         "Human review remains required for source apply and memory promotion."
     ];
 
@@ -521,7 +521,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
     {
         var warnings = new List<string>
         {
-            "Dogfood Loop API v1 receipt storage is non-durable, API-local, not SQL-backed, not durable evidence, and not release approval."
+            "Dogfood Loop API v1 receipt storage is durable SQL-backed evidence, not release approval, execution permission, policy satisfaction, source apply, memory promotion, or workflow continuation."
         };
 
         if (receipt.ContainsNonDurableReferences)
@@ -532,7 +532,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
 
     private static IReadOnlyList<string> KnownLimitations() =>
     [
-        "No SQL source-of-truth dogfood receipt store exists in this PR.",
+        "Dogfood receipts are durable SQL-backed evidence only and do not approve release readiness.",
         "No autonomous dogfood workflow runner is introduced.",
         "No tool execution, source apply, memory promotion, release approval, or governance authority is introduced."
     ];
@@ -580,7 +580,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
             ModelOutputIsAuthority = false,
             EndpointAccessIsExecutionPermission = false,
             ApiResponseStatusIsGovernance = false,
-            Durable = false,
+            Durable = true,
             ContainsNonDurableReferences = true,
             HumanReviewRequiredForSourceApply = true,
             HumanReviewRequiredForMemoryPromotion = true
@@ -621,29 +621,6 @@ public interface IDogfoodLoopApiStore
     DogfoodLoopApiStoredReceipt? Get(string tenantId, string projectId, string dogfoodLoopId);
 
     int Count();
-}
-
-public sealed class InMemoryDogfoodLoopApiStore : IDogfoodLoopApiStore
-{
-    private readonly ConcurrentDictionary<string, DogfoodLoopApiStoredReceipt> _receipts = new(StringComparer.Ordinal);
-
-    public DogfoodLoopApiStoreSaveResult Save(DogfoodLoopApiStoredReceipt receipt)
-    {
-        var key = Key(receipt.TenantId, receipt.ProjectId, receipt.DogfoodLoopId);
-        var created = _receipts.TryAdd(key, receipt);
-        return new DogfoodLoopApiStoreSaveResult { Created = created };
-    }
-
-    public DogfoodLoopApiStoredReceipt? Get(string tenantId, string projectId, string dogfoodLoopId)
-    {
-        _receipts.TryGetValue(Key(tenantId, projectId, dogfoodLoopId), out var receipt);
-        return receipt;
-    }
-
-    public int Count() => _receipts.Count;
-
-    private static string Key(string tenantId, string projectId, string dogfoodLoopId) =>
-        $"{tenantId}::{projectId}::{dogfoodLoopId}";
 }
 
 public sealed record DogfoodLoopApiStoreSaveResult

@@ -51,7 +51,7 @@ PR 61 exposed the tool request API v1.
 - `GET /api/v1/tool-requests/{toolRequestId}`
 - Boundary: tool request is request form, not execution permission.
 - Boundary: request approval is separate.
-- Durability: non-durable API-local inspection cache.
+- Durability: durable SQL-backed tool request record.
 
 PR 62 exposed the tool gate API v1.
 
@@ -59,7 +59,7 @@ PR 62 exposed the tool gate API v1.
 - Boundary: gate evaluation is not execution.
 - Boundary: gate pass is not human approval.
 - Boundary: gate is not executor.
-- Durability: non-durable API-local gate preview.
+- Durability: durable SQL-backed gate decision evidence.
 - CLI status: API only / no CLI yet.
 
 PR 63 exposed the dogfood loop API v1.
@@ -68,7 +68,7 @@ PR 63 exposed the dogfood loop API v1.
 - `GET /api/v1/dogfood-loops/{dogfoodLoopId}`
 - Boundary: dogfood receipt is evidence, not release approval.
 - Boundary: dogfood loop is not autonomous workflow.
-- Durability: non-durable API-local receipt storage.
+- Durability: durable SQL-backed dogfood receipt evidence once PR78 lands.
 
 ## Completed CLI Surfaces
 
@@ -165,16 +165,23 @@ Focused validation evidence for this report:
 
 ## Non-Durable Boundaries
 
-PR 61 Tool Request API remains non-durable API-local unless durable SQL-backed Tool Request Store has landed.
+PR 61 Tool Request API is backed by durable SQL tool request records once the durable Tool Request Store has landed.
 
-PR 62 Tool Gate API remains non-durable API-local gate preview unless durable SQL-backed Gate Decision Store has landed.
+PR 62/75 Tool Gate API records durable SQL-backed gate decision evidence once the durable Gate Decision Store has landed.
 
-PR 63 Dogfood Loop API remains non-durable API-local receipt storage unless durable SQL-backed Dogfood Loop Store has landed.
+PR 63 Dogfood Loop API is backed by durable SQL dogfood receipt evidence once PR78 lands.
 
-Non-durable records are not:
+PR 76 Approval Decision Store records durable SQL-backed approval decision evidence. It has no Block F API or CLI endpoint and does not grant execution permission, source apply, external effects, or memory promotion. PR77 Policy Decision Event Store records durable SQL-backed policy decision evidence. It has no API/CLI endpoint and does not approve, execute, satisfy policy, continue workflow, apply source, create A2A handoff, create dogfood receipt, or promote memory.
+
+Temporary API-local caches are not:
 
 - SQL source of truth.
 - Durable audit evidence.
+
+Dogfood receipt records remain evidence only, not approval or release readiness.
+
+Durable dogfood receipt records are not:
+
 - Execution evidence.
 - Approval.
 - Release evidence.
@@ -206,8 +213,8 @@ PR 71 does not add:
 ## Next Required Work
 
 1. Durable SQL Tool Request Store.
-2. Durable SQL Tool Gate Decision Store, if previews must become durable evidence.
-3. Durable SQL Dogfood Loop Receipt Store, if receipts must become project history.
+2. Durable SQL Tool Gate Decision Store, if previews must become durable evidence. Completed by PR75; PR76 adds durable approval decision evidence without adding an API/CLI approval endpoint.
+3. Durable SQL Dogfood Loop Receipt Store. Completed by PR78; receipts become evidence history, not release approval.
 4. Clean known broad API/full-solution red lanes.
 5. Decide whether CLI Tool Gate commands are needed separately.
 6. Decide next backend dogfood execution path, if any, without hiding execution authority.

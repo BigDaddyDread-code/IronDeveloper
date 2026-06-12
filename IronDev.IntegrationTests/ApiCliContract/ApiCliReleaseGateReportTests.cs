@@ -130,11 +130,11 @@ public sealed class ApiCliReleaseGateReportTests
         var report = ReadReport();
         var expected = new[]
         {
-            "PR 61 Tool Request API remains non-durable API-local unless durable SQL-backed Tool Request Store has landed.",
-            "PR 62 Tool Gate API remains non-durable API-local gate preview unless durable SQL-backed Gate Decision Store has landed.",
-            "PR 63 Dogfood Loop API remains non-durable API-local receipt storage unless durable SQL-backed Dogfood Loop Store has landed.",
+            "PR 61 Tool Request API is backed by durable SQL tool request records once the durable Tool Request Store has landed.",
+            "PR 62/75 Tool Gate API records durable SQL-backed gate decision evidence once the durable Gate Decision Store has landed.",
+            "PR 63 Dogfood Loop API is backed by durable SQL dogfood receipt evidence once PR78 lands.",
             "SQL source of truth.",
-            "Durable audit evidence.",
+            "Dogfood receipt records remain evidence only, not approval or release readiness.",
             "Execution evidence.",
             "Approval.",
             "Release evidence."

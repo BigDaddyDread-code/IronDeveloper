@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.SqlTypes;
 using Dapper;
 using IronDev.Core.Governance;
 using IronDev.Data;
@@ -427,6 +428,33 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
         await using var connection = new SqlConnection(ConnectionString);
         await connection.ExecuteAsync(
             """
+                          IF OBJECT_ID(N'governance.usp_PolicyDecisionEvent_Record', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicyDecisionEvent_Record;
+              IF OBJECT_ID(N'governance.usp_PolicyDecisionEvent_GetById', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicyDecisionEvent_GetById;
+              IF OBJECT_ID(N'governance.usp_PolicyDecisionEvent_ListForSubject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicyDecisionEvent_ListForSubject;
+              IF OBJECT_ID(N'governance.usp_PolicyDecisionEvent_ListForProject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicyDecisionEvent_ListForProject;
+              IF OBJECT_ID(N'governance.usp_PolicyDecisionEvent_ListForCorrelation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicyDecisionEvent_ListForCorrelation;
+              IF OBJECT_ID(N'governance.TR_PolicyDecisionEvent_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PolicyDecisionEvent_ValidateInsert;
+              IF OBJECT_ID(N'governance.TR_PolicyDecisionEvent_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete;
+              IF OBJECT_ID(N'governance.PolicyDecisionEvent', N'U') IS NOT NULL DROP TABLE governance.PolicyDecisionEvent;
+              IF OBJECT_ID(N'governance.usp_ApprovalDecision_Record', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ApprovalDecision_Record;
+            IF OBJECT_ID(N'governance.usp_ApprovalDecision_GetById', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ApprovalDecision_GetById;
+            IF OBJECT_ID(N'governance.usp_ApprovalDecision_ListForSubject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ApprovalDecision_ListForSubject;
+            IF OBJECT_ID(N'governance.usp_ApprovalDecision_ListForSubject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ApprovalDecision_ListForSubject;
+            IF OBJECT_ID(N'governance.usp_ApprovalDecision_ListForProject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ApprovalDecision_ListForProject;
+            IF OBJECT_ID(N'governance.usp_ApprovalDecision_ListForCorrelation', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ApprovalDecision_ListForCorrelation;
+            IF OBJECT_ID(N'governance.TR_ApprovalDecision_ValidateInsert', N'TR') IS NOT NULL
+                DROP TRIGGER governance.TR_ApprovalDecision_ValidateInsert;
+            IF OBJECT_ID(N'governance.TR_ApprovalDecision_BlockUpdateDelete', N'TR') IS NOT NULL
+                DROP TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete;
+            IF OBJECT_ID(N'governance.ApprovalDecision', N'U') IS NOT NULL
+                DROP TABLE governance.ApprovalDecision;
+
             IF OBJECT_ID(N'governance.TR_GovernanceEvent_BlockUpdateDelete', N'TR') IS NOT NULL
                 DROP TRIGGER governance.TR_GovernanceEvent_BlockUpdateDelete;
             IF OBJECT_ID(N'governance.AppendGovernanceEvent', N'P') IS NOT NULL
@@ -441,6 +469,39 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
                 DROP PROCEDURE governance.ListGovernanceEventsForSubject;
             IF OBJECT_ID(N'governance.ListGovernanceEventsCausedBy', N'P') IS NOT NULL
                 DROP PROCEDURE governance.ListGovernanceEventsCausedBy;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_Record', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_Record;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_GetById', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_GetById;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForToolRequest', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_ListForToolRequest;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForProject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_ListForProject;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForCorrelation', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_ListForCorrelation;
+            IF OBJECT_ID(N'governance.TR_ToolGateDecision_BlockUpdateDelete', N'TR') IS NOT NULL
+                DROP TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete;
+            IF OBJECT_ID(N'governance.ToolGateDecision', N'U') IS NOT NULL
+                DROP TABLE governance.ToolGateDecision;
+
+            IF OBJECT_ID(N'governance.usp_ToolRequest_Create', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_Create;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_GetById', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_GetById;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_ListForProject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_ListForProject;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_ListForCorrelation', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_ListForCorrelation;
+            IF OBJECT_ID(N'governance.ToolRequest', N'U') IS NOT NULL
+                DROP TABLE governance.ToolRequest;
+            IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_Record', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_Record;
+            IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_GetById', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_GetById;
+            IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry;
+            IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent;
+            IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation;
+            IF OBJECT_ID(N'governance.TR_ThoughtLedgerGovernanceEventReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_ValidateInsert;
+            IF OBJECT_ID(N'governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete;
+            IF OBJECT_ID(N'governance.ThoughtLedgerGovernanceEventReference', N'U') IS NOT NULL DROP TABLE governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID(N'governance.GovernanceEvent', N'U') IS NOT NULL
                 DROP TABLE governance.GovernanceEvent;
             IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'IronDevGovernanceEventRuntimeRole' AND type = N'R')
@@ -462,7 +523,7 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
     {
         var expected = summaries
             .OrderByDescending(summary => summary.CreatedUtc)
-            .ThenByDescending(summary => summary.EventId)
+            .ThenByDescending(summary => new SqlGuid(summary.EventId))
             .Select(summary => summary.EventId)
             .ToArray();
         var actual = summaries.Select(summary => summary.EventId).ToArray();

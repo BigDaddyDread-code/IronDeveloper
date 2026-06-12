@@ -239,7 +239,7 @@ public sealed class CliToolRequestsTests
     [TestMethod]
     public async Task CliToolRequests_JsonOutput_PreservesApiWarnings()
     {
-        var handler = new RecordingHandler(CreateEnvelope(warnings: ["non-durable API-local inspection cache"]));
+        var handler = new RecordingHandler(CreateEnvelope(warnings: ["durable SQL-backed tool request records"]));
         var output = new StringWriter();
         var error = new StringWriter();
 
@@ -254,8 +254,8 @@ public sealed class CliToolRequestsTests
         Assert.AreEqual(0, exitCode, error.ToString());
         using var json = JsonDocument.Parse(output.ToString());
         Assert.AreEqual("succeeded", json.RootElement.GetProperty("status").GetString());
-        Assert.AreEqual("non-durable API-local inspection cache", json.RootElement.GetProperty("warnings")[0].GetString());
-        Assert.IsFalse(json.RootElement.GetProperty("data").GetProperty("boundary").GetProperty("durable").GetBoolean());
+        Assert.AreEqual("durable SQL-backed tool request records", json.RootElement.GetProperty("warnings")[0].GetString());
+        Assert.IsTrue(json.RootElement.GetProperty("data").GetProperty("boundary").GetBoolean());
     }
 
     [TestMethod]
@@ -404,7 +404,7 @@ public sealed class CliToolRequestsTests
           "evidenceId": "evidence-tool-request-42-workspacediff-001",
           "boundary": {
             "toolRequestIsExecutionPermission": false,
-            "durable": false,
+            "durable": true,
             "toolExecuted": false,
             "requestApproved": false,
             "auditIsApproval": false,
@@ -419,7 +419,7 @@ public sealed class CliToolRequestsTests
           },
           "mutationOccurred": true,
           "humanApprovalRequired": false,
-          "warnings": {{JsonSerializer.Serialize(warnings ?? ["Tool request is request form, not execution permission.", "Tool Request API v1 uses a non-durable API-local inspection cache."])}},
+          "warnings": {{JsonSerializer.Serialize(warnings ?? ["Tool request is request form, not execution permission.", "Tool Request API v1 uses a durable SQL-backed tool request records."])}},
           "errors": [],
           "data": {
             "toolRequestId": "tool-request-42-workspacediff",
@@ -452,7 +452,7 @@ public sealed class CliToolRequestsTests
           "evidenceId": "evidence-tool-request-42-workspacediff-001",
           "boundary": {
             "toolRequestIsExecutionPermission": false,
-            "durable": false,
+            "durable": true,
             "toolExecuted": false,
             "requestApproved": false,
             "auditIsApproval": false,
@@ -467,7 +467,7 @@ public sealed class CliToolRequestsTests
           },
           "mutationOccurred": false,
           "humanApprovalRequired": false,
-          "warnings": {{JsonSerializer.Serialize(warnings ?? ["Tool Request API v1 uses a non-durable API-local inspection cache."])}},
+          "warnings": {{JsonSerializer.Serialize(warnings ?? ["Tool Request API v1 uses a durable SQL-backed tool request records."])}},
           "errors": [],
           "data": {
             "toolRequestId": "tool-request-42-workspacediff",
@@ -524,7 +524,7 @@ public sealed class CliToolRequestsTests
           "evidenceId": "",
           "boundary": {
             "toolRequestIsExecutionPermission": false,
-            "durable": false,
+            "durable": true,
             "toolExecuted": false,
             "requestApproved": false,
             "auditIsApproval": false,

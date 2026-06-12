@@ -36,7 +36,7 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
         var boundary = json.RootElement.GetProperty("boundary");
         AssertRequestOnlyBoundary(boundary);
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
-            warning.GetString()?.Contains("non-durable API-local inspection cache", StringComparison.OrdinalIgnoreCase) == true));
+            warning.GetString()?.Contains("durable SQL-backed tool request records", StringComparison.OrdinalIgnoreCase) == true));
 
         var data = json.RootElement.GetProperty("data");
         Assert.IsTrue(data.GetProperty("requestOnly").GetBoolean());
@@ -192,18 +192,13 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task ToolRequestApi_DoesNotExposeHiddenReasoning_WhenStoredRequestContainsPrivateReasoning()
+    public void ToolRequestApi_DurableStoreRejectsHiddenReasoningRecords()
     {
-        Store().Save(BuildPrivateReasoningRecord("tool-request-private-1", 810));
-        using var client = await AuthedClientAsync();
+        var store = Store();
+        var before = store.Count();
 
-        var response = await client.GetAsync("/api/v1/tool-requests/tool-request-private-1?projectId=810");
-        var text = await response.Content.ReadAsStringAsync();
-
-        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
-        StringAssert.Contains(text, "[redacted: sensitive tool-request text]");
-        AssertNoPrivateReasoningLeak(text);
-        AssertNoMisleadingAuthorityLanguage(text);
+        Assert.ThrowsException<ArgumentException>(() => store.Save(BuildPrivateReasoningRecord("tool-request-private-1", 810)));
+        Assert.AreEqual(before, store.Count(), "Hidden reasoning must be rejected before durable request record creation.");
     }
 
     [TestMethod]
@@ -227,9 +222,9 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
         AssertRequestOnlyBoundary(json.RootElement.GetProperty("boundary"));
-        Assert.IsFalse(json.RootElement.GetProperty("boundary").GetProperty("durable").GetBoolean());
+        Assert.IsTrue(json.RootElement.GetProperty("boundary").GetProperty("durable").GetBoolean());
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
-            warning.GetString()?.Contains("SQL-backed durable tool request storage is not provided", StringComparison.OrdinalIgnoreCase) == true));
+            warning.GetString()?.Contains("durable SQL-backed tool request records", StringComparison.OrdinalIgnoreCase) == true));
         AssertNoMisleadingAuthorityLanguage(text);
     }
 
@@ -300,9 +295,9 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
         StringAssert.Contains(text, "Tool request is a request form, not execution permission.");
         StringAssert.Contains(text, "Tool request is not approval.");
         StringAssert.Contains(text, "Tool request is not tool execution.");
-        StringAssert.Contains(text, "non-durable API-local request inspection record");
-        StringAssert.Contains(text, "This does not yet satisfy durable SQL source-of-truth storage for tool requests.");
-        StringAssert.Contains(text, "\"durable\": false");
+        StringAssert.Contains(text, "durable SQL-backed tool request record");
+        StringAssert.Contains(text, "Tool request records are durable SQL-backed backend records and are linked to the governance event spine.");
+        StringAssert.Contains(text, "\"durable\": true");
         StringAssert.Contains(text, "Audit evidence is not approval.");
         StringAssert.Contains(text, "Gate is not executor.");
         StringAssert.Contains(text, "Endpoint access is not execution permission.");
@@ -319,7 +314,7 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
     }
 
     private static IToolRequestApiStore Store() =>
-        Factory.Services.GetRequiredService<IToolRequestApiStore>();
+        Factory.Services.CreateScope().ServiceProvider.GetRequiredService<IToolRequestApiStore>();
 
     private static ToolRequestApiRequestBody ValidRequest(int projectId, string correlationId) =>
         new(
@@ -437,7 +432,7 @@ public sealed class ToolRequestApiContractTests : ApiTestBase
     private static void AssertRequestOnlyBoundary(JsonElement boundary)
     {
         Assert.IsFalse(boundary.GetProperty("toolRequestIsExecutionPermission").GetBoolean());
-        Assert.IsFalse(boundary.GetProperty("durable").GetBoolean());
+        Assert.IsTrue(boundary.GetProperty("durable").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("toolExecuted").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("requestApproved").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("auditIsApproval").GetBoolean());

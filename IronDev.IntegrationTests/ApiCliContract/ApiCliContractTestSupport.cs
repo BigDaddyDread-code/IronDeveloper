@@ -222,13 +222,13 @@ internal static class ApiCliContractTestSupport
           "data": {
             "dogfoodLoopId": "{{DogfoodLoopId}}",
             "projectId": "{{ProjectId}}",
-            "durable": false,
+            "durable": true,
             "releaseApproval": false,
             "autonomousWorkflow": false,
             "sourceApplied": false,
             "memoryPromoted": false
           },
-          "warnings": ["Dogfood receipt is not release approval.", "Dogfood loop is not autonomous workflow.", "Human review remains required for source apply and memory promotion.", "This dogfood loop is a non-durable API-local inspection cache."],
+          "warnings": ["Dogfood receipt is not release approval.", "Dogfood loop is not autonomous workflow.", "Human review remains required for source apply and memory promotion.", "Dogfood receipt is durable SQL-backed evidence, not release approval."],
           "errors": []
         }
         """;
@@ -242,18 +242,16 @@ internal static class ApiCliContractTestSupport
           "command": "tool-gate evaluate",
           "status": "blocked",
           "data": {
-            "durable": false,
-            "gateDecisionDurable": false,
+            "durable": true,
+            "gateDecisionDurable": true,
             "gateIsExecutor": false,
             "toolExecuted": false,
             "sourceApplied": false,
             "memoryPromoted": false
           },
-          "warnings": ["Gate evaluation is not execution.", "Tool execution is separate."],
+          "warnings": ["Gate decision evidence is durable SQL-backed.", "Gate evaluation is not execution.", "Tool execution is separate."],
           "errors": []
         }
         """;
     }
 }
-
-

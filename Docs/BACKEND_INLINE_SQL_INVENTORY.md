@@ -94,3 +94,89 @@ This does not weaken constraints, disable triggers, ignore cleanup errors, or re
 ## Remaining intentional exceptions
 
 The production runtime DDL candidates listed above are explicit cleanup debt. They remain because this PR is not allowed to change product bootstrap behavior. A later cleanup can remove them only by moving schema ownership into setup/migration artifacts while preserving behavior and result shapes.
+
+# PR74b retrospective inline SQL inventory
+
+PR74b does not remove inline SQL. It classifies the current inline SQL surface so later cleanup can separate runtime requirements from tests, local utilities, and legacy bootstrap behavior.
+
+## 1. Runtime inline SQL
+
+Runtime inline SQL remains in core application services for projects, tickets, project memory/context, project documents, semantic memory, and legacy run stores. Normal parameterized CRUD SQL is allowed when it is the service-owned persistence boundary. Runtime DDL remains an exception and must move to migration/bootstrap ownership in a later cleanup.
+
+## 2. Test inline SQL
+
+Integration and API tests use inline SQL for fixture setup, reset, direct-invariant checks, and unsafe-path regression checks. This is allowed when clearly test-only and scoped to the test database.
+
+## 3. Migration/helper inline SQL
+
+Migration scripts, `Database/apply-migrations.ps1`, `Database/verify-migrations.ps1`, local setup scripts, and LocalTest reset scripts are expected to contain SQL. They are setup/verification tools, not runtime feature code.
+
+## 4. Inline SQL allowed/forbidden guidance
+
+Allowed:
+
+- Parameterized runtime CRUD owned by a repository/service.
+- Stored procedure calls through explicit store classes.
+- Test setup/reset SQL in test projects.
+- Migration and local/dev utility SQL in `Database` or `tools/localtest`.
+
+Forbidden without a later migration-ownership PR:
+
+- New runtime DDL in application services.
+- New direct writes bypassing governed stored procedure boundaries.
+- New API/CLI/controller SQL writes that claim authority, approval, promotion, source apply, workflow state, or gate execution.
+
+## 5. Candidates to move behind stored procedures
+
+Candidates remain the previously documented runtime DDL/bootstrap areas plus any future durable governance stores added after Block G. Current Block G governance/tool-request/tool-gate-decision/approval-decision writes already use stored procedures and are not candidates for inline SQL expansion.
+
+## PR77 policy decision event SQL boundary
+
+Policy decision event writes are stored-procedure-only through `governance.usp_PolicyDecisionEvent_Record`. Runtime code must not insert, update, delete, or create `governance.PolicyDecisionEvent` directly.
+
+Allowed PR77 runtime SQL shape:
+
+- `SqlPolicyDecisionEventStore` calls `governance.usp_PolicyDecisionEvent_Record`.
+- `SqlPolicyDecisionEventStore` calls read procedures for get/list operations.
+- Migration and smoke scripts own schema setup and verification.
+
+Forbidden PR77 runtime SQL shape:
+
+- Inline `INSERT INTO governance.PolicyDecisionEvent`.
+- Inline `UPDATE` or `DELETE` against `governance.PolicyDecisionEvent`.
+- Runtime DDL for policy decision tables, triggers, or stored procedures.
+
+## PR78 dogfood receipt SQL boundary
+
+Dogfood receipt writes are stored-procedure-only through `governance.usp_DogfoodReceipt_Record`. Runtime code must not insert, update, delete, or create `governance.DogfoodReceipt` directly.
+
+Allowed PR78 runtime SQL shape:
+
+- `SqlDogfoodReceiptStore` calls `governance.usp_DogfoodReceipt_Record`.
+- `SqlDogfoodReceiptStore` calls read procedures for get/list operations.
+- `SqlDogfoodLoopApiStore` stores API dogfood receipts through `IDogfoodReceiptStore`.
+- Migration and smoke scripts own schema setup and verification.
+
+Forbidden PR78 runtime SQL shape:
+
+- Inline `INSERT INTO governance.DogfoodReceipt`.
+- Inline `UPDATE` or `DELETE` against `governance.DogfoodReceipt`.
+- Runtime DDL for dogfood receipt tables, triggers, or stored procedures.
+- Treating a dogfood receipt as release approval, policy satisfaction, execution permission, source apply, workflow continuation, A2A handoff, or memory promotion.
+
+## PR79 ThoughtLedger governance reference SQL boundary
+
+ThoughtLedger governance reference writes are stored-procedure-only through `governance.usp_ThoughtLedgerGovernanceEventReference_Record`. Runtime code must not insert, update, delete, or create `governance.ThoughtLedgerGovernanceEventReference` directly.
+
+Allowed PR79 runtime SQL shape:
+
+- `SqlThoughtLedgerGovernanceEventReferenceStore` calls `governance.usp_ThoughtLedgerGovernanceEventReference_Record`.
+- `SqlThoughtLedgerGovernanceEventReferenceStore` calls read procedures for get/list operations.
+- Migration and smoke scripts own schema setup and verification.
+
+Forbidden PR79 runtime SQL shape:
+
+- Inline `INSERT INTO governance.ThoughtLedgerGovernanceEventReference`.
+- Inline `UPDATE` or `DELETE` against `governance.ThoughtLedgerGovernanceEventReference`.
+- Runtime DDL for ThoughtLedger governance reference tables, triggers, or stored procedures.
+- Treating a ThoughtLedger governance reference as approval, execution permission, policy satisfaction, workflow continuation, source apply, release approval, dogfood receipt creation, A2A handoff creation, or memory promotion.

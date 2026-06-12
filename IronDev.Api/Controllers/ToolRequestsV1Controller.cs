@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -627,7 +626,7 @@ public sealed class ToolRequestsV1Controller : ControllerBase
         new()
         {
             ToolRequestIsExecutionPermission = false,
-            Durable = false,
+            Durable = true,
             ToolExecuted = false,
             RequestApproved = false,
             AuditIsApproval = false,
@@ -644,7 +643,7 @@ public sealed class ToolRequestsV1Controller : ControllerBase
     private static IReadOnlyList<string> BoundaryWarnings() =>
     [
         "Tool Request API v1 creates or inspects tool request evidence only.",
-        "Tool Request API v1 uses a non-durable API-local inspection cache; SQL-backed durable tool request storage is not provided by this endpoint.",
+        "Tool Request API v1 persists durable SQL-backed tool request records.",
         "Tool request is not approval, execution permission, tool execution, source apply, memory promotion, or governance.",
         "A separate gate/executor path is required before any requested tool can run.",
         "Human review remains required for source apply and memory promotion."
@@ -694,29 +693,6 @@ public interface IToolRequestApiStore
     ToolRequestApiStoredRecord? Get(string tenantId, string projectId, string toolRequestId);
 
     int Count();
-}
-
-public sealed class InMemoryToolRequestApiStore : IToolRequestApiStore
-{
-    private readonly ConcurrentDictionary<string, ToolRequestApiStoredRecord> _records = new(StringComparer.Ordinal);
-
-    public ToolRequestApiStoreSaveResult Save(ToolRequestApiStoredRecord record)
-    {
-        var key = Key(record.ToolRequest.Scope.TenantId, record.ToolRequest.Scope.ProjectId, record.ToolRequest.ToolRequestId);
-        var created = _records.TryAdd(key, record);
-        return new ToolRequestApiStoreSaveResult { Created = created };
-    }
-
-    public ToolRequestApiStoredRecord? Get(string tenantId, string projectId, string toolRequestId)
-    {
-        _records.TryGetValue(Key(tenantId, projectId, toolRequestId), out var record);
-        return record;
-    }
-
-    public int Count() => _records.Count;
-
-    private static string Key(string tenantId, string projectId, string toolRequestId) =>
-        $"{tenantId}::{projectId}::{toolRequestId}";
 }
 
 public sealed record ToolRequestApiStoreSaveResult
