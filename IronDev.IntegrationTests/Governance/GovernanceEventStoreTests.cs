@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using Dapper;
 using IronDev.Core.Governance;
 using IronDev.Data;
@@ -16,7 +16,9 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
     private static readonly Guid ProjectId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid OtherProjectId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid CorrelationId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid OtherCorrelationId = Guid.Parse("33333333-3333-3333-3333-333333333334");
     private static readonly Guid CausationId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid OtherCausationId = Guid.Parse("44444444-4444-4444-4444-444444444445");
     private const string ValidPayload = "{\"schema\":\"governance.event.created.v1\",\"message\":\"Governance event store smoke event\",\"source\":\"integration-test\"}";
 
     private SqlGovernanceEventStore _store = default!;
@@ -40,26 +42,36 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
     }
 
     [TestMethod]
-    public void GovernanceEventContracts_ExposeAppendOnlyStoreShape()
+    public void GovernanceEventContracts_ExposeAppendOnlyReadModelStoreShape()
     {
         Assert.IsNotNull(typeof(GovernanceEvent));
+        Assert.IsNotNull(typeof(GovernanceEventReadModel));
+        Assert.IsNotNull(typeof(GovernanceEventSummary));
+        Assert.IsNotNull(typeof(GovernanceEventsForProjectQuery));
+        Assert.IsNotNull(typeof(GovernanceEventsForCorrelationQuery));
+        Assert.IsNotNull(typeof(GovernanceEventsForSubjectQuery));
+        Assert.IsNotNull(typeof(GovernanceEventsCausedByQuery));
         Assert.IsNotNull(typeof(GovernanceEventAppendRequest));
-        Assert.IsNotNull(typeof(GovernanceEventValidationIssue));
         Assert.IsNotNull(typeof(GovernanceEventValidator));
         Assert.IsNotNull(typeof(IGovernanceEventStore));
 
         var methods = typeof(IGovernanceEventStore).GetMethods().Select(method => method.Name).ToArray();
         CollectionAssert.AreEquivalent(
-            new[] { "AppendAsync", "GetAsync", "ListForProjectAsync", "ListForCorrelationAsync" },
+            new[] { "AppendAsync", "GetAsync", "ListForProjectAsync", "ListForCorrelationAsync", "ListForSubjectAsync", "ListCausedByAsync" },
             methods);
-        AssertNoForbiddenNames(methods, "UpdateAsync", "DeleteAsync", "UpsertAsync", "SaveAsync");
+        AssertNoForbiddenNames(methods, "UpdateAsync", "DeleteAsync", "UpsertAsync", "SaveAsync", "ApproveAsync", "ExecuteAsync", "PromoteAsync", "MarkReleaseReadyAsync");
 
-        var properties = typeof(GovernanceEvent).GetProperties().Select(property => property.Name).ToArray();
-        AssertNoForbiddenNames(properties, "ApprovalGranted", "ExecutionPermission", "PromotesMemory", "StartsWorkflow", "ReleaseApproved");
+        var summaryProperties = typeof(GovernanceEventSummary).GetProperties().Select(property => property.Name).ToArray();
+        Assert.IsFalse(summaryProperties.Contains("PayloadJson"), "Summary model must not expose payload JSON.");
+        AssertNoForbiddenNames(summaryProperties, "ApprovalGranted", "ExecutionPermission", "PromotesMemory", "StartsWorkflow", "ReleaseApproved");
+
+        var readProperties = typeof(GovernanceEventReadModel).GetProperties().Select(property => property.Name).ToArray();
+        CollectionAssert.Contains(readProperties, "PayloadJson");
+        AssertNoForbiddenNames(readProperties, "ApprovalGranted", "ExecutionPermission", "PromotesMemory", "StartsWorkflow", "ReleaseApproved");
     }
 
     [TestMethod]
-    public async Task GovernanceEventMigration_CreatesSchemaTableConstraintsAndIndexes()
+    public async Task GovernanceEventMigration_CreatesSchemaTableConstraintsIndexesAndReadProcedures()
     {
         await using var connection = new SqlConnection(ConnectionString);
 
@@ -93,77 +105,155 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
                 "IX_GovernanceEvent_Subject"
             },
             indexes);
+
+        var procedures = (await connection.QueryAsync<string>(
+            """
+            SELECT name
+            FROM sys.procedures
+            WHERE schema_id = SCHEMA_ID(N'governance')
+            """)).ToArray();
+        CollectionAssert.IsSubsetOf(
+            new[]
+            {
+                "AppendGovernanceEvent",
+                "GetGovernanceEvent",
+                "ListGovernanceEventsForProject",
+                "ListGovernanceEventsForCorrelation",
+                "ListGovernanceEventsForSubject",
+                "ListGovernanceEventsCausedBy"
+            },
+            procedures);
     }
 
     [TestMethod]
-    public async Task GovernanceEventStore_AppendsReadsAndListsEvents()
+    public async Task GovernanceEventStore_AppendsAndGetReturnsFullPayloadReadModel()
     {
-        var first = await _store.AppendAsync(ValidRequest() with { EventType = " governance.event.created ", ActorId = " test-actor " });
-        var second = await _store.AppendAsync(ValidRequest() with { EventType = "tool.request.created" });
+        var appended = await _store.AppendAsync(ValidRequest() with { EventType = " governance.event.created ", ActorId = " test-actor " });
 
-        Assert.AreNotEqual(Guid.Empty, first.EventId);
-        Assert.AreEqual(ProjectId, first.ProjectId);
-        Assert.AreEqual("governance.event.created", first.EventType);
-        Assert.AreEqual("test", first.ActorType);
-        Assert.AreEqual("test-actor", first.ActorId);
-        Assert.AreEqual(CorrelationId, first.CorrelationId);
-        Assert.AreEqual(CausationId, first.CausationId);
-        Assert.AreEqual("tool_request", first.SubjectType);
-        Assert.AreEqual("tool-request-1", first.SubjectId);
-        Assert.AreEqual(1, first.PayloadVersion);
-        Assert.AreEqual(ValidPayload, first.PayloadJson);
-        Assert.AreNotEqual(default, first.CreatedUtc);
+        Assert.AreNotEqual(Guid.Empty, appended.EventId);
+        Assert.AreEqual(ProjectId, appended.ProjectId);
+        Assert.AreEqual("governance.event.created", appended.EventType);
+        Assert.AreEqual("test", appended.ActorType);
+        Assert.AreEqual("test-actor", appended.ActorId);
+        Assert.AreEqual(CorrelationId, appended.CorrelationId);
+        Assert.AreEqual(CausationId, appended.CausationId);
+        Assert.AreEqual("tool_request", appended.SubjectType);
+        Assert.AreEqual("tool-request-1", appended.SubjectId);
+        Assert.AreEqual(1, appended.PayloadVersion);
+        Assert.AreEqual(ValidPayload, appended.PayloadJson);
+        Assert.AreNotEqual(default, appended.CreatedUtc);
 
-        var read = await _store.GetAsync(first.EventId);
+        var read = await _store.GetAsync(appended.EventId);
         Assert.IsNotNull(read);
-        Assert.AreEqual(first.EventId, read.EventId);
-        Assert.AreEqual(first.PayloadJson, read.PayloadJson);
-
-        var byProject = await _store.ListForProjectAsync(ProjectId, 50);
-        Assert.AreEqual(2, byProject.Count);
-        Assert.IsTrue(byProject.Any(item => item.EventId == first.EventId));
-        Assert.IsTrue(byProject.Any(item => item.EventId == second.EventId));
-
-        var byCorrelation = await _store.ListForCorrelationAsync(CorrelationId, 50);
-        Assert.AreEqual(2, byCorrelation.Count);
-        Assert.IsTrue(byCorrelation.All(item => item.CorrelationId == CorrelationId));
+        Assert.AreEqual(appended.EventId, read.EventId);
+        Assert.AreEqual(appended.PayloadJson, read.PayloadJson);
+        Assert.AreEqual(appended.PayloadVersion, read.PayloadVersion);
+        Assert.AreEqual(appended.CorrelationId, read.CorrelationId);
+        Assert.AreEqual(appended.CausationId, read.CausationId);
+        Assert.IsNull(await _store.GetAsync(Guid.NewGuid()));
+        Assert.IsNull(await _store.GetAsync(Guid.Empty));
     }
 
     [TestMethod]
-    public async Task GovernanceEventStore_IsProjectScopedAndHandlesEmptyReadKeys()
+    public async Task ListForProject_ReturnsMatchingProjectSummariesOnlyDeterministicallyAndWithoutPayload()
     {
-        await _store.AppendAsync(ValidRequest());
-        await _store.AppendAsync(ValidRequest() with { ProjectId = OtherProjectId });
+        await _store.AppendAsync(ValidRequest() with { EventType = "event.one" });
+        await _store.AppendAsync(ValidRequest() with { EventType = "event.two", SubjectId = "tool-request-2" });
+        await _store.AppendAsync(ValidRequest() with { ProjectId = OtherProjectId, EventType = "event.other" });
 
-        var projectEvents = await _store.ListForProjectAsync(ProjectId, 1000);
-        var noneForEmpty = await _store.ListForProjectAsync(Guid.Empty, 100);
-        var noneForEmptyCorrelation = await _store.ListForCorrelationAsync(Guid.Empty, 100);
-        var noneForEmptyEvent = await _store.GetAsync(Guid.Empty);
+        var summaries = await _store.ListForProjectAsync(new GovernanceEventsForProjectQuery { ProjectId = ProjectId, Take = 2 });
 
-        Assert.AreEqual(1, projectEvents.Count);
-        Assert.AreEqual(ProjectId, projectEvents.Single().ProjectId);
-        Assert.AreEqual(0, noneForEmpty.Count);
-        Assert.AreEqual(0, noneForEmptyCorrelation.Count);
-        Assert.IsNull(noneForEmptyEvent);
+        Assert.AreEqual(2, summaries.Count);
+        Assert.IsTrue(summaries.All(summary => summary.ProjectId == ProjectId));
+        AssertOrderedDescending(summaries);
+        AssertSummaryDoesNotExposePayload();
     }
 
     [TestMethod]
-    public async Task GovernanceEventStore_RejectsInvalidAppendRequests()
+    public async Task ListForCorrelation_ReturnsMatchingCorrelationAcrossSubjectsDeterministicallyAndWithoutPayload()
     {
-        var cases = new Dictionary<string, GovernanceEventAppendRequest>
+        await _store.AppendAsync(ValidRequest() with { SubjectType = "tool_request", SubjectId = "tool-request-1" });
+        await _store.AppendAsync(ValidRequest() with { SubjectType = "gate_decision", SubjectId = "gate-decision-1" });
+        await _store.AppendAsync(ValidRequest() with { CorrelationId = OtherCorrelationId, SubjectId = "other" });
+
+        var summaries = await _store.ListForCorrelationAsync(new GovernanceEventsForCorrelationQuery { CorrelationId = CorrelationId, Take = 10 });
+
+        Assert.AreEqual(2, summaries.Count);
+        Assert.IsTrue(summaries.All(summary => summary.CorrelationId == CorrelationId));
+        Assert.IsTrue(summaries.Select(summary => summary.SubjectType).Contains("tool_request"));
+        Assert.IsTrue(summaries.Select(summary => summary.SubjectType).Contains("gate_decision"));
+        AssertOrderedDescending(summaries);
+        AssertSummaryDoesNotExposePayload();
+    }
+
+    [TestMethod]
+    public async Task ListForSubject_IsProjectScopedAndTrimsSubjectFilters()
+    {
+        await _store.AppendAsync(ValidRequest() with { SubjectType = "tool_request", SubjectId = "shared-subject" });
+        await _store.AppendAsync(ValidRequest() with { SubjectType = "tool_request", SubjectId = "other-subject" });
+        await _store.AppendAsync(ValidRequest() with { ProjectId = OtherProjectId, SubjectType = "tool_request", SubjectId = "shared-subject" });
+
+        var summaries = await _store.ListForSubjectAsync(new GovernanceEventsForSubjectQuery
         {
-            [GovernanceEventValidator.ProjectIdRequired] = ValidRequest() with { ProjectId = Guid.Empty },
-            [GovernanceEventValidator.EventTypeRequired] = ValidRequest() with { EventType = " " },
-            [GovernanceEventValidator.ActorTypeRequired] = ValidRequest() with { ActorType = " " },
-            [GovernanceEventValidator.ActorIdRequired] = ValidRequest() with { ActorId = " " },
-            [GovernanceEventValidator.PayloadVersionInvalid] = ValidRequest() with { PayloadVersion = 0 },
-            [GovernanceEventValidator.PayloadJsonRequired] = ValidRequest() with { PayloadJson = " " },
-            [GovernanceEventValidator.PayloadJsonInvalid] = ValidRequest() with { PayloadJson = "{not-json" },
-            [GovernanceEventValidator.PayloadTextUnsafe] = ValidRequest() with { PayloadJson = "{\"rawPrompt\":\"do not store\"}" }
+            ProjectId = ProjectId,
+            SubjectType = " tool_request ",
+            SubjectId = " shared-subject ",
+            Take = 10
+        });
+
+        Assert.AreEqual(1, summaries.Count);
+        Assert.AreEqual(ProjectId, summaries.Single().ProjectId);
+        Assert.AreEqual("tool_request", summaries.Single().SubjectType);
+        Assert.AreEqual("shared-subject", summaries.Single().SubjectId);
+        AssertSummaryDoesNotExposePayload();
+    }
+
+    [TestMethod]
+    public async Task ListCausedBy_ReturnsMatchingCausationSummariesOnly()
+    {
+        await _store.AppendAsync(ValidRequest() with { CausationId = CausationId, EventType = "event.caused.one" });
+        await _store.AppendAsync(ValidRequest() with { CausationId = CausationId, EventType = "event.caused.two" });
+        await _store.AppendAsync(ValidRequest() with { CausationId = OtherCausationId, EventType = "event.other" });
+
+        var summaries = await _store.ListCausedByAsync(new GovernanceEventsCausedByQuery { CausationId = CausationId, Take = 10 });
+
+        Assert.AreEqual(2, summaries.Count);
+        Assert.IsTrue(summaries.All(summary => summary.CausationId == CausationId));
+        AssertOrderedDescending(summaries);
+        AssertSummaryDoesNotExposePayload();
+    }
+
+    [TestMethod]
+    public async Task GovernanceEventStore_RejectsInvalidAppendAndReadQueries()
+    {
+        var appendCases = new Dictionary<string, Func<Task>>
+        {
+            [GovernanceEventValidator.ProjectIdRequired] = () => _store.AppendAsync(ValidRequest() with { ProjectId = Guid.Empty }),
+            [GovernanceEventValidator.EventTypeRequired] = () => _store.AppendAsync(ValidRequest() with { EventType = " " }),
+            [GovernanceEventValidator.ActorTypeRequired] = () => _store.AppendAsync(ValidRequest() with { ActorType = " " }),
+            [GovernanceEventValidator.ActorIdRequired] = () => _store.AppendAsync(ValidRequest() with { ActorId = " " }),
+            [GovernanceEventValidator.PayloadVersionInvalid] = () => _store.AppendAsync(ValidRequest() with { PayloadVersion = 0 }),
+            [GovernanceEventValidator.PayloadJsonRequired] = () => _store.AppendAsync(ValidRequest() with { PayloadJson = " " }),
+            [GovernanceEventValidator.PayloadJsonInvalid] = () => _store.AppendAsync(ValidRequest() with { PayloadJson = "{not-json" }),
+            [GovernanceEventValidator.PayloadTextUnsafe] = () => _store.AppendAsync(ValidRequest() with { PayloadJson = "{\"rawPrompt\":\"do not store\"}" })
         };
 
-        foreach (var pair in cases)
-            await ExpectArgumentExceptionAsync(pair.Key, () => _store.AppendAsync(pair.Value));
+        foreach (var pair in appendCases)
+            await ExpectArgumentExceptionAsync(pair.Key, pair.Value);
+
+        var queryCases = new Dictionary<string, Func<Task>>
+        {
+            [GovernanceEventValidator.ProjectIdRequired] = () => _store.ListForProjectAsync(new GovernanceEventsForProjectQuery { ProjectId = Guid.Empty }),
+            [GovernanceEventValidator.TakeInvalid] = () => _store.ListForProjectAsync(new GovernanceEventsForProjectQuery { ProjectId = ProjectId, Take = 0 }),
+            [GovernanceEventValidator.TakeInvalid + " max"] = () => _store.ListForProjectAsync(new GovernanceEventsForProjectQuery { ProjectId = ProjectId, Take = GovernanceEventValidator.MaxTake + 1 }),
+            [GovernanceEventValidator.CorrelationIdRequired] = () => _store.ListForCorrelationAsync(new GovernanceEventsForCorrelationQuery { CorrelationId = Guid.Empty }),
+            [GovernanceEventValidator.SubjectTypeRequired] = () => _store.ListForSubjectAsync(new GovernanceEventsForSubjectQuery { ProjectId = ProjectId, SubjectType = " ", SubjectId = "subject" }),
+            [GovernanceEventValidator.SubjectIdRequired] = () => _store.ListForSubjectAsync(new GovernanceEventsForSubjectQuery { ProjectId = ProjectId, SubjectType = "subject", SubjectId = " " }),
+            [GovernanceEventValidator.CausationIdRequired] = () => _store.ListCausedByAsync(new GovernanceEventsCausedByQuery { CausationId = Guid.Empty })
+        };
+
+        foreach (var pair in queryCases)
+            await ExpectArgumentExceptionAsync(pair.Key.Replace(" max", string.Empty, StringComparison.Ordinal), pair.Value);
     }
 
     [TestMethod]
@@ -191,13 +281,18 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
     }
 
     [TestMethod]
-    public async Task GovernanceEventCreation_DoesNotCreateAuthorityAdjacentRecords()
+    public async Task GovernanceEventReadModels_DoNotCreateAuthorityAdjacentRecords()
     {
         var beforeTables = await ExistingTablesAsync();
         var appended = await _store.AppendAsync(ValidRequest());
-        var afterTables = await ExistingTablesAsync();
 
-        Assert.AreNotEqual(Guid.Empty, appended.EventId);
+        _ = await _store.GetAsync(appended.EventId);
+        _ = await _store.ListForProjectAsync(new GovernanceEventsForProjectQuery { ProjectId = ProjectId });
+        _ = await _store.ListForCorrelationAsync(new GovernanceEventsForCorrelationQuery { CorrelationId = CorrelationId });
+        _ = await _store.ListForSubjectAsync(new GovernanceEventsForSubjectQuery { ProjectId = ProjectId, SubjectType = "tool_request", SubjectId = "tool-request-1" });
+        _ = await _store.ListCausedByAsync(new GovernanceEventsCausedByQuery { CausationId = CausationId });
+
+        var afterTables = await ExistingTablesAsync();
         CollectionAssert.AreEquivalent(beforeTables, afterTables);
         Assert.IsFalse(afterTables.Contains("governance.ToolRequest", StringComparer.OrdinalIgnoreCase));
         Assert.IsFalse(afterTables.Contains("governance.ToolGateDecision", StringComparer.OrdinalIgnoreCase));
@@ -221,6 +316,8 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
         StringAssert.Contains(storeText, "CommandType.StoredProcedure");
         StringAssert.Contains(migrationText, "CREATE TRIGGER governance.TR_GovernanceEvent_BlockUpdateDelete");
         StringAssert.Contains(migrationText, "DENY INSERT, UPDATE, DELETE ON OBJECT::governance.GovernanceEvent");
+        StringAssert.Contains(migrationText, "ListGovernanceEventsForSubject");
+        StringAssert.Contains(migrationText, "ListGovernanceEventsCausedBy");
 
         AssertNoForbiddenTokens(storeText, "UPDATE governance.GovernanceEvent", "DELETE FROM governance.GovernanceEvent", "MERGE governance.GovernanceEvent", "IWorkflow", "LangGraph", "IAgentHandoff", "PromoteCollectiveMemory", "SourceApply", "ControllerBase", "WebApplication", "IHostedService", "BackgroundService", "ProcessStartInfo", "File.Copy", "File.Delete");
         AssertNoForbiddenTokens(coreText, "SqlConnection", "Dapper", "IWorkflow", "LangGraph", "IAgentHandoff", "PromoteCollectiveMemory", "SourceApply", "ControllerBase", "HttpClient", "ProcessStartInfo", "File.Copy", "File.Delete");
@@ -340,6 +437,10 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
                 DROP PROCEDURE governance.ListGovernanceEventsForProject;
             IF OBJECT_ID(N'governance.ListGovernanceEventsForCorrelation', N'P') IS NOT NULL
                 DROP PROCEDURE governance.ListGovernanceEventsForCorrelation;
+            IF OBJECT_ID(N'governance.ListGovernanceEventsForSubject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.ListGovernanceEventsForSubject;
+            IF OBJECT_ID(N'governance.ListGovernanceEventsCausedBy', N'P') IS NOT NULL
+                DROP PROCEDURE governance.ListGovernanceEventsCausedBy;
             IF OBJECT_ID(N'governance.GovernanceEvent', N'U') IS NOT NULL
                 DROP TABLE governance.GovernanceEvent;
             IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'IronDevGovernanceEventRuntimeRole' AND type = N'R')
@@ -350,10 +451,29 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
     }
 
     private static IReadOnlyList<string> SplitSqlBatches(string sql) =>
-        sql.Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Split("\nGO\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        System.Text.RegularExpressions.Regex.Split(
+                sql.Replace("\r\n", "\n", StringComparison.Ordinal),
+                @"(?im)^\s*GO\s*$")
+            .Select(batch => batch.Trim())
             .Where(batch => !string.IsNullOrWhiteSpace(batch))
             .ToArray();
+
+    private static void AssertOrderedDescending(IReadOnlyList<GovernanceEventSummary> summaries)
+    {
+        var expected = summaries
+            .OrderByDescending(summary => summary.CreatedUtc)
+            .ThenByDescending(summary => summary.EventId)
+            .Select(summary => summary.EventId)
+            .ToArray();
+        var actual = summaries.Select(summary => summary.EventId).ToArray();
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    private static void AssertSummaryDoesNotExposePayload()
+    {
+        var properties = typeof(GovernanceEventSummary).GetProperties().Select(property => property.Name).ToArray();
+        Assert.IsFalse(properties.Contains("PayloadJson"));
+    }
 
     private static void AssertNoForbiddenNames(IReadOnlyCollection<string> values, params string[] forbidden)
     {

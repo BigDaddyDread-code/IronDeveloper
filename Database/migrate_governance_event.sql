@@ -1,4 +1,4 @@
-﻿IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'governance')
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'governance')
 BEGIN
     EXEC(N'CREATE SCHEMA governance');
 END;
@@ -154,15 +154,28 @@ GO
 
 CREATE OR ALTER PROCEDURE governance.ListGovernanceEventsForProject
     @ProjectId UNIQUEIDENTIFIER,
-    @Take INT = 100
+    @Take INT = 100,
+    @BeforeCreatedUtc DATETIMEOFFSET(7) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT TOP (CASE WHEN @Take < 1 THEN 1 WHEN @Take > 500 THEN 500 ELSE @Take END) *
+    SELECT TOP (CASE WHEN @Take < 1 THEN 1 WHEN @Take > 500 THEN 500 ELSE @Take END)
+        EventId,
+        ProjectId,
+        EventType,
+        ActorType,
+        ActorId,
+        CorrelationId,
+        CausationId,
+        SubjectType,
+        SubjectId,
+        PayloadVersion,
+        CreatedUtc
     FROM governance.GovernanceEvent
     WHERE ProjectId = @ProjectId
-    ORDER BY CreatedUtc ASC, EventId ASC;
+      AND (@BeforeCreatedUtc IS NULL OR CreatedUtc < @BeforeCreatedUtc)
+    ORDER BY CreatedUtc DESC, EventId DESC;
 END;
 GO
 
@@ -173,10 +186,75 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT TOP (CASE WHEN @Take < 1 THEN 1 WHEN @Take > 500 THEN 500 ELSE @Take END) *
+    SELECT TOP (CASE WHEN @Take < 1 THEN 1 WHEN @Take > 500 THEN 500 ELSE @Take END)
+        EventId,
+        ProjectId,
+        EventType,
+        ActorType,
+        ActorId,
+        CorrelationId,
+        CausationId,
+        SubjectType,
+        SubjectId,
+        PayloadVersion,
+        CreatedUtc
     FROM governance.GovernanceEvent
     WHERE CorrelationId = @CorrelationId
-    ORDER BY CreatedUtc ASC, EventId ASC;
+    ORDER BY CreatedUtc DESC, EventId DESC;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE governance.ListGovernanceEventsForSubject
+    @ProjectId UNIQUEIDENTIFIER,
+    @SubjectType NVARCHAR(120),
+    @SubjectId NVARCHAR(200),
+    @Take INT = 100
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP (CASE WHEN @Take < 1 THEN 1 WHEN @Take > 500 THEN 500 ELSE @Take END)
+        EventId,
+        ProjectId,
+        EventType,
+        ActorType,
+        ActorId,
+        CorrelationId,
+        CausationId,
+        SubjectType,
+        SubjectId,
+        PayloadVersion,
+        CreatedUtc
+    FROM governance.GovernanceEvent
+    WHERE ProjectId = @ProjectId
+      AND SubjectType = @SubjectType
+      AND SubjectId = @SubjectId
+    ORDER BY CreatedUtc DESC, EventId DESC;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE governance.ListGovernanceEventsCausedBy
+    @CausationId UNIQUEIDENTIFIER,
+    @Take INT = 100
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP (CASE WHEN @Take < 1 THEN 1 WHEN @Take > 500 THEN 500 ELSE @Take END)
+        EventId,
+        ProjectId,
+        EventType,
+        ActorType,
+        ActorId,
+        CorrelationId,
+        CausationId,
+        SubjectType,
+        SubjectId,
+        PayloadVersion,
+        CreatedUtc
+    FROM governance.GovernanceEvent
+    WHERE CausationId = @CausationId
+    ORDER BY CreatedUtc DESC, EventId DESC;
 END;
 GO
 
@@ -190,6 +268,8 @@ GRANT EXECUTE ON OBJECT::governance.AppendGovernanceEvent TO IronDevGovernanceEv
 GRANT EXECUTE ON OBJECT::governance.GetGovernanceEvent TO IronDevGovernanceEventRuntimeRole;
 GRANT EXECUTE ON OBJECT::governance.ListGovernanceEventsForProject TO IronDevGovernanceEventRuntimeRole;
 GRANT EXECUTE ON OBJECT::governance.ListGovernanceEventsForCorrelation TO IronDevGovernanceEventRuntimeRole;
+GRANT EXECUTE ON OBJECT::governance.ListGovernanceEventsForSubject TO IronDevGovernanceEventRuntimeRole;
+GRANT EXECUTE ON OBJECT::governance.ListGovernanceEventsCausedBy TO IronDevGovernanceEventRuntimeRole;
 GRANT SELECT ON OBJECT::governance.GovernanceEvent TO IronDevGovernanceEventRuntimeRole;
 DENY INSERT, UPDATE, DELETE ON OBJECT::governance.GovernanceEvent TO IronDevGovernanceEventRuntimeRole;
 DENY ALTER ON SCHEMA::governance TO IronDevGovernanceEventRuntimeRole;

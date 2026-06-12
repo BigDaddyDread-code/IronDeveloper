@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using Dapper;
 using IronDev.Core.Governance;
 using IronDev.Data;
@@ -11,6 +11,8 @@ public sealed class SqlGovernanceEventStore : IGovernanceEventStore
     private const string GetProcedure = "governance.GetGovernanceEvent";
     private const string ListForProjectProcedure = "governance.ListGovernanceEventsForProject";
     private const string ListForCorrelationProcedure = "governance.ListGovernanceEventsForCorrelation";
+    private const string ListForSubjectProcedure = "governance.ListGovernanceEventsForSubject";
+    private const string ListCausedByProcedure = "governance.ListGovernanceEventsCausedBy";
 
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly GovernanceEventValidator _validator;
@@ -32,9 +34,7 @@ public sealed class SqlGovernanceEventStore : IGovernanceEventStore
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var issues = _validator.ValidateAppend(request);
-        if (issues.Count > 0)
-            throw new ArgumentException(FormatIssues(issues), nameof(request));
+        ThrowIfInvalid(_validator.ValidateAppend(request), nameof(request));
 
         var normalized = _validator.Normalize(request);
         var eventId = Guid.NewGuid();
@@ -63,7 +63,7 @@ public sealed class SqlGovernanceEventStore : IGovernanceEventStore
         return row.ToEvent();
     }
 
-    public async Task<GovernanceEvent?> GetAsync(Guid eventId, CancellationToken cancellationToken = default)
+    public async Task<GovernanceEventReadModel?> GetAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
         if (eventId == Guid.Empty)
             return null;
@@ -76,45 +76,86 @@ public sealed class SqlGovernanceEventStore : IGovernanceEventStore
                 commandType: CommandType.StoredProcedure,
                 cancellationToken: cancellationToken));
 
-        return row?.ToEvent();
+        return row?.ToReadModel();
     }
 
-    public async Task<IReadOnlyList<GovernanceEvent>> ListForProjectAsync(
-        Guid projectId,
-        int take,
+    public async Task<IReadOnlyList<GovernanceEventSummary>> ListForProjectAsync(
+        GovernanceEventsForProjectQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (projectId == Guid.Empty)
-            return [];
+        ArgumentNullException.ThrowIfNull(query);
+        ThrowIfInvalid(_validator.ValidateProjectQuery(query), nameof(query));
 
         using var connection = _connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<GovernanceEventRow>(
+        var rows = await connection.QueryAsync<GovernanceEventSummaryRow>(
             new CommandDefinition(
                 ListForProjectProcedure,
-                new { ProjectId = projectId, Take = Math.Clamp(take, 1, 500) },
+                new { query.ProjectId, query.Take, query.BeforeCreatedUtc },
                 commandType: CommandType.StoredProcedure,
                 cancellationToken: cancellationToken));
 
-        return rows.Select(row => row.ToEvent()).ToArray();
+        return rows.Select(row => row.ToSummary()).ToArray();
     }
 
-    public async Task<IReadOnlyList<GovernanceEvent>> ListForCorrelationAsync(
-        Guid correlationId,
-        int take,
+    public async Task<IReadOnlyList<GovernanceEventSummary>> ListForCorrelationAsync(
+        GovernanceEventsForCorrelationQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (correlationId == Guid.Empty)
-            return [];
+        ArgumentNullException.ThrowIfNull(query);
+        ThrowIfInvalid(_validator.ValidateCorrelationQuery(query), nameof(query));
 
         using var connection = _connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<GovernanceEventRow>(
+        var rows = await connection.QueryAsync<GovernanceEventSummaryRow>(
             new CommandDefinition(
                 ListForCorrelationProcedure,
-                new { CorrelationId = correlationId, Take = Math.Clamp(take, 1, 500) },
+                new { query.CorrelationId, query.Take },
                 commandType: CommandType.StoredProcedure,
                 cancellationToken: cancellationToken));
 
-        return rows.Select(row => row.ToEvent()).ToArray();
+        return rows.Select(row => row.ToSummary()).ToArray();
+    }
+
+    public async Task<IReadOnlyList<GovernanceEventSummary>> ListForSubjectAsync(
+        GovernanceEventsForSubjectQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ThrowIfInvalid(_validator.ValidateSubjectQuery(query), nameof(query));
+        var normalized = _validator.Normalize(query);
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<GovernanceEventSummaryRow>(
+            new CommandDefinition(
+                ListForSubjectProcedure,
+                new { normalized.ProjectId, normalized.SubjectType, normalized.SubjectId, normalized.Take },
+                commandType: CommandType.StoredProcedure,
+                cancellationToken: cancellationToken));
+
+        return rows.Select(row => row.ToSummary()).ToArray();
+    }
+
+    public async Task<IReadOnlyList<GovernanceEventSummary>> ListCausedByAsync(
+        GovernanceEventsCausedByQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ThrowIfInvalid(_validator.ValidateCausedByQuery(query), nameof(query));
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<GovernanceEventSummaryRow>(
+            new CommandDefinition(
+                ListCausedByProcedure,
+                new { query.CausationId, query.Take },
+                commandType: CommandType.StoredProcedure,
+                cancellationToken: cancellationToken));
+
+        return rows.Select(row => row.ToSummary()).ToArray();
+    }
+
+    private static void ThrowIfInvalid(IReadOnlyList<GovernanceEventValidationIssue> issues, string paramName)
+    {
+        if (issues.Count > 0)
+            throw new ArgumentException(FormatIssues(issues), paramName);
     }
 
     private static string FormatIssues(IReadOnlyList<GovernanceEventValidationIssue> issues) =>
@@ -149,6 +190,54 @@ public sealed class SqlGovernanceEventStore : IGovernanceEventStore
                 SubjectId = SubjectId,
                 PayloadVersion = PayloadVersion,
                 PayloadJson = PayloadJson,
+                CreatedUtc = CreatedUtc
+            };
+
+        public GovernanceEventReadModel ToReadModel() =>
+            new()
+            {
+                EventId = EventId,
+                ProjectId = ProjectId,
+                EventType = EventType,
+                ActorType = ActorType,
+                ActorId = ActorId,
+                CorrelationId = CorrelationId,
+                CausationId = CausationId,
+                SubjectType = SubjectType,
+                SubjectId = SubjectId,
+                PayloadVersion = PayloadVersion,
+                PayloadJson = PayloadJson,
+                CreatedUtc = CreatedUtc
+            };
+    }
+
+    private sealed class GovernanceEventSummaryRow
+    {
+        public Guid EventId { get; init; }
+        public Guid ProjectId { get; init; }
+        public string EventType { get; init; } = string.Empty;
+        public string ActorType { get; init; } = string.Empty;
+        public string ActorId { get; init; } = string.Empty;
+        public Guid? CorrelationId { get; init; }
+        public Guid? CausationId { get; init; }
+        public string? SubjectType { get; init; }
+        public string? SubjectId { get; init; }
+        public int PayloadVersion { get; init; }
+        public DateTimeOffset CreatedUtc { get; init; }
+
+        public GovernanceEventSummary ToSummary() =>
+            new()
+            {
+                EventId = EventId,
+                ProjectId = ProjectId,
+                EventType = EventType,
+                ActorType = ActorType,
+                ActorId = ActorId,
+                CorrelationId = CorrelationId,
+                CausationId = CausationId,
+                SubjectType = SubjectType,
+                SubjectId = SubjectId,
+                PayloadVersion = PayloadVersion,
                 CreatedUtc = CreatedUtc
             };
     }
