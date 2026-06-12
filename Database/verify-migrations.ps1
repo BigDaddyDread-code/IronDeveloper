@@ -93,7 +93,21 @@ try {
             @{ Name = "ToolGateDecision no approval grant check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoApprovalGrant'" },
             @{ Name = "ToolGateDecision no execution grant check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoExecutionGrant'" },
             @{ Name = "ToolGateDecision no source mutation check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoSourceMutation'" },
-            @{ Name = "ToolGateDecision no memory promotion check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoMemoryPromotion'" }
+            @{ Name = "ToolGateDecision no memory promotion check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoMemoryPromotion'" },
+            @{ Name = "governance.ApprovalDecision table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.ApprovalDecision', N'U') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ApprovalDecision_Record procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ApprovalDecision_Record', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ApprovalDecision_GetById procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ApprovalDecision_GetById', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ApprovalDecision_ListForSubject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ApprovalDecision_ListForSubject', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ApprovalDecision_ListForProject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ApprovalDecision_ListForProject', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ApprovalDecision_ListForCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ApprovalDecision_ListForCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.TR_ApprovalDecision_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_ApprovalDecision_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.TR_ApprovalDecision_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_ApprovalDecision_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "FK_ApprovalDecision_GovernanceEvent"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND referenced_object_id = OBJECT_ID(N'governance.GovernanceEvent') AND name = N'FK_ApprovalDecision_GovernanceEvent'" },
+            @{ Name = "FK_ApprovalDecision_Supersedes"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND referenced_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND name = N'FK_ApprovalDecision_Supersedes'" },
+            @{ Name = "ApprovalDecision decision allowed check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND name = N'CK_ApprovalDecision_Decision_Allowed'" },
+            @{ Name = "ApprovalDecision decision not execution check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND name = N'CK_ApprovalDecision_Decision_NotExecution'" },
+            @{ Name = "ApprovalDecision evidence JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND name = N'CK_ApprovalDecision_EvidenceJson_IsJson'" },
+            @{ Name = "ApprovalDecision evidence JSON versioned check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ApprovalDecision') AND name = N'CK_ApprovalDecision_EvidenceJson_Versioned'" }
         )
 
         foreach ($check in $checks) {

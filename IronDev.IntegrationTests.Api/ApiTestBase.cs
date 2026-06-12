@@ -255,6 +255,7 @@ public abstract class ApiTestBase
         
         // 1. Wipe domain data
         await conn.ExecuteAsync("""
+            IF OBJECT_ID('governance.ApprovalDecision', 'U') IS NOT NULL TRUNCATE TABLE governance.ApprovalDecision;
             IF OBJECT_ID('governance.ToolGateDecision', 'U') IS NOT NULL TRUNCATE TABLE governance.ToolGateDecision;
             IF OBJECT_ID('governance.ToolRequest', 'U') IS NOT NULL DELETE FROM governance.ToolRequest;
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;

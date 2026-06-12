@@ -50,4 +50,4 @@ PR 74a does not remove older non-Block-G runtime DDL debt. Those legacy exceptio
 
 ## Non-goals
 
-This is not a migration framework rewrite. It does not add gate decisions, approval decisions, policy decisions, dogfood receipt durability, workflow, A2A, LangGraph, source apply, memory promotion, UI, API expansion, or CLI expansion.
+This is not a migration framework rewrite. It does not add policy decisions, dogfood receipt durability, workflow, A2A, LangGraph, source apply, memory promotion, UI, API expansion, or CLI expansion.

@@ -14,6 +14,11 @@
                            "id":  "2026-06-block-g-tool-gate-decision",
                            "path":  "Database/migrate_tool_gate_decision.sql",
                            "description":  "Creates durable ToolGateDecision table and stored procedures linked to ToolRequest and GovernanceEvent."
+                       },
+                       {
+                           "id":  "2026-06-block-g-approval-decision",
+                           "path":  "Database/migrate_approval_decision.sql",
+                           "description":  "Creates durable ApprovalDecision table and stored procedures linked to GovernanceEvent with scoped approval subjects."
                        }
                    ]
 }

@@ -46,6 +46,6 @@ The API/CLI contract suite treats these phrases as boundary anchors:
 
 ## Freeze Notes
 
-The matrix records durable SQL-backed tool requests and durable SQL-backed tool gate decisions plus temporary non-durable API-local inspection caches for dogfood loops.
+The matrix records durable SQL-backed tool requests, durable SQL-backed tool gate decisions, and durable SQL-backed approval decisions plus temporary non-durable API-local inspection caches for dogfood loops. Approval decisions have no API/CLI surface in Block F.
 
 Those caches are not SQL source of truth, not approval, not execution permission, not audit authority, not source apply evidence, and not memory promotion evidence.

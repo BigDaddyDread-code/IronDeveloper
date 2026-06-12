@@ -128,4 +128,4 @@ Forbidden without a later migration-ownership PR:
 
 ## 5. Candidates to move behind stored procedures
 
-Candidates remain the previously documented runtime DDL/bootstrap areas plus any future durable governance stores added after Block G. Current Block G governance/tool-request/tool-gate-decision writes already use stored procedures and are not candidates for inline SQL expansion.
+Candidates remain the previously documented runtime DDL/bootstrap areas plus any future durable governance stores added after Block G. Current Block G governance/tool-request/tool-gate-decision/approval-decision writes already use stored procedures and are not candidates for inline SQL expansion.

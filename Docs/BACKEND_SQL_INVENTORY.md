@@ -164,8 +164,8 @@ No schema, stored procedure shape, API, CLI, UI, runtime behavior, persistence b
 ## 1. Summary
 
 - `Database/sql-inventory.json` is the machine-readable retrospective inventory.
-- `Database/migrations.json` currently applies only the Block G governance event and durable tool request migrations.
-- `Database/verify-migrations.ps1` currently verifies the Block G governance, tool-request, and tool-gate-decision objects and constraints.
+- `Database/migrations.json` currently applies the Block G governance event, durable tool request, durable tool gate decision, and durable approval decision migrations.
+- `Database/verify-migrations.ps1` currently verifies the Block G governance, tool-request, tool-gate-decision, and approval-decision objects and constraints.
 - Older runtime SQL remains inventoried as required runtime schema, but mostly `appliedByManifest: false` and `verifiedByScript: false`.
 - Existing runtime DDL candidates remain explicit migration-discipline debt; they are not fixed in this PR.
 
@@ -178,6 +178,7 @@ Current manifest-covered runtime schema:
 | `Database/migrate_governance_event.sql` | governance | Yes | Yes | Creates `governance.GovernanceEvent` and governance event procedures. |
 | `Database/migrate_tool_request.sql` | tool-request | Yes | Yes | Creates `governance.ToolRequest`, tool request procedures, and `FK_ToolRequest_GovernanceEvent`. |
 | `Database/migrate_tool_gate_decision.sql` | tool-gate-decision | Yes | Yes | Creates `governance.ToolGateDecision`, gate decision procedures, `FK_ToolGateDecision_ToolRequest`, and `FK_ToolGateDecision_GovernanceEvent`. |
+| `Database/migrate_approval_decision.sql` | approval-decision | Yes | Yes | Creates `governance.ApprovalDecision`, approval decision procedures, `FK_ApprovalDecision_GovernanceEvent`, `FK_ApprovalDecision_Supersedes`, and SQL insert validation for sensitive human-only scopes plus private-reasoning evidence rejection. |
 
 Runtime schema not yet covered by the current PR74a manifest includes agent memory, agent run audit, collective memory, tool execution audit, project documents, project profiles, chat, ticket, code indexing, project context, and decision lookup migrations. Those are intentionally listed in `Database/sql-inventory.json` as required runtime schema with manifest/verify coverage set to false unless currently proven.
 
@@ -204,7 +205,7 @@ Older stored procedure surfaces remain inventoried, including `agent.usp_*`, col
 
 Runtime inline SQL remains present in application services such as project, ticket, project memory/context, project document, semantic memory, and legacy run stores. These are required runtime queries or legacy bootstrap DDL candidates and are separately documented in `Docs/BACKEND_INLINE_SQL_INVENTORY.md`.
 
-The new Block G governance/tool-request/tool-gate-decision stores use stored procedures for governed writes/reads and do not create schema at runtime.
+The new Block G governance/tool-request/tool-gate-decision/approval-decision stores use stored procedures for governed writes/reads and do not create schema at runtime.
 
 ## 5. Required test SQL
 
@@ -233,7 +234,7 @@ Candidate areas:
 
 ## 9. Known gaps
 
-- The current ordered manifest is intentionally narrow and covers PR72/73/74/75 Block G governance/tool-request/tool-gate-decision migrations.
+- The current ordered manifest is intentionally narrow and covers PR72/73/74/75/76 Block G governance/tool-request/tool-gate-decision/approval-decision migrations.
 - Older active SQL still needs migration-ownership decisions.
 - Runtime DDL candidates remain explicit debt.
 - This PR does not prove real DB API smoke behavior; PR74c remains necessary.
