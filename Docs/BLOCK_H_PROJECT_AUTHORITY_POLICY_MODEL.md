@@ -68,3 +68,21 @@ PR84 does not write SQL, call agents, call models, create A2A handoffs, mutate s
 Missing policy or rules fail closed. Invalid policy or rules fail closed. Sensitive scopes require human approval. Experimental autonomy does not bypass sensitive approval.
 
 The evaluator answers only what approval is required. It does not grant approval, satisfy policy, or allow execution.
+
+## PR85 Approval Package Model
+
+PR85 adds a review package model.
+
+Approval packages gather requirements and evidence for review.
+Approval packages do not approve anything.
+Approval packages do not check approval decisions.
+Approval packages do not satisfy policy.
+Approval packages do not execute tools.
+Approval packages do not mutate source.
+Approval packages do not promote memory.
+Approval packages do not continue workflow.
+Approval packages do not expose API or CLI endpoints.
+
+ReadyForReview means ready for human review, not approved.
+
+Approval package evidence remains supporting material only. Requirement entries preserve evaluator output without satisfying those requirements. All authority flags remain false.
