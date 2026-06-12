@@ -122,3 +122,19 @@ Sensitive scopes always require human approval across all profiles:
 Experimental may relax only non-sensitive scopes. Experimental does not bypass human approval for sensitive scopes.
 
 Missing policy or rules still fail closed. Profiles are starter templates for explicit later setup, not hidden defaults.
+
+
+## PR87 Missing Policy Fails Closed Tests
+
+PR87 proves missing policy and missing approval rules fail closed.
+No active policy is not permission.
+No matching rule is not permission.
+Draft policies are not active policies.
+Retired and superseded policies are not active policies.
+Profile templates are not active policies.
+Generated profile policies and rules remain draft until an explicit later setup path makes them active.
+Experimental is not permission.
+ReadyForReview approval packages do not override missing policy.
+Sensitive scopes require explicit human approval rules.
+
+PR87 is tests and documentation only. It adds no SQL, API, CLI, runtime wiring, workflow runner, A2A handoff, source apply, memory promotion, release approval, execution engine, or policy activation path.
