@@ -79,7 +79,21 @@ try {
             @{ Name = "GovernanceEvent payload JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.GovernanceEvent') AND name = N'CK_GovernanceEvent_PayloadJson_IsJson'" },
             @{ Name = "GovernanceEvent payload version check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.GovernanceEvent') AND name = N'CK_GovernanceEvent_PayloadVersion_Positive'" },
             @{ Name = "ToolRequest payload JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolRequest') AND name = N'CK_ToolRequest_RequestPayloadJson_IsJson'" },
-            @{ Name = "ToolRequest payload version check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolRequest') AND name = N'CK_ToolRequest_RequestPayloadVersion_Positive'" }
+            @{ Name = "ToolRequest payload version check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolRequest') AND name = N'CK_ToolRequest_RequestPayloadVersion_Positive'" },
+            @{ Name = "governance.ToolGateDecision table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.ToolGateDecision', N'U') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ToolGateDecision_Record procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ToolGateDecision_Record', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ToolGateDecision_GetById procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ToolGateDecision_GetById', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ToolGateDecision_ListForToolRequest procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ToolGateDecision_ListForToolRequest', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ToolGateDecision_ListForProject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ToolGateDecision_ListForProject', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.usp_ToolGateDecision_ListForCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_ToolGateDecision_ListForCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "governance.TR_ToolGateDecision_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_ToolGateDecision_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" },
+            @{ Name = "FK_ToolGateDecision_ToolRequest"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND referenced_object_id = OBJECT_ID(N'governance.ToolRequest') AND name = N'FK_ToolGateDecision_ToolRequest'" },
+            @{ Name = "FK_ToolGateDecision_GovernanceEvent"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND referenced_object_id = OBJECT_ID(N'governance.GovernanceEvent') AND name = N'FK_ToolGateDecision_GovernanceEvent'" },
+            @{ Name = "ToolGateDecision evidence JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_EvidenceJson_IsJson'" },
+            @{ Name = "ToolGateDecision no approval grant check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoApprovalGrant'" },
+            @{ Name = "ToolGateDecision no execution grant check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoExecutionGrant'" },
+            @{ Name = "ToolGateDecision no source mutation check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoSourceMutation'" },
+            @{ Name = "ToolGateDecision no memory promotion check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ToolGateDecision') AND name = N'CK_ToolGateDecision_NoMemoryPromotion'" }
         )
 
         foreach ($check in $checks) {

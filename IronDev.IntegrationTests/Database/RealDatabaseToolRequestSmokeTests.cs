@@ -41,7 +41,6 @@ public sealed class RealDatabaseToolRequestSmokeTests
 
         foreach (var expected in new[]
                  {
-                     "governance.ToolGateDecision",
                      "governance.ApprovalDecision",
                      "governance.PolicyDecision",
                      "governance.DogfoodReceipt",
@@ -57,6 +56,7 @@ public sealed class RealDatabaseToolRequestSmokeTests
         }
 
         StringAssert.Contains(text, "gateDecisionCreated = $false");
+        StringAssert.Contains(text, "Assert-NoRowsIfObjectExists");
         StringAssert.Contains(text, "approvalDecisionCreated = $false");
         StringAssert.Contains(text, "dogfoodReceiptCreated = $false");
         StringAssert.Contains(text, "workflowStateCreated = $false");

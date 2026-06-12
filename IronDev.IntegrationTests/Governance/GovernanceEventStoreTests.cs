@@ -441,6 +441,21 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
                 DROP PROCEDURE governance.ListGovernanceEventsForSubject;
             IF OBJECT_ID(N'governance.ListGovernanceEventsCausedBy', N'P') IS NOT NULL
                 DROP PROCEDURE governance.ListGovernanceEventsCausedBy;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_Record', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_Record;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_GetById', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_GetById;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForToolRequest', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_ListForToolRequest;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForProject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_ListForProject;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForCorrelation', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolGateDecision_ListForCorrelation;
+            IF OBJECT_ID(N'governance.TR_ToolGateDecision_BlockUpdateDelete', N'TR') IS NOT NULL
+                DROP TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete;
+            IF OBJECT_ID(N'governance.ToolGateDecision', N'U') IS NOT NULL
+                DROP TABLE governance.ToolGateDecision;
+
             IF OBJECT_ID(N'governance.usp_ToolRequest_Create', N'P') IS NOT NULL
                 DROP PROCEDURE governance.usp_ToolRequest_Create;
             IF OBJECT_ID(N'governance.usp_ToolRequest_GetById', N'P') IS NOT NULL

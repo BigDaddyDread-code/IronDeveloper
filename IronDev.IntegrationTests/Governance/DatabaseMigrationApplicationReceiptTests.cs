@@ -21,11 +21,13 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(2, migrations.Length);
+        Assert.AreEqual(3, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_tool_request.sql", migrations[1].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-g-tool-gate-decision", migrations[2].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_tool_gate_decision.sql", migrations[2].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {
@@ -194,6 +196,13 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_Record', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolGateDecision_Record;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_GetById', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolGateDecision_GetById;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForToolRequest', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolGateDecision_ListForToolRequest;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForProject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolGateDecision_ListForProject;
+            IF OBJECT_ID(N'governance.usp_ToolGateDecision_ListForCorrelation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolGateDecision_ListForCorrelation;
+            IF OBJECT_ID(N'governance.TR_ToolGateDecision_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete;
+            IF OBJECT_ID(N'governance.ToolGateDecision', N'U') IS NOT NULL DROP TABLE governance.ToolGateDecision;
             IF OBJECT_ID(N'governance.usp_ToolRequest_Create', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolRequest_Create;
             IF OBJECT_ID(N'governance.usp_ToolRequest_GetById', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolRequest_GetById;
             IF OBJECT_ID(N'governance.usp_ToolRequest_ListForProject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ToolRequest_ListForProject;

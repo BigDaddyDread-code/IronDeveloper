@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -339,9 +338,9 @@ public sealed class ToolGatesV1Controller : ControllerBase
             RequiresDryRun = RequiresDryRun(preview),
             RequiresGovernanceGate = RequiresGovernanceGate(preview),
             RequiresSeparateExecutor = decision.RequiresExecutor,
-            Durable = false,
+            Durable = true,
             RequestDurable = true,
-            GateDecisionDurable = false,
+            GateDecisionDurable = true,
             EvaluatedAtUtc = decision.EvaluatedAtUtc,
             Warnings = SafeWarnings(preview)
         };
@@ -369,9 +368,9 @@ public sealed class ToolGatesV1Controller : ControllerBase
             RequiresDryRun = response.RequiresDryRun,
             RequiresGovernanceGate = response.RequiresGovernanceGate,
             RequiresSeparateExecutor = response.RequiresSeparateExecutor,
-            Durable = false,
+            Durable = true,
             RequestDurable = true,
-            GateDecisionDurable = false,
+            GateDecisionDurable = true,
             EvaluatedAtUtc = response.EvaluatedAtUtc,
             Warnings = response.Warnings
         };
@@ -509,8 +508,8 @@ public sealed class ToolGatesV1Controller : ControllerBase
     [
         "Tool Gate API v1 evaluates or inspects gate decisions only.",
         "Gate is not executor; gate decision is not approval; gate pass is not human approval.",
-        "Tool Gate API v1 uses a non-durable API-local preview cache; SQL-backed durable gate decision storage is not provided by this endpoint.",
-        "Tool requests read by this endpoint are durable SQL-backed request records; gate decisions remain non-durable API-local previews until a durable gate store exists.",
+        "Tool Gate API v1 records durable SQL-backed gate decision evidence; this evidence is not approval, execution permission, source apply, or memory promotion.",
+        "Tool requests and gate decisions read by this endpoint are durable SQL-backed records; the gate remains separate from execution and approval.",
         "A separate executor path is required before any requested tool can run.",
         "Human review remains required for source apply and memory promotion."
     ];
@@ -556,9 +555,9 @@ public sealed class ToolGatesV1Controller : ControllerBase
             ModelOutputIsAuthority = false,
             EndpointAccessIsExecutionPermission = false,
             ApiResponseStatusIsGovernance = false,
-            Durable = false,
+            Durable = true,
             RequestDurable = true,
-            GateDecisionDurable = false,
+            GateDecisionDurable = true,
             HumanReviewRequiredForSourceApply = true,
             HumanReviewRequiredForMemoryPromotion = true
         };
@@ -607,29 +606,6 @@ public interface IToolGateApiStore
     ToolGateApiStoredDecision? Get(string tenantId, string projectId, string gateDecisionId);
 
     int Count();
-}
-
-public sealed class InMemoryToolGateApiStore : IToolGateApiStore
-{
-    private readonly ConcurrentDictionary<string, ToolGateApiStoredDecision> _decisions = new(StringComparer.Ordinal);
-
-    public ToolGateApiStoreSaveResult Save(ToolGateApiStoredDecision decision)
-    {
-        var key = Key(decision.TenantId, decision.ProjectId, decision.Decision.GateDecisionId);
-        var created = _decisions.TryAdd(key, decision);
-        return new ToolGateApiStoreSaveResult { Created = created };
-    }
-
-    public ToolGateApiStoredDecision? Get(string tenantId, string projectId, string gateDecisionId)
-    {
-        _decisions.TryGetValue(Key(tenantId, projectId, gateDecisionId), out var decision);
-        return decision;
-    }
-
-    public int Count() => _decisions.Count;
-
-    private static string Key(string tenantId, string projectId, string gateDecisionId) =>
-        $"{tenantId}::{projectId}::{gateDecisionId}";
 }
 
 public sealed record ToolGateApiStoreSaveResult

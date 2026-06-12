@@ -233,7 +233,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
         Assert.IsTrue(json.RootElement.GetProperty("data").GetProperty("containsNonDurableReferences").GetBoolean());
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
-            warning.GetString()?.Contains("PR61 tool request and PR62 gate preview references are non-durable", StringComparison.OrdinalIgnoreCase) == true));
+            warning.GetString()?.Contains("PR61/74 tool request and PR62/75 gate decision references are durable SQL-backed", StringComparison.OrdinalIgnoreCase) == true));
         AssertNoMisleadingAuthorityLanguage(text);
     }
 
@@ -435,8 +435,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
             "gateIsExecutor\":true",
             "apiResponseStatusIsGovernance\":true",
             "endpointAccessIsExecutionPermission\":true",
-            "modelOutputIsAuthority\":true",
-            "durable\":true"
+            "modelOutputIsAuthority\":true"
         };
 
         foreach (var token in forbidden)

@@ -115,7 +115,7 @@ This API operates on non-durable API-local receipt data and does not yet provide
 
 `durable` is always `false` in v1.
 
-Tool request records are durable SQL-backed data once the durable Tool Request Store has landed; PR62 gate preview records remain non-durable API-local data unless a durable SQL Tool Gate Decision Store is added later.
+Tool request records and PR75 gate decision records are durable SQL-backed data. Dogfood loop receipts remain non-durable API-local data unless a durable SQL Dogfood Loop Store is added later.
 
 References to non-durable gate decisions are labelled non-durable and must not be treated as durable backend evidence, approval, execution permission, or release evidence by themselves.
 
@@ -142,9 +142,9 @@ PR56 froze the backend contract with known broad-lane exceptions.
 
 PR61 Tool Request API v1 uses durable SQL-backed tool request records once the durable Tool Request Store has landed.
 
-PR62 Tool Gate API v1 currently uses a non-durable API-local gate preview cache.
+PR62/75 Tool Gate API v1 records durable SQL-backed gate decision evidence.
 
-PR63 preserves the remaining gate limitation. It does not claim durable backend evidence for PR62 gate references.
+PR63 preserves the remaining dogfood-loop durability limitation. It references durable PR75 gate decision evidence but does not make the dogfood loop receipt durable backend evidence.
 
 ## Examples
 

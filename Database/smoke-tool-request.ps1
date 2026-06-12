@@ -103,6 +103,27 @@ function Assert-ObjectAbsent {
     Write-Host "Verified no side-effect table $Name"
 }
 
+function Assert-NoRowsIfObjectExists {
+    param(
+        [Parameter(Mandatory = $true)][System.Data.SqlClient.SqlConnection]$Connection,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Sql
+    )
+
+    $existsSql = "SELECT CASE WHEN OBJECT_ID(N'$Name', N'U') IS NULL THEN 0 ELSE 1 END"
+    $exists = [int](Invoke-Scalar -Connection $Connection -Sql $existsSql)
+    if ($exists -eq 0) {
+        Write-Host "Verified optional table absent $Name"
+        return
+    }
+
+    $count = [int](Invoke-Scalar -Connection $Connection -Sql $Sql)
+    if ($count -ne 0) {
+        throw "Unexpected side-effect rows exist during PR74C smoke: $Name"
+    }
+
+    Write-Host "Verified no side-effect rows in $Name"
+}
 function Invoke-ToolRequestCreate {
     param(
         [Parameter(Mandatory = $true)][System.Data.SqlClient.SqlConnection]$Connection,
@@ -288,7 +309,6 @@ try {
         Assert-Exists -Connection $connection -Name "linked tool.request.created governance event" -Sql "SELECT COUNT(*) FROM governance.GovernanceEvent WHERE EventId = '$governanceEventId' AND EventType = N'tool.request.created' AND SubjectType = N'tool_request' AND SubjectId = N'$toolRequestId'"
 
         $forbiddenSideEffectTables = @(
-            "governance.ToolGateDecision",
             "governance.ApprovalDecision",
             "governance.PolicyDecision",
             "governance.DogfoodReceipt",
@@ -303,6 +323,8 @@ try {
         foreach ($table in $forbiddenSideEffectTables) {
             Assert-ObjectAbsent -Connection $connection -Name $table
         }
+
+        Assert-NoRowsIfObjectExists -Connection $connection -Name "governance.ToolGateDecision" -Sql "SELECT COUNT(*) FROM governance.ToolGateDecision WHERE ToolRequestId = '$toolRequestId'"
 
         $summary = [ordered]@{
             database = if ([string]::IsNullOrWhiteSpace($Database)) { "connection-string-database" } else { $Database }

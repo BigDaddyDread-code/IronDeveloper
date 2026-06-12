@@ -12,6 +12,7 @@ Current Block G order:
 
 1. `Database/migrate_governance_event.sql`
 2. `Database/migrate_tool_request.sql`
+3. `Database/migrate_tool_gate_decision.sql`
 
 The order matters because `governance.ToolRequest` depends on `governance.GovernanceEvent`.
 
@@ -43,9 +44,9 @@ The verifier checks the governance schema, governance event table/procedures/tri
 
 ## Runtime DDL boundary
 
-Runtime services may call stored procedures. They must not create the governance schema or governance/tool-request tables on startup.
+Runtime services may call stored procedures. They must not create the governance schema or governance/tool-request/tool-gate-decision tables on startup.
 
-PR 74a does not remove older non-Block-G runtime DDL debt. Those legacy exceptions remain documented cleanup debt; this receipt only prevents the new governance/tool-request path from relying on hidden runtime schema creation.
+PR 74a does not remove older non-Block-G runtime DDL debt. Those legacy exceptions remain documented cleanup debt; this receipt only prevents the new governance/tool-request/tool-gate-decision path from relying on hidden runtime schema creation.
 
 ## Non-goals
 

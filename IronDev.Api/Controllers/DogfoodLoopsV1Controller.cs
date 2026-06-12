@@ -284,7 +284,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
             ReferencedCriticReviews = request.CriticReviewRunIds.Select(id => Reference("critic_review", id, durable: false, "Caller-supplied critic review reference; not verified by Dogfood Loop API v1.")).ToArray(),
             ReferencedMemoryImprovements = request.MemoryImprovementRunIds.Select(id => Reference("memory_improvement", id, durable: false, "Caller-supplied memory-improvement reference; not verified by Dogfood Loop API v1.")).ToArray(),
             ReferencedToolRequests = request.ToolRequestIds.Select(id => Reference("tool_request_preview", id, durable: false, "PR61 tool request API records are non-durable API-local inspection cache entries.")).ToArray(),
-            ReferencedGateDecisions = request.ToolGateDecisionIds.Select(id => Reference("tool_gate_preview", id, durable: false, "PR62 tool gate API records are non-durable API-local preview cache entries.")).ToArray(),
+            ReferencedGateDecisions = request.ToolGateDecisionIds.Select(id => Reference("tool_gate_decision", id, durable: true, "PR75 tool gate API records are durable SQL-backed gate decision evidence.")).ToArray(),
             EvidenceRefs = evidenceRefs,
             Durable = false,
             ContainsNonDurableReferences = containsNonDurable,
@@ -513,7 +513,7 @@ public sealed class DogfoodLoopsV1Controller : ControllerBase
         "Dogfood loop is not autonomous workflow.",
         "Dogfood receipt is not tool execution, source apply, memory promotion, governance authority, or release readiness.",
         "This API uses non-durable API-local receipt data and does not provide SQL source-of-truth dogfood receipts.",
-        "PR61 tool request and PR62 gate preview references are non-durable API-local records until durable SQL stores exist.",
+        "PR61/74 tool request and PR62/75 gate decision references are durable SQL-backed records; dogfood loop receipts remain non-durable API-local records until a durable dogfood store exists.",
         "Human review remains required for source apply and memory promotion."
     ];
 

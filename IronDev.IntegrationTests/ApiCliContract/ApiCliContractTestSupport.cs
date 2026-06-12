@@ -242,18 +242,16 @@ internal static class ApiCliContractTestSupport
           "command": "tool-gate evaluate",
           "status": "blocked",
           "data": {
-            "durable": false,
-            "gateDecisionDurable": false,
+            "durable": true,
+            "gateDecisionDurable": true,
             "gateIsExecutor": false,
             "toolExecuted": false,
             "sourceApplied": false,
             "memoryPromoted": false
           },
-          "warnings": ["Gate evaluation is not execution.", "Tool execution is separate."],
+          "warnings": ["Gate decision evidence is durable SQL-backed.", "Gate evaluation is not execution.", "Tool execution is separate."],
           "errors": []
         }
         """;
     }
 }
-
-

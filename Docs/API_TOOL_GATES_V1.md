@@ -10,13 +10,13 @@ This API exposes the frozen `AgentToolExecutionGate` contract through HTTP. It d
 
 ### POST `/api/v1/tool-gates/evaluations`
 
-Evaluates a gate preview for a tool request currently available in the API-local PR61 request inspection cache.
+Evaluates and records durable gate decision evidence for a durable tool request.
 
 Request fields:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `projectId` | yes | Project scope for the request and gate preview. |
+| `projectId` | yes | Project scope for the request and gate decision evidence. |
 | `toolRequestId` | yes | Existing API-local tool request inspection ID. |
 | `evidenceRefs` | no | Caller-supplied evidence references for the preview. |
 | `correlationId` | no | Caller correlation ID. |
@@ -29,12 +29,12 @@ Rules:
 - Hidden chain-of-thought, raw prompts, raw completions, scratchpad text, system prompts, developer prompts, and private reasoning are rejected.
 - Secret-like request material is rejected.
 - Approval, execution, source apply, memory promotion, gate execution, audit approval, model authority, and external submission claims are rejected.
-- The endpoint may create a non-durable API-local gate preview record.
+- The endpoint records durable SQL-backed gate decision evidence.
 - The endpoint must not run the tool, approve the request, apply source, promote memory, append tool execution audit, or create governance authority.
 
 ### GET `/api/v1/tool-gates/evaluations/{gateDecisionId}?projectId={projectId}`
 
-Inspects an existing non-durable API-local gate preview.
+Inspects an existing durable SQL-backed gate decision evidence record.
 
 Rules:
 
@@ -42,7 +42,7 @@ Rules:
 - The endpoint is read-only.
 - Cross-project access returns not found.
 - Hidden/private gate or request text is redacted before response data is returned.
-- The response remains gate preview evidence, not approval, permission, execution, source apply, memory promotion, or governance.
+- The response remains gate decision evidence, not approval, permission, execution, source apply, memory promotion, or governance.
 
 ## Response shape
 
@@ -69,9 +69,9 @@ Both endpoints return:
     "modelOutputIsAuthority": false,
     "endpointAccessIsExecutionPermission": false,
     "apiResponseStatusIsGovernance": false,
-    "durable": false,
+    "durable": true,
     "requestDurable": true,
-    "gateDecisionDurable": false,
+    "gateDecisionDurable": true,
     "humanReviewRequiredForSourceApply": true,
     "humanReviewRequiredForMemoryPromotion": true
   },
@@ -82,7 +82,7 @@ Both endpoints return:
 }
 ```
 
-For `POST`, `mutationOccurred` may be `true` only for creating the non-durable API-local gate preview record. It does not mean a tool ran.
+For `POST`, `mutationOccurred` may be `true` only for creating the durable gate decision evidence record. It does not mean a tool ran.
 
 For `GET`, `mutationOccurred` is always `false`.
 
@@ -143,20 +143,19 @@ Validation failure is not a gate rejection. Gate block is not an internal error.
 
 ## Durability boundary
 
-This API reads durable SQL-backed tool request records and creates non-durable API-local gate previews. It does not yet provide durable SQL source-of-truth gate decisions.
+This API reads durable SQL-backed tool request records and records durable SQL-backed gate decision evidence. A gate decision is still not approval, execution permission, source apply, or memory promotion.
 
-The gate preview record is:
+The gate decision evidence record is:
 
-- non-durable
-- not SQL-backed
-- not visible across app instances
-- not durable across process restart
-- not part of durable evidence/audit history
+- SQL-backed
+- durable across process restart
+- linked to durable tool request evidence
+- linked to a governance event
 - not approval
 - not execution permission
 - not governance authority
-
-Durable SQL Tool Request plus Tool Gate Decision storage is required before gate decisions can become backend evidence.
+- not source apply
+- not memory promotion
 
 ## Hidden reasoning boundary
 
@@ -168,13 +167,13 @@ Stored unsafe request or gate text is redacted on readback.
 
 Tool request records are durable SQL-backed backend records.
 
-PR62 still provides a non-durable API-local gate preview over durable tool request records.
+PR75 moves Tool Gate API decisions to durable SQL-backed gate decision evidence over durable tool request records.
 
-PR62 does not satisfy durable SQL source-of-truth storage for gate decisions.
+PR75 satisfies durable SQL source-of-truth storage for gate decision evidence, while preserving the no-approval/no-execution boundary.
 
 ## Examples
 
-### Evaluate a gate preview
+### Evaluate gate decision evidence
 
 ```http
 POST /api/v1/tool-gates/evaluations
@@ -189,7 +188,7 @@ Content-Type: application/json
 }
 ```
 
-### Inspect a gate preview
+### Inspect gate decision evidence
 
 ```http
 GET /api/v1/tool-gates/evaluations/tool-gate-tool-request-42-workspacediff-diff-42?projectId=42
@@ -205,10 +204,8 @@ Tool Gate API v1 does not add:
 - memory promotion
 - tool execution audit append
 - tool execution
-- durable SQL-backed gate decision store
 - hidden workflow or scheduler
 - autonomous runner
 - GitHub submission
 - CLI or UI exposure
-- SQL schema or stored procedure shape changes
 - vector/index behavior changes

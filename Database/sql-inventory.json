@@ -531,6 +531,34 @@
                         "notes":  "Block G durable tool request migration; manifest-applied and verifier-checked."
                     },
                     {
+                        "id":  "database.migrate-tool-gate-decision",
+                        "path":  "Database/migrate_tool_gate_decision.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "tool-gate-decision",
+                        "objectsCreated":  [
+                                               "governance.ToolGateDecision",
+                                               "governance.TR_ToolGateDecision_BlockUpdateDelete",
+                                               "governance.usp_ToolGateDecision_Record",
+                                               "governance.usp_ToolGateDecision_GetById",
+                                               "governance.usp_ToolGateDecision_ListForToolRequest",
+                                               "governance.usp_ToolGateDecision_ListForProject",
+                                               "governance.usp_ToolGateDecision_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.ToolRequest",
+                                              "governance.GovernanceEvent"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlToolGateDecisionStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G durable tool gate decision migration. Gate decision evidence is not approval, execution permission, source apply, workflow progress, or memory promotion."
+                    },
+                    {
                         "id":  "database.migration-tickets-linked-files",
                         "path":  "Database/migration_tickets_linked_files.sql",
                         "kind":  "migration-script",

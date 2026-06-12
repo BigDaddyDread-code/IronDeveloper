@@ -59,7 +59,7 @@ PR 62 exposed the tool gate API v1.
 - Boundary: gate evaluation is not execution.
 - Boundary: gate pass is not human approval.
 - Boundary: gate is not executor.
-- Durability: non-durable API-local gate preview.
+- Durability: durable SQL-backed gate decision evidence.
 - CLI status: API only / no CLI yet.
 
 PR 63 exposed the dogfood loop API v1.
@@ -167,7 +167,7 @@ Focused validation evidence for this report:
 
 PR 61 Tool Request API is backed by durable SQL tool request records once the durable Tool Request Store has landed.
 
-PR 62 Tool Gate API remains non-durable API-local gate preview unless durable SQL-backed Gate Decision Store has landed.
+PR 62/75 Tool Gate API records durable SQL-backed gate decision evidence once the durable Gate Decision Store has landed.
 
 PR 63 Dogfood Loop API remains non-durable API-local receipt storage unless durable SQL-backed Dogfood Loop Store has landed.
 
