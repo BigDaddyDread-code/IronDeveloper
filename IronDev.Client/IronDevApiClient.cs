@@ -157,6 +157,43 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => GetJsonEnvelopeAsync($"api/v1/tool-requests/{Uri.EscapeDataString(toolRequestId)}?projectId={projectId}", cancellationToken);
 
+    public Task<IronDevApiResponse<JsonElement?>> CreateDogfoodLoopAsync(
+        DogfoodLoopCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var body = new
+        {
+            projectId = request.ProjectId,
+            summary = request.Summary,
+            goal = request.Goal,
+            agentRunIds = request.AgentRunIds,
+            criticReviewRunIds = request.CriticReviewRunIds,
+            memoryImprovementRunIds = request.MemoryImprovementRunIds,
+            toolRequestIds = request.ToolRequestIds,
+            toolGateDecisionIds = request.ToolGateDecisionIds,
+            evidenceRefs = request.EvidenceRefs.Select(reference => new
+            {
+                refType = reference.RefType,
+                refId = reference.RefId,
+                summary = reference.Summary,
+                source = reference.Source
+            }),
+            observations = request.Observations,
+            blockedReasons = request.BlockedReasons,
+            correlationId = request.CorrelationId
+        };
+
+        return PostJsonEnvelopeAsync("api/v1/dogfood-loops", body, cancellationToken);
+    }
+
+    public Task<IronDevApiResponse<JsonElement?>> GetDogfoodLoopAsync(
+        int projectId,
+        string dogfoodLoopId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/dogfood-loops/{Uri.EscapeDataString(dogfoodLoopId)}?projectId={projectId}", cancellationToken);
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
