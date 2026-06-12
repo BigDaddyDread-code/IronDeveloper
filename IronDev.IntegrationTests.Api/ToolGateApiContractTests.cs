@@ -37,7 +37,7 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         Assert.AreEqual(requestId, data.GetProperty("toolRequestId").GetString());
         Assert.AreEqual("allowed_by_gate", data.GetProperty("decision").GetString());
         Assert.IsFalse(data.GetProperty("durable").GetBoolean());
-        Assert.IsFalse(data.GetProperty("requestDurable").GetBoolean());
+        Assert.IsTrue(data.GetProperty("requestDurable").GetBoolean());
         Assert.IsFalse(data.GetProperty("gateDecisionDurable").GetBoolean());
         Assert.IsTrue(data.GetProperty("requiresSeparateExecutor").GetBoolean());
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
@@ -309,10 +309,10 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         StringAssert.Contains(text, "API response status is not governance.");
         StringAssert.Contains(text, "Human review remains required for source apply.");
         StringAssert.Contains(text, "Human review remains required for memory promotion.");
-        StringAssert.Contains(text, "This API operates on non-durable API-local request inspection data");
+        StringAssert.Contains(text, "This API reads durable SQL-backed tool request records");
         StringAssert.Contains(text, "does not yet provide durable SQL source-of-truth gate decisions");
         StringAssert.Contains(text, "\"durable\": false");
-        StringAssert.Contains(text, "\"requestDurable\": false");
+        StringAssert.Contains(text, "\"requestDurable\": true");
         StringAssert.Contains(text, "\"gateDecisionDurable\": false");
     }
 
@@ -518,7 +518,7 @@ public sealed class ToolGateApiContractTests : ApiTestBase
         Assert.IsFalse(boundary.GetProperty("endpointAccessIsExecutionPermission").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("apiResponseStatusIsGovernance").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("durable").GetBoolean());
-        Assert.IsFalse(boundary.GetProperty("requestDurable").GetBoolean());
+        Assert.IsTrue(boundary.GetProperty("requestDurable").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("gateDecisionDurable").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("humanReviewRequiredForSourceApply").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("humanReviewRequiredForMemoryPromotion").GetBoolean());
@@ -547,8 +547,6 @@ public sealed class ToolGateApiContractTests : ApiTestBase
             "apiResponseStatusIsGovernance\":true",
             "endpointAccessIsExecutionPermission\":true",
             "modelOutputIsAuthority\":true",
-            "durable\":true",
-            "requestDurable\":true",
             "gateDecisionDurable\":true"
         };
 

@@ -212,6 +212,38 @@ public abstract class ApiTestBase
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChatMessages') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ChatMessages ADD LinkedSymbols NVARCHAR(MAX) NULL;
             """);
+
+        await ApplySqlFileAsync(conn, "Database", "migrate_governance_event.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_tool_request.sql");
+    }
+
+    private static async Task ApplySqlFileAsync(SqlConnection connection, params string[] pathParts)
+    {
+        var sql = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot(), Path.Combine(pathParts)));
+        foreach (var batch in SplitSqlBatches(sql))
+            await connection.ExecuteAsync(batch);
+    }
+
+    private static IReadOnlyList<string> SplitSqlBatches(string sql) =>
+        System.Text.RegularExpressions.Regex.Split(
+                sql.Replace("\r\n", "\n", StringComparison.Ordinal),
+                @"(?im)^\s*GO\s*$")
+            .Select(batch => batch.Trim())
+            .Where(batch => !string.IsNullOrWhiteSpace(batch))
+            .ToArray();
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not find repository root.");
     }
 
     /// <summary>Clears domain data between tests; tenant/user seed is preserved and synchronized.</summary>
@@ -222,6 +254,7 @@ public abstract class ApiTestBase
         
         // 1. Wipe domain data
         await conn.ExecuteAsync("""
+            IF OBJECT_ID('governance.ToolRequest', 'U') IS NOT NULL DELETE FROM governance.ToolRequest;
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;

@@ -6,9 +6,9 @@ Tool Request API v1 exposes the frozen `AgentToolRequest` contract through HTTP.
 
 Tool Request API v1 creates or inspects tool request evidence only. A tool request is not approval, execution permission, tool execution, source apply, memory promotion, or governance.
 
-This API validates request shape and stores a non-durable API-local request inspection record. It does not execute the requested tool and does not create any approval, gate, source-apply, memory-promotion, workflow, CLI, UI, SQL, schema, or stored-procedure capability.
+This API validates request shape and stores a durable SQL-backed tool request record. It does not execute the requested tool and does not create any approval, gate, source-apply, memory-promotion, workflow, CLI, UI, or runtime capability.
 
-This does not yet satisfy durable SQL source-of-truth storage for tool requests.
+Tool request records are durable SQL-backed backend records and are linked to the governance event spine.
 
 ## Endpoints
 
@@ -39,14 +39,14 @@ Rules:
 - Secret-like request material is rejected.
 - Approval, execution, source apply, memory promotion, gate execution, audit approval, model authority, and external submission claims are rejected.
 - Payload content is bounded.
-- The endpoint may create a non-durable API-local request inspection record.
-- The record is not durable across process restart.
-- The record is not SQL-backed and is not part of durable evidence/audit history.
+- The endpoint may create a durable SQL-backed tool request record.
+- The record is durable across process restart.
+- The record is SQL-backed and linked to durable governance event history.
 - The endpoint must not run the tool, approve the request, execute a gate, apply source, promote memory, or create governance authority.
 
 ### GET `/api/v1/tool-requests/{toolRequestId}?projectId={projectId}`
 
-Inspects an existing non-durable API-local tool request inspection record.
+Inspects an existing durable SQL-backed tool request record.
 
 Rules:
 
@@ -69,7 +69,7 @@ Both endpoints return:
   "evidenceId": "evidence-tool-request-...",
   "boundary": {
     "toolRequestIsExecutionPermission": false,
-    "durable": false,
+    "durable": true,
     "toolExecuted": false,
     "requestApproved": false,
     "auditIsApproval": false,
@@ -89,26 +89,26 @@ Both endpoints return:
 }
 ```
 
-For `POST`, `mutationOccurred` may be `true` only for creating the non-durable API-local request inspection record. It does not mean a tool ran.
+For `POST`, `mutationOccurred` may be `true` only for creating the durable SQL-backed tool request record. It does not mean a tool ran.
 
 For `GET`, `mutationOccurred` is always `false`.
 
 ## Durability boundary
 
-Tool Request API v1 uses an API-local in-memory inspection cache.
+Tool Request API v1 uses a durable SQL-backed tool request store.
 
 The inspection record is:
 
-- non-durable
-- not SQL-backed
-- not visible across app instances
-- not durable across process restart
-- not part of the real evidence/audit history
+- durable
+- SQL-backed
+- visible across app instances when backed by the same SQL database
+- durable across process restart
+- linked to durable governance event history
 - not approval
 - not execution permission
 - not governance authority
 
-Durable SQL source-of-truth storage for tool requests is a required follow-up before these records can be treated as backend evidence.
+Durable SQL source-of-truth storage for tool requests is now present; gate decisions and execution audit remain separate concepts.
 
 ## Error model
 
@@ -182,7 +182,6 @@ Tool Request API v1 does not add:
 - gate execution
 - source apply
 - memory promotion
-- durable SQL-backed tool request storage
 - hidden workflow or scheduler
 - autonomous runner
 - GitHub submission

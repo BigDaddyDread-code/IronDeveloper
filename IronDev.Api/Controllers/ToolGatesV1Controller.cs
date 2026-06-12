@@ -113,7 +113,7 @@ public sealed class ToolGatesV1Controller : ControllerBase
                 "not_found",
                 null,
                 toolRequestId: SanitiseText(request.ToolRequestId),
-                errors: [ValidationError(nameof(request.ToolRequestId), "Tool request was not found in the non-durable API-local request inspection cache.", "missing_tool_request")]));
+                errors: [ValidationError(nameof(request.ToolRequestId), "Tool request was not found for this project.", "missing_tool_request")]));
         }
 
         var evaluatedAt = DateTimeOffset.UtcNow;
@@ -340,7 +340,7 @@ public sealed class ToolGatesV1Controller : ControllerBase
             RequiresGovernanceGate = RequiresGovernanceGate(preview),
             RequiresSeparateExecutor = decision.RequiresExecutor,
             Durable = false,
-            RequestDurable = false,
+            RequestDurable = true,
             GateDecisionDurable = false,
             EvaluatedAtUtc = decision.EvaluatedAtUtc,
             Warnings = SafeWarnings(preview)
@@ -370,7 +370,7 @@ public sealed class ToolGatesV1Controller : ControllerBase
             RequiresGovernanceGate = response.RequiresGovernanceGate,
             RequiresSeparateExecutor = response.RequiresSeparateExecutor,
             Durable = false,
-            RequestDurable = false,
+            RequestDurable = true,
             GateDecisionDurable = false,
             EvaluatedAtUtc = response.EvaluatedAtUtc,
             Warnings = response.Warnings
@@ -510,7 +510,7 @@ public sealed class ToolGatesV1Controller : ControllerBase
         "Tool Gate API v1 evaluates or inspects gate decisions only.",
         "Gate is not executor; gate decision is not approval; gate pass is not human approval.",
         "Tool Gate API v1 uses a non-durable API-local preview cache; SQL-backed durable gate decision storage is not provided by this endpoint.",
-        "Tool requests read by this endpoint are non-durable API-local inspection records until a durable SQL Tool Request Store exists.",
+        "Tool requests read by this endpoint are durable SQL-backed request records; gate decisions remain non-durable API-local previews until a durable gate store exists.",
         "A separate executor path is required before any requested tool can run.",
         "Human review remains required for source apply and memory promotion."
     ];
@@ -557,7 +557,7 @@ public sealed class ToolGatesV1Controller : ControllerBase
             EndpointAccessIsExecutionPermission = false,
             ApiResponseStatusIsGovernance = false,
             Durable = false,
-            RequestDurable = false,
+            RequestDurable = true,
             GateDecisionDurable = false,
             HumanReviewRequiredForSourceApply = true,
             HumanReviewRequiredForMemoryPromotion = true

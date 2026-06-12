@@ -15,6 +15,7 @@ using IronDev.Core.Promotion;
 using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
+using IronDev.Core.Governance;
 using IronDev.Infrastructure.AgentRunAudit;
 using IronDev.Data;
 using IronDev.Infrastructure.Builder;
@@ -25,6 +26,7 @@ using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Services.Promotion;
 using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Tracing;
+using IronDev.Infrastructure.Governance;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -69,7 +71,7 @@ Log.Information(
     environmentInfo.LogsRoot,
     environmentInfo.DangerRealRepoWritesEnabled);
 
-// ── Services ─────────────────────────────────────────────────────────────────
+// â”€â”€ Services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -161,7 +163,8 @@ builder.Services.AddScoped<ManualAgentExecutionStoreValidator>();
 builder.Services.AddScoped<IStoredManualIndependentCriticAgentService, StoredManualIndependentCriticAgentService>();
 builder.Services.AddScoped<IStoredManualMemoryImprovementAgentService, StoredManualMemoryImprovementAgentService>();
 builder.Services.AddSingleton<AgentToolRequestValidator>();
-builder.Services.AddSingleton<IToolRequestApiStore, InMemoryToolRequestApiStore>();
+builder.Services.AddScoped<IToolRequestStore, SqlToolRequestStore>();
+builder.Services.AddScoped<IToolRequestApiStore, SqlToolRequestApiStore>();
 builder.Services.AddSingleton<IAgentToolExecutionGate, AgentToolExecutionGate>();
 builder.Services.AddSingleton<IToolGateApiStore, InMemoryToolGateApiStore>();
 builder.Services.AddSingleton<IDogfoodLoopApiStore, InMemoryDogfoodLoopApiStore>();
@@ -183,13 +186,13 @@ builder.Services.AddScoped<ILLMService>(_ =>
     };
 });
 
-// Tenant context — request-scoped, reads tenant_id from JWT claim.
+// Tenant context â€” request-scoped, reads tenant_id from JWT claim.
 builder.Services.AddScoped<ICurrentTenantContext, JwtTenantContext>();
 
 // JWT token factory
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
-// ── Authentication & Authorization ────────────────────────────────────────────
+// â”€â”€ Authentication & Authorization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"]
@@ -213,7 +216,7 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-// ── Build ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 var app = builder.Build();
 

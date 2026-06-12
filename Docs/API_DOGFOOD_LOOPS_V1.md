@@ -115,9 +115,9 @@ This API operates on non-durable API-local receipt data and does not yet provide
 
 `durable` is always `false` in v1.
 
-PR61 tool request records and PR62 gate preview records remain non-durable API-local data unless a durable SQL Tool Request Store and durable SQL Tool Gate Decision Store are added later.
+Tool request records are durable SQL-backed data once the durable Tool Request Store has landed; PR62 gate preview records remain non-durable API-local data unless a durable SQL Tool Gate Decision Store is added later.
 
-References to tool requests or gate decisions are labelled non-durable and must not be treated as durable backend evidence, approval, execution permission, or release evidence by themselves.
+References to non-durable gate decisions are labelled non-durable and must not be treated as durable backend evidence, approval, execution permission, or release evidence by themselves.
 
 ## Hidden reasoning boundary
 
@@ -140,11 +140,11 @@ Missing evidence is not hidden. Non-durable references are not silently treated 
 
 PR56 froze the backend contract with known broad-lane exceptions.
 
-PR61 Tool Request API v1 currently uses a non-durable API-local request inspection cache.
+PR61 Tool Request API v1 uses durable SQL-backed tool request records once the durable Tool Request Store has landed.
 
 PR62 Tool Gate API v1 currently uses a non-durable API-local gate preview cache.
 
-PR63 preserves those limitations. It does not claim durable backend evidence for PR61 or PR62 references.
+PR63 preserves the remaining gate limitation. It does not claim durable backend evidence for PR62 gate references.
 
 ## Examples
 

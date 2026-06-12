@@ -70,7 +70,7 @@ Both endpoints return:
     "endpointAccessIsExecutionPermission": false,
     "apiResponseStatusIsGovernance": false,
     "durable": false,
-    "requestDurable": false,
+    "requestDurable": true,
     "gateDecisionDurable": false,
     "humanReviewRequiredForSourceApply": true,
     "humanReviewRequiredForMemoryPromotion": true
@@ -143,7 +143,7 @@ Validation failure is not a gate rejection. Gate block is not an internal error.
 
 ## Durability boundary
 
-This API operates on non-durable API-local request inspection data and does not yet provide durable SQL source-of-truth gate decisions.
+This API reads durable SQL-backed tool request records and creates non-durable API-local gate previews. It does not yet provide durable SQL source-of-truth gate decisions.
 
 The gate preview record is:
 
@@ -166,11 +166,11 @@ Stored unsafe request or gate text is redacted on readback.
 
 ## Known PR56 / PR61 exceptions
 
-PR61 currently provides a non-durable API-local tool request inspection cache, not SQL-backed tool request storage.
+Tool request records are durable SQL-backed backend records.
 
-PR62 therefore provides a non-durable API-local gate preview over that cache.
+PR62 still provides a non-durable API-local gate preview over durable tool request records.
 
-Neither PR61 nor PR62 satisfies durable SQL source-of-truth storage for tool requests or gate decisions.
+PR62 does not satisfy durable SQL source-of-truth storage for gate decisions.
 
 ## Examples
 
@@ -204,7 +204,7 @@ Tool Gate API v1 does not add:
 - source apply
 - memory promotion
 - tool execution audit append
-- durable SQL-backed tool request store
+- tool execution
 - durable SQL-backed gate decision store
 - hidden workflow or scheduler
 - autonomous runner

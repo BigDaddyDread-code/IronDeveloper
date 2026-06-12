@@ -108,9 +108,9 @@ Warnings and errors from the API are preserved.
 
 ## Durability boundary
 
-Tool requests created through this CLI are non-durable API-local request inspection records unless a durable SQL-backed tool request store has landed. They are not SQL source-of-truth records and are not durable execution evidence. They may disappear across process restart if backed by PR61 API-local storage.
+Tool requests created through this CLI are durable SQL-backed request records when the API is backed by the durable Tool Request Store. They are not execution evidence, approval, gate decisions, source apply, or memory promotion.
 
-When the API returns `durable: false`, the CLI keeps that boundary visible.
+When the API returns `durable: true`, the CLI keeps that request-record durability visible without treating it as execution permission.
 
 ## Authority boundaries
 
@@ -132,4 +132,4 @@ The CLI rejects obvious raw/private reasoning markers before create requests are
 
 ## Known limitations
 
-These commands do not expose tool gate commands. They do not create durable SQL tool-request records while PR61 remains API-local. They do not execute tools, apply patches, submit GitHub reviews, promote memory, write accepted memory, write CollectiveMemory, write vector/index authority, append execution audit, or run workflows.
+These commands do not expose tool gate commands. They do not execute tools, apply patches, submit GitHub reviews, promote memory, write accepted memory, write CollectiveMemory, write vector/index authority, append execution audit, or run workflows.

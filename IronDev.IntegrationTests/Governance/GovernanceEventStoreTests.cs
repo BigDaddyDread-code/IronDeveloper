@@ -441,6 +441,16 @@ public sealed class GovernanceEventStoreTests : IntegrationTestBase
                 DROP PROCEDURE governance.ListGovernanceEventsForSubject;
             IF OBJECT_ID(N'governance.ListGovernanceEventsCausedBy', N'P') IS NOT NULL
                 DROP PROCEDURE governance.ListGovernanceEventsCausedBy;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_Create', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_Create;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_GetById', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_GetById;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_ListForProject', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_ListForProject;
+            IF OBJECT_ID(N'governance.usp_ToolRequest_ListForCorrelation', N'P') IS NOT NULL
+                DROP PROCEDURE governance.usp_ToolRequest_ListForCorrelation;
+            IF OBJECT_ID(N'governance.ToolRequest', N'U') IS NOT NULL
+                DROP TABLE governance.ToolRequest;
             IF OBJECT_ID(N'governance.GovernanceEvent', N'U') IS NOT NULL
                 DROP TABLE governance.GovernanceEvent;
             IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'IronDevGovernanceEventRuntimeRole' AND type = N'R')

@@ -51,7 +51,7 @@ PR 61 exposed the tool request API v1.
 - `GET /api/v1/tool-requests/{toolRequestId}`
 - Boundary: tool request is request form, not execution permission.
 - Boundary: request approval is separate.
-- Durability: non-durable API-local inspection cache.
+- Durability: durable SQL-backed tool request record.
 
 PR 62 exposed the tool gate API v1.
 
@@ -165,13 +165,13 @@ Focused validation evidence for this report:
 
 ## Non-Durable Boundaries
 
-PR 61 Tool Request API remains non-durable API-local unless durable SQL-backed Tool Request Store has landed.
+PR 61 Tool Request API is backed by durable SQL tool request records once the durable Tool Request Store has landed.
 
 PR 62 Tool Gate API remains non-durable API-local gate preview unless durable SQL-backed Gate Decision Store has landed.
 
 PR 63 Dogfood Loop API remains non-durable API-local receipt storage unless durable SQL-backed Dogfood Loop Store has landed.
 
-Non-durable records are not:
+Non-durable gate and dogfood records are not:
 
 - SQL source of truth.
 - Durable audit evidence.
