@@ -86,3 +86,39 @@ Approval packages do not expose API or CLI endpoints.
 ReadyForReview means ready for human review, not approved.
 
 Approval package evidence remains supporting material only. Requirement entries preserve evaluator output without satisfying those requirements. All authority flags remain false.
+
+
+## PR86 Conservative/Balanced/Experimental Policy Profiles
+
+PR86 adds canonical starter policy profiles only:
+
+- Conservative
+- Balanced
+- Experimental
+
+Profiles produce draft policy and rule shapes only.
+
+Profiles do not activate policy.
+Profiles do not evaluate policy.
+Profiles do not approve anything.
+Profiles do not execute anything.
+Profiles do not satisfy policy.
+Profiles do not start or continue workflow.
+Profiles do not mutate source.
+Profiles do not promote memory.
+Profiles do not add SQL, API, CLI, or runtime wiring.
+
+Generated project autonomy policies are Draft.
+Generated project approval rules are Draft.
+
+Sensitive scopes always require human approval across all profiles:
+
+- source_apply
+- memory_promotion
+- release_readiness
+- external_side_effect
+- destructive_operation
+
+Experimental may relax only non-sensitive scopes. Experimental does not bypass human approval for sensitive scopes.
+
+Missing policy or rules still fail closed. Profiles are starter templates for explicit later setup, not hidden defaults.
