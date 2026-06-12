@@ -145,3 +145,21 @@ Forbidden PR77 runtime SQL shape:
 - Inline `INSERT INTO governance.PolicyDecisionEvent`.
 - Inline `UPDATE` or `DELETE` against `governance.PolicyDecisionEvent`.
 - Runtime DDL for policy decision tables, triggers, or stored procedures.
+
+## PR78 dogfood receipt SQL boundary
+
+Dogfood receipt writes are stored-procedure-only through `governance.usp_DogfoodReceipt_Record`. Runtime code must not insert, update, delete, or create `governance.DogfoodReceipt` directly.
+
+Allowed PR78 runtime SQL shape:
+
+- `SqlDogfoodReceiptStore` calls `governance.usp_DogfoodReceipt_Record`.
+- `SqlDogfoodReceiptStore` calls read procedures for get/list operations.
+- `SqlDogfoodLoopApiStore` stores API dogfood receipts through `IDogfoodReceiptStore`.
+- Migration and smoke scripts own schema setup and verification.
+
+Forbidden PR78 runtime SQL shape:
+
+- Inline `INSERT INTO governance.DogfoodReceipt`.
+- Inline `UPDATE` or `DELETE` against `governance.DogfoodReceipt`.
+- Runtime DDL for dogfood receipt tables, triggers, or stored procedures.
+- Treating a dogfood receipt as release approval, policy satisfaction, execution permission, source apply, workflow continuation, A2A handoff, or memory promotion.

@@ -19,8 +19,8 @@ This matrix records the Block F API/CLI contract boundary. It is a testable inve
 | `tool-requests create` | `POST /api/v1/tool-requests` | false | false | false | false | false | Tool request is request form, not execution permission. |
 | `tool-requests get` | `GET /api/v1/tool-requests/{toolRequestId}` | false | false | false | false | false | Tool execution is separate. |
 | API only / no CLI yet | `POST /api/v1/tool-gates/evaluations` | false | false | false | false | false | Gate evaluation is not execution. |
-| `dogfood-loops create` | `POST /api/v1/dogfood-loops` | false | false | false | false | false | Dogfood receipt is evidence, not release approval. |
-| `dogfood-loops get` | `GET /api/v1/dogfood-loops/{dogfoodLoopId}` | false | false | false | false | false | Dogfood loop is not autonomous workflow. |
+| `dogfood-loops create` | `POST /api/v1/dogfood-loops` | true | false | false | false | false | Dogfood receipt is evidence, not release approval. |
+| `dogfood-loops get` | `GET /api/v1/dogfood-loops/{dogfoodLoopId}` | true | false | false | false | false | Dogfood loop is not autonomous workflow. |
 
 ## Frozen Boundary Language
 
@@ -46,6 +46,6 @@ The API/CLI contract suite treats these phrases as boundary anchors:
 
 ## Freeze Notes
 
-The matrix records durable SQL-backed tool requests, durable SQL-backed tool gate decisions, and durable SQL-backed approval decisions plus temporary non-durable API-local inspection caches for dogfood loops. Approval decisions have no API/CLI surface in Block F. Policy decision events have no API/CLI surface in Block G/PR77.
+The matrix records durable SQL-backed tool requests, durable SQL-backed tool gate decisions, and durable SQL-backed approval decisions plus durable SQL-backed dogfood receipt evidence. Approval decisions have no API/CLI surface in Block F. Policy decision events have no API/CLI surface in Block G/PR77.
 
-Those caches are not SQL source of truth, not approval, not execution permission, not audit authority, not source apply evidence, and not memory promotion evidence.
+Dogfood receipt evidence is SQL-backed but remains not approval, not execution permission, not audit authority, not source apply evidence, not memory promotion evidence, and not release readiness.

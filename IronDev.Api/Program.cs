@@ -168,7 +168,8 @@ builder.Services.AddScoped<IToolRequestApiStore, SqlToolRequestApiStore>();
 builder.Services.AddSingleton<IAgentToolExecutionGate, AgentToolExecutionGate>();
 builder.Services.AddScoped<IToolGateDecisionStore, SqlToolGateDecisionStore>();
 builder.Services.AddScoped<IToolGateApiStore, SqlToolGateApiStore>();
-builder.Services.AddSingleton<IDogfoodLoopApiStore, InMemoryDogfoodLoopApiStore>();
+builder.Services.AddScoped<IDogfoodReceiptStore, SqlDogfoodReceiptStore>();
+builder.Services.AddScoped<IDogfoodLoopApiStore, SqlDogfoodLoopApiStore>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))

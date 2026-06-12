@@ -68,7 +68,7 @@ PR 63 exposed the dogfood loop API v1.
 - `GET /api/v1/dogfood-loops/{dogfoodLoopId}`
 - Boundary: dogfood receipt is evidence, not release approval.
 - Boundary: dogfood loop is not autonomous workflow.
-- Durability: non-durable API-local receipt storage.
+- Durability: durable SQL-backed dogfood receipt evidence once PR78 lands.
 
 ## Completed CLI Surfaces
 
@@ -169,14 +169,19 @@ PR 61 Tool Request API is backed by durable SQL tool request records once the du
 
 PR 62/75 Tool Gate API records durable SQL-backed gate decision evidence once the durable Gate Decision Store has landed.
 
-PR 63 Dogfood Loop API remains non-durable API-local receipt storage unless durable SQL-backed Dogfood Loop Store has landed.
+PR 63 Dogfood Loop API is backed by durable SQL dogfood receipt evidence once PR78 lands.
 
 PR 76 Approval Decision Store records durable SQL-backed approval decision evidence. It has no Block F API or CLI endpoint and does not grant execution permission, source apply, external effects, or memory promotion. PR77 Policy Decision Event Store records durable SQL-backed policy decision evidence. It has no API/CLI endpoint and does not approve, execute, satisfy policy, continue workflow, apply source, create A2A handoff, create dogfood receipt, or promote memory.
 
-Non-durable gate and dogfood records are not:
+Temporary API-local caches are not:
 
 - SQL source of truth.
 - Durable audit evidence.
+
+Dogfood receipt records remain evidence only, not approval or release readiness.
+
+Durable dogfood receipt records are not:
+
 - Execution evidence.
 - Approval.
 - Release evidence.
@@ -209,7 +214,7 @@ PR 71 does not add:
 
 1. Durable SQL Tool Request Store.
 2. Durable SQL Tool Gate Decision Store, if previews must become durable evidence. Completed by PR75; PR76 adds durable approval decision evidence without adding an API/CLI approval endpoint.
-3. Durable SQL Dogfood Loop Receipt Store, if receipts must become project history.
+3. Durable SQL Dogfood Loop Receipt Store. Completed by PR78; receipts become evidence history, not release approval.
 4. Clean known broad API/full-solution red lanes.
 5. Decide whether CLI Tool Gate commands are needed separately.
 6. Decide next backend dogfood execution path, if any, without hiding execution authority.

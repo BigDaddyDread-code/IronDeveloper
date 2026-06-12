@@ -256,3 +256,15 @@ PR77 adds the fifth Block G manifest-covered governance ledger:
 | `IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_PolicyDecisionEvent_*` stored procedures only; no runtime schema creation and no API/CLI endpoint. |
 
 Policy decision events are evidence only. They do not approve, execute, satisfy policy, continue workflow, apply source, create A2A handoff, create dogfood receipt, or promote memory.
+
+## PR78 durable dogfood receipt update
+
+PR78 adds the sixth Block G manifest-covered governance ledger:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_dogfood_receipt.sql` | governance | Yes | Yes | Creates `governance.DogfoodReceipt`, stored procedures, validation triggers, and optional links to tool request, tool gate decision, approval decision, and policy decision evidence. |
+| `IronDev.Infrastructure/Governance/SqlDogfoodReceiptStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_DogfoodReceipt_*` stored procedures only; no runtime schema creation. |
+| `IronDev.Api/Controllers/SqlDogfoodLoopApiStore.cs` | API/governance bridge | Yes | Yes | Dogfood Loop API stores durable receipt evidence through `IDogfoodReceiptStore`; it does not create approval, execution permission, policy satisfaction, source apply, workflow continuation, A2A handoff, or memory promotion. |
+
+Dogfood receipts are evidence only. They do not approve release readiness, satisfy policy, continue workflow, execute tools, apply source, create A2A handoff, or promote memory.

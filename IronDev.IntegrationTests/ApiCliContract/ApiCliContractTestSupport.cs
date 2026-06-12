@@ -222,13 +222,13 @@ internal static class ApiCliContractTestSupport
           "data": {
             "dogfoodLoopId": "{{DogfoodLoopId}}",
             "projectId": "{{ProjectId}}",
-            "durable": false,
+            "durable": true,
             "releaseApproval": false,
             "autonomousWorkflow": false,
             "sourceApplied": false,
             "memoryPromoted": false
           },
-          "warnings": ["Dogfood receipt is not release approval.", "Dogfood loop is not autonomous workflow.", "Human review remains required for source apply and memory promotion.", "This dogfood loop is a non-durable API-local inspection cache."],
+          "warnings": ["Dogfood receipt is not release approval.", "Dogfood loop is not autonomous workflow.", "Human review remains required for source apply and memory promotion.", "Dogfood receipt is durable SQL-backed evidence, not release approval."],
           "errors": []
         }
         """;

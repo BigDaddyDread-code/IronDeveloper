@@ -78,7 +78,7 @@ Every response includes explicit boundary flags:
   "modelOutputIsAuthority": false,
   "endpointAccessIsExecutionPermission": false,
   "apiResponseStatusIsGovernance": false,
-  "durable": false,
+  "durable": true,
   "containsNonDurableReferences": true,
   "humanReviewRequiredForSourceApply": true,
   "humanReviewRequiredForMemoryPromotion": true
@@ -111,13 +111,13 @@ The API does not execute tools, run tests, run builds, invoke critic or memory-i
 
 ## Durability boundary
 
-This API operates on non-durable API-local receipt data and does not yet provide durable SQL source-of-truth dogfood receipts.
+This API stores durable SQL-backed dogfood receipt evidence linked to the governance event spine. Durable SQL storage does not make the receipt release approval. The receipt is still evidence only; it is not release approval, policy satisfaction, execution permission, source apply, memory promotion, or workflow continuation.
 
-`durable` is always `false` in v1.
+`durable` is `true` for the dogfood receipt record in v1.
 
-Tool request records and PR75 gate decision records are durable SQL-backed data. Dogfood loop receipts remain non-durable API-local data unless a durable SQL Dogfood Loop Store is added later.
+Tool request records, PR75 gate decision records, and PR78 dogfood receipt records are durable SQL-backed data. Caller-supplied references are still labelled separately and must not be treated as authority by themselves.
 
-References to non-durable gate decisions are labelled non-durable and must not be treated as durable backend evidence, approval, execution permission, or release evidence by themselves.
+References that are caller-supplied or not backed by their own backend records are labelled non-durable and must not be treated as approval, execution permission, release evidence, source apply, or memory promotion by themselves.
 
 ## Hidden reasoning boundary
 
@@ -144,7 +144,7 @@ PR61 Tool Request API v1 uses durable SQL-backed tool request records once the d
 
 PR62/75 Tool Gate API v1 records durable SQL-backed gate decision evidence.
 
-PR63 preserves the remaining dogfood-loop durability limitation. It references durable PR75 gate decision evidence but does not make the dogfood loop receipt durable backend evidence.
+PR78 removes the dogfood-loop durability limitation by storing dogfood receipts in SQL and linking them to governance events. PR63 endpoint semantics remain receipt-only and non-authoritative.
 
 ## Examples
 
@@ -184,4 +184,4 @@ Inspect a receipt:
 GET /api/v1/dogfood-loops/dogfood-loop-123-dogfood-123?projectId=123
 ```
 
-The response remains receipt-only and non-durable.
+The response remains receipt-only and non-authoritative, even though the receipt is durable SQL-backed evidence.

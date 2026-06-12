@@ -17,12 +17,11 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
     public async Task DogfoodLoopApi_Create_IsReceiptOnly()
     {
         using var client = await AuthedClientAsync();
-        var store = Store();
-        var before = store.Count();
+        var before = StoreCount();
 
         var response = await client.PostAsJsonAsync("/api/v1/dogfood-loops", ValidRequest(1001, "receipt-only").ToBody());
         var json = await ReadJsonAsync(response);
-        var after = store.Count();
+        var after = StoreCount();
         var text = json.RootElement.ToString();
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
@@ -34,7 +33,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
 
         var data = json.RootElement.GetProperty("data");
         Assert.IsTrue(data.GetProperty("receiptOnly").GetBoolean());
-        Assert.IsFalse(data.GetProperty("durable").GetBoolean());
+        Assert.IsTrue(data.GetProperty("durable").GetBoolean());
         Assert.IsTrue(data.GetProperty("containsNonDurableReferences").GetBoolean());
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
             warning.GetString()?.Contains("Dogfood receipt is not release approval", StringComparison.OrdinalIgnoreCase) == true));
@@ -48,11 +47,11 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
         var create = await client.PostAsJsonAsync("/api/v1/dogfood-loops", ValidRequest(1002, "get-readonly").ToBody());
         var createJson = await ReadJsonAsync(create);
         var loopId = createJson.RootElement.GetProperty("dogfoodLoopId").GetString();
-        var before = Store().Count();
+        var before = StoreCount();
 
         var response = await client.GetAsync($"/api/v1/dogfood-loops/{loopId}?projectId=1002");
         var json = await ReadJsonAsync(response);
-        var after = Store().Count();
+        var after = StoreCount();
         var text = json.RootElement.ToString();
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
@@ -94,7 +93,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
     public async Task DogfoodLoopApi_RejectsExecutionFields()
     {
         using var client = await AuthedClientAsync();
-        var before = Store().Count();
+        var before = StoreCount();
         var request = ValidRequest(1006, "execution-fields") with
         {
             Extra = new Dictionary<string, object?>
@@ -107,7 +106,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
 
         var response = await client.PostAsJsonAsync("/api/v1/dogfood-loops", request.ToBody());
         var json = await ReadJsonAsync(response);
-        var after = Store().Count();
+        var after = StoreCount();
 
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, json.RootElement.ToString());
         Assert.AreEqual(before, after, "Execution-shaped fields must not create receipts.");
@@ -207,22 +206,17 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task DogfoodLoopApi_DoesNotExposeHiddenReasoning_WhenStoredReceiptContainsPrivateReasoning()
+    public void DogfoodLoopApi_DurableStoreRejectsHiddenReasoningReceipts()
     {
-        Store().Save(BuildPrivateReceipt("dogfood-loop-private-1", 1012));
-        using var client = await AuthedClientAsync();
+        var before = StoreCount();
 
-        var response = await client.GetAsync("/api/v1/dogfood-loops/dogfood-loop-private-1?projectId=1012");
-        var text = await response.Content.ReadAsStringAsync();
+        Assert.ThrowsException<ArgumentException>(() => StoreSave(BuildPrivateReceipt("dogfood-loop-private-1", 1012)));
 
-        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
-        StringAssert.Contains(text, "[redacted: sensitive dogfood-loop text]");
-        AssertNoPrivateReasoningLeak(text);
-        AssertNoMisleadingAuthorityLanguage(text);
+        Assert.AreEqual(before, StoreCount(), "Private reasoning shaped receipts must not enter the durable dogfood receipt ledger.");
     }
 
     [TestMethod]
-    public async Task DogfoodLoopApi_IdentifiesNonDurableToolRequestAndGateReferences()
+    public async Task DogfoodLoopApi_IdentifiesDurableReceiptWithNonAuthoritativeReferences()
     {
         using var client = await AuthedClientAsync();
 
@@ -233,7 +227,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, text);
         Assert.IsTrue(json.RootElement.GetProperty("data").GetProperty("containsNonDurableReferences").GetBoolean());
         Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray().Any(warning =>
-            warning.GetString()?.Contains("PR61/74 tool request and PR62/75 gate decision references are durable SQL-backed", StringComparison.OrdinalIgnoreCase) == true));
+            warning.GetString()?.Contains("Dogfood loop receipts are durable SQL-backed evidence", StringComparison.OrdinalIgnoreCase) == true));
         AssertNoMisleadingAuthorityLanguage(text);
     }
 
@@ -291,7 +285,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
             Assert.IsFalse(text.Contains(token, StringComparison.OrdinalIgnoreCase), $"Forbidden token found in dogfood loop API controller: {token}");
 
         StringAssert.Contains(text, "IDogfoodLoopApiStore");
-        StringAssert.Contains(text, "InMemoryDogfoodLoopApiStore");
+        Assert.IsFalse(text.Contains("InMemoryDogfoodLoopApiStore", StringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]
@@ -312,9 +306,9 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
         StringAssert.Contains(text, "API response status is not governance.");
         StringAssert.Contains(text, "Human review remains required for source apply.");
         StringAssert.Contains(text, "Human review remains required for memory promotion.");
-        StringAssert.Contains(text, "This API operates on non-durable API-local receipt data");
-        StringAssert.Contains(text, "does not yet provide durable SQL source-of-truth dogfood receipts");
-        StringAssert.Contains(text, "\"durable\": false");
+        StringAssert.Contains(text, "This API stores durable SQL-backed dogfood receipt evidence");
+        StringAssert.Contains(text, "does not make the receipt release approval");
+        StringAssert.Contains(text, "\"durable\": true");
         StringAssert.Contains(text, "\"containsNonDurableReferences\": true");
     }
 
@@ -325,8 +319,17 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
         return GetAuthedClient(tenantToken);
     }
 
-    private static IDogfoodLoopApiStore Store() =>
-        Factory.Services.GetRequiredService<IDogfoodLoopApiStore>();
+    private static int StoreCount()
+    {
+        using var scope = Factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IDogfoodLoopApiStore>().Count();
+    }
+
+    private static void StoreSave(DogfoodLoopApiStoredReceipt receipt)
+    {
+        using var scope = Factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IDogfoodLoopApiStore>().Save(receipt);
+    }
 
     private static DogfoodLoopApiRequestBody ValidRequest(int projectId, string correlationId) =>
         new(
@@ -370,7 +373,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
             ReferencedToolRequests = [PrivateReference(privateText)],
             ReferencedGateDecisions = [PrivateReference(privateText)],
             EvidenceRefs = [PrivateReference(privateText)],
-            Durable = false,
+            Durable = true,
             ContainsNonDurableReferences = true,
             CreatedAtUtc = CreatedAt,
             CreatedByUserId = "user-1",
@@ -386,7 +389,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
             RefType = privateText,
             RefId = privateText,
             Summary = privateText,
-            Durable = false,
+            Durable = true,
             BackendRecorded = false,
             Source = privateText
         };
@@ -407,7 +410,7 @@ public sealed class DogfoodLoopApiContractTests : ApiTestBase
         Assert.IsFalse(boundary.GetProperty("modelOutputIsAuthority").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("endpointAccessIsExecutionPermission").GetBoolean());
         Assert.IsFalse(boundary.GetProperty("apiResponseStatusIsGovernance").GetBoolean());
-        Assert.IsFalse(boundary.GetProperty("durable").GetBoolean());
+        Assert.IsTrue(boundary.GetProperty("durable").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("containsNonDurableReferences").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("humanReviewRequiredForSourceApply").GetBoolean());
         Assert.IsTrue(boundary.GetProperty("humanReviewRequiredForMemoryPromotion").GetBoolean());
