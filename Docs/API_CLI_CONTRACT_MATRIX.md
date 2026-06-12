@@ -18,7 +18,7 @@ This matrix records the Block F API/CLI contract boundary. It is a testable inve
 | `memory-improvements get` | `GET /api/v1/manual-memory-improvements/{agentRunId}` | true | false | false | false | false | Candidate is not memory. |
 | `tool-requests create` | `POST /api/v1/tool-requests` | false | false | false | false | false | Tool request is request form, not execution permission. |
 | `tool-requests get` | `GET /api/v1/tool-requests/{toolRequestId}` | false | false | false | false | false | Tool execution is separate. |
-| `tool-gate evaluate` | `POST /api/v1/tool-gates/evaluate` | false | false | false | false | false | Gate evaluation is not execution. |
+| API only / no CLI yet | `POST /api/v1/tool-gates/evaluations` | false | false | false | false | false | Gate evaluation is not execution. |
 | `dogfood-loops create` | `POST /api/v1/dogfood-loops` | false | false | false | false | false | Dogfood receipt is evidence, not release approval. |
 | `dogfood-loops get` | `GET /api/v1/dogfood-loops/{dogfoodLoopId}` | false | false | false | false | false | Dogfood loop is not autonomous workflow. |
 

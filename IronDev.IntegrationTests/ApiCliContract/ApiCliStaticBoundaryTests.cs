@@ -20,6 +20,8 @@ public sealed class ApiCliStaticBoundaryTests
         StringAssert.Contains(matrix, "Tool request is request form, not execution permission.");
         StringAssert.Contains(matrix, "Dogfood receipt is evidence, not release approval.");
         StringAssert.Contains(matrix, "Gate evaluation is not execution.");
+        StringAssert.Contains(matrix, "API only / no CLI yet");
+        StringAssert.Contains(matrix, "POST /api/v1/tool-gates/evaluations");
         StringAssert.Contains(matrix, "Retrieval match is not memory candidate.");
     }
 
