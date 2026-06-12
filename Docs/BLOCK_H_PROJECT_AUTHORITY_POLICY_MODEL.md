@@ -50,3 +50,21 @@ System and Agent approver types are not allowed for sensitive scopes. Model, LLM
 The word free remains forbidden for approval rules. Missing approval rules must later fail closed. Model output remains advisory only.
 
 PR83 names the approval rulebook. It does not approve anything.
+
+## PR84 Approval Requirement Evaluator
+
+PR84 adds deterministic requirement evaluation.
+
+The evaluator consumes a project autonomy policy, project approval rules, and action context. It returns approval requirements only.
+
+PR84 does not check existing approval decisions.
+PR84 does not create approval decisions.
+PR84 does not create policy decision events.
+PR84 does not execute anything.
+PR84 does not start or continue workflow.
+PR84 does not expose API or CLI endpoints.
+PR84 does not write SQL, call agents, call models, create A2A handoffs, mutate source, promote memory, create dogfood receipts, or mark release readiness.
+
+Missing policy or rules fail closed. Invalid policy or rules fail closed. Sensitive scopes require human approval. Experimental autonomy does not bypass sensitive approval.
+
+The evaluator answers only what approval is required. It does not grant approval, satisfy policy, or allow execution.
