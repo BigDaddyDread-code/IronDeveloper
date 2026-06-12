@@ -94,3 +94,38 @@ This does not weaken constraints, disable triggers, ignore cleanup errors, or re
 ## Remaining intentional exceptions
 
 The production runtime DDL candidates listed above are explicit cleanup debt. They remain because this PR is not allowed to change product bootstrap behavior. A later cleanup can remove them only by moving schema ownership into setup/migration artifacts while preserving behavior and result shapes.
+
+# PR74b retrospective inline SQL inventory
+
+PR74b does not remove inline SQL. It classifies the current inline SQL surface so later cleanup can separate runtime requirements from tests, local utilities, and legacy bootstrap behavior.
+
+## 1. Runtime inline SQL
+
+Runtime inline SQL remains in core application services for projects, tickets, project memory/context, project documents, semantic memory, and legacy run stores. Normal parameterized CRUD SQL is allowed when it is the service-owned persistence boundary. Runtime DDL remains an exception and must move to migration/bootstrap ownership in a later cleanup.
+
+## 2. Test inline SQL
+
+Integration and API tests use inline SQL for fixture setup, reset, direct-invariant checks, and unsafe-path regression checks. This is allowed when clearly test-only and scoped to the test database.
+
+## 3. Migration/helper inline SQL
+
+Migration scripts, `Database/apply-migrations.ps1`, `Database/verify-migrations.ps1`, local setup scripts, and LocalTest reset scripts are expected to contain SQL. They are setup/verification tools, not runtime feature code.
+
+## 4. Inline SQL allowed/forbidden guidance
+
+Allowed:
+
+- Parameterized runtime CRUD owned by a repository/service.
+- Stored procedure calls through explicit store classes.
+- Test setup/reset SQL in test projects.
+- Migration and local/dev utility SQL in `Database` or `tools/localtest`.
+
+Forbidden without a later migration-ownership PR:
+
+- New runtime DDL in application services.
+- New direct writes bypassing governed stored procedure boundaries.
+- New API/CLI/controller SQL writes that claim authority, approval, promotion, source apply, workflow state, or gate execution.
+
+## 5. Candidates to move behind stored procedures
+
+Candidates remain the previously documented runtime DDL/bootstrap areas plus any future durable governance stores added after Block G. Current Block G governance/tool-request writes already use stored procedures and are not candidates for inline SQL expansion.

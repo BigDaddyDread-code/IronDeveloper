@@ -1,0 +1,890 @@
+{
+    "schemaVersion":  1,
+    "generatedFor":  "PR74b retrospective SQL inventory",
+    "generatedAtUtc":  "2026-06-12T00:00:00Z",
+    "entries":  [
+                    {
+                        "id":  "database.local-dev-setup",
+                        "path":  "Database/local_dev_setup.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local/dev setup script; not a governed migration manifest entry."
+                    },
+                    {
+                        "id":  "database.migrate-agent-local-memory",
+                        "path":  "Database/migrate_agent_local_memory.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-execution-audit",
+                        "path":  "Database/migrate_agent_memory_execution_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-handoff",
+                        "path":  "Database/migrate_agent_memory_handoff.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-improvement-proposals",
+                        "path":  "Database/migrate_agent_memory_improvement_proposals.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-indexing",
+                        "path":  "Database/migrate_agent_memory_indexing.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-influence",
+                        "path":  "Database/migrate_agent_memory_influence.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-permissions",
+                        "path":  "Database/migrate_agent_memory_permissions.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-stored-procedures",
+                        "path":  "Database/migrate_agent_memory_stored_procedures.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-run-audit-envelope",
+                        "path":  "Database/migrate_agent_run_audit_envelope.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-chat-message-tags-envelope",
+                        "path":  "Database/migrate_chat_message_tags_envelope.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-chat-turn-audit",
+                        "path":  "Database/migrate_chat_turn_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-code-indexing",
+                        "path":  "Database/migrate_code_indexing.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-collective-memory",
+                        "path":  "Database/migrate_collective_memory.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-decisions-category-status",
+                        "path":  "Database/migrate_decisions_category_status.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-governance-event",
+                        "path":  "Database/migrate_governance_event.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.GovernanceEvent",
+                                               "governance.AppendGovernanceEvent",
+                                               "governance.GetGovernanceEvent",
+                                               "governance.ListGovernanceEventsForProject",
+                                               "governance.ListGovernanceEventsForCorrelation",
+                                               "governance.ListGovernanceEventsForSubject",
+                                               "governance.ListGovernanceEventsCausedBy"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlGovernanceEventStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G governance event migration; manifest-applied and verifier-checked."
+                    },
+                    {
+                        "id":  "database.migrate-implementation-plans",
+                        "path":  "Database/migrate_implementation_plans.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-persistent-chat",
+                        "path":  "Database/migrate_persistent_chat.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-plans-to-tickets",
+                        "path":  "Database/migrate_plans_to_tickets.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-project-context-documents",
+                        "path":  "Database/migrate_project_context_documents.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-project-documents",
+                        "path":  "Database/migrate_project_documents.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-project-profiles",
+                        "path":  "Database/migrate_project_profiles.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-projects-indexing-fields",
+                        "path":  "Database/migrate_projects_indexing_fields.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-structured-tickets",
+                        "path":  "Database/migrate_structured_tickets.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-ticket-draft-fields",
+                        "path":  "Database/migrate_ticket_draft_fields.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-tool-execution-audit",
+                        "path":  "Database/migrate_tool_execution_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "agent-run",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-tool-request",
+                        "path":  "Database/migrate_tool_request.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "tool-request",
+                        "objectsCreated":  [
+                                               "governance.ToolRequest",
+                                               "governance.usp_ToolRequest_Create",
+                                               "governance.usp_ToolRequest_GetById",
+                                               "governance.usp_ToolRequest_ListForProject",
+                                               "governance.usp_ToolRequest_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.GovernanceEvent"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlToolRequestStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G durable tool request migration; manifest-applied and verifier-checked."
+                    },
+                    {
+                        "id":  "database.migration-tickets-linked-files",
+                        "path":  "Database/migration_tickets_linked_files.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.rebuild-db",
+                        "path":  "Database/rebuild_db.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local/dev rebuild script; destructive by design and not runtime migration discipline."
+                    },
+                    {
+                        "id":  "database.seed-dev-data",
+                        "path":  "Database/seed_dev_data.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local seed data only."
+                    },
+                    {
+                        "id":  "database.setup-irondev-record",
+                        "path":  "Database/setup_irondev_record.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local IronDev project seed/update script."
+                    },
+                    {
+                        "id":  "database.update-schema-v1-indexing",
+                        "path":  "Database/update_schema_v1_indexing.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "legacy-unused",
+                        "ownerArea":  "unknown",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Older indexing update script that drops and recreates CodeIndexEntries; retained as uncertain legacy debt."
+                    },
+                    {
+                        "id":  "runtime.governance-event-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlGovernanceEventStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.AppendGovernanceEvent",
+                                              "governance.GetGovernanceEvent",
+                                              "governance.ListGovernanceEventsForProject",
+                                              "governance.ListGovernanceEventsForCorrelation",
+                                              "governance.ListGovernanceEventsForSubject",
+                                              "governance.ListGovernanceEventsCausedBy"
+                                          ],
+                        "referencedBy":  [
+                                             "runtime governance event repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation."
+                    },
+                    {
+                        "id":  "runtime.tool-request-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlToolRequestStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "tool-request",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_ToolRequest_Create",
+                                              "governance.usp_ToolRequest_GetById",
+                                              "governance.usp_ToolRequest_ListForProject",
+                                              "governance.usp_ToolRequest_ListForCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "runtime tool request repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation."
+                    },
+                    {
+                        "id":  "runtime.api-tool-request-cache",
+                        "path":  "IronDev.Api/Controllers/SqlToolRequestApiStore.cs",
+                        "kind":  "inline-query",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.ToolRequest"
+                                          ],
+                        "referencedBy":  [
+                                             "ToolRequestsV1Controller"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "API reads durable tool requests; request creation remains through governed store path."
+                    },
+                    {
+                        "id":  "test.integration-test-base",
+                        "path":  "IronDev.IntegrationTests/IntegrationTestBase.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+                                               "test bootstrap tables"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo application tables"
+                                          ],
+                        "referencedBy":  [
+                                             "integration tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test fixture setup/reset SQL only."
+                    },
+                    {
+                        "id":  "test.api-test-base",
+                        "path":  "IronDev.IntegrationTests.Api/ApiTestBase.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+                                               "test bootstrap tables"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo application tables"
+                                          ],
+                        "referencedBy":  [
+                                             "API integration tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "API test fixture setup/reset SQL only."
+                    },
+                    {
+                        "id":  "test.agent-memory-schema-support",
+                        "path":  "IronDev.IntegrationTests/AgentMemory/AgentMemorySchemaTestSupport.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "agent memory schema"
+                                          ],
+                        "referencedBy":  [
+                                             "agent memory SQL tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test-only agent schema teardown/apply helper."
+                    },
+                    {
+                        "id":  "test.database-migration-receipt",
+                        "path":  "IronDev.IntegrationTests/Governance/DatabaseMigrationApplicationReceiptTests.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "Database/apply-migrations.ps1",
+                                              "Database/verify-migrations.ps1"
+                                          ],
+                        "referencedBy":  [
+                                             "PR74a receipt tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test-only migration receipt proof."
+                    },
+                    {
+                        "id":  "tool.localtest-seed",
+                        "path":  "tools/localtest/localtest-seed.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+                                               "localtest seed/bootstrap tables"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo application tables"
+                                          ],
+                        "referencedBy":  [
+                                             "tools/localtest/reset-localtest-data.ps1"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "LocalTest seed/reset script."
+                    },
+                    {
+                        "id":  "tool.localtest-reset",
+                        "path":  "tools/localtest/reset-localtest-data.ps1",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "tools/localtest/localtest-seed.sql",
+                                              "Database/local_dev_setup.sql"
+                                          ],
+                        "referencedBy":  [
+                                             "LocalTest reset workflow"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "LocalTest reset utility."
+                    },
+                    {
+                        "id":  "database.apply-migrations",
+                        "path":  "Database/apply-migrations.ps1",
+                        "kind":  "test-helper",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "Database/migrations.json"
+                                          ],
+                        "referencedBy":  [
+                                             "PR74a migration receipt",
+                                             "PR74b inventory checker"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  false,
+                        "notes":  "Applies ordered manifest entries; utility, not runtime."
+                    },
+                    {
+                        "id":  "database.verify-migrations",
+                        "path":  "Database/verify-migrations.ps1",
+                        "kind":  "test-helper",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance schema",
+                                              "governance.ToolRequest"
+                                          ],
+                        "referencedBy":  [
+                                             "PR74a migration receipt"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  true,
+                        "notes":  "Verifies current Block G migration objects and constraints."
+                    },
+                    {
+                        "id":  "docs.migration-007-chat-feedback",
+                        "path":  "Docs/migrations/007_ChatMessageFeedback.sql",
+                        "kind":  "doc-only",
+                        "bucket":  "legacy-unused",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+                                               "dbo.ChatMessageFeedback"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "documentation migration history"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Historical doc migration artifact."
+                    },
+                    {
+                        "id":  "docs.migration-008-chat-turn-audit",
+                        "path":  "Docs/migrations/008_ChatTurnAudit.sql",
+                        "kind":  "doc-only",
+                        "bucket":  "legacy-unused",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+                                               "dbo.ChatTurnGovernance",
+                                               "dbo.ChatTurnClarifications",
+                                               "dbo.ChatTurnTraces"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "documentation migration history"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Historical doc migration artifact."
+                    }
+                ]
+}

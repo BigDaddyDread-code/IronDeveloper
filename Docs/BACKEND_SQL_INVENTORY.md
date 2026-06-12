@@ -154,3 +154,92 @@ Result-shape changes:
 - Critic remains distinct from governance.
 - Memory safe remains distinct from promotion.
 - No FK or constraint was weakened.
+
+# PR74b retrospective SQL inventory and runtime dependency map
+
+PR 74b is truth-finding, not schema cleanup. It updates this existing SQL inventory with the current Block G migration manifest view and separates required runtime schema from runtime queries, test fixtures, local/dev utilities, legacy artifacts, and future migration candidates.
+
+No schema, stored procedure shape, API, CLI, UI, runtime behavior, persistence behavior, authority, workflow, A2A, LangGraph path, source apply, or memory promotion changes are made by PR74b.
+
+## 1. Summary
+
+- `Database/sql-inventory.json` is the machine-readable retrospective inventory.
+- `Database/migrations.json` currently applies only the Block G governance event and durable tool request migrations.
+- `Database/verify-migrations.ps1` currently verifies only the Block G governance/tool-request objects and constraints.
+- Older runtime SQL remains inventoried as required runtime schema, but mostly `appliedByManifest: false` and `verifiedByScript: false`.
+- Existing runtime DDL candidates remain explicit migration-discipline debt; they are not fixed in this PR.
+
+## 2. Required runtime schema
+
+Current manifest-covered runtime schema:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_governance_event.sql` | governance | Yes | Yes | Creates `governance.GovernanceEvent` and governance event procedures. |
+| `Database/migrate_tool_request.sql` | tool-request | Yes | Yes | Creates `governance.ToolRequest`, tool request procedures, and `FK_ToolRequest_GovernanceEvent`. |
+
+Runtime schema not yet covered by the current PR74a manifest includes agent memory, agent run audit, collective memory, tool execution audit, project documents, project profiles, chat, ticket, code indexing, project context, and decision lookup migrations. Those are intentionally listed in `Database/sql-inventory.json` as required runtime schema with manifest/verify coverage set to false unless currently proven.
+
+## 3. Required runtime stored procedures
+
+Current Block G stored procedure dependencies:
+
+| Procedure | Called by | Covered by manifest | Verified |
+| --- | --- | --- | --- |
+| `governance.AppendGovernanceEvent` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.GetGovernanceEvent` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsForProject` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsForCorrelation` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsForSubject` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.ListGovernanceEventsCausedBy` | `SqlGovernanceEventStore` | Yes | Yes |
+| `governance.usp_ToolRequest_Create` | `SqlToolRequestStore` | Yes | Yes |
+| `governance.usp_ToolRequest_GetById` | `SqlToolRequestStore` | Yes | Yes |
+| `governance.usp_ToolRequest_ListForProject` | `SqlToolRequestStore` | Yes | Yes |
+| `governance.usp_ToolRequest_ListForCorrelation` | `SqlToolRequestStore` | Yes | Yes |
+
+Older stored procedure surfaces remain inventoried, including `agent.usp_*`, collective memory procedures, and `toolaudit.*` audit procedures. They are active but outside the current Block G manifest proof.
+
+## 4. Required runtime inline SQL
+
+Runtime inline SQL remains present in application services such as project, ticket, project memory/context, project document, semantic memory, and legacy run stores. These are required runtime queries or legacy bootstrap DDL candidates and are separately documented in `Docs/BACKEND_INLINE_SQL_INVENTORY.md`.
+
+The new Block G governance/tool-request stores use stored procedures for governed writes/reads and do not create schema at runtime.
+
+## 5. Required test SQL
+
+Required test SQL includes `IntegrationTestBase`, `ApiTestBase`, agent memory schema helpers, API audit seed helpers, and specific SQL-heavy integration tests. These are test fixtures and must not be mistaken for production migration ownership.
+
+## 6. Local/dev utility SQL
+
+Local/dev utility SQL includes `Database/local_dev_setup.sql`, `Database/rebuild_db.sql`, `Database/seed_dev_data.sql`, `Database/setup_irondev_record.sql`, `tools/localtest/localtest-seed.sql`, and localtest reset scripts.
+
+These are useful developer workflows, not runtime migration proof.
+
+## 7. Legacy or unused SQL
+
+Legacy or uncertain SQL remains in place. Examples include `Database/update_schema_v1_indexing.sql` and `Docs/migrations/*.sql`. They are inventoried, not deleted.
+
+## 8. Future migration candidates
+
+Future migration candidates include legacy runtime DDL/bootstrap services and older active runtime schema scripts not yet represented in the ordered migration manifest and verification script.
+
+Candidate areas:
+
+- Run and run-event stores.
+- Ticket/project memory/project document bootstrap DDL.
+- Semantic memory cache/index bootstrap DDL.
+- Agent memory, audit, collective memory, and tool audit migrations outside the current Block G manifest.
+
+## 9. Known gaps
+
+- The current ordered manifest is intentionally narrow and covers only PR72/73/74 Block G governance/tool-request migrations.
+- Older active SQL still needs migration-ownership decisions.
+- Runtime DDL candidates remain explicit debt.
+- This PR does not prove real DB API smoke behavior; PR74c remains necessary.
+
+## 10. Next cleanup candidates
+
+- Expand ordered migration discipline beyond Block G after ownership is confirmed.
+- Move remaining runtime bootstrap DDL behind migrations without changing runtime result shapes.
+- Decide whether historical docs migrations should remain, move, or be retired after freeze.
+- Add PR74c API smoke receipt against a migrated database.
