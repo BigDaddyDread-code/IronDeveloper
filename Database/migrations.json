@@ -1,0 +1,14 @@
+{
+  "migrations": [
+    {
+      "id": "2026-06-block-g-governance-event",
+      "path": "Database/migrate_governance_event.sql",
+      "description": "Creates governance schema, GovernanceEvent table, governance event stored procedures, indexes, append-only trigger, and runtime role protections."
+    },
+    {
+      "id": "2026-06-block-g-tool-request",
+      "path": "Database/migrate_tool_request.sql",
+      "description": "Creates durable ToolRequest table and stored procedures linked to GovernanceEvent."
+    }
+  ]
+}

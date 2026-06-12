@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.SqlTypes;
 using Dapper;
 using IronDev.Core.Governance;
 using IronDev.Data;
@@ -450,7 +451,7 @@ public sealed class ToolRequestStoreTests : IntegrationTestBase
     {
         var expected = summaries
             .OrderByDescending(summary => summary.CreatedUtc)
-            .ThenByDescending(summary => summary.ToolRequestId)
+            .ThenByDescending(summary => new SqlGuid(summary.ToolRequestId))
             .Select(summary => summary.ToolRequestId)
             .ToArray();
         var actual = summaries.Select(summary => summary.ToolRequestId).ToArray();
