@@ -3,40 +3,41 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests.Database;
 
 [TestClass]
-public sealed class RealDatabaseApprovalDecisionSmokeTests
+public sealed class RealDatabasePolicyDecisionSmokeTests
 {
     [TestMethod]
-    public void ApprovalDecisionSmokeScript_RecordsDurableApprovalWithoutSideEffects()
+    public void PolicyDecisionSmokeScript_RecordsDurablePolicyDecisionWithoutSideEffects()
     {
         var root = FindRepositoryRoot();
-        var script = File.ReadAllText(Path.Combine(root, "Database", "smoke-approval-decision.ps1"));
-        var receipt = File.ReadAllText(Path.Combine(root, "Docs", "receipts", "PR76_REAL_DB_APPROVAL_DECISION_SMOKE_RECEIPT.md"));
+        var script = File.ReadAllText(Path.Combine(root, "Database", "smoke-policy-decision.ps1"));
+        var receipt = File.ReadAllText(Path.Combine(root, "Docs", "receipts", "PR77_REAL_DB_POLICY_DECISION_SMOKE_RECEIPT.md"));
 
         StringAssert.Contains(script, "governance.usp_ToolRequest_Create");
         StringAssert.Contains(script, "governance.usp_ToolGateDecision_Record");
         StringAssert.Contains(script, "governance.usp_ApprovalDecision_Record");
-        StringAssert.Contains(script, "approval.decision.recorded");
-        StringAssert.Contains(script, "durableApprovalDecisionRecorded");
-        StringAssert.Contains(script, "approvalGovernanceEventRecorded");
-        StringAssert.Contains(script, "approvalDecisionIsExecutionPermission");
-        StringAssert.Contains(script, "policyDecisionCreated");
+        StringAssert.Contains(script, "governance.usp_PolicyDecisionEvent_Record");
+        StringAssert.Contains(script, "policy.decision.recorded");
+        StringAssert.Contains(script, "durablePolicyDecisionRecorded");
+        StringAssert.Contains(script, "policyGovernanceEventRecorded");
+        StringAssert.Contains(script, "policyDecisionIsApproval");
+        StringAssert.Contains(script, "policyDecisionIsExecutionPermission");
         StringAssert.Contains(script, "toolExecuted");
         StringAssert.Contains(script, "sourceApplied");
         StringAssert.Contains(script, "memoryPromoted");
         StringAssert.Contains(script, "workflowStarted");
         StringAssert.Contains(script, "a2aHandoffCreated");
         StringAssert.Contains(script, "dogfoodReceiptCreated");
-        StringAssert.Contains(receipt, "Approval remains evidence.");
+        StringAssert.Contains(receipt, "Policy decision remains evidence.");
     }
 
     [TestMethod]
-    public void ApprovalDecisionSmokeReceipt_IsAsciiAndHasNoBom()
+    public void PolicyDecisionSmokeReceipt_IsAsciiAndHasNoBom()
     {
         var root = FindRepositoryRoot();
         foreach (var relativePath in new[]
         {
-            Path.Combine("Database", "smoke-approval-decision.ps1"),
-            Path.Combine("Docs", "receipts", "PR76_REAL_DB_APPROVAL_DECISION_SMOKE_RECEIPT.md")
+            Path.Combine("Database", "smoke-policy-decision.ps1"),
+            Path.Combine("Docs", "receipts", "PR77_REAL_DB_POLICY_DECISION_SMOKE_RECEIPT.md")
         })
         {
             var bytes = File.ReadAllBytes(Path.Combine(root, relativePath));

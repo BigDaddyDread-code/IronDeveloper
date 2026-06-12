@@ -14,7 +14,7 @@ Current Block G order:
 2. `Database/migrate_tool_request.sql`
 3. `Database/migrate_tool_gate_decision.sql`
 
-The order matters because `governance.ToolRequest` depends on `governance.GovernanceEvent`.
+The order matters because each durable ledger depends on the earlier governance evidence chain: tool requests depend on governance events, gate decisions depend on tool requests, approval decisions depend on governance events, and policy decision events may reference tool request, gate, and approval evidence.
 
 ## Apply migrations
 
@@ -40,14 +40,14 @@ The script:
 .\Database\verify-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
-The verifier checks the governance schema, governance event table/procedures/trigger, tool request table/procedures, the ToolRequest-to-GovernanceEvent foreign key, and the key JSON/version constraints.
+The verifier checks the governance schema, governance event table/procedures/trigger, tool request, tool gate decision, approval decision, and policy decision event tables/procedures/triggers/foreign keys plus key JSON/version constraints.
 
 ## Runtime DDL boundary
 
-Runtime services may call stored procedures. They must not create the governance schema or governance/tool-request/tool-gate-decision tables on startup.
+Runtime services may call stored procedures. They must not create the governance schema or governance/tool-request/tool-gate-decision/approval-decision/policy-decision-event tables on startup.
 
 PR 74a does not remove older non-Block-G runtime DDL debt. Those legacy exceptions remain documented cleanup debt; this receipt only prevents the new governance/tool-request/tool-gate-decision path from relying on hidden runtime schema creation.
 
 ## Non-goals
 
-This is not a migration framework rewrite. It does not add policy decisions, dogfood receipt durability, workflow, A2A, LangGraph, source apply, memory promotion, UI, API expansion, or CLI expansion.
+This is not a migration framework rewrite. It does not add dogfood receipt durability, workflow, A2A, LangGraph, source apply, memory promotion, UI, API expansion, or CLI expansion.

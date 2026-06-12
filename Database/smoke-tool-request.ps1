@@ -325,6 +325,7 @@ try {
         }
 
         Assert-NoRowsIfObjectExists -Connection $connection -Name "governance.ToolGateDecision" -Sql "SELECT COUNT(*) FROM governance.ToolGateDecision WHERE ToolRequestId = '$toolRequestId'"
+        Assert-NoRowsIfObjectExists -Connection $connection -Name "governance.PolicyDecisionEvent" -Sql "SELECT COUNT(*) FROM governance.PolicyDecisionEvent WHERE ProjectId = '$projectId' AND CorrelationId = '$correlationId'"
 
         $summary = [ordered]@{
             database = if ([string]::IsNullOrWhiteSpace($Database)) { "connection-string-database" } else { $Database }
@@ -337,6 +338,7 @@ try {
             requestOnly = $true
             gateDecisionCreated = $false
             approvalDecisionCreated = $false
+            policyDecisionCreated = $false
             dogfoodReceiptCreated = $false
             workflowStateCreated = $false
             a2aHandoffCreated = $false

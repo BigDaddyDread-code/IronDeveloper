@@ -43,6 +43,7 @@ public sealed class RealDatabaseToolRequestSmokeTests
                  {
                      "governance.ApprovalDecision",
                      "governance.PolicyDecision",
+                     "governance.PolicyDecisionEvent",
                      "governance.DogfoodReceipt",
                      "governance.WorkflowState",
                      "governance.WorkflowStep",
@@ -58,6 +59,7 @@ public sealed class RealDatabaseToolRequestSmokeTests
         StringAssert.Contains(text, "gateDecisionCreated = $false");
         StringAssert.Contains(text, "Assert-NoRowsIfObjectExists");
         StringAssert.Contains(text, "approvalDecisionCreated = $false");
+        StringAssert.Contains(text, "policyDecisionCreated = $false");
         StringAssert.Contains(text, "dogfoodReceiptCreated = $false");
         StringAssert.Contains(text, "workflowStateCreated = $false");
         StringAssert.Contains(text, "a2aHandoffCreated = $false");

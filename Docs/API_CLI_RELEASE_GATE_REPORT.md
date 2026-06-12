@@ -171,7 +171,7 @@ PR 62/75 Tool Gate API records durable SQL-backed gate decision evidence once th
 
 PR 63 Dogfood Loop API remains non-durable API-local receipt storage unless durable SQL-backed Dogfood Loop Store has landed.
 
-PR 76 Approval Decision Store records durable SQL-backed approval decision evidence. It has no Block F API or CLI endpoint and does not grant execution permission, source apply, external effects, or memory promotion.
+PR 76 Approval Decision Store records durable SQL-backed approval decision evidence. It has no Block F API or CLI endpoint and does not grant execution permission, source apply, external effects, or memory promotion. PR77 Policy Decision Event Store records durable SQL-backed policy decision evidence. It has no API/CLI endpoint and does not approve, execute, satisfy policy, continue workflow, apply source, create A2A handoff, create dogfood receipt, or promote memory.
 
 Non-durable gate and dogfood records are not:
 

@@ -245,3 +245,14 @@ Candidate areas:
 - Move remaining runtime bootstrap DDL behind migrations without changing runtime result shapes.
 - Decide whether historical docs migrations should remain, move, or be retired after freeze.
 - Add PR74c API smoke receipt against a migrated database.
+
+## PR77 durable policy decision event update
+
+PR77 adds the fifth Block G manifest-covered governance ledger:
+
+| Object/script | Owner | Manifest applied | Verify script checked | Notes |
+| --- | --- | --- | --- | --- |
+| `Database/migrate_policy_decision_event.sql` | governance | Yes | Yes | Creates `governance.PolicyDecisionEvent`, stored procedures, validation triggers, and optional links to tool request, tool gate decision, and approval decision evidence. |
+| `IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_PolicyDecisionEvent_*` stored procedures only; no runtime schema creation and no API/CLI endpoint. |
+
+Policy decision events are evidence only. They do not approve, execute, satisfy policy, continue workflow, apply source, create A2A handoff, create dogfood receipt, or promote memory.

@@ -27,6 +27,8 @@ $query = @(
 'DECLARE @ToolGateEventId UNIQUEIDENTIFIER = NEWID();',
 'DECLARE @ApprovalDecisionId UNIQUEIDENTIFIER = NEWID();',
 'DECLARE @ApprovalEventId UNIQUEIDENTIFIER = NEWID();',
+'DECLARE @PolicyDecisionEventId UNIQUEIDENTIFIER = NEWID();',
+'DECLARE @PolicyEventId UNIQUEIDENTIFIER = NEWID();',
 'DECLARE @SubjectId NVARCHAR(200) = CONVERT(NVARCHAR(36), @ToolRequestId);',
 '',
 'EXEC governance.usp_ToolRequest_Create',
@@ -39,10 +41,10 @@ $query = @(
 '    @RequestedByActorId = N''smoke-agent'',',
 '    @CorrelationId = @CorrelationId,',
 '    @CausationId = NULL,',
-'    @Purpose = N''PR76 durable approval decision smoke request.'',',
+'    @Purpose = N''PR77 durable policy decision smoke request.'',',
 '    @RequestPayloadVersion = 1,',
-'    @RequestPayloadJson = N''{"schemaVersion":1,"purpose":"approval-decision-smoke"}'',',
-'    @GovernanceEventPayloadJson = N''{"schemaVersion":1,"source":"smoke-approval-decision"}'';',
+'    @RequestPayloadJson = N''{"schemaVersion":1,"purpose":"policy-decision-smoke"}'',',
+'    @GovernanceEventPayloadJson = N''{"schemaVersion":1,"source":"smoke-policy-decision"}'';',
 '',
 'EXEC governance.usp_ToolGateDecision_Record',
 '    @ToolGateDecisionId = @ToolGateDecisionId,',
@@ -59,7 +61,7 @@ $query = @(
 '    @ReasonCode = N''SMOKE_REQUIRES_APPROVAL'',',
 '    @EvidenceVersion = 1,',
 '    @EvidenceJson = N''{"schemaVersion":1,"evidence":"smoke"}'',',
-'    @GovernanceEventPayloadJson = N''{"schemaVersion":1,"source":"smoke-approval-decision"}'';',
+'    @GovernanceEventPayloadJson = N''{"schemaVersion":1,"source":"smoke-policy-decision"}'';',
 '',
 'EXEC governance.usp_ApprovalDecision_Record',
 '    @ApprovalDecisionId = @ApprovalDecisionId,',
@@ -78,17 +80,42 @@ $query = @(
 '    @CausationId = @ToolGateEventId,',
 '    @EvidenceVersion = 1,',
 '    @EvidenceJson = N''{"schema":"approval.decision.evidence.v1","reviewedBy":"human","evidenceRefs":["tool_request:smoke","tool_gate_decision:smoke"],"grantsExecution":false,"mutatesSource":false,"promotesMemory":false,"startsWorkflow":false}'',',
-'    @GovernanceEventPayloadJson = N''{"schema":"approval.decision.recorded.v1","source":"smoke-approval-decision","grantsExecution":false,"mutatesSource":false,"promotesMemory":false,"startsWorkflow":false}'';',
+'    @GovernanceEventPayloadJson = N''{"schema":"approval.decision.recorded.v1","source":"smoke-policy-decision","grantsExecution":false,"mutatesSource":false,"promotesMemory":false,"startsWorkflow":false}'';',
+'',
+'EXEC governance.usp_PolicyDecisionEvent_Record',
+'    @PolicyDecisionEventId = @PolicyDecisionEventId,',
+'    @ProjectId = @ProjectId,',
+'    @GovernanceEventId = @PolicyEventId,',
+'    @PolicyScope = N''tool_execution'',',
+'    @PolicyName = N''tool-execution-policy'',',
+'    @PolicyVersion = 1,',
+'    @SubjectType = N''tool_request'',',
+'    @SubjectId = @SubjectId,',
+'    @Decision = N''RequiresApproval'',',
+'    @RequirementCode = N''HUMAN_APPROVAL_REQUIRED'',',
+'    @ReasonCode = N''SOURCE_MUTATION_REQUIRES_APPROVAL'',',
+'    @Reason = N''Policy check recorded approval requirement only.'',',
+'    @DecidedByActorType = N''system'',',
+'    @DecidedByActorId = N''smoke-policy-check'',',
+'    @RelatedToolRequestId = @ToolRequestId,',
+'    @RelatedToolGateDecisionId = @ToolGateDecisionId,',
+'    @RelatedApprovalDecisionId = @ApprovalDecisionId,',
+'    @CorrelationId = @CorrelationId,',
+'    @CausationId = @ApprovalEventId,',
+'    @EvidenceVersion = 1,',
+'    @EvidenceJson = N''{"schema":"policy.decision.evidence.v1","inputRefs":["tool_request:smoke","tool_gate_decision:smoke","approval_decision:smoke"],"result":{"decision":"RequiresApproval","requirementCode":"HUMAN_APPROVAL_REQUIRED"},"grantsApproval":false,"grantsExecution":false,"mutatesSource":false,"promotesMemory":false,"startsWorkflow":false,"satisfiesPolicy":false,"transfersAuthority":false}'',',
+'    @GovernanceEventPayloadJson = N''{"schema":"policy.decision.recorded.v1","source":"smoke-policy-decision","grantsApproval":false,"grantsExecution":false,"mutatesSource":false,"promotesMemory":false,"startsWorkflow":false,"satisfiesPolicy":false,"transfersAuthority":false}'';',
 '',
 'SELECT',
 '    @ProjectId AS projectId,',
 '    @ToolRequestId AS toolRequestId,',
 '    @ToolGateDecisionId AS toolGateDecisionId,',
 '    @ApprovalDecisionId AS approvalDecisionId,',
-'    CAST(CASE WHEN EXISTS (SELECT 1 FROM governance.ApprovalDecision WHERE ApprovalDecisionId = @ApprovalDecisionId) THEN 1 ELSE 0 END AS bit) AS durableApprovalDecisionRecorded,',
-'    CAST(CASE WHEN EXISTS (SELECT 1 FROM governance.GovernanceEvent WHERE EventId = @ApprovalEventId AND EventType = N''approval.decision.recorded'') THEN 1 ELSE 0 END AS bit) AS approvalGovernanceEventRecorded,',
-'    CAST(0 AS bit) AS approvalDecisionIsExecutionPermission,',
-'    CAST(0 AS bit) AS policyDecisionCreated,',
+'    @PolicyDecisionEventId AS policyDecisionEventId,',
+'    CAST(CASE WHEN EXISTS (SELECT 1 FROM governance.PolicyDecisionEvent WHERE PolicyDecisionEventId = @PolicyDecisionEventId) THEN 1 ELSE 0 END AS bit) AS durablePolicyDecisionRecorded,',
+'    CAST(CASE WHEN EXISTS (SELECT 1 FROM governance.GovernanceEvent WHERE EventId = @PolicyEventId AND EventType = N''policy.decision.recorded'') THEN 1 ELSE 0 END AS bit) AS policyGovernanceEventRecorded,',
+'    CAST(0 AS bit) AS policyDecisionIsApproval,',
+'    CAST(0 AS bit) AS policyDecisionIsExecutionPermission,',
 '    CAST(0 AS bit) AS toolExecuted,',
 '    CAST(0 AS bit) AS sourceApplied,',
 '    CAST(0 AS bit) AS memoryPromoted,',
@@ -100,12 +127,12 @@ $query = @(
 
 $result = @(Invoke-Sqlcmd @invokeParams -Query $query) | Select-Object -Last 1
 
-if (-not $result.durableApprovalDecisionRecorded -or -not $result.approvalGovernanceEventRecorded) {
-    throw 'Approval decision smoke did not record durable approval decision and governance event.'
+if (-not $result.durablePolicyDecisionRecorded -or -not $result.policyGovernanceEventRecorded) {
+    throw 'Policy decision smoke did not record durable policy decision and governance event.'
 }
 
-if ($result.approvalDecisionIsExecutionPermission -or $result.policyDecisionCreated -or $result.toolExecuted -or $result.sourceApplied -or $result.memoryPromoted -or $result.workflowStarted -or $result.a2aHandoffCreated -or $result.dogfoodReceiptCreated -or $result.externalEffectCreated) {
-    throw 'Approval decision smoke produced forbidden side effects.'
+if ($result.policyDecisionIsApproval -or $result.policyDecisionIsExecutionPermission -or $result.toolExecuted -or $result.sourceApplied -or $result.memoryPromoted -or $result.workflowStarted -or $result.a2aHandoffCreated -or $result.dogfoodReceiptCreated -or $result.externalEffectCreated) {
+    throw 'Policy decision smoke produced forbidden side effects.'
 }
 
 $result | Select-Object `
@@ -113,10 +140,11 @@ $result | Select-Object `
     toolRequestId, `
     toolGateDecisionId, `
     approvalDecisionId, `
-    durableApprovalDecisionRecorded, `
-    approvalGovernanceEventRecorded, `
-    approvalDecisionIsExecutionPermission, `
-    policyDecisionCreated, `
+    policyDecisionEventId, `
+    durablePolicyDecisionRecorded, `
+    policyGovernanceEventRecorded, `
+    policyDecisionIsApproval, `
+    policyDecisionIsExecutionPermission, `
     toolExecuted, `
     sourceApplied, `
     memoryPromoted, `

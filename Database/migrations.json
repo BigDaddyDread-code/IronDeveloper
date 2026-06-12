@@ -19,6 +19,11 @@
                            "id":  "2026-06-block-g-approval-decision",
                            "path":  "Database/migrate_approval_decision.sql",
                            "description":  "Creates durable ApprovalDecision table and stored procedures linked to GovernanceEvent with scoped approval subjects."
+                       },
+                       {
+                           "id":  "2026-06-block-g-policy-decision-event",
+                           "path":  "Database/migrate_policy_decision_event.sql",
+                           "description":  "Creates durable PolicyDecisionEvent table and stored procedures linked to GovernanceEvent and optional request, gate, and approval evidence."
                        }
                    ]
 }

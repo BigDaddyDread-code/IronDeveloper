@@ -41,10 +41,12 @@ public sealed class RealDatabaseToolGateDecisionSmokeTests
         StringAssert.Contains(text, "durableGateDecisionRecorded = $true");
         StringAssert.Contains(text, "gateDecisionIsApproval = $false");
         StringAssert.Contains(text, "gatePassIsHumanApproval = $false");
+        StringAssert.Contains(text, "policyDecisionCreated = $false");
         StringAssert.Contains(text, "executionPermissionGranted = $false");
         StringAssert.Contains(text, "toolExecuted = $false");
         StringAssert.Contains(text, "sourceApplied = $false");
         StringAssert.Contains(text, "memoryPromoted = $false");
+        StringAssert.Contains(text, "governance.PolicyDecisionEvent");
         StringAssert.Contains(text, "CK_ToolGateDecision_NoApprovalGrant");
         StringAssert.Contains(text, "CK_ToolGateDecision_NoExecutionGrant");
     }

@@ -173,6 +173,14 @@ try {
         Assert-Exists -Connection $connection -Name "linked tool.gate.decision.recorded governance event" -Sql "SELECT COUNT(*) FROM governance.GovernanceEvent WHERE EventId = '$toolGateEventId' AND EventType = N'tool.gate.decision.recorded' AND SubjectType = N'tool_gate_decision' AND SubjectId = N'$toolGateDecisionId'"
         Assert-Exists -Connection $connection -Name "tool request list returns gate decision" -Sql "SELECT COUNT(*) FROM governance.ToolGateDecision WHERE ProjectId = '$projectId' AND ToolRequestId = '$toolRequestId'"
         Assert-Exists -Connection $connection -Name "correlation list returns gate decision" -Sql "SELECT COUNT(*) FROM governance.ToolGateDecision WHERE ProjectId = '$projectId' AND CorrelationId = '$correlationId'"
+        $policyDecisionRows = 0
+        if ([int](Invoke-Scalar -Connection $connection -Sql "SELECT CASE WHEN OBJECT_ID(N'governance.PolicyDecisionEvent', N'U') IS NULL THEN 0 ELSE 1 END") -eq 1) {
+            $policyDecisionRows = [int](Invoke-Scalar -Connection $connection -Sql "SELECT COUNT(*) FROM governance.PolicyDecisionEvent WHERE ProjectId = '$projectId' AND CorrelationId = '$correlationId'")
+        }
+
+        if ($policyDecisionRows -ne 0) {
+            throw "Tool gate decision smoke unexpectedly created policy decision rows."
+        }
 
         $summary = [ordered]@{
             database = if ([string]::IsNullOrWhiteSpace($Database)) { "connection-string-database" } else { $Database }
@@ -184,6 +192,7 @@ try {
             durableGateDecisionRecorded = $true
             gateDecisionIsApproval = $false
             gatePassIsHumanApproval = $false
+            policyDecisionCreated = $false
             executionPermissionGranted = $false
             toolExecuted = $false
             sourceApplied = $false
