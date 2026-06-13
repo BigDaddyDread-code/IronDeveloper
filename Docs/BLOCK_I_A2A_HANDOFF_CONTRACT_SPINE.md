@@ -365,6 +365,16 @@ The pack proves that handoff, allowed-use evidence, no-authority-transfer valida
 
 The pack adds no A2A runtime, transport, API, CLI, workflow runner, LangGraph, source apply, memory promotion, accepted memory, release approval, approval satisfaction, or execution path.
 
+## PR97 Block I A2A Spine Receipt
+
+PR97 closes Block I with a receipt.
+
+The receipt states that Block I delivered the A2A Handoff Contract Spine, not A2A runtime.
+
+The receipt preserves the evidence-only and no-authority-transfer boundaries.
+
+The receipt explicitly refuses runtime, transport, workflow, source apply, memory promotion, accepted memory, release approval, approval satisfaction, and execution claims.
+
 ## Non-goals
 
 PR90 does not deliver:
