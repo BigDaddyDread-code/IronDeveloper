@@ -170,6 +170,23 @@ try {
             ,@{ Name = "AgentHandoff metadata JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'a2a.AgentHandoff') AND name = N'CK_AgentHandoff_MetadataJson_IsJson'" }
             ,@{ Name = "AgentHandoff no authority transfer check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'a2a.AgentHandoff') AND name = N'CK_AgentHandoff_NoAuthorityTransfer'" }
             ,@{ Name = "AgentHandoff evidence allowed-use check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'a2a.AgentHandoffEvidenceAllowedUse') AND name = N'CK_AgentHandoffEvidenceAllowedUse_Allowed'" }
+            ,@{ Name = "workflow schema"; Sql = "SELECT CASE WHEN SCHEMA_ID(N'workflow') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.WorkflowRun table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowRun', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.WorkflowRunStep table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowRunStep', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.WorkflowRunEvidenceReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowRunEvidenceReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.WorkflowRunGroundingReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowRunGroundingReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowRun_Create procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowRun_Create', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowRun_Get procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowRun_Get', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowRun_ListByProject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowRun_ListByProject', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowRun_ListByCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowRun_ListByCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowRun_ListBySubject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowRun_ListBySubject', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.TR_WorkflowRun_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.TR_WorkflowRun_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.TR_WorkflowRun_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.TR_WorkflowRun_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "WorkflowRun no workflow continuation check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRun') AND name = N'CK_WorkflowRun_NoWorkflowContinuation'" }
+            ,@{ Name = "WorkflowRun no authority transfer check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRun') AND name = N'CK_WorkflowRun_NoAuthorityTransfer'" }
+            ,@{ Name = "WorkflowRunStep no execution grant check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRunStep') AND name = N'CK_WorkflowRunStep_NoExecutionGrant'" }
+            ,@{ Name = "WorkflowRunEvidenceReference allowed-use check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRunEvidenceReference') AND name = N'CK_WorkflowRunEvidenceReference_AllowedUse_Allowed'" }
+            ,@{ Name = "WorkflowRunGroundingReference claim-type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRunGroundingReference') AND name = N'CK_WorkflowRunGroundingReference_ClaimType_Allowed'" }
         )
 
         foreach ($check in $checks) {

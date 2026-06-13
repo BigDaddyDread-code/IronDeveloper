@@ -458,6 +458,8 @@ public sealed class AgentHandoffContractTests
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "GroundingEvidenceReferenceModels.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "ThoughtLedgerHandoffEntryModels.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Workflow", "WorkflowRunModels.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.EndsWith(Path.Combine("IronDev.Infrastructure", "Workflow", "SqlWorkflowRunStore.cs"), StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         foreach (var file in files)

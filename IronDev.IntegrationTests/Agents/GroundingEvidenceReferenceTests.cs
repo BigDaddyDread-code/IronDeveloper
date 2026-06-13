@@ -495,7 +495,7 @@ public sealed class GroundingEvidenceReferenceTests
     {
         AssertNoProductionReference("IronDev.Api", "GroundingEvidenceReference");
         AssertNoProductionReference(Path.Combine("tools", "IronDev.Cli"), "GroundingEvidenceReference");
-        AssertNoDatabaseReference("GroundingEvidenceReference");
+        AssertNoDatabaseReference("GroundingEvidenceReference", "Database/migrate_workflow_run.sql", "Database/smoke-workflow-run.ps1", "Database/verify-migrations.ps1", "Database/sql-inventory.json");
         AssertNoProductionToken("IGroundingEvidenceReferenceStore", "SqlGroundingEvidenceReference", "GroundingEvidenceReferenceRepository");
         AssertNoProductionToken("AddScoped<IGroundingEvidenceReferenceFactory", "AddSingleton<IGroundingEvidenceReferenceFactory");
     }
@@ -694,14 +694,19 @@ public sealed class GroundingEvidenceReferenceTests
         }
     }
 
-    private static void AssertNoDatabaseReference(string token)
+    private static void AssertNoDatabaseReference(string token, params string[] allowedRelativePaths)
     {
-        var root = Path.Combine(RepositoryRoot(), "Database");
+        var repositoryRoot = RepositoryRoot();
+        var root = Path.Combine(repositoryRoot, "Database");
+        var allowed = allowedRelativePaths.Select(path => Path.GetFullPath(Path.Combine(repositoryRoot, path))).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
                      .Where(path => path.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
                                     || path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
                                     || path.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase)))
         {
+            if (allowed.Contains(Path.GetFullPath(file)))
+                continue;
+
             var source = File.ReadAllText(file);
             Assert.IsFalse(source.Contains(token, StringComparison.Ordinal), $"{token} must not be referenced by database artifact {file}.");
         }

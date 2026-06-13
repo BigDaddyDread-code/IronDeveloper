@@ -1011,6 +1011,53 @@
             "appliedByManifest": true,
             "verifiedByScript": true,
             "notes": "Runtime uses stored procedures after handoff and no-authority-transfer validation; no runtime schema creation and no delivery, execution, approval, policy, workflow, source apply, release, or memory promotion authority."
+        }        ,{
+            "id": "database.migrate-workflow-run",
+            "path": "Database/migrate_workflow_run.sql",
+            "kind": "migration-script",
+            "bucket": "required-runtime-schema",
+            "ownerArea": "workflow",
+            "objectsCreated": [
+                "workflow.WorkflowRun",
+                "workflow.WorkflowRunStep",
+                "workflow.WorkflowRunEvidenceReference",
+                "workflow.WorkflowRunGroundingReference",
+                "workflow.usp_WorkflowRun_Create",
+                "workflow.usp_WorkflowRun_Get",
+                "workflow.usp_WorkflowRun_ListByProject",
+                "workflow.usp_WorkflowRun_ListByCorrelation",
+                "workflow.usp_WorkflowRun_ListBySubject"
+            ],
+            "objectsCalled": [],
+            "referencedBy": [
+                "IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs",
+                "Database/migrations.json",
+                "Database/verify-migrations.ps1"
+            ],
+            "appliedByManifest": true,
+            "verifiedByScript": true,
+            "notes": "PR98 durable workflow run ledger; records run, step, evidence, and grounding references only. It is not workflow execution, workflow continuation, agent dispatch, tool execution, approval, policy satisfaction, source apply, release approval, or memory promotion."
+        },
+        {
+            "id": "runtime.workflow-run-store",
+            "path": "IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs",
+            "kind": "runtime-store",
+            "bucket": "stored-procedure-runtime",
+            "ownerArea": "workflow",
+            "objectsCreated": [],
+            "objectsCalled": [
+                "workflow.usp_WorkflowRun_Create",
+                "workflow.usp_WorkflowRun_Get",
+                "workflow.usp_WorkflowRun_ListByProject",
+                "workflow.usp_WorkflowRun_ListByCorrelation",
+                "workflow.usp_WorkflowRun_ListBySubject"
+            ],
+            "referencedBy": [
+                "durable workflow run repository"
+            ],
+            "appliedByManifest": true,
+            "verifiedByScript": true,
+            "notes": "Runtime uses stored procedures after workflow run validation; no runtime schema creation and no workflow execution, continuation, dispatch, approval, policy, source apply, release, or memory promotion authority."
         }
     ]
 }

@@ -39,6 +39,10 @@
             "id": "2026-06-block-i-agent-handoff",
             "path": "Database/migrate_agent_handoff.sql",
             "description": "Creates durable A2A AgentHandoff tables, stored procedures, append-only triggers, and evidence-only governance event linkage."
+        }        ,{
+            "id": "2026-06-block-j-workflow-run",
+            "path": "Database/migrate_workflow_run.sql",
+            "description": "Creates durable WorkflowRun tables, stored procedures, append-only triggers, and evidence-only workflow run storage."
         }
     ]
 }
