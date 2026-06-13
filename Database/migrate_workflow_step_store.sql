@@ -46,6 +46,197 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_WorkflowRunStep_Proje
     CREATE INDEX IX_WorkflowRunStep_Project_Subject_CreatedUtc ON workflow.WorkflowRunStep(ProjectId, SubjectType, SubjectId, CreatedUtc DESC, WorkflowRunStepId DESC) WHERE SubjectType IS NOT NULL AND SubjectId IS NOT NULL;
 GO
 
+CREATE OR ALTER TRIGGER workflow.TR_WorkflowRunStep_ValidateInsert
+ON workflow.WorkflowRunStep
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        JOIN workflow.WorkflowRun r ON r.WorkflowRunId = i.WorkflowRunId
+        WHERE r.ProjectId <> i.ProjectId
+    )
+        THROW 54020, 'Workflow run step project must match parent workflow run project.', 1;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        WHERE JSON_VALUE(i.MetadataJson, '$.grantsApproval') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.grantsExecution') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.mutatesSource') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.promotesMemory') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.startsWorkflow') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.continuesWorkflow') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.satisfiesPolicy') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.transfersAuthority') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.approvesRelease') = N'true'
+           OR JSON_VALUE(i.MetadataJson, '$.createsAcceptedMemory') = N'true'
+    )
+        THROW 54021, 'Workflow run step metadata must not claim authority or action.', 1;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        CROSS APPLY (SELECT LOWER(CONCAT(COALESCE(i.SafeSummary, N''), N' ', COALESCE(i.MetadataJson, N''))) AS UnsafeText) u
+        WHERE u.UnsafeText LIKE N'%private reasoning%'
+           OR u.UnsafeText LIKE N'%hidden reasoning%'
+           OR u.UnsafeText LIKE N'%hiddenreasoning%'
+           OR u.UnsafeText LIKE N'%chainofthought%'
+           OR u.UnsafeText LIKE N'%chain of thought%'
+           OR u.UnsafeText LIKE N'%chain-of-thought%'
+           OR u.UnsafeText LIKE N'%scratchpad%'
+           OR u.UnsafeText LIKE N'%rawprompt%'
+           OR u.UnsafeText LIKE N'%raw prompt%'
+           OR u.UnsafeText LIKE N'%rawcompletion%'
+           OR u.UnsafeText LIKE N'%raw completion%'
+           OR u.UnsafeText LIKE N'%rawtooloutput%'
+           OR u.UnsafeText LIKE N'%raw tool output%'
+           OR u.UnsafeText LIKE N'%entirepatch%'
+           OR u.UnsafeText LIKE N'%entire patch%'
+           OR u.UnsafeText LIKE N'%approval granted%'
+           OR u.UnsafeText LIKE N'%execution permission%'
+           OR u.UnsafeText LIKE N'%execution allowed%'
+           OR u.UnsafeText LIKE N'%policy satisfied%'
+           OR u.UnsafeText LIKE N'%tool executed%'
+           OR u.UnsafeText LIKE N'%source mutated%'
+           OR u.UnsafeText LIKE N'%memory promoted%'
+           OR u.UnsafeText LIKE N'%promote memory%'
+           OR u.UnsafeText LIKE N'%authority transferred%'
+           OR u.UnsafeText LIKE N'%release approved%'
+           OR u.UnsafeText LIKE N'%continue workflow%'
+    )
+        THROW 54022, 'Workflow run step text must not contain authority or raw/private reasoning markers.', 1;
+END;
+GO
+
+CREATE OR ALTER TRIGGER workflow.TR_WorkflowRunEvidenceReference_ValidateInsert
+ON workflow.WorkflowRunEvidenceReference
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        JOIN workflow.WorkflowRun r ON r.WorkflowRunId = i.WorkflowRunId
+        WHERE r.ProjectId <> i.ProjectId
+    )
+        THROW 54030, 'Workflow evidence project must match parent workflow run project.', 1;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        JOIN workflow.WorkflowRunStep s ON s.WorkflowRunStepId = i.WorkflowRunStepId
+        WHERE i.WorkflowRunStepId IS NOT NULL AND (s.ProjectId <> i.ProjectId OR s.WorkflowRunId <> i.WorkflowRunId)
+    )
+        THROW 54031, 'Workflow evidence step must belong to the same workflow run.', 1;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        CROSS APPLY (SELECT LOWER(CONCAT(COALESCE(i.EvidenceLabel, N''), N' ', COALESCE(i.SafeSummary, N''))) AS UnsafeText) u
+        WHERE u.UnsafeText LIKE N'%private reasoning%'
+           OR u.UnsafeText LIKE N'%hidden reasoning%'
+           OR u.UnsafeText LIKE N'%hiddenreasoning%'
+           OR u.UnsafeText LIKE N'%chainofthought%'
+           OR u.UnsafeText LIKE N'%chain of thought%'
+           OR u.UnsafeText LIKE N'%chain-of-thought%'
+           OR u.UnsafeText LIKE N'%scratchpad%'
+           OR u.UnsafeText LIKE N'%rawprompt%'
+           OR u.UnsafeText LIKE N'%raw prompt%'
+           OR u.UnsafeText LIKE N'%rawcompletion%'
+           OR u.UnsafeText LIKE N'%raw completion%'
+           OR u.UnsafeText LIKE N'%rawtooloutput%'
+           OR u.UnsafeText LIKE N'%raw tool output%'
+           OR u.UnsafeText LIKE N'%entirepatch%'
+           OR u.UnsafeText LIKE N'%entire patch%'
+           OR u.UnsafeText LIKE N'%approval granted%'
+           OR u.UnsafeText LIKE N'%execution permission%'
+           OR u.UnsafeText LIKE N'%execution allowed%'
+           OR u.UnsafeText LIKE N'%policy satisfied%'
+           OR u.UnsafeText LIKE N'%tool executed%'
+           OR u.UnsafeText LIKE N'%source mutated%'
+           OR u.UnsafeText LIKE N'%memory promoted%'
+           OR u.UnsafeText LIKE N'%promote memory%'
+           OR u.UnsafeText LIKE N'%authority transferred%'
+           OR u.UnsafeText LIKE N'%release approved%'
+           OR u.UnsafeText LIKE N'%continue workflow%'
+    )
+        THROW 54032, 'Workflow evidence text must not contain authority or raw/private reasoning markers.', 1;
+END;
+GO
+
+CREATE OR ALTER TRIGGER workflow.TR_WorkflowRunGroundingReference_ValidateInsert
+ON workflow.WorkflowRunGroundingReference
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        JOIN workflow.WorkflowRun r ON r.WorkflowRunId = i.WorkflowRunId
+        WHERE r.ProjectId <> i.ProjectId
+    )
+        THROW 54040, 'Workflow grounding project must match parent workflow run project.', 1;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        JOIN workflow.WorkflowRunStep s ON s.WorkflowRunStepId = i.WorkflowRunStepId
+        WHERE i.WorkflowRunStepId IS NOT NULL AND (s.ProjectId <> i.ProjectId OR s.WorkflowRunId <> i.WorkflowRunId)
+    )
+        THROW 54041, 'Workflow grounding step must belong to the same workflow run.', 1;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted i
+        CROSS APPLY (SELECT LOWER(COALESCE(i.SafeSummary, N'')) AS UnsafeText) u
+        WHERE u.UnsafeText LIKE N'%private reasoning%'
+           OR u.UnsafeText LIKE N'%hidden reasoning%'
+           OR u.UnsafeText LIKE N'%hiddenreasoning%'
+           OR u.UnsafeText LIKE N'%chainofthought%'
+           OR u.UnsafeText LIKE N'%chain of thought%'
+           OR u.UnsafeText LIKE N'%chain-of-thought%'
+           OR u.UnsafeText LIKE N'%scratchpad%'
+           OR u.UnsafeText LIKE N'%rawprompt%'
+           OR u.UnsafeText LIKE N'%raw prompt%'
+           OR u.UnsafeText LIKE N'%rawcompletion%'
+           OR u.UnsafeText LIKE N'%raw completion%'
+           OR u.UnsafeText LIKE N'%rawtooloutput%'
+           OR u.UnsafeText LIKE N'%raw tool output%'
+           OR u.UnsafeText LIKE N'%entirepatch%'
+           OR u.UnsafeText LIKE N'%entire patch%'
+           OR u.UnsafeText LIKE N'%approval granted%'
+           OR u.UnsafeText LIKE N'%execution permission%'
+           OR u.UnsafeText LIKE N'%execution allowed%'
+           OR u.UnsafeText LIKE N'%policy satisfied%'
+           OR u.UnsafeText LIKE N'%tool executed%'
+           OR u.UnsafeText LIKE N'%source mutated%'
+           OR u.UnsafeText LIKE N'%memory promoted%'
+           OR u.UnsafeText LIKE N'%promote memory%'
+           OR u.UnsafeText LIKE N'%authority transferred%'
+           OR u.UnsafeText LIKE N'%release approved%'
+           OR u.UnsafeText LIKE N'%continue workflow%'
+    )
+        THROW 54042, 'Workflow grounding text must not contain authority or raw/private reasoning markers.', 1;
+END;
+GO
+
 CREATE OR ALTER PROCEDURE workflow.usp_WorkflowStep_Get
     @ProjectId UNIQUEIDENTIFIER,
     @WorkflowRunId UNIQUEIDENTIFIER,
@@ -181,8 +372,19 @@ BEGIN
 
     IF @UnsafeText LIKE N'%private reasoning%'
         OR @UnsafeText LIKE N'%hidden reasoning%'
+        OR @UnsafeText LIKE N'%hiddenreasoning%'
+        OR @UnsafeText LIKE N'%chainofthought%'
+        OR @UnsafeText LIKE N'%chain of thought%'
         OR @UnsafeText LIKE N'%chain-of-thought%'
         OR @UnsafeText LIKE N'%scratchpad%'
+        OR @UnsafeText LIKE N'%rawprompt%'
+        OR @UnsafeText LIKE N'%raw prompt%'
+        OR @UnsafeText LIKE N'%rawcompletion%'
+        OR @UnsafeText LIKE N'%raw completion%'
+        OR @UnsafeText LIKE N'%rawtooloutput%'
+        OR @UnsafeText LIKE N'%raw tool output%'
+        OR @UnsafeText LIKE N'%entirepatch%'
+        OR @UnsafeText LIKE N'%entire patch%'
         OR @UnsafeText LIKE N'%approval granted%'
         OR @UnsafeText LIKE N'%execution allowed%'
         OR @UnsafeText LIKE N'%tool executed%'

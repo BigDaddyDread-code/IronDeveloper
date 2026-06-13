@@ -205,6 +205,69 @@ public sealed class WorkflowStepStoreTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task WorkflowStepSql_RejectsRawPrivateMarkersThroughCreateProcedure()
+    {
+        var workflowRunId = await CreateParentRunAsync();
+
+        await ExpectThrowsAsync<SqlException>(() => ExecuteWorkflowStepCreateViaSqlAsync(
+            workflowRunId,
+            "raw-prompt",
+            safeSummary: "rawPrompt leaked"));
+
+        await ExpectThrowsAsync<SqlException>(() => ExecuteWorkflowStepCreateViaSqlAsync(
+            workflowRunId,
+            "raw-completion",
+            safeSummary: "rawCompletion leaked"));
+
+        await ExpectThrowsAsync<SqlException>(() => ExecuteWorkflowStepCreateViaSqlAsync(
+            workflowRunId,
+            "raw-tool-output-evidence",
+            evidenceReferencesJson:
+            """
+            [
+              {
+                "evidenceType": "CriticReview",
+                "EvidenceId": "evidence-raw-tool-output",
+                "EvidenceLabel": "Evidence",
+                "SafeSummary": "rawToolOutput leaked"
+              }
+            ]
+            """));
+
+        var groundingId = Guid.NewGuid();
+        await ExpectThrowsAsync<SqlException>(() => ExecuteWorkflowStepCreateViaSqlAsync(
+            workflowRunId,
+            "entire-patch-grounding",
+            groundingReferencesJson:
+            $$"""
+            [
+              {
+                "GroundingEvidenceReferenceId": "{{groundingId}}",
+                "claimType": "ReviewFinding",
+                "ClaimId": "claim-entire-patch",
+                "SafeSummary": "entirePatch leaked"
+              }
+            ]
+            """));
+
+        await ExpectThrowsAsync<SqlException>(() => ExecuteWorkflowStepCreateViaSqlAsync(
+            workflowRunId,
+            "chain-of-thought-metadata",
+            metadataJson: "{\"schema\":\"workflow.step.metadata.v1\",\"chainOfThought\":\"leaked\"}"));
+
+        var persisted = await ScalarAsync<int>(
+            """
+            SELECT COUNT(1)
+            FROM workflow.WorkflowRunStep
+            WHERE WorkflowRunId = @workflowRunId
+              AND StepKey IN (N'raw-prompt', N'raw-completion', N'raw-tool-output-evidence', N'entire-patch-grounding', N'chain-of-thought-metadata');
+            """,
+            new { workflowRunId });
+
+        Assert.AreEqual(0, persisted);
+    }
+
+    [TestMethod]
     public async Task WorkflowStepStore_DoesNotCreateApprovalPolicyDogfoodToolA2aSourceApplyMemoryOrAuditSideEffects()
     {
         var workflowRunId = await CreateParentRunAsync();
@@ -471,6 +534,50 @@ public sealed class WorkflowStepStoreTests : IntegrationTestBase
         await using var connection = new SqlConnection(ConnectionString);
         await connection.ExecuteAsync(sql, parameters);
     }
+
+    private Task ExecuteWorkflowStepCreateViaSqlAsync(
+        Guid workflowRunId,
+        string stepKey,
+        string safeSummary = "Direct SQL workflow step.",
+        string metadataJson = "{\"schema\":\"workflow.step.metadata.v1\"}",
+        string evidenceReferencesJson = "[]",
+        string groundingReferencesJson = "[]") =>
+        ExecuteAsync(
+            """
+            EXEC workflow.usp_WorkflowStep_Create
+                @WorkflowRunStepId = @stepId,
+                @WorkflowRunId = @runId,
+                @ProjectId = @projectId,
+                @StepKey = @stepKey,
+                @StepName = N'Direct SQL workflow step',
+                @StepType = N'ReviewFinding',
+                @Status = N'Created',
+                @AgentRole = NULL,
+                @AgentId = NULL,
+                @SubjectType = N'workflow_step',
+                @SubjectId = N'subject-direct-sql',
+                @SafeSummary = @safeSummary,
+                @SequenceNumber = 99,
+                @CorrelationId = @correlationId,
+                @CausationId = @causationId,
+                @MetadataVersion = 1,
+                @MetadataJson = @metadataJson,
+                @EvidenceReferencesJson = @evidenceReferencesJson,
+                @GroundingReferencesJson = @groundingReferencesJson;
+            """,
+            new
+            {
+                stepId = Guid.NewGuid(),
+                runId = workflowRunId,
+                projectId = ProjectId,
+                stepKey,
+                safeSummary,
+                correlationId = CorrelationId,
+                causationId = CausationId,
+                metadataJson,
+                evidenceReferencesJson,
+                groundingReferencesJson
+            });
 
     private async Task<int> CountIfExistsAsync(string tableName)
     {
