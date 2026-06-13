@@ -239,6 +239,24 @@ Metadata must not contain hidden reasoning, raw chain-of-thought, scratchpad tex
 
 Metadata flags such as grantsApproval, grantsExecution, mutatesSource, promotesMemory, startsWorkflow, satisfiesPolicy, and transfersAuthority must remain false if present.
 
+## PR92 No Authority Transfer Validator
+
+PR92 adds a pure validator for authority-transfer attempts.
+
+The validator rejects handoffs that attempt to transfer approval, execution permission, workflow authority, source apply authority, memory promotion authority, memory ownership, policy satisfaction, or release approval.
+
+The validator does not send handoffs.
+
+The validator does not receive handoffs.
+
+The validator does not execute anything.
+
+The validator does not write SQL.
+
+The validator does not add API/CLI/runtime wiring.
+
+It only proves the handoff is structurally non-authoritative.
+
 ## Non-goals
 
 PR90 does not deliver:
