@@ -21,7 +21,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(10, migrations.Length);
+        Assert.AreEqual(11, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
@@ -42,6 +42,8 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         Assert.AreEqual("Database/migrate_workflow_run.sql", migrations[8].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-j-workflow-step-store", migrations[9].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_workflow_step_store.sql", migrations[9].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-j-workflow-checkpoint-store", migrations[10].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_workflow_checkpoint_store.sql", migrations[10].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {
@@ -105,6 +107,19 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             "CK_WorkflowRunStep_SequenceNumber_Positive",
             "CK_WorkflowRunEvidenceReference_AllowedUse_Allowed",
             "CK_WorkflowRunGroundingReference_ClaimType_Allowed",
+            "workflow.WorkflowCheckpoint",
+            "workflow.WorkflowCheckpointEvidenceReference",
+            "workflow.WorkflowCheckpointGroundingReference",
+            "workflow.usp_WorkflowCheckpoint_Create",
+            "workflow.usp_WorkflowCheckpoint_Get",
+            "workflow.usp_WorkflowCheckpoint_ListByRun",
+            "workflow.usp_WorkflowCheckpoint_ListByStep",
+            "workflow.usp_WorkflowCheckpoint_ListByCorrelation",
+            "workflow.usp_WorkflowCheckpoint_ListBySubject",
+            "CK_WorkflowCheckpoint_NoWorkflowResume",
+            "CK_WorkflowCheckpoint_NoExecution",
+            "CK_WorkflowCheckpointEvidenceReference_AllowedUse_Allowed",
+            "CK_WorkflowCheckpointGroundingReference_ClaimType_Allowed",
             "FK_ToolRequest_GovernanceEvent",
             "FK_ThoughtLedgerGovernanceEventReference_GovernanceEvent",
             "CK_AgentHandoff_NoAuthorityTransfer",
@@ -153,6 +168,14 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         var workflowStepSequenceExists = await connection.ExecuteScalarAsync<int>(
             "SELECT CASE WHEN COL_LENGTH(N'workflow.WorkflowRunStep', N'SequenceNumber') IS NULL THEN 0 ELSE 1 END");
         Assert.AreEqual(1, workflowStepSequenceExists);
+
+        var workflowCheckpointExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowCheckpoint', N'U') IS NULL THEN 0 ELSE 1 END");
+        Assert.AreEqual(1, workflowCheckpointExists);
+
+        var workflowCheckpointCreateExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Create', N'P') IS NULL THEN 0 ELSE 1 END");
+        Assert.AreEqual(1, workflowCheckpointCreateExists);
     }
 
     [TestMethod]
@@ -201,6 +224,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Workflow", "SqlWorkflowRunStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Workflow", "SqlWorkflowStepStore.cs"),
+            Path.Combine(root, "IronDev.Infrastructure", "Workflow", "SqlWorkflowCheckpointStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlDogfoodLoopApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlToolRequestApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "ToolRequestsV1Controller.cs"),
@@ -268,6 +292,12 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Create', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_Create;
+            IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Get', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_Get;
+            IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByRun', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_ListByRun;
+            IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByStep', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_ListByStep;
+            IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByCorrelation', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_ListByCorrelation;
+            IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_ListBySubject;
             IF OBJECT_ID(N'workflow.usp_WorkflowStep_Create', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_Create;
             IF OBJECT_ID(N'workflow.usp_WorkflowStep_Get', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_Get;
             IF OBJECT_ID(N'workflow.usp_WorkflowStep_ListByRun', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_ListByRun;
@@ -278,6 +308,12 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             IF OBJECT_ID(N'workflow.usp_WorkflowRun_ListByProject', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_ListByProject;
             IF OBJECT_ID(N'workflow.usp_WorkflowRun_ListByCorrelation', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_ListByCorrelation;
             IF OBJECT_ID(N'workflow.usp_WorkflowRun_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_ListBySubject;
+            IF OBJECT_ID(N'workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowCheckpointGroundingReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_ValidateInsert;
+            IF OBJECT_ID(N'workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowCheckpointEvidenceReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_ValidateInsert;
+            IF OBJECT_ID(N'workflow.TR_WorkflowCheckpoint_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowCheckpoint_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowCheckpoint_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowCheckpoint_ValidateInsert;
             IF OBJECT_ID(N'workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete;
             IF OBJECT_ID(N'workflow.TR_WorkflowRunGroundingReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunGroundingReference_ValidateInsert;
             IF OBJECT_ID(N'workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete;
@@ -286,6 +322,9 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             IF OBJECT_ID(N'workflow.TR_WorkflowRunStep_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunStep_ValidateInsert;
             IF OBJECT_ID(N'workflow.TR_WorkflowRun_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRun_BlockUpdateDelete;
             IF OBJECT_ID(N'workflow.TR_WorkflowRun_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRun_ValidateInsert;
+            IF OBJECT_ID(N'workflow.WorkflowCheckpointGroundingReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowCheckpointGroundingReference;
+            IF OBJECT_ID(N'workflow.WorkflowCheckpointEvidenceReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowCheckpointEvidenceReference;
+            IF OBJECT_ID(N'workflow.WorkflowCheckpoint', N'U') IS NOT NULL DROP TABLE workflow.WorkflowCheckpoint;
             IF OBJECT_ID(N'workflow.WorkflowRunGroundingReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRunGroundingReference;
             IF OBJECT_ID(N'workflow.WorkflowRunEvidenceReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRunEvidenceReference;
             IF OBJECT_ID(N'workflow.WorkflowRunStep', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRunStep;

@@ -195,3 +195,10 @@ Allowed inline SQL in PR93 is limited to integration-test teardown and direct-SQ
 The runtime store must not create schemas, tables, triggers, stored procedures, or roles at runtime.
 
 The runtime store must not call API, CLI, workflow, transport, executor, source apply, memory promotion, release, or approval-satisfaction paths.
+
+## PR100 workflow checkpoint SQL seam
+
+- `Database/migrate_workflow_checkpoint_store.sql` owns schema/stored procedure creation for durable workflow checkpoints.
+- `IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs` calls stored procedures only.
+- No runtime DDL was added.
+- No inline application INSERT/UPDATE/DELETE path was added for checkpoint persistence.

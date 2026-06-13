@@ -194,6 +194,21 @@ try {
             ,@{ Name = "WorkflowRunStep no execution grant check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRunStep') AND name = N'CK_WorkflowRunStep_NoExecutionGrant'" }
             ,@{ Name = "WorkflowRunEvidenceReference allowed-use check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRunEvidenceReference') AND name = N'CK_WorkflowRunEvidenceReference_AllowedUse_Allowed'" }
             ,@{ Name = "WorkflowRunGroundingReference claim-type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowRunGroundingReference') AND name = N'CK_WorkflowRunGroundingReference_ClaimType_Allowed'" }
+            ,@{ Name = "workflow.WorkflowCheckpoint table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowCheckpoint', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.WorkflowCheckpointEvidenceReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowCheckpointEvidenceReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.WorkflowCheckpointGroundingReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowCheckpointGroundingReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowCheckpoint_Create procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Create', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowCheckpoint_Get procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Get', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowCheckpoint_ListByRun procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByRun', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowCheckpoint_ListByStep procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByStep', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowCheckpoint_ListByCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.usp_WorkflowCheckpoint_ListBySubject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListBySubject', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.TR_WorkflowCheckpoint_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.TR_WorkflowCheckpoint_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "workflow.TR_WorkflowCheckpoint_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'workflow.TR_WorkflowCheckpoint_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "WorkflowCheckpoint no workflow resume check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpoint') AND name = N'CK_WorkflowCheckpoint_NoWorkflowResume'" }
+            ,@{ Name = "WorkflowCheckpoint no execution check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpoint') AND name = N'CK_WorkflowCheckpoint_NoExecution'" }
+            ,@{ Name = "WorkflowCheckpointEvidenceReference allowed-use check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpointEvidenceReference') AND name = N'CK_WorkflowCheckpointEvidenceReference_AllowedUse_Allowed'" }
+            ,@{ Name = "WorkflowCheckpointGroundingReference claim-type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpointGroundingReference') AND name = N'CK_WorkflowCheckpointGroundingReference_ClaimType_Allowed'" }
         )
 
         foreach ($check in $checks) {
