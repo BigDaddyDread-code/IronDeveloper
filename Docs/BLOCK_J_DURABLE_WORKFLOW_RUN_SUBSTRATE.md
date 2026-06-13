@@ -181,6 +181,55 @@ PR101 is Core contract only. It adds no SQL schema, runtime store, API, CLI, UI,
 PR101 labels the step's input and output receipts. It does not consume the input or produce the output.
 
 
+## PR102 - Failure and Retry State Model
+
+PR102 adds bounded workflow failure and retry state models.
+
+Failure state records safe failure facts.
+
+Retry state records reviewable retry facts and recommendations.
+
+### Boundary
+
+Failure state does not retry workflow.
+
+Retry state does not retry workflow.
+
+Retry recommendation does not grant retry permission.
+
+Retry eligibility does not execute retry.
+
+The model does not execute workflow.
+
+The model does not continue workflow.
+
+The model does not resume workflow.
+
+The model does not dispatch agents.
+
+The model does not call tools.
+
+The model does not call models.
+
+The model does not mutate source.
+
+The model does not promote memory.
+
+The model does not create accepted memory.
+
+The model does not approve release.
+
+The model does not satisfy approval requirements.
+
+Failure/retry statuses are stored facts, not runtime actions.
+
+### Source-of-truth rule
+
+PR102 is Core contract only. It adds no SQL schema, runtime store, retry runner, retry scheduler, API, CLI, UI, runner, scheduler, orchestrator, dispatcher, tool execution, model call, source apply, memory promotion, release approval, or approval-satisfaction path.
+
+PR102 writes the failure/retry note. It does not press retry.
+
+
 ## PR100 - Durable Workflow Checkpoint Store
 
 PR100 adds durable workflow checkpoint storage over the PR98/PR99 workflow substrate. Checkpoints record safe workflow state, evidence references, grounding references, and review support facts.
