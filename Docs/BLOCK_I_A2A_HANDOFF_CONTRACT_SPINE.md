@@ -291,6 +291,44 @@ Durable handoff records may be read for audit, traceability, review, debugging, 
 
 Reading a durable handoff record does not grant authority.
 
+## PR94 ThoughtLedger Handoff Entries
+
+PR94 adds safe ThoughtLedger handoff entries.
+
+ThoughtLedger may record that a handoff exists.
+
+ThoughtLedger may summarize handoff context, evidence, allowed uses, and constraints.
+
+ThoughtLedger does not approve handoffs.
+
+ThoughtLedger does not send or receive handoffs.
+
+ThoughtLedger does not execute handoffs.
+
+ThoughtLedger does not continue workflow.
+
+ThoughtLedger does not mutate source.
+
+ThoughtLedger does not promote memory.
+
+ThoughtLedger does not approve release.
+
+ThoughtLedger entries must not contain hidden/private reasoning.
+
+A ThoughtLedger handoff entry is evidence only.
+
+It is not target-agent receipt.
+
+It is not A2A delivery confirmation.
+
+It is not policy satisfaction.
+
+It is not memory ownership transfer.
+
+It may help a human understand what durable handoff record exists, who prepared it, who it names as target, which subject it concerns, which evidence it cites, which allowed uses bound that evidence, and which constraints remain open.
+
+It must keep all authority flags false.
+
 ## Non-goals
 
 PR90 does not deliver:
@@ -330,8 +368,31 @@ PR93 does not deliver:
 - execution engine
 - UI
 
+PR94 does not deliver:
+
+- A2A runtime
+- handoff transport
+- handoff delivery
+- handoff dispatch
+- target-agent receipt
+- API/CLI surface
+- workflow state
+- workflow runner
+- LangGraph
+- source apply
+- memory promotion
+- release approval
+- approval satisfaction
+- policy satisfaction
+- execution engine
+- UI
+
 ## Final statement
 
 PR90 defines the envelope.
 
 It does not send it, receive it, store it, route it, execute it, approve it, or make it powerful.
+
+PR94 lets ThoughtLedger say the envelope exists.
+
+It does not deliver the envelope.
