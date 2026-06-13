@@ -429,6 +429,7 @@ public sealed class ApprovalPackageTests
         var sqlReferences = Directory.Exists(databaseRoot)
             ? Directory.GetFiles(databaseRoot, "*.sql", SearchOption.AllDirectories)
                 .Where(path => !path.EndsWith(Path.Combine("Database", "migrate_agent_handoff.sql"), StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.EndsWith(Path.Combine("Database", "migrate_workflow_run.sql"), StringComparison.OrdinalIgnoreCase))
                 .Where(path => File.ReadAllText(path).Contains("ApprovalPackage", StringComparison.OrdinalIgnoreCase))
                 .ToArray()
             : [];

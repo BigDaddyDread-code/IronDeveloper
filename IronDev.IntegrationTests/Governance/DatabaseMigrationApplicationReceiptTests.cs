@@ -21,7 +21,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(8, migrations.Length);
+        Assert.AreEqual(9, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
@@ -38,6 +38,8 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         Assert.AreEqual("Database/migrate_thoughtledger_governance_event_reference.sql", migrations[6].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-i-agent-handoff", migrations[7].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_agent_handoff.sql", migrations[7].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-j-workflow-run", migrations[8].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_workflow_run.sql", migrations[8].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {
@@ -81,6 +83,20 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             "a2a.usp_AgentHandoff_Create",
             "a2a.usp_AgentHandoff_Get",
             "a2a.usp_AgentHandoff_ListByProject",
+            "workflow.WorkflowRun",
+            "workflow.WorkflowRunStep",
+            "workflow.WorkflowRunEvidenceReference",
+            "workflow.WorkflowRunGroundingReference",
+            "workflow.usp_WorkflowRun_Create",
+            "workflow.usp_WorkflowRun_Get",
+            "workflow.usp_WorkflowRun_ListByProject",
+            "workflow.usp_WorkflowRun_ListByCorrelation",
+            "workflow.usp_WorkflowRun_ListBySubject",
+            "CK_WorkflowRun_NoWorkflowContinuation",
+            "CK_WorkflowRun_NoAuthorityTransfer",
+            "CK_WorkflowRunStep_NoExecutionGrant",
+            "CK_WorkflowRunEvidenceReference_AllowedUse_Allowed",
+            "CK_WorkflowRunGroundingReference_ClaimType_Allowed",
             "FK_ToolRequest_GovernanceEvent",
             "FK_ThoughtLedgerGovernanceEventReference_GovernanceEvent",
             "CK_AgentHandoff_NoAuthorityTransfer",
@@ -117,6 +133,10 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         var agentHandoffExists = await connection.ExecuteScalarAsync<int>(
             "SELECT CASE WHEN OBJECT_ID(N'a2a.AgentHandoff', N'U') IS NULL THEN 0 ELSE 1 END");
         Assert.AreEqual(1, agentHandoffExists);
+
+        var workflowRunExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowRun', N'U') IS NULL THEN 0 ELSE 1 END");
+        Assert.AreEqual(1, workflowRunExists);
     }
 
     [TestMethod]
@@ -163,6 +183,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlDogfoodReceiptStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlThoughtLedgerGovernanceEventReferenceStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"),
+            Path.Combine(root, "IronDev.Infrastructure", "Workflow", "SqlWorkflowRunStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlDogfoodLoopApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlToolRequestApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "ToolRequestsV1Controller.cs"),

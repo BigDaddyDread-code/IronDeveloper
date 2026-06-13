@@ -317,3 +317,43 @@ Boundary:
 - no release approval
 
 Behavior changed in this PR: no product/runtime behavior; only the durable handoff ledger and repository are added.
+## PR98 durable workflow run store
+
+Status: active.
+
+SQL artifacts:
+
+- `workflow.WorkflowRun`
+- `workflow.WorkflowRunStep`
+- `workflow.WorkflowRunEvidenceReference`
+- `workflow.WorkflowRunGroundingReference`
+- `workflow.usp_WorkflowRun_Create`
+- `workflow.usp_WorkflowRun_Get`
+- `workflow.usp_WorkflowRun_ListByProject`
+- `workflow.usp_WorkflowRun_ListByCorrelation`
+- `workflow.usp_WorkflowRun_ListBySubject`
+
+Owner:
+
+- `IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs`
+
+Boundary:
+
+- records workflow run context and evidence only
+- records steps as audit/reporting state only
+- records evidence references as pointers only
+- records grounding references as pointers only
+- append-only after insert
+- no workflow runner
+- no workflow continuation
+- no agent dispatch
+- no inbox/outbox
+- no tool execution
+- no approval satisfaction
+- no policy satisfaction
+- no source apply permission
+- no memory promotion permission
+- no release approval
+- no authority transfer
+
+Behavior changed in this PR: no product/runtime behavior; only the durable workflow run ledger and repository are added.
