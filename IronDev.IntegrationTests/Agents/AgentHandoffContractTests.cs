@@ -474,6 +474,7 @@ public sealed class AgentHandoffContractTests
             "A handoff does not transfer approval, execution permission, memory ownership, workflow authority, source apply authority, memory promotion authority, or release authority.",
             "A handoff may cite approval decisions only as evidence.",
             "A handoff may cite gate decisions, dogfood receipts, critic output, validation output, ThoughtLedger references, and governance events only as evidence.",
+            "PR91 Handoff allowedUse and Evidence Reference Model",
             "PR91 adds bounded allowed-use semantics to each evidence reference.",
             "Evidence references must declare allowed uses.",
             "Allowed use is not authority.",

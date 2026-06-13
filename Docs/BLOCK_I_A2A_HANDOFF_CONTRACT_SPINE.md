@@ -140,6 +140,8 @@ Forbidden type meanings:
 
 ## Evidence reference boundary
 
+## PR91 Handoff allowedUse and Evidence Reference Model
+
 Evidence references are evidence only.
 
 PR91 adds bounded allowed-use semantics to each evidence reference.
