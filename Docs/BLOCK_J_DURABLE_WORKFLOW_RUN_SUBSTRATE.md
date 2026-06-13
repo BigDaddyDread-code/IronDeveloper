@@ -136,6 +136,51 @@ A persisted step means a validated workflow step fact was recorded with evidence
 SQL remains the source of truth. The runtime store uses stored procedures only and does not create or mutate schema at runtime.
 
 
+## PR101 - Step Input/Output Reference Model
+
+PR101 adds bounded workflow step input/output reference models.
+
+Input references describe what a step record may refer to.
+
+Output references describe what a step record may record as output.
+
+### Boundary
+
+Input references do not consume input.
+
+Output references do not produce output.
+
+The model does not execute workflow.
+
+The model does not continue workflow.
+
+The model does not resume workflow.
+
+The model does not dispatch agents.
+
+The model does not call tools.
+
+The model does not call models.
+
+The model does not mutate source.
+
+The model does not promote memory.
+
+The model does not create accepted memory.
+
+The model does not approve release.
+
+The model does not satisfy approval requirements.
+
+Input/output statuses are stored facts, not runtime actions.
+
+### Source-of-truth rule
+
+PR101 is Core contract only. It adds no SQL schema, runtime store, API, CLI, UI, runner, scheduler, orchestrator, dispatcher, tool execution, model call, source apply, memory promotion, release approval, or approval-satisfaction path.
+
+PR101 labels the step's input and output receipts. It does not consume the input or produce the output.
+
+
 ## PR100 - Durable Workflow Checkpoint Store
 
 PR100 adds durable workflow checkpoint storage over the PR98/PR99 workflow substrate. Checkpoints record safe workflow state, evidence references, grounding references, and review support facts.
