@@ -155,6 +155,21 @@ try {
             ,@{ Name = "ThoughtLedgerGovernanceEventReference metadata JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ThoughtLedgerGovernanceEventReference') AND name = N'CK_ThoughtLedgerGovernanceEventReference_MetadataJson_IsJson'" }
             ,@{ Name = "ThoughtLedgerGovernanceEventReference metadata JSON versioned check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ThoughtLedgerGovernanceEventReference') AND name = N'CK_ThoughtLedgerGovernanceEventReference_MetadataJson_Versioned'" }
             ,@{ Name = "ThoughtLedgerGovernanceEventReference metadata version check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.ThoughtLedgerGovernanceEventReference') AND name = N'CK_ThoughtLedgerGovernanceEventReference_MetadataVersion_Positive'" }
+            ,@{ Name = "a2a schema"; Sql = "SELECT CASE WHEN SCHEMA_ID(N'a2a') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.AgentHandoff table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.AgentHandoff', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.AgentHandoffEvidenceReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.AgentHandoffEvidenceReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.AgentHandoffEvidenceAllowedUse table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.AgentHandoffEvidenceAllowedUse', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.AgentHandoffConstraint table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.AgentHandoffConstraint', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.usp_AgentHandoff_Create procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.usp_AgentHandoff_Create', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.usp_AgentHandoff_Get procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.usp_AgentHandoff_Get', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.usp_AgentHandoff_ListByProject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.usp_AgentHandoff_ListByProject', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.usp_AgentHandoff_ListByCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.usp_AgentHandoff_ListByCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.usp_AgentHandoff_ListBySubject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.usp_AgentHandoff_ListBySubject', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.TR_AgentHandoff_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.TR_AgentHandoff_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "a2a.TR_AgentHandoff_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'a2a.TR_AgentHandoff_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "AgentHandoff metadata JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'a2a.AgentHandoff') AND name = N'CK_AgentHandoff_MetadataJson_IsJson'" }
+            ,@{ Name = "AgentHandoff no authority transfer check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'a2a.AgentHandoff') AND name = N'CK_AgentHandoff_NoAuthorityTransfer'" }
+            ,@{ Name = "AgentHandoff evidence allowed-use check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'a2a.AgentHandoffEvidenceAllowedUse') AND name = N'CK_AgentHandoffEvidenceAllowedUse_Allowed'" }
         )
 
         foreach ($check in $checks) {

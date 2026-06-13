@@ -180,3 +180,18 @@ Forbidden PR79 runtime SQL shape:
 - Inline `UPDATE` or `DELETE` against `governance.ThoughtLedgerGovernanceEventReference`.
 - Runtime DDL for ThoughtLedger governance reference tables, triggers, or stored procedures.
 - Treating a ThoughtLedger governance reference as approval, execution permission, policy satisfaction, workflow continuation, source apply, release approval, dogfood receipt creation, A2A handoff creation, or memory promotion.
+## PR93 durable A2A handoff store
+
+`SqlAgentHandoffStore` is a stored-procedure runtime store. It calls only:
+
+- `a2a.usp_AgentHandoff_Create`
+- `a2a.usp_AgentHandoff_Get`
+- `a2a.usp_AgentHandoff_ListByProject`
+- `a2a.usp_AgentHandoff_ListByCorrelation`
+- `a2a.usp_AgentHandoff_ListBySubject`
+
+Allowed inline SQL in PR93 is limited to integration-test teardown and direct-SQL hostile regression checks.
+
+The runtime store must not create schemas, tables, triggers, stored procedures, or roles at runtime.
+
+The runtime store must not call API, CLI, workflow, transport, executor, source apply, memory promotion, release, or approval-satisfaction paths.

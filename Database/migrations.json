@@ -35,5 +35,10 @@
             "path": "Database/migrate_thoughtledger_governance_event_reference.sql",
             "description": "Creates durable ThoughtLedgerGovernanceEventReference table and stored procedures linking ThoughtLedger entry IDs to GovernanceEvent records as evidence only."
         }
+        ,{
+            "id": "2026-06-block-i-agent-handoff",
+            "path": "Database/migrate_agent_handoff.sql",
+            "description": "Creates durable A2A AgentHandoff tables, stored procedures, append-only triggers, and evidence-only governance event linkage."
+        }
     ]
 }

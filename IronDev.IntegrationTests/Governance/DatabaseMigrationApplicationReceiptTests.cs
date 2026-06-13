@@ -21,7 +21,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(7, migrations.Length);
+        Assert.AreEqual(8, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
@@ -36,6 +36,8 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         Assert.AreEqual("Database/migrate_dogfood_receipt.sql", migrations[5].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-thoughtledger-governance-event-reference", migrations[6].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_thoughtledger_governance_event_reference.sql", migrations[6].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-i-agent-handoff", migrations[7].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_agent_handoff.sql", migrations[7].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {
@@ -75,8 +77,13 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             "governance.PolicyDecisionEvent",
             "governance.DogfoodReceipt",
             "governance.ThoughtLedgerGovernanceEventReference",
+            "a2a.AgentHandoff",
+            "a2a.usp_AgentHandoff_Create",
+            "a2a.usp_AgentHandoff_Get",
+            "a2a.usp_AgentHandoff_ListByProject",
             "FK_ToolRequest_GovernanceEvent",
             "FK_ThoughtLedgerGovernanceEventReference_GovernanceEvent",
+            "CK_AgentHandoff_NoAuthorityTransfer",
             "CK_ApprovalDecision_EvidenceJson_Versioned",
             "CK_PolicyDecisionEvent_EvidenceJson_Versioned",
             "CK_DogfoodReceipt_EvidenceJson_Versioned",
@@ -106,6 +113,10 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         var toolRequestExists = await connection.ExecuteScalarAsync<int>(
             "SELECT CASE WHEN OBJECT_ID(N'governance.ToolRequest', N'U') IS NULL THEN 0 ELSE 1 END");
         Assert.AreEqual(1, toolRequestExists);
+
+        var agentHandoffExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT CASE WHEN OBJECT_ID(N'a2a.AgentHandoff', N'U') IS NULL THEN 0 ELSE 1 END");
+        Assert.AreEqual(1, agentHandoffExists);
     }
 
     [TestMethod]
@@ -151,6 +162,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlPolicyDecisionEventStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlDogfoodReceiptStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlThoughtLedgerGovernanceEventReferenceStore.cs"),
+            Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlDogfoodLoopApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlToolRequestApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "ToolRequestsV1Controller.cs"),
@@ -218,6 +230,24 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID(N'a2a.usp_AgentHandoff_Create', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_Create;
+            IF OBJECT_ID(N'a2a.usp_AgentHandoff_Get', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_Get;
+            IF OBJECT_ID(N'a2a.usp_AgentHandoff_ListByProject', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_ListByProject;
+            IF OBJECT_ID(N'a2a.usp_AgentHandoff_ListByCorrelation', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_ListByCorrelation;
+            IF OBJECT_ID(N'a2a.usp_AgentHandoff_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_ListBySubject;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoffEvidenceAllowedUse_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoffEvidenceAllowedUse_BlockUpdateDelete;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoffEvidenceAllowedUse_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoffEvidenceAllowedUse_ValidateInsert;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoffConstraint_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoffConstraint_BlockUpdateDelete;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoffConstraint_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoffConstraint_ValidateInsert;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoffEvidenceReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoffEvidenceReference_BlockUpdateDelete;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoffEvidenceReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoffEvidenceReference_ValidateInsert;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoff_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoff_BlockUpdateDelete;
+            IF OBJECT_ID(N'a2a.TR_AgentHandoff_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER a2a.TR_AgentHandoff_ValidateInsert;
+            IF OBJECT_ID(N'a2a.AgentHandoffEvidenceAllowedUse', N'U') IS NOT NULL DROP TABLE a2a.AgentHandoffEvidenceAllowedUse;
+            IF OBJECT_ID(N'a2a.AgentHandoffConstraint', N'U') IS NOT NULL DROP TABLE a2a.AgentHandoffConstraint;
+            IF OBJECT_ID(N'a2a.AgentHandoffEvidenceReference', N'U') IS NOT NULL DROP TABLE a2a.AgentHandoffEvidenceReference;
+            IF OBJECT_ID(N'a2a.AgentHandoff', N'U') IS NOT NULL DROP TABLE a2a.AgentHandoff;
+            IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'a2a') DROP SCHEMA a2a;
             IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_Record', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_Record;
             IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_GetById', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_GetById;
             IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry;

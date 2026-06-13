@@ -198,6 +198,36 @@ public sealed record AgentHandoffSummary
     public required DateTimeOffset CreatedUtc { get; init; }
 }
 
+public interface IAgentHandoffStore
+{
+    Task<AgentHandoff> CreateAsync(
+        AgentHandoffCreateRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<AgentHandoff?> GetAsync(
+        Guid projectId,
+        Guid agentHandoffId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AgentHandoffSummary>> ListByProjectAsync(
+        Guid projectId,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AgentHandoffSummary>> ListByCorrelationAsync(
+        Guid projectId,
+        Guid correlationId,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AgentHandoffSummary>> ListBySubjectAsync(
+        Guid projectId,
+        string subjectType,
+        string subjectId,
+        int take,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed record AgentHandoffValidationResult
 {
     public required bool IsValid { get; init; }
