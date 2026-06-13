@@ -495,7 +495,7 @@ public sealed class GroundingEvidenceReferenceTests
     {
         AssertNoProductionReference("IronDev.Api", "GroundingEvidenceReference");
         AssertNoProductionReference(Path.Combine("tools", "IronDev.Cli"), "GroundingEvidenceReference");
-        AssertNoDatabaseReference("GroundingEvidenceReference", "Database/migrate_workflow_run.sql", "Database/smoke-workflow-run.ps1", "Database/verify-migrations.ps1", "Database/sql-inventory.json");
+        AssertNoDatabaseReference("GroundingEvidenceReference", "Database/migrate_workflow_run.sql", "Database/migrate_workflow_step_store.sql", "Database/smoke-workflow-run.ps1", "Database/verify-migrations.ps1", "Database/sql-inventory.json");
         AssertNoProductionToken("IGroundingEvidenceReferenceStore", "SqlGroundingEvidenceReference", "GroundingEvidenceReferenceRepository");
         AssertNoProductionToken("AddScoped<IGroundingEvidenceReferenceFactory", "AddSingleton<IGroundingEvidenceReferenceFactory");
     }

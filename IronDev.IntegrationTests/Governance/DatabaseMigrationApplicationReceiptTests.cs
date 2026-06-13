@@ -21,7 +21,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(9, migrations.Length);
+        Assert.AreEqual(10, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
@@ -40,6 +40,8 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         Assert.AreEqual("Database/migrate_agent_handoff.sql", migrations[7].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-j-workflow-run", migrations[8].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_workflow_run.sql", migrations[8].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-j-workflow-step-store", migrations[9].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_workflow_step_store.sql", migrations[9].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {
@@ -92,9 +94,15 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             "workflow.usp_WorkflowRun_ListByProject",
             "workflow.usp_WorkflowRun_ListByCorrelation",
             "workflow.usp_WorkflowRun_ListBySubject",
+            "workflow.usp_WorkflowStep_Create",
+            "workflow.usp_WorkflowStep_Get",
+            "workflow.usp_WorkflowStep_ListByRun",
+            "workflow.usp_WorkflowStep_ListByCorrelation",
+            "workflow.usp_WorkflowStep_ListBySubject",
             "CK_WorkflowRun_NoWorkflowContinuation",
             "CK_WorkflowRun_NoAuthorityTransfer",
             "CK_WorkflowRunStep_NoExecutionGrant",
+            "CK_WorkflowRunStep_SequenceNumber_Positive",
             "CK_WorkflowRunEvidenceReference_AllowedUse_Allowed",
             "CK_WorkflowRunGroundingReference_ClaimType_Allowed",
             "FK_ToolRequest_GovernanceEvent",
@@ -137,6 +145,14 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         var workflowRunExists = await connection.ExecuteScalarAsync<int>(
             "SELECT CASE WHEN OBJECT_ID(N'workflow.WorkflowRun', N'U') IS NULL THEN 0 ELSE 1 END");
         Assert.AreEqual(1, workflowRunExists);
+
+        var workflowStepCreateExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT CASE WHEN OBJECT_ID(N'workflow.usp_WorkflowStep_Create', N'P') IS NULL THEN 0 ELSE 1 END");
+        Assert.AreEqual(1, workflowStepCreateExists);
+
+        var workflowStepSequenceExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT CASE WHEN COL_LENGTH(N'workflow.WorkflowRunStep', N'SequenceNumber') IS NULL THEN 0 ELSE 1 END");
+        Assert.AreEqual(1, workflowStepSequenceExists);
     }
 
     [TestMethod]
@@ -184,6 +200,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlThoughtLedgerGovernanceEventReferenceStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Workflow", "SqlWorkflowRunStore.cs"),
+            Path.Combine(root, "IronDev.Infrastructure", "Workflow", "SqlWorkflowStepStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlDogfoodLoopApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "SqlToolRequestApiStore.cs"),
             Path.Combine(root, "IronDev.Api", "Controllers", "ToolRequestsV1Controller.cs"),
@@ -251,6 +268,29 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID(N'workflow.usp_WorkflowStep_Create', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_Create;
+            IF OBJECT_ID(N'workflow.usp_WorkflowStep_Get', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_Get;
+            IF OBJECT_ID(N'workflow.usp_WorkflowStep_ListByRun', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_ListByRun;
+            IF OBJECT_ID(N'workflow.usp_WorkflowStep_ListByCorrelation', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_ListByCorrelation;
+            IF OBJECT_ID(N'workflow.usp_WorkflowStep_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowStep_ListBySubject;
+            IF OBJECT_ID(N'workflow.usp_WorkflowRun_Create', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_Create;
+            IF OBJECT_ID(N'workflow.usp_WorkflowRun_Get', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_Get;
+            IF OBJECT_ID(N'workflow.usp_WorkflowRun_ListByProject', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_ListByProject;
+            IF OBJECT_ID(N'workflow.usp_WorkflowRun_ListByCorrelation', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_ListByCorrelation;
+            IF OBJECT_ID(N'workflow.usp_WorkflowRun_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowRun_ListBySubject;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRunGroundingReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunGroundingReference_ValidateInsert;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRunEvidenceReference_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunEvidenceReference_ValidateInsert;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRunStep_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunStep_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRunStep_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunStep_ValidateInsert;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRun_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRun_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_WorkflowRun_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRun_ValidateInsert;
+            IF OBJECT_ID(N'workflow.WorkflowRunGroundingReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRunGroundingReference;
+            IF OBJECT_ID(N'workflow.WorkflowRunEvidenceReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRunEvidenceReference;
+            IF OBJECT_ID(N'workflow.WorkflowRunStep', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRunStep;
+            IF OBJECT_ID(N'workflow.WorkflowRun', N'U') IS NOT NULL DROP TABLE workflow.WorkflowRun;
+            IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'workflow') DROP SCHEMA workflow;
             IF OBJECT_ID(N'a2a.usp_AgentHandoff_Create', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_Create;
             IF OBJECT_ID(N'a2a.usp_AgentHandoff_Get', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_Get;
             IF OBJECT_ID(N'a2a.usp_AgentHandoff_ListByProject', N'P') IS NOT NULL DROP PROCEDURE a2a.usp_AgentHandoff_ListByProject;

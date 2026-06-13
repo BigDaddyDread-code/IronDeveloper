@@ -22,7 +22,11 @@ public enum WorkflowRunStepType
     GroundingSummary = 5,
     HumanDecisionSupport = 6,
     EvidenceCollection = 7,
-    Receipt = 8
+    Receipt = 8,
+    PolicyEvaluationInput = 9,
+    ApprovalRequirementEvaluation = 10,
+    DebugFinding = 11,
+    ReviewFinding = 12
 }
 
 public enum WorkflowRunEvidenceType
