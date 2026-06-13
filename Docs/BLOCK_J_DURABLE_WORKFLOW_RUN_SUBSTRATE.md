@@ -230,6 +230,49 @@ PR102 is Core contract only. It adds no SQL schema, runtime store, retry runner,
 PR102 writes the failure/retry note. It does not press retry.
 
 
+## PR103 Workflow Read-only API
+
+PR103 adds read-only workflow inspection endpoints.
+
+The API exposes durable workflow run, step, checkpoint, evidence, and grounding facts.
+
+The API is read-only.
+
+The API does not create workflow records.
+
+The API does not update workflow records.
+
+The API does not delete workflow records.
+
+The API does not execute workflow.
+
+The API does not continue workflow.
+
+The API does not resume workflow.
+
+The API does not retry workflow.
+
+The API does not dispatch agents.
+
+The API does not call tools.
+
+The API does not call models.
+
+The API does not mutate source.
+
+The API does not promote memory.
+
+The API does not create accepted memory.
+
+The API does not approve release.
+
+The API does not satisfy approval requirements.
+
+Statuses returned by the API are stored facts, not runtime actions.
+
+PR103 lets clients read the workflow clipboard. It does not add any buttons.
+
+
 ## PR100 - Durable Workflow Checkpoint Store
 
 PR100 adds durable workflow checkpoint storage over the PR98/PR99 workflow substrate. Checkpoints record safe workflow state, evidence references, grounding references, and review support facts.

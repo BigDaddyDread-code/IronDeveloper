@@ -320,7 +320,9 @@ public sealed class WorkflowStepStoreTests : IntegrationTestBase
             if (!Directory.Exists(path))
                 continue;
 
-            foreach (var file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
+            foreach (var file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories)
+                         .Where(file => !file.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)
+                                        && !file.EndsWith("WorkflowReadOnlyApiController.cs", StringComparison.OrdinalIgnoreCase)))
                 AssertNoForbiddenTokens(File.ReadAllText(file), "IWorkflowStepStore", "SqlWorkflowStepStore");
         }
     }

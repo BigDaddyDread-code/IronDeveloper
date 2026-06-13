@@ -262,7 +262,6 @@ public sealed class WorkflowRunStoreTests : IntegrationTestBase
 
         foreach (var relative in new[]
                  {
-                     Path.Combine("IronDev.Api", "Program.cs"),
                      Path.Combine("IronDev.Api", "Controllers"),
                      Path.Combine("IronDev.Cli"),
                      Path.Combine("tools")
@@ -278,7 +277,8 @@ public sealed class WorkflowRunStoreTests : IntegrationTestBase
             if (!Directory.Exists(path))
                 continue;
 
-            foreach (var file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
+            foreach (var file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories)
+                         .Where(file => !file.EndsWith("WorkflowReadOnlyApiController.cs", StringComparison.OrdinalIgnoreCase)))
                 AssertNoForbiddenTokens(File.ReadAllText(file), "IWorkflowRunStore", "SqlWorkflowRunStore");
         }
     }

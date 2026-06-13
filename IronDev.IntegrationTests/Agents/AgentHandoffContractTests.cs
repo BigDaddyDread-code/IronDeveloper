@@ -453,6 +453,7 @@ public sealed class AgentHandoffContractTests
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests.Api{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "AgentHandoffModels.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "AgentHandoffAuthorityTransferValidator.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "GroundingEvidenceReferenceModels.cs"), StringComparison.OrdinalIgnoreCase))
@@ -461,6 +462,7 @@ public sealed class AgentHandoffContractTests
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Workflow", "WorkflowRunModels.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Infrastructure", "Workflow", "SqlWorkflowRunStore.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Infrastructure", "Workflow", "SqlWorkflowStepStore.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.EndsWith(Path.Combine("IronDev.Api", "Controllers", "WorkflowReadOnlyApiController.cs"), StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         foreach (var file in files)
