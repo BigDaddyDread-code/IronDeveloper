@@ -17,6 +17,7 @@ public sealed class AgentHandoffContractTests
         Assert.IsNotNull(typeof(AgentHandoff));
         Assert.IsNotNull(typeof(AgentHandoffCreateRequest));
         Assert.IsNotNull(typeof(AgentHandoffSummary));
+        Assert.IsNotNull(typeof(IAgentHandoffStore));
         Assert.IsNotNull(typeof(AgentHandoffStatus));
         Assert.IsNotNull(typeof(AgentHandoffType));
         Assert.IsNotNull(typeof(AgentHandoffEvidenceAllowedUse));
@@ -454,6 +455,7 @@ public sealed class AgentHandoffContractTests
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "AgentHandoffModels.cs"), StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "AgentHandoffAuthorityTransferValidator.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.EndsWith(Path.Combine("IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"), StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         foreach (var file in files)
@@ -486,7 +488,9 @@ public sealed class AgentHandoffContractTests
             "Critic/model/retrieval output may be cited only as advisory evidence.",
             "A handoff does not send itself.",
             "A handoff does not create A2A runtime messages.",
-            "A handoff does not add API/CLI/SQL/runtime wiring.",
+            "PR90 does not add API/CLI/SQL/runtime wiring.",
+            "PR93 adds durable SQL-backed handoff recording only.",
+            "The durable handoff store records handoff evidence and constraints; it does not deliver, route, execute, approve, satisfy policy, continue workflow, mutate source, promote memory, or release anything.",
             "PR90 defines the envelope.",
             "It does not send it, receive it, store it, route it, execute it, approve it, or make it powerful."
         })

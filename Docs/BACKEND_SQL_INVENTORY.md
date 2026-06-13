@@ -279,3 +279,41 @@ PR79 adds the seventh Block G manifest-covered governance ledger:
 | `IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs` | governance | Yes | Yes | Runtime store calls `governance.usp_ThoughtLedgerGovernanceEventReference_*` stored procedures only; no runtime schema creation. |
 
 ThoughtLedger governance event references are evidence links only. They preserve the ThoughtLedger entry ID exactly as text because no durable ThoughtLedger table exists yet. They do not approve, authorize, execute, satisfy policy, continue workflow, apply source, approve release, create dogfood receipts, create A2A handoffs, or promote memory.
+## PR93 durable A2A handoff store
+
+Status: active.
+
+SQL artifacts:
+
+- `a2a.AgentHandoff`
+- `a2a.AgentHandoffEvidenceReference`
+- `a2a.AgentHandoffEvidenceAllowedUse`
+- `a2a.AgentHandoffConstraint`
+- `a2a.usp_AgentHandoff_Create`
+- `a2a.usp_AgentHandoff_Get`
+- `a2a.usp_AgentHandoff_ListByProject`
+- `a2a.usp_AgentHandoff_ListByCorrelation`
+- `a2a.usp_AgentHandoff_ListBySubject`
+
+Owner:
+
+- `IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs`
+
+Boundary:
+
+- records handoff context and evidence only
+- validates `AgentHandoffValidator` before persistence
+- validates `AgentHandoffAuthorityTransferValidator` before persistence
+- writes a governance event for traceability
+- append-only after insert
+- no A2A transport
+- no inbox/outbox
+- no workflow continuation
+- no approval satisfaction
+- no policy satisfaction
+- no execution permission
+- no source apply permission
+- no memory promotion permission
+- no release approval
+
+Behavior changed in this PR: no product/runtime behavior; only the durable handoff ledger and repository are added.

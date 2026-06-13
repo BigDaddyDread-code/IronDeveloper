@@ -153,3 +153,46 @@ No entity, model, mapping, table, stored procedure, DTO, API/CLI/UI contract, or
 | ThoughtLedger governance event reference | `governance.ThoughtLedgerGovernanceEventReference` | `ThoughtLedgerGovernanceEventReference`, `ThoughtLedgerGovernanceEventReferenceReadModel`, `ThoughtLedgerGovernanceEventReferenceSummary` | `SqlThoughtLedgerGovernanceEventReferenceStore` | `governance.usp_ThoughtLedgerGovernanceEventReference_*` | `ThoughtLedgerGovernanceReferenceStoreTests`, migration verifier, smoke script | Active | Yes | Yes |
 
 This table preserves `ThoughtLedgerEntryId` as an exact text identity because there is no durable ThoughtLedger table in this slice. The table links ThoughtLedger entries to existing `governance.GovernanceEvent` rows as evidence only. It is not approval, execution permission, policy satisfaction, workflow continuation, source apply, release approval, dogfood receipt creation, A2A handoff creation, or memory promotion.
+## PR93 A2A agent handoff persistence
+
+Persistence concept: durable agent handoff record.
+
+SQL schema/table:
+
+- `a2a.AgentHandoff`
+- `a2a.AgentHandoffEvidenceReference`
+- `a2a.AgentHandoffEvidenceAllowedUse`
+- `a2a.AgentHandoffConstraint`
+
+C# entity/model class:
+
+- `AgentHandoff`
+- `AgentHandoffEvidenceReference`
+- `AgentHandoffConstraint`
+- `AgentHandoffSummary`
+
+Repository/service owner:
+
+- `SqlAgentHandoffStore`
+- `IAgentHandoffStore`
+
+Stored procedure owner:
+
+- `a2a.usp_AgentHandoff_Create`
+- `a2a.usp_AgentHandoff_Get`
+- `a2a.usp_AgentHandoff_ListByProject`
+- `a2a.usp_AgentHandoff_ListByCorrelation`
+- `a2a.usp_AgentHandoff_ListBySubject`
+
+Test coverage:
+
+- `AgentHandoffStoreTests`
+- `AgentHandoffContractTests`
+- `NoAuthorityTransferValidatorTests`
+- `DatabaseMigrationApplicationReceiptTests`
+
+Status: active.
+
+Changed in PR93: yes.
+
+Behavior unchanged confirmation: the store records handoff context, evidence references, allowed uses, and constraints only. It does not deliver messages, start workflow, approve, satisfy policy, execute, mutate source, promote memory, or approve release.

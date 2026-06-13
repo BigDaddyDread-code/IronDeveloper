@@ -278,6 +278,7 @@ public sealed class NoAuthorityTransferValidatorTests
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}IronDev.IntegrationTests{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.EndsWith(Path.Combine("IronDev.Core", "Agents", "AgentHandoffAuthorityTransferValidator.cs"), StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.EndsWith(Path.Combine("IronDev.Infrastructure", "Governance", "SqlAgentHandoffStore.cs"), StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         foreach (var file in files)

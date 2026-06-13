@@ -960,6 +960,57 @@
             "appliedByManifest": true,
             "verifiedByScript": true,
             "notes": "Runtime uses stored procedures; no runtime schema creation and no approval, execution, policy, workflow, source apply, release, dogfood, A2A, or memory promotion authority."
+        },
+        {
+            "id": "database.migrate-agent-handoff",
+            "path": "Database/migrate_agent_handoff.sql",
+            "kind": "migration-script",
+            "bucket": "required-runtime-schema",
+            "ownerArea": "a2a",
+            "objectsCreated": [
+                "a2a.AgentHandoff",
+                "a2a.AgentHandoffEvidenceReference",
+                "a2a.AgentHandoffEvidenceAllowedUse",
+                "a2a.AgentHandoffConstraint",
+                "a2a.usp_AgentHandoff_Create",
+                "a2a.usp_AgentHandoff_Get",
+                "a2a.usp_AgentHandoff_ListByProject",
+                "a2a.usp_AgentHandoff_ListByCorrelation",
+                "a2a.usp_AgentHandoff_ListBySubject"
+            ],
+            "objectsCalled": [
+                "governance.GovernanceEvent",
+                "governance.AppendGovernanceEvent"
+            ],
+            "referencedBy": [
+                "IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs",
+                "Database/migrations.json",
+                "Database/verify-migrations.ps1"
+            ],
+            "appliedByManifest": true,
+            "verifiedByScript": true,
+            "notes": "PR93 durable A2A handoff ledger; records handoff context, evidence references, allowed uses, and constraints only. It is not transport, delivery, workflow continuation, approval, policy satisfaction, execution permission, source apply, release approval, or memory promotion."
+        },
+        {
+            "id": "runtime.agent-handoff-store",
+            "path": "IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs",
+            "kind": "runtime-store",
+            "bucket": "stored-procedure-runtime",
+            "ownerArea": "a2a",
+            "objectsCreated": [],
+            "objectsCalled": [
+                "a2a.usp_AgentHandoff_Create",
+                "a2a.usp_AgentHandoff_Get",
+                "a2a.usp_AgentHandoff_ListByProject",
+                "a2a.usp_AgentHandoff_ListByCorrelation",
+                "a2a.usp_AgentHandoff_ListBySubject"
+            ],
+            "referencedBy": [
+                "durable agent handoff repository"
+            ],
+            "appliedByManifest": true,
+            "verifiedByScript": true,
+            "notes": "Runtime uses stored procedures after handoff and no-authority-transfer validation; no runtime schema creation and no delivery, execution, approval, policy, workflow, source apply, release, or memory promotion authority."
         }
     ]
 }

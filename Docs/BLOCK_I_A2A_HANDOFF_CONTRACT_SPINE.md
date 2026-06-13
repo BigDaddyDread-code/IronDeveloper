@@ -4,9 +4,9 @@
 
 PR90 begins Block I with the Agent Handoff contract.
 
-This is contract/model/tests/docs only.
+PR90 is contract/model/tests/docs only.
 
-No SQL, API, CLI, runtime wiring, workflow runner, A2A runtime, LangGraph runtime, source apply, memory promotion, release approval, execution engine, transport, message bus, inbox, outbox, dispatcher, receiver, scheduler, orchestrator, model call, approval lookup, approval recording, approval satisfaction checker, policy decision recording, repository, stored procedure, durable handoff store, or UI is added.
+PR90 adds no SQL, API, CLI, runtime wiring, workflow runner, A2A runtime, LangGraph runtime, source apply, memory promotion, release approval, execution engine, transport, message bus, inbox, outbox, dispatcher, receiver, scheduler, orchestrator, model call, approval lookup, approval recording, approval satisfaction checker, policy decision recording, repository, stored procedure, durable handoff store, or UI.
 
 ## Core rule
 
@@ -24,7 +24,7 @@ A handoff does not send itself.
 
 A handoff does not create A2A runtime messages.
 
-A handoff does not add API/CLI/SQL/runtime wiring.
+PR90 does not add API/CLI/SQL/runtime wiring.
 
 ## Main claim
 
@@ -257,6 +257,40 @@ The validator does not add API/CLI/runtime wiring.
 
 It only proves the handoff is structurally non-authoritative.
 
+## PR93 Durable Agent Handoff Store
+
+PR93 adds durable SQL-backed handoff recording only.
+
+The durable handoff store records handoff evidence and constraints; it does not deliver, route, execute, approve, satisfy policy, continue workflow, mutate source, promote memory, or release anything.
+
+The store validates the handoff contract before persistence.
+
+The store validates no-authority-transfer before persistence.
+
+The store writes append-only a2a handoff records and child evidence/allowed-use/constraint rows.
+
+The store writes a governance event for traceability.
+
+The governance event is evidence only.
+
+The durable handoff store is not:
+
+- A2A transport
+- A2A inbox
+- A2A outbox
+- workflow state
+- workflow continuation
+- approval satisfaction
+- policy satisfaction
+- execution permission
+- source apply permission
+- memory promotion permission
+- release approval
+
+Durable handoff records may be read for audit, traceability, review, debugging, validation, policy input, or human decision support.
+
+Reading a durable handoff record does not grant authority.
+
 ## Non-goals
 
 PR90 does not deliver:
@@ -278,6 +312,23 @@ PR90 does not deliver:
 - execution engine
 - UI
 - L4 agents
+
+PR93 does not deliver:
+
+- A2A runtime
+- handoff transport
+- handoff delivery
+- handoff inbox/outbox
+- API/CLI surface
+- workflow state
+- workflow runner
+- LangGraph
+- source apply
+- memory promotion
+- release approval
+- approval satisfaction
+- execution engine
+- UI
 
 ## Final statement
 
