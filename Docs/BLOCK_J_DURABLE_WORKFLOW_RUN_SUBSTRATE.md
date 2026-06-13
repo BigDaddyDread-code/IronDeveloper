@@ -134,3 +134,48 @@ A persisted step means a validated workflow step fact was recorded with evidence
 ### Source-of-truth rule
 
 SQL remains the source of truth. The runtime store uses stored procedures only and does not create or mutate schema at runtime.
+
+
+## PR100 - Durable Workflow Checkpoint Store
+
+PR100 adds durable workflow checkpoint storage over the PR98/PR99 workflow substrate. Checkpoints record safe workflow state, evidence references, grounding references, and review support facts.
+
+### What changed
+
+- Added `workflow.WorkflowCheckpoint`.
+- Added `workflow.WorkflowCheckpointEvidenceReference`.
+- Added `workflow.WorkflowCheckpointGroundingReference`.
+- Added `workflow.usp_WorkflowCheckpoint_Create`.
+- Added `workflow.usp_WorkflowCheckpoint_Get`.
+- Added `workflow.usp_WorkflowCheckpoint_ListByRun`.
+- Added `workflow.usp_WorkflowCheckpoint_ListByStep`.
+- Added `workflow.usp_WorkflowCheckpoint_ListByCorrelation`.
+- Added `workflow.usp_WorkflowCheckpoint_ListBySubject`.
+- Added `IWorkflowCheckpointStore` and `SqlWorkflowCheckpointStore`.
+
+### Boundary
+
+A workflow checkpoint row is a safe state/evidence snapshot. It is not a workflow resume token.
+
+PR100 does not:
+
+- start a workflow
+- continue a workflow
+- resume a workflow
+- restore a workflow
+- dispatch an agent
+- execute a workflow step
+- execute a tool
+- approve anything
+- satisfy policy
+- mutate source
+- promote memory
+- transfer authority
+- create A2A transport
+- expose API/CLI/UI/runtime wiring
+
+A persisted checkpoint means safe checkpoint facts were recorded with evidence and grounding references. It does not mean workflow execution can continue from that checkpoint.
+
+### Source-of-truth rule
+
+SQL remains the source of truth. The runtime store uses stored procedures only and does not create or mutate schema at runtime.

@@ -373,3 +373,21 @@ Behavior changed in this PR: no product/runtime behavior; only the durable workf
 - Status: active runtime schema and stored procedure surface
 - Behavior changed in this PR: no workflow execution behavior changed; this PR adds durable step recording only
 - Boundary: workflow step record is not workflow execution, policy satisfaction, approval, source mutation, memory promotion, authority transfer, API/CLI/UI exposure, or runtime orchestration
+
+
+## PR100 - Durable Workflow Checkpoint Store Inventory
+
+- Migration: `Database/migrate_workflow_checkpoint_store.sql`
+- Runtime store: `IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs`
+- Core contract: `IronDev.Core/Workflow/WorkflowCheckpointModels.cs`
+- SQL owner: `workflow.WorkflowCheckpoint`, `workflow.WorkflowCheckpointEvidenceReference`, `workflow.WorkflowCheckpointGroundingReference`
+- Stored procedure owner:
+  - `workflow.usp_WorkflowCheckpoint_Create`
+  - `workflow.usp_WorkflowCheckpoint_Get`
+  - `workflow.usp_WorkflowCheckpoint_ListByRun`
+  - `workflow.usp_WorkflowCheckpoint_ListByStep`
+  - `workflow.usp_WorkflowCheckpoint_ListByCorrelation`
+  - `workflow.usp_WorkflowCheckpoint_ListBySubject`
+- Status: active runtime schema and stored procedure surface
+- Behavior changed in this PR: no workflow execution behavior changed; this PR adds durable checkpoint recording only
+- Boundary: workflow checkpoint record is not workflow resume, workflow execution, agent dispatch, policy satisfaction, approval, source mutation, memory promotion, authority transfer, API/CLI/UI exposure, or runtime orchestration
