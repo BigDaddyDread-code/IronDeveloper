@@ -357,6 +357,14 @@ Grounding gives a claim a receipt trail.
 
 It does not make the claim true, approved, executable, promoted, or released.
 
+## PR96 A2A Contract Validation Test Pack
+
+PR96 adds a contract validation test pack for the Block I A2A spine.
+
+The pack proves that handoff, allowed-use evidence, no-authority-transfer validation, durable handoff storage, ThoughtLedger handoff entries, and grounding evidence references compose without creating approval, execution permission, workflow continuation, source mutation, memory promotion, accepted memory, release approval, policy satisfaction, or authority transfer.
+
+The pack adds no A2A runtime, transport, API, CLI, workflow runner, LangGraph, source apply, memory promotion, accepted memory, release approval, approval satisfaction, or execution path.
+
 ## Non-goals
 
 PR90 does not deliver:
