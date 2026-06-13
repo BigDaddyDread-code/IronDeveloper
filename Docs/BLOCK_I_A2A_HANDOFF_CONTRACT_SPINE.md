@@ -329,6 +329,34 @@ It may help a human understand what durable handoff record exists, who prepared 
 
 It must keep all authority flags false.
 
+## PR95 Grounding Evidence Reference Contract
+
+PR95 adds a shared grounding evidence reference contract.
+
+Grounding references support traceability and claim support.
+
+Grounding references do not approve claims.
+
+Grounding references do not execute tools.
+
+Grounding references do not satisfy policy.
+
+Grounding references do not continue workflow.
+
+Grounding references do not mutate source.
+
+Grounding references do not promote memory.
+
+Grounding references do not approve release.
+
+Grounding references do not create accepted memory.
+
+Grounding references must not contain hidden/private reasoning.
+
+Grounding gives a claim a receipt trail.
+
+It does not make the claim true, approved, executable, promoted, or released.
+
 ## Non-goals
 
 PR90 does not deliver:
