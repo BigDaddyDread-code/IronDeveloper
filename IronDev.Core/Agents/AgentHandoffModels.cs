@@ -74,6 +74,20 @@ public enum AgentHandoffEvidenceType
     CodeStandardsReview = 14
 }
 
+public enum AgentHandoffEvidenceAllowedUse
+{
+    Context = 1,
+    Review = 2,
+    Debugging = 3,
+    Validation = 4,
+    Traceability = 5,
+    RequirementEvaluation = 6,
+    HumanDecisionSupport = 7,
+    AuditReference = 8,
+    PolicyInput = 9,
+    HandoffExplanation = 10
+}
+
 public enum AgentHandoffConstraintType
 {
     RequiresHumanReview = 1,
@@ -137,6 +151,7 @@ public sealed record AgentHandoffEvidenceReference
 {
     public required AgentHandoffEvidenceType EvidenceType { get; init; }
     public required string EvidenceId { get; init; }
+    public required IReadOnlyList<AgentHandoffEvidenceAllowedUse> AllowedUses { get; init; }
     public string? EvidenceLabel { get; init; }
     public string? EvidenceSummary { get; init; }
     public Guid? GovernanceEventId { get; init; }
@@ -213,6 +228,9 @@ public sealed class AgentHandoffValidator
     public const string EvidenceRequired = "AGENT_HANDOFF_EVIDENCE_REQUIRED";
     public const string EvidenceInvalid = "AGENT_HANDOFF_EVIDENCE_INVALID";
     public const string EvidenceTypeInvalid = "AGENT_HANDOFF_EVIDENCE_TYPE_INVALID";
+    public const string EvidenceAllowedUseRequired = "AGENT_HANDOFF_EVIDENCE_ALLOWED_USE_REQUIRED";
+    public const string EvidenceAllowedUseInvalid = "AGENT_HANDOFF_EVIDENCE_ALLOWED_USE_INVALID";
+    public const string EvidenceAllowedUseDuplicate = "AGENT_HANDOFF_EVIDENCE_ALLOWED_USE_DUPLICATE";
     public const string ConstraintRequired = "AGENT_HANDOFF_CONSTRAINT_REQUIRED";
     public const string ConstraintInvalid = "AGENT_HANDOFF_CONSTRAINT_INVALID";
     public const string ConstraintTypeInvalid = "AGENT_HANDOFF_CONSTRAINT_TYPE_INVALID";
@@ -244,13 +262,39 @@ public sealed class AgentHandoffValidator
         "approvalTransferred",
         "approval granted",
         "canExecute",
+        "can execute",
+        "execution permission",
         "execution granted",
         "sourceApplyAllowed",
+        "source apply allowed",
+        "source apply permission",
         "memoryPromotionAllowed",
+        "memory promotion allowed",
+        "memory promotion permission",
         "workflowContinues",
+        "workflow continuation",
+        "continue workflow",
         "releaseApproved",
+        "release approved",
+        "release approval",
+        "can ship",
         "transfersAuthority",
         "authorityTransfer",
+        "authority transfer",
+        "permission transfer",
+        "approval transfer",
+        "approvalTransfer",
+        "human approval transfer",
+        "gate approval",
+        "dogfood approval",
+        "critic approval",
+        "model approval",
+        "retrieval approval",
+        "policy satisfied",
+        "policy satisfaction",
+        "satisfy policy",
+        "approved to execute",
+        "human approved",
         "grantsApproval",
         "grantsExecution",
         "mutatesSource",
@@ -430,9 +474,32 @@ public sealed class AgentHandoffValidator
             if (string.IsNullOrWhiteSpace(evidence.EvidenceId))
                 AddError(issues, EvidenceInvalid, "EvidenceId is required.", nameof(AgentHandoffEvidenceReference.EvidenceId));
 
+            ValidateAllowedUses(evidence.AllowedUses, issues);
             ValidateTextSafety(evidence.EvidenceId, nameof(AgentHandoffEvidenceReference.EvidenceId), issues);
             ValidateTextSafety(evidence.EvidenceLabel, nameof(AgentHandoffEvidenceReference.EvidenceLabel), issues);
             ValidateTextSafety(evidence.EvidenceSummary, nameof(AgentHandoffEvidenceReference.EvidenceSummary), issues);
+        }
+    }
+
+    private static void ValidateAllowedUses(IReadOnlyList<AgentHandoffEvidenceAllowedUse> allowedUses, List<AgentHandoffValidationIssue> issues)
+    {
+        if (allowedUses is null || allowedUses.Count == 0)
+        {
+            AddError(issues, EvidenceAllowedUseRequired, "Evidence reference must declare at least one allowed use.", nameof(AgentHandoffEvidenceReference.AllowedUses));
+            return;
+        }
+
+        var seen = new HashSet<AgentHandoffEvidenceAllowedUse>();
+        foreach (var allowedUse in allowedUses)
+        {
+            if (!Enum.IsDefined(allowedUse))
+            {
+                AddError(issues, EvidenceAllowedUseInvalid, "Evidence allowed use is invalid.", nameof(AgentHandoffEvidenceReference.AllowedUses));
+                continue;
+            }
+
+            if (!seen.Add(allowedUse))
+                AddError(issues, EvidenceAllowedUseDuplicate, "Evidence allowed use values must be unique.", nameof(AgentHandoffEvidenceReference.AllowedUses));
         }
     }
 

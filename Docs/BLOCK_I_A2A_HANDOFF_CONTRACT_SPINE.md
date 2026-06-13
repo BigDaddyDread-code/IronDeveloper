@@ -140,7 +140,19 @@ Forbidden type meanings:
 
 ## Evidence reference boundary
 
+## PR91 Handoff allowedUse and Evidence Reference Model
+
 Evidence references are evidence only.
+
+PR91 adds bounded allowed-use semantics to each evidence reference.
+
+Evidence references must declare allowed uses.
+
+Allowed use is not authority.
+
+Allowed use bounds how evidence may support context, review, debugging, validation, requirement evaluation, traceability, audit, policy input, handoff explanation, or human decision support.
+
+Allowed use cannot be approval, execution permission, policy satisfaction, workflow continuation, source apply permission, memory promotion permission, release approval, or authority transfer.
 
 ApprovalDecision may be cited only as evidence.
 
@@ -151,6 +163,33 @@ DogfoodReceipt is not approval.
 CriticReview is not approval.
 
 ApprovalPackage is not approval.
+
+Approval decisions may be cited only as evidence.
+
+Gate decisions may be cited only as evidence.
+
+Dogfood receipts may be cited only as evidence.
+
+Critic/model/retrieval output may be cited only as advisory evidence.
+
+Safe allowed-use values:
+
+- Context
+- Review
+- Debugging
+- Validation
+- Traceability
+- RequirementEvaluation
+- HumanDecisionSupport
+- AuditReference
+- PolicyInput
+- HandoffExplanation
+
+PolicyInput means evidence may be considered during policy or approval requirement evaluation. It does not satisfy policy.
+
+HumanDecisionSupport means evidence may support a human decision. It does not make that decision.
+
+AuditReference means evidence may support later audit. Audit is not approval.
 
 Forbidden evidence meanings:
 

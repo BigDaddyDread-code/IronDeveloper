@@ -19,6 +19,7 @@ public sealed class AgentHandoffContractTests
         Assert.IsNotNull(typeof(AgentHandoffSummary));
         Assert.IsNotNull(typeof(AgentHandoffStatus));
         Assert.IsNotNull(typeof(AgentHandoffType));
+        Assert.IsNotNull(typeof(AgentHandoffEvidenceAllowedUse));
         Assert.IsNotNull(typeof(AgentHandoffValidator));
         Assert.IsNotNull(typeof(AgentHandoffValidationResult));
         Assert.IsNotNull(typeof(AgentHandoffValidationIssue));
@@ -54,6 +55,7 @@ public sealed class AgentHandoffContractTests
         AssertHasProperty<AgentHandoffSubject>(nameof(AgentHandoffSubject.Summary));
         AssertHasProperty<AgentHandoffEvidenceReference>(nameof(AgentHandoffEvidenceReference.EvidenceType));
         AssertHasProperty<AgentHandoffEvidenceReference>(nameof(AgentHandoffEvidenceReference.EvidenceId));
+        AssertHasProperty<AgentHandoffEvidenceReference>(nameof(AgentHandoffEvidenceReference.AllowedUses));
         AssertHasProperty<AgentHandoffEvidenceReference>(nameof(AgentHandoffEvidenceReference.GovernanceEventId));
         AssertHasProperty<AgentHandoffConstraint>(nameof(AgentHandoffConstraint.ConstraintType));
         AssertHasProperty<AgentHandoffConstraint>(nameof(AgentHandoffConstraint.ConstraintCode));
@@ -161,6 +163,59 @@ public sealed class AgentHandoffContractTests
     }
 
     [TestMethod]
+    public void AgentHandoffEvidenceAllowedUse_AllowsKnownNonAuthoritativeUseVocabulary()
+    {
+        CollectionAssert.AreEquivalent(
+            new[]
+            {
+                "Context",
+                "Review",
+                "Debugging",
+                "Validation",
+                "Traceability",
+                "RequirementEvaluation",
+                "HumanDecisionSupport",
+                "AuditReference",
+                "PolicyInput",
+                "HandoffExplanation"
+            },
+            Enum.GetNames<AgentHandoffEvidenceAllowedUse>());
+    }
+
+    [TestMethod]
+    public void AgentHandoffEvidenceAllowedUse_DoesNotExposeAuthorityUseVocabulary()
+    {
+        AssertEnumExcludes<AgentHandoffEvidenceAllowedUse>(
+            "Approval",
+            "Approve",
+            "Approved",
+            "ExecutionPermission",
+            "CanExecute",
+            "Execute",
+            "ExecutionAllowed",
+            "PolicySatisfied",
+            "SatisfyPolicy",
+            "WorkflowContinuation",
+            "ContinueWorkflow",
+            "SourceApplyPermission",
+            "SourceApplyAllowed",
+            "MemoryPromotionPermission",
+            "MemoryPromotionAllowed",
+            "ReleaseApproval",
+            "ReleaseApproved",
+            "CanShip",
+            "AuthorityTransfer",
+            "PermissionTransfer",
+            "ApprovalTransfer",
+            "HumanApprovalTransfer",
+            "GateApproval",
+            "DogfoodApproval",
+            "CriticApproval",
+            "ModelApproval",
+            "RetrievalApproval");
+    }
+
+    [TestMethod]
     public void AgentHandoffConstraint_AllowsRequirementsAndNegativeBoundariesOnly()
     {
         CollectionAssert.AreEquivalent(
@@ -222,6 +277,10 @@ public sealed class AgentHandoffContractTests
             (ValidCreateRequest() with { EvidenceReferences = [] }, AgentHandoffValidator.EvidenceRequired),
             (ValidCreateRequest() with { EvidenceReferences = [Evidence() with { EvidenceType = (AgentHandoffEvidenceType)999 }] }, AgentHandoffValidator.EvidenceTypeInvalid),
             (ValidCreateRequest() with { EvidenceReferences = [Evidence() with { EvidenceId = string.Empty }] }, AgentHandoffValidator.EvidenceInvalid),
+            (ValidCreateRequest() with { EvidenceReferences = [Evidence() with { AllowedUses = null! }] }, AgentHandoffValidator.EvidenceAllowedUseRequired),
+            (ValidCreateRequest() with { EvidenceReferences = [Evidence() with { AllowedUses = [] }] }, AgentHandoffValidator.EvidenceAllowedUseRequired),
+            (ValidCreateRequest() with { EvidenceReferences = [Evidence() with { AllowedUses = [(AgentHandoffEvidenceAllowedUse)999] }] }, AgentHandoffValidator.EvidenceAllowedUseInvalid),
+            (ValidCreateRequest() with { EvidenceReferences = [Evidence() with { AllowedUses = [AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.Review] }] }, AgentHandoffValidator.EvidenceAllowedUseDuplicate),
             (ValidCreateRequest() with { Constraints = [] }, AgentHandoffValidator.ConstraintRequired),
             (ValidCreateRequest() with { Constraints = [Constraint() with { ConstraintType = (AgentHandoffConstraintType)999 }] }, AgentHandoffValidator.ConstraintTypeInvalid),
             (ValidCreateRequest() with { Constraints = [Constraint() with { ConstraintCode = string.Empty }] }, AgentHandoffValidator.ConstraintInvalid),
@@ -266,11 +325,44 @@ public sealed class AgentHandoffContractTests
             ValidCreateRequest() with { MetadataJson = "{\"schema\":\"agent.handoff.metadata.v1\",\"releaseApproved\":true}" },
             ValidCreateRequest() with { Subject = Subject() with { ActionName = "canExecute" } },
             ValidCreateRequest() with { EvidenceReferences = [Evidence() with { EvidenceLabel = "approval granted" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence() with { EvidenceLabel = "approval transfer" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence() with { EvidenceSummary = "approved to execute" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.ToolGateDecision, AgentHandoffEvidenceAllowedUse.Review) with { EvidenceSummary = "execution permission" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.DogfoodReceipt, AgentHandoffEvidenceAllowedUse.Validation) with { EvidenceSummary = "release approval" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.CriticReview, AgentHandoffEvidenceAllowedUse.Review) with { EvidenceSummary = "critic approval" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.CodeStandardsReview, AgentHandoffEvidenceAllowedUse.Review) with { EvidenceSummary = "model approval" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.ApprovalPackage, AgentHandoffEvidenceAllowedUse.Review) with { EvidenceSummary = "policy satisfied" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.ApprovalDecision, AgentHandoffEvidenceAllowedUse.HumanDecisionSupport) with { EvidenceSummary = "human approval transfer" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.ValidationOutput, AgentHandoffEvidenceAllowedUse.Validation) with { EvidenceSummary = "can ship" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.RunReport, AgentHandoffEvidenceAllowedUse.Debugging) with { EvidenceSummary = "release approved" }] },
+            ValidCreateRequest() with { EvidenceReferences = [Evidence(AgentHandoffEvidenceType.ThoughtLedgerReference, AgentHandoffEvidenceAllowedUse.Traceability) with { EvidenceSummary = "authority transfer" }] },
             ValidCreateRequest() with { Constraints = [Constraint() with { Description = "execution granted" }] }
         };
 
         foreach (var request in cases)
             AssertHasIssue(Validator.Validate(request), AgentHandoffValidator.AuthorityMetadataBlocked);
+    }
+
+    [TestMethod]
+    public void AgentHandoffCreateRequest_AllowsSafeEvidenceUseMappings()
+    {
+        var safeEvidence = new[]
+        {
+            Evidence(AgentHandoffEvidenceType.ToolGateDecision, AgentHandoffEvidenceAllowedUse.Context, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.Traceability, AgentHandoffEvidenceAllowedUse.HumanDecisionSupport),
+            Evidence(AgentHandoffEvidenceType.DogfoodReceipt, AgentHandoffEvidenceAllowedUse.Validation, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.ApprovalRequirementEvaluation, AgentHandoffEvidenceAllowedUse.RequirementEvaluation, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.ApprovalPackage, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.HumanDecisionSupport, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.CriticReview, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.HumanDecisionSupport, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.ValidationOutput, AgentHandoffEvidenceAllowedUse.Validation, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.RunReport, AgentHandoffEvidenceAllowedUse.Debugging, AgentHandoffEvidenceAllowedUse.Validation, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.PolicyDecisionEvent, AgentHandoffEvidenceAllowedUse.PolicyInput, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.Traceability),
+            Evidence(AgentHandoffEvidenceType.HumanNote, AgentHandoffEvidenceAllowedUse.Context, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.HumanDecisionSupport),
+            Evidence(AgentHandoffEvidenceType.ThoughtLedgerReference, AgentHandoffEvidenceAllowedUse.Context, AgentHandoffEvidenceAllowedUse.Traceability, AgentHandoffEvidenceAllowedUse.HandoffExplanation)
+        };
+
+        var result = Validator.Validate(ValidCreateRequest() with { EvidenceReferences = safeEvidence });
+
+        AssertValid(result);
     }
 
     [TestMethod]
@@ -303,6 +395,8 @@ public sealed class AgentHandoffContractTests
         Assert.IsFalse(handoff.StartsWorkflow);
         Assert.IsFalse(handoff.SatisfiesPolicy);
         Assert.IsFalse(handoff.TransfersAuthority);
+
+        CollectionAssert.Contains(handoff.EvidenceReferences.Single().AllowedUses.ToArray(), AgentHandoffEvidenceAllowedUse.Review);
     }
 
     [TestMethod]
@@ -380,6 +474,15 @@ public sealed class AgentHandoffContractTests
             "A handoff does not transfer approval, execution permission, memory ownership, workflow authority, source apply authority, memory promotion authority, or release authority.",
             "A handoff may cite approval decisions only as evidence.",
             "A handoff may cite gate decisions, dogfood receipts, critic output, validation output, ThoughtLedger references, and governance events only as evidence.",
+            "PR91 Handoff allowedUse and Evidence Reference Model",
+            "PR91 adds bounded allowed-use semantics to each evidence reference.",
+            "Evidence references must declare allowed uses.",
+            "Allowed use is not authority.",
+            "Allowed use cannot be approval, execution permission, policy satisfaction, workflow continuation, source apply permission, memory promotion permission, release approval, or authority transfer.",
+            "Approval decisions may be cited only as evidence.",
+            "Gate decisions may be cited only as evidence.",
+            "Dogfood receipts may be cited only as evidence.",
+            "Critic/model/retrieval output may be cited only as advisory evidence.",
             "A handoff does not send itself.",
             "A handoff does not create A2A runtime messages.",
             "A handoff does not add API/CLI/SQL/runtime wiring.",
@@ -476,12 +579,16 @@ public sealed class AgentHandoffContractTests
         };
 
     private static AgentHandoffEvidenceReference Evidence() =>
+        Evidence(AgentHandoffEvidenceType.ApprovalDecision, AgentHandoffEvidenceAllowedUse.Review, AgentHandoffEvidenceAllowedUse.Traceability, AgentHandoffEvidenceAllowedUse.HumanDecisionSupport);
+
+    private static AgentHandoffEvidenceReference Evidence(AgentHandoffEvidenceType evidenceType, params AgentHandoffEvidenceAllowedUse[] allowedUses) =>
         new()
         {
-            EvidenceType = AgentHandoffEvidenceType.ApprovalDecision,
-            EvidenceId = "approval-decision-1",
-            EvidenceLabel = "Approval decision evidence",
-            EvidenceSummary = "Existing approval decision is cited only as evidence.",
+            EvidenceType = evidenceType,
+            EvidenceId = $"{evidenceType}-1",
+            AllowedUses = allowedUses,
+            EvidenceLabel = $"{evidenceType} evidence",
+            EvidenceSummary = $"{evidenceType} is cited only as evidence.",
             GovernanceEventId = Guid.Parse("44444444-4444-4444-4444-444444444444")
         };
 
