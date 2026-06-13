@@ -357,3 +357,19 @@ Boundary:
 - no authority transfer
 
 Behavior changed in this PR: no product/runtime behavior; only the durable workflow run ledger and repository are added.
+
+## PR99 - Durable Workflow Step Store Inventory
+
+- Migration: `Database/migrate_workflow_step_store.sql`
+- Runtime store: `IronDev.Infrastructure/Workflow/SqlWorkflowStepStore.cs`
+- Core contract: `IronDev.Core/Workflow/WorkflowStepModels.cs`
+- SQL owner: `workflow.WorkflowRunStep`, `workflow.WorkflowRunEvidenceReference`, `workflow.WorkflowRunGroundingReference`
+- Stored procedure owner:
+  - `workflow.usp_WorkflowStep_Create`
+  - `workflow.usp_WorkflowStep_Get`
+  - `workflow.usp_WorkflowStep_ListByRun`
+  - `workflow.usp_WorkflowStep_ListByCorrelation`
+  - `workflow.usp_WorkflowStep_ListBySubject`
+- Status: active runtime schema and stored procedure surface
+- Behavior changed in this PR: no workflow execution behavior changed; this PR adds durable step recording only
+- Boundary: workflow step record is not workflow execution, policy satisfaction, approval, source mutation, memory promotion, authority transfer, API/CLI/UI exposure, or runtime orchestration

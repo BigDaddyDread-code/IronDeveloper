@@ -95,3 +95,42 @@ PR98 adds no:
 - UI surface
 
 PR98 records the workflow envelope. It does not move it.
+## PR99 - Durable Workflow Step Store
+
+PR99 adds durable workflow step storage over the PR98 workflow schema. It reuses the existing `workflow.WorkflowRunStep`, `workflow.WorkflowRunEvidenceReference`, and `workflow.WorkflowRunGroundingReference` tables and adds the stored procedure/read-model surface needed to record individual workflow step facts.
+
+### What changed
+
+- Added `workflow.usp_WorkflowStep_Create`.
+- Added `workflow.usp_WorkflowStep_Get`.
+- Added `workflow.usp_WorkflowStep_ListByRun`.
+- Added `workflow.usp_WorkflowStep_ListByCorrelation`.
+- Added `workflow.usp_WorkflowStep_ListBySubject`.
+- Added `workflow.WorkflowRunStep.SequenceNumber` for deterministic step ordering.
+- Added `CK_WorkflowRunStep_SequenceNumber_Positive`.
+- Extended the safe step-type vocabulary for policy/debug/review evidence steps.
+- Added `IWorkflowStepStore` and `SqlWorkflowStepStore`.
+
+### Boundary
+
+A workflow step row is evidence about a workflow step. It is not execution.
+
+PR99 does not:
+
+- start a workflow
+- continue a workflow
+- dispatch a workflow
+- execute a workflow step
+- approve anything
+- satisfy policy
+- mutate source
+- promote memory
+- transfer authority
+- create A2A transport
+- expose API/CLI/UI/runtime wiring
+
+A persisted step means a validated workflow step fact was recorded with evidence and grounding references. It does not mean the step was performed.
+
+### Source-of-truth rule
+
+SQL remains the source of truth. The runtime store uses stored procedures only and does not create or mutate schema at runtime.
