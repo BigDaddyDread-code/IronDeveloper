@@ -10,6 +10,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
     private readonly WorkflowStepContractValidator _contractValidator;
     private readonly IWorkflowStepPolicyPreflightChecker _policyPreflightChecker;
     private readonly IWorkflowA2aHandoffValidator _a2aHandoffValidator;
+    private readonly IWorkflowApprovalHaltEvaluator _approvalHaltEvaluator;
 
     public WorkflowRunnerSkeleton()
         : this(new WorkflowStepContractValidator(), new WorkflowStepPolicyPreflightChecker(), new WorkflowA2aHandoffValidator())
@@ -25,10 +26,20 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
         WorkflowStepContractValidator contractValidator,
         IWorkflowStepPolicyPreflightChecker policyPreflightChecker,
         IWorkflowA2aHandoffValidator a2aHandoffValidator)
+        : this(contractValidator, policyPreflightChecker, a2aHandoffValidator, new WorkflowApprovalHaltEvaluator())
+    {
+    }
+
+    internal WorkflowRunnerSkeleton(
+        WorkflowStepContractValidator contractValidator,
+        IWorkflowStepPolicyPreflightChecker policyPreflightChecker,
+        IWorkflowA2aHandoffValidator a2aHandoffValidator,
+        IWorkflowApprovalHaltEvaluator approvalHaltEvaluator)
     {
         _contractValidator = contractValidator;
         _policyPreflightChecker = policyPreflightChecker;
         _a2aHandoffValidator = a2aHandoffValidator;
+        _approvalHaltEvaluator = approvalHaltEvaluator;
     }
 
     public WorkflowRunnerEvaluation Evaluate(WorkflowRunnerEvaluationRequest? request)
@@ -62,13 +73,19 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             .GroupBy(a2aRequest => a2aRequest.StepContract!.StepContractId.Trim(), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
+        var approvalHaltRequests = (request.ApprovalHaltRequests ?? [])
+            .Where(approvalRequest => !string.IsNullOrWhiteSpace(approvalRequest.WorkflowStepId))
+            .GroupBy(approvalRequest => approvalRequest.WorkflowStepId.Trim(), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
         var stepEvaluations = request.StepContracts
             .Select(step => EvaluateStep(
                 request.WorkflowRunId,
                 step,
                 availableEvidence,
                 policyPreflightRequests,
-                a2aHandoffValidationRequests))
+                a2aHandoffValidationRequests,
+                approvalHaltRequests))
             .ToArray();
 
         var aggregateReasons = stepEvaluations
@@ -93,7 +110,8 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
         WorkflowStepContract step,
         HashSet<string> availableEvidence,
         IReadOnlyDictionary<string, WorkflowStepPolicyPreflightRequest> policyPreflightRequests,
-        IReadOnlyDictionary<string, WorkflowA2aHandoffValidationRequest> a2aHandoffValidationRequests)
+        IReadOnlyDictionary<string, WorkflowA2aHandoffValidationRequest> a2aHandoffValidationRequests,
+        IReadOnlyDictionary<string, WorkflowApprovalHaltEvaluationRequest> approvalHaltRequests)
     {
         var validation = _contractValidator.Validate(step);
         if (!string.Equals(step.WorkflowRunId, workflowRunId, StringComparison.Ordinal))
@@ -130,6 +148,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 A2aHandoffValidationStatus = null,
                 A2aHandoffBlockReasons = [],
                 MissingA2aHandoffEvidence = [],
+                ApprovalHaltStatus = null,
+                ApprovalHaltReasons = [],
+                MissingApprovalRequirements = [],
                 NextRecordableTransition = null
             };
         }
@@ -153,6 +174,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 A2aHandoffValidationStatus = null,
                 A2aHandoffBlockReasons = [],
                 MissingA2aHandoffEvidence = [],
+                ApprovalHaltStatus = null,
+                ApprovalHaltReasons = [],
+                MissingApprovalRequirements = [],
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -177,6 +201,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 A2aHandoffValidationStatus = null,
                 A2aHandoffBlockReasons = [],
                 MissingA2aHandoffEvidence = [],
+                ApprovalHaltStatus = null,
+                ApprovalHaltReasons = [],
+                MissingApprovalRequirements = [],
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -196,6 +223,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 A2aHandoffValidationStatus = null,
                 A2aHandoffBlockReasons = [],
                 MissingA2aHandoffEvidence = [],
+                ApprovalHaltStatus = null,
+                ApprovalHaltReasons = [],
+                MissingApprovalRequirements = [],
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -222,6 +252,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 A2aHandoffValidationStatus = a2aHandoffValidation.Status,
                 A2aHandoffBlockReasons = a2aHandoffValidation.BlockReasons,
                 MissingA2aHandoffEvidence = a2aHandoffValidation.MissingEvidence,
+                ApprovalHaltStatus = null,
+                ApprovalHaltReasons = [],
+                MissingApprovalRequirements = [],
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -241,6 +274,58 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 A2aHandoffValidationStatus = a2aHandoffValidation.Status,
                 A2aHandoffBlockReasons = a2aHandoffValidation.BlockReasons,
                 MissingA2aHandoffEvidence = a2aHandoffValidation.MissingEvidence,
+                ApprovalHaltStatus = null,
+                ApprovalHaltReasons = [],
+                MissingApprovalRequirements = [],
+                NextRecordableTransition = FirstTransition(step)
+            };
+        }
+
+        var approvalHaltRequest = TryGetApprovalHaltRequest(step.StepContractId, approvalHaltRequests);
+        var approvalHalt = approvalHaltRequest is null
+            ? null
+            : _approvalHaltEvaluator.Evaluate(approvalHaltRequest with { WorkflowStepId = step.StepContractId });
+
+        if (approvalHalt?.Status == WorkflowApprovalHaltStatus.InvalidApprovalRequirement)
+        {
+            return new WorkflowStepRunnerEvaluation
+            {
+                StepId = step.StepContractId,
+                Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
+                BlockReasons = [WorkflowRunnerBlockReason.ApprovalRequirementInvalid, .. boundaryReasons],
+                MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
+                PolicyPreflightStatus = policyPreflight?.Status,
+                PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
+                MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
+                A2aHandoffValidationStatus = a2aHandoffValidation?.Status,
+                A2aHandoffBlockReasons = a2aHandoffValidation?.BlockReasons ?? [],
+                MissingA2aHandoffEvidence = a2aHandoffValidation?.MissingEvidence ?? [],
+                ApprovalHaltStatus = approvalHalt.Status,
+                ApprovalHaltReasons = approvalHalt.Reasons,
+                MissingApprovalRequirements = [],
+                NextRecordableTransition = FirstTransition(step)
+            };
+        }
+
+        if (approvalHalt?.Status == WorkflowApprovalHaltStatus.ApprovalRequiredHalt)
+        {
+            return new WorkflowStepRunnerEvaluation
+            {
+                StepId = step.StepContractId,
+                Eligibility = WorkflowStepRunnerEligibility.BlockedApprovalRequired,
+                BlockReasons = [WorkflowRunnerBlockReason.ApprovalRequiredHalt, WorkflowRunnerBlockReason.ApprovalEvidenceMissing, .. boundaryReasons],
+                MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
+                PolicyPreflightStatus = policyPreflight?.Status,
+                PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
+                MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
+                A2aHandoffValidationStatus = a2aHandoffValidation?.Status,
+                A2aHandoffBlockReasons = a2aHandoffValidation?.BlockReasons ?? [],
+                MissingA2aHandoffEvidence = a2aHandoffValidation?.MissingEvidence ?? [],
+                ApprovalHaltStatus = approvalHalt.Status,
+                ApprovalHaltReasons = approvalHalt.Reasons,
+                MissingApprovalRequirements = approvalHalt.MissingApprovalRequirements,
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -258,6 +343,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             A2aHandoffValidationStatus = a2aHandoffValidation?.Status,
             A2aHandoffBlockReasons = a2aHandoffValidation?.BlockReasons ?? [],
             MissingA2aHandoffEvidence = a2aHandoffValidation?.MissingEvidence ?? [],
+            ApprovalHaltStatus = approvalHalt?.Status,
+            ApprovalHaltReasons = approvalHalt?.Reasons ?? [],
+            MissingApprovalRequirements = approvalHalt?.MissingApprovalRequirements ?? [],
             NextRecordableTransition = FirstTransition(step)
         };
     }
@@ -314,6 +402,18 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             : null;
     }
 
+    private static WorkflowApprovalHaltEvaluationRequest? TryGetApprovalHaltRequest(
+        string? stepContractId,
+        IReadOnlyDictionary<string, WorkflowApprovalHaltEvaluationRequest> approvalHaltRequests)
+    {
+        if (string.IsNullOrWhiteSpace(stepContractId))
+            return null;
+
+        return approvalHaltRequests.TryGetValue(stepContractId.Trim(), out var approvalRequest)
+            ? approvalRequest
+            : null;
+    }
+
     private static IReadOnlyList<WorkflowRunnerBlockReason> BoundaryReasonsFor(WorkflowStepContract step)
     {
         var reasons = new List<WorkflowRunnerBlockReason>
@@ -351,6 +451,7 @@ public sealed record WorkflowRunnerEvaluationRequest
     public required IReadOnlyList<WorkflowEvidenceReference> AvailableEvidence { get; init; }
     public IReadOnlyList<WorkflowStepPolicyPreflightRequest> PolicyPreflightRequests { get; init; } = [];
     public IReadOnlyList<WorkflowA2aHandoffValidationRequest> A2aHandoffValidationRequests { get; init; } = [];
+    public IReadOnlyList<WorkflowApprovalHaltEvaluationRequest> ApprovalHaltRequests { get; init; } = [];
 }
 
 public sealed record WorkflowEvidenceReference
@@ -390,6 +491,9 @@ public sealed record WorkflowStepRunnerEvaluation
     public WorkflowA2aHandoffValidationStatus? A2aHandoffValidationStatus { get; init; }
     public IReadOnlyList<WorkflowA2aHandoffBlockReason> A2aHandoffBlockReasons { get; init; } = [];
     public IReadOnlyList<WorkflowA2aHandoffEvidenceReference> MissingA2aHandoffEvidence { get; init; } = [];
+    public WorkflowApprovalHaltStatus? ApprovalHaltStatus { get; init; }
+    public IReadOnlyList<WorkflowApprovalHaltReason> ApprovalHaltReasons { get; init; } = [];
+    public IReadOnlyList<WorkflowApprovalHaltRequirement> MissingApprovalRequirements { get; init; } = [];
     public WorkflowStepContractTransitionKind? NextRecordableTransition { get; init; }
 }
 
@@ -399,7 +503,8 @@ public enum WorkflowStepRunnerEligibility
     InvalidContract = 1,
     BlockedMissingEvidence = 2,
     BlockedByBoundary = 3,
-    EligibleForFutureExecution = 4
+    EligibleForFutureExecution = 4,
+    BlockedApprovalRequired = 5
 }
 
 public enum WorkflowRunnerBlockReason
@@ -421,5 +526,8 @@ public enum WorkflowRunnerBlockReason
     MissingThoughtLedgerReference = 14,
     InvalidThoughtLedgerReference = 15,
     A2aHandoffValidationInvalid = 16,
-    A2aHandoffValidationMissingEvidence = 17
+    A2aHandoffValidationMissingEvidence = 17,
+    ApprovalRequiredHalt = 18,
+    ApprovalRequirementInvalid = 19,
+    ApprovalEvidenceMissing = 20
 }
