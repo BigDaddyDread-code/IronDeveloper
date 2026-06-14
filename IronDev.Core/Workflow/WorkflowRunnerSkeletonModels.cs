@@ -9,23 +9,26 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
 {
     private readonly WorkflowStepContractValidator _contractValidator;
     private readonly IWorkflowStepPolicyPreflightChecker _policyPreflightChecker;
+    private readonly IWorkflowA2aHandoffValidator _a2aHandoffValidator;
 
     public WorkflowRunnerSkeleton()
-        : this(new WorkflowStepContractValidator(), new WorkflowStepPolicyPreflightChecker())
+        : this(new WorkflowStepContractValidator(), new WorkflowStepPolicyPreflightChecker(), new WorkflowA2aHandoffValidator())
     {
     }
 
     internal WorkflowRunnerSkeleton(WorkflowStepContractValidator contractValidator)
-        : this(contractValidator, new WorkflowStepPolicyPreflightChecker(contractValidator))
+        : this(contractValidator, new WorkflowStepPolicyPreflightChecker(contractValidator), new WorkflowA2aHandoffValidator(contractValidator))
     {
     }
 
     internal WorkflowRunnerSkeleton(
         WorkflowStepContractValidator contractValidator,
-        IWorkflowStepPolicyPreflightChecker policyPreflightChecker)
+        IWorkflowStepPolicyPreflightChecker policyPreflightChecker,
+        IWorkflowA2aHandoffValidator a2aHandoffValidator)
     {
         _contractValidator = contractValidator;
         _policyPreflightChecker = policyPreflightChecker;
+        _a2aHandoffValidator = a2aHandoffValidator;
     }
 
     public WorkflowRunnerEvaluation Evaluate(WorkflowRunnerEvaluationRequest? request)
@@ -53,12 +56,19 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             .GroupBy(policyRequest => policyRequest.StepContract!.StepContractId.Trim(), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
+        var a2aHandoffValidationRequests = (request.A2aHandoffValidationRequests ?? [])
+            .Where(a2aRequest => a2aRequest.StepContract is not null &&
+                                 !string.IsNullOrWhiteSpace(a2aRequest.StepContract.StepContractId))
+            .GroupBy(a2aRequest => a2aRequest.StepContract!.StepContractId.Trim(), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
         var stepEvaluations = request.StepContracts
             .Select(step => EvaluateStep(
                 request.WorkflowRunId,
                 step,
                 availableEvidence,
-                policyPreflightRequests))
+                policyPreflightRequests,
+                a2aHandoffValidationRequests))
             .ToArray();
 
         var aggregateReasons = stepEvaluations
@@ -82,7 +92,8 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
         string workflowRunId,
         WorkflowStepContract step,
         HashSet<string> availableEvidence,
-        IReadOnlyDictionary<string, WorkflowStepPolicyPreflightRequest> policyPreflightRequests)
+        IReadOnlyDictionary<string, WorkflowStepPolicyPreflightRequest> policyPreflightRequests,
+        IReadOnlyDictionary<string, WorkflowA2aHandoffValidationRequest> a2aHandoffValidationRequests)
     {
         var validation = _contractValidator.Validate(step);
         if (!string.Equals(step.WorkflowRunId, workflowRunId, StringComparison.Ordinal))
@@ -116,6 +127,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 PolicyPreflightStatus = null,
                 PolicyBlockReasons = [],
                 MissingPolicyRequirements = [],
+                A2aHandoffValidationStatus = null,
+                A2aHandoffBlockReasons = [],
+                MissingA2aHandoffEvidence = [],
                 NextRecordableTransition = null
             };
         }
@@ -136,6 +150,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 PolicyPreflightStatus = null,
                 PolicyBlockReasons = [],
                 MissingPolicyRequirements = [],
+                A2aHandoffValidationStatus = null,
+                A2aHandoffBlockReasons = [],
+                MissingA2aHandoffEvidence = [],
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -157,6 +174,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 PolicyPreflightStatus = policyPreflight.Status,
                 PolicyBlockReasons = policyPreflight.BlockReasons,
                 MissingPolicyRequirements = policyPreflight.MissingPolicyRequirements,
+                A2aHandoffValidationStatus = null,
+                A2aHandoffBlockReasons = [],
+                MissingA2aHandoffEvidence = [],
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -173,6 +193,54 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 PolicyPreflightStatus = policyPreflight.Status,
                 PolicyBlockReasons = policyPreflight.BlockReasons,
                 MissingPolicyRequirements = policyPreflight.MissingPolicyRequirements,
+                A2aHandoffValidationStatus = null,
+                A2aHandoffBlockReasons = [],
+                MissingA2aHandoffEvidence = [],
+                NextRecordableTransition = FirstTransition(step)
+            };
+        }
+
+        var a2aHandoffValidationRequest = TryGetA2aHandoffValidationRequest(step.StepContractId, a2aHandoffValidationRequests);
+        var a2aHandoffValidation = a2aHandoffValidationRequest is null
+            ? null
+            : _a2aHandoffValidator.Validate(a2aHandoffValidationRequest with { StepContract = step });
+
+        if (a2aHandoffValidation?.Status is WorkflowA2aHandoffValidationStatus.InvalidRequest or
+            WorkflowA2aHandoffValidationStatus.InvalidStepContract or
+            WorkflowA2aHandoffValidationStatus.InvalidHandoffReference)
+        {
+            return new WorkflowStepRunnerEvaluation
+            {
+                StepId = step.StepContractId,
+                Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
+                BlockReasons = [WorkflowRunnerBlockReason.A2aHandoffValidationInvalid, .. boundaryReasons],
+                MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
+                PolicyPreflightStatus = policyPreflight?.Status,
+                PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
+                MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
+                A2aHandoffValidationStatus = a2aHandoffValidation.Status,
+                A2aHandoffBlockReasons = a2aHandoffValidation.BlockReasons,
+                MissingA2aHandoffEvidence = a2aHandoffValidation.MissingEvidence,
+                NextRecordableTransition = FirstTransition(step)
+            };
+        }
+
+        if (a2aHandoffValidation?.Status == WorkflowA2aHandoffValidationStatus.BlockedMissingEvidence)
+        {
+            return new WorkflowStepRunnerEvaluation
+            {
+                StepId = step.StepContractId,
+                Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
+                BlockReasons = [WorkflowRunnerBlockReason.A2aHandoffValidationMissingEvidence, .. boundaryReasons],
+                MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
+                PolicyPreflightStatus = policyPreflight?.Status,
+                PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
+                MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
+                A2aHandoffValidationStatus = a2aHandoffValidation.Status,
+                A2aHandoffBlockReasons = a2aHandoffValidation.BlockReasons,
+                MissingA2aHandoffEvidence = a2aHandoffValidation.MissingEvidence,
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -187,6 +255,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             PolicyPreflightStatus = policyPreflight?.Status,
             PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
             MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
+            A2aHandoffValidationStatus = a2aHandoffValidation?.Status,
+            A2aHandoffBlockReasons = a2aHandoffValidation?.BlockReasons ?? [],
+            MissingA2aHandoffEvidence = a2aHandoffValidation?.MissingEvidence ?? [],
             NextRecordableTransition = FirstTransition(step)
         };
     }
@@ -231,6 +302,18 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             : null;
     }
 
+    private static WorkflowA2aHandoffValidationRequest? TryGetA2aHandoffValidationRequest(
+        string? stepContractId,
+        IReadOnlyDictionary<string, WorkflowA2aHandoffValidationRequest> a2aHandoffValidationRequests)
+    {
+        if (string.IsNullOrWhiteSpace(stepContractId))
+            return null;
+
+        return a2aHandoffValidationRequests.TryGetValue(stepContractId.Trim(), out var a2aRequest)
+            ? a2aRequest
+            : null;
+    }
+
     private static IReadOnlyList<WorkflowRunnerBlockReason> BoundaryReasonsFor(WorkflowStepContract step)
     {
         var reasons = new List<WorkflowRunnerBlockReason>
@@ -267,6 +350,7 @@ public sealed record WorkflowRunnerEvaluationRequest
     public required IReadOnlyList<WorkflowStepContract> StepContracts { get; init; }
     public required IReadOnlyList<WorkflowEvidenceReference> AvailableEvidence { get; init; }
     public IReadOnlyList<WorkflowStepPolicyPreflightRequest> PolicyPreflightRequests { get; init; } = [];
+    public IReadOnlyList<WorkflowA2aHandoffValidationRequest> A2aHandoffValidationRequests { get; init; } = [];
 }
 
 public sealed record WorkflowEvidenceReference
@@ -303,6 +387,9 @@ public sealed record WorkflowStepRunnerEvaluation
     public WorkflowStepPolicyPreflightStatus? PolicyPreflightStatus { get; init; }
     public IReadOnlyList<WorkflowStepPolicyBlockReason> PolicyBlockReasons { get; init; } = [];
     public IReadOnlyList<WorkflowStepPolicyRequirement> MissingPolicyRequirements { get; init; } = [];
+    public WorkflowA2aHandoffValidationStatus? A2aHandoffValidationStatus { get; init; }
+    public IReadOnlyList<WorkflowA2aHandoffBlockReason> A2aHandoffBlockReasons { get; init; } = [];
+    public IReadOnlyList<WorkflowA2aHandoffEvidenceReference> MissingA2aHandoffEvidence { get; init; } = [];
     public WorkflowStepContractTransitionKind? NextRecordableTransition { get; init; }
 }
 
@@ -332,5 +419,7 @@ public enum WorkflowRunnerBlockReason
     PolicyPreflightMissingEvidence = 12,
     PolicyPreflightInvalid = 13,
     MissingThoughtLedgerReference = 14,
-    InvalidThoughtLedgerReference = 15
+    InvalidThoughtLedgerReference = 15,
+    A2aHandoffValidationInvalid = 16,
+    A2aHandoffValidationMissingEvidence = 17
 }
