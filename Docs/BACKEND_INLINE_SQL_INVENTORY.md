@@ -202,3 +202,16 @@ The runtime store must not call API, CLI, workflow, transport, executor, source 
 - `IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs` calls stored procedures only.
 - No runtime DDL was added.
 - No inline application INSERT/UPDATE/DELETE path was added for checkpoint persistence.
+
+## PR107 - Memory proposal staging SQL access
+
+`IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs` uses stored procedures only:
+
+- `memory.usp_MemoryProposal_Create`
+- `memory.usp_MemoryProposal_Get`
+- `memory.usp_MemoryProposal_ListByProject`
+- `memory.usp_MemoryProposal_ListByStatus`
+- `memory.usp_MemoryProposal_ListByWorkflowRun`
+- `memory.usp_MemoryProposal_ListBySource`
+
+No runtime DDL is introduced. No inline insert/update/delete is introduced. The migration grants runtime EXEC and SELECT while denying direct INSERT, UPDATE, DELETE, and ALTER.

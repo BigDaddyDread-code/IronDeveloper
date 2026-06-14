@@ -54,6 +54,11 @@
       "id": "2026-06-block-j-workflow-checkpoint-store",
       "path": "Database/migrate_workflow_checkpoint_store.sql",
       "description": "Creates durable WorkflowCheckpoint tables, stored procedures, append-only triggers, and evidence-only checkpoint storage."
+    },
+    {
+      "id": "2026-06-block-k-memory-proposal-staging",
+      "path": "Database/migrate_memory_proposal_staging.sql",
+      "description": "Creates durable memory proposal staging tables, stored procedures, append-only triggers, and staging-only authority protections."
     }
   ]
 }

@@ -21,7 +21,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(11, migrations.Length);
+        Assert.AreEqual(12, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
@@ -44,6 +44,8 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         Assert.AreEqual("Database/migrate_workflow_step_store.sql", migrations[9].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-j-workflow-checkpoint-store", migrations[10].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_workflow_checkpoint_store.sql", migrations[10].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-k-memory-proposal-staging", migrations[11].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_memory_proposal_staging.sql", migrations[11].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {

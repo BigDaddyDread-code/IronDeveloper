@@ -391,3 +391,15 @@ Behavior changed in this PR: no product/runtime behavior; only the durable workf
 - Status: active runtime schema and stored procedure surface
 - Behavior changed in this PR: no workflow execution behavior changed; this PR adds durable checkpoint recording only
 - Boundary: workflow checkpoint record is not workflow resume, workflow execution, agent dispatch, policy satisfaction, approval, source mutation, memory promotion, authority transfer, API/CLI/UI exposure, or runtime orchestration
+
+## PR107 - Memory proposal staging store
+
+| Artifact | Owner | Status | Behavior change |
+| --- | --- | --- | --- |
+| `memory.MemoryProposal` | `SqlMemoryProposalStagingStore` | active | Adds durable staging only; no accepted memory, promotion, retrieval authority, approval, policy satisfaction, workflow progress, source apply, or vector/index write. |
+| `memory.MemoryProposalEvidenceReference` | `SqlMemoryProposalStagingStore` | active | Evidence references for review only; evidence is not authority. |
+| `memory.MemoryProposalGroundingReference` | `SqlMemoryProposalStagingStore` | active | Grounding references for traceability only; grounding is not acceptance. |
+| `memory.MemoryProposalWorkflowReference` | `SqlMemoryProposalStagingStore` | active | Workflow references for provenance only; workflow reference is not continuation/resume. |
+| `memory.usp_MemoryProposal_*` | `SqlMemoryProposalStagingStore` | active | Stored-procedure write/read surface; runtime direct table mutation remains denied. |
+
+The existing `agent.AgentMemoryImprovementProposal` table remains the manual improvement proposal queue. PR107 does not repurpose it.
