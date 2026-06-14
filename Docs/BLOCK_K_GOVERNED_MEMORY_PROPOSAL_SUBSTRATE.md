@@ -180,3 +180,25 @@ A promotion request package is a review folder. It is not promotion approval, tr
 Duplicate, stale, conflict, and cross-run pattern signals remain review-only. Approval requirement references remain unsatisfied requirements only. Evidence remains evidence only, and grounding remains traceability only.
 
 The package can request review. It cannot approve promotion, accept memory, promote memory, create Portable Engineering Memory, activate retrieval, satisfy approval, or satisfy policy.
+
+## PR114 - Memory Proposal ThoughtLedger Enforcement
+
+PR114 enforces safe ThoughtLedger/governance traceability for memory proposal artifacts.
+
+See [PR114 Memory Proposal ThoughtLedger Enforcement](receipts/PR114_MEMORY_PROPOSAL_THOUGHTLEDGER_ENFORCEMENT.md).
+
+A memory proposal must not be hidden.
+A memory proposal must have a safe reviewable trace.
+A ThoughtLedger reference is evidence only.
+A ThoughtLedger reference is not approval.
+A ThoughtLedger reference is not memory acceptance.
+A ThoughtLedger reference is not memory promotion.
+A ThoughtLedger reference is not retrieval authority.
+
+PR114 does not create accepted memory.
+PR114 does not promote memory.
+PR114 does not activate retrieval.
+PR114 does not create embeddings.
+PR114 does not write to vector storage.
+
+Governance references remain evidence only. Workflow references remain context only. Grounding remains traceability only. Traceability does not satisfy approval or policy, and it does not make any staged proposal live memory.
