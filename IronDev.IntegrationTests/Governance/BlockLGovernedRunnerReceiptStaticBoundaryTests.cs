@@ -1,0 +1,208 @@
+﻿using System.Diagnostics;
+using System.Reflection;
+using IronDev.Core.Workflow;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace IronDev.IntegrationTests.Governance;
+
+[TestClass]
+public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
+{
+    [TestMethod]
+    public void BlockLGovernedRunnerReceipt_Pr126ChangedFilesAreDocsAndTestsOnly()
+    {
+        var changedFiles = ChangedFilesSinceMain();
+
+        foreach (var file in changedFiles)
+        {
+            Assert.IsTrue(
+                file.StartsWith("Docs/receipts/", StringComparison.Ordinal) ||
+                file.StartsWith("IronDev.IntegrationTests/Governance/", StringComparison.Ordinal),
+                $"PR126 must stay docs/tests only, but changed: {file}");
+        }
+    }
+
+    [TestMethod]
+    public void BlockLGovernedRunnerReceipt_NoProductionWorkflowCodeChangedByPr126()
+    {
+        var changedProductionWorkflowFiles = ChangedFilesSinceMain()
+            .Where(file => file.StartsWith("IronDev.Core/Workflow/", StringComparison.Ordinal) ||
+                           file.StartsWith("IronDev.Infrastructure/", StringComparison.Ordinal) ||
+                           file.StartsWith("IronDev.Api/", StringComparison.Ordinal) ||
+                           file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.AreEqual(0, changedProductionWorkflowFiles.Length, "PR126 must not change production workflow/API/CLI/infrastructure code.");
+    }
+
+    [TestMethod]
+    public void BlockLGovernedRunnerReceipt_NoSqlApiCliUiOrRuntimeFilesAddedByPr126()
+    {
+        var changedFiles = ChangedFilesSinceMain();
+
+        Assert.IsFalse(changedFiles.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR126 must not add SQL migrations or SQL scripts.");
+        Assert.IsFalse(changedFiles.Any(file => file.Contains("Controller", StringComparison.OrdinalIgnoreCase)), "PR126 must not add API controllers.");
+        Assert.IsFalse(changedFiles.Any(file => file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal)), "PR126 must not add CLI commands.");
+        Assert.IsFalse(changedFiles.Any(file => file.StartsWith("IronDev.Client/", StringComparison.Ordinal)), "PR126 must not add UI files.");
+        Assert.IsFalse(changedFiles.Any(file => file.Contains("HostedService", StringComparison.OrdinalIgnoreCase) || file.Contains("BackgroundService", StringComparison.OrdinalIgnoreCase)), "PR126 must not add hosted services.");
+        Assert.IsFalse(changedFiles.Any(file => file.Contains("Scheduler", StringComparison.OrdinalIgnoreCase) || file.Contains("Orchestrator", StringComparison.OrdinalIgnoreCase)), "PR126 must not add scheduler/orchestrator files.");
+    }
+
+    [TestMethod]
+    public void BlockLGovernedRunnerReceipt_ChangedProductionFilesDoNotAddAuthorityRuntimeOrMutationMarkers()
+    {
+        var changedProductionFiles = ChangedFilesSinceMain()
+            .Where(IsProductionSourceFile)
+            .ToArray();
+
+        var combinedText = string.Join("\n", changedProductionFiles.Select(file => File.ReadAllText(Path.Combine(RepositoryRoot(), NormalizeForLocalPath(file)))));
+
+        AssertDoesNotContainAny(
+            combinedText,
+            "SqlConnection",
+            "DbConnection",
+            "INSERT ",
+            "UPDATE ",
+            "DELETE ",
+            "HttpClient",
+            "ProcessStartInfo",
+            "File.Write",
+            "File.Delete",
+            "Directory.CreateDirectory",
+            "IHostedService",
+            "BackgroundService",
+            "ControllerBase",
+            "WebApplication",
+            "OpenAI",
+            "LangGraph runtime",
+            "ToolInvoker",
+            "AgentDispatcher",
+            "WorkflowTransitionRecorder",
+            "WorkflowStateWriter",
+            "ApprovalMutation",
+            "PolicySatisfaction",
+            "MemoryPromotion",
+            "RetrievalActivation",
+            "PatchApply",
+            "DispatchAsync",
+            "InvokeToolAsync",
+            "ApproveAsync",
+            "TransitionAsync",
+            "ApplyPatch",
+            "MutateSource",
+            "PromoteMemory",
+            "ActivateRetrieval",
+            "RawPrompt",
+            "RawCompletion",
+            "RawToolOutput",
+            "PrivateReasoning",
+            "HiddenReasoning",
+            "ChainOfThought",
+            "WholePatch",
+            "PatchPayload",
+            "approval-required",
+            "governance-event-required",
+            "policy-required",
+            "authority-granted",
+            "execution-allowed",
+            "dispatch-allowed",
+            "source-mutation-approved",
+            "memory-promotion-approved",
+            "retrieval-activation-approved",
+            "dry-run-approved",
+            "route-approved");
+    }
+
+    [TestMethod]
+    public void BlockLGovernedRunnerReceipt_WorkflowInterfacesRemainBoxed()
+    {
+        AssertPublicMethods<IWorkflowRunnerSkeleton>("Evaluate");
+        AssertPublicMethods<IWorkflowDryRunExecutor>("ExecuteDryRun");
+        AssertPublicMethods<IBoxedLangGraphRoutingAdapter>("SuggestRoute");
+    }
+
+    [TestMethod]
+    public void BlockLGovernedRunnerReceipt_ReceiptDocumentsDocsTestsOnlyBoundary()
+    {
+        var receipt = File.ReadAllText(Path.Combine(RepositoryRoot(), "Docs", "receipts", "PR126_BLOCK_L_GOVERNED_RUNNER_RECEIPT.md"));
+
+        StringAssert.Contains(receipt, "Receipt is not capability.");
+        StringAssert.Contains(receipt, "does not claim the runner can drive");
+        StringAssert.Contains(receipt, "Block M must not treat Block L receipt as permission");
+    }
+
+    private static void AssertPublicMethods<T>(params string[] expectedNames)
+    {
+        var names = typeof(T)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(method => method.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(expectedNames.OrderBy(name => name, StringComparer.Ordinal).ToArray(), names, typeof(T).Name);
+    }
+
+    private static IReadOnlyList<string> ChangedFilesSinceMain()
+    {
+        var files = new SortedSet<string>(StringComparer.Ordinal);
+        AddGitFiles(files, "diff --name-only main...HEAD");
+        AddGitFiles(files, "diff --name-only");
+        AddGitFiles(files, "diff --cached --name-only");
+        return files.ToArray();
+    }
+
+    private static void AddGitFiles(ISet<string> files, string arguments)
+    {
+        var result = RunGit(arguments);
+        if (result.ExitCode != 0)
+            return;
+
+        foreach (var line in result.Output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            files.Add(line.Replace('\\', '/'));
+    }
+
+    private static (int ExitCode, string Output) RunGit(string arguments)
+    {
+        var startInfo = new ProcessStartInfo("git", arguments)
+        {
+            WorkingDirectory = RepositoryRoot(),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start git.");
+        var output = process.StandardOutput.ReadToEnd();
+        output += process.StandardError.ReadToEnd();
+        process.WaitForExit(10_000);
+        return (process.ExitCode, output);
+    }
+
+    private static bool IsProductionSourceFile(string file) =>
+        file.EndsWith(".cs", StringComparison.Ordinal) &&
+        !file.StartsWith("IronDev.IntegrationTests/", StringComparison.Ordinal) &&
+        !file.StartsWith("IronDev.Tests/", StringComparison.Ordinal);
+
+    private static string NormalizeForLocalPath(string file) => file.Replace('/', Path.DirectorySeparatorChar);
+
+    private static string RepositoryRoot()
+    {
+        var directory = AppContext.BaseDirectory;
+        while (!string.IsNullOrWhiteSpace(directory))
+        {
+            if (File.Exists(Path.Combine(directory, "IronDev.slnx")))
+                return directory;
+
+            directory = Directory.GetParent(directory)?.FullName ?? string.Empty;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
+    }
+
+    private static void AssertDoesNotContainAny(string text, params string[] forbidden)
+    {
+        foreach (var value in forbidden)
+            Assert.IsFalse(text.Contains(value, StringComparison.OrdinalIgnoreCase), $"Forbidden production marker found: {value}");
+    }
+}
