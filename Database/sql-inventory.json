@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedFor": "PR74b retrospective SQL inventory",
-  "generatedAtUtc": "2026-06-12T00:00:00Z",
+  "generatedFor": "PR107 memory proposal staging SQL inventory update",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
   "entries": [
     {
       "id": "database.local-dev-setup",
@@ -1160,6 +1160,56 @@
       "appliedByManifest": false,
       "verifiedByScript": false,
       "notes": "Runtime store uses stored procedures only and performs no runtime DDL. Checkpoint rows are evidence only and not resumable workflow state."
+    },
+    {
+      "id": "database.migrate-memory-proposal-staging",
+      "path": "Database/migrate_memory_proposal_staging.sql",
+      "kind": "migration-script",
+      "bucket": "required-runtime-schema",
+      "ownerArea": "memory",
+      "objectsCreated": [
+        "memory.MemoryProposal",
+        "memory.MemoryProposalEvidenceReference",
+        "memory.MemoryProposalGroundingReference",
+        "memory.MemoryProposalWorkflowReference",
+        "memory.usp_MemoryProposal_Create",
+        "memory.usp_MemoryProposal_Get",
+        "memory.usp_MemoryProposal_ListByProject",
+        "memory.usp_MemoryProposal_ListByStatus",
+        "memory.usp_MemoryProposal_ListByWorkflowRun",
+        "memory.usp_MemoryProposal_ListBySource"
+      ],
+      "objectsCalled": [],
+      "referencedBy": [
+        "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
+        "Database/migrations.json",
+        "Database/verify-migrations.ps1"
+      ],
+      "appliedByManifest": true,
+      "verifiedByScript": true,
+      "notes": "PR107 durable memory proposal staging store. Staged proposals are review candidates only; they are not accepted memory, promotion, retrieval authority, policy, approval, workflow progress, source apply, or vector index writes."
+    },
+    {
+      "id": "runtime.memory-proposal-staging-store",
+      "path": "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
+      "kind": "runtime-store",
+      "bucket": "stored-procedure-runtime",
+      "ownerArea": "memory",
+      "objectsCreated": [],
+      "objectsCalled": [
+        "memory.usp_MemoryProposal_Create",
+        "memory.usp_MemoryProposal_Get",
+        "memory.usp_MemoryProposal_ListByProject",
+        "memory.usp_MemoryProposal_ListByStatus",
+        "memory.usp_MemoryProposal_ListByWorkflowRun",
+        "memory.usp_MemoryProposal_ListBySource"
+      ],
+      "referencedBy": [
+        "durable memory proposal staging repository"
+      ],
+      "appliedByManifest": true,
+      "verifiedByScript": true,
+      "notes": "Runtime uses stored procedures after MemoryProposalValidator. No runtime DDL, API, CLI, retrieval indexing, accepted memory creation, or promotion authority."
     }
   ]
 }

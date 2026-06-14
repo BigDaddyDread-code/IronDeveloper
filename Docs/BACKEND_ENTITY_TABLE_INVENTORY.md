@@ -196,3 +196,13 @@ Status: active.
 Changed in PR93: yes.
 
 Behavior unchanged confirmation: the store records handoff context, evidence references, allowed uses, and constraints only. It does not deliver messages, start workflow, approve, satisfy policy, execute, mutate source, promote memory, or approve release.
+## PR107 - Memory proposal staging entity/table contract
+
+| SQL table | C# model/store | Status | Changed in PR107 | Behavior unchanged confirmation |
+| --- | --- | --- | --- | --- |
+| `memory.MemoryProposal` | `MemoryProposal`, `SqlMemoryProposalStagingStore` | active | yes | Staged proposal only. It is not accepted memory, promotion, policy, approval, workflow progress, retrieval authority, source apply, or vector/index content. |
+| `memory.MemoryProposalEvidenceReference` | `MemoryProposalEvidenceReference` | active | yes | Review evidence only. Evidence does not grant authority. |
+| `memory.MemoryProposalGroundingReference` | `MemoryProposalGroundingReference` | active | yes | Traceability only. Grounding does not create truth or acceptance. |
+| `memory.MemoryProposalWorkflowReference` | `MemoryProposalWorkflowReference` | active | yes | Provenance only. Workflow reference does not resume or continue workflow. |
+
+Ugly-name note: `agent.AgentMemoryImprovementProposal` remains in place as the older manual improvement proposal queue and is not renamed or repurposed in PR107.

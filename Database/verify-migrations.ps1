@@ -209,6 +209,24 @@ try {
             ,@{ Name = "WorkflowCheckpoint no execution check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpoint') AND name = N'CK_WorkflowCheckpoint_NoExecution'" }
             ,@{ Name = "WorkflowCheckpointEvidenceReference allowed-use check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpointEvidenceReference') AND name = N'CK_WorkflowCheckpointEvidenceReference_AllowedUse_Allowed'" }
             ,@{ Name = "WorkflowCheckpointGroundingReference claim-type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'workflow.WorkflowCheckpointGroundingReference') AND name = N'CK_WorkflowCheckpointGroundingReference_ClaimType_Allowed'" }
+            ,@{ Name = "memory.MemoryProposal table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposal', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.MemoryProposalEvidenceReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposalEvidenceReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.MemoryProposalGroundingReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposalGroundingReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.MemoryProposalWorkflowReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposalWorkflowReference', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.usp_MemoryProposal_Create procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_MemoryProposal_Create', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.usp_MemoryProposal_Get procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_MemoryProposal_Get', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.usp_MemoryProposal_ListByProject procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_MemoryProposal_ListByProject', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.usp_MemoryProposal_ListByStatus procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_MemoryProposal_ListByStatus', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.usp_MemoryProposal_ListByWorkflowRun procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_MemoryProposal_ListByWorkflowRun', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.usp_MemoryProposal_ListBySource procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_MemoryProposal_ListBySource', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.TR_MemoryProposal_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.TR_MemoryProposal_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.TR_MemoryProposal_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.TR_MemoryProposal_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "MemoryProposal no memory promotion check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposal') AND name = N'CK_MemoryProposal_NoMemoryPromotion'" }
+            ,@{ Name = "MemoryProposal no retrieval authority check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposal') AND name = N'CK_MemoryProposal_NoRetrievalAuthority'" }
+            ,@{ Name = "MemoryProposal no vector index write check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposal') AND name = N'CK_MemoryProposal_NoVectorIndexWrite'" }
+            ,@{ Name = "MemoryProposal status staging-only check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposal') AND name = N'CK_MemoryProposal_Status_StagingOnly'" }
+            ,@{ Name = "MemoryProposalEvidenceReference evidence type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposalEvidenceReference') AND name = N'CK_MemoryProposalEvidenceReference_EvidenceType_Allowed'" }
+            ,@{ Name = "MemoryProposalWorkflowReference target check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposalWorkflowReference') AND name = N'CK_MemoryProposalWorkflowReference_Target'" }
         )
 
         foreach ($check in $checks) {
