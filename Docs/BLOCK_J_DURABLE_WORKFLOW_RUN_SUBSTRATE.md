@@ -396,3 +396,23 @@ The tests do not create accepted memory.
 The tests do not approve release.
 
 The tests do not satisfy approval requirements.
+
+## PR106 - Block J Workflow State Receipt
+
+PR106 closes Block J as a workflow state substrate receipt.
+Block J is complete as durable workflow state and inspection infrastructure.
+Block J does not add workflow runtime.
+Block J does not execute workflow.
+Block J does not continue workflow.
+Block J does not resume workflow.
+Block J does not retry workflow.
+Block J does not dispatch agents.
+Block J does not call tools.
+Block J does not call models.
+Block J does not mutate source.
+Block J does not promote memory.
+Block J does not create accepted memory.
+Block J does not satisfy approval.
+Block J does not approve release.
+
+See `Docs/receipts/BLOCK_J_WORKFLOW_STATE_RECEIPT.md` for the final Block J receipt.
