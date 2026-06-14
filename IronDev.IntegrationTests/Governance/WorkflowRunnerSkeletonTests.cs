@@ -97,6 +97,28 @@ public sealed class WorkflowRunnerSkeletonTests
     }
 
     [TestMethod]
+    public void WorkflowRunnerSkeleton_UnsafeThoughtLedgerReferenceDoesNotPropagateInvalidOutput()
+    {
+        var step = ValidStep() with
+        {
+            ThoughtLedgerReference = WorkflowStepContractTests.ValidThoughtLedgerReference() with
+            {
+                SafeSummary = "raw prompt leaked into trace marker."
+            }
+        };
+
+        var result = _runner.Evaluate(Request([step], [Evidence()]));
+        var serialized = JsonSerializer.Serialize(result);
+
+        Assert.AreEqual(WorkflowRunnerEvaluationStatus.AllBlocked, result.Status);
+        Assert.AreEqual(WorkflowStepRunnerEligibility.InvalidContract, result.StepEvaluations[0].Eligibility);
+        CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.InvalidStepContract);
+        CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.InvalidThoughtLedgerReference);
+        Assert.IsNull(result.StepEvaluations[0].ThoughtLedgerReference);
+        AssertDoesNotContainAny(serialized, "raw prompt", "rawPrompt");
+    }
+
+    [TestMethod]
     public void WorkflowRunnerSkeleton_MultipleStepsProduceOneEvaluationPerStep()
     {
         var second = ValidStep("step-contract-002", "review-material-002", "governance-event-002");

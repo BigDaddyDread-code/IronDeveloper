@@ -112,7 +112,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 Eligibility = WorkflowStepRunnerEligibility.InvalidContract,
                 BlockReasons = [.. InvalidContractReasons(validation), .. boundaryReasons],
                 MissingEvidenceRequirements = [],
-                ThoughtLedgerReference = step.ThoughtLedgerReference,
+                ThoughtLedgerReference = null,
                 PolicyPreflightStatus = null,
                 PolicyBlockReasons = [],
                 MissingPolicyRequirements = [],
