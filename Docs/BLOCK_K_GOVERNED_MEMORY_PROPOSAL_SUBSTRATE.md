@@ -103,3 +103,23 @@ A staleness score is not truth.
 The detector is deterministic and does not use model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
 
 Stale detection produces review candidates only. Human/governed review remains required before any correction, rejection, deletion, acceptance, promotion, retrieval activation, or memory-truth decision.
+
+
+## PR111 boundary
+
+PR111 adds deterministic conflict detection for staged memory proposals.
+
+A conflict candidate is not a conflict decision.
+A conflict candidate does not choose truth.
+A conflict candidate does not reject proposals.
+A conflict candidate does not delete proposals.
+A conflict candidate does not correct proposals.
+A conflict candidate does not accept memory.
+A conflict candidate does not promote memory.
+A conflict candidate does not activate retrieval.
+A conflict score is not approval.
+A conflict score is not truth.
+
+The detector is deterministic and does not use model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
+
+Conflict detection produces review candidates only. Human/governed review remains required before any truth, correction, rejection, deletion, acceptance, promotion, retrieval activation, or memory decision.
