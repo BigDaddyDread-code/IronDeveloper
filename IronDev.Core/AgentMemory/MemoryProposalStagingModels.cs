@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace IronDev.Core.AgentMemory;
 
@@ -71,7 +71,7 @@ public enum MemoryProposalEvidenceType
     WorkflowRun,
     WorkflowRunStep,
     WorkflowCheckpoint,
-    AgentHandoff,
+    Handoff,
     ThoughtLedgerReference,
     GroundingReference,
     CriticReview,
@@ -135,7 +135,7 @@ public sealed class MemoryProposalEvidenceReferenceCreateRequest
     public Guid? WorkflowRunEvidenceReferenceId { get; init; }
     public Guid? WorkflowRunStepId { get; init; }
     public Guid? WorkflowCheckpointId { get; init; }
-    public Guid? AgentHandoffId { get; init; }
+    public Guid? HandoffId { get; init; }
     public Guid? ThoughtLedgerEntryId { get; init; }
 }
 
@@ -153,7 +153,7 @@ public sealed class MemoryProposalEvidenceReference
     public Guid? WorkflowRunEvidenceReferenceId { get; init; }
     public Guid? WorkflowRunStepId { get; init; }
     public Guid? WorkflowCheckpointId { get; init; }
-    public Guid? AgentHandoffId { get; init; }
+    public Guid? HandoffId { get; init; }
     public Guid? ThoughtLedgerEntryId { get; init; }
     public DateTimeOffset CreatedUtc { get; init; }
 }
@@ -523,7 +523,7 @@ public sealed class MemoryProposalValidator
             WorkflowRunEvidenceReferenceId = e.WorkflowRunEvidenceReferenceId,
             WorkflowRunStepId = e.WorkflowRunStepId,
             WorkflowCheckpointId = e.WorkflowCheckpointId,
-            AgentHandoffId = e.AgentHandoffId,
+            HandoffId = e.HandoffId,
             ThoughtLedgerEntryId = e.ThoughtLedgerEntryId
         }).ToList(),
         GroundingReferences = (request.GroundingReferences ?? Array.Empty<MemoryProposalGroundingReferenceCreateRequest>()).Select(g => new MemoryProposalGroundingReferenceCreateRequest
