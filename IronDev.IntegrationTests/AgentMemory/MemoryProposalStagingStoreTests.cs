@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using Dapper;
 using IronDev.Core.AgentMemory;
 using IronDev.Data;
@@ -182,6 +182,23 @@ public sealed class MemoryProposalStagingStoreTests : IntegrationTestBase
                 "CreateCollectiveMemory",
                 "ApplySource",
                 "MutateSource");
+        }
+    }
+
+    [TestMethod]
+    public void MemoryProposalStagingProductionFiles_UseNeutralHandoffReferenceNaming()
+    {
+        var files = new[]
+        {
+            "IronDev.Core/AgentMemory/MemoryProposalStagingModels.cs",
+            "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
+            "Database/migrate_memory_proposal_staging.sql"
+        };
+
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", file));
+            AssertNoForbiddenTokens(text, "AgentHandoff", "agentHandoff");
         }
     }
 

@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Text.Json;
 using Dapper;
 using IronDev.Core.AgentMemory;
@@ -103,7 +103,7 @@ public sealed class SqlMemoryProposalStagingStore : IMemoryProposalStagingStore
                 e.WorkflowRunEvidenceReferenceId,
                 e.WorkflowRunStepId,
                 e.WorkflowCheckpointId,
-                e.AgentHandoffId,
+                e.HandoffId,
                 e.ThoughtLedgerEntryId
             }),
             JsonOptions);
@@ -275,7 +275,7 @@ public sealed class SqlMemoryProposalStagingStore : IMemoryProposalStagingStore
         WorkflowRunEvidenceReferenceId = row.WorkflowRunEvidenceReferenceId,
         WorkflowRunStepId = row.WorkflowRunStepId,
         WorkflowCheckpointId = row.WorkflowCheckpointId,
-        AgentHandoffId = row.AgentHandoffId,
+        HandoffId = row.HandoffId,
         ThoughtLedgerEntryId = row.ThoughtLedgerEntryId,
         CreatedUtc = row.CreatedUtc
     };
@@ -391,7 +391,7 @@ public sealed class SqlMemoryProposalStagingStore : IMemoryProposalStagingStore
         public Guid? WorkflowRunEvidenceReferenceId { get; init; }
         public Guid? WorkflowRunStepId { get; init; }
         public Guid? WorkflowCheckpointId { get; init; }
-        public Guid? AgentHandoffId { get; init; }
+        public Guid? HandoffId { get; init; }
         public Guid? ThoughtLedgerEntryId { get; init; }
         public DateTimeOffset CreatedUtc { get; init; }
     }
