@@ -55,6 +55,20 @@ public sealed class WorkflowA2aHandoffValidatorTests
     }
 
     [TestMethod]
+    public void WorkflowA2aHandoff_UnsafeHandoffReferenceIdFailsClosedWithoutSerializingUnsafeMarker()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            HandoffReference = ValidHandoff() with { HandoffReferenceId = "raw prompt handoff reference" }
+        });
+        var serialized = JsonSerializer.Serialize(result);
+
+        Assert.AreEqual(WorkflowA2aHandoffValidationStatus.InvalidHandoffReference, result.Status);
+        CollectionAssert.Contains(result.BlockReasons.ToList(), WorkflowA2aHandoffBlockReason.InvalidThoughtLedgerReference);
+        AssertDoesNotContainAny(serialized, "raw prompt", "rawPrompt");
+    }
+
+    [TestMethod]
     public void WorkflowA2aHandoff_WorkflowRunMismatchFails()
     {
         var result = _validator.Validate(ValidRequest() with { HandoffReference = ValidHandoff() with { WorkflowRunId = "other-run" } });
@@ -180,6 +194,37 @@ public sealed class WorkflowA2aHandoffValidatorTests
 
         Assert.AreEqual(WorkflowA2aHandoffValidationStatus.BlockedMissingEvidence, result.Status);
         CollectionAssert.Contains(result.BlockReasons.ToList(), WorkflowA2aHandoffBlockReason.MissingGovernanceEvidence);
+    }
+
+    [TestMethod]
+    public void WorkflowA2aHandoff_MissingGovernanceEventIdDoesNotSynthesizePlaceholderEvidence()
+    {
+        var step = ValidStep() with
+        {
+            ThoughtLedgerReference = ValidThoughtLedgerReference() with { GovernanceEventId = null }
+        };
+        var handoff = ValidHandoff() with
+        {
+            ThoughtLedgerReference = ValidThoughtLedgerReference() with { GovernanceEventId = null }
+        };
+
+        var result = _validator.Validate(ValidRequest() with
+        {
+            StepContract = step,
+            HandoffReference = handoff,
+            AvailableEvidence =
+            [
+                Evidence(WorkflowA2aHandoffEvidenceKind.GovernanceEventReference, "governance-event-required"),
+                Evidence(WorkflowA2aHandoffEvidenceKind.HandoffContractReference, "handoff-reference-001"),
+                Evidence(WorkflowA2aHandoffEvidenceKind.HandoffValidationReference, "handoff-reference-001"),
+                Evidence(WorkflowA2aHandoffEvidenceKind.PolicyPreflightReference, "policy-preflight-001")
+            ]
+        });
+        var serialized = JsonSerializer.Serialize(result);
+
+        Assert.AreNotEqual(WorkflowA2aHandoffValidationStatus.ValidForFutureHandoff, result.Status);
+        CollectionAssert.Contains(result.BlockReasons.ToList(), WorkflowA2aHandoffBlockReason.MissingGovernanceEvidence);
+        AssertDoesNotContainAny(serialized, "governance-event-required");
     }
 
     [TestMethod]

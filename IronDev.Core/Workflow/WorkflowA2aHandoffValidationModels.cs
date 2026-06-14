@@ -86,6 +86,10 @@ public sealed class WorkflowA2aHandoffValidator : IWorkflowA2aHandoffValidator
         var blockReasons = new List<WorkflowA2aHandoffBlockReason>();
 
         Require(handoff.HandoffReferenceId, WorkflowA2aHandoffBlockReason.MissingHandoffReferenceId, blockReasons);
+        ValidateTextSafety(handoff.HandoffReferenceId, blockReasons);
+        ValidateTextSafety(handoff.WorkflowRunId, blockReasons);
+        ValidateTextSafety(handoff.WorkflowStepId, blockReasons);
+        ValidateTextSafety(handoff.CorrelationId, blockReasons);
         if (!string.Equals(handoff.WorkflowRunId?.Trim(), step.WorkflowRunId.Trim(), StringComparison.Ordinal))
             blockReasons.Add(WorkflowA2aHandoffBlockReason.WorkflowRunMismatch);
 
@@ -105,7 +109,11 @@ public sealed class WorkflowA2aHandoffValidator : IWorkflowA2aHandoffValidator
             .Select(evidence => EvidenceKey(evidence.Kind, evidence.ReferenceId))
             .ToHashSet(StringComparer.Ordinal);
 
-        var missingEvidence = RequiredEvidenceFor(step, handoff)
+        var requiredEvidence = RequiredEvidenceFor(step, handoff, blockReasons);
+        if (blockReasons.Count > 0)
+            return Result(step.WorkflowRunId, step.StepContractId, WorkflowA2aHandoffValidationStatus.InvalidHandoffReference, blockReasons);
+
+        var missingEvidence = requiredEvidence
             .Where(evidence => !available.Contains(EvidenceKey(evidence.Kind, evidence.ReferenceId)))
             .ToArray();
 
@@ -120,14 +128,21 @@ public sealed class WorkflowA2aHandoffValidator : IWorkflowA2aHandoffValidator
         return Result(step.WorkflowRunId, step.StepContractId, WorkflowA2aHandoffValidationStatus.ValidForFutureHandoff, []);
     }
 
-    private static WorkflowA2aHandoffEvidenceReference[] RequiredEvidenceFor(WorkflowStepContract step, WorkflowA2aHandoffReference handoff)
+    private static WorkflowA2aHandoffEvidenceReference[] RequiredEvidenceFor(
+        WorkflowStepContract step,
+        WorkflowA2aHandoffReference handoff,
+        List<WorkflowA2aHandoffBlockReason> blockReasons)
     {
+        var governanceEventId = step.ThoughtLedgerReference?.GovernanceEventId ?? handoff.ThoughtLedgerReference?.GovernanceEventId;
+        if (string.IsNullOrWhiteSpace(governanceEventId))
+            blockReasons.Add(WorkflowA2aHandoffBlockReason.MissingGovernanceEvidence);
+
         var required = new List<WorkflowA2aHandoffEvidenceReference>
         {
             new()
             {
                 Kind = WorkflowA2aHandoffEvidenceKind.GovernanceEventReference,
-                ReferenceId = step.ThoughtLedgerReference?.GovernanceEventId ?? handoff.ThoughtLedgerReference?.GovernanceEventId ?? "governance-event-required",
+                ReferenceId = governanceEventId ?? string.Empty,
                 CorrelationId = handoff.CorrelationId
             },
             new()
@@ -144,14 +159,23 @@ public sealed class WorkflowA2aHandoffValidator : IWorkflowA2aHandoffValidator
             }
         };
 
+        foreach (var evidence in required)
+        {
+            ValidateTextSafety(evidence.ReferenceId, blockReasons);
+            ValidateTextSafety(evidence.CorrelationId, blockReasons);
+        }
+
         if (IsA2aSensitive(step))
         {
-            required.Add(new WorkflowA2aHandoffEvidenceReference
+            var policyReference = new WorkflowA2aHandoffEvidenceReference
             {
                 Kind = WorkflowA2aHandoffEvidenceKind.PolicyPreflightReference,
                 ReferenceId = handoff.CorrelationId ?? step.StepContractId,
                 CorrelationId = handoff.CorrelationId
-            });
+            };
+            ValidateTextSafety(policyReference.ReferenceId, blockReasons);
+            ValidateTextSafety(policyReference.CorrelationId, blockReasons);
+            required.Add(policyReference);
         }
 
         return required.ToArray();
