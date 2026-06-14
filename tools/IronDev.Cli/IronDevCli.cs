@@ -194,6 +194,9 @@ public static class IronDevCli
         if (IronDevCliDogfoodLoops.IsDogfoodLoopsCommand(args))
             return await IronDevCliDogfoodLoops.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
+            return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
+
         if (IsCommand(args, "ticket", "create"))
             return await HandleTicketCreateAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "ticket", "list"))
@@ -2853,6 +2856,12 @@ public static class IronDevCli
         error.WriteLine("  irondev tool-requests get <toolRequestId> --project-id <id> [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev dogfood-loops create --project-id <id> --summary <text> --goal <text> [--observation <text>] [--blocked-reason <text>] [--agent-run-id <id>] [--critic-review-run-id <id>] [--memory-improvement-run-id <id>] [--tool-request-id <id>] [--tool-gate-decision-id <id>] [--evidence-ref <ref>] [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev dogfood-loops get <dogfoodLoopId> --project-id <id> [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow inspect runs --project <id> [--take 100] [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow inspect run --project <id> --run <workflowRunId> [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow inspect steps --project <id> --run <workflowRunId> [--take 100] [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow inspect step --project <id> --run <workflowRunId> --step <workflowRunStepId> [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow inspect checkpoints --project <id> --run <workflowRunId> [--take 100] [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow inspect checkpoint --project <id> --run <workflowRunId> --checkpoint <workflowCheckpointId> [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev ticket create --project-id <id> --file <ticket.json> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket list --project-id <id> [--take 50] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket show --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");

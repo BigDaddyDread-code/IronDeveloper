@@ -60,6 +60,60 @@ public interface IIronDevApiClient
         string dogfoodLoopId,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListWorkflowRunsAsync(
+        string projectId,
+        int? take = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetWorkflowRunAsync(
+        string projectId,
+        string workflowRunId,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListWorkflowRunsByCorrelationAsync(
+        string projectId,
+        string correlationId,
+        int? take = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListWorkflowRunsBySubjectAsync(
+        string projectId,
+        string subjectType,
+        string subjectId,
+        int? take = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListWorkflowStepsAsync(
+        string projectId,
+        string workflowRunId,
+        int? take = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetWorkflowStepAsync(
+        string projectId,
+        string workflowRunId,
+        string workflowRunStepId,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListWorkflowCheckpointsAsync(
+        string projectId,
+        string workflowRunId,
+        int? take = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> ListWorkflowStepCheckpointsAsync(
+        string projectId,
+        string workflowRunId,
+        string workflowRunStepId,
+        int? take = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetWorkflowCheckpointAsync(
+        string projectId,
+        string workflowRunId,
+        string workflowCheckpointId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
