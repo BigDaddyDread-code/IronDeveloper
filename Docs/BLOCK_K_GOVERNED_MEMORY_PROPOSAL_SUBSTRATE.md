@@ -144,3 +144,27 @@ The detector only looks for repeated staged proposal themes across workflow runs
 The detector is deterministic and does not use SQL writes, model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
 
 Cross-run pattern detection produces review candidates only. Human/governed review remains required before any proposal acceptance, memory promotion, Portable Engineering Memory creation, retrieval activation, indexing, embedding, policy, approval, workflow, source apply, or memory-truth decision.
+
+## PR113 boundary
+
+PR113 adds a promotion request package for staged memory proposals.
+
+A promotion request package is not accepted memory.
+A promotion request package is not promoted memory.
+A promotion request package is not active project memory.
+A promotion request package is not active agent memory.
+A promotion request package is not Portable Engineering Memory.
+A promotion request package is not retrieval authority.
+A promotion request package is not approval.
+A promotion request package is not policy satisfaction.
+A promotion request package is not a promotion decision.
+
+The package gathers review material for a later governed promotion decision.
+It does not decide the proposal.
+It does not index memory.
+It does not create embeddings.
+It does not write to vector storage.
+
+Evidence remains evidence only. Grounding remains traceability only. Duplicate, stale, conflict, and cross-run pattern signals remain advisory only. Approval requirement references remain unsatisfied requirements only.
+
+Human/governed approval remains required before any proposal acceptance, memory promotion, Portable Engineering Memory creation, retrieval activation, indexing, embedding, policy, approval, workflow, source apply, or memory-truth decision.
