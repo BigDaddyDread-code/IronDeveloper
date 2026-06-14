@@ -316,3 +316,45 @@ A persisted checkpoint means safe checkpoint facts were recorded with evidence a
 ### Source-of-truth rule
 
 SQL remains the source of truth. The runtime store uses stored procedures only and does not create or mutate schema at runtime.
+
+## PR104 Workflow Inspection CLI Commands
+
+PR104 adds read-only workflow inspection CLI commands.
+
+The CLI exposes durable workflow run, step, checkpoint, evidence, and grounding facts.
+
+The CLI is read-only.
+
+The CLI does not create workflow records.
+
+The CLI does not update workflow records.
+
+The CLI does not delete workflow records.
+
+The CLI does not execute workflow.
+
+The CLI does not continue workflow.
+
+The CLI does not resume workflow.
+
+The CLI does not retry workflow.
+
+The CLI does not dispatch agents.
+
+The CLI does not call tools.
+
+The CLI does not call models.
+
+The CLI does not mutate source.
+
+The CLI does not promote memory.
+
+The CLI does not create accepted memory.
+
+The CLI does not approve release.
+
+The CLI does not satisfy approval requirements.
+
+Statuses printed by the CLI are stored facts, not runtime actions.
+
+PR104 lets users inspect the workflow clipboard from CLI. It does not add any buttons.

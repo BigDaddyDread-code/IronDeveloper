@@ -194,6 +194,75 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => GetJsonEnvelopeAsync($"api/v1/dogfood-loops/{Uri.EscapeDataString(dogfoodLoopId)}?projectId={projectId}", cancellationToken);
 
+    public Task<IronDevApiResponse<JsonElement?>> ListWorkflowRunsAsync(
+        string projectId,
+        int? take = null,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildWorkflowPath("api/v1/workflow/runs", projectId, take), cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> GetWorkflowRunAsync(
+        string projectId,
+        string workflowRunId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}?projectId={Uri.EscapeDataString(projectId)}", cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> ListWorkflowRunsByCorrelationAsync(
+        string projectId,
+        string correlationId,
+        int? take = null,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildWorkflowPath($"api/v1/workflow/runs/by-correlation/{Uri.EscapeDataString(correlationId)}", projectId, take), cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> ListWorkflowRunsBySubjectAsync(
+        string projectId,
+        string subjectType,
+        string subjectId,
+        int? take = null,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildWorkflowPath(
+            "api/v1/workflow/runs/by-subject",
+            projectId,
+            take,
+            new KeyValuePair<string, string>("subjectType", subjectType),
+            new KeyValuePair<string, string>("subjectId", subjectId)),
+            cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> ListWorkflowStepsAsync(
+        string projectId,
+        string workflowRunId,
+        int? take = null,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildWorkflowPath($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}/steps", projectId, take), cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> GetWorkflowStepAsync(
+        string projectId,
+        string workflowRunId,
+        string workflowRunStepId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}/steps/{Uri.EscapeDataString(workflowRunStepId)}?projectId={Uri.EscapeDataString(projectId)}", cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> ListWorkflowCheckpointsAsync(
+        string projectId,
+        string workflowRunId,
+        int? take = null,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildWorkflowPath($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}/checkpoints", projectId, take), cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> ListWorkflowStepCheckpointsAsync(
+        string projectId,
+        string workflowRunId,
+        string workflowRunStepId,
+        int? take = null,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync(BuildWorkflowPath($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}/steps/{Uri.EscapeDataString(workflowRunStepId)}/checkpoints", projectId, take), cancellationToken);
+
+    public Task<IronDevApiResponse<JsonElement?>> GetWorkflowCheckpointAsync(
+        string projectId,
+        string workflowRunId,
+        string workflowCheckpointId,
+        CancellationToken cancellationToken = default)
+        => GetJsonEnvelopeAsync($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}/checkpoints/{Uri.EscapeDataString(workflowCheckpointId)}?projectId={Uri.EscapeDataString(projectId)}", cancellationToken);
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
@@ -600,6 +669,27 @@ public sealed class IronDevApiClient : IIronDevApiClient
         Add(parameters, "skip", query.Skip?.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         return "api/v1/agent-runs?" + string.Join("&", parameters.Select(parameter =>
+            $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value)}"));
+    }
+
+    private static string BuildWorkflowPath(
+        string path,
+        string projectId,
+        int? take,
+        params KeyValuePair<string, string>[] extraParameters)
+    {
+        var parameters = new List<KeyValuePair<string, string>>
+        {
+            new("projectId", projectId)
+        };
+
+        foreach (var parameter in extraParameters)
+            Add(parameters, parameter.Key, parameter.Value);
+
+        if (take is not null)
+            Add(parameters, "take", take.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        return path + "?" + string.Join("&", parameters.Select(parameter =>
             $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value)}"));
     }
 
