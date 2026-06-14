@@ -68,3 +68,20 @@ It does not create embeddings.
 It does not write to vector storage.
 
 The package may summarize staged proposal evidence, grounding references, workflow context, risk notes, confidentiality notes, sanitization notes, and review hints. Those facts remain review material only.
+
+## PR109 boundary
+
+PR109 adds deterministic duplicate detection for staged memory proposals.
+
+A duplicate candidate is not a duplicate decision.
+A duplicate candidate does not merge proposals.
+A duplicate candidate does not reject proposals.
+A duplicate candidate does not accept memory.
+A duplicate candidate does not promote memory.
+A duplicate candidate does not activate retrieval.
+A similarity score is not approval.
+A similarity score is not truth.
+
+The detector is deterministic and does not use model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
+
+Duplicate detection produces review candidates only. Human/governed review remains required before any proposal merge, rejection, acceptance, promotion, retrieval activation, or memory-truth decision.
