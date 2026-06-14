@@ -85,3 +85,21 @@ A similarity score is not truth.
 The detector is deterministic and does not use model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
 
 Duplicate detection produces review candidates only. Human/governed review remains required before any proposal merge, rejection, acceptance, promotion, retrieval activation, or memory-truth decision.
+
+## PR110 boundary
+
+PR110 adds deterministic stale detection for staged memory proposals.
+
+A stale candidate is not a stale decision.
+A stale candidate does not reject proposals.
+A stale candidate does not delete proposals.
+A stale candidate does not correct proposals.
+A stale candidate does not accept memory.
+A stale candidate does not promote memory.
+A stale candidate does not activate retrieval.
+A staleness score is not approval.
+A staleness score is not truth.
+
+The detector is deterministic and does not use model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
+
+Stale detection produces review candidates only. Human/governed review remains required before any correction, rejection, deletion, acceptance, promotion, retrieval activation, or memory-truth decision.
