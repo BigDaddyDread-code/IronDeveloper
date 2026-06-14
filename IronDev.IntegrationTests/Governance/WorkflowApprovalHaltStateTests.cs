@@ -36,6 +36,27 @@ public sealed class WorkflowApprovalHaltStateTests
     }
 
     [TestMethod]
+    public void WorkflowApprovalHalt_NullRequirementSafeSummaryNormalizesWithoutCrashing()
+    {
+        var result = _evaluator.Evaluate(Request([]) with
+        {
+            RequiredApprovals =
+            [
+                Requirement(WorkflowApprovalRequirementKind.HumanApprovalReference, "human-approval-001") with
+                {
+                    SafeSummary = null!
+                }
+            ]
+        });
+        var serialized = JsonSerializer.Serialize(result);
+
+        Assert.AreEqual(WorkflowApprovalHaltStatus.ApprovalRequiredHalt, result.Status);
+        Assert.AreEqual(1, result.MissingApprovalRequirements.Count);
+        Assert.AreEqual(string.Empty, result.MissingApprovalRequirements[0].SafeSummary);
+        Assert.IsFalse(serialized.Contains("null", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
     public void WorkflowApprovalHalt_NotApprovalRequiredDoesNotInventApproval()
     {
         var result = _evaluator.Evaluate(new WorkflowApprovalHaltEvaluationRequest

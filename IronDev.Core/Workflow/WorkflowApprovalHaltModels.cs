@@ -180,7 +180,9 @@ public sealed class WorkflowApprovalHaltEvaluator : IWorkflowApprovalHaltEvaluat
         requirement with
         {
             RequirementId = requirement.RequirementId.Trim(),
-            SafeSummary = requirement.SafeSummary.Trim()
+            SafeSummary = string.IsNullOrWhiteSpace(requirement.SafeSummary)
+                ? string.Empty
+                : requirement.SafeSummary.Trim()
         };
 
     private static WorkflowApprovalHaltReason[] BoundaryReasons() =>
