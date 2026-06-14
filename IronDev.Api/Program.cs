@@ -16,6 +16,7 @@ using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
 using IronDev.Core.Governance;
+using IronDev.Core.Workflow;
 using IronDev.Infrastructure.AgentRunAudit;
 using IronDev.Data;
 using IronDev.Infrastructure.Builder;
@@ -27,6 +28,7 @@ using IronDev.Infrastructure.Services.Promotion;
 using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Infrastructure.Governance;
+using IronDev.Infrastructure.Workflow;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -170,6 +172,9 @@ builder.Services.AddScoped<IToolGateDecisionStore, SqlToolGateDecisionStore>();
 builder.Services.AddScoped<IToolGateApiStore, SqlToolGateApiStore>();
 builder.Services.AddScoped<IDogfoodReceiptStore, SqlDogfoodReceiptStore>();
 builder.Services.AddScoped<IDogfoodLoopApiStore, SqlDogfoodLoopApiStore>();
+builder.Services.AddScoped<IWorkflowRunStore, SqlWorkflowRunStore>();
+builder.Services.AddScoped<IWorkflowStepStore, SqlWorkflowStepStore>();
+builder.Services.AddScoped<IWorkflowCheckpointStore, SqlWorkflowCheckpointStore>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))

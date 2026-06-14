@@ -221,6 +221,9 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_policy_decision_event.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_dogfood_receipt.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_thoughtledger_governance_event_reference.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workflow_run.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workflow_step_store.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workflow_checkpoint_store.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -321,6 +324,27 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
             IF OBJECT_ID('governance.TR_ApprovalDecision_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete ON governance.ApprovalDecision;
             IF OBJECT_ID('governance.TR_ToolGateDecision_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete ON governance.ToolGateDecision;
+            IF OBJECT_ID('workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete ON workflow.WorkflowCheckpointGroundingReference;
+            IF OBJECT_ID('workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete ON workflow.WorkflowCheckpointEvidenceReference;
+            IF OBJECT_ID('workflow.TR_WorkflowCheckpoint_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowCheckpoint_BlockUpdateDelete ON workflow.WorkflowCheckpoint;
+            IF OBJECT_ID('workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete ON workflow.WorkflowRunGroundingReference;
+            IF OBJECT_ID('workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete ON workflow.WorkflowRunEvidenceReference;
+            IF OBJECT_ID('workflow.TR_WorkflowRunStep_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowRunStep_BlockUpdateDelete ON workflow.WorkflowRunStep;
+            IF OBJECT_ID('workflow.TR_WorkflowRun_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER workflow.TR_WorkflowRun_BlockUpdateDelete ON workflow.WorkflowRun;
+            IF OBJECT_ID('workflow.WorkflowCheckpointGroundingReference', 'U') IS NOT NULL DELETE FROM workflow.WorkflowCheckpointGroundingReference;
+            IF OBJECT_ID('workflow.WorkflowCheckpointEvidenceReference', 'U') IS NOT NULL DELETE FROM workflow.WorkflowCheckpointEvidenceReference;
+            IF OBJECT_ID('workflow.WorkflowCheckpoint', 'U') IS NOT NULL DELETE FROM workflow.WorkflowCheckpoint;
+            IF OBJECT_ID('workflow.WorkflowRunGroundingReference', 'U') IS NOT NULL DELETE FROM workflow.WorkflowRunGroundingReference;
+            IF OBJECT_ID('workflow.WorkflowRunEvidenceReference', 'U') IS NOT NULL DELETE FROM workflow.WorkflowRunEvidenceReference;
+            IF OBJECT_ID('workflow.WorkflowRunStep', 'U') IS NOT NULL DELETE FROM workflow.WorkflowRunStep;
+            IF OBJECT_ID('workflow.WorkflowRun', 'U') IS NOT NULL DELETE FROM workflow.WorkflowRun;
+            IF OBJECT_ID('workflow.TR_WorkflowRun_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowRun_BlockUpdateDelete ON workflow.WorkflowRun;
+            IF OBJECT_ID('workflow.TR_WorkflowRunStep_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowRunStep_BlockUpdateDelete ON workflow.WorkflowRunStep;
+            IF OBJECT_ID('workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowRunEvidenceReference_BlockUpdateDelete ON workflow.WorkflowRunEvidenceReference;
+            IF OBJECT_ID('workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowRunGroundingReference_BlockUpdateDelete ON workflow.WorkflowRunGroundingReference;
+            IF OBJECT_ID('workflow.TR_WorkflowCheckpoint_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpoint_BlockUpdateDelete ON workflow.WorkflowCheckpoint;
+            IF OBJECT_ID('workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete ON workflow.WorkflowCheckpointEvidenceReference;
+            IF OBJECT_ID('workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete ON workflow.WorkflowCheckpointGroundingReference;
             IF OBJECT_ID('governance.ThoughtLedgerGovernanceEventReference', 'U') IS NOT NULL DELETE FROM governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.DogfoodReceipt', 'U') IS NOT NULL DELETE FROM governance.DogfoodReceipt;
             IF OBJECT_ID('governance.PolicyDecisionEvent', 'U') IS NOT NULL DELETE FROM governance.PolicyDecisionEvent;
