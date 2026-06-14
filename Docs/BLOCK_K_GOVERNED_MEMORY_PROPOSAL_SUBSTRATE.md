@@ -168,3 +168,15 @@ It does not write to vector storage.
 Evidence remains evidence only. Grounding remains traceability only. Duplicate, stale, conflict, and cross-run pattern signals remain advisory only. Approval requirement references remain unsatisfied requirements only.
 
 Human/governed approval remains required before any proposal acceptance, memory promotion, Portable Engineering Memory creation, retrieval activation, indexing, embedding, policy, approval, workflow, source apply, or memory-truth decision.
+
+## PR113A boundary receipt
+
+PR113A hardens the PR113 memory promotion request boundary.
+
+See [PR113A Memory Promotion Request Boundary Receipt](receipts/PR113A_MEMORY_PROMOTION_REQUEST_BOUNDARY_RECEIPT.md).
+
+A promotion request package is a review folder. It is not promotion approval, triage action, memory acceptance, memory rejection, correction, merge, rewrite, retrieval activation, approval satisfaction, or policy satisfaction.
+
+Duplicate, stale, conflict, and cross-run pattern signals remain review-only. Approval requirement references remain unsatisfied requirements only. Evidence remains evidence only, and grounding remains traceability only.
+
+The package can request review. It cannot approve promotion, accept memory, promote memory, create Portable Engineering Memory, activate retrieval, satisfy approval, or satisfy policy.
