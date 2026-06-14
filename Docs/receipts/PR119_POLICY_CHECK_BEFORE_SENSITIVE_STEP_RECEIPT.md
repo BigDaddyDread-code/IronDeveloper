@@ -14,6 +14,8 @@ Policy evidence does not execute or transition workflow state.
 
 The runner skeleton remains evaluation-only.
 
+PR119 policy preflight uses caller-supplied policy preflight snapshots. It does not infer sensitivity from the workflow step contract by itself.
+
 ## What changed
 
 - Added typed workflow step sensitivity classification.

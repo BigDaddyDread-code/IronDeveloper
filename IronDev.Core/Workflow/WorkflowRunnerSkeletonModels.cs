@@ -58,7 +58,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 request.WorkflowRunId,
                 step,
                 availableEvidence,
-                policyPreflightRequests.TryGetValue(step.StepContractId.Trim(), out var policyRequest) ? policyRequest : null))
+                policyPreflightRequests))
             .ToArray();
 
         var aggregateReasons = stepEvaluations
@@ -82,7 +82,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
         string workflowRunId,
         WorkflowStepContract step,
         HashSet<string> availableEvidence,
-        WorkflowStepPolicyPreflightRequest? policyPreflightRequest)
+        IReadOnlyDictionary<string, WorkflowStepPolicyPreflightRequest> policyPreflightRequests)
     {
         var validation = _contractValidator.Validate(step);
         if (!string.Equals(step.WorkflowRunId, workflowRunId, StringComparison.Ordinal))
@@ -138,6 +138,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             };
         }
 
+        var policyPreflightRequest = TryGetPolicyPreflightRequest(step.StepContractId, policyPreflightRequests);
         var policyPreflight = policyPreflightRequest is null
             ? null
             : _policyPreflightChecker.Check(policyPreflightRequest with { StepContract = step });
@@ -196,6 +197,18 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
 
     private static WorkflowStepContractTransitionKind? FirstTransition(WorkflowStepContract step) =>
         step.AllowedTransitions.FirstOrDefault()?.Kind;
+
+    private static WorkflowStepPolicyPreflightRequest? TryGetPolicyPreflightRequest(
+        string? stepContractId,
+        IReadOnlyDictionary<string, WorkflowStepPolicyPreflightRequest> policyPreflightRequests)
+    {
+        if (string.IsNullOrWhiteSpace(stepContractId))
+            return null;
+
+        return policyPreflightRequests.TryGetValue(stepContractId.Trim(), out var policyRequest)
+            ? policyRequest
+            : null;
+    }
 
     private static IReadOnlyList<WorkflowRunnerBlockReason> BoundaryReasonsFor(WorkflowStepContract step)
     {

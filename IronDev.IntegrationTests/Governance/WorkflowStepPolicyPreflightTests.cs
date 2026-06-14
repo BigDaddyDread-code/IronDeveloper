@@ -377,6 +377,21 @@ public sealed class WorkflowRunnerSkeletonPolicyPreflightTests
     }
 
     [TestMethod]
+    public void WorkflowRunnerSkeleton_MalformedStepIdReturnsInvalidContractInsteadOfThrowing()
+    {
+        var step = WorkflowStepPolicyPreflightCheckerTests.ValidStep() with { StepContractId = null! };
+
+        var result = _runner.Evaluate(Request(
+            [step],
+            [WorkflowStepPolicyPreflightCheckerTests.EvidenceReference()],
+            []));
+
+        Assert.AreEqual(WorkflowRunnerEvaluationStatus.AllBlocked, result.Status);
+        Assert.AreEqual(WorkflowStepRunnerEligibility.InvalidContract, result.StepEvaluations[0].Eligibility);
+        CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.InvalidStepContract);
+    }
+
+    [TestMethod]
     public void WorkflowRunnerSkeleton_MarksSensitiveStepWithPolicyEvidenceAsEligibleForFutureExecutionOnly()
     {
         var step = WorkflowStepPolicyPreflightCheckerTests.ValidStep();
