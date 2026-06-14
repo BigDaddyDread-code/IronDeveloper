@@ -202,3 +202,23 @@ PR114 does not create embeddings.
 PR114 does not write to vector storage.
 
 Governance references remain evidence only. Workflow references remain context only. Grounding remains traceability only. Traceability does not satisfy approval or policy, and it does not make any staged proposal live memory.
+
+## PR115 - Memory Cannot Promote Itself Test Pack
+
+PR115 proves that memory proposal artifacts cannot promote themselves.
+
+See [PR115 Memory Cannot Promote Itself](receipts/PR115_MEMORY_CANNOT_PROMOTE_ITSELF.md).
+
+A staged proposal is not accepted memory.
+An evidence package is not accepted memory.
+A duplicate signal is not a merge decision.
+A stale signal is not a rejection decision.
+A conflict signal is not a truth decision.
+A cross-run pattern signal is not Portable Engineering Memory.
+A ThoughtLedger trace is not approval.
+A grounding reference is not truth.
+A promotion request package is not promotion approval.
+
+No combination of proposal, evidence, traceability, signals, grounding, and promotion request package creates accepted memory, promoted memory, Portable Engineering Memory, retrieval authority, approval satisfaction, or policy satisfaction.
+
+The full Block K proposal chain can request review. It cannot accept memory, promote memory, activate retrieval, create embeddings, write vectors, satisfy policy, satisfy approval, approve release, or make memory live.
