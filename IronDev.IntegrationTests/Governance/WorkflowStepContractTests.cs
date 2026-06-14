@@ -50,6 +50,39 @@ public sealed class WorkflowStepContractTests
     }
 
     [TestMethod]
+    public void WorkflowStepContract_MissingThoughtLedgerReferenceFails()
+    {
+        var result = _validator.Validate(ValidContract() with { ThoughtLedgerReference = null });
+
+        AssertInvalid(result, "WORKFLOW_STEP_CONTRACT_THOUGHT_LEDGER_REFERENCE_REQUIRED");
+    }
+
+    [TestMethod]
+    public void WorkflowStepContract_BlankThoughtLedgerEntryIdFails()
+    {
+        var result = _validator.Validate(ValidContract() with
+        {
+            ThoughtLedgerReference = ValidThoughtLedgerReference() with { ThoughtLedgerEntryId = " " }
+        });
+
+        AssertInvalid(result, "WORKFLOW_STEP_CONTRACT_THOUGHT_LEDGER_ENTRY_ID_REQUIRED");
+    }
+
+    [TestMethod]
+    public void WorkflowStepContract_ThoughtLedgerReferenceWithSafeSummaryPasses()
+    {
+        var result = _validator.Validate(ValidContract() with
+        {
+            ThoughtLedgerReference = ValidThoughtLedgerReference() with
+            {
+                SafeSummary = "Safe public trace marker for the workflow step."
+            }
+        });
+
+        AssertValid(result);
+    }
+
+    [TestMethod]
     public void WorkflowStepContract_InvalidEnumsFail()
     {
         var contract = ValidContract() with
@@ -98,6 +131,10 @@ public sealed class WorkflowStepContractTests
             InputReference = ValidContract().InputReference with
             {
                 SafeSummary = "rawPrompt and chainOfThought are not allowed"
+            },
+            ThoughtLedgerReference = ValidThoughtLedgerReference() with
+            {
+                SafeSummary = "rawToolOutput and entirePatch are not allowed"
             },
             EvidenceRequirements =
             [
@@ -261,7 +298,8 @@ public sealed class WorkflowStepContractTests
             StepContractId = " step-contract-001 ",
             WorkflowRunId = " workflow-run-001 ",
             SafeSummary = " review step contract ",
-            InputReference = ValidContract().InputReference with { ReferenceId = " input-001 ", SafeSummary = " input evidence " }
+            InputReference = ValidContract().InputReference with { ReferenceId = " input-001 ", SafeSummary = " input evidence " },
+            ThoughtLedgerReference = ValidThoughtLedgerReference() with { ThoughtLedgerEntryId = " thought-ledger-entry-001 " }
         });
 
         Assert.AreEqual("step-contract-001", normalized.StepContractId);
@@ -269,6 +307,7 @@ public sealed class WorkflowStepContractTests
         Assert.AreEqual("review step contract", normalized.SafeSummary);
         Assert.AreEqual("input-001", normalized.InputReference.ReferenceId);
         Assert.AreEqual("input evidence", normalized.InputReference.SafeSummary);
+        Assert.AreEqual("thought-ledger-entry-001", normalized.ThoughtLedgerReference!.ThoughtLedgerEntryId);
     }
 
     [TestMethod]
@@ -285,6 +324,7 @@ public sealed class WorkflowStepContractTests
         Assert.AreEqual(contract.InputReference.ReferenceId, roundTrip.InputReference.ReferenceId);
         Assert.AreEqual(contract.AllowedTransitions[0].Kind, roundTrip.AllowedTransitions[0].Kind);
         Assert.AreEqual(contract.EvidenceRequirements[0].Kind, roundTrip.EvidenceRequirements[0].Kind);
+        Assert.AreEqual(contract.ThoughtLedgerReference!.ThoughtLedgerEntryId, roundTrip.ThoughtLedgerReference!.ThoughtLedgerEntryId);
     }
 
     [TestMethod]
@@ -306,7 +346,8 @@ public sealed class WorkflowStepContractTests
             typeof(WorkflowStepContractReference),
             typeof(WorkflowStepContractEvidenceRequirement),
             typeof(WorkflowStepContractTransitionRule),
-            typeof(WorkflowStepContractBoundary)
+            typeof(WorkflowStepContractBoundary),
+            typeof(WorkflowStepThoughtLedgerReference)
         }
         .SelectMany(type => type.GetProperties())
         .Select(property => property.Name);
@@ -399,8 +440,19 @@ public sealed class WorkflowStepContractTests
                     SafeSummary = "Governance event reference is required as evidence."
                 }
             ],
+            ThoughtLedgerReference = ValidThoughtLedgerReference(),
             Boundary = new WorkflowStepContractBoundary(),
             SafeSummary = "Typed step contract records intent, references, actor expectation, transitions, and evidence."
+        };
+
+    internal static WorkflowStepThoughtLedgerReference ValidThoughtLedgerReference() =>
+        new()
+        {
+            ThoughtLedgerEntryId = "thought-ledger-entry-001",
+            TraceId = "trace-001",
+            GovernanceEventId = "governance-event-001",
+            CorrelationId = "correlation-001",
+            SafeSummary = "ThoughtLedger reference is traceability only."
         };
 
     private static void AssertValid(WorkflowRunValidationResult result) =>

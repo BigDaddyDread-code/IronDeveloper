@@ -105,6 +105,15 @@ public sealed record WorkflowStepContractBoundary
     public bool AllowsWorkflowContinuation { get; init; }
 }
 
+public sealed record WorkflowStepThoughtLedgerReference
+{
+    public required string ThoughtLedgerEntryId { get; init; }
+    public string? TraceId { get; init; }
+    public string? GovernanceEventId { get; init; }
+    public string? CorrelationId { get; init; }
+    public string? SafeSummary { get; init; }
+}
+
 public sealed record WorkflowStepContract
 {
     public required string StepContractId { get; init; }
@@ -115,6 +124,7 @@ public sealed record WorkflowStepContract
     public required WorkflowStepContractActorKind ExpectedActorKind { get; init; }
     public IReadOnlyList<WorkflowStepContractTransitionRule> AllowedTransitions { get; init; } = [];
     public IReadOnlyList<WorkflowStepContractEvidenceRequirement> EvidenceRequirements { get; init; } = [];
+    public required WorkflowStepThoughtLedgerReference? ThoughtLedgerReference { get; init; }
     public required WorkflowStepContractBoundary Boundary { get; init; }
     public string SafeSummary { get; init; } = string.Empty;
 }
@@ -189,6 +199,7 @@ public sealed class WorkflowStepContractValidator
         ValidateReference(contract.ExpectedOutputReference, "expectedOutputReference", issues);
         ValidateTransitions(contract.AllowedTransitions, issues);
         ValidateEvidenceRequirements(contract.EvidenceRequirements, issues);
+        ValidateThoughtLedgerReference(contract.ThoughtLedgerReference, "thoughtLedgerReference", issues);
         ValidateBoundary(contract.Boundary, issues);
 
         return Result(issues);
@@ -203,7 +214,8 @@ public sealed class WorkflowStepContractValidator
             InputReference = NormalizeReference(contract.InputReference),
             ExpectedOutputReference = NormalizeReference(contract.ExpectedOutputReference),
             AllowedTransitions = contract.AllowedTransitions.Select(NormalizeTransition).ToArray(),
-            EvidenceRequirements = contract.EvidenceRequirements.Select(NormalizeEvidenceRequirement).ToArray()
+            EvidenceRequirements = contract.EvidenceRequirements.Select(NormalizeEvidenceRequirement).ToArray(),
+            ThoughtLedgerReference = NormalizeThoughtLedgerReference(contract.ThoughtLedgerReference)
         };
 
     private static WorkflowStepContractReference NormalizeReference(WorkflowStepContractReference reference) =>
@@ -222,6 +234,18 @@ public sealed class WorkflowStepContractValidator
             RequirementId = requirement.RequirementId.Trim(),
             SafeSummary = requirement.SafeSummary.Trim()
         };
+
+    private static WorkflowStepThoughtLedgerReference? NormalizeThoughtLedgerReference(WorkflowStepThoughtLedgerReference? reference) =>
+        reference is null
+            ? null
+            : reference with
+            {
+                ThoughtLedgerEntryId = reference.ThoughtLedgerEntryId.Trim(),
+                TraceId = string.IsNullOrWhiteSpace(reference.TraceId) ? null : reference.TraceId.Trim(),
+                GovernanceEventId = string.IsNullOrWhiteSpace(reference.GovernanceEventId) ? null : reference.GovernanceEventId.Trim(),
+                CorrelationId = string.IsNullOrWhiteSpace(reference.CorrelationId) ? null : reference.CorrelationId.Trim(),
+                SafeSummary = string.IsNullOrWhiteSpace(reference.SafeSummary) ? null : reference.SafeSummary.Trim()
+            };
 
     private static void ValidateReference(WorkflowStepContractReference? reference, string field, List<WorkflowRunValidationIssue> issues)
     {
@@ -287,6 +311,22 @@ public sealed class WorkflowStepContractValidator
             RejectAuthorityFlag(requirement.PromotesMemory, $"{field}.promotesMemory", issues);
             RejectAuthorityFlag(requirement.RequiresHydratedContent, $"{field}.requiresHydratedContent", issues);
         }
+    }
+
+    private static void ValidateThoughtLedgerReference(WorkflowStepThoughtLedgerReference? reference, string field, List<WorkflowRunValidationIssue> issues)
+    {
+        if (reference is null)
+        {
+            AddError(issues, "WORKFLOW_STEP_CONTRACT_THOUGHT_LEDGER_REFERENCE_REQUIRED", "Workflow step contract ThoughtLedger reference is required.", field);
+            return;
+        }
+
+        Require(reference.ThoughtLedgerEntryId, "WORKFLOW_STEP_CONTRACT_THOUGHT_LEDGER_ENTRY_ID_REQUIRED", $"{field}.thoughtLedgerEntryId", issues);
+        ValidateTextSafety(reference.ThoughtLedgerEntryId, $"{field}.thoughtLedgerEntryId", issues);
+        ValidateTextSafety(reference.TraceId, $"{field}.traceId", issues);
+        ValidateTextSafety(reference.GovernanceEventId, $"{field}.governanceEventId", issues);
+        ValidateTextSafety(reference.CorrelationId, $"{field}.correlationId", issues);
+        ValidateTextSafety(reference.SafeSummary, $"{field}.safeSummary", issues);
     }
 
     private static void ValidateBoundary(WorkflowStepContractBoundary? boundary, List<WorkflowRunValidationIssue> issues)
