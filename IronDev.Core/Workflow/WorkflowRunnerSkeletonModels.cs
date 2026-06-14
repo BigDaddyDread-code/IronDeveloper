@@ -8,15 +8,24 @@ public interface IWorkflowRunnerSkeleton
 public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
 {
     private readonly WorkflowStepContractValidator _contractValidator;
+    private readonly IWorkflowStepPolicyPreflightChecker _policyPreflightChecker;
 
     public WorkflowRunnerSkeleton()
-        : this(new WorkflowStepContractValidator())
+        : this(new WorkflowStepContractValidator(), new WorkflowStepPolicyPreflightChecker())
     {
     }
 
     internal WorkflowRunnerSkeleton(WorkflowStepContractValidator contractValidator)
+        : this(contractValidator, new WorkflowStepPolicyPreflightChecker(contractValidator))
+    {
+    }
+
+    internal WorkflowRunnerSkeleton(
+        WorkflowStepContractValidator contractValidator,
+        IWorkflowStepPolicyPreflightChecker policyPreflightChecker)
     {
         _contractValidator = contractValidator;
+        _policyPreflightChecker = policyPreflightChecker;
     }
 
     public WorkflowRunnerEvaluation Evaluate(WorkflowRunnerEvaluationRequest? request)
@@ -38,8 +47,18 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             .Select(evidence => EvidenceKey(evidence.Kind, evidence.ReferenceId))
             .ToHashSet(StringComparer.Ordinal);
 
+        var policyPreflightRequests = (request.PolicyPreflightRequests ?? [])
+            .Where(policyRequest => policyRequest.StepContract is not null &&
+                                    !string.IsNullOrWhiteSpace(policyRequest.StepContract.StepContractId))
+            .GroupBy(policyRequest => policyRequest.StepContract!.StepContractId.Trim(), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
         var stepEvaluations = request.StepContracts
-            .Select(step => EvaluateStep(request.WorkflowRunId, step, availableEvidence))
+            .Select(step => EvaluateStep(
+                request.WorkflowRunId,
+                step,
+                availableEvidence,
+                policyPreflightRequests.TryGetValue(step.StepContractId.Trim(), out var policyRequest) ? policyRequest : null))
             .ToArray();
 
         var aggregateReasons = stepEvaluations
@@ -59,7 +78,11 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
         };
     }
 
-    private WorkflowStepRunnerEvaluation EvaluateStep(string workflowRunId, WorkflowStepContract step, HashSet<string> availableEvidence)
+    private WorkflowStepRunnerEvaluation EvaluateStep(
+        string workflowRunId,
+        WorkflowStepContract step,
+        HashSet<string> availableEvidence,
+        WorkflowStepPolicyPreflightRequest? policyPreflightRequest)
     {
         var validation = _contractValidator.Validate(step);
         if (!string.Equals(step.WorkflowRunId, workflowRunId, StringComparison.Ordinal))
@@ -89,6 +112,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 Eligibility = WorkflowStepRunnerEligibility.InvalidContract,
                 BlockReasons = [WorkflowRunnerBlockReason.InvalidStepContract, .. boundaryReasons],
                 MissingEvidenceRequirements = [],
+                PolicyPreflightStatus = null,
+                PolicyBlockReasons = [],
+                MissingPolicyRequirements = [],
                 NextRecordableTransition = null
             };
         }
@@ -105,6 +131,43 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 Eligibility = WorkflowStepRunnerEligibility.BlockedMissingEvidence,
                 BlockReasons = [WorkflowRunnerBlockReason.MissingRequiredEvidence, .. boundaryReasons],
                 MissingEvidenceRequirements = missingEvidence,
+                PolicyPreflightStatus = null,
+                PolicyBlockReasons = [],
+                MissingPolicyRequirements = [],
+                NextRecordableTransition = FirstTransition(step)
+            };
+        }
+
+        var policyPreflight = policyPreflightRequest is null
+            ? null
+            : _policyPreflightChecker.Check(policyPreflightRequest with { StepContract = step });
+
+        if (policyPreflight?.Status == WorkflowStepPolicyPreflightStatus.InvalidPolicyRequest)
+        {
+            return new WorkflowStepRunnerEvaluation
+            {
+                StepId = step.StepContractId,
+                Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
+                BlockReasons = [WorkflowRunnerBlockReason.PolicyPreflightInvalid, .. boundaryReasons],
+                MissingEvidenceRequirements = [],
+                PolicyPreflightStatus = policyPreflight.Status,
+                PolicyBlockReasons = policyPreflight.BlockReasons,
+                MissingPolicyRequirements = policyPreflight.MissingPolicyRequirements,
+                NextRecordableTransition = FirstTransition(step)
+            };
+        }
+
+        if (policyPreflight?.Status == WorkflowStepPolicyPreflightStatus.BlockedMissingPolicyEvidence)
+        {
+            return new WorkflowStepRunnerEvaluation
+            {
+                StepId = step.StepContractId,
+                Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
+                BlockReasons = [WorkflowRunnerBlockReason.PolicyPreflightMissingEvidence, .. boundaryReasons],
+                MissingEvidenceRequirements = [],
+                PolicyPreflightStatus = policyPreflight.Status,
+                PolicyBlockReasons = policyPreflight.BlockReasons,
+                MissingPolicyRequirements = policyPreflight.MissingPolicyRequirements,
                 NextRecordableTransition = FirstTransition(step)
             };
         }
@@ -115,6 +178,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             Eligibility = WorkflowStepRunnerEligibility.EligibleForFutureExecution,
             BlockReasons = boundaryReasons,
             MissingEvidenceRequirements = [],
+            PolicyPreflightStatus = policyPreflight?.Status,
+            PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
+            MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
             NextRecordableTransition = FirstTransition(step)
         };
     }
@@ -166,6 +232,7 @@ public sealed record WorkflowRunnerEvaluationRequest
     public required string WorkflowRunId { get; init; }
     public required IReadOnlyList<WorkflowStepContract> StepContracts { get; init; }
     public required IReadOnlyList<WorkflowEvidenceReference> AvailableEvidence { get; init; }
+    public IReadOnlyList<WorkflowStepPolicyPreflightRequest> PolicyPreflightRequests { get; init; } = [];
 }
 
 public sealed record WorkflowEvidenceReference
@@ -198,6 +265,9 @@ public sealed record WorkflowStepRunnerEvaluation
     public required WorkflowStepRunnerEligibility Eligibility { get; init; }
     public required IReadOnlyList<WorkflowRunnerBlockReason> BlockReasons { get; init; }
     public required IReadOnlyList<WorkflowStepContractEvidenceRequirement> MissingEvidenceRequirements { get; init; }
+    public WorkflowStepPolicyPreflightStatus? PolicyPreflightStatus { get; init; }
+    public IReadOnlyList<WorkflowStepPolicyBlockReason> PolicyBlockReasons { get; init; } = [];
+    public IReadOnlyList<WorkflowStepPolicyRequirement> MissingPolicyRequirements { get; init; } = [];
     public WorkflowStepContractTransitionKind? NextRecordableTransition { get; init; }
 }
 
@@ -223,5 +293,7 @@ public enum WorkflowRunnerBlockReason
     SourceMutationBoundaryPreventsApply = 8,
     ApprovalBoundaryPreventsMutation = 9,
     MemoryBoundaryPreventsPromotion = 10,
-    RetrievalBoundaryPreventsActivation = 11
+    RetrievalBoundaryPreventsActivation = 11,
+    PolicyPreflightMissingEvidence = 12,
+    PolicyPreflightInvalid = 13
 }
