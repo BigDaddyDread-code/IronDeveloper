@@ -47,6 +47,7 @@ public sealed class WorkflowRunnerSkeletonTests
         Assert.AreEqual(WorkflowRunnerEvaluationStatus.HasEligibleSteps, result.Status);
         Assert.AreEqual(WorkflowStepRunnerEligibility.EligibleForFutureExecution, result.StepEvaluations[0].Eligibility);
         Assert.IsFalse(result.StepEvaluations[0].MissingEvidenceRequirements.Any());
+        Assert.AreEqual("thought-ledger-entry-001", result.StepEvaluations[0].ThoughtLedgerReference!.ThoughtLedgerEntryId);
     }
 
     [TestMethod]
@@ -70,6 +71,51 @@ public sealed class WorkflowRunnerSkeletonTests
         Assert.AreEqual(WorkflowRunnerEvaluationStatus.AllBlocked, result.Status);
         Assert.AreEqual(WorkflowStepRunnerEligibility.InvalidContract, result.StepEvaluations[0].Eligibility);
         CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.InvalidStepContract);
+    }
+
+    [TestMethod]
+    public void WorkflowRunnerSkeleton_MissingThoughtLedgerReferenceReturnsInvalidContract()
+    {
+        var step = ValidStep() with { ThoughtLedgerReference = null };
+
+        var result = _runner.Evaluate(Request([step], [Evidence()]));
+
+        Assert.AreEqual(WorkflowRunnerEvaluationStatus.AllBlocked, result.Status);
+        Assert.AreEqual(WorkflowStepRunnerEligibility.InvalidContract, result.StepEvaluations[0].Eligibility);
+        CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.MissingThoughtLedgerReference);
+    }
+
+    [TestMethod]
+    public void WorkflowRunnerSkeleton_ThoughtLedgerReferenceDoesNotApproveExecuteTransitionOrSatisfyPolicy()
+    {
+        var result = _runner.Evaluate(Request([ValidStep()], [Evidence()]));
+        var serialized = JsonSerializer.Serialize(result);
+
+        Assert.AreEqual(WorkflowStepRunnerEligibility.EligibleForFutureExecution, result.StepEvaluations[0].Eligibility);
+        Assert.AreEqual("thought-ledger-entry-001", result.StepEvaluations[0].ThoughtLedgerReference!.ThoughtLedgerEntryId);
+        AssertDoesNotContainAny(serialized, "ApprovalGranted", "PolicySatisfied", "ExecutionAllowed", "TransitionRecorded", "MemoryPromoted", "RetrievalActivated");
+    }
+
+    [TestMethod]
+    public void WorkflowRunnerSkeleton_UnsafeThoughtLedgerReferenceDoesNotPropagateInvalidOutput()
+    {
+        var step = ValidStep() with
+        {
+            ThoughtLedgerReference = WorkflowStepContractTests.ValidThoughtLedgerReference() with
+            {
+                SafeSummary = "raw prompt leaked into trace marker."
+            }
+        };
+
+        var result = _runner.Evaluate(Request([step], [Evidence()]));
+        var serialized = JsonSerializer.Serialize(result);
+
+        Assert.AreEqual(WorkflowRunnerEvaluationStatus.AllBlocked, result.Status);
+        Assert.AreEqual(WorkflowStepRunnerEligibility.InvalidContract, result.StepEvaluations[0].Eligibility);
+        CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.InvalidStepContract);
+        CollectionAssert.Contains(result.StepEvaluations[0].BlockReasons.ToList(), WorkflowRunnerBlockReason.InvalidThoughtLedgerReference);
+        Assert.IsNull(result.StepEvaluations[0].ThoughtLedgerReference);
+        AssertDoesNotContainAny(serialized, "raw prompt", "rawPrompt");
     }
 
     [TestMethod]
@@ -428,6 +474,7 @@ public sealed class WorkflowRunnerSkeletonTests
                     SafeSummary = "Governance event reference is required as evidence."
                 }
             ],
+            ThoughtLedgerReference = WorkflowStepContractTests.ValidThoughtLedgerReference(),
             Boundary = new WorkflowStepContractBoundary(),
             SafeSummary = "Typed step contract records intent and evidence requirements."
         };

@@ -21,6 +21,44 @@ public sealed class WorkflowStepPolicyPreflightCheckerTests
     }
 
     [TestMethod]
+    public void WorkflowStepPolicyPreflight_MissingThoughtLedgerReferenceFailsThroughStepValidator()
+    {
+        var result = _checker.Check(Request(
+            ValidStep() with { ThoughtLedgerReference = null },
+            WorkflowStepSensitivityKind.ToolInvocation,
+            Requirement(WorkflowStepPolicyRequirementKind.ToolGateReference),
+            Evidence(WorkflowStepPolicyRequirementKind.ToolGateReference)));
+
+        Assert.AreEqual(WorkflowStepPolicyPreflightStatus.InvalidPolicyRequest, result.Status);
+        CollectionAssert.Contains(result.BlockReasons.ToList(), WorkflowStepPolicyBlockReason.InvalidStepContract);
+    }
+
+    [TestMethod]
+    public void WorkflowStepPolicyPreflight_PolicyEvidenceCannotCompensateForMissingThoughtLedgerReference()
+    {
+        var result = _checker.Check(Request(
+            ValidStep() with { ThoughtLedgerReference = null },
+            WorkflowStepSensitivityKind.SourceMutation,
+            Requirement(WorkflowStepPolicyRequirementKind.SourceMutationApprovalReference),
+            Evidence(WorkflowStepPolicyRequirementKind.SourceMutationApprovalReference)));
+
+        Assert.AreEqual(WorkflowStepPolicyPreflightStatus.InvalidPolicyRequest, result.Status);
+        CollectionAssert.Contains(result.BlockReasons.ToList(), WorkflowStepPolicyBlockReason.InvalidStepContract);
+    }
+
+    [TestMethod]
+    public void WorkflowStepPolicyPreflight_ThoughtLedgerReferenceCannotCompensateForMissingPolicyEvidence()
+    {
+        var result = _checker.Check(Request(
+            ValidStep(),
+            WorkflowStepSensitivityKind.MemoryPromotion,
+            Requirement(WorkflowStepPolicyRequirementKind.MemoryPromotionApprovalReference)));
+
+        Assert.AreEqual(WorkflowStepPolicyPreflightStatus.BlockedMissingPolicyEvidence, result.Status);
+        CollectionAssert.Contains(result.BlockReasons.ToList(), WorkflowStepPolicyBlockReason.MissingPolicyEvidence);
+    }
+
+    [TestMethod]
     public void WorkflowStepPolicyPreflight_InvalidStepContractBlocksPolicyPreflight()
     {
         var result = _checker.Check(Request(
@@ -306,6 +344,7 @@ public sealed class WorkflowStepPolicyPreflightCheckerTests
                     SafeSummary = "Governance event reference is required as evidence."
                 }
             ],
+            ThoughtLedgerReference = WorkflowStepContractTests.ValidThoughtLedgerReference(),
             Boundary = new WorkflowStepContractBoundary(),
             SafeSummary = "Typed step contract records intent and evidence requirements."
         };

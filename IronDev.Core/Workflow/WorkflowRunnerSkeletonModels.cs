@@ -110,8 +110,9 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             {
                 StepId = step.StepContractId,
                 Eligibility = WorkflowStepRunnerEligibility.InvalidContract,
-                BlockReasons = [WorkflowRunnerBlockReason.InvalidStepContract, .. boundaryReasons],
+                BlockReasons = [.. InvalidContractReasons(validation), .. boundaryReasons],
                 MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = null,
                 PolicyPreflightStatus = null,
                 PolicyBlockReasons = [],
                 MissingPolicyRequirements = [],
@@ -131,6 +132,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 Eligibility = WorkflowStepRunnerEligibility.BlockedMissingEvidence,
                 BlockReasons = [WorkflowRunnerBlockReason.MissingRequiredEvidence, .. boundaryReasons],
                 MissingEvidenceRequirements = missingEvidence,
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
                 PolicyPreflightStatus = null,
                 PolicyBlockReasons = [],
                 MissingPolicyRequirements = [],
@@ -151,6 +153,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
                 BlockReasons = [WorkflowRunnerBlockReason.PolicyPreflightInvalid, .. boundaryReasons],
                 MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
                 PolicyPreflightStatus = policyPreflight.Status,
                 PolicyBlockReasons = policyPreflight.BlockReasons,
                 MissingPolicyRequirements = policyPreflight.MissingPolicyRequirements,
@@ -166,6 +169,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
                 Eligibility = WorkflowStepRunnerEligibility.BlockedByBoundary,
                 BlockReasons = [WorkflowRunnerBlockReason.PolicyPreflightMissingEvidence, .. boundaryReasons],
                 MissingEvidenceRequirements = [],
+                ThoughtLedgerReference = step.ThoughtLedgerReference,
                 PolicyPreflightStatus = policyPreflight.Status,
                 PolicyBlockReasons = policyPreflight.BlockReasons,
                 MissingPolicyRequirements = policyPreflight.MissingPolicyRequirements,
@@ -179,6 +183,7 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
             Eligibility = WorkflowStepRunnerEligibility.EligibleForFutureExecution,
             BlockReasons = boundaryReasons,
             MissingEvidenceRequirements = [],
+            ThoughtLedgerReference = step.ThoughtLedgerReference,
             PolicyPreflightStatus = policyPreflight?.Status,
             PolicyBlockReasons = policyPreflight?.BlockReasons ?? [],
             MissingPolicyRequirements = policyPreflight?.MissingPolicyRequirements ?? [],
@@ -197,6 +202,22 @@ public sealed class WorkflowRunnerSkeleton : IWorkflowRunnerSkeleton
 
     private static WorkflowStepContractTransitionKind? FirstTransition(WorkflowStepContract step) =>
         step.AllowedTransitions.FirstOrDefault()?.Kind;
+
+    private static IReadOnlyList<WorkflowRunnerBlockReason> InvalidContractReasons(WorkflowRunValidationResult validation)
+    {
+        var reasons = new List<WorkflowRunnerBlockReason> { WorkflowRunnerBlockReason.InvalidStepContract };
+
+        if (validation.Issues.Any(issue => string.Equals(issue.Code, "WORKFLOW_STEP_CONTRACT_THOUGHT_LEDGER_REFERENCE_REQUIRED", StringComparison.Ordinal)))
+            reasons.Add(WorkflowRunnerBlockReason.MissingThoughtLedgerReference);
+
+        if (validation.Issues.Any(issue =>
+                string.Equals(issue.Code, "WORKFLOW_STEP_CONTRACT_THOUGHT_LEDGER_ENTRY_ID_REQUIRED", StringComparison.Ordinal) ||
+                (string.Equals(issue.Code, "WORKFLOW_STEP_CONTRACT_TEXT_UNSAFE", StringComparison.Ordinal) &&
+                 issue.Field.StartsWith("thoughtLedgerReference", StringComparison.Ordinal))))
+            reasons.Add(WorkflowRunnerBlockReason.InvalidThoughtLedgerReference);
+
+        return reasons.Distinct().OrderBy(reason => reason).ToArray();
+    }
 
     private static WorkflowStepPolicyPreflightRequest? TryGetPolicyPreflightRequest(
         string? stepContractId,
@@ -278,6 +299,7 @@ public sealed record WorkflowStepRunnerEvaluation
     public required WorkflowStepRunnerEligibility Eligibility { get; init; }
     public required IReadOnlyList<WorkflowRunnerBlockReason> BlockReasons { get; init; }
     public required IReadOnlyList<WorkflowStepContractEvidenceRequirement> MissingEvidenceRequirements { get; init; }
+    public required WorkflowStepThoughtLedgerReference? ThoughtLedgerReference { get; init; }
     public WorkflowStepPolicyPreflightStatus? PolicyPreflightStatus { get; init; }
     public IReadOnlyList<WorkflowStepPolicyBlockReason> PolicyBlockReasons { get; init; } = [];
     public IReadOnlyList<WorkflowStepPolicyRequirement> MissingPolicyRequirements { get; init; } = [];
@@ -308,5 +330,7 @@ public enum WorkflowRunnerBlockReason
     MemoryBoundaryPreventsPromotion = 10,
     RetrievalBoundaryPreventsActivation = 11,
     PolicyPreflightMissingEvidence = 12,
-    PolicyPreflightInvalid = 13
+    PolicyPreflightInvalid = 13,
+    MissingThoughtLedgerReference = 14,
+    InvalidThoughtLedgerReference = 15
 }
