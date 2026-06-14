@@ -123,3 +123,24 @@ A conflict score is not truth.
 The detector is deterministic and does not use model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
 
 Conflict detection produces review candidates only. Human/governed review remains required before any truth, correction, rejection, deletion, acceptance, promotion, retrieval activation, or memory decision.
+
+## PR112 boundary
+
+PR112 adds deterministic cross-run pattern detection for staged memory proposals.
+
+A cross-run pattern candidate is not accepted memory.
+A cross-run pattern candidate is not promoted memory.
+A cross-run pattern candidate is not Portable Engineering Memory.
+A cross-run pattern candidate is not retrieval authority.
+A cross-run pattern candidate is not vector index content.
+A cross-run pattern candidate is not an embedding.
+A cross-run pattern candidate is not policy satisfaction.
+A cross-run pattern candidate is not approval.
+A cross-run pattern candidate is not workflow progress.
+A cross-run pattern candidate is not source apply.
+
+The detector only looks for repeated staged proposal themes across workflow runs. It may identify repeated facts, decisions, boundaries, failure modes, risks, conventions, debugging lessons, validation findings, review findings, workflow patterns, policy invariants, and portable-review candidates.
+
+The detector is deterministic and does not use SQL writes, model calls, embeddings, vector search, Weaviate, retrieval indexing, API, CLI, or runtime dispatch.
+
+Cross-run pattern detection produces review candidates only. Human/governed review remains required before any proposal acceptance, memory promotion, Portable Engineering Memory creation, retrieval activation, indexing, embedding, policy, approval, workflow, source apply, or memory-truth decision.
