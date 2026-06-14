@@ -358,3 +358,41 @@ The CLI does not satisfy approval requirements.
 Statuses printed by the CLI are stored facts, not runtime actions.
 
 PR104 lets users inspect the workflow clipboard from CLI. It does not add any buttons.
+
+## PR105 Workflow State Contract Tests
+
+PR105 adds workflow state contract tests for Block J.
+
+The tests prove workflow run, step, checkpoint, evidence, grounding, API inspection, and CLI inspection compose without creating runtime authority.
+
+The tests do not add workflow state.
+
+The tests do not add SQL storage.
+
+The tests do not add API endpoints.
+
+The tests do not add CLI commands.
+
+The tests do not execute workflow.
+
+The tests do not continue workflow.
+
+The tests do not resume workflow.
+
+The tests do not retry workflow.
+
+The tests do not dispatch agents.
+
+The tests do not call tools.
+
+The tests do not call models.
+
+The tests do not mutate source.
+
+The tests do not promote memory.
+
+The tests do not create accepted memory.
+
+The tests do not approve release.
+
+The tests do not satisfy approval requirements.
