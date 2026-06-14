@@ -47,3 +47,24 @@ The older `agent.AgentMemoryImprovementProposal` table remains the manual improv
 ## Review rule
 
 Human/governed review remains required before any staged memory proposal can become accepted memory or promoted memory.
+
+## PR108 boundary
+
+PR108 adds a reviewable evidence package model for staged memory proposals.
+
+A memory proposal evidence package is not accepted memory.
+A memory proposal evidence package is not promoted memory.
+A memory proposal evidence package is not active project memory.
+A memory proposal evidence package is not active agent memory.
+A memory proposal evidence package is not Portable Engineering Memory.
+A memory proposal evidence package is not retrieval authority.
+A memory proposal evidence package is not approval.
+A memory proposal evidence package is not policy satisfaction.
+
+The package gathers evidence for review.
+It does not decide the proposal.
+It does not index memory.
+It does not create embeddings.
+It does not write to vector storage.
+
+The package may summarize staged proposal evidence, grounding references, workflow context, risk notes, confidentiality notes, sanitization notes, and review hints. Those facts remain review material only.
