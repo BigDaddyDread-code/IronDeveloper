@@ -9,6 +9,8 @@ import type {
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
+  DogfoodLoopApiEnvelope,
+  DogfoodReceiptDetailData,
   GovernanceTraceApiEnvelope,
   GovernanceTraceDetailData,
   GovernanceTraceListData,
@@ -535,6 +537,18 @@ class IronDevApiClient {
     const queryString = toQueryString({ projectReferenceId });
     return this.request<GovernanceTraceApiEnvelope<GovernanceTraceListData>>(
       `/api/v1/governance/traces/by-workflow-run/${encodeURIComponent(workflowRunId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getDogfoodLoopReceipt(
+    dogfoodLoopId: string,
+    projectId: string | number,
+    signal?: AbortSignal
+  ): Promise<DogfoodLoopApiEnvelope<DogfoodReceiptDetailData>> {
+    const queryString = toQueryString({ projectId });
+    return this.request<DogfoodLoopApiEnvelope<DogfoodReceiptDetailData>>(
+      `/api/v1/dogfood-loops/${encodeURIComponent(dogfoodLoopId)}${queryString}`,
       { method: 'GET', signal }
     );
   }

@@ -2251,3 +2251,110 @@ p {
     justify-content: flex-start;
   }
 }
+
+/* PR156 Dogfood Receipt Viewer UI */
+.dogfood-receipt-workspace {
+  display: block;
+}
+
+.dogfood-receipt-banner,
+.dogfood-receipt-actions,
+.dogfood-receipt-actions--stack,
+.dogfood-receipt-card-list {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.dogfood-receipt-banner {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 50rem;
+}
+
+.dogfood-receipt-banner span {
+  border: 1px solid rgba(96, 72, 32, 0.24);
+  border-radius: 999px;
+  background: rgba(251, 240, 210, 0.78);
+  color: #5b4219;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+}
+
+.dogfood-receipt-filters {
+  margin-top: 1rem;
+}
+
+.dogfood-receipt-filter-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.dogfood-receipt-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.dogfood-receipt-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(18rem, 0.9fr) minmax(24rem, 1.4fr) minmax(17rem, 0.8fr);
+  margin-top: 1rem;
+}
+
+.dogfood-receipt-card-list,
+.dogfood-receipt-actions--stack {
+  flex-direction: column;
+}
+
+.dogfood-receipt-card {
+  border: 1px solid rgba(96, 72, 32, 0.18);
+  border-radius: 1rem;
+  background: rgba(255, 252, 241, 0.86);
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem;
+  text-align: left;
+}
+
+.dogfood-receipt-card:hover,
+.dogfood-receipt-card--selected {
+  border-color: rgba(96, 72, 32, 0.45);
+  box-shadow: 0 0.75rem 1.8rem rgba(71, 54, 21, 0.12);
+}
+
+.dogfood-receipt-card__kind {
+  color: #6b5836;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dogfood-receipt-detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  margin-top: 1rem;
+}
+
+.dogfood-receipt-boundary {
+  border-left: 4px solid #8a6427;
+  color: #57411e;
+  margin-top: 1rem;
+  padding-left: 0.75rem;
+}
+
+@media (max-width: 1120px) {
+  .dogfood-receipt-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dogfood-receipt-banner {
+    justify-content: flex-start;
+  }
+}
