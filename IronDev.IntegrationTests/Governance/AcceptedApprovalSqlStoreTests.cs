@@ -104,6 +104,26 @@ public sealed class AcceptedApprovalSqlStoreTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task AcceptedApprovalSqlStore_CanListByProjectAndCorrelation()
+    {
+        var projectId = Guid.NewGuid();
+        var correlation = "correlation-project-scoped";
+        var matchingFirst = ValidRecord() with { ProjectId = projectId, AcceptedApprovalId = Guid.NewGuid(), CorrelationId = correlation };
+        var matchingSecond = ValidRecord() with { ProjectId = projectId, AcceptedApprovalId = Guid.NewGuid(), CorrelationId = correlation };
+        var otherProject = ValidRecord() with { ProjectId = Guid.NewGuid(), AcceptedApprovalId = Guid.NewGuid(), CorrelationId = correlation };
+        var otherCorrelation = ValidRecord() with { ProjectId = projectId, AcceptedApprovalId = Guid.NewGuid(), CorrelationId = "other-correlation" };
+
+        await Store().SaveAsync(matchingFirst);
+        await Store().SaveAsync(matchingSecond);
+        await Store().SaveAsync(otherProject);
+        await Store().SaveAsync(otherCorrelation);
+
+        var results = await Store().ListByProjectAndCorrelationAsync(projectId, correlation);
+
+        CollectionAssert.AreEquivalent(new[] { matchingFirst.AcceptedApprovalId, matchingSecond.AcceptedApprovalId }, results.Select(result => result.AcceptedApprovalId).ToArray());
+    }
+
+    [TestMethod]
     public async Task AcceptedApprovalSqlStore_RejectsDuplicateAcceptedApprovalId()
     {
         var record = ValidRecord();
@@ -224,6 +244,7 @@ public sealed class AcceptedApprovalSqlStoreTests : IntegrationTestBase
         StringAssert.Contains(inventory, "runtime.accepted-approval-store");
         StringAssert.Contains(verifier, "governance.AcceptedApproval table");
         StringAssert.Contains(sql, "governance.usp_AcceptedApproval_Save");
+        StringAssert.Contains(sql, "governance.usp_AcceptedApproval_ListByProjectAndCorrelation");
         StringAssert.Contains(sql, "TR_AcceptedApproval_BlockUpdateDelete");
     }
 
@@ -310,6 +331,7 @@ public sealed class AcceptedApprovalSqlStoreTests : IntegrationTestBase
               IF OBJECT_ID(N'governance.usp_AcceptedApproval_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_Get;
               IF OBJECT_ID(N'governance.usp_AcceptedApproval_ListByTarget', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_ListByTarget;
               IF OBJECT_ID(N'governance.usp_AcceptedApproval_ListByCorrelation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_ListByCorrelation;
+              IF OBJECT_ID(N'governance.usp_AcceptedApproval_ListByProjectAndCorrelation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_ListByProjectAndCorrelation;
               IF OBJECT_ID(N'governance.TR_AcceptedApproval_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_AcceptedApproval_ValidateInsert;
               IF OBJECT_ID(N'governance.TR_AcceptedApproval_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_AcceptedApproval_BlockUpdateDelete;
               IF OBJECT_ID(N'governance.AcceptedApproval', N'U') IS NOT NULL DROP TABLE governance.AcceptedApproval;",

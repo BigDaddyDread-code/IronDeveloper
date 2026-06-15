@@ -495,7 +495,8 @@
         "governance.usp_AcceptedApproval_Save",
         "governance.usp_AcceptedApproval_Get",
         "governance.usp_AcceptedApproval_ListByTarget",
-        "governance.usp_AcceptedApproval_ListByCorrelation"
+        "governance.usp_AcceptedApproval_ListByCorrelation",
+        "governance.usp_AcceptedApproval_ListByProjectAndCorrelation"
       ],
       "objectsCalled": [],
       "referencedBy": [
@@ -855,7 +856,8 @@
         "governance.usp_AcceptedApproval_Save",
         "governance.usp_AcceptedApproval_Get",
         "governance.usp_AcceptedApproval_ListByTarget",
-        "governance.usp_AcceptedApproval_ListByCorrelation"
+        "governance.usp_AcceptedApproval_ListByCorrelation",
+        "governance.usp_AcceptedApproval_ListByProjectAndCorrelation"
       ],
       "referencedBy": [
         "durable accepted approval repository"

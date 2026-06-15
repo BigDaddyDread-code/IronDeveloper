@@ -18,4 +18,9 @@ public interface IAcceptedApprovalStore
     Task<IReadOnlyList<AcceptedApprovalRecord>> ListByCorrelationAsync(
         string correlationId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AcceptedApprovalRecord>> ListByProjectAndCorrelationAsync(
+        Guid projectId,
+        string correlationId,
+        CancellationToken cancellationToken = default);
 }
