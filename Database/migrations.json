@@ -1,74 +1,79 @@
 {
-  "migrations": [
-    {
-      "id": "2026-06-block-g-governance-event",
-      "path": "Database/migrate_governance_event.sql",
-      "description": "Creates governance schema, GovernanceEvent table, governance event stored procedures, indexes, append-only trigger, and runtime role protections."
-    },
-    {
-      "id": "2026-06-block-g-tool-request",
-      "path": "Database/migrate_tool_request.sql",
-      "description": "Creates durable ToolRequest table and stored procedures linked to GovernanceEvent."
-    },
-    {
-      "id": "2026-06-block-g-tool-gate-decision",
-      "path": "Database/migrate_tool_gate_decision.sql",
-      "description": "Creates durable ToolGateDecision table and stored procedures linked to ToolRequest and GovernanceEvent."
-    },
-    {
-      "id": "2026-06-block-g-approval-decision",
-      "path": "Database/migrate_approval_decision.sql",
-      "description": "Creates durable ApprovalDecision table and stored procedures linked to GovernanceEvent with scoped approval subjects."
-    },
-    {
-      "id": "2026-06-block-p-accepted-approval",
-      "path": "Database/migrate_accepted_approval.sql",
-      "description": "Creates durable AcceptedApproval table and stored procedures for append-only accepted approval records."
-    },
-    {
-      "id": "2026-06-block-g-policy-decision-event",
-      "path": "Database/migrate_policy_decision_event.sql",
-      "description": "Creates durable PolicyDecisionEvent table and stored procedures linked to GovernanceEvent and optional request, gate, and approval evidence."
-    },
-    {
-      "id": "2026-06-block-g-dogfood-receipt",
-      "path": "Database/migrate_dogfood_receipt.sql",
-      "description": "Creates durable DogfoodReceipt table and stored procedures linked to GovernanceEvent and optional governance evidence records."
-    },
-    {
-      "id": "2026-06-block-g-thoughtledger-governance-event-reference",
-      "path": "Database/migrate_thoughtledger_governance_event_reference.sql",
-      "description": "Creates durable ThoughtLedgerGovernanceEventReference table and stored procedures linking ThoughtLedger entry IDs to GovernanceEvent records as evidence only."
-    },
-    {
-      "id": "2026-06-block-i-agent-handoff",
-      "path": "Database/migrate_agent_handoff.sql",
-      "description": "Creates durable A2A AgentHandoff tables, stored procedures, append-only triggers, and evidence-only governance event linkage."
-    },
-    {
-      "id": "2026-06-block-j-workflow-run",
-      "path": "Database/migrate_workflow_run.sql",
-      "description": "Creates durable WorkflowRun tables, stored procedures, append-only triggers, and evidence-only workflow run storage."
-    },
-    {
-      "id": "2026-06-block-j-workflow-step-store",
-      "path": "Database/migrate_workflow_step_store.sql",
-      "description": "Adds durable WorkflowStep stored procedures, sequence metadata, verifier coverage, and evidence-only workflow step storage over the existing workflow step tables."
-    },
-    {
-      "id": "2026-06-block-j-workflow-checkpoint-store",
-      "path": "Database/migrate_workflow_checkpoint_store.sql",
-      "description": "Creates durable WorkflowCheckpoint tables, stored procedures, append-only triggers, and evidence-only checkpoint storage."
-    },
-    {
-      "id": "2026-06-block-k-memory-proposal-staging",
-      "path": "Database/migrate_memory_proposal_staging.sql",
-      "description": "Creates durable memory proposal staging tables, stored procedures, append-only triggers, and staging-only authority protections."
-    },
-    {
-      "id": "2026-06-block-n-apply-dry-run-store",
-      "path": "Database/migrate_apply_dry_run_store.sql",
-      "description": "Creates durable workflow apply dry-run receipt table, stored procedures, append-only trigger, and receipt-only authority protections."
-    }
-  ]
+    "migrations":  [
+                       {
+                           "id":  "2026-06-block-g-governance-event",
+                           "path":  "Database/migrate_governance_event.sql",
+                           "description":  "Creates governance schema, GovernanceEvent table, governance event stored procedures, indexes, append-only trigger, and runtime role protections."
+                       },
+                       {
+                           "id":  "2026-06-block-g-tool-request",
+                           "path":  "Database/migrate_tool_request.sql",
+                           "description":  "Creates durable ToolRequest table and stored procedures linked to GovernanceEvent."
+                       },
+                       {
+                           "id":  "2026-06-block-g-tool-gate-decision",
+                           "path":  "Database/migrate_tool_gate_decision.sql",
+                           "description":  "Creates durable ToolGateDecision table and stored procedures linked to ToolRequest and GovernanceEvent."
+                       },
+                       {
+                           "id":  "2026-06-block-g-approval-decision",
+                           "path":  "Database/migrate_approval_decision.sql",
+                           "description":  "Creates durable ApprovalDecision table and stored procedures linked to GovernanceEvent with scoped approval subjects."
+                       },
+                       {
+                           "id":  "2026-06-block-p-accepted-approval",
+                           "path":  "Database/migrate_accepted_approval.sql",
+                           "description":  "Creates durable AcceptedApproval table and stored procedures for append-only accepted approval records."
+                       },
+                       {
+                           "id":  "2026-06-block-q-policy-satisfaction",
+                           "path":  "Database/migrate_policy_satisfaction.sql",
+                           "description":  "Creates durable PolicySatisfaction table and stored procedures for append-only policy satisfaction records."
+                       },
+                       {
+                           "id":  "2026-06-block-g-policy-decision-event",
+                           "path":  "Database/migrate_policy_decision_event.sql",
+                           "description":  "Creates durable PolicyDecisionEvent table and stored procedures linked to GovernanceEvent and optional request, gate, and approval evidence."
+                       },
+                       {
+                           "id":  "2026-06-block-g-dogfood-receipt",
+                           "path":  "Database/migrate_dogfood_receipt.sql",
+                           "description":  "Creates durable DogfoodReceipt table and stored procedures linked to GovernanceEvent and optional governance evidence records."
+                       },
+                       {
+                           "id":  "2026-06-block-g-thoughtledger-governance-event-reference",
+                           "path":  "Database/migrate_thoughtledger_governance_event_reference.sql",
+                           "description":  "Creates durable ThoughtLedgerGovernanceEventReference table and stored procedures linking ThoughtLedger entry IDs to GovernanceEvent records as evidence only."
+                       },
+                       {
+                           "id":  "2026-06-block-i-agent-handoff",
+                           "path":  "Database/migrate_agent_handoff.sql",
+                           "description":  "Creates durable A2A AgentHandoff tables, stored procedures, append-only triggers, and evidence-only governance event linkage."
+                       },
+                       {
+                           "id":  "2026-06-block-j-workflow-run",
+                           "path":  "Database/migrate_workflow_run.sql",
+                           "description":  "Creates durable WorkflowRun tables, stored procedures, append-only triggers, and evidence-only workflow run storage."
+                       },
+                       {
+                           "id":  "2026-06-block-j-workflow-step-store",
+                           "path":  "Database/migrate_workflow_step_store.sql",
+                           "description":  "Adds durable WorkflowStep stored procedures, sequence metadata, verifier coverage, and evidence-only workflow step storage over the existing workflow step tables."
+                       },
+                       {
+                           "id":  "2026-06-block-j-workflow-checkpoint-store",
+                           "path":  "Database/migrate_workflow_checkpoint_store.sql",
+                           "description":  "Creates durable WorkflowCheckpoint tables, stored procedures, append-only triggers, and evidence-only checkpoint storage."
+                       },
+                       {
+                           "id":  "2026-06-block-k-memory-proposal-staging",
+                           "path":  "Database/migrate_memory_proposal_staging.sql",
+                           "description":  "Creates durable memory proposal staging tables, stored procedures, append-only triggers, and staging-only authority protections."
+                       },
+                       {
+                           "id":  "2026-06-block-n-apply-dry-run-store",
+                           "path":  "Database/migrate_apply_dry_run_store.sql",
+                           "description":  "Creates durable workflow apply dry-run receipt table, stored procedures, append-only trigger, and receipt-only authority protections."
+                       }
+                   ]
 }

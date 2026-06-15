@@ -1,1305 +1,1532 @@
 {
-  "schemaVersion": 1,
-  "generatedFor": "PR140 apply dry-run store SQL inventory update",
-  "generatedAtUtc": "2026-06-14T00:00:00Z",
-  "entries": [
-    {
-      "id": "database.local-dev-setup",
-      "path": "Database/local_dev_setup.sql",
-      "kind": "reset-script",
-      "bucket": "local-dev-utility",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Local/dev setup script; not a governed migration manifest entry."
-    },
-    {
-      "id": "database.migrate-agent-local-memory",
-      "path": "Database/migrate_agent_local_memory.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-execution-audit",
-      "path": "Database/migrate_agent_memory_execution_audit.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-handoff",
-      "path": "Database/migrate_agent_memory_handoff.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-improvement-proposals",
-      "path": "Database/migrate_agent_memory_improvement_proposals.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-indexing",
-      "path": "Database/migrate_agent_memory_indexing.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-influence",
-      "path": "Database/migrate_agent_memory_influence.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-permissions",
-      "path": "Database/migrate_agent_memory_permissions.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-memory-stored-procedures",
-      "path": "Database/migrate_agent_memory_stored_procedures.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-agent-run-audit-envelope",
-      "path": "Database/migrate_agent_run_audit_envelope.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-chat-message-tags-envelope",
-      "path": "Database/migrate_chat_message_tags_envelope.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-chat-turn-audit",
-      "path": "Database/migrate_chat_turn_audit.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-code-indexing",
-      "path": "Database/migrate_code_indexing.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-collective-memory",
-      "path": "Database/migrate_collective_memory.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-decisions-category-status",
-      "path": "Database/migrate_decisions_category_status.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-governance-event",
-      "path": "Database/migrate_governance_event.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "governance",
-      "objectsCreated": [
-        "governance.GovernanceEvent",
-        "governance.AppendGovernanceEvent",
-        "governance.GetGovernanceEvent",
-        "governance.ListGovernanceEventsForProject",
-        "governance.ListGovernanceEventsForCorrelation",
-        "governance.ListGovernanceEventsForSubject",
-        "governance.ListGovernanceEventsCausedBy"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlGovernanceEventStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Block G governance event migration; manifest-applied and verifier-checked."
-    },
-    {
-      "id": "database.migrate-implementation-plans",
-      "path": "Database/migrate_implementation_plans.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-persistent-chat",
-      "path": "Database/migrate_persistent_chat.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-plans-to-tickets",
-      "path": "Database/migrate_plans_to_tickets.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-project-context-documents",
-      "path": "Database/migrate_project_context_documents.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-project-documents",
-      "path": "Database/migrate_project_documents.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-project-profiles",
-      "path": "Database/migrate_project_profiles.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-projects-indexing-fields",
-      "path": "Database/migrate_projects_indexing_fields.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-structured-tickets",
-      "path": "Database/migrate_structured_tickets.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-ticket-draft-fields",
-      "path": "Database/migrate_ticket_draft_fields.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-tool-execution-audit",
-      "path": "Database/migrate_tool_execution_audit.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "agent-run",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.migrate-tool-request",
-      "path": "Database/migrate_tool_request.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "tool-request",
-      "objectsCreated": [
-        "governance.usp_ToolRequest_Create",
-        "governance.usp_ToolRequest_GetById",
-        "governance.usp_ToolRequest_ListForProject",
-        "governance.usp_ToolRequest_ListForCorrelation"
-      ],
-      "objectsCalled": [
-        "governance.GovernanceEvent"
-      ],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlToolRequestStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Block G durable tool request migration; manifest-applied and verifier-checked."
-    },
-    {
-      "id": "database.migrate-tool-gate-decision",
-      "path": "Database/migrate_tool_gate_decision.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "tool-gate-decision",
-      "objectsCreated": [
-        "governance.TR_ToolGateDecision_BlockUpdateDelete",
-        "governance.usp_ToolGateDecision_Record",
-        "governance.usp_ToolGateDecision_GetById",
-        "governance.usp_ToolGateDecision_ListForToolRequest",
-        "governance.usp_ToolGateDecision_ListForProject",
-        "governance.usp_ToolGateDecision_ListForCorrelation"
-      ],
-      "objectsCalled": [
-        "governance.GovernanceEvent"
-      ],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlToolGateDecisionStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Block G durable tool gate decision migration. Gate decision evidence is not approval, execution permission, source apply, workflow progress, or memory promotion."
-    },
-    {
-      "id": "database.migrate-approval-decision",
-      "path": "Database/migrate_approval_decision.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "governance",
-      "objectsCreated": [
-        "governance.ApprovalDecision",
-        "governance.TR_ApprovalDecision_ValidateInsert",
-        "governance.TR_ApprovalDecision_BlockUpdateDelete",
-        "governance.usp_ApprovalDecision_Record",
-        "governance.usp_ApprovalDecision_GetById",
-        "governance.usp_ApprovalDecision_ListForSubject",
-        "governance.usp_ApprovalDecision_ListForProject",
-        "governance.usp_ApprovalDecision_ListForCorrelation"
-      ],
-      "objectsCalled": [
-        "governance.GovernanceEvent",
-        "governance.GovernanceEvent"
-      ],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlApprovalDecisionStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Block G durable approval decision migration. Approval decision evidence is not execution permission, source apply, external effect, workflow progress, or memory promotion."
-    },
-    {
-      "id": "database.migrate-accepted-approval",
-      "path": "Database/migrate_accepted_approval.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "governance",
-      "objectsCreated": [
-        "governance.AcceptedApproval",
-        "governance.TR_AcceptedApproval_ValidateInsert",
-        "governance.TR_AcceptedApproval_BlockUpdateDelete",
-        "governance.usp_AcceptedApproval_Save",
-        "governance.usp_AcceptedApproval_Get",
-        "governance.usp_AcceptedApproval_ListByTarget",
-        "governance.usp_AcceptedApproval_ListByCorrelation",
-        "governance.usp_AcceptedApproval_ListByProjectAndCorrelation"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlAcceptedApprovalStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Block P durable accepted approval migration. The record is append-only evidence for later approval satisfaction checks; it does not satisfy policy or execute any action."
-    },
-    {
-      "id": "database.migration-tickets-linked-files",
-      "path": "Database/migration_tickets_linked_files.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
-    },
-    {
-      "id": "database.rebuild-db",
-      "path": "Database/rebuild_db.sql",
-      "kind": "reset-script",
-      "bucket": "local-dev-utility",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Local/dev rebuild script; destructive by design and not runtime migration discipline."
-    },
-    {
-      "id": "database.seed-dev-data",
-      "path": "Database/seed_dev_data.sql",
-      "kind": "reset-script",
-      "bucket": "local-dev-utility",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Local seed data only."
-    },
-    {
-      "id": "database.setup-irondev-record",
-      "path": "Database/setup_irondev_record.sql",
-      "kind": "reset-script",
-      "bucket": "local-dev-utility",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Local IronDev project seed/update script."
-    },
-    {
-      "id": "database.update-schema-v1-indexing",
-      "path": "Database/update_schema_v1_indexing.sql",
-      "kind": "migration-script",
-      "bucket": "legacy-unused",
-      "ownerArea": "unknown",
-      "objectsCreated": [],
-      "objectsCalled": [],
-      "referencedBy": [
-        "SQL inventory discovery"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Older indexing update script that drops and recreates CodeIndexEntries; retained as uncertain legacy debt."
-    },
-    {
-      "id": "runtime.governance-event-store",
-      "path": "IronDev.Infrastructure/Governance/SqlGovernanceEventStore.cs",
-      "kind": "stored-procedure",
-      "bucket": "required-runtime-query",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.AppendGovernanceEvent",
-        "governance.GetGovernanceEvent",
-        "governance.ListGovernanceEventsForProject",
-        "governance.ListGovernanceEventsForCorrelation",
-        "governance.ListGovernanceEventsForSubject",
-        "governance.ListGovernanceEventsCausedBy"
-      ],
-      "referencedBy": [
-        "runtime governance event repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures; no runtime schema creation."
-    },
-    {
-      "id": "runtime.tool-request-store",
-      "path": "IronDev.Infrastructure/Governance/SqlToolRequestStore.cs",
-      "kind": "stored-procedure",
-      "bucket": "required-runtime-query",
-      "ownerArea": "tool-request",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.usp_ToolRequest_Create",
-        "governance.usp_ToolRequest_GetById",
-        "governance.usp_ToolRequest_ListForProject",
-        "governance.usp_ToolRequest_ListForCorrelation"
-      ],
-      "referencedBy": [
-        "runtime tool request repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures; no runtime schema creation."
-    },
-    {
-      "id": "runtime.api-tool-request-cache",
-      "path": "IronDev.Api/Controllers/SqlToolRequestApiStore.cs",
-      "kind": "inline-query",
-      "bucket": "required-runtime-query",
-      "ownerArea": "api",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.ToolRequest"
-      ],
-      "referencedBy": [
-        "ToolRequestsV1Controller"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "API reads durable tool requests; request creation remains through governed store path."
-    },
-    {
-      "id": "test.integration-test-base",
-      "path": "IronDev.IntegrationTests/IntegrationTestBase.cs",
-      "kind": "test-helper",
-      "bucket": "required-test",
-      "ownerArea": "test",
-      "objectsCreated": [
-        "test bootstrap tables"
-      ],
-      "objectsCalled": [
-        "dbo application tables"
-      ],
-      "referencedBy": [
-        "integration tests"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Test fixture setup/reset SQL only."
-    },
-    {
-      "id": "test.api-test-base",
-      "path": "IronDev.IntegrationTests.Api/ApiTestBase.cs",
-      "kind": "test-helper",
-      "bucket": "required-test",
-      "ownerArea": "test",
-      "objectsCreated": [
-        "test bootstrap tables"
-      ],
-      "objectsCalled": [
-        "dbo application tables"
-      ],
-      "referencedBy": [
-        "API integration tests"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "API test fixture setup/reset SQL only."
-    },
-    {
-      "id": "test.agent-memory-schema-support",
-      "path": "IronDev.IntegrationTests/AgentMemory/AgentMemorySchemaTestSupport.cs",
-      "kind": "test-helper",
-      "bucket": "required-test",
-      "ownerArea": "test",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "agent memory schema"
-      ],
-      "referencedBy": [
-        "agent memory SQL tests"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Test-only agent schema teardown/apply helper."
-    },
-    {
-      "id": "test.database-migration-receipt",
-      "path": "IronDev.IntegrationTests/Governance/DatabaseMigrationApplicationReceiptTests.cs",
-      "kind": "test-helper",
-      "bucket": "required-test",
-      "ownerArea": "test",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "Database/apply-migrations.ps1",
-        "Database/verify-migrations.ps1"
-      ],
-      "referencedBy": [
-        "PR74a receipt tests"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Test-only migration receipt proof."
-    },
-    {
-      "id": "tool.localtest-seed",
-      "path": "tools/localtest/localtest-seed.sql",
-      "kind": "reset-script",
-      "bucket": "local-dev-utility",
-      "ownerArea": "test",
-      "objectsCreated": [
-        "localtest seed/bootstrap tables"
-      ],
-      "objectsCalled": [
-        "dbo application tables"
-      ],
-      "referencedBy": [
-        "tools/localtest/reset-localtest-data.ps1"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "LocalTest seed/reset script."
-    },
-    {
-      "id": "tool.localtest-reset",
-      "path": "tools/localtest/reset-localtest-data.ps1",
-      "kind": "reset-script",
-      "bucket": "local-dev-utility",
-      "ownerArea": "test",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "tools/localtest/localtest-seed.sql",
-        "Database/local_dev_setup.sql"
-      ],
-      "referencedBy": [
-        "LocalTest reset workflow"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "LocalTest reset utility."
-    },
-    {
-      "id": "database.apply-migrations",
-      "path": "Database/apply-migrations.ps1",
-      "kind": "test-helper",
-      "bucket": "local-dev-utility",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "Database/migrations.json"
-      ],
-      "referencedBy": [
-        "PR74a migration receipt",
-        "PR74b inventory checker"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": false,
-      "notes": "Applies ordered manifest entries; utility, not runtime."
-    },
-    {
-      "id": "database.verify-migrations",
-      "path": "Database/verify-migrations.ps1",
-      "kind": "test-helper",
-      "bucket": "local-dev-utility",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance schema",
-        "governance.ToolRequest"
-      ],
-      "referencedBy": [
-        "PR74a migration receipt"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": true,
-      "notes": "Verifies current Block G migration objects and constraints."
-    },
-    {
-      "id": "docs.migration-007-chat-feedback",
-      "path": "Docs/migrations/007_ChatMessageFeedback.sql",
-      "kind": "doc-only",
-      "bucket": "legacy-unused",
-      "ownerArea": "api",
-      "objectsCreated": [
-        "dbo.ChatMessageFeedback"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "documentation migration history"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Historical doc migration artifact."
-    },
-    {
-      "id": "docs.migration-008-chat-turn-audit",
-      "path": "Docs/migrations/008_ChatTurnAudit.sql",
-      "kind": "doc-only",
-      "bucket": "legacy-unused",
-      "ownerArea": "api",
-      "objectsCreated": [
-        "dbo.ChatTurnGovernance",
-        "dbo.ChatTurnClarifications",
-        "dbo.ChatTurnTraces"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "documentation migration history"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Historical doc migration artifact."
-    },
-    {
-      "id": "runtime.approval-decision-store",
-      "path": "IronDev.Infrastructure/Governance/SqlApprovalDecisionStore.cs",
-      "kind": "stored-procedure",
-      "bucket": "required-runtime-query",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.usp_ApprovalDecision_Record",
-        "governance.usp_ApprovalDecision_GetById",
-        "governance.usp_ApprovalDecision_ListForSubject",
-        "governance.usp_ApprovalDecision_ListForProject",
-        "governance.usp_ApprovalDecision_ListForCorrelation"
-      ],
-      "referencedBy": [
-        "durable approval decision repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures; no runtime schema creation and no API endpoint is introduced by PR76."
-    },
-    {
-      "id": "runtime.accepted-approval-store",
-      "path": "IronDev.Infrastructure/Governance/SqlAcceptedApprovalStore.cs",
-      "kind": "stored-procedure",
-      "bucket": "required-runtime-query",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.usp_AcceptedApproval_Save",
-        "governance.usp_AcceptedApproval_Get",
-        "governance.usp_AcceptedApproval_ListByTarget",
-        "governance.usp_AcceptedApproval_ListByCorrelation",
-        "governance.usp_AcceptedApproval_ListByProjectAndCorrelation"
-      ],
-      "referencedBy": [
-        "durable accepted approval repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures and AcceptedApprovalValidation before persistence; no API endpoint or update/delete/upsert path is introduced by PR169."
-    },
-    {
-      "id": "database.migrate-policy-decision-event",
-      "path": "Database/migrate_policy_decision_event.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "governance",
-      "objectsCreated": [
-        "governance.PolicyDecisionEvent",
-        "governance.usp_PolicyDecisionEvent_Record",
-        "governance.usp_PolicyDecisionEvent_GetById",
-        "governance.usp_PolicyDecisionEvent_ListForSubject",
-        "governance.usp_PolicyDecisionEvent_ListForProject",
-        "governance.usp_PolicyDecisionEvent_ListForCorrelation"
-      ],
-      "objectsCalled": [
-        "governance.GovernanceEvent",
-        "governance.ToolRequest",
-        "governance.ToolGateDecision",
-        "governance.ApprovalDecision"
-      ],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Block G durable policy decision event migration; policy decisions are evidence only and do not approve, execute, satisfy policy, continue workflow, apply source, or promote memory."
-    },
-    {
-      "id": "runtime.policy-decision-event-store",
-      "path": "IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs",
-      "kind": "stored-procedure",
-      "bucket": "required-runtime-query",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.usp_PolicyDecisionEvent_Record",
-        "governance.usp_PolicyDecisionEvent_GetById",
-        "governance.usp_PolicyDecisionEvent_ListForSubject",
-        "governance.usp_PolicyDecisionEvent_ListForProject",
-        "governance.usp_PolicyDecisionEvent_ListForCorrelation"
-      ],
-      "referencedBy": [
-        "durable policy decision event repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures; no runtime schema creation and no API or CLI endpoint is introduced by PR77."
-    },
-    {
-      "id": "database.migrate-dogfood-receipt",
-      "path": "Database/migrate_dogfood_receipt.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "governance",
-      "objectsCreated": [
-        "governance.DogfoodReceipt",
-        "governance.usp_DogfoodReceipt_Record",
-        "governance.usp_DogfoodReceipt_GetById",
-        "governance.usp_DogfoodReceipt_ListForSubject",
-        "governance.usp_DogfoodReceipt_ListForProject",
-        "governance.usp_DogfoodReceipt_ListForCorrelation"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlDogfoodReceiptStore.cs",
-        "IronDev.Api/Controllers/SqlDogfoodLoopApiStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR78 durable dogfood receipt ledger; evidence only, not release approval, execution permission, workflow continuation, source apply, policy satisfaction, or memory promotion."
-    },
-    {
-      "id": "runtime.dogfood-receipt-store",
-      "path": "IronDev.Infrastructure/Governance/SqlDogfoodReceiptStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.usp_DogfoodReceipt_Record",
-        "governance.usp_DogfoodReceipt_GetById",
-        "governance.usp_DogfoodReceipt_ListForSubject",
-        "governance.usp_DogfoodReceipt_ListForProject",
-        "governance.usp_DogfoodReceipt_ListForCorrelation"
-      ],
-      "referencedBy": [
-        "durable dogfood receipt repository",
-        "Dogfood Loop API v1 SQL store"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures; no runtime schema creation and no execution, approval, source apply, workflow, or memory promotion authority."
-    },
-    {
-      "id": "database.migrate-thoughtledger-governance-event-reference",
-      "path": "Database/migrate_thoughtledger_governance_event_reference.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "governance",
-      "objectsCreated": [
-        "governance.ThoughtLedgerGovernanceEventReference",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_Record",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_GetById",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR79 durable ThoughtLedger-to-governance-event reference ledger; evidence only, not approval, execution permission, policy satisfaction, workflow progress, source apply, release approval, A2A handoff, dogfood receipt creation, or memory promotion."
-    },
-    {
-      "id": "runtime.thoughtledger-governance-event-reference-store",
-      "path": "IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "governance",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "governance.usp_ThoughtLedgerGovernanceEventReference_Record",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_GetById",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent",
-        "governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation"
-      ],
-      "referencedBy": [
-        "durable ThoughtLedger governance event reference repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures; no runtime schema creation and no approval, execution, policy, workflow, source apply, release, dogfood, A2A, or memory promotion authority."
-    },
-    {
-      "id": "database.migrate-agent-handoff",
-      "path": "Database/migrate_agent_handoff.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "a2a",
-      "objectsCreated": [
-        "a2a.AgentHandoff",
-        "a2a.AgentHandoffEvidenceReference",
-        "a2a.AgentHandoffEvidenceAllowedUse",
-        "a2a.AgentHandoffConstraint",
-        "a2a.usp_AgentHandoff_Create",
-        "a2a.usp_AgentHandoff_Get",
-        "a2a.usp_AgentHandoff_ListByProject",
-        "a2a.usp_AgentHandoff_ListByCorrelation",
-        "a2a.usp_AgentHandoff_ListBySubject"
-      ],
-      "objectsCalled": [
-        "governance.GovernanceEvent",
-        "governance.AppendGovernanceEvent"
-      ],
-      "referencedBy": [
-        "IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR93 durable A2A handoff ledger; records handoff context, evidence references, allowed uses, and constraints only. It is not transport, delivery, workflow continuation, approval, policy satisfaction, execution permission, source apply, release approval, or memory promotion."
-    },
-    {
-      "id": "runtime.agent-handoff-store",
-      "path": "IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "a2a",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "a2a.usp_AgentHandoff_Create",
-        "a2a.usp_AgentHandoff_Get",
-        "a2a.usp_AgentHandoff_ListByProject",
-        "a2a.usp_AgentHandoff_ListByCorrelation",
-        "a2a.usp_AgentHandoff_ListBySubject"
-      ],
-      "referencedBy": [
-        "durable agent handoff repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures after handoff and no-authority-transfer validation; no runtime schema creation and no delivery, execution, approval, policy, workflow, source apply, release, or memory promotion authority."
-    },
-    {
-      "id": "database.migrate-workflow-run",
-      "path": "Database/migrate_workflow_run.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "workflow",
-      "objectsCreated": [
-        "workflow.WorkflowRun",
-        "workflow.WorkflowRunStep",
-        "workflow.WorkflowRunEvidenceReference",
-        "workflow.WorkflowRunGroundingReference",
-        "workflow.usp_WorkflowRun_Create",
-        "workflow.usp_WorkflowRun_Get",
-        "workflow.usp_WorkflowRun_ListByProject",
-        "workflow.usp_WorkflowRun_ListByCorrelation",
-        "workflow.usp_WorkflowRun_ListBySubject"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR98 durable workflow run ledger; records run, step, evidence, and grounding references only. It is not workflow execution, workflow continuation, agent dispatch, tool execution, approval, policy satisfaction, source apply, release approval, or memory promotion."
-    },
-    {
-      "id": "runtime.workflow-run-store",
-      "path": "IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "workflow",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "workflow.usp_WorkflowRun_Create",
-        "workflow.usp_WorkflowRun_Get",
-        "workflow.usp_WorkflowRun_ListByProject",
-        "workflow.usp_WorkflowRun_ListByCorrelation",
-        "workflow.usp_WorkflowRun_ListBySubject"
-      ],
-      "referencedBy": [
-        "durable workflow run repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures after workflow run validation; no runtime schema creation and no workflow execution, continuation, dispatch, approval, policy, source apply, release, or memory promotion authority."
-    },
-    {
-      "id": "database.migrate-workflow-step-store",
-      "path": "Database/migrate_workflow_step_store.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "workflow",
-      "objectsCreated": [
-        "workflow.usp_WorkflowStep_Create",
-        "workflow.usp_WorkflowStep_Get",
-        "workflow.usp_WorkflowStep_ListByRun",
-        "workflow.usp_WorkflowStep_ListByCorrelation",
-        "workflow.usp_WorkflowStep_ListBySubject"
-      ],
-      "objectsCalled": [
-        "workflow.WorkflowRun",
-        "workflow.WorkflowRunStep",
-        "workflow.WorkflowRunEvidenceReference",
-        "workflow.WorkflowRunGroundingReference"
-      ],
-      "referencedBy": [
-        "IronDev.Infrastructure/Workflow/SqlWorkflowStepStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR99 durable workflow step store; records step facts, evidence references, and grounding references only. It is not workflow execution, continuation, agent dispatch, tool execution, approval, policy satisfaction, source apply, release approval, or memory promotion."
-    },
-    {
-      "id": "runtime.workflow-step-store",
-      "path": "IronDev.Infrastructure/Workflow/SqlWorkflowStepStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "workflow",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "workflow.usp_WorkflowStep_Create",
-        "workflow.usp_WorkflowStep_Get",
-        "workflow.usp_WorkflowStep_ListByRun",
-        "workflow.usp_WorkflowStep_ListByCorrelation",
-        "workflow.usp_WorkflowStep_ListBySubject"
-      ],
-      "referencedBy": [
-        "durable workflow step repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures after workflow step validation; no runtime schema creation and no workflow execution, continuation, dispatch, approval, policy, source apply, release, or memory promotion authority."
-    },
-    {
-      "id": "database.migrate-workflow-checkpoint-store",
-      "path": "Database/migrate_workflow_checkpoint_store.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "workflow",
-      "objectsCreated": [
-        "workflow.WorkflowCheckpoint",
-        "workflow.WorkflowCheckpointEvidenceReference",
-        "workflow.WorkflowCheckpointGroundingReference",
-        "workflow.usp_WorkflowCheckpoint_Create",
-        "workflow.usp_WorkflowCheckpoint_Get",
-        "workflow.usp_WorkflowCheckpoint_ListByRun",
-        "workflow.usp_WorkflowCheckpoint_ListByStep",
-        "workflow.usp_WorkflowCheckpoint_ListByCorrelation",
-        "workflow.usp_WorkflowCheckpoint_ListBySubject"
-      ],
-      "objectsCalled": [
-        "workflow.WorkflowRun",
-        "workflow.WorkflowRunStep"
-      ],
-      "referencedBy": [
-        "Database/migrations.json",
-        "IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs",
-        "IronDev.IntegrationTests/Governance/WorkflowCheckpointStoreTests.cs"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR100 durable workflow checkpoint store. Records safe checkpoint facts only; it does not resume, continue, execute, approve, mutate source, or promote memory."
-    },
-    {
-      "id": "runtime.workflow-checkpoint-store",
-      "path": "IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs",
-      "kind": "runtime-store",
-      "bucket": "runtime-sql-access",
-      "ownerArea": "workflow",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "workflow.usp_WorkflowCheckpoint_Create",
-        "workflow.usp_WorkflowCheckpoint_Get",
-        "workflow.usp_WorkflowCheckpoint_ListByRun",
-        "workflow.usp_WorkflowCheckpoint_ListByStep",
-        "workflow.usp_WorkflowCheckpoint_ListByCorrelation",
-        "workflow.usp_WorkflowCheckpoint_ListBySubject"
-      ],
-      "referencedBy": [
-        "IronDev.IntegrationTests/Governance/WorkflowCheckpointStoreTests.cs"
-      ],
-      "appliedByManifest": false,
-      "verifiedByScript": false,
-      "notes": "Runtime store uses stored procedures only and performs no runtime DDL. Checkpoint rows are evidence only and not resumable workflow state."
-    },
-    {
-      "id": "database.migrate-apply-dry-run-store",
-      "path": "Database/migrate_apply_dry_run_store.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "workflow",
-      "objectsCreated": [
-        "workflow.ApplyDryRunRecord",
-        "workflow.usp_ApplyDryRun_Create",
-        "workflow.usp_ApplyDryRun_Get",
-        "workflow.usp_ApplyDryRun_ListByWorkflowRun",
-        "workflow.usp_ApplyDryRun_ListByControlledApplyPlan"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR140 durable apply dry-run receipt store. Records dry-run review evidence only; it does not perform dry-run, apply source, mutate files, satisfy approval or policy, transition workflow, or promote memory."
-    },
-    {
-      "id": "runtime.apply-dry-run-store",
-      "path": "IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "workflow",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "workflow.usp_ApplyDryRun_Create",
-        "workflow.usp_ApplyDryRun_Get",
-        "workflow.usp_ApplyDryRun_ListByWorkflowRun",
-        "workflow.usp_ApplyDryRun_ListByControlledApplyPlan"
-      ],
-      "referencedBy": [
-        "durable apply dry-run receipt repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures after ApplyDryRunStoreValidator. No runtime DDL, API, CLI, dry-run performer, source apply, validation run, rollback, approval satisfaction, policy satisfaction, workflow transition, or memory promotion authority."
-    },
-    {
-      "id": "database.migrate-memory-proposal-staging",
-      "path": "Database/migrate_memory_proposal_staging.sql",
-      "kind": "migration-script",
-      "bucket": "required-runtime-schema",
-      "ownerArea": "memory",
-      "objectsCreated": [
-        "memory.MemoryProposal",
-        "memory.MemoryProposalEvidenceReference",
-        "memory.MemoryProposalGroundingReference",
-        "memory.MemoryProposalWorkflowReference",
-        "memory.usp_MemoryProposal_Create",
-        "memory.usp_MemoryProposal_Get",
-        "memory.usp_MemoryProposal_ListByProject",
-        "memory.usp_MemoryProposal_ListByStatus",
-        "memory.usp_MemoryProposal_ListByWorkflowRun",
-        "memory.usp_MemoryProposal_ListBySource"
-      ],
-      "objectsCalled": [],
-      "referencedBy": [
-        "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
-        "Database/migrations.json",
-        "Database/verify-migrations.ps1"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "PR107 durable memory proposal staging store. Staged proposals are review candidates only; they are not accepted memory, promotion, retrieval authority, policy, approval, workflow progress, source apply, or vector index writes."
-    },
-    {
-      "id": "runtime.memory-proposal-staging-store",
-      "path": "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
-      "kind": "runtime-store",
-      "bucket": "stored-procedure-runtime",
-      "ownerArea": "memory",
-      "objectsCreated": [],
-      "objectsCalled": [
-        "memory.usp_MemoryProposal_Create",
-        "memory.usp_MemoryProposal_Get",
-        "memory.usp_MemoryProposal_ListByProject",
-        "memory.usp_MemoryProposal_ListByStatus",
-        "memory.usp_MemoryProposal_ListByWorkflowRun",
-        "memory.usp_MemoryProposal_ListBySource"
-      ],
-      "referencedBy": [
-        "durable memory proposal staging repository"
-      ],
-      "appliedByManifest": true,
-      "verifiedByScript": true,
-      "notes": "Runtime uses stored procedures after MemoryProposalValidator. No runtime DDL, API, CLI, retrieval indexing, accepted memory creation, or promotion authority."
-    }
-  ]
+    "schemaVersion":  1,
+    "generatedFor":  "PR140 apply dry-run store SQL inventory update",
+    "generatedAtUtc":  "2026-06-14T00:00:00Z",
+    "entries":  [
+                    {
+                        "id":  "database.local-dev-setup",
+                        "path":  "Database/local_dev_setup.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local/dev setup script; not a governed migration manifest entry."
+                    },
+                    {
+                        "id":  "database.migrate-agent-local-memory",
+                        "path":  "Database/migrate_agent_local_memory.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-execution-audit",
+                        "path":  "Database/migrate_agent_memory_execution_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-handoff",
+                        "path":  "Database/migrate_agent_memory_handoff.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-improvement-proposals",
+                        "path":  "Database/migrate_agent_memory_improvement_proposals.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-indexing",
+                        "path":  "Database/migrate_agent_memory_indexing.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-influence",
+                        "path":  "Database/migrate_agent_memory_influence.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-permissions",
+                        "path":  "Database/migrate_agent_memory_permissions.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-memory-stored-procedures",
+                        "path":  "Database/migrate_agent_memory_stored_procedures.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-agent-run-audit-envelope",
+                        "path":  "Database/migrate_agent_run_audit_envelope.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-chat-message-tags-envelope",
+                        "path":  "Database/migrate_chat_message_tags_envelope.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-chat-turn-audit",
+                        "path":  "Database/migrate_chat_turn_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-code-indexing",
+                        "path":  "Database/migrate_code_indexing.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-collective-memory",
+                        "path":  "Database/migrate_collective_memory.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-decisions-category-status",
+                        "path":  "Database/migrate_decisions_category_status.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-governance-event",
+                        "path":  "Database/migrate_governance_event.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.GovernanceEvent",
+                                               "governance.AppendGovernanceEvent",
+                                               "governance.GetGovernanceEvent",
+                                               "governance.ListGovernanceEventsForProject",
+                                               "governance.ListGovernanceEventsForCorrelation",
+                                               "governance.ListGovernanceEventsForSubject",
+                                               "governance.ListGovernanceEventsCausedBy"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlGovernanceEventStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G governance event migration; manifest-applied and verifier-checked."
+                    },
+                    {
+                        "id":  "database.migrate-implementation-plans",
+                        "path":  "Database/migrate_implementation_plans.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-persistent-chat",
+                        "path":  "Database/migrate_persistent_chat.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-plans-to-tickets",
+                        "path":  "Database/migrate_plans_to_tickets.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-project-context-documents",
+                        "path":  "Database/migrate_project_context_documents.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-project-documents",
+                        "path":  "Database/migrate_project_documents.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-project-profiles",
+                        "path":  "Database/migrate_project_profiles.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-projects-indexing-fields",
+                        "path":  "Database/migrate_projects_indexing_fields.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-structured-tickets",
+                        "path":  "Database/migrate_structured_tickets.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-ticket-draft-fields",
+                        "path":  "Database/migrate_ticket_draft_fields.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-tool-execution-audit",
+                        "path":  "Database/migrate_tool_execution_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "agent-run",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.migrate-tool-request",
+                        "path":  "Database/migrate_tool_request.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "tool-request",
+                        "objectsCreated":  [
+                                               "governance.usp_ToolRequest_Create",
+                                               "governance.usp_ToolRequest_GetById",
+                                               "governance.usp_ToolRequest_ListForProject",
+                                               "governance.usp_ToolRequest_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.GovernanceEvent"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlToolRequestStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G durable tool request migration; manifest-applied and verifier-checked."
+                    },
+                    {
+                        "id":  "database.migrate-tool-gate-decision",
+                        "path":  "Database/migrate_tool_gate_decision.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "tool-gate-decision",
+                        "objectsCreated":  [
+                                               "governance.TR_ToolGateDecision_BlockUpdateDelete",
+                                               "governance.usp_ToolGateDecision_Record",
+                                               "governance.usp_ToolGateDecision_GetById",
+                                               "governance.usp_ToolGateDecision_ListForToolRequest",
+                                               "governance.usp_ToolGateDecision_ListForProject",
+                                               "governance.usp_ToolGateDecision_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.GovernanceEvent"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlToolGateDecisionStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G durable tool gate decision migration. Gate decision evidence is not approval, execution permission, source apply, workflow progress, or memory promotion."
+                    },
+                    {
+                        "id":  "database.migrate-approval-decision",
+                        "path":  "Database/migrate_approval_decision.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.ApprovalDecision",
+                                               "governance.TR_ApprovalDecision_ValidateInsert",
+                                               "governance.TR_ApprovalDecision_BlockUpdateDelete",
+                                               "governance.usp_ApprovalDecision_Record",
+                                               "governance.usp_ApprovalDecision_GetById",
+                                               "governance.usp_ApprovalDecision_ListForSubject",
+                                               "governance.usp_ApprovalDecision_ListForProject",
+                                               "governance.usp_ApprovalDecision_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.GovernanceEvent",
+                                              "governance.GovernanceEvent"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlApprovalDecisionStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G durable approval decision migration. Approval decision evidence is not execution permission, source apply, external effect, workflow progress, or memory promotion."
+                    },
+                    {
+                        "id":  "database.migrate-accepted-approval",
+                        "path":  "Database/migrate_accepted_approval.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.AcceptedApproval",
+                                               "governance.TR_AcceptedApproval_ValidateInsert",
+                                               "governance.TR_AcceptedApproval_BlockUpdateDelete",
+                                               "governance.usp_AcceptedApproval_Save",
+                                               "governance.usp_AcceptedApproval_Get",
+                                               "governance.usp_AcceptedApproval_ListByTarget",
+                                               "governance.usp_AcceptedApproval_ListByCorrelation",
+                                               "governance.usp_AcceptedApproval_ListByProjectAndCorrelation"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlAcceptedApprovalStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block P durable accepted approval migration. The record is append-only evidence for later approval satisfaction checks; it does not satisfy policy or execute any action."
+                    },
+                    {
+                        "id":  "database.migrate-policy-satisfaction",
+                        "path":  "Database/migrate_policy_satisfaction.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.PolicySatisfaction",
+                                               "governance.TR_PolicySatisfaction_ValidateInsert",
+                                               "governance.TR_PolicySatisfaction_BlockUpdateDelete",
+                                               "governance.usp_PolicySatisfaction_Save",
+                                               "governance.usp_PolicySatisfaction_Get",
+                                               "governance.usp_PolicySatisfaction_ListBySubject",
+                                               "governance.usp_PolicySatisfaction_ListByAcceptedApproval",
+                                               "governance.usp_PolicySatisfaction_ListByProjectAndCorrelation"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlPolicySatisfactionStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block Q durable policy satisfaction migration. Persisted policy satisfaction is append-only evidence for later governed dry-run/source-apply paths; it does not execute or authorize any action by itself."
+                    },
+                    {
+                        "id":  "database.migration-tickets-linked-files",
+                        "path":  "Database/migration_tickets_linked_files.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                    },
+                    {
+                        "id":  "database.rebuild-db",
+                        "path":  "Database/rebuild_db.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local/dev rebuild script; destructive by design and not runtime migration discipline."
+                    },
+                    {
+                        "id":  "database.seed-dev-data",
+                        "path":  "Database/seed_dev_data.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local seed data only."
+                    },
+                    {
+                        "id":  "database.setup-irondev-record",
+                        "path":  "Database/setup_irondev_record.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Local IronDev project seed/update script."
+                    },
+                    {
+                        "id":  "database.update-schema-v1-indexing",
+                        "path":  "Database/update_schema_v1_indexing.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "legacy-unused",
+                        "ownerArea":  "unknown",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Older indexing update script that drops and recreates CodeIndexEntries; retained as uncertain legacy debt."
+                    },
+                    {
+                        "id":  "runtime.governance-event-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlGovernanceEventStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.AppendGovernanceEvent",
+                                              "governance.GetGovernanceEvent",
+                                              "governance.ListGovernanceEventsForProject",
+                                              "governance.ListGovernanceEventsForCorrelation",
+                                              "governance.ListGovernanceEventsForSubject",
+                                              "governance.ListGovernanceEventsCausedBy"
+                                          ],
+                        "referencedBy":  [
+                                             "runtime governance event repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation."
+                    },
+                    {
+                        "id":  "runtime.tool-request-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlToolRequestStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "tool-request",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_ToolRequest_Create",
+                                              "governance.usp_ToolRequest_GetById",
+                                              "governance.usp_ToolRequest_ListForProject",
+                                              "governance.usp_ToolRequest_ListForCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "runtime tool request repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation."
+                    },
+                    {
+                        "id":  "runtime.api-tool-request-cache",
+                        "path":  "IronDev.Api/Controllers/SqlToolRequestApiStore.cs",
+                        "kind":  "inline-query",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.ToolRequest"
+                                          ],
+                        "referencedBy":  [
+                                             "ToolRequestsV1Controller"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "API reads durable tool requests; request creation remains through governed store path."
+                    },
+                    {
+                        "id":  "test.integration-test-base",
+                        "path":  "IronDev.IntegrationTests/IntegrationTestBase.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+                                               "test bootstrap tables"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo application tables"
+                                          ],
+                        "referencedBy":  [
+                                             "integration tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test fixture setup/reset SQL only."
+                    },
+                    {
+                        "id":  "test.api-test-base",
+                        "path":  "IronDev.IntegrationTests.Api/ApiTestBase.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+                                               "test bootstrap tables"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo application tables"
+                                          ],
+                        "referencedBy":  [
+                                             "API integration tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "API test fixture setup/reset SQL only."
+                    },
+                    {
+                        "id":  "test.agent-memory-schema-support",
+                        "path":  "IronDev.IntegrationTests/AgentMemory/AgentMemorySchemaTestSupport.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "agent memory schema"
+                                          ],
+                        "referencedBy":  [
+                                             "agent memory SQL tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test-only agent schema teardown/apply helper."
+                    },
+                    {
+                        "id":  "test.database-migration-receipt",
+                        "path":  "IronDev.IntegrationTests/Governance/DatabaseMigrationApplicationReceiptTests.cs",
+                        "kind":  "test-helper",
+                        "bucket":  "required-test",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "Database/apply-migrations.ps1",
+                                              "Database/verify-migrations.ps1"
+                                          ],
+                        "referencedBy":  [
+                                             "PR74a receipt tests"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test-only migration receipt proof."
+                    },
+                    {
+                        "id":  "tool.localtest-seed",
+                        "path":  "tools/localtest/localtest-seed.sql",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+                                               "localtest seed/bootstrap tables"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo application tables"
+                                          ],
+                        "referencedBy":  [
+                                             "tools/localtest/reset-localtest-data.ps1"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "LocalTest seed/reset script."
+                    },
+                    {
+                        "id":  "tool.localtest-reset",
+                        "path":  "tools/localtest/reset-localtest-data.ps1",
+                        "kind":  "reset-script",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "test",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "tools/localtest/localtest-seed.sql",
+                                              "Database/local_dev_setup.sql"
+                                          ],
+                        "referencedBy":  [
+                                             "LocalTest reset workflow"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "LocalTest reset utility."
+                    },
+                    {
+                        "id":  "database.apply-migrations",
+                        "path":  "Database/apply-migrations.ps1",
+                        "kind":  "test-helper",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "Database/migrations.json"
+                                          ],
+                        "referencedBy":  [
+                                             "PR74a migration receipt",
+                                             "PR74b inventory checker"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  false,
+                        "notes":  "Applies ordered manifest entries; utility, not runtime."
+                    },
+                    {
+                        "id":  "database.verify-migrations",
+                        "path":  "Database/verify-migrations.ps1",
+                        "kind":  "test-helper",
+                        "bucket":  "local-dev-utility",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance schema",
+                                              "governance.ToolRequest"
+                                          ],
+                        "referencedBy":  [
+                                             "PR74a migration receipt"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  true,
+                        "notes":  "Verifies current Block G migration objects and constraints."
+                    },
+                    {
+                        "id":  "docs.migration-007-chat-feedback",
+                        "path":  "Docs/migrations/007_ChatMessageFeedback.sql",
+                        "kind":  "doc-only",
+                        "bucket":  "legacy-unused",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+                                               "dbo.ChatMessageFeedback"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "documentation migration history"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Historical doc migration artifact."
+                    },
+                    {
+                        "id":  "docs.migration-008-chat-turn-audit",
+                        "path":  "Docs/migrations/008_ChatTurnAudit.sql",
+                        "kind":  "doc-only",
+                        "bucket":  "legacy-unused",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+                                               "dbo.ChatTurnGovernance",
+                                               "dbo.ChatTurnClarifications",
+                                               "dbo.ChatTurnTraces"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "documentation migration history"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Historical doc migration artifact."
+                    },
+                    {
+                        "id":  "runtime.approval-decision-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlApprovalDecisionStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_ApprovalDecision_Record",
+                                              "governance.usp_ApprovalDecision_GetById",
+                                              "governance.usp_ApprovalDecision_ListForSubject",
+                                              "governance.usp_ApprovalDecision_ListForProject",
+                                              "governance.usp_ApprovalDecision_ListForCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "durable approval decision repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation and no API endpoint is introduced by PR76."
+                    },
+                    {
+                        "id":  "runtime.accepted-approval-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlAcceptedApprovalStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_AcceptedApproval_Save",
+                                              "governance.usp_AcceptedApproval_Get",
+                                              "governance.usp_AcceptedApproval_ListByTarget",
+                                              "governance.usp_AcceptedApproval_ListByCorrelation",
+                                              "governance.usp_AcceptedApproval_ListByProjectAndCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "durable accepted approval repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures and AcceptedApprovalValidation before persistence; no API endpoint or update/delete/upsert path is introduced by PR169."
+                    },
+                    {
+                        "id":  "runtime.policy-satisfaction-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlPolicySatisfactionStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_PolicySatisfaction_Save",
+                                              "governance.usp_PolicySatisfaction_Get",
+                                              "governance.usp_PolicySatisfaction_ListBySubject",
+                                              "governance.usp_PolicySatisfaction_ListByAcceptedApproval",
+                                              "governance.usp_PolicySatisfaction_ListByProjectAndCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "durable policy satisfaction repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures and PolicySatisfactionValidation before persistence; no API endpoint, evaluator, update, delete, or upsert path is introduced by PR175."
+                    },
+                    {
+                        "id":  "database.migrate-policy-decision-event",
+                        "path":  "Database/migrate_policy_decision_event.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.PolicyDecisionEvent",
+                                               "governance.usp_PolicyDecisionEvent_Record",
+                                               "governance.usp_PolicyDecisionEvent_GetById",
+                                               "governance.usp_PolicyDecisionEvent_ListForSubject",
+                                               "governance.usp_PolicyDecisionEvent_ListForProject",
+                                               "governance.usp_PolicyDecisionEvent_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.GovernanceEvent",
+                                              "governance.ToolRequest",
+                                              "governance.ToolGateDecision",
+                                              "governance.ApprovalDecision"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Block G durable policy decision event migration; policy decisions are evidence only and do not approve, execute, satisfy policy, continue workflow, apply source, or promote memory."
+                    },
+                    {
+                        "id":  "runtime.policy-decision-event-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlPolicyDecisionEventStore.cs",
+                        "kind":  "stored-procedure",
+                        "bucket":  "required-runtime-query",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_PolicyDecisionEvent_Record",
+                                              "governance.usp_PolicyDecisionEvent_GetById",
+                                              "governance.usp_PolicyDecisionEvent_ListForSubject",
+                                              "governance.usp_PolicyDecisionEvent_ListForProject",
+                                              "governance.usp_PolicyDecisionEvent_ListForCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "durable policy decision event repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation and no API or CLI endpoint is introduced by PR77."
+                    },
+                    {
+                        "id":  "database.migrate-dogfood-receipt",
+                        "path":  "Database/migrate_dogfood_receipt.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.DogfoodReceipt",
+                                               "governance.usp_DogfoodReceipt_Record",
+                                               "governance.usp_DogfoodReceipt_GetById",
+                                               "governance.usp_DogfoodReceipt_ListForSubject",
+                                               "governance.usp_DogfoodReceipt_ListForProject",
+                                               "governance.usp_DogfoodReceipt_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlDogfoodReceiptStore.cs",
+                                             "IronDev.Api/Controllers/SqlDogfoodLoopApiStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR78 durable dogfood receipt ledger; evidence only, not release approval, execution permission, workflow continuation, source apply, policy satisfaction, or memory promotion."
+                    },
+                    {
+                        "id":  "runtime.dogfood-receipt-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlDogfoodReceiptStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_DogfoodReceipt_Record",
+                                              "governance.usp_DogfoodReceipt_GetById",
+                                              "governance.usp_DogfoodReceipt_ListForSubject",
+                                              "governance.usp_DogfoodReceipt_ListForProject",
+                                              "governance.usp_DogfoodReceipt_ListForCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "durable dogfood receipt repository",
+                                             "Dogfood Loop API v1 SQL store"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation and no execution, approval, source apply, workflow, or memory promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-thoughtledger-governance-event-reference",
+                        "path":  "Database/migrate_thoughtledger_governance_event_reference.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.ThoughtLedgerGovernanceEventReference",
+                                               "governance.usp_ThoughtLedgerGovernanceEventReference_Record",
+                                               "governance.usp_ThoughtLedgerGovernanceEventReference_GetById",
+                                               "governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry",
+                                               "governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent",
+                                               "governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR79 durable ThoughtLedger-to-governance-event reference ledger; evidence only, not approval, execution permission, policy satisfaction, workflow progress, source apply, release approval, A2A handoff, dogfood receipt creation, or memory promotion."
+                    },
+                    {
+                        "id":  "runtime.thoughtledger-governance-event-reference-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlThoughtLedgerGovernanceEventReferenceStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_ThoughtLedgerGovernanceEventReference_Record",
+                                              "governance.usp_ThoughtLedgerGovernanceEventReference_GetById",
+                                              "governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry",
+                                              "governance.usp_ThoughtLedgerGovernanceEventReference_ListForGovernanceEvent",
+                                              "governance.usp_ThoughtLedgerGovernanceEventReference_ListForCorrelation"
+                                          ],
+                        "referencedBy":  [
+                                             "durable ThoughtLedger governance event reference repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures; no runtime schema creation and no approval, execution, policy, workflow, source apply, release, dogfood, A2A, or memory promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-agent-handoff",
+                        "path":  "Database/migrate_agent_handoff.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "a2a",
+                        "objectsCreated":  [
+                                               "a2a.AgentHandoff",
+                                               "a2a.AgentHandoffEvidenceReference",
+                                               "a2a.AgentHandoffEvidenceAllowedUse",
+                                               "a2a.AgentHandoffConstraint",
+                                               "a2a.usp_AgentHandoff_Create",
+                                               "a2a.usp_AgentHandoff_Get",
+                                               "a2a.usp_AgentHandoff_ListByProject",
+                                               "a2a.usp_AgentHandoff_ListByCorrelation",
+                                               "a2a.usp_AgentHandoff_ListBySubject"
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.GovernanceEvent",
+                                              "governance.AppendGovernanceEvent"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR93 durable A2A handoff ledger; records handoff context, evidence references, allowed uses, and constraints only. It is not transport, delivery, workflow continuation, approval, policy satisfaction, execution permission, source apply, release approval, or memory promotion."
+                    },
+                    {
+                        "id":  "runtime.agent-handoff-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlAgentHandoffStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "a2a",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "a2a.usp_AgentHandoff_Create",
+                                              "a2a.usp_AgentHandoff_Get",
+                                              "a2a.usp_AgentHandoff_ListByProject",
+                                              "a2a.usp_AgentHandoff_ListByCorrelation",
+                                              "a2a.usp_AgentHandoff_ListBySubject"
+                                          ],
+                        "referencedBy":  [
+                                             "durable agent handoff repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures after handoff and no-authority-transfer validation; no runtime schema creation and no delivery, execution, approval, policy, workflow, source apply, release, or memory promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-workflow-run",
+                        "path":  "Database/migrate_workflow_run.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+                                               "workflow.WorkflowRun",
+                                               "workflow.WorkflowRunStep",
+                                               "workflow.WorkflowRunEvidenceReference",
+                                               "workflow.WorkflowRunGroundingReference",
+                                               "workflow.usp_WorkflowRun_Create",
+                                               "workflow.usp_WorkflowRun_Get",
+                                               "workflow.usp_WorkflowRun_ListByProject",
+                                               "workflow.usp_WorkflowRun_ListByCorrelation",
+                                               "workflow.usp_WorkflowRun_ListBySubject"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR98 durable workflow run ledger; records run, step, evidence, and grounding references only. It is not workflow execution, workflow continuation, agent dispatch, tool execution, approval, policy satisfaction, source apply, release approval, or memory promotion."
+                    },
+                    {
+                        "id":  "runtime.workflow-run-store",
+                        "path":  "IronDev.Infrastructure/Workflow/SqlWorkflowRunStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "workflow.usp_WorkflowRun_Create",
+                                              "workflow.usp_WorkflowRun_Get",
+                                              "workflow.usp_WorkflowRun_ListByProject",
+                                              "workflow.usp_WorkflowRun_ListByCorrelation",
+                                              "workflow.usp_WorkflowRun_ListBySubject"
+                                          ],
+                        "referencedBy":  [
+                                             "durable workflow run repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures after workflow run validation; no runtime schema creation and no workflow execution, continuation, dispatch, approval, policy, source apply, release, or memory promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-workflow-step-store",
+                        "path":  "Database/migrate_workflow_step_store.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+                                               "workflow.usp_WorkflowStep_Create",
+                                               "workflow.usp_WorkflowStep_Get",
+                                               "workflow.usp_WorkflowStep_ListByRun",
+                                               "workflow.usp_WorkflowStep_ListByCorrelation",
+                                               "workflow.usp_WorkflowStep_ListBySubject"
+                                           ],
+                        "objectsCalled":  [
+                                              "workflow.WorkflowRun",
+                                              "workflow.WorkflowRunStep",
+                                              "workflow.WorkflowRunEvidenceReference",
+                                              "workflow.WorkflowRunGroundingReference"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Workflow/SqlWorkflowStepStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR99 durable workflow step store; records step facts, evidence references, and grounding references only. It is not workflow execution, continuation, agent dispatch, tool execution, approval, policy satisfaction, source apply, release approval, or memory promotion."
+                    },
+                    {
+                        "id":  "runtime.workflow-step-store",
+                        "path":  "IronDev.Infrastructure/Workflow/SqlWorkflowStepStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "workflow.usp_WorkflowStep_Create",
+                                              "workflow.usp_WorkflowStep_Get",
+                                              "workflow.usp_WorkflowStep_ListByRun",
+                                              "workflow.usp_WorkflowStep_ListByCorrelation",
+                                              "workflow.usp_WorkflowStep_ListBySubject"
+                                          ],
+                        "referencedBy":  [
+                                             "durable workflow step repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures after workflow step validation; no runtime schema creation and no workflow execution, continuation, dispatch, approval, policy, source apply, release, or memory promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-workflow-checkpoint-store",
+                        "path":  "Database/migrate_workflow_checkpoint_store.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+                                               "workflow.WorkflowCheckpoint",
+                                               "workflow.WorkflowCheckpointEvidenceReference",
+                                               "workflow.WorkflowCheckpointGroundingReference",
+                                               "workflow.usp_WorkflowCheckpoint_Create",
+                                               "workflow.usp_WorkflowCheckpoint_Get",
+                                               "workflow.usp_WorkflowCheckpoint_ListByRun",
+                                               "workflow.usp_WorkflowCheckpoint_ListByStep",
+                                               "workflow.usp_WorkflowCheckpoint_ListByCorrelation",
+                                               "workflow.usp_WorkflowCheckpoint_ListBySubject"
+                                           ],
+                        "objectsCalled":  [
+                                              "workflow.WorkflowRun",
+                                              "workflow.WorkflowRunStep"
+                                          ],
+                        "referencedBy":  [
+                                             "Database/migrations.json",
+                                             "IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs",
+                                             "IronDev.IntegrationTests/Governance/WorkflowCheckpointStoreTests.cs"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR100 durable workflow checkpoint store. Records safe checkpoint facts only; it does not resume, continue, execute, approve, mutate source, or promote memory."
+                    },
+                    {
+                        "id":  "runtime.workflow-checkpoint-store",
+                        "path":  "IronDev.Infrastructure/Workflow/SqlWorkflowCheckpointStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "runtime-sql-access",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "workflow.usp_WorkflowCheckpoint_Create",
+                                              "workflow.usp_WorkflowCheckpoint_Get",
+                                              "workflow.usp_WorkflowCheckpoint_ListByRun",
+                                              "workflow.usp_WorkflowCheckpoint_ListByStep",
+                                              "workflow.usp_WorkflowCheckpoint_ListByCorrelation",
+                                              "workflow.usp_WorkflowCheckpoint_ListBySubject"
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.IntegrationTests/Governance/WorkflowCheckpointStoreTests.cs"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store uses stored procedures only and performs no runtime DDL. Checkpoint rows are evidence only and not resumable workflow state."
+                    },
+                    {
+                        "id":  "database.migrate-apply-dry-run-store",
+                        "path":  "Database/migrate_apply_dry_run_store.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+                                               "workflow.ApplyDryRunRecord",
+                                               "workflow.usp_ApplyDryRun_Create",
+                                               "workflow.usp_ApplyDryRun_Get",
+                                               "workflow.usp_ApplyDryRun_ListByWorkflowRun",
+                                               "workflow.usp_ApplyDryRun_ListByControlledApplyPlan"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR140 durable apply dry-run receipt store. Records dry-run review evidence only; it does not perform dry-run, apply source, mutate files, satisfy approval or policy, transition workflow, or promote memory."
+                    },
+                    {
+                        "id":  "runtime.apply-dry-run-store",
+                        "path":  "IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "workflow",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "workflow.usp_ApplyDryRun_Create",
+                                              "workflow.usp_ApplyDryRun_Get",
+                                              "workflow.usp_ApplyDryRun_ListByWorkflowRun",
+                                              "workflow.usp_ApplyDryRun_ListByControlledApplyPlan"
+                                          ],
+                        "referencedBy":  [
+                                             "durable apply dry-run receipt repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures after ApplyDryRunStoreValidator. No runtime DDL, API, CLI, dry-run performer, source apply, validation run, rollback, approval satisfaction, policy satisfaction, workflow transition, or memory promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-memory-proposal-staging",
+                        "path":  "Database/migrate_memory_proposal_staging.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+                                               "memory.MemoryProposal",
+                                               "memory.MemoryProposalEvidenceReference",
+                                               "memory.MemoryProposalGroundingReference",
+                                               "memory.MemoryProposalWorkflowReference",
+                                               "memory.usp_MemoryProposal_Create",
+                                               "memory.usp_MemoryProposal_Get",
+                                               "memory.usp_MemoryProposal_ListByProject",
+                                               "memory.usp_MemoryProposal_ListByStatus",
+                                               "memory.usp_MemoryProposal_ListByWorkflowRun",
+                                               "memory.usp_MemoryProposal_ListBySource"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR107 durable memory proposal staging store. Staged proposals are review candidates only; they are not accepted memory, promotion, retrieval authority, policy, approval, workflow progress, source apply, or vector index writes."
+                    },
+                    {
+                        "id":  "runtime.memory-proposal-staging-store",
+                        "path":  "IronDev.Infrastructure/AgentMemory/SqlMemoryProposalStagingStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "memory.usp_MemoryProposal_Create",
+                                              "memory.usp_MemoryProposal_Get",
+                                              "memory.usp_MemoryProposal_ListByProject",
+                                              "memory.usp_MemoryProposal_ListByStatus",
+                                              "memory.usp_MemoryProposal_ListByWorkflowRun",
+                                              "memory.usp_MemoryProposal_ListBySource"
+                                          ],
+                        "referencedBy":  [
+                                             "durable memory proposal staging repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures after MemoryProposalValidator. No runtime DDL, API, CLI, retrieval indexing, accepted memory creation, or promotion authority."
+                    }
+                ]
 }
