@@ -54,6 +54,9 @@ internal static class ApiCliContractTestSupport
     public const string AgentRunId = "agent-run-api-cli-contract";
     public const string ToolRequestId = "tool-request-api-cli-contract";
     public const string DogfoodLoopId = "dogfood-loop-api-cli-contract";
+    public const string WorkflowRunId = "workflow-run-api-cli-contract";
+    public const string WorkflowStepId = "workflow-step-api-cli-contract";
+    public const string ControlledApplyPlanId = "apply-plan-api-cli-contract";
 
     public static readonly IReadOnlyDictionary<string, string?> EmptyEnvironment = new Dictionary<string, string?>();
 
@@ -250,6 +253,50 @@ internal static class ApiCliContractTestSupport
             "memoryPromoted": false
           },
           "warnings": ["Gate decision evidence is durable SQL-backed.", "Gate evaluation is not execution.", "Tool execution is separate."],
+          "errors": []
+        }
+        """;
+    }
+
+    public static string ApplyPreviewEnvelope()
+    {
+        return $$"""
+        {
+          "ok": true,
+          "command": "workflow apply-preview",
+          "status": "succeeded",
+          "mutationOccurred": false,
+          "previewStatus": "preview_available",
+          "data": {
+            "workflowRunId": "{{WorkflowRunId}}",
+            "workflowStepId": "{{WorkflowStepId}}",
+            "controlledApplyPlanReferenceId": "{{ControlledApplyPlanId}}",
+            "status": "preview_available",
+            "safeSummaryLines": ["Apply preview is review evidence only."],
+            "dryRunSummaries": [],
+            "missingEvidence": [],
+            "gates": [],
+            "risks": [],
+            "issues": [],
+            "isPreviewOnly": true,
+            "canApplySource": false,
+            "isDryRunExecution": false,
+            "appliesPatch": false,
+            "readsSourceFiles": false,
+            "mutatesFiles": false,
+            "runsCommand": false,
+            "invokesTool": false,
+            "runsValidation": false,
+            "runsRollback": false,
+            "satisfiesApproval": false,
+            "satisfiesPolicy": false,
+            "transitionsWorkflow": false,
+            "promotesMemory": false,
+            "activatesRetrieval": false,
+            "dispatchesAgent": false,
+            "callsModel": false
+          },
+          "warnings": ["Apply preview is evidence, not permission.", "Source apply remains unimplemented.", "Human review remains required before source apply."],
           "errors": []
         }
         """;

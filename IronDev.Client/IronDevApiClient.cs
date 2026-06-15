@@ -263,6 +263,30 @@ public sealed class IronDevApiClient : IIronDevApiClient
         CancellationToken cancellationToken = default)
         => GetJsonEnvelopeAsync($"api/v1/workflow/runs/{Uri.EscapeDataString(workflowRunId)}/checkpoints/{Uri.EscapeDataString(workflowCheckpointId)}?projectId={Uri.EscapeDataString(projectId)}", cancellationToken);
 
+    public Task<IronDevApiResponse<JsonElement?>> GetApplyPreviewAsync(
+        string workflowRunId,
+        string workflowStepId,
+        string? controlledApplyPlanReferenceId = null,
+        int takeDryRuns = 10,
+        bool includeDryRunSummaries = true,
+        CancellationToken cancellationToken = default)
+    {
+        var parameters = new List<KeyValuePair<string, string>>
+        {
+            new("takeDryRuns", Math.Clamp(takeDryRuns, 1, 50).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            new("includeDryRunSummaries", includeDryRunSummaries ? "true" : "false")
+        };
+
+        Add(parameters, "controlledApplyPlanReferenceId", controlledApplyPlanReferenceId);
+
+        var query = string.Join("&", parameters.Select(parameter =>
+            $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value)}"));
+
+        return GetJsonEnvelopeAsync(
+            $"api/workflow/apply-preview/{Uri.EscapeDataString(workflowRunId)}/{Uri.EscapeDataString(workflowStepId)}?{query}",
+            cancellationToken);
+    }
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);

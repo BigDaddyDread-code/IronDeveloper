@@ -176,6 +176,30 @@ public sealed class ApiCliCommandMappingTests
         Assert.AreEqual("/api/v1/dogfood-loops/dogfood-loop-api-cli-contract?projectId=42", handler.LastRequest?.RequestUri?.PathAndQuery);
     }
 
+    [TestMethod]
+    public async Task ApiCliContract_ApplyPreview_MapsToPreviewEndpoint()
+    {
+        var handler = new RecordingHttpMessageHandler(ApiCliContractTestSupport.ApplyPreviewEnvelope());
+        using var output = ApiCliContractTestSupport.NewWriter();
+        using var error = ApiCliContractTestSupport.NewWriter();
+
+        var exitCode = await RunAsync(ApiCliContractTestSupport.CommonJsonArgs(
+            "workflow",
+            "apply-preview",
+            "--workflow-run",
+            ApiCliContractTestSupport.WorkflowRunId,
+            "--workflow-step",
+            ApiCliContractTestSupport.WorkflowStepId,
+            "--controlled-apply-plan",
+            ApiCliContractTestSupport.ControlledApplyPlanId,
+            "--take-dry-runs",
+            "2"), output, error, handler);
+
+        Assert.AreEqual(0, exitCode, error.ToString());
+        Assert.AreEqual(HttpMethod.Get, handler.LastRequest?.Method);
+        Assert.AreEqual("/api/workflow/apply-preview/workflow-run-api-cli-contract/workflow-step-api-cli-contract?takeDryRuns=2&includeDryRunSummaries=true&controlledApplyPlanReferenceId=apply-plan-api-cli-contract", handler.LastRequest?.RequestUri?.PathAndQuery);
+    }
+
     private static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, HttpMessageHandler handler)
     {
         return await IronDevCli.RunAsync(args, output, error, handler, CancellationToken.None);

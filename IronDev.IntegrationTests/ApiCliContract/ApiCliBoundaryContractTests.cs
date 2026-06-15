@@ -16,6 +16,7 @@ public sealed class ApiCliBoundaryContractTests
     [DataRow("memory-improvements create", "MemoryImprovementEnvelope")]
     [DataRow("tool-requests create", "ToolRequestEnvelope")]
     [DataRow("dogfood-loops create", "DogfoodLoopEnvelope")]
+    [DataRow("workflow apply-preview", "ApplyPreviewEnvelope")]
     public void ApiCliContract_JsonEnvelope_PreservesStandardFields(string expectedCommand, string envelopeName)
     {
         using var document = JsonDocument.Parse(GetEnvelope(envelopeName));
@@ -63,7 +64,12 @@ public sealed class ApiCliBoundaryContractTests
                 "dogfood-loops create",
                 ApiCliContractTestSupport.DogfoodLoopEnvelope(),
                 ApiCliContractTestSupport.CommonTextArgs("dogfood-loops", "create", "--project-id", ApiCliContractTestSupport.ProjectId, "--summary", "Dogfood loop receipt.", "--goal", "Exercise API CLI contract.", "--source", "manual"),
-                new[] { "Dogfood receipt is not release approval.", "Dogfood loop is not autonomous workflow.", "Human review remains required for source apply and memory promotion." })
+                new[] { "Dogfood receipt is not release approval.", "Dogfood loop is not autonomous workflow.", "Human review remains required for source apply and memory promotion." }),
+            new TextCase(
+                "workflow apply-preview",
+                ApiCliContractTestSupport.ApplyPreviewEnvelope(),
+                ApiCliContractTestSupport.CommonTextArgs("workflow", "apply-preview", "--workflow-run", ApiCliContractTestSupport.WorkflowRunId, "--workflow-step", ApiCliContractTestSupport.WorkflowStepId),
+                new[] { "Preview only.", "Source apply remains unimplemented.", "Approval was not satisfied.", "Policy was not satisfied.", "Workflow was not transitioned." })
         };
 
         foreach (var testCase in cases)
@@ -177,6 +183,7 @@ public sealed class ApiCliBoundaryContractTests
             "MemoryImprovementEnvelope" => ApiCliContractTestSupport.MemoryImprovementEnvelope(),
             "ToolRequestEnvelope" => ApiCliContractTestSupport.ToolRequestEnvelope(),
             "DogfoodLoopEnvelope" => ApiCliContractTestSupport.DogfoodLoopEnvelope(),
+            "ApplyPreviewEnvelope" => ApiCliContractTestSupport.ApplyPreviewEnvelope(),
             _ => throw new ArgumentOutOfRangeException(nameof(envelopeName), envelopeName, null)
         };
     }

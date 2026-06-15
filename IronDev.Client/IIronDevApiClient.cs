@@ -114,6 +114,14 @@ public interface IIronDevApiClient
         string workflowCheckpointId,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> GetApplyPreviewAsync(
+        string workflowRunId,
+        string workflowStepId,
+        string? controlledApplyPlanReferenceId = null,
+        int takeDryRuns = 10,
+        bool includeDryRunSummaries = true,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);

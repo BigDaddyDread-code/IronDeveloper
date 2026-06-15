@@ -194,6 +194,9 @@ public static class IronDevCli
         if (IronDevCliDogfoodLoops.IsDogfoodLoopsCommand(args))
             return await IronDevCliDogfoodLoops.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliApplyPreview.IsApplyPreviewCommand(args))
+            return await IronDevCliApplyPreview.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
@@ -2862,6 +2865,7 @@ public static class IronDevCli
         error.WriteLine("  irondev workflow inspect step --project <id> --run <workflowRunId> --step <workflowRunStepId> [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev workflow inspect checkpoints --project <id> --run <workflowRunId> [--take 100] [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev workflow inspect checkpoint --project <id> --run <workflowRunId> --checkpoint <workflowCheckpointId> [--output text|json] [--api-base-url <url>] [--token <token>]");
+        error.WriteLine("  irondev workflow apply-preview --workflow-run <workflowRunId> --workflow-step <workflowStepId> [--controlled-apply-plan <id>] [--take-dry-runs 10] [--no-dry-runs] [--output text|json] [--api-base-url <url>] [--token <token>]");
         error.WriteLine("  irondev ticket create --project-id <id> --file <ticket.json> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket list --project-id <id> [--take 50] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket show --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
