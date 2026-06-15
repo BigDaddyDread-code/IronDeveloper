@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import type { WorkspaceRoute } from '../app/routes';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { routeForId, routeForPath, type WorkspaceRoute } from '../app/routes';
 
 export interface BuildDiscussionDraft {
   title: string;
@@ -21,14 +21,28 @@ interface WorkspaceNavigationContextValue {
 const WorkspaceNavigationContext = createContext<WorkspaceNavigationContextValue | null>(null);
 
 export function WorkspaceNavigationProvider({ children }: { children: ReactNode }) {
-  const [activeRouteId, setActiveRouteId] = useState<WorkspaceRoute['id']>('home');
+  const [activeRouteId, setActiveRouteId] = useState<WorkspaceRoute['id']>(() => routeForPath(window.location.pathname).id);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [buildDiscussionDraft, setBuildDiscussionDraft] = useState<BuildDiscussionDraft | null>(null);
   const navigateToWorkspace = useCallback((routeId: WorkspaceRoute['id']) => {
+    const route = routeForId(routeId);
+    if (window.location.pathname !== route.route) {
+      window.history.pushState({ workspaceRouteId: routeId }, '', route.route);
+    }
+
     setActiveRouteId(routeId);
   }, []);
   const consumeBuildDiscussionDraft = useCallback(() => {
     setBuildDiscussionDraft(null);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveRouteId(routeForPath(window.location.pathname).id);
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const contextValue = useMemo(
@@ -56,4 +70,3 @@ export function useWorkspaceNavigation() {
 
   return context;
 }
-

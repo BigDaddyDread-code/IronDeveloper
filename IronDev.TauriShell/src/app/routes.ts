@@ -27,7 +27,7 @@ export interface WorkspaceRouteMeta {
   blockReasonTestId?: string;
 }
 
-export type WorkspaceRouteId = 'home' | 'chat' | 'build' | 'tickets' | 'knowledge' | 'runs' | 'settings';
+export type WorkspaceRouteId = 'home' | 'chat' | 'build' | 'tickets' | 'knowledge' | 'runs' | 'governance' | 'settings';
 
 export interface WorkspaceRoute {
   id: WorkspaceRouteId;
@@ -74,6 +74,12 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     description: 'Execution history, evidence, failures, and review packages.'
   },
   {
+    id: 'governance',
+    label: 'Governance',
+    route: '/governance/timeline',
+    description: 'Read-only governance trace timeline and operational evidence links.'
+  },
+  {
     id: 'settings',
     label: 'Settings',
     route: '/settings',
@@ -83,4 +89,10 @@ export const workspaceRoutes: WorkspaceRoute[] = [
 
 export function routeForId(routeId: WorkspaceRoute['id']) {
   return workspaceRoutes.find((route) => route.id === routeId) ?? workspaceRoutes[0];
+}
+
+export function routeForPath(pathname: string) {
+  const normalized = pathname.trim().replace(/\/+$/, '') || '/';
+
+  return workspaceRoutes.find((route) => route.route === normalized) ?? workspaceRoutes[0];
 }

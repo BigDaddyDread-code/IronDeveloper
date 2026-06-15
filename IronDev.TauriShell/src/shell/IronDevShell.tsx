@@ -5,6 +5,7 @@ import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
+import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
 import { BuildRoute } from '../features/chatToBuild/BuildRoute';
 import { ChatRoute } from '../features/chatToBuild/ChatRoute';
@@ -57,6 +58,8 @@ export function IronDevShell() {
         return <KnowledgeRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'runs':
         return <RunReportsRoute route={activeRoute} onRouteReady={onRouteReady} />;
+      case 'governance':
+        return <GovernanceTimelineRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'settings':
         return <SettingsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       default:
