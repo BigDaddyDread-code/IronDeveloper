@@ -109,10 +109,9 @@ public sealed class AcceptedApprovalReadApiTests : ApiTestBase
     }
 
     [TestMethod]
-    public void AcceptedApprovalReadApi_UsesGetOnlyRoutes()
+    public void AcceptedApprovalReadApi_ReadRoutesRemainGetOnly()
     {
-        var methods = typeof(AcceptedApprovalsV1Controller).GetMethods()
-            .Where(method => method.DeclaringType == typeof(AcceptedApprovalsV1Controller))
+        var methods = ReadRouteMethods()
             .ToArray();
 
         Assert.AreEqual(3, methods.Count(method => method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false).Any()));
@@ -123,14 +122,16 @@ public sealed class AcceptedApprovalReadApiTests : ApiTestBase
     }
 
     [TestMethod]
-    public void AcceptedApprovalReadApi_DoesNotCreateAcceptedApproval()
+    public void AcceptedApprovalReadApi_ReadActionsDoNotCreateAcceptedApproval()
     {
-        var controller = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.Api", "Controllers", "AcceptedApprovalsV1Controller.cs"));
-
-        foreach (var token in new[] { "CreateAcceptedApproval", "SaveAcceptedApproval", "HttpPost", "[HttpPost]", "HttpPut", "HttpPatch", "HttpDelete", "IAcceptedApprovalStore", ".SaveAsync" })
-            Assert.IsFalse(controller.Contains(token, StringComparison.OrdinalIgnoreCase), $"Forbidden token found in controller: {token}");
-
-        StringAssert.Contains(controller, "IAcceptedApprovalQueryService");
+        var methods = ReadRouteMethods().ToArray();
+        foreach (var method in methods)
+        {
+            Assert.IsFalse(method.GetCustomAttributes(typeof(HttpPostAttribute), inherit: false).Any(), $"Read route unexpectedly used POST: {method.Name}");
+            Assert.IsFalse(method.GetCustomAttributes(typeof(HttpPutAttribute), inherit: false).Any(), $"Read route unexpectedly used PUT: {method.Name}");
+            Assert.IsFalse(method.GetCustomAttributes(typeof(HttpPatchAttribute), inherit: false).Any(), $"Read route unexpectedly used PATCH: {method.Name}");
+            Assert.IsFalse(method.GetCustomAttributes(typeof(HttpDeleteAttribute), inherit: false).Any(), $"Read route unexpectedly used DELETE: {method.Name}");
+        }
     }
 
     [TestMethod]
@@ -335,10 +336,17 @@ public sealed class AcceptedApprovalReadApiTests : ApiTestBase
         var root = RepositoryRoot();
         return
         [
-            Path.Combine(root, "IronDev.Api", "Controllers", "AcceptedApprovalsV1Controller.cs"),
             Path.Combine(root, "IronDev.Core", "Governance", "AcceptedApprovalReadModels.cs"),
             Path.Combine(root, "IronDev.Infrastructure", "Governance", "AcceptedApprovalQueryService.cs")
         ];
+    }
+
+    private static IEnumerable<System.Reflection.MethodInfo> ReadRouteMethods()
+    {
+        var readRouteNames = new[] { "Get", "ListByTarget", "ListByCorrelation" };
+        return typeof(AcceptedApprovalsV1Controller).GetMethods()
+            .Where(method => method.DeclaringType == typeof(AcceptedApprovalsV1Controller))
+            .Where(method => readRouteNames.Contains(method.Name, StringComparer.Ordinal));
     }
 
     private static string RepositoryRoot()

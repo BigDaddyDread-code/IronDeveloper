@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IronDev.Core.Governance;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,7 @@ namespace IronDev.Api.Controllers;
 public sealed class AcceptedApprovalsV1Controller : ControllerBase
 {
     private const int MaxIdLength = 256;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private static readonly string[] PrivateReasoningMarkers =
     [
@@ -64,9 +66,15 @@ public sealed class AcceptedApprovalsV1Controller : ControllerBase
     ];
 
     private readonly IAcceptedApprovalQueryService _query;
+    private readonly IAcceptedApprovalCreateService _create;
 
-    public AcceptedApprovalsV1Controller(IAcceptedApprovalQueryService query) =>
+    public AcceptedApprovalsV1Controller(
+        IAcceptedApprovalQueryService query,
+        IAcceptedApprovalCreateService create)
+    {
         _query = query ?? throw new ArgumentNullException(nameof(query));
+        _create = create ?? throw new ArgumentNullException(nameof(create));
+    }
 
     [HttpGet("{acceptedApprovalId:guid}")]
     public async Task<ActionResult<AcceptedApprovalApiEnvelope<AcceptedApprovalReadModel>>> Get(
@@ -123,6 +131,60 @@ public sealed class AcceptedApprovalsV1Controller : ControllerBase
         return Ok(Envelope("found", records));
     }
 
+    [HttpPost]
+    public async Task<ActionResult<AcceptedApprovalApiEnvelope<AcceptedApprovalReadModel>>> Create(
+        [FromRoute] Guid projectId,
+        [FromBody] JsonElement body,
+        CancellationToken cancellationToken)
+    {
+        if (body.ValueKind is not JsonValueKind.Object)
+        {
+            return BadRequest(Envelope<AcceptedApprovalReadModel>(
+                "validation_error",
+                null,
+                errors: [Error("request", "Accepted approval create request body is required.")]));
+        }
+
+        var forbiddenFields = FindForbiddenClientFields(body).ToArray();
+        if (forbiddenFields.Length > 0)
+        {
+            return BadRequest(Envelope<AcceptedApprovalReadModel>(
+                "validation_error",
+                null,
+                errors: forbiddenFields
+                    .Select(field => Error(field, "Field is server-owned and must not be supplied by the client.", "server_owned_field"))
+                    .ToArray()));
+        }
+
+        CreateAcceptedApprovalRequest? request;
+        try
+        {
+            request = body.Deserialize<CreateAcceptedApprovalRequest>(JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return BadRequest(Envelope<AcceptedApprovalReadModel>(
+                "validation_error",
+                null,
+                errors: [Error("request", "Accepted approval create request JSON is invalid.")]));
+        }
+
+        var result = await _create.CreateAsync(projectId, request, User, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(Envelope<AcceptedApprovalReadModel>(
+                "validation_error",
+                null,
+                errors: result.Issues.Select(ToError).ToArray()));
+        }
+
+        var acceptedApproval = result.AcceptedApproval!;
+        return CreatedAtAction(
+            nameof(Get),
+            new { projectId, acceptedApprovalId = acceptedApproval.AcceptedApprovalId },
+            CreateEnvelope("created", acceptedApproval, acceptedApproval.AcceptedApprovalId));
+    }
+
     private static IReadOnlyList<AcceptedApprovalApiErrorDto> ValidateLookupText(string? value, string field)
     {
         var errors = new List<AcceptedApprovalApiErrorDto>();
@@ -168,6 +230,31 @@ public sealed class AcceptedApprovalsV1Controller : ControllerBase
         values.Any(value => !string.IsNullOrWhiteSpace(value) &&
                             markers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase)));
 
+    private static IEnumerable<string> FindForbiddenClientFields(JsonElement body)
+    {
+        var forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "acceptedApprovalId",
+            "projectId",
+            "approvedByActorId",
+            "approvedByActorDisplayName",
+            "acceptedAtUtc",
+            "createdAtUtc",
+            "isPolicySatisfied",
+            "canApplySource",
+            "canContinueWorkflow",
+            "canApproveRelease"
+        };
+
+        foreach (var property in body.EnumerateObject())
+        {
+            if (forbidden.Contains(property.Name))
+            {
+                yield return property.Name;
+            }
+        }
+    }
+
     private static AcceptedApprovalApiEnvelope<TData> Envelope<TData>(
         string status,
         TData? data,
@@ -185,6 +272,26 @@ public sealed class AcceptedApprovalsV1Controller : ControllerBase
             Errors = errors ?? []
         };
 
+    private static AcceptedApprovalApiEnvelope<TData> CreateEnvelope<TData>(
+        string status,
+        TData? data,
+        Guid? acceptedApprovalId,
+        IReadOnlyList<AcceptedApprovalApiErrorDto>? errors = null) =>
+        new()
+        {
+            Status = status,
+            Data = data,
+            AcceptedApprovalId = acceptedApprovalId,
+            Boundary = new AcceptedApprovalCreateBoundary(),
+            MutationOccurred = data is not null,
+            HumanApprovalRequired = true,
+            Warnings = AcceptedApprovalCreateBoundaryText.Warnings,
+            Errors = errors ?? []
+        };
+
+    private static AcceptedApprovalApiErrorDto ToError(AcceptedApprovalCreateIssue issue) =>
+        Error(issue.Field, issue.Message, issue.Code);
+
     private static AcceptedApprovalApiErrorDto Error(string field, string message, string code = "validation_error") =>
         new()
         {
@@ -200,7 +307,7 @@ public sealed record AcceptedApprovalApiEnvelope<TData>
     public required string Status { get; init; }
     public TData? Data { get; init; }
     public Guid? AcceptedApprovalId { get; init; }
-    public required AcceptedApprovalReadBoundary Boundary { get; init; }
+    public required object Boundary { get; init; }
     public bool MutationOccurred { get; init; }
     public bool HumanApprovalRequired { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
