@@ -6,6 +6,7 @@ import { useSessionContext } from '../state/useSessionContext';
 import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
 import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
+import { ToolGateDecisionRoute } from '../features/governance/ToolGateDecisionRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
 import { BuildRoute } from '../features/chatToBuild/BuildRoute';
 import { ChatRoute } from '../features/chatToBuild/ChatRoute';
@@ -59,7 +60,11 @@ export function IronDevShell() {
       case 'runs':
         return <RunReportsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'governance':
-        return <GovernanceTimelineRoute route={activeRoute} onRouteReady={onRouteReady} />;
+        return window.location.pathname.startsWith('/governance/tool-gates') ? (
+          <ToolGateDecisionRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : (
+          <GovernanceTimelineRoute route={activeRoute} onRouteReady={onRouteReady} />
+        );
       case 'settings':
         return <SettingsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       default:

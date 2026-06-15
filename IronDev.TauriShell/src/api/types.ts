@@ -454,6 +454,92 @@ export interface GovernanceTraceApiEnvelope<TData> {
   data?: TData | null;
 }
 
+export interface ToolGateFilter {
+  projectReferenceId?: string;
+  workflowRunId?: string;
+  workflowStepId?: string;
+  toolRequestId?: string;
+  gateDecisionId?: string;
+  correlationId?: string;
+  decisionStatus?: string;
+  toolName?: string;
+  sourceComponent?: string;
+  fromUtc?: string;
+  toUtc?: string;
+  take?: number;
+}
+
+export interface ToolGateIssue {
+  code?: string | null;
+  field?: string | null;
+  message?: string | null;
+}
+
+export interface ToolRequestListItem {
+  toolRequestId: string;
+  projectReferenceId?: string | null;
+  workflowRunId?: string | null;
+  workflowStepId?: string | null;
+  correlationId?: string | null;
+  requestedToolName: string;
+  requestedCapability?: string | null;
+  requestedOperation?: string | null;
+  requestStatus: string;
+  sourceComponent?: string | null;
+  createdUtc?: string | null;
+  subjectReference?: string | null;
+  safeSummary: string;
+}
+
+export interface ToolGateDecisionListItem {
+  decisionId: string;
+  toolRequestId: string;
+  decisionStatus: string;
+  policyOutcomeSummary: string;
+  approvalRequirementSummary: string;
+  safeReason: string;
+  decidedUtc?: string | null;
+  correlationId?: string | null;
+  causationId?: string | null;
+  subjectReference?: string | null;
+  safeSummary: string;
+}
+
+export interface ToolGateApiBoundary {
+  readOnly?: boolean | null;
+  durable?: boolean | null;
+  mutationOccurred?: boolean | null;
+  requestVisibilityIsExecutionPermission?: boolean | null;
+  gateDecisionVisibilityIsAuthority?: boolean | null;
+  approvalRequirementIsApproval?: boolean | null;
+  policyEvidenceIsPolicySatisfaction?: boolean | null;
+  gateStatusIsToolInvocation?: boolean | null;
+  canApprove?: boolean | null;
+  canReject?: boolean | null;
+  canOverrideGate?: boolean | null;
+  canReopenGate?: boolean | null;
+  canSatisfyPolicy?: boolean | null;
+  canExecuteTool?: boolean | null;
+  canInvokeTool?: boolean | null;
+  canDispatchAgent?: boolean | null;
+  canTransitionWorkflow?: boolean | null;
+  canApplySource?: boolean | null;
+  canApplyPatch?: boolean | null;
+}
+
+export interface ToolGateApiEnvelope<TData> {
+  status?: string | null;
+  mutationOccurred?: boolean | null;
+  durable?: boolean | null;
+  boundary?: ToolGateApiBoundary | null;
+  warnings?: string[] | null;
+  errors?: ToolGateIssue[] | null;
+  data?: TData | null;
+}
+
+export type ToolRequestDetailData = Record<string, unknown>;
+export type ToolGateDecisionDetailData = Record<string, unknown>;
+
 export interface LoginRequest {
   email: string;
   password: string;

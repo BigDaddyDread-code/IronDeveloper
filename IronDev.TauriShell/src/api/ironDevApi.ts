@@ -13,6 +13,9 @@ import type {
   GovernanceTraceDetailData,
   GovernanceTraceListData,
   GovernanceTraceQuery,
+  ToolGateApiEnvelope,
+  ToolGateDecisionDetailData,
+  ToolRequestDetailData,
   RunEvidenceItem,
   RunReportDetail,
   RunReportSummary,
@@ -532,6 +535,30 @@ class IronDevApiClient {
     const queryString = toQueryString({ projectReferenceId });
     return this.request<GovernanceTraceApiEnvelope<GovernanceTraceListData>>(
       `/api/v1/governance/traces/by-workflow-run/${encodeURIComponent(workflowRunId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getToolRequest(
+    toolRequestId: string,
+    projectId: string | number,
+    signal?: AbortSignal
+  ): Promise<ToolGateApiEnvelope<ToolRequestDetailData>> {
+    const queryString = toQueryString({ projectId });
+    return this.request<ToolGateApiEnvelope<ToolRequestDetailData>>(
+      `/api/v1/tool-requests/${encodeURIComponent(toolRequestId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getToolGateDecision(
+    gateDecisionId: string,
+    projectId: string | number,
+    signal?: AbortSignal
+  ): Promise<ToolGateApiEnvelope<ToolGateDecisionDetailData>> {
+    const queryString = toQueryString({ projectId });
+    return this.request<ToolGateApiEnvelope<ToolGateDecisionDetailData>>(
+      `/api/v1/tool-gates/evaluations/${encodeURIComponent(gateDecisionId)}${queryString}`,
       { method: 'GET', signal }
     );
   }
