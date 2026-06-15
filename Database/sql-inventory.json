@@ -483,6 +483,31 @@
       "notes": "Block G durable approval decision migration. Approval decision evidence is not execution permission, source apply, external effect, workflow progress, or memory promotion."
     },
     {
+      "id": "database.migrate-accepted-approval",
+      "path": "Database/migrate_accepted_approval.sql",
+      "kind": "migration-script",
+      "bucket": "required-runtime-schema",
+      "ownerArea": "governance",
+      "objectsCreated": [
+        "governance.AcceptedApproval",
+        "governance.TR_AcceptedApproval_ValidateInsert",
+        "governance.TR_AcceptedApproval_BlockUpdateDelete",
+        "governance.usp_AcceptedApproval_Save",
+        "governance.usp_AcceptedApproval_Get",
+        "governance.usp_AcceptedApproval_ListByTarget",
+        "governance.usp_AcceptedApproval_ListByCorrelation"
+      ],
+      "objectsCalled": [],
+      "referencedBy": [
+        "IronDev.Infrastructure/Governance/SqlAcceptedApprovalStore.cs",
+        "Database/migrations.json",
+        "Database/verify-migrations.ps1"
+      ],
+      "appliedByManifest": true,
+      "verifiedByScript": true,
+      "notes": "Block P durable accepted approval migration. The record is append-only evidence for later approval satisfaction checks; it does not satisfy policy or execute any action."
+    },
+    {
       "id": "database.migration-tickets-linked-files",
       "path": "Database/migration_tickets_linked_files.sql",
       "kind": "migration-script",
@@ -818,6 +843,26 @@
       "appliedByManifest": true,
       "verifiedByScript": true,
       "notes": "Runtime uses stored procedures; no runtime schema creation and no API endpoint is introduced by PR76."
+    },
+    {
+      "id": "runtime.accepted-approval-store",
+      "path": "IronDev.Infrastructure/Governance/SqlAcceptedApprovalStore.cs",
+      "kind": "stored-procedure",
+      "bucket": "required-runtime-query",
+      "ownerArea": "governance",
+      "objectsCreated": [],
+      "objectsCalled": [
+        "governance.usp_AcceptedApproval_Save",
+        "governance.usp_AcceptedApproval_Get",
+        "governance.usp_AcceptedApproval_ListByTarget",
+        "governance.usp_AcceptedApproval_ListByCorrelation"
+      ],
+      "referencedBy": [
+        "durable accepted approval repository"
+      ],
+      "appliedByManifest": true,
+      "verifiedByScript": true,
+      "notes": "Runtime uses stored procedures and AcceptedApprovalValidation before persistence; no API endpoint or update/delete/upsert path is introduced by PR169."
     },
     {
       "id": "database.migrate-policy-decision-event",

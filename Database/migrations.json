@@ -21,6 +21,11 @@
       "description": "Creates durable ApprovalDecision table and stored procedures linked to GovernanceEvent with scoped approval subjects."
     },
     {
+      "id": "2026-06-block-p-accepted-approval",
+      "path": "Database/migrate_accepted_approval.sql",
+      "description": "Creates durable AcceptedApproval table and stored procedures for append-only accepted approval records."
+    },
+    {
       "id": "2026-06-block-g-policy-decision-event",
       "path": "Database/migrate_policy_decision_event.sql",
       "description": "Creates durable PolicyDecisionEvent table and stored procedures linked to GovernanceEvent and optional request, gate, and approval evidence."
