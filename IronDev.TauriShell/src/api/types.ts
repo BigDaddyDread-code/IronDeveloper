@@ -454,6 +454,81 @@ export interface GovernanceTraceApiEnvelope<TData> {
   data?: TData | null;
 }
 
+export interface DogfoodLoopIssue {
+  category?: string | null;
+  code?: string | null;
+  field?: string | null;
+  message?: string | null;
+}
+
+export interface DogfoodLoopReferenceData {
+  refType?: string | null;
+  refId?: string | null;
+  summary?: string | null;
+  durable?: boolean | null;
+  backendRecorded?: boolean | null;
+  source?: string | null;
+}
+
+export interface DogfoodReceiptDetailData {
+  dogfoodLoopId?: string | null;
+  runId?: string | null;
+  receiptId?: string | null;
+  evidenceId?: string | null;
+  projectId?: string | number | null;
+  summary?: string | null;
+  goal?: string | null;
+  observations?: string[] | null;
+  blockedReasons?: string[] | null;
+  referencedAgentRuns?: DogfoodLoopReferenceData[] | null;
+  referencedCriticReviews?: DogfoodLoopReferenceData[] | null;
+  referencedMemoryImprovements?: DogfoodLoopReferenceData[] | null;
+  referencedToolRequests?: DogfoodLoopReferenceData[] | null;
+  referencedGateDecisions?: DogfoodLoopReferenceData[] | null;
+  evidenceRefs?: DogfoodLoopReferenceData[] | null;
+  durable?: boolean | null;
+  containsNonDurableReferences?: boolean | null;
+  durabilityWarnings?: string[] | null;
+  knownLimitations?: string[] | null;
+  createdAtUtc?: string | null;
+  warnings?: string[] | null;
+}
+
+export interface DogfoodLoopApiBoundary {
+  dogfoodReceiptIsReleaseApproval?: boolean | null;
+  dogfoodLoopIsAutonomousWorkflow?: boolean | null;
+  toolExecuted?: boolean | null;
+  requestApproved?: boolean | null;
+  gateExecuted?: boolean | null;
+  gateIsExecutor?: boolean | null;
+  sourceApplied?: boolean | null;
+  memoryPromoted?: boolean | null;
+  collectiveMemoryWritten?: boolean | null;
+  vectorAuthorityWritten?: boolean | null;
+  auditIsApproval?: boolean | null;
+  modelOutputIsAuthority?: boolean | null;
+  endpointAccessIsExecutionPermission?: boolean | null;
+  apiResponseStatusIsGovernance?: boolean | null;
+  durable?: boolean | null;
+  containsNonDurableReferences?: boolean | null;
+  humanReviewRequiredForSourceApply?: boolean | null;
+  humanReviewRequiredForMemoryPromotion?: boolean | null;
+}
+
+export interface DogfoodLoopApiEnvelope<TData> {
+  status?: string | null;
+  data?: TData | null;
+  dogfoodLoopId?: string | null;
+  runId?: string | null;
+  receiptId?: string | null;
+  evidenceId?: string | null;
+  boundary?: DogfoodLoopApiBoundary | null;
+  mutationOccurred?: boolean | null;
+  humanApprovalRequired?: boolean | null;
+  warnings?: string[] | null;
+  errors?: DogfoodLoopIssue[] | null;
+}
+
 export interface ToolGateFilter {
   projectReferenceId?: string;
   workflowRunId?: string;

@@ -6,6 +6,7 @@ import { useSessionContext } from '../state/useSessionContext';
 import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
 import { ApprovalPackageReviewRoute } from '../features/governance/ApprovalPackageReviewRoute';
+import { DogfoodReceiptViewerRoute } from '../features/governance/DogfoodReceiptViewerRoute';
 import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
 import { ToolGateDecisionRoute } from '../features/governance/ToolGateDecisionRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
@@ -61,7 +62,9 @@ export function IronDevShell() {
       case 'runs':
         return <RunReportsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'governance':
-        return window.location.pathname.startsWith('/governance/approval-packages') ? (
+        return window.location.pathname.startsWith('/governance/dogfood-receipts') ? (
+          <DogfoodReceiptViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/approval-packages') ? (
           <ApprovalPackageReviewRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/tool-gates') ? (
           <ToolGateDecisionRoute route={activeRoute} onRouteReady={onRouteReady} />
