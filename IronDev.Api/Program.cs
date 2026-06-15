@@ -175,6 +175,8 @@ builder.Services.AddScoped<IDogfoodLoopApiStore, SqlDogfoodLoopApiStore>();
 builder.Services.AddScoped<IWorkflowRunStore, SqlWorkflowRunStore>();
 builder.Services.AddScoped<IWorkflowStepStore, SqlWorkflowStepStore>();
 builder.Services.AddScoped<IWorkflowCheckpointStore, SqlWorkflowCheckpointStore>();
+builder.Services.AddScoped<IApplyDryRunStore, SqlApplyDryRunStore>();
+builder.Services.AddScoped<IApplyPreviewService, ApplyPreviewService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))

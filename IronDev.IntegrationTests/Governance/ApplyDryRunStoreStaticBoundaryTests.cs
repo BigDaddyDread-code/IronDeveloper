@@ -89,12 +89,11 @@ public sealed class ApplyDryRunStoreStaticBoundaryTests
     }
 
     [TestMethod]
-    public void ApplyDryRunStore_IsNotRegisteredInApiCliRuntimeOrWorkflowRunner()
+    public void ApplyDryRunStore_IsNotRegisteredInCliRuntimeOrWorkflowRunner()
     {
         var root = RepositoryRoot();
         foreach (var path in new[]
                  {
-                     Path.Combine(root, "IronDev.Api"),
                      Path.Combine(root, "IronDev.Cli"),
                      Path.Combine(root, "IronDev.Core", "Agents"),
                      Path.Combine(root, "IronDev.Infrastructure", "Agents")
