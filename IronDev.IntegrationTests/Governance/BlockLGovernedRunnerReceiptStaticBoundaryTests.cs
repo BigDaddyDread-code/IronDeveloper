@@ -208,7 +208,15 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
             "IronDev.IntegrationTests/ApiCliContract/ApiCliStaticBoundaryTests.cs" or
             "IronDev.IntegrationTests/ApiCliContract/ApiCliContractTestSupport.cs" or
             "Docs/receipts/PR142_APPLY_PREVIEW_CLI.md" or
-            "Docs/receipts/PR141_APPLY_PREVIEW_API.md";
+            "Docs/receipts/PR141_APPLY_PREVIEW_API.md" or
+            "IronDev.Core/Workflow/FailedWorkflowDiagnosisReportModels.cs" or
+            "IronDev.Core/Workflow/IFailedWorkflowDiagnosisReportService.cs" or
+            "IronDev.Infrastructure/Workflow/FailedWorkflowDiagnosisReportService.cs" or
+            "IronDev.Api/Controllers/FailedWorkflowDiagnosisReportController.cs" or
+            "IronDev.IntegrationTests.Api/FailedWorkflowDiagnosisReportApiContractTests.cs" or
+            "IronDev.IntegrationTests/Governance/FailedWorkflowDiagnosisReportBoundaryTests.cs" or
+            "IronDev.IntegrationTests/Governance/FailedWorkflowDiagnosisReportStaticBoundaryTests.cs" or
+            "Docs/receipts/PR146_FAILED_WORKFLOW_DIAGNOSIS_REPORT.md";
 
     private static string NormalizeForLocalPath(string file) => file.Replace('/', Path.DirectorySeparatorChar);
 
