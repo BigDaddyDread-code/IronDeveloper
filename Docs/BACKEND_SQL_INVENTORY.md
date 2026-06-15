@@ -403,3 +403,13 @@ Behavior changed in this PR: no product/runtime behavior; only the durable workf
 | `memory.usp_MemoryProposal_*` | `SqlMemoryProposalStagingStore` | active | Stored-procedure write/read surface; runtime direct table mutation remains denied. |
 
 The existing `agent.AgentMemoryImprovementProposal` table remains the manual improvement proposal queue. PR107 does not repurpose it.
+
+## PR140 apply dry-run store
+
+- SQL file: `Database/migrate_apply_dry_run_store.sql`
+- Runtime owner: `IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs`
+- Core contract: `IronDev.Core/Workflow/ApplyDryRunStoreModels.cs`
+- Tables: `workflow.ApplyDryRunRecord`
+- Procedures: `workflow.usp_ApplyDryRun_Create`, `workflow.usp_ApplyDryRun_Get`, `workflow.usp_ApplyDryRun_ListByWorkflowRun`, `workflow.usp_ApplyDryRun_ListByControlledApplyPlan`
+- Boundary: stores apply dry-run receipts only; does not perform dry-run, apply source, mutate files, satisfy approval or policy, transition workflow, or promote memory.
+- Behaviour changed in this PR: no runtime behaviour change; durable receipt storage only.

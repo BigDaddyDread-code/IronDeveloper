@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedFor": "PR107 memory proposal staging SQL inventory update",
+  "generatedFor": "PR140 apply dry-run store SQL inventory update",
   "generatedAtUtc": "2026-06-14T00:00:00Z",
   "entries": [
     {
@@ -1160,6 +1160,49 @@
       "appliedByManifest": false,
       "verifiedByScript": false,
       "notes": "Runtime store uses stored procedures only and performs no runtime DDL. Checkpoint rows are evidence only and not resumable workflow state."
+    },
+    {
+      "id": "database.migrate-apply-dry-run-store",
+      "path": "Database/migrate_apply_dry_run_store.sql",
+      "kind": "migration-script",
+      "bucket": "required-runtime-schema",
+      "ownerArea": "workflow",
+      "objectsCreated": [
+        "workflow.ApplyDryRunRecord",
+        "workflow.usp_ApplyDryRun_Create",
+        "workflow.usp_ApplyDryRun_Get",
+        "workflow.usp_ApplyDryRun_ListByWorkflowRun",
+        "workflow.usp_ApplyDryRun_ListByControlledApplyPlan"
+      ],
+      "objectsCalled": [],
+      "referencedBy": [
+        "IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs",
+        "Database/migrations.json",
+        "Database/verify-migrations.ps1"
+      ],
+      "appliedByManifest": true,
+      "verifiedByScript": true,
+      "notes": "PR140 durable apply dry-run receipt store. Records dry-run review evidence only; it does not perform dry-run, apply source, mutate files, satisfy approval or policy, transition workflow, or promote memory."
+    },
+    {
+      "id": "runtime.apply-dry-run-store",
+      "path": "IronDev.Infrastructure/Workflow/SqlApplyDryRunStore.cs",
+      "kind": "runtime-store",
+      "bucket": "stored-procedure-runtime",
+      "ownerArea": "workflow",
+      "objectsCreated": [],
+      "objectsCalled": [
+        "workflow.usp_ApplyDryRun_Create",
+        "workflow.usp_ApplyDryRun_Get",
+        "workflow.usp_ApplyDryRun_ListByWorkflowRun",
+        "workflow.usp_ApplyDryRun_ListByControlledApplyPlan"
+      ],
+      "referencedBy": [
+        "durable apply dry-run receipt repository"
+      ],
+      "appliedByManifest": true,
+      "verifiedByScript": true,
+      "notes": "Runtime uses stored procedures after ApplyDryRunStoreValidator. No runtime DDL, API, CLI, dry-run performer, source apply, validation run, rollback, approval satisfaction, policy satisfaction, workflow transition, or memory promotion authority."
     },
     {
       "id": "database.migrate-memory-proposal-staging",

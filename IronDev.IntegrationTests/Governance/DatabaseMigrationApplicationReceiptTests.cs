@@ -21,7 +21,7 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var migrations = document.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
 
-        Assert.AreEqual(12, migrations.Length);
+        Assert.AreEqual(13, migrations.Length);
         Assert.AreEqual("2026-06-block-g-governance-event", migrations[0].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_governance_event.sql", migrations[0].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-g-tool-request", migrations[1].GetProperty("id").GetString());
@@ -46,6 +46,8 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         Assert.AreEqual("Database/migrate_workflow_checkpoint_store.sql", migrations[10].GetProperty("path").GetString());
         Assert.AreEqual("2026-06-block-k-memory-proposal-staging", migrations[11].GetProperty("id").GetString());
         Assert.AreEqual("Database/migrate_memory_proposal_staging.sql", migrations[11].GetProperty("path").GetString());
+        Assert.AreEqual("2026-06-block-n-apply-dry-run-store", migrations[12].GetProperty("id").GetString());
+        Assert.AreEqual("Database/migrate_apply_dry_run_store.sql", migrations[12].GetProperty("path").GetString());
 
         foreach (var migration in migrations)
         {
@@ -294,6 +296,10 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
         await connection.OpenAsync();
         await connection.ExecuteAsync(
             """
+            IF OBJECT_ID(N'workflow.usp_ApplyDryRun_Create', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_ApplyDryRun_Create;
+            IF OBJECT_ID(N'workflow.usp_ApplyDryRun_Get', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_ApplyDryRun_Get;
+            IF OBJECT_ID(N'workflow.usp_ApplyDryRun_ListByWorkflowRun', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_ApplyDryRun_ListByWorkflowRun;
+            IF OBJECT_ID(N'workflow.usp_ApplyDryRun_ListByControlledApplyPlan', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_ApplyDryRun_ListByControlledApplyPlan;
             IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Create', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_Create;
             IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_Get', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_Get;
             IF OBJECT_ID(N'workflow.usp_WorkflowCheckpoint_ListByRun', N'P') IS NOT NULL DROP PROCEDURE workflow.usp_WorkflowCheckpoint_ListByRun;
@@ -324,6 +330,9 @@ public sealed class DatabaseMigrationApplicationReceiptTests : IntegrationTestBa
             IF OBJECT_ID(N'workflow.TR_WorkflowRunStep_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRunStep_ValidateInsert;
             IF OBJECT_ID(N'workflow.TR_WorkflowRun_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRun_BlockUpdateDelete;
             IF OBJECT_ID(N'workflow.TR_WorkflowRun_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_WorkflowRun_ValidateInsert;
+            IF OBJECT_ID(N'workflow.TR_ApplyDryRunRecord_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_ApplyDryRunRecord_BlockUpdateDelete;
+            IF OBJECT_ID(N'workflow.TR_ApplyDryRunRecord_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER workflow.TR_ApplyDryRunRecord_ValidateInsert;
+            IF OBJECT_ID(N'workflow.ApplyDryRunRecord', N'U') IS NOT NULL DROP TABLE workflow.ApplyDryRunRecord;
             IF OBJECT_ID(N'workflow.WorkflowCheckpointGroundingReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowCheckpointGroundingReference;
             IF OBJECT_ID(N'workflow.WorkflowCheckpointEvidenceReference', N'U') IS NOT NULL DROP TABLE workflow.WorkflowCheckpointEvidenceReference;
             IF OBJECT_ID(N'workflow.WorkflowCheckpoint', N'U') IS NOT NULL DROP TABLE workflow.WorkflowCheckpoint;
