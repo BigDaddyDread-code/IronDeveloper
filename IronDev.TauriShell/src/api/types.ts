@@ -343,6 +343,117 @@ export type RunReportSummary = components['schemas']['RunReportSummary'];
 export type RunPromotionReview = components['schemas']['RunPromotionReview'];
 export type RunReviewPolicySnapshot = components['schemas']['RunReviewPolicySnapshot'];
 
+export interface GovernanceTraceQuery {
+  projectReferenceId?: string;
+  workflowRunId?: string;
+  workflowStepId?: string;
+  correlationId?: string;
+  causationId?: string;
+  subjectReferenceId?: string;
+  eventKind?: string;
+  sourceComponent?: string;
+  fromUtc?: string;
+  toUtc?: string;
+  take?: number;
+}
+
+export interface GovernanceTraceIssue {
+  code?: string | null;
+  field?: string | null;
+  message?: string | null;
+}
+
+export interface GovernanceTraceSummary {
+  traceId?: string | null;
+  projectReferenceId?: string | null;
+  workflowRunId?: string | null;
+  workflowStepId?: string | null;
+  correlationId?: string | null;
+  causationId?: string | null;
+  subjectReferenceId?: string | null;
+  eventKind?: string | null;
+  sourceComponent?: string | null;
+  safeSummary?: string | null;
+  recordedUtc?: string | null;
+  isReadOnlyTrace?: boolean | null;
+  isAuthorityDecision?: boolean | null;
+  isApproval?: boolean | null;
+  isPolicySatisfaction?: boolean | null;
+  isWorkflowTransition?: boolean | null;
+  canApprove?: boolean | null;
+  canReject?: boolean | null;
+  canSatisfyPolicy?: boolean | null;
+  canTransitionWorkflow?: boolean | null;
+  canInvokeTool?: boolean | null;
+  canDispatchAgent?: boolean | null;
+  canCallModel?: boolean | null;
+  canPromoteMemory?: boolean | null;
+  canApplySource?: boolean | null;
+}
+
+export interface GovernanceTraceTimelineItem {
+  eventId?: string | null;
+  eventKind?: string | null;
+  sourceComponent?: string | null;
+  safeSummary?: string | null;
+  recordedUtc?: string | null;
+  correlationId?: string | null;
+  causationId?: string | null;
+  subjectReferenceId?: string | null;
+}
+
+export interface GovernanceTraceRelatedReference {
+  referenceKind?: string | null;
+  referenceId?: string | null;
+  safeSummary?: string | null;
+}
+
+export interface GovernanceTraceDetail {
+  summary?: GovernanceTraceSummary | null;
+  timeline?: GovernanceTraceTimelineItem[] | null;
+  relatedReferences?: GovernanceTraceRelatedReference[] | null;
+  boundaryWarnings?: string[] | null;
+}
+
+export interface GovernanceTraceListData {
+  status?: string | number | null;
+  traces?: GovernanceTraceSummary[] | null;
+  issues?: GovernanceTraceIssue[] | null;
+  boundaryWarnings?: string[] | null;
+}
+
+export interface GovernanceTraceDetailData {
+  status?: string | number | null;
+  trace?: GovernanceTraceDetail | null;
+  issues?: GovernanceTraceIssue[] | null;
+  boundaryWarnings?: string[] | null;
+}
+
+export interface GovernanceTraceApiBoundary {
+  readOnlyTrace?: boolean | null;
+  traceabilityIsAuthority?: boolean | null;
+  traceOutputIsApproval?: boolean | null;
+  traceOutputIsPolicySatisfaction?: boolean | null;
+  traceOutputIsWorkflowTransition?: boolean | null;
+  traceOutputIsToolInvocation?: boolean | null;
+  traceOutputIsAgentDispatch?: boolean | null;
+  traceOutputIsModelExecution?: boolean | null;
+  traceOutputIsMemoryPromotion?: boolean | null;
+  traceOutputIsSourceApply?: boolean | null;
+  traceOutputIsPatchApply?: boolean | null;
+  exposesRawPayloadJson?: boolean | null;
+  exposesPrivateReasoning?: boolean | null;
+}
+
+export interface GovernanceTraceApiEnvelope<TData> {
+  status?: string | null;
+  mutationOccurred?: boolean | null;
+  boundary?: GovernanceTraceApiBoundary | null;
+  warnings?: string[] | null;
+  errors?: GovernanceTraceIssue[] | null;
+  data?: TData | null;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

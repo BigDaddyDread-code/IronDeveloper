@@ -9,6 +9,10 @@ import type {
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
+  GovernanceTraceApiEnvelope,
+  GovernanceTraceDetailData,
+  GovernanceTraceListData,
+  GovernanceTraceQuery,
   RunEvidenceItem,
   RunReportDetail,
   RunReportSummary,
@@ -487,6 +491,51 @@ class IronDevApiClient {
     });
   }
 
+  async searchGovernanceTraces(
+    query: GovernanceTraceQuery,
+    signal?: AbortSignal
+  ): Promise<GovernanceTraceApiEnvelope<GovernanceTraceListData>> {
+    const queryString = toQueryString(query);
+    return this.request<GovernanceTraceApiEnvelope<GovernanceTraceListData>>(
+      `/api/v1/governance/traces${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getGovernanceTrace(
+    traceId: string,
+    signal?: AbortSignal
+  ): Promise<GovernanceTraceApiEnvelope<GovernanceTraceDetailData>> {
+    return this.request<GovernanceTraceApiEnvelope<GovernanceTraceDetailData>>(
+      `/api/v1/governance/traces/${encodeURIComponent(traceId)}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getGovernanceTraceByCorrelation(
+    correlationId: string,
+    projectReferenceId = '',
+    signal?: AbortSignal
+  ): Promise<GovernanceTraceApiEnvelope<GovernanceTraceDetailData>> {
+    const queryString = toQueryString({ projectReferenceId });
+    return this.request<GovernanceTraceApiEnvelope<GovernanceTraceDetailData>>(
+      `/api/v1/governance/traces/by-correlation/${encodeURIComponent(correlationId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getGovernanceTraceByWorkflowRun(
+    workflowRunId: string,
+    projectReferenceId: string,
+    signal?: AbortSignal
+  ): Promise<GovernanceTraceApiEnvelope<GovernanceTraceListData>> {
+    const queryString = toQueryString({ projectReferenceId });
+    return this.request<GovernanceTraceApiEnvelope<GovernanceTraceListData>>(
+      `/api/v1/governance/traces/by-workflow-run/${encodeURIComponent(workflowRunId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
   private async request<T>(path: string, options: RequestOptions): Promise<T> {
     const headers = new Headers({ Accept: 'application/json' });
 
@@ -541,6 +590,21 @@ function isDefaultLocalApi(value: string) {
   } catch {
     return value === DEFAULT_API_BASE_URL;
   }
+}
+
+function toQueryString(query: object) {
+  const parameters = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(query as Record<string, string | number | boolean | null | undefined>)) {
+    if (value === undefined || value === null || value === '') {
+      continue;
+    }
+
+    parameters.set(key, `${value}`);
+  }
+
+  const text = parameters.toString();
+  return text ? `?${text}` : '';
 }
 
 async function readBody(response: Response) {
