@@ -180,6 +180,8 @@ builder.Services.AddScoped<IWorkflowStepStore, SqlWorkflowStepStore>();
 builder.Services.AddScoped<IWorkflowCheckpointStore, SqlWorkflowCheckpointStore>();
 builder.Services.AddScoped<IApplyDryRunStore, SqlApplyDryRunStore>();
 builder.Services.AddScoped<IApplyPreviewService, ApplyPreviewService>();
+builder.Services.AddScoped<IAcceptedApprovalStore, SqlAcceptedApprovalStore>();
+builder.Services.AddScoped<IAcceptedApprovalQueryService, AcceptedApprovalQueryService>();
 builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplorerService>();
 builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflowDiagnosisReportService>();
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();

@@ -71,6 +71,13 @@ BEGIN
 END;
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AcceptedApproval_Project_Correlation' AND object_id = OBJECT_ID(N'governance.AcceptedApproval'))
+BEGIN
+    CREATE INDEX IX_AcceptedApproval_Project_Correlation
+    ON governance.AcceptedApproval(ProjectId, CorrelationId, AcceptedAtUtc DESC, AcceptedApprovalId DESC);
+END;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AcceptedApproval_Correlation' AND object_id = OBJECT_ID(N'governance.AcceptedApproval'))
 BEGIN
     CREATE INDEX IX_AcceptedApproval_Correlation
@@ -315,12 +322,46 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE governance.usp_AcceptedApproval_ListByProjectAndCorrelation
+    @ProjectId UNIQUEIDENTIFIER,
+    @CorrelationId NVARCHAR(256),
+    @Take INT = 100
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @EffectiveTake INT = CASE WHEN @Take IS NULL OR @Take <= 0 THEN 100 WHEN @Take > 500 THEN 500 ELSE @Take END;
+
+    SELECT TOP (@EffectiveTake)
+        AcceptedApprovalId,
+        ProjectId,
+        ApprovalTargetKind,
+        ApprovalTargetId,
+        ApprovalTargetHash,
+        CapabilityCode,
+        ApprovalPurpose,
+        ApprovedByActorId,
+        ApprovedByActorDisplayName,
+        AcceptedAtUtc,
+        ExpiresAtUtc,
+        CorrelationId,
+        CausationId,
+        EvidenceReferencesJson,
+        BoundaryMaximsJson,
+        CreatedAtUtc
+    FROM governance.AcceptedApproval
+    WHERE ProjectId = @ProjectId
+      AND CorrelationId = LTRIM(RTRIM(@CorrelationId))
+    ORDER BY AcceptedAtUtc DESC, AcceptedApprovalId DESC;
+END;
+GO
+
 IF DATABASE_PRINCIPAL_ID(N'IronDevGovernanceEventRuntimeRole') IS NOT NULL
 BEGIN
     GRANT EXECUTE ON OBJECT::governance.usp_AcceptedApproval_Save TO IronDevGovernanceEventRuntimeRole;
     GRANT EXECUTE ON OBJECT::governance.usp_AcceptedApproval_Get TO IronDevGovernanceEventRuntimeRole;
     GRANT EXECUTE ON OBJECT::governance.usp_AcceptedApproval_ListByTarget TO IronDevGovernanceEventRuntimeRole;
     GRANT EXECUTE ON OBJECT::governance.usp_AcceptedApproval_ListByCorrelation TO IronDevGovernanceEventRuntimeRole;
+    GRANT EXECUTE ON OBJECT::governance.usp_AcceptedApproval_ListByProjectAndCorrelation TO IronDevGovernanceEventRuntimeRole;
     GRANT SELECT ON OBJECT::governance.AcceptedApproval TO IronDevGovernanceEventRuntimeRole;
     DENY INSERT, UPDATE, DELETE ON OBJECT::governance.AcceptedApproval TO IronDevGovernanceEventRuntimeRole;
     DENY ALTER ON SCHEMA::governance TO IronDevGovernanceEventRuntimeRole;

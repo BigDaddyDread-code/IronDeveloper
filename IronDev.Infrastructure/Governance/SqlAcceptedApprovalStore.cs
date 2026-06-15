@@ -106,6 +106,26 @@ public sealed class SqlAcceptedApprovalStore : IAcceptedApprovalStore
         return rows.Select(row => row.ToRecord()).ToArray();
     }
 
+    public async Task<IReadOnlyList<AcceptedApprovalRecord>> ListByProjectAndCorrelationAsync(
+        Guid projectId,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            throw new ArgumentException("Correlation ID is required.", nameof(correlationId));
+        }
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<AcceptedApprovalRow>(new CommandDefinition(
+            "governance.usp_AcceptedApproval_ListByProjectAndCorrelation",
+            new { ProjectId = projectId, CorrelationId = Normalize(correlationId) },
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken));
+
+        return rows.Select(row => row.ToRecord()).ToArray();
+    }
+
     private static string Normalize(string value) => value.Trim();
 
     private static string? NormalizeOptional(string? value) =>

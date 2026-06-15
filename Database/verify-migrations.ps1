@@ -113,6 +113,7 @@ try {
             ,@{ Name = "governance.usp_AcceptedApproval_Get procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_AcceptedApproval_Get', N'P') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "governance.usp_AcceptedApproval_ListByTarget procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_AcceptedApproval_ListByTarget', N'P') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "governance.usp_AcceptedApproval_ListByCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_AcceptedApproval_ListByCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_AcceptedApproval_ListByProjectAndCorrelation procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_AcceptedApproval_ListByProjectAndCorrelation', N'P') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "governance.TR_AcceptedApproval_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_AcceptedApproval_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "governance.TR_AcceptedApproval_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_AcceptedApproval_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "AcceptedApproval expiry check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.AcceptedApproval') AND name = N'CK_AcceptedApproval_Expiry_AfterAccepted'" }
