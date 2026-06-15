@@ -13,7 +13,7 @@ public sealed class ApprovalSatisfactionEvaluator : IApprovalSatisfactionEvaluat
         if (acceptedApproval is null)
         {
             Add(issues, "ACCEPTED_APPROVAL_REQUIRED", "acceptedApproval", "Accepted approval record is required.");
-            return Evaluation(false, null, issues);
+            return Evaluation(false, null, [], [], issues);
         }
 
         var approvalValidation = AcceptedApprovalValidation.Validate(acceptedApproval);
@@ -24,7 +24,12 @@ public sealed class ApprovalSatisfactionEvaluator : IApprovalSatisfactionEvaluat
 
         if (!approvalValidation.IsValid)
         {
-            return Evaluation(false, acceptedApproval.AcceptedApprovalId, issues);
+            return Evaluation(
+                false,
+                acceptedApproval.AcceptedApprovalId,
+                acceptedApproval.EvidenceReferences,
+                acceptedApproval.BoundaryMaxims,
+                issues);
         }
 
         AddIfMismatch(issues, acceptedApproval.ProjectId, requirement.ProjectId, nameof(requirement.ProjectId), "PROJECT_ID_MISMATCH", "Project ID must match exactly.");
@@ -55,7 +60,12 @@ public sealed class ApprovalSatisfactionEvaluator : IApprovalSatisfactionEvaluat
             "REQUIRED_BOUNDARY_MAXIM_MISSING",
             "Required boundary maxim is missing from accepted approval record.");
 
-        return Evaluation(issues.Count == 0, acceptedApproval.AcceptedApprovalId, issues);
+        return Evaluation(
+            issues.Count == 0,
+            acceptedApproval.AcceptedApprovalId,
+            acceptedApproval.EvidenceReferences,
+            acceptedApproval.BoundaryMaxims,
+            issues);
     }
 
     private static void ValidateRequirement(ApprovalRequirement requirement, List<ApprovalSatisfactionIssue> issues)
@@ -141,11 +151,18 @@ public sealed class ApprovalSatisfactionEvaluator : IApprovalSatisfactionEvaluat
         }
     }
 
-    private static ApprovalSatisfactionEvaluation Evaluation(bool isSatisfied, Guid? acceptedApprovalId, IReadOnlyList<ApprovalSatisfactionIssue> issues) =>
+    private static ApprovalSatisfactionEvaluation Evaluation(
+        bool isSatisfied,
+        Guid? acceptedApprovalId,
+        IReadOnlyList<string> evidenceReferences,
+        IReadOnlyList<string> boundaryMaxims,
+        IReadOnlyList<ApprovalSatisfactionIssue> issues) =>
         new()
         {
             IsSatisfied = isSatisfied,
             AcceptedApprovalId = acceptedApprovalId,
+            EvidenceReferences = evidenceReferences,
+            BoundaryMaxims = boundaryMaxims,
             Issues = issues
         };
 
