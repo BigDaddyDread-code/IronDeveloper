@@ -723,3 +723,137 @@ export interface ProjectContextState {
   selectedProjectName: string | null;
   projectSelectionMode: 'api' | 'fallback-config' | 'missing';
 }
+
+export interface WorkflowReadOnlyIssue {
+  code: string;
+  message: string;
+  severity: string;
+}
+
+export interface WorkflowAuthorityFlagsData {
+  createsApproval?: boolean;
+  satisfiesApproval?: boolean;
+  grantsExecutionPermission?: boolean;
+  transitionsWorkflow?: boolean;
+  invokesTool?: boolean;
+  dispatchesAgent?: boolean;
+  mutatesSource?: boolean;
+  appliesPatch?: boolean;
+  promotesMemory?: boolean;
+  activatesRetrieval?: boolean;
+  releasesSoftware?: boolean;
+  createsAuthority?: boolean;
+  containsRawPrivateReasoning?: boolean;
+}
+
+export interface WorkflowEvidenceReferenceData {
+  evidenceReferenceId?: string;
+  evidenceId?: string;
+  evidenceType?: string;
+  evidenceLabel?: string;
+  safeSummary?: string;
+  isApproval?: boolean;
+  isExecutionPermission?: boolean;
+  isPolicySatisfaction?: boolean;
+  isWorkflowTransition?: boolean;
+  isMemoryPromotion?: boolean;
+  isSourceApply?: boolean;
+}
+
+export interface WorkflowGroundingReferenceData {
+  groundingReferenceId?: string;
+  groundingId?: string;
+  groundingType?: string;
+  claim?: string;
+  safeSummary?: string;
+  groundingIsAuthority?: boolean;
+}
+
+export interface WorkflowStepSummaryData {
+  workflowRunStepId: string;
+  workflowRunId: string;
+  projectId: string;
+  stepKey: string;
+  stepName: string;
+  stepType: string;
+  status: string;
+  sequenceNumber?: number;
+  agentRole?: string;
+  agentId?: string;
+  subjectType?: string;
+  subjectId?: string;
+  correlationId?: string;
+  causationId?: string;
+  evidenceReferenceCount?: number;
+  groundingReferenceCount?: number;
+  authorityFlags?: WorkflowAuthorityFlagsData;
+  createdUtc?: string;
+}
+
+export interface WorkflowStepDetailData extends WorkflowStepSummaryData {
+  safeSummary?: string;
+  evidenceReferences?: WorkflowEvidenceReferenceData[];
+  groundingReferences?: WorkflowGroundingReferenceData[];
+}
+
+export interface WorkflowRunSummaryData {
+  workflowRunId: string;
+  projectId: string;
+  workflowType: string;
+  workflowName: string;
+  status: string;
+  subjectType?: string;
+  subjectId?: string;
+  correlationId?: string;
+  causationId?: string;
+  stepCount?: number;
+  evidenceReferenceCount?: number;
+  groundingReferenceCount?: number;
+  authorityFlags?: WorkflowAuthorityFlagsData;
+  createdUtc?: string;
+}
+
+export interface WorkflowRunDetailData extends WorkflowRunSummaryData {
+  subjectSummary?: string;
+  steps?: WorkflowStepSummaryData[];
+  evidenceReferences?: WorkflowEvidenceReferenceData[];
+  groundingReferences?: WorkflowGroundingReferenceData[];
+}
+
+export interface WorkflowRunListData {
+  runs?: WorkflowRunSummaryData[];
+  issues?: WorkflowReadOnlyIssue[];
+}
+
+export interface WorkflowStepListData {
+  steps?: WorkflowStepSummaryData[];
+  issues?: WorkflowReadOnlyIssue[];
+}
+
+export interface WorkflowReadOnlyApiBoundary {
+  readOnlyInspection?: boolean;
+  workflowStatusIsAction?: boolean;
+  evidenceIsPermission?: boolean;
+  groundingIsAuthority?: boolean;
+  endpointAccessIsExecutionPermission?: boolean;
+  apiResponseStatusIsGovernance?: boolean;
+  modelOutputIsAuthority?: boolean;
+  sourceApplied?: boolean;
+  memoryPromoted?: boolean;
+  releaseApproved?: boolean;
+  approvalSatisfied?: boolean;
+  humanReviewRequiredForSourceApply?: boolean;
+  humanReviewRequiredForMemoryPromotion?: boolean;
+}
+
+export interface WorkflowReadOnlyApiEnvelope<TData> {
+  status?: string;
+  data?: TData | null;
+  workflowRunId?: string;
+  evidenceId?: string;
+  boundary?: WorkflowReadOnlyApiBoundary;
+  mutationOccurred?: boolean;
+  humanApprovalRequired?: boolean;
+  warnings?: string[];
+  errors?: WorkflowReadOnlyIssue[];
+}

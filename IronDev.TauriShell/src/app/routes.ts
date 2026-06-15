@@ -94,7 +94,7 @@ export function routeForId(routeId: WorkspaceRoute['id']) {
 export function routeForPath(pathname: string) {
   const normalized = pathname.trim().replace(/\/+$/, '') || '/';
 
-  if (normalized.startsWith('/governance/')) {
+  if (normalized.startsWith('/governance/') || normalized.startsWith('/workflows/')) {
     return routeForId('governance');
   }
 

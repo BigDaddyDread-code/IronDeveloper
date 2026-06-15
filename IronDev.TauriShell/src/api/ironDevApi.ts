@@ -45,7 +45,12 @@ import type {
   TicketEvidenceSummary,
   TicketLoadResult,
   TicketRunReview,
-  UserProfile
+  UserProfile,
+  WorkflowReadOnlyApiEnvelope,
+  WorkflowRunDetailData,
+  WorkflowRunListData,
+  WorkflowStepDetailData,
+  WorkflowStepListData
 } from './types';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:5000';
@@ -537,6 +542,71 @@ class IronDevApiClient {
     const queryString = toQueryString({ projectReferenceId });
     return this.request<GovernanceTraceApiEnvelope<GovernanceTraceListData>>(
       `/api/v1/governance/traces/by-workflow-run/${encodeURIComponent(workflowRunId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async listWorkflowRuns(
+    projectId: string | number,
+    take: string | number,
+    signal?: AbortSignal
+  ): Promise<WorkflowReadOnlyApiEnvelope<WorkflowRunListData>> {
+    const queryString = toQueryString({ projectId, take });
+    return this.request<WorkflowReadOnlyApiEnvelope<WorkflowRunListData>>(
+      `/api/v1/workflow/runs${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async listWorkflowRunsByCorrelation(
+    correlationId: string,
+    projectId: string | number,
+    take: string | number,
+    signal?: AbortSignal
+  ): Promise<WorkflowReadOnlyApiEnvelope<WorkflowRunListData>> {
+    const queryString = toQueryString({ projectId, take });
+    return this.request<WorkflowReadOnlyApiEnvelope<WorkflowRunListData>>(
+      `/api/v1/workflow/runs/by-correlation/${encodeURIComponent(correlationId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getWorkflowRun(
+    workflowRunId: string,
+    projectId: string | number,
+    signal?: AbortSignal
+  ): Promise<WorkflowReadOnlyApiEnvelope<WorkflowRunDetailData>> {
+    const queryString = toQueryString({ projectId });
+    return this.request<WorkflowReadOnlyApiEnvelope<WorkflowRunDetailData>>(
+      `/api/v1/workflow/runs/${encodeURIComponent(workflowRunId)}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async listWorkflowSteps(
+    workflowRunId: string,
+    projectId: string | number,
+    take: string | number,
+    signal?: AbortSignal
+  ): Promise<WorkflowReadOnlyApiEnvelope<WorkflowStepListData>> {
+    const queryString = toQueryString({ projectId, take });
+    return this.request<WorkflowReadOnlyApiEnvelope<WorkflowStepListData>>(
+      `/api/v1/workflow/runs/${encodeURIComponent(workflowRunId)}/steps${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getWorkflowStep(
+    workflowRunId: string,
+    workflowRunStepId: string,
+    projectId: string | number,
+    signal?: AbortSignal
+  ): Promise<WorkflowReadOnlyApiEnvelope<WorkflowStepDetailData>> {
+    const queryString = toQueryString({ projectId });
+    return this.request<WorkflowReadOnlyApiEnvelope<WorkflowStepDetailData>>(
+      `/api/v1/workflow/runs/${encodeURIComponent(workflowRunId)}/steps/${encodeURIComponent(
+        workflowRunStepId
+      )}${queryString}`,
       { method: 'GET', signal }
     );
   }
