@@ -2144,3 +2144,110 @@ p {
     grid-template-columns: 1fr;
   }
 }
+
+/* PR155 Approval Package Review UI */
+.approval-package-workspace {
+  display: block;
+}
+
+.approval-package-banner,
+.approval-package-actions,
+.approval-package-actions--stack,
+.approval-package-card-list {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.approval-package-banner {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 48rem;
+}
+
+.approval-package-banner span {
+  border: 1px solid rgba(33, 77, 92, 0.24);
+  border-radius: 999px;
+  background: rgba(219, 241, 236, 0.72);
+  color: #174455;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+}
+
+.approval-package-filters {
+  margin-top: 1rem;
+}
+
+.approval-package-filter-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.approval-package-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.approval-package-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(18rem, 0.9fr) minmax(24rem, 1.4fr) minmax(17rem, 0.8fr);
+  margin-top: 1rem;
+}
+
+.approval-package-card-list,
+.approval-package-actions--stack {
+  flex-direction: column;
+}
+
+.approval-package-card {
+  border: 1px solid rgba(33, 77, 92, 0.18);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem;
+  text-align: left;
+}
+
+.approval-package-card:hover,
+.approval-package-card--selected {
+  border-color: rgba(33, 77, 92, 0.45);
+  box-shadow: 0 0.75rem 1.8rem rgba(21, 54, 71, 0.12);
+}
+
+.approval-package-card__kind {
+  color: #49606c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.approval-package-detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  margin-top: 1rem;
+}
+
+.approval-package-boundary {
+  border-left: 4px solid #386f7d;
+  color: #25434e;
+  margin-top: 1rem;
+  padding-left: 0.75rem;
+}
+
+@media (max-width: 1120px) {
+  .approval-package-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-package-banner {
+    justify-content: flex-start;
+  }
+}

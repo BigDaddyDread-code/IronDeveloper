@@ -540,6 +540,76 @@ export interface ToolGateApiEnvelope<TData> {
 export type ToolRequestDetailData = Record<string, unknown>;
 export type ToolGateDecisionDetailData = Record<string, unknown>;
 
+export interface ApprovalPackageFilter {
+  projectReferenceId?: string;
+  workflowRunId?: string;
+  workflowStepId?: string;
+  approvalPackageId?: string;
+  correlationId?: string;
+  scope?: string;
+  packageStatus?: string;
+  sourceComponent?: string;
+  fromUtc?: string;
+  toUtc?: string;
+  take?: number;
+}
+
+export interface ApprovalPackageEvidenceReference {
+  referenceKind: string;
+  referenceId: string;
+  safeSummary: string;
+}
+
+export interface ApprovalPackageListItem {
+  approvalPackageId: string;
+  projectReferenceId?: string | null;
+  workflowRunId?: string | null;
+  workflowStepId?: string | null;
+  correlationId?: string | null;
+  traceId?: string | null;
+  requestedDecision: string;
+  approvalScope: string;
+  packageStatus: string;
+  sourceComponent?: string | null;
+  createdUtc?: string | null;
+  safeSummary: string;
+}
+
+export interface ApprovalPackageDetail {
+  approvalPackageId: string;
+  requestedDecision: string;
+  approvalScope: string;
+  packageStatus: string;
+  safeSummary: string;
+  safeRiskSummary: string;
+  safeEvidenceSummary: string;
+  evidenceReferences: ApprovalPackageEvidenceReference[];
+  missingEvidenceWarnings: string[];
+  boundaryWarnings: string[];
+}
+
+export interface ApprovalPackageReviewViewModel {
+  isReadOnly: true;
+  mutationOccurred: false;
+  canApprove: false;
+  canReject: false;
+  canAcceptApproval: false;
+  canCreateAcceptedApprovalRecord: false;
+  canSatisfyPolicy: false;
+  canTransitionWorkflow: false;
+  canContinueWorkflow: false;
+  canInvokeTool: false;
+  canDispatchAgent: false;
+  canCallModel: false;
+  canApplySource: false;
+  canApplyPatch: false;
+  canApproveRelease: false;
+  packages: ApprovalPackageListItem[];
+  selectedPackage?: ApprovalPackageDetail;
+  warnings: string[];
+  errors: string[];
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
