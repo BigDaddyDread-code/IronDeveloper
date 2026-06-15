@@ -2560,3 +2560,211 @@ p {
   margin-top: 1rem;
   padding: 1rem 0 0.2rem;
 }
+
+.memory-proposal-review-workspace {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.16), transparent 24rem),
+    radial-gradient(circle at 88% 20%, rgba(14, 165, 233, 0.14), transparent 26rem),
+    linear-gradient(135deg, #fffaf0 0%, #f1f8f8 50%, #fbf7ef 100%);
+}
+
+.memory-proposal-review-banner {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin: 1rem 0;
+}
+
+.memory-proposal-review-banner span {
+  background: rgba(255, 251, 235, 0.9);
+  border: 1px solid rgba(180, 83, 9, 0.22);
+  border-radius: 999px;
+  color: #78350f;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.55rem 0.8rem;
+  text-align: center;
+}
+
+.memory-proposal-review-filters {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  margin-bottom: 1rem;
+}
+
+.memory-proposal-review-filters label {
+  color: #3c2d1d;
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.memory-proposal-review-filters input {
+  border: 1px solid rgba(60, 45, 29, 0.18);
+  border-radius: 0.8rem;
+  color: #26190f;
+  font: inherit;
+  padding: 0.72rem 0.8rem;
+}
+
+.memory-proposal-review-filter-actions,
+.memory-proposal-review-card__actions,
+.memory-proposal-review-related {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.memory-proposal-review-filter-actions button,
+.memory-proposal-review-card__actions button,
+.memory-proposal-review-related button {
+  background: #713f12;
+  border: 0;
+  border-radius: 999px;
+  color: #fffaf0;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.64rem 0.9rem;
+}
+
+.memory-proposal-review-filter-actions button:disabled,
+.memory-proposal-review-card__actions button:disabled,
+.memory-proposal-review-related button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.memory-proposal-review-message {
+  background: rgba(255, 255, 255, 0.8);
+  border-left: 4px solid #d97706;
+  border-radius: 0.8rem;
+  color: #4a341c;
+  font-weight: 800;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.memory-proposal-review-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(18rem, 0.95fr) minmax(20rem, 1.2fr);
+}
+
+.memory-proposal-review-panel,
+.memory-proposal-review-detail,
+.memory-proposal-review-issues {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.memory-proposal-review-panel__header {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.memory-proposal-review-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.memory-proposal-review-card {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(113, 63, 18, 0.13);
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem;
+}
+
+.memory-proposal-review-card.is-selected {
+  border-color: rgba(217, 119, 6, 0.56);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.13);
+}
+
+.memory-proposal-review-card h3,
+.memory-proposal-review-detail h3,
+.memory-proposal-review-panel h2 {
+  margin: 0;
+}
+
+.memory-proposal-review-card p,
+.memory-proposal-review-detail p {
+  color: #6c5539;
+  margin: 0.15rem 0 0;
+}
+
+.memory-proposal-review-card dl,
+.memory-proposal-review-detail dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.memory-proposal-review-card dt,
+.memory-proposal-review-detail dt {
+  color: #876641;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.memory-proposal-review-card dd,
+.memory-proposal-review-detail dd {
+  color: #26190f;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.memory-proposal-review-detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.memory-proposal-review-detail ul,
+.memory-proposal-review-issues ul {
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.memory-proposal-review-detail li,
+.memory-proposal-review-issues li {
+  background: rgba(255, 251, 235, 0.72);
+  border: 1px solid rgba(113, 63, 18, 0.12);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+}
+
+.memory-proposal-review-detail li span {
+  color: #876641;
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-top: 0.2rem;
+  text-transform: uppercase;
+}
+
+.memory-proposal-review-footer {
+  color: #4a341c;
+  font-size: 0.88rem;
+  font-weight: 800;
+  margin-top: 1rem;
+  padding: 1rem 0 0.2rem;
+}
+
+@media (max-width: 860px) {
+  .memory-proposal-review-grid {
+    grid-template-columns: 1fr;
+  }
+}
