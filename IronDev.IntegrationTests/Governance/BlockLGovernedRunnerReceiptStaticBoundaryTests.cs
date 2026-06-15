@@ -232,7 +232,15 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
             "IronDev.IntegrationTests.Api/AgentRunHealthSummaryApiContractTests.cs" or
             "IronDev.IntegrationTests/Governance/AgentRunHealthSummaryBoundaryTests.cs" or
             "IronDev.IntegrationTests/Governance/AgentRunHealthSummaryStaticBoundaryTests.cs" or
-            "Docs/receipts/PR148_AGENT_RUN_HEALTH_SUMMARY.md";
+            "Docs/receipts/PR148_AGENT_RUN_HEALTH_SUMMARY.md" or
+            "IronDev.Core/Operations/BackendOperationalHealthModels.cs" or
+            "IronDev.Core/Operations/IBackendOperationalHealthService.cs" or
+            "IronDev.Infrastructure/Operations/BackendOperationalHealthService.cs" or
+            "IronDev.Api/Controllers/BackendOperationalHealthController.cs" or
+            "IronDev.IntegrationTests.Api/BackendOperationalHealthApiContractTests.cs" or
+            "IronDev.IntegrationTests/Governance/BackendOperationalHealthBoundaryTests.cs" or
+            "IronDev.IntegrationTests/Governance/BackendOperationalHealthStaticBoundaryTests.cs" or
+            "Docs/receipts/PR149_BACKEND_OPERATIONAL_HEALTH_CHECKS.md";
 
     private static string NormalizeForLocalPath(string file) => file.Replace('/', Path.DirectorySeparatorChar);
 
