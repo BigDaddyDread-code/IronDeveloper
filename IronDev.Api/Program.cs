@@ -16,6 +16,7 @@ using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
 using IronDev.Core.Governance;
+using IronDev.Core.Operations;
 using IronDev.Core.Workflow;
 using IronDev.Infrastructure.AgentRunAudit;
 using IronDev.Data;
@@ -29,6 +30,7 @@ using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Infrastructure.Agents;
 using IronDev.Infrastructure.Governance;
+using IronDev.Infrastructure.Operations;
 using IronDev.Infrastructure.Workflow;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
@@ -182,6 +184,7 @@ builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplo
 builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflowDiagnosisReportService>();
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
+builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
