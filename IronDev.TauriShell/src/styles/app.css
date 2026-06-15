@@ -2358,3 +2358,205 @@ p {
     justify-content: flex-start;
   }
 }
+
+.workflow-run-step-workspace {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(52, 211, 153, 0.16), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.14), transparent 24rem),
+    linear-gradient(135deg, #f7fbf8 0%, #eef5f2 45%, #f8faf7 100%);
+}
+
+.workflow-run-step-banner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.workflow-run-step-banner span {
+  border: 1px solid rgba(21, 128, 61, 0.22);
+  border-radius: 999px;
+  background: rgba(240, 253, 244, 0.86);
+  color: #14532d;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.55rem 0.8rem;
+  text-align: center;
+}
+
+.workflow-run-step-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.workflow-run-step-filters label {
+  color: #244036;
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.workflow-run-step-filters input {
+  border: 1px solid rgba(36, 64, 54, 0.18);
+  border-radius: 0.8rem;
+  color: #13241e;
+  font: inherit;
+  padding: 0.72rem 0.8rem;
+}
+
+.workflow-run-step-filter-actions,
+.workflow-run-step-card__actions,
+.workflow-run-step-related {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.workflow-run-step-filter-actions button,
+.workflow-run-step-card__actions button,
+.workflow-run-step-related button {
+  background: #143c32;
+  border: 0;
+  border-radius: 999px;
+  color: #f8fff9;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.64rem 0.9rem;
+}
+
+.workflow-run-step-filter-actions button:disabled,
+.workflow-run-step-card__actions button:disabled,
+.workflow-run-step-related button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workflow-run-step-message {
+  background: rgba(255, 255, 255, 0.76);
+  border-left: 4px solid #16a34a;
+  border-radius: 0.8rem;
+  color: #1f3d32;
+  font-weight: 700;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.workflow-run-step-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+}
+
+.workflow-run-step-panel,
+.workflow-run-step-detail,
+.workflow-run-step-issues {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.workflow-run-step-panel__header {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.workflow-run-step-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.workflow-run-step-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(20, 60, 50, 0.12);
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem;
+}
+
+.workflow-run-step-card.is-selected {
+  border-color: rgba(22, 163, 74, 0.58);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+}
+
+.workflow-run-step-card h3,
+.workflow-run-step-detail h3,
+.workflow-run-step-panel h2 {
+  margin: 0;
+}
+
+.workflow-run-step-card p,
+.workflow-run-step-detail p {
+  color: #466055;
+  margin: 0.15rem 0 0;
+}
+
+.workflow-run-step-card dl,
+.workflow-run-step-detail dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.workflow-run-step-card dt,
+.workflow-run-step-detail dt {
+  color: #527165;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workflow-run-step-card dd,
+.workflow-run-step-detail dd {
+  color: #14241f;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.workflow-run-step-detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.workflow-run-step-detail ul,
+.workflow-run-step-issues ul {
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workflow-run-step-detail li,
+.workflow-run-step-issues li {
+  background: rgba(247, 252, 249, 0.86);
+  border: 1px solid rgba(20, 60, 50, 0.1);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+}
+
+.workflow-run-step-detail li span {
+  color: #527165;
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-top: 0.2rem;
+  text-transform: uppercase;
+}
+
+.workflow-run-step-footer {
+  color: #29443a;
+  font-size: 0.88rem;
+  font-weight: 800;
+  margin-top: 1rem;
+  padding: 1rem 0 0.2rem;
+}
