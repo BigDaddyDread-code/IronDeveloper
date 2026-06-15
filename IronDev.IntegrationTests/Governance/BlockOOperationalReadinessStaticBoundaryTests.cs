@@ -9,10 +9,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests.Governance;
 
 [TestClass]
-public sealed class OperationalDebuggingStaticBoundaryTests
+public sealed class BlockOOperationalReadinessStaticBoundaryTests
 {
     [TestMethod]
-    public void OperationalDebugging_BlockOControllers_ExposeGetOnly()
+    public void BlockO_BlockOControllers_ExposeGetOnly()
     {
         foreach (var file in ControllerFiles())
         {
@@ -23,7 +23,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_BlockOControllers_DoNotExposeControlRouteFragments()
+    public void BlockO_BlockOControllers_DoNotExposeControlRouteFragments()
     {
         foreach (var route in ControllerRoutes())
         foreach (var fragment in ForbiddenRouteFragments())
@@ -31,7 +31,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_ProductionServices_DoNotExposeForbiddenControlMethodNames()
+    public void BlockO_ProductionServices_DoNotExposeForbiddenControlMethodNames()
     {
         var methodNames = ProductionTypes()
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static))
@@ -43,7 +43,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_ProductionModels_DoNotExposeRawPrivatePayloadPropertyNames()
+    public void BlockO_ProductionModels_DoNotExposeRawPrivatePayloadPropertyNames()
     {
         var propertyNames = ProductionTypes()
             .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
@@ -55,7 +55,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_ProductionFiles_DoNotReferenceModelToolAgentExecutionMarkers()
+    public void BlockO_ProductionFiles_DoNotReferenceModelToolAgentExecutionMarkers()
     {
         foreach (var file in ProductionFiles())
         {
@@ -66,7 +66,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_ProductionFiles_DoNotReferenceCleanupDeletePurgeArchiveRedactExecutableMarkers()
+    public void BlockO_ProductionFiles_DoNotReferenceCleanupDeletePurgeArchiveRedactExecutableMarkers()
     {
         foreach (var file in ProductionFiles())
         {
@@ -77,7 +77,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_ProductionFiles_DoNotReferenceHostedBackgroundOrSchedulerMarkers()
+    public void BlockO_ProductionFiles_DoNotReferenceHostedBackgroundOrSchedulerMarkers()
     {
         foreach (var file in ProductionFiles())
         {
@@ -87,17 +87,17 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_PR150_DoesNotAddApiCliSqlOrJobSurface()
+    public void BlockO_PR150_DoesNotAddApiCliSqlOrJobSurface()
     {
         var changed = ChangedFilesSinceMain();
-        Assert.IsFalse(changed.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR151 must not add SQL.");
-        Assert.IsFalse(changed.Any(file => file.StartsWith("IronDev.Api/Controllers/", StringComparison.Ordinal) && file.Contains("Retention", StringComparison.OrdinalIgnoreCase)), "PR150/151 must not add retention API.");
-        Assert.IsFalse(changed.Any(file => file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal)), "PR151 must not add CLI commands.");
-        Assert.IsFalse(changed.Any(file => file.Contains("HostedService", StringComparison.OrdinalIgnoreCase) || file.Contains("BackgroundService", StringComparison.OrdinalIgnoreCase)), "PR151 must not add jobs.");
+        Assert.IsFalse(changed.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR152 must not add SQL.");
+        Assert.IsFalse(changed.Any(file => file.StartsWith("IronDev.Api/Controllers/", StringComparison.Ordinal) && file.Contains("Retention", StringComparison.OrdinalIgnoreCase)), "Block O must not add retention API.");
+        Assert.IsFalse(changed.Any(file => file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal)), "PR152 must not add CLI commands.");
+        Assert.IsFalse(changed.Any(file => file.Contains("HostedService", StringComparison.OrdinalIgnoreCase) || file.Contains("BackgroundService", StringComparison.OrdinalIgnoreCase)), "PR152 must not add jobs.");
     }
 
     [TestMethod]
-    public void OperationalDebugging_PR149_DoesNotRunMigrationsOrSqlMutations()
+    public void BlockO_PR149_DoesNotRunMigrationsOrSqlMutations()
     {
         var backendHealthFiles = ProductionFiles().Where(file => file.Contains("BackendOperationalHealth", StringComparison.OrdinalIgnoreCase));
         foreach (var file in backendHealthFiles)
@@ -108,7 +108,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_PR148_DoesNotDispatchAgents()
+    public void BlockO_PR148_DoesNotDispatchAgents()
     {
         var files = ProductionFiles().Where(file => file.Contains("AgentRunHealthSummary", StringComparison.OrdinalIgnoreCase));
         foreach (var file in files)
@@ -116,7 +116,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_PR147_DoesNotApproveReleaseOpenGatesOrMarkDogfoodPassed()
+    public void BlockO_PR147_DoesNotApproveReleaseOpenGatesOrMarkDogfoodPassed()
     {
         var files = ProductionFiles().Where(file => file.Contains("ApprovalGateDogfoodCorrelationReport", StringComparison.OrdinalIgnoreCase));
         foreach (var file in files)
@@ -124,7 +124,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_PR146_DoesNotRepairRetryOrRerunWorkflows()
+    public void BlockO_PR146_DoesNotRepairRetryOrRerunWorkflows()
     {
         var files = ProductionFiles().Where(file => file.Contains("FailedWorkflowDiagnosisReport", StringComparison.OrdinalIgnoreCase));
         foreach (var file in files)
@@ -132,7 +132,7 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_PR145_DoesNotReplayGovernanceOrExposeRawPayloads()
+    public void BlockO_PR145_DoesNotReplayGovernanceOrExposeRawPayloads()
     {
         var files = ProductionFiles().Where(file => file.Contains("GovernanceTraceExplorer", StringComparison.OrdinalIgnoreCase));
         foreach (var file in files)
@@ -143,19 +143,19 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     }
 
     [TestMethod]
-    public void OperationalDebugging_Receipt_StatesObservationBoundary()
+    public void BlockO_Receipt_StatesObservationBoundary()
     {
-        var text = File.ReadAllText(Path.Combine(RepositoryRoot(), "Docs", "receipts", "PR151_OPERATIONAL_DEBUGGING_CONTRACT_TESTS.md"));
+        var text = File.ReadAllText(Path.Combine(RepositoryRoot(), "Docs", "receipts", "PR152_BLOCK_O_OPERATIONAL_READINESS_RECEIPT.md"));
 
-        StringAssert.Contains(text, "Operational debugging surfaces are read-only.");
-        StringAssert.Contains(text, "Observation is not authority.");
+        StringAssert.Contains(text, "Block O adds operational observability and traceability.");
+        StringAssert.Contains(text, "Block O does not add operational authority.");
         StringAssert.Contains(text, "Diagnosis is not repair.");
         StringAssert.Contains(text, "Health is not release readiness.");
         StringAssert.Contains(text, "Correlation is not approval.");
         StringAssert.Contains(text, "Recommendation is not execution.");
-        StringAssert.Contains(text, "Retention rule is not cleanup execution.");
+        StringAssert.Contains(text, "Retention rule evaluation is not cleanup execution.");
         StringAssert.Contains(text, "Traceability is not mutation permission.");
-        StringAssert.Contains(text, "does not hand it the wrench");
+        StringAssert.Contains(text, "does not install the control panel");
     }
 
     private static IReadOnlyList<string> ProductionFiles()
@@ -557,3 +557,6 @@ public sealed class OperationalDebuggingStaticBoundaryTests
         throw new InvalidOperationException("Could not locate repository root.");
     }
 }
+
+
+
