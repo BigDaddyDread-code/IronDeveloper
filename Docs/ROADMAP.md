@@ -1,5 +1,25 @@
 # IronDev Roadmap
 
+## Current governed L4 authority roadmap
+
+**Status: Active planning after PR166**
+
+The current backend authority rollout is tracked in `Docs/BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md`.
+
+The governing chain is:
+
+accepted approval record -> policy satisfaction record -> controlled dry-run -> patch artifact -> controlled source apply -> rollback -> workflow continuation -> release readiness gate
+
+The next immediate slice is PR167 - Block P Authority Validation Baseline.
+
+PR167 paints the authority lanes. It does not drive in them.
+
+The first real authority implementation block after that is Block P - Accepted Approval.
+
+Approval package is not accepted approval. Accepted approval must be a backend-owned durable record.
+
+---
+
 ## Phase 0 — Prototype → Real Architecture
 
 **Status: Complete**
