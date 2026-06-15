@@ -35,7 +35,8 @@ public sealed class ApiCliStaticBoundaryTests
             "tools/IronDev.Cli/CliManualCritic.cs",
             "tools/IronDev.Cli/CliMemoryImprovements.cs",
             "tools/IronDev.Cli/CliToolRequests.cs",
-            "tools/IronDev.Cli/CliDogfoodLoops.cs"
+            "tools/IronDev.Cli/CliDogfoodLoops.cs",
+            "tools/IronDev.Cli/CliApplyPreview.cs"
         };
 
         var forbidden = new[]
