@@ -177,6 +177,7 @@ builder.Services.AddScoped<IWorkflowStepStore, SqlWorkflowStepStore>();
 builder.Services.AddScoped<IWorkflowCheckpointStore, SqlWorkflowCheckpointStore>();
 builder.Services.AddScoped<IApplyDryRunStore, SqlApplyDryRunStore>();
 builder.Services.AddScoped<IApplyPreviewService, ApplyPreviewService>();
+builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplorerService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
