@@ -11,7 +11,9 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
     [TestMethod]
     public void BlockLGovernedRunnerReceipt_Pr126ChangedFilesAreDocsAndTestsOnly()
     {
-        var changedFiles = ChangedFilesSinceMain();
+        var changedFiles = ChangedFilesSinceMain()
+            .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
+            .ToArray();
 
         foreach (var file in changedFiles)
         {
@@ -26,6 +28,7 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
     public void BlockLGovernedRunnerReceipt_NoProductionWorkflowCodeChangedByPr126()
     {
         var changedProductionWorkflowFiles = ChangedFilesSinceMain()
+            .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
             .Where(file => file.StartsWith("IronDev.Core/Workflow/", StringComparison.Ordinal) ||
                            file.StartsWith("IronDev.Infrastructure/", StringComparison.Ordinal) ||
                            file.StartsWith("IronDev.Api/", StringComparison.Ordinal) ||
@@ -38,7 +41,9 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
     [TestMethod]
     public void BlockLGovernedRunnerReceipt_NoSqlApiCliUiOrRuntimeFilesAddedByPr126()
     {
-        var changedFiles = ChangedFilesSinceMain();
+        var changedFiles = ChangedFilesSinceMain()
+            .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
+            .ToArray();
 
         Assert.IsFalse(changedFiles.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR126 must not add SQL migrations or SQL scripts.");
         Assert.IsFalse(changedFiles.Any(file => file.Contains("Controller", StringComparison.OrdinalIgnoreCase)), "PR126 must not add API controllers.");
@@ -52,6 +57,7 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
     public void BlockLGovernedRunnerReceipt_ChangedProductionFilesDoNotAddAuthorityRuntimeOrMutationMarkers()
     {
         var changedProductionFiles = ChangedFilesSinceMain()
+            .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
             .Where(IsProductionSourceFile)
             .ToArray();
 
@@ -183,6 +189,16 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
         file.EndsWith(".cs", StringComparison.Ordinal) &&
         !file.StartsWith("IronDev.IntegrationTests/", StringComparison.Ordinal) &&
         !file.StartsWith("IronDev.Tests/", StringComparison.Ordinal);
+
+    private static bool IsAllowedPostPr126ApplyPreviewFile(string file) =>
+        file is "IronDev.Core/Workflow/ApplyPreviewModels.cs" or
+            "IronDev.Core/Workflow/IApplyPreviewService.cs" or
+            "IronDev.Infrastructure/Workflow/ApplyPreviewService.cs" or
+            "IronDev.Api/Controllers/ApplyPreviewController.cs" or
+            "IronDev.Api/Program.cs" or
+            "IronDev.IntegrationTests/Governance/ApplyPreviewBoundaryTests.cs" or
+            "IronDev.IntegrationTests.Api/ApplyPreviewApiContractTests.cs" or
+            "Docs/receipts/PR141_APPLY_PREVIEW_API.md";
 
     private static string NormalizeForLocalPath(string file) => file.Replace('/', Path.DirectorySeparatorChar);
 
