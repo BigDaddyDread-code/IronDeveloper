@@ -2035,3 +2035,112 @@ p {
     text-align: left;
   }
 }
+
+.tool-gate-workspace {
+  min-width: 0;
+  min-height: 0;
+}
+
+.tool-gate-banner,
+.tool-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tool-gate-banner {
+  max-width: 38rem;
+  justify-content: flex-end;
+}
+
+.tool-gate-banner span {
+  display: inline-flex;
+  border: var(--border-subtle);
+  border-color: color-mix(in srgb, var(--color-status-info) 42%, var(--color-border-subtle));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-status-info) 9%, var(--color-bg-surface-subtle));
+  color: var(--color-status-info);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-strong);
+}
+
+.tool-gate-filters {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.tool-gate-filter-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.tool-gate-layout {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.85fr) minmax(15rem, 0.85fr) minmax(24rem, 1.3fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.tool-gate-card-list,
+.tool-gate-detail-grid {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tool-gate-card {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-muted);
+  color: var(--color-text-secondary);
+  padding: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tool-gate-card:hover,
+.tool-gate-card--selected {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface-hover);
+}
+
+.tool-gate-card strong {
+  color: var(--color-text-primary);
+}
+
+.tool-gate-card__kind {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
+}
+
+.tool-gate-actions--stack {
+  display: grid;
+  justify-items: start;
+}
+
+.tool-gate-boundary {
+  border: var(--border-subtle);
+  border-color: color-mix(in srgb, var(--color-status-warning) 38%, var(--color-border-subtle));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-status-warning) 8%, var(--color-bg-surface-subtle));
+  color: var(--color-status-warning);
+  padding: var(--space-3);
+  font-weight: var(--font-weight-strong);
+}
+
+@media (max-width: 72rem) {
+  .tool-gate-layout,
+  .tool-gate-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
