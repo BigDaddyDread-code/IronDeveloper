@@ -27,6 +27,7 @@ using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Services.Promotion;
 using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Tracing;
+using IronDev.Infrastructure.Agents;
 using IronDev.Infrastructure.Governance;
 using IronDev.Infrastructure.Workflow;
 using IronDev.Services;
@@ -180,6 +181,7 @@ builder.Services.AddScoped<IApplyPreviewService, ApplyPreviewService>();
 builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplorerService>();
 builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflowDiagnosisReportService>();
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();
+builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
