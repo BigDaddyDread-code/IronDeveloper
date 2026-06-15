@@ -216,7 +216,15 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
             "IronDev.IntegrationTests.Api/FailedWorkflowDiagnosisReportApiContractTests.cs" or
             "IronDev.IntegrationTests/Governance/FailedWorkflowDiagnosisReportBoundaryTests.cs" or
             "IronDev.IntegrationTests/Governance/FailedWorkflowDiagnosisReportStaticBoundaryTests.cs" or
-            "Docs/receipts/PR146_FAILED_WORKFLOW_DIAGNOSIS_REPORT.md";
+            "Docs/receipts/PR146_FAILED_WORKFLOW_DIAGNOSIS_REPORT.md" or
+            "IronDev.Core/Governance/ApprovalGateDogfoodCorrelationReportModels.cs" or
+            "IronDev.Core/Governance/IApprovalGateDogfoodCorrelationReportService.cs" or
+            "IronDev.Infrastructure/Governance/ApprovalGateDogfoodCorrelationReportService.cs" or
+            "IronDev.Api/Controllers/ApprovalGateDogfoodCorrelationReportController.cs" or
+            "IronDev.IntegrationTests.Api/ApprovalGateDogfoodCorrelationReportApiContractTests.cs" or
+            "IronDev.IntegrationTests/Governance/ApprovalGateDogfoodCorrelationReportBoundaryTests.cs" or
+            "IronDev.IntegrationTests/Governance/ApprovalGateDogfoodCorrelationReportStaticBoundaryTests.cs" or
+            "Docs/receipts/PR147_APPROVAL_GATE_DOGFOOD_CORRELATION_REPORT.md";
 
     private static string NormalizeForLocalPath(string file) => file.Replace('/', Path.DirectorySeparatorChar);
 
