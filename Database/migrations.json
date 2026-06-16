@@ -84,6 +84,11 @@
                            "id":  "2026-06-block-s-patch-artifact",
                            "path":  "Database/migrate_patch_artifact.sql",
                            "description":  "Creates durable PatchArtifact table, stored procedures, append-only trigger, and proposed-change-package-only authority protections."
+                       },
+                       {
+                           "id":  "2026-06-block-u-rollback-support-receipt",
+                           "path":  "Database/migrate_rollback_support_receipt.sql",
+                           "description":  "Creates durable RollbackSupportReceipt table, stored procedures, append-only trigger, and rollback-support-only authority protections."
                        }
                    ]
 }

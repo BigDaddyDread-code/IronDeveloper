@@ -1633,6 +1633,59 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Runtime store validates supplied PatchArtifact records and calls stored procedures only; no creator, dry-run receipt composition, executor composition, source apply, rollback, workflow continuation, or release approval path."
+                    },
+                    {
+                        "id":  "database.migrate-rollback-support-receipt",
+                        "path":  "Database/migrate_rollback_support_receipt.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.RollbackSupportReceipt",
+                                               "governance.usp_RollbackSupportReceipt_Save",
+                                               "governance.usp_RollbackSupportReceipt_Get",
+                                               "governance.usp_RollbackSupportReceipt_GetByReceiptHash",
+                                               "governance.usp_RollbackSupportReceipt_ListByPatchArtifact",
+                                               "governance.usp_RollbackSupportReceipt_ListByPatchHash",
+                                               "governance.usp_RollbackSupportReceipt_ListByRollbackPlan",
+                                               "governance.usp_RollbackSupportReceipt_ListBySourceBaselineHash",
+                                               "governance.TR_RollbackSupportReceipt_ValidateInsert",
+                                               "governance.TR_RollbackSupportReceipt_BlockUpdateDelete"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "PR196 Rollback Receipt Store"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Durable append-only storage for rollback-support receipts only; does not execute rollback, prove rollback success, apply source, inspect worktree, continue workflow, or approve release."
+                    },
+                    {
+                        "id":  "runtime.rollback-support-receipt-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlRollbackSupportReceiptStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "governed-persistence",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_RollbackSupportReceipt_Save",
+                                              "governance.usp_RollbackSupportReceipt_Get",
+                                              "governance.usp_RollbackSupportReceipt_GetByReceiptHash",
+                                              "governance.usp_RollbackSupportReceipt_ListByPatchArtifact",
+                                              "governance.usp_RollbackSupportReceipt_ListByPatchHash",
+                                              "governance.usp_RollbackSupportReceipt_ListByRollbackPlan",
+                                              "governance.usp_RollbackSupportReceipt_ListBySourceBaselineHash"
+                                          ],
+                        "referencedBy":  [
+                                             "IRollbackSupportReceiptStore"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store validates supplied RollbackSupportReceipt records and calls stored procedures only; no gate evaluation, rollback execution, source apply, branch/worktree inspection, workflow continuation, release approval, model, agent, tool, memory, or retrieval path."
                     }
                 ]
 }
