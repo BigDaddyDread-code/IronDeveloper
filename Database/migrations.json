@@ -99,6 +99,11 @@
                            "id":  "2026-06-pr204-source-apply-receipt",
                            "path":  "Database/migrate_source_apply_receipt.sql",
                            "description":  "Creates durable SourceApplyReceipt table, stored procedures, append-only trigger, and narrow-real-apply receipt authority protections."
+                       },
+                       {
+                           "id":  "2026-06-pr206-rollback-execution-receipt",
+                           "path":  "Database/migrate_rollback_execution_receipt.sql",
+                           "description":  "Creates durable RollbackExecutionReceipt table, stored procedures, append-only trigger, and controlled rollback execution receipt authority protections."
                        }
                    ]
 }

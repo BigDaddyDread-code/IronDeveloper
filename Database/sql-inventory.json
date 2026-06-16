@@ -1792,6 +1792,59 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Runtime store validates supplied SourceApplyReceipt records and calls stored procedures only; no source apply execution, API, CLI, workflow continuation, release approval, rollback execution, memory promotion, retrieval activation, agent, model, or tool path."
+                    },
+                    {
+                        "id":  "database.migrate-rollback-execution-receipt",
+                        "path":  "Database/migrate_rollback_execution_receipt.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.RollbackExecutionReceipt",
+                                               "governance.usp_RollbackExecutionReceipt_Save",
+                                               "governance.usp_RollbackExecutionReceipt_Get",
+                                               "governance.usp_RollbackExecutionReceipt_GetByReceiptHash",
+                                               "governance.usp_RollbackExecutionReceipt_ListBySourceApplyReceipt",
+                                               "governance.usp_RollbackExecutionReceipt_ListByRollbackPlan",
+                                               "governance.usp_RollbackExecutionReceipt_ListByRollbackSupportReceipt",
+                                               "governance.usp_RollbackExecutionReceipt_ListByPatchArtifact",
+                                               "governance.TR_RollbackExecutionReceipt_ValidateInsert",
+                                               "governance.TR_RollbackExecutionReceipt_BlockUpdateDelete"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "PR206 Rollback Executor"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Durable append-only storage for controlled rollback execution receipts only; does not expose API, expose CLI, continue workflow, approve release, expand source apply, promote memory, activate retrieval, run agents/models/tools, create git commits, push, merge, branch, or create pull requests."
+                    },
+                    {
+                        "id":  "runtime.rollback-execution-receipt-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlRollbackExecutionReceiptStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "governed-persistence",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_RollbackExecutionReceipt_Save",
+                                              "governance.usp_RollbackExecutionReceipt_Get",
+                                              "governance.usp_RollbackExecutionReceipt_GetByReceiptHash",
+                                              "governance.usp_RollbackExecutionReceipt_ListBySourceApplyReceipt",
+                                              "governance.usp_RollbackExecutionReceipt_ListByRollbackPlan",
+                                              "governance.usp_RollbackExecutionReceipt_ListByRollbackSupportReceipt",
+                                              "governance.usp_RollbackExecutionReceipt_ListByPatchArtifact"
+                                          ],
+                        "referencedBy":  [
+                                             "IRollbackExecutionReceiptStore"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store validates supplied RollbackExecutionReceipt records and calls stored procedures only; no rollback planning, source apply expansion, workflow continuation, release approval, git, API, CLI, UI, agent, model, tool, memory, or retrieval path."
                     }
                 ]
 }
