@@ -189,6 +189,8 @@ builder.Services.AddScoped<IPolicySatisfactionQueryService, PolicySatisfactionQu
 builder.Services.AddScoped<IPolicySatisfactionCreateService, PolicySatisfactionCreateService>();
 builder.Services.AddScoped<IPatchArtifactStore, SqlPatchArtifactStore>();
 builder.Services.AddScoped<IPatchArtifactQueryService, PatchArtifactQueryService>();
+builder.Services.AddScoped<ISourceApplyDryRunReceiptStore, SqlSourceApplyDryRunReceiptStore>();
+builder.Services.AddScoped<ISourceApplyDryRunReceiptQueryService, SourceApplyDryRunReceiptQueryService>();
 builder.Services.AddScoped<IRollbackSupportReceiptStore, SqlRollbackSupportReceiptStore>();
 builder.Services.AddScoped<IRollbackSupportReceiptQueryService, RollbackSupportReceiptQueryService>();
 builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplorerService>();

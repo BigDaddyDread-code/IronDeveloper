@@ -222,6 +222,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_policy_satisfaction.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_patch_artifact.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_rollback_support_receipt.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_source_apply_dry_run_receipt.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_policy_decision_event.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_dogfood_receipt.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_thoughtledger_governance_event_reference.sql");
@@ -241,6 +242,16 @@ public abstract class ApiTestBase
         IF OBJECT_ID(N'governance.TR_RollbackSupportReceipt_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_RollbackSupportReceipt_ValidateInsert;
         IF OBJECT_ID(N'governance.TR_RollbackSupportReceipt_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_RollbackSupportReceipt_BlockUpdateDelete;
         IF OBJECT_ID(N'governance.RollbackSupportReceipt', N'U') IS NOT NULL DROP TABLE governance.RollbackSupportReceipt;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_Save;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_Get;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_GetByReceiptHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_GetByReceiptHash;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyRequest', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyRequest;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyGateEvaluation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyGateEvaluation;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_ListByPatchArtifact', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_ListByPatchArtifact;
+        IF OBJECT_ID(N'governance.usp_SourceApplyDryRunReceipt_ListByRollbackSupportReceipt', N'P') IS NOT NULL DROP PROCEDURE governance.usp_SourceApplyDryRunReceipt_ListByRollbackSupportReceipt;
+        IF OBJECT_ID(N'governance.TR_SourceApplyDryRunReceipt_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_SourceApplyDryRunReceipt_ValidateInsert;
+        IF OBJECT_ID(N'governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete;
+        IF OBJECT_ID(N'governance.SourceApplyDryRunReceipt', N'U') IS NOT NULL DROP TABLE governance.SourceApplyDryRunReceipt;
         IF OBJECT_ID(N'governance.usp_PatchArtifact_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_Save;
         IF OBJECT_ID(N'governance.usp_PatchArtifact_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_Get;
         IF OBJECT_ID(N'governance.usp_PatchArtifact_ListByDryRunReceiptHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListByDryRunReceiptHash;
@@ -362,6 +373,7 @@ public abstract class ApiTestBase
         await conn.ExecuteAsync("""
             IF OBJECT_ID('governance.TR_PatchArtifact_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PatchArtifact_BlockUpdateDelete ON governance.PatchArtifact;
             IF OBJECT_ID('governance.TR_RollbackSupportReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_RollbackSupportReceipt_BlockUpdateDelete ON governance.RollbackSupportReceipt;
+            IF OBJECT_ID('governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete ON governance.SourceApplyDryRunReceipt;
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.TR_DogfoodReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_DogfoodReceipt_BlockUpdateDelete ON governance.DogfoodReceipt;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
@@ -390,6 +402,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('workflow.TR_WorkflowCheckpoint_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpoint_BlockUpdateDelete ON workflow.WorkflowCheckpoint;
             IF OBJECT_ID('workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete ON workflow.WorkflowCheckpointEvidenceReference;
             IF OBJECT_ID('workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete ON workflow.WorkflowCheckpointGroundingReference;
+            IF OBJECT_ID('governance.SourceApplyDryRunReceipt', 'U') IS NOT NULL DELETE FROM governance.SourceApplyDryRunReceipt;
             IF OBJECT_ID('governance.RollbackSupportReceipt', 'U') IS NOT NULL DELETE FROM governance.RollbackSupportReceipt;
             IF OBJECT_ID('governance.PatchArtifact', 'U') IS NOT NULL DELETE FROM governance.PatchArtifact;
             IF OBJECT_ID('governance.ThoughtLedgerGovernanceEventReference', 'U') IS NOT NULL DELETE FROM governance.ThoughtLedgerGovernanceEventReference;
@@ -401,6 +414,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.ToolGateDecision', 'U') IS NOT NULL DELETE FROM governance.ToolGateDecision;
             IF OBJECT_ID('governance.TR_PatchArtifact_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PatchArtifact_BlockUpdateDelete ON governance.PatchArtifact;
             IF OBJECT_ID('governance.TR_RollbackSupportReceipt_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_RollbackSupportReceipt_BlockUpdateDelete ON governance.RollbackSupportReceipt;
+            IF OBJECT_ID('governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete ON governance.SourceApplyDryRunReceipt;
             IF OBJECT_ID('governance.TR_ToolGateDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete ON governance.ToolGateDecision;
             IF OBJECT_ID('governance.TR_ApprovalDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete ON governance.ApprovalDecision;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
