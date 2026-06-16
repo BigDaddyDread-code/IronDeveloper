@@ -220,6 +220,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_approval_decision.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_accepted_approval.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_policy_satisfaction.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_patch_artifact.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_policy_decision_event.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_dogfood_receipt.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_thoughtledger_governance_event_reference.sql");
@@ -229,6 +230,17 @@ public abstract class ApiTestBase
     }
 
     private const string DropGovernanceSql = """
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_Save;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_Get;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_ListByDryRunReceiptHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListByDryRunReceiptHash;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_ListByDryRunAuditHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListByDryRunAuditHash;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_ListByControlledDryRunRequest', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListByControlledDryRunRequest;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListBySubject;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_ListByPatchHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListByPatchHash;
+        IF OBJECT_ID(N'governance.usp_PatchArtifact_ListBySourceBaselineHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PatchArtifact_ListBySourceBaselineHash;
+        IF OBJECT_ID(N'governance.TR_PatchArtifact_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PatchArtifact_ValidateInsert;
+        IF OBJECT_ID(N'governance.TR_PatchArtifact_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PatchArtifact_BlockUpdateDelete;
+        IF OBJECT_ID(N'governance.PatchArtifact', N'U') IS NOT NULL DROP TABLE governance.PatchArtifact;
         IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_Record', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_Record;
         IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_GetById', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_GetById;
         IF OBJECT_ID(N'governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ThoughtLedgerGovernanceEventReference_ListForThoughtLedgerEntry;
@@ -337,6 +349,7 @@ public abstract class ApiTestBase
         
         // 1. Wipe domain data
         await conn.ExecuteAsync("""
+            IF OBJECT_ID('governance.TR_PatchArtifact_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PatchArtifact_BlockUpdateDelete ON governance.PatchArtifact;
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.TR_DogfoodReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_DogfoodReceipt_BlockUpdateDelete ON governance.DogfoodReceipt;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
@@ -365,6 +378,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('workflow.TR_WorkflowCheckpoint_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpoint_BlockUpdateDelete ON workflow.WorkflowCheckpoint;
             IF OBJECT_ID('workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete ON workflow.WorkflowCheckpointEvidenceReference;
             IF OBJECT_ID('workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete ON workflow.WorkflowCheckpointGroundingReference;
+            IF OBJECT_ID('governance.PatchArtifact', 'U') IS NOT NULL DELETE FROM governance.PatchArtifact;
             IF OBJECT_ID('governance.ThoughtLedgerGovernanceEventReference', 'U') IS NOT NULL DELETE FROM governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.DogfoodReceipt', 'U') IS NOT NULL DELETE FROM governance.DogfoodReceipt;
             IF OBJECT_ID('governance.PolicyDecisionEvent', 'U') IS NOT NULL DELETE FROM governance.PolicyDecisionEvent;
@@ -372,6 +386,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.AcceptedApproval', 'U') IS NOT NULL DELETE FROM governance.AcceptedApproval;
             IF OBJECT_ID('governance.ApprovalDecision', 'U') IS NOT NULL DELETE FROM governance.ApprovalDecision;
             IF OBJECT_ID('governance.ToolGateDecision', 'U') IS NOT NULL DELETE FROM governance.ToolGateDecision;
+            IF OBJECT_ID('governance.TR_PatchArtifact_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PatchArtifact_BlockUpdateDelete ON governance.PatchArtifact;
             IF OBJECT_ID('governance.TR_ToolGateDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete ON governance.ToolGateDecision;
             IF OBJECT_ID('governance.TR_ApprovalDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete ON governance.ApprovalDecision;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;

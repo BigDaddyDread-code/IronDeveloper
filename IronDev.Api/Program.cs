@@ -187,6 +187,8 @@ builder.Services.AddSingleton<IPolicyRequirementSatisfactionEvaluator, PolicyReq
 builder.Services.AddScoped<IPolicySatisfactionStore, SqlPolicySatisfactionStore>();
 builder.Services.AddScoped<IPolicySatisfactionQueryService, PolicySatisfactionQueryService>();
 builder.Services.AddScoped<IPolicySatisfactionCreateService, PolicySatisfactionCreateService>();
+builder.Services.AddScoped<IPatchArtifactStore, SqlPatchArtifactStore>();
+builder.Services.AddScoped<IPatchArtifactQueryService, PatchArtifactQueryService>();
 builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplorerService>();
 builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflowDiagnosisReportService>();
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();
