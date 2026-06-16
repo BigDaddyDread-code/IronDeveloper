@@ -79,6 +79,11 @@
                            "id":  "2026-06-block-r-controlled-dry-run-receipt",
                            "path":  "Database/migrate_controlled_dry_run_receipt.sql",
                            "description":  "Creates durable controlled dry-run receipt table, stored procedures, append-only trigger, and evidence-only authority protections."
+                       },
+                       {
+                           "id":  "2026-06-block-s-patch-artifact",
+                           "path":  "Database/migrate_patch_artifact.sql",
+                           "description":  "Creates durable PatchArtifact table, stored procedures, append-only trigger, and proposed-change-package-only authority protections."
                        }
                    ]
 }

@@ -1578,6 +1578,61 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Runtime uses stored procedures after MemoryProposalValidator. No runtime DDL, API, CLI, retrieval indexing, accepted memory creation, or promotion authority."
+                    },
+                    {
+                        "id":  "database.migrate-patch-artifact",
+                        "path":  "Database/migrate_patch_artifact.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.PatchArtifact",
+                                               "governance.usp_PatchArtifact_Save",
+                                               "governance.usp_PatchArtifact_Get",
+                                               "governance.usp_PatchArtifact_ListByDryRunReceiptHash",
+                                               "governance.usp_PatchArtifact_ListByDryRunAuditHash",
+                                               "governance.usp_PatchArtifact_ListByControlledDryRunRequest",
+                                               "governance.usp_PatchArtifact_ListBySubject",
+                                               "governance.usp_PatchArtifact_ListByPatchHash",
+                                               "governance.usp_PatchArtifact_ListBySourceBaselineHash",
+                                               "governance.TR_PatchArtifact_ValidateInsert",
+                                               "governance.TR_PatchArtifact_BlockUpdateDelete"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "PR188 Patch Artifact Store"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Durable append-only storage for supplied PatchArtifact records only; does not create artifacts, apply source, execute rollback, continue workflow, or approve release."
+                    },
+                    {
+                        "id":  "runtime.patch-artifact-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlPatchArtifactStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "governed-persistence",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_PatchArtifact_Save",
+                                              "governance.usp_PatchArtifact_Get",
+                                              "governance.usp_PatchArtifact_ListByDryRunReceiptHash",
+                                              "governance.usp_PatchArtifact_ListByDryRunAuditHash",
+                                              "governance.usp_PatchArtifact_ListByControlledDryRunRequest",
+                                              "governance.usp_PatchArtifact_ListBySubject",
+                                              "governance.usp_PatchArtifact_ListByPatchHash",
+                                              "governance.usp_PatchArtifact_ListBySourceBaselineHash"
+                                          ],
+                        "referencedBy":  [
+                                             "IPatchArtifactStore"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store validates supplied PatchArtifact records and calls stored procedures only; no creator, dry-run receipt composition, executor composition, source apply, rollback, workflow continuation, or release approval path."
                     }
                 ]
 }
