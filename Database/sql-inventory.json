@@ -1686,6 +1686,59 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Runtime store validates supplied RollbackSupportReceipt records and calls stored procedures only; no gate evaluation, rollback execution, source apply, branch/worktree inspection, workflow continuation, release approval, model, agent, tool, memory, or retrieval path."
+                    },
+                    {
+                        "id":  "database.migrate-source-apply-dry-run-receipt",
+                        "path":  "Database/migrate_source_apply_dry_run_receipt.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.SourceApplyDryRunReceipt",
+                                               "governance.usp_SourceApplyDryRunReceipt_Save",
+                                               "governance.usp_SourceApplyDryRunReceipt_Get",
+                                               "governance.usp_SourceApplyDryRunReceipt_GetByReceiptHash",
+                                               "governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyRequest",
+                                               "governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyGateEvaluation",
+                                               "governance.usp_SourceApplyDryRunReceipt_ListByPatchArtifact",
+                                               "governance.usp_SourceApplyDryRunReceipt_ListByRollbackSupportReceipt",
+                                               "governance.TR_SourceApplyDryRunReceipt_ValidateInsert",
+                                               "governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "PR202 Source Apply Dry-run Receipt Store"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Durable append-only storage for source-apply dry-run receipts only; does not apply source, apply patches, inspect git or worktree, continue workflow, satisfy approval or policy, approve release, execute rollback, promote memory, activate retrieval, expose API, expose CLI, or run agents/models/tools."
+                    },
+                    {
+                        "id":  "runtime.source-apply-dry-run-receipt-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlSourceApplyDryRunReceiptStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "governed-persistence",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_SourceApplyDryRunReceipt_Save",
+                                              "governance.usp_SourceApplyDryRunReceipt_Get",
+                                              "governance.usp_SourceApplyDryRunReceipt_GetByReceiptHash",
+                                              "governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyRequest",
+                                              "governance.usp_SourceApplyDryRunReceipt_ListBySourceApplyGateEvaluation",
+                                              "governance.usp_SourceApplyDryRunReceipt_ListByPatchArtifact",
+                                              "governance.usp_SourceApplyDryRunReceipt_ListByRollbackSupportReceipt"
+                                          ],
+                        "referencedBy":  [
+                                             "ISourceApplyDryRunReceiptStore"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store validates supplied SourceApplyDryRunReceipt records and calls stored procedures only; no source apply, patch application, git/worktree inspection, workflow continuation, approval or policy satisfaction, release readiness, rollback execution, memory promotion, retrieval activation, API, CLI, UI, agent, model, or tool path."
                     }
                 ]
 }
