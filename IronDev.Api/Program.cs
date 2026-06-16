@@ -183,6 +183,8 @@ builder.Services.AddScoped<IApplyPreviewService, ApplyPreviewService>();
 builder.Services.AddScoped<IAcceptedApprovalStore, SqlAcceptedApprovalStore>();
 builder.Services.AddScoped<IAcceptedApprovalQueryService, AcceptedApprovalQueryService>();
 builder.Services.AddScoped<IAcceptedApprovalCreateService, AcceptedApprovalCreateService>();
+builder.Services.AddScoped<IPolicySatisfactionStore, SqlPolicySatisfactionStore>();
+builder.Services.AddScoped<IPolicySatisfactionQueryService, PolicySatisfactionQueryService>();
 builder.Services.AddScoped<IGovernanceTraceExplorerService, GovernanceTraceExplorerService>();
 builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflowDiagnosisReportService>();
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();

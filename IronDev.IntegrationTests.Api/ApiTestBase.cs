@@ -219,6 +219,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_tool_gate_decision.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_approval_decision.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_accepted_approval.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_policy_satisfaction.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_policy_decision_event.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_dogfood_receipt.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_thoughtledger_governance_event_reference.sql");
@@ -252,6 +253,14 @@ public abstract class ApiTestBase
         IF OBJECT_ID(N'governance.TR_PolicyDecisionEvent_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PolicyDecisionEvent_ValidateInsert;
         IF OBJECT_ID(N'governance.TR_PolicyDecisionEvent_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete;
         IF OBJECT_ID(N'governance.PolicyDecisionEvent', N'U') IS NOT NULL DROP TABLE governance.PolicyDecisionEvent;
+        IF OBJECT_ID(N'governance.usp_PolicySatisfaction_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicySatisfaction_Save;
+        IF OBJECT_ID(N'governance.usp_PolicySatisfaction_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicySatisfaction_Get;
+        IF OBJECT_ID(N'governance.usp_PolicySatisfaction_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicySatisfaction_ListBySubject;
+        IF OBJECT_ID(N'governance.usp_PolicySatisfaction_ListByAcceptedApproval', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicySatisfaction_ListByAcceptedApproval;
+        IF OBJECT_ID(N'governance.usp_PolicySatisfaction_ListByProjectAndCorrelation', N'P') IS NOT NULL DROP PROCEDURE governance.usp_PolicySatisfaction_ListByProjectAndCorrelation;
+        IF OBJECT_ID(N'governance.TR_PolicySatisfaction_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PolicySatisfaction_ValidateInsert;
+        IF OBJECT_ID(N'governance.TR_PolicySatisfaction_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_PolicySatisfaction_BlockUpdateDelete;
+        IF OBJECT_ID(N'governance.PolicySatisfaction', N'U') IS NOT NULL DROP TABLE governance.PolicySatisfaction;
         IF OBJECT_ID(N'governance.usp_AcceptedApproval_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_Save;
         IF OBJECT_ID(N'governance.usp_AcceptedApproval_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_Get;
         IF OBJECT_ID(N'governance.usp_AcceptedApproval_ListByTarget', N'P') IS NOT NULL DROP PROCEDURE governance.usp_AcceptedApproval_ListByTarget;
@@ -331,6 +340,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.TR_DogfoodReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_DogfoodReceipt_BlockUpdateDelete ON governance.DogfoodReceipt;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
+            IF OBJECT_ID('governance.TR_PolicySatisfaction_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PolicySatisfaction_BlockUpdateDelete ON governance.PolicySatisfaction;
             IF OBJECT_ID('governance.TR_AcceptedApproval_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_AcceptedApproval_BlockUpdateDelete ON governance.AcceptedApproval;
             IF OBJECT_ID('governance.TR_ApprovalDecision_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete ON governance.ApprovalDecision;
             IF OBJECT_ID('governance.TR_ToolGateDecision_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete ON governance.ToolGateDecision;
@@ -358,12 +368,14 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.ThoughtLedgerGovernanceEventReference', 'U') IS NOT NULL DELETE FROM governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.DogfoodReceipt', 'U') IS NOT NULL DELETE FROM governance.DogfoodReceipt;
             IF OBJECT_ID('governance.PolicyDecisionEvent', 'U') IS NOT NULL DELETE FROM governance.PolicyDecisionEvent;
+            IF OBJECT_ID('governance.PolicySatisfaction', 'U') IS NOT NULL DELETE FROM governance.PolicySatisfaction;
             IF OBJECT_ID('governance.AcceptedApproval', 'U') IS NOT NULL DELETE FROM governance.AcceptedApproval;
             IF OBJECT_ID('governance.ApprovalDecision', 'U') IS NOT NULL DELETE FROM governance.ApprovalDecision;
             IF OBJECT_ID('governance.ToolGateDecision', 'U') IS NOT NULL DELETE FROM governance.ToolGateDecision;
             IF OBJECT_ID('governance.TR_ToolGateDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete ON governance.ToolGateDecision;
             IF OBJECT_ID('governance.TR_ApprovalDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete ON governance.ApprovalDecision;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
+            IF OBJECT_ID('governance.TR_PolicySatisfaction_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PolicySatisfaction_BlockUpdateDelete ON governance.PolicySatisfaction;
             IF OBJECT_ID('governance.TR_AcceptedApproval_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_AcceptedApproval_BlockUpdateDelete ON governance.AcceptedApproval;
             IF OBJECT_ID('governance.TR_DogfoodReceipt_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_DogfoodReceipt_BlockUpdateDelete ON governance.DogfoodReceipt;
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
