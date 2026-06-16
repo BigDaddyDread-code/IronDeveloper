@@ -89,6 +89,11 @@
                            "id":  "2026-06-block-u-rollback-support-receipt",
                            "path":  "Database/migrate_rollback_support_receipt.sql",
                            "description":  "Creates durable RollbackSupportReceipt table, stored procedures, append-only trigger, and rollback-support-only authority protections."
+                       },
+                       {
+                           "id":  "2026-06-block-t-source-apply-dry-run-receipt",
+                           "path":  "Database/migrate_source_apply_dry_run_receipt.sql",
+                           "description":  "Creates durable SourceApplyDryRunReceipt table, stored procedures, append-only trigger, and dry-run-receipt-only authority protections."
                        }
                    ]
 }
