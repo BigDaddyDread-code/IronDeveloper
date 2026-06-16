@@ -292,6 +292,19 @@ try {
             ,@{ Name = "SourceApplyDryRunReceipt file results JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.SourceApplyDryRunReceipt') AND name = N'CK_SourceApplyDryRunReceipt_FileResultsJson_IsJson'" }
             ,@{ Name = "SourceApplyDryRunReceipt expiry check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.SourceApplyDryRunReceipt') AND name = N'CK_SourceApplyDryRunReceipt_ExpiresAfterCreated'" }
             ,@{ Name = "SourceApplyDryRunReceipt evidence JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.SourceApplyDryRunReceipt') AND name = N'CK_SourceApplyDryRunReceipt_EvidenceReferencesJson_IsJson'" }
+            ,@{ Name = "governance.SourceApplyReceipt table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.SourceApplyReceipt', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_Save procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_Save', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_Get procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_Get', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_GetByReceiptHash procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_GetByReceiptHash', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_ListBySourceApplyRequest procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_ListBySourceApplyRequest', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_ListBySourceApplyDryRunReceipt procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_ListBySourceApplyDryRunReceipt', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_ListByPatchArtifact procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_ListByPatchArtifact', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.usp_SourceApplyReceipt_ListByRollbackSupportReceipt procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.usp_SourceApplyReceipt_ListByRollbackSupportReceipt', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.TR_SourceApplyReceipt_ValidateInsert trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_SourceApplyReceipt_ValidateInsert', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "governance.TR_SourceApplyReceipt_BlockUpdateDelete trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'governance.TR_SourceApplyReceipt_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "SourceApplyReceipt file results JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.SourceApplyReceipt') AND name = N'CK_SourceApplyReceipt_FileResultsJson_IsJson'" }
+            ,@{ Name = "SourceApplyReceipt evidence JSON check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.SourceApplyReceipt') AND name = N'CK_SourceApplyReceipt_EvidenceReferencesJson_IsJson'" }
+            ,@{ Name = "SourceApplyReceipt partial not succeeded check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'governance.SourceApplyReceipt') AND name = N'CK_SourceApplyReceipt_PartialNotSucceeded'" }
             ,@{ Name = "memory.MemoryProposal table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposal', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "memory.MemoryProposalEvidenceReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposalEvidenceReference', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "memory.MemoryProposalGroundingReference table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.MemoryProposalGroundingReference', N'U') IS NULL THEN 0 ELSE 1 END" }
@@ -327,3 +340,4 @@ catch {
     Write-Error $_.Exception.Message
     exit 1
 }
+

@@ -94,6 +94,11 @@
                            "id":  "2026-06-block-t-source-apply-dry-run-receipt",
                            "path":  "Database/migrate_source_apply_dry_run_receipt.sql",
                            "description":  "Creates durable SourceApplyDryRunReceipt table, stored procedures, append-only trigger, and dry-run-receipt-only authority protections."
+                       },
+                       {
+                           "id":  "2026-06-pr204-source-apply-receipt",
+                           "path":  "Database/migrate_source_apply_receipt.sql",
+                           "description":  "Creates durable SourceApplyReceipt table, stored procedures, append-only trigger, and narrow-real-apply receipt authority protections."
                        }
                    ]
 }
