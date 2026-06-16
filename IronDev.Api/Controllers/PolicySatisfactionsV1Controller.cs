@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IronDev.Core.Governance;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,7 @@ namespace IronDev.Api.Controllers;
 public sealed class PolicySatisfactionsV1Controller : ControllerBase
 {
     private const int MaxIdLength = 256;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private static readonly string[] PrivateReasoningMarkers =
     [
@@ -53,9 +55,15 @@ public sealed class PolicySatisfactionsV1Controller : ControllerBase
     ];
 
     private readonly IPolicySatisfactionQueryService _query;
+    private readonly IPolicySatisfactionCreateService _create;
 
-    public PolicySatisfactionsV1Controller(IPolicySatisfactionQueryService query) =>
+    public PolicySatisfactionsV1Controller(
+        IPolicySatisfactionQueryService query,
+        IPolicySatisfactionCreateService create)
+    {
         _query = query ?? throw new ArgumentNullException(nameof(query));
+        _create = create ?? throw new ArgumentNullException(nameof(create));
+    }
 
     [HttpGet("{policySatisfactionId:guid}")]
     public async Task<ActionResult<PolicySatisfactionApiEnvelope<PolicySatisfactionReadModel>>> Get(
@@ -122,6 +130,62 @@ public sealed class PolicySatisfactionsV1Controller : ControllerBase
         return Ok(Envelope("found", records));
     }
 
+    [HttpPost]
+    public async Task<ActionResult<PolicySatisfactionApiEnvelope<PolicySatisfactionReadModel>>> Create(
+        [FromRoute] Guid projectId,
+        [FromBody] JsonElement body,
+        CancellationToken cancellationToken)
+    {
+        if (body.ValueKind is not JsonValueKind.Object)
+        {
+            return BadRequest(CreateEnvelope<PolicySatisfactionReadModel>(
+                "validation_error",
+                null,
+                errors: [Error("request", "Policy satisfaction create request body is required.")]));
+        }
+
+        var forbiddenFields = FindForbiddenClientFields(body).ToArray();
+        if (forbiddenFields.Length > 0)
+        {
+            return BadRequest(CreateEnvelope<PolicySatisfactionReadModel>(
+                "validation_error",
+                null,
+                errors: forbiddenFields
+                    .Select(field => Error(field, "Field is server-owned and must not be supplied by the client.", "server_owned_field"))
+                    .ToArray()));
+        }
+
+        PolicySatisfactionCreateRequest? request;
+        try
+        {
+            request = body.Deserialize<PolicySatisfactionCreateRequest>(JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return BadRequest(CreateEnvelope<PolicySatisfactionReadModel>(
+                "validation_error",
+                null,
+                errors: [Error("request", "Policy satisfaction create request JSON is invalid.")]));
+        }
+
+        var result = await _create.CreateAsync(projectId, request, User, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            var envelope = CreateEnvelope<PolicySatisfactionReadModel>(
+                "validation_error",
+                null,
+                errors: result.Issues.Select(ToError).ToArray());
+
+            return result.IsConflict ? Conflict(envelope) : BadRequest(envelope);
+        }
+
+        var policySatisfaction = result.PolicySatisfaction!;
+        return CreatedAtAction(
+            nameof(Get),
+            new { projectId, policySatisfactionId = policySatisfaction.PolicySatisfactionId },
+            CreateEnvelope("created", policySatisfaction, policySatisfaction.PolicySatisfactionId));
+    }
+
     private static IReadOnlyList<PolicySatisfactionApiErrorDto> ValidateLookupText(string? value, string field)
     {
         var errors = new List<PolicySatisfactionApiErrorDto>();
@@ -167,6 +231,34 @@ public sealed class PolicySatisfactionsV1Controller : ControllerBase
         values.Any(value => !string.IsNullOrWhiteSpace(value) &&
                             markers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase)));
 
+    private static IEnumerable<string> FindForbiddenClientFields(JsonElement body)
+    {
+        var forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "policySatisfactionId",
+            "projectId",
+            "satisfiedAtUtc",
+            "createdAtUtc",
+            "isExpired",
+            "isPolicySatisfied",
+            "canApplySource",
+            "canRunDryRun",
+            "canCreatePatchArtifact",
+            "canContinueWorkflow",
+            "canApproveRelease",
+            "releaseReady",
+            "mutationOccurred"
+        };
+
+        foreach (var property in body.EnumerateObject())
+        {
+            if (forbidden.Contains(property.Name))
+            {
+                yield return property.Name;
+            }
+        }
+    }
+
     private static PolicySatisfactionApiEnvelope<TData> Envelope<TData>(
         string status,
         TData? data,
@@ -184,6 +276,26 @@ public sealed class PolicySatisfactionsV1Controller : ControllerBase
             Errors = errors ?? []
         };
 
+    private static PolicySatisfactionApiEnvelope<TData> CreateEnvelope<TData>(
+        string status,
+        TData? data,
+        Guid? policySatisfactionId = null,
+        IReadOnlyList<PolicySatisfactionApiErrorDto>? errors = null) =>
+        new()
+        {
+            Status = status,
+            Data = data,
+            PolicySatisfactionId = policySatisfactionId,
+            Boundary = new PolicySatisfactionCreateBoundary(),
+            MutationOccurred = data is not null,
+            HumanApprovalRequired = true,
+            Warnings = PolicySatisfactionCreateBoundaryText.Warnings,
+            Errors = errors ?? []
+        };
+
+    private static PolicySatisfactionApiErrorDto ToError(PolicySatisfactionCreateIssue issue) =>
+        Error(issue.Field, issue.Message, issue.Code);
+
     private static PolicySatisfactionApiErrorDto Error(string field, string message, string code = "validation_error") =>
         new()
         {
@@ -199,7 +311,7 @@ public sealed record PolicySatisfactionApiEnvelope<TData>
     public required string Status { get; init; }
     public TData? Data { get; init; }
     public Guid? PolicySatisfactionId { get; init; }
-    public required PolicySatisfactionReadBoundary Boundary { get; init; }
+    public required object Boundary { get; init; }
     public bool MutationOccurred { get; init; }
     public bool HumanApprovalRequired { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
