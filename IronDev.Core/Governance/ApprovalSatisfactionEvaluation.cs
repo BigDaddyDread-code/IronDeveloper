@@ -19,6 +19,8 @@ public sealed record ApprovalSatisfactionEvaluation
 {
     public required bool IsSatisfied { get; init; }
     public Guid? AcceptedApprovalId { get; init; }
+    public IReadOnlyList<string> EvidenceReferences { get; init; } = [];
+    public IReadOnlyList<string> BoundaryMaxims { get; init; } = [];
     public required IReadOnlyList<ApprovalSatisfactionIssue> Issues { get; init; }
     public string Boundary { get; init; } = ApprovalSatisfactionBoundaryText.Boundary;
 }
