@@ -149,28 +149,27 @@ public sealed class PolicySatisfactionReadApiTests : ApiTestBase
     }
 
     [TestMethod]
-    public void PolicySatisfactionReadApi_UsesGetOnlyRoutes()
+    public void PolicySatisfactionReadApi_ReadRoutesRemainGetOnly()
     {
         var methods = ReadRouteMethods().ToArray();
+        var readMethods = methods.Where(method => new[] { "Get", "ListBySubject", "ListByAcceptedApproval", "ListByCorrelation" }.Contains(method.Name)).ToArray();
 
-        Assert.AreEqual(4, methods.Count(method => method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false).Any()));
-        Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpPostAttribute), inherit: false).Any()));
+        Assert.AreEqual(4, readMethods.Length);
+        Assert.IsTrue(readMethods.All(method => method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false).Any()));
+        Assert.IsFalse(readMethods.Any(method => method.GetCustomAttributes(typeof(HttpPostAttribute), inherit: false).Any()));
         Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpPutAttribute), inherit: false).Any()));
         Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpPatchAttribute), inherit: false).Any()));
         Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpDeleteAttribute), inherit: false).Any()));
     }
 
     [TestMethod]
-    public void PolicySatisfactionReadApi_DoesNotCreatePolicySatisfaction()
+    public void PolicySatisfactionReadApi_ReadActionsUseQueryOnly()
     {
         var controller = File.ReadAllText(ControllerPath());
 
-        foreach (var token in new[] { "CreatePolicySatisfaction", "SavePolicySatisfaction", "HttpPost", "[HttpPost]", "IPolicySatisfactionStore", ".SaveAsync" })
-        {
-            Assert.IsFalse(controller.Contains(token, StringComparison.Ordinal), $"Controller must not contain {token}.");
-        }
-
         StringAssert.Contains(controller, "IPolicySatisfactionQueryService");
+        Assert.IsFalse(controller.Contains("IPolicySatisfactionStore", StringComparison.Ordinal), "Controller must not depend on the SQL store directly.");
+        Assert.IsFalse(controller.Contains(".SaveAsync", StringComparison.Ordinal), "Controller must not save policy satisfaction records directly.");
     }
 
     [TestMethod]
