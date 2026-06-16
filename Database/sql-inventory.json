@@ -1475,6 +1475,57 @@
                         "notes":  "Runtime uses stored procedures after ApplyDryRunStoreValidator. No runtime DDL, API, CLI, dry-run performer, source apply, validation run, rollback, approval satisfaction, policy satisfaction, workflow transition, or memory promotion authority."
                     },
                     {
+                        "id":  "database.migrate-controlled-dry-run-receipt",
+                        "path":  "Database/migrate_controlled_dry_run_receipt.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.ControlledDryRunReceipt",
+                                               "governance.usp_ControlledDryRunReceipt_Save",
+                                               "governance.usp_ControlledDryRunReceipt_Get",
+                                               "governance.usp_ControlledDryRunReceipt_ListByRequest",
+                                               "governance.usp_ControlledDryRunReceipt_ListByPolicySatisfaction",
+                                               "governance.usp_ControlledDryRunReceipt_ListBySubject",
+                                               "governance.usp_ControlledDryRunReceipt_ListByAuditHash"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "IronDev.Infrastructure/Governance/SqlControlledDryRunReceiptStore.cs",
+                                             "Database/migrations.json",
+                                             "Database/verify-migrations.ps1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "PR184 durable controlled dry-run receipt store. Records supplied dry-run execution audit evidence only; it does not execute dry-runs, create patch artifacts, apply source, continue workflow, approve release, activate retrieval, or promote memory."
+                    },
+                    {
+                        "id":  "runtime.controlled-dry-run-receipt-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlControlledDryRunReceiptStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "stored-procedure-runtime",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_ControlledDryRunReceipt_Save",
+                                              "governance.usp_ControlledDryRunReceipt_Get",
+                                              "governance.usp_ControlledDryRunReceipt_ListByRequest",
+                                              "governance.usp_ControlledDryRunReceipt_ListByPolicySatisfaction",
+                                              "governance.usp_ControlledDryRunReceipt_ListBySubject",
+                                              "governance.usp_ControlledDryRunReceipt_ListByAuditHash"
+                                          ],
+                        "referencedBy":  [
+                                             "durable controlled dry-run receipt repository"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Runtime uses stored procedures after ControlledDryRunExecutionAuditValidation. No runtime DDL, API, CLI, dry-run execution, patch artifact creation, source apply, workflow continuation, release approval, memory promotion, or retrieval activation authority."
+                    },
+                    {
                         "id":  "database.migrate-memory-proposal-staging",
                         "path":  "Database/migrate_memory_proposal_staging.sql",
                         "kind":  "migration-script",
