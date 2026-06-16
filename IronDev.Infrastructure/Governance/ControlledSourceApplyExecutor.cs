@@ -1,4 +1,5 @@
 using IronDev.Core.Governance;
+using System.Text;
 
 namespace IronDev.Infrastructure.Governance;
 
@@ -20,19 +21,22 @@ public sealed class ControlledSourceApplyExecutor : IControlledSourceApplyExecut
             return Rejected(issues, preflight.FileResults);
         }
 
-        var fileResults = new List<SourceApplyReceiptFileResult>();
+        var fileResults = preflight.FileResults.ToList();
         var mutationOccurred = false;
         var partial = false;
         var issueCodes = new List<string>();
+        var plannedOperations = preflight.PlannedOperations.ToArray();
+        var currentOperationIndex = -1;
 
         try
         {
-            foreach (var operation in OrderedOperations(request.SourceApplyRequest.FileOperations))
+            for (var index = 0; index < plannedOperations.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var planned = preflight.PlannedOperations.Single(plan => ReferenceEquals(plan.Operation, operation));
+                currentOperationIndex = index;
+                var planned = plannedOperations[index];
                 var result = await ApplyOperationAsync(planned, cancellationToken);
-                fileResults.Add(result);
+                fileResults[index] = result;
                 mutationOccurred |= result.MutationApplied;
             }
         }
@@ -41,6 +45,32 @@ public sealed class ControlledSourceApplyExecutor : IControlledSourceApplyExecut
             partial = mutationOccurred;
             issueCodes.Add("ApplyFailedAfterMutationStarted");
             issues.Add(new("ApplyFailed", nameof(ControlledSourceApplyRequest.WorkspaceRoot), ex.Message));
+
+            if (currentOperationIndex >= 0 && currentOperationIndex < fileResults.Count)
+            {
+                var failed = fileResults[currentOperationIndex];
+                var failedIssues = failed.IssueCodes.Concat(["ApplyFailed"]).Distinct(StringComparer.Ordinal).ToArray();
+                var failedResult = failed with
+                {
+                    PreconditionsSatisfied = false,
+                    MutationApplied = false,
+                    Created = false,
+                    Modified = false,
+                    Deleted = false,
+                    Renamed = false,
+                    Noop = false,
+                    IssueCodes = failedIssues
+                };
+                fileResults[currentOperationIndex] = failedResult with
+                {
+                    FileResultHash = SourceApplyReceiptHashing.ComputeFileResultHash(failedResult)
+                };
+            }
+        }
+
+        if (issues.Count > 0 && !mutationOccurred)
+        {
+            return Rejected(issues, fileResults);
         }
 
         var receipt = BuildReceipt(
@@ -48,7 +78,7 @@ public sealed class ControlledSourceApplyExecutor : IControlledSourceApplyExecut
             mutationOccurred,
             applySucceeded: issues.Count == 0,
             partialApplyOccurred: partial,
-            fileResults.Count == 0 ? preflight.FileResults : fileResults,
+            fileResults,
             issueCodes.Concat(issues.Select(issue => issue.Code)).Distinct(StringComparer.Ordinal).ToArray());
 
         await _receiptStore.SaveAsync(receipt, cancellationToken);
@@ -111,6 +141,8 @@ public sealed class ControlledSourceApplyExecutor : IControlledSourceApplyExecut
         RequireEqual(request.SourceApplyRequest.PatchArtifactId, request.PatchArtifact.PatchArtifactId, "PatchArtifactId", issues);
         RequireEqual(request.SourceApplyRequest.PatchHash, request.PatchArtifact.PatchHash, "PatchHash", issues);
         RequireEqual(request.SourceApplyRequest.ChangeSetHash, request.PatchArtifact.ChangeSetHash, "ChangeSetHash", issues);
+        RequireEqual(request.SourceApplyRequest.PatchHash, request.RollbackSupportReceipt.PatchHash, "RollbackPatchHash", issues);
+        RequireEqual(request.SourceApplyRequest.ChangeSetHash, request.RollbackSupportReceipt.ChangeSetHash, "RollbackChangeSetHash", issues);
         RequireEqual(request.SourceApplyRequest.RollbackSupportReceiptId, request.RollbackSupportReceipt.RollbackSupportReceiptId, "RollbackSupportReceiptId", issues);
         RequireEqual(request.SourceApplyRequest.RollbackSupportReceiptHash, request.RollbackSupportReceipt.RollbackSupportReceiptHash, "RollbackSupportReceiptHash", issues);
         RequireEqual(request.SourceApplyRequest.SourceBaselineHash, request.SourceApplyDryRunReceipt.SourceBaselineHash, "SourceBaselineHash", issues);

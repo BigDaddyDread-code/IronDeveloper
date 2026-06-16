@@ -61,6 +61,8 @@ If validation or preflight fails, no mutation occurs and no source apply receipt
 
 If mutation starts and a later write fails, a partial source apply receipt is stored with `PartialApplyOccurred = true` and `ApplySucceeded = false`.
 
+`ObservedCleanWorktreeHashAfterApply` is receipt-derived in PR204 from the applied file-result hashes. It is not a git/worktree-discovered clean-state proof yet. A future controlled worktree-state provider can replace that seam.
+
 ## Non-goals
 
 PR204 does not add:
