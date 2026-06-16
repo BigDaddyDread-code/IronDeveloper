@@ -74,6 +74,11 @@
                            "id":  "2026-06-block-n-apply-dry-run-store",
                            "path":  "Database/migrate_apply_dry_run_store.sql",
                            "description":  "Creates durable workflow apply dry-run receipt table, stored procedures, append-only trigger, and receipt-only authority protections."
+                       },
+                       {
+                           "id":  "2026-06-block-r-controlled-dry-run-receipt",
+                           "path":  "Database/migrate_controlled_dry_run_receipt.sql",
+                           "description":  "Creates durable controlled dry-run receipt table, stored procedures, append-only trigger, and evidence-only authority protections."
                        }
                    ]
 }
