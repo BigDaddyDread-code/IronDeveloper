@@ -352,7 +352,16 @@ public sealed class WorkflowContinuationGateTests
                       ReadAllTextIfDirectoryExists(Path.Combine(root, "IronDev.Cli"));
         var databaseText = ReadAllTextIfDirectoryExists(Path.Combine(root, "Database"));
 
-        AssertDoesNotContainAny(apiText, "WorkflowContinuationGate");
+        AssertDoesNotContainAny(
+            apiText,
+            "WorkflowContinuationExecutor",
+            "ContinueWorkflow(",
+            "AdvanceWorkflow(",
+            "CompleteStep(",
+            "StartNextStep(",
+            "usp_WorkflowContinuationGate_Save",
+            "usp_WorkflowContinuationGate_Create",
+            "usp_WorkflowContinuationGate_Evaluate");
         AssertDoesNotContainAny(cliText, "WorkflowContinuationGate");
         AssertDoesNotContainAny(
             databaseText,

@@ -178,6 +178,8 @@ builder.Services.AddScoped<IDogfoodLoopApiStore, SqlDogfoodLoopApiStore>();
 builder.Services.AddScoped<IWorkflowRunStore, SqlWorkflowRunStore>();
 builder.Services.AddScoped<IWorkflowStepStore, SqlWorkflowStepStore>();
 builder.Services.AddScoped<IWorkflowCheckpointStore, SqlWorkflowCheckpointStore>();
+builder.Services.AddScoped<IWorkflowTransitionRecordStore, SqlWorkflowTransitionRecordStore>();
+builder.Services.AddScoped<IWorkflowTransitionRecordQueryService, WorkflowTransitionRecordQueryService>();
 builder.Services.AddScoped<IApplyDryRunStore, SqlApplyDryRunStore>();
 builder.Services.AddScoped<IApplyPreviewService, ApplyPreviewService>();
 builder.Services.AddScoped<IAcceptedApprovalStore, SqlAcceptedApprovalStore>();
