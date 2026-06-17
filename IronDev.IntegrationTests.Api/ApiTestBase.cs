@@ -230,9 +230,19 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workflow_step_store.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workflow_checkpoint_store.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workflow_transition_record.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_release_readiness_decision_record.sql");
     }
 
     private const string DropGovernanceSql = """
+        IF OBJECT_ID(N'governance.usp_ReleaseReadinessDecisionRecord_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ReleaseReadinessDecisionRecord_Save;
+        IF OBJECT_ID(N'governance.usp_ReleaseReadinessDecisionRecord_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ReleaseReadinessDecisionRecord_Get;
+        IF OBJECT_ID(N'governance.usp_ReleaseReadinessDecisionRecord_GetByHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ReleaseReadinessDecisionRecord_GetByHash;
+        IF OBJECT_ID(N'governance.usp_ReleaseReadinessDecisionRecord_ListByReleaseReadinessReport', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ReleaseReadinessDecisionRecord_ListByReleaseReadinessReport;
+        IF OBJECT_ID(N'governance.usp_ReleaseReadinessDecisionRecord_ListByWorkflowRun', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ReleaseReadinessDecisionRecord_ListByWorkflowRun;
+        IF OBJECT_ID(N'governance.usp_ReleaseReadinessDecisionRecord_ListBySubject', N'P') IS NOT NULL DROP PROCEDURE governance.usp_ReleaseReadinessDecisionRecord_ListBySubject;
+        IF OBJECT_ID(N'governance.TR_ReleaseReadinessDecisionRecord_ValidateInsert', N'TR') IS NOT NULL DROP TRIGGER governance.TR_ReleaseReadinessDecisionRecord_ValidateInsert;
+        IF OBJECT_ID(N'governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete;
+        IF OBJECT_ID(N'governance.ReleaseReadinessDecisionRecord', N'U') IS NOT NULL DROP TABLE governance.ReleaseReadinessDecisionRecord;
         IF OBJECT_ID(N'governance.usp_WorkflowTransitionRecord_Save', N'P') IS NOT NULL DROP PROCEDURE governance.usp_WorkflowTransitionRecord_Save;
         IF OBJECT_ID(N'governance.usp_WorkflowTransitionRecord_Get', N'P') IS NOT NULL DROP PROCEDURE governance.usp_WorkflowTransitionRecord_Get;
         IF OBJECT_ID(N'governance.usp_WorkflowTransitionRecord_GetByRecordHash', N'P') IS NOT NULL DROP PROCEDURE governance.usp_WorkflowTransitionRecord_GetByRecordHash;
@@ -387,6 +397,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.TR_RollbackSupportReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_RollbackSupportReceipt_BlockUpdateDelete ON governance.RollbackSupportReceipt;
             IF OBJECT_ID('governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete ON governance.SourceApplyDryRunReceipt;
             IF OBJECT_ID('governance.TR_WorkflowTransitionRecord_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_WorkflowTransitionRecord_BlockUpdateDelete ON governance.WorkflowTransitionRecord;
+            IF OBJECT_ID('governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete ON governance.ReleaseReadinessDecisionRecord;
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.TR_DogfoodReceipt_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_DogfoodReceipt_BlockUpdateDelete ON governance.DogfoodReceipt;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL DISABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
@@ -416,6 +427,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointEvidenceReference_BlockUpdateDelete ON workflow.WorkflowCheckpointEvidenceReference;
             IF OBJECT_ID('workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER workflow.TR_WorkflowCheckpointGroundingReference_BlockUpdateDelete ON workflow.WorkflowCheckpointGroundingReference;
             IF OBJECT_ID('governance.WorkflowTransitionRecord', 'U') IS NOT NULL DELETE FROM governance.WorkflowTransitionRecord;
+            IF OBJECT_ID('governance.ReleaseReadinessDecisionRecord', 'U') IS NOT NULL DELETE FROM governance.ReleaseReadinessDecisionRecord;
             IF OBJECT_ID('governance.SourceApplyDryRunReceipt', 'U') IS NOT NULL DELETE FROM governance.SourceApplyDryRunReceipt;
             IF OBJECT_ID('governance.RollbackSupportReceipt', 'U') IS NOT NULL DELETE FROM governance.RollbackSupportReceipt;
             IF OBJECT_ID('governance.PatchArtifact', 'U') IS NOT NULL DELETE FROM governance.PatchArtifact;
@@ -430,6 +442,7 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.TR_RollbackSupportReceipt_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_RollbackSupportReceipt_BlockUpdateDelete ON governance.RollbackSupportReceipt;
             IF OBJECT_ID('governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_SourceApplyDryRunReceipt_BlockUpdateDelete ON governance.SourceApplyDryRunReceipt;
             IF OBJECT_ID('governance.TR_WorkflowTransitionRecord_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_WorkflowTransitionRecord_BlockUpdateDelete ON governance.WorkflowTransitionRecord;
+            IF OBJECT_ID('governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete ON governance.ReleaseReadinessDecisionRecord;
             IF OBJECT_ID('governance.TR_ToolGateDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ToolGateDecision_BlockUpdateDelete ON governance.ToolGateDecision;
             IF OBJECT_ID('governance.TR_ApprovalDecision_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ApprovalDecision_BlockUpdateDelete ON governance.ApprovalDecision;
             IF OBJECT_ID('governance.TR_PolicyDecisionEvent_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_PolicyDecisionEvent_BlockUpdateDelete ON governance.PolicyDecisionEvent;
