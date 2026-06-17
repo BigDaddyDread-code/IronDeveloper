@@ -349,7 +349,12 @@ public sealed class WorkflowTransitionRecordTests
 
         AssertDoesNotContainAny(apiText, "WorkflowTransitionRecord");
         AssertDoesNotContainAny(cliText, "WorkflowTransitionRecord");
-        AssertDoesNotContainAny(databaseText, "WorkflowTransitionRecord");
+        AssertDoesNotContainAny(
+            databaseText,
+            "WorkflowTransitionExecutor",
+            "usp_WorkflowTransitionRecord_Execute",
+            "usp_WorkflowTransitionRecord_Continue",
+            "usp_WorkflowTransitionRecord_ApproveRelease");
     }
 
     [TestMethod]

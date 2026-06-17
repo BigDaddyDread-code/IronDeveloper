@@ -104,6 +104,11 @@
                            "id":  "2026-06-pr206-rollback-execution-receipt",
                            "path":  "Database/migrate_rollback_execution_receipt.sql",
                            "description":  "Creates durable RollbackExecutionReceipt table, stored procedures, append-only trigger, and controlled rollback execution receipt authority protections."
+                       },
+                       {
+                           "id":  "2026-06-pr212-workflow-transition-record",
+                           "path":  "Database/migrate_workflow_transition_record.sql",
+                           "description":  "Creates durable WorkflowTransitionRecord table, stored procedures, append-only trigger, and movement-receipt-only authority protections."
                        }
                    ]
 }

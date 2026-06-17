@@ -1845,6 +1845,61 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Runtime store validates supplied RollbackExecutionReceipt records and calls stored procedures only; no rollback planning, source apply expansion, workflow continuation, release approval, git, API, CLI, UI, agent, model, tool, memory, or retrieval path."
+                    },
+                    {
+                        "id":  "database.migrate-workflow-transition-record",
+                        "path":  "Database/migrate_workflow_transition_record.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.WorkflowTransitionRecord",
+                                               "governance.usp_WorkflowTransitionRecord_Save",
+                                               "governance.usp_WorkflowTransitionRecord_Get",
+                                               "governance.usp_WorkflowTransitionRecord_GetByRecordHash",
+                                               "governance.usp_WorkflowTransitionRecord_ListByWorkflowRun",
+                                               "governance.usp_WorkflowTransitionRecord_ListByWorkflowStep",
+                                               "governance.usp_WorkflowTransitionRecord_ListByContinuationGateEvaluation",
+                                               "governance.usp_WorkflowTransitionRecord_ListBySourceApplyReceipt",
+                                               "governance.usp_WorkflowTransitionRecord_ListByRollbackExecutionReceipt",
+                                               "governance.TR_WorkflowTransitionRecord_ValidateInsert",
+                                               "governance.TR_WorkflowTransitionRecord_BlockUpdateDelete"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "PR212 Workflow Transition Store"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Durable append-only storage for validated WorkflowTransitionRecord evidence only; does not transition workflow, mutate workflow state, continue workflow, approve release, execute source apply, execute rollback, run agents/models/tools, promote memory, activate retrieval, or use git."
+                    },
+                    {
+                        "id":  "runtime.workflow-transition-record-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlWorkflowTransitionRecordStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "governed-persistence",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_WorkflowTransitionRecord_Save",
+                                              "governance.usp_WorkflowTransitionRecord_Get",
+                                              "governance.usp_WorkflowTransitionRecord_GetByRecordHash",
+                                              "governance.usp_WorkflowTransitionRecord_ListByWorkflowRun",
+                                              "governance.usp_WorkflowTransitionRecord_ListByWorkflowStep",
+                                              "governance.usp_WorkflowTransitionRecord_ListByContinuationGateEvaluation",
+                                              "governance.usp_WorkflowTransitionRecord_ListBySourceApplyReceipt",
+                                              "governance.usp_WorkflowTransitionRecord_ListByRollbackExecutionReceipt"
+                                          ],
+                        "referencedBy":  [
+                                             "IWorkflowTransitionRecordStore"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store validates supplied WorkflowTransitionRecord records and calls stored procedures only; no workflow transition executor, workflow mutation, workflow continuation, release approval/readiness, source apply, rollback execution, git, API, CLI, UI, agent, model, tool, memory, or retrieval path."
                     }
                 ]
 }
