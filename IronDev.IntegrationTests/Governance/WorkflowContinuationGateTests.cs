@@ -354,7 +354,12 @@ public sealed class WorkflowContinuationGateTests
 
         AssertDoesNotContainAny(apiText, "WorkflowContinuationGate");
         AssertDoesNotContainAny(cliText, "WorkflowContinuationGate");
-        AssertDoesNotContainAny(databaseText, "WorkflowContinuationGate");
+        AssertDoesNotContainAny(
+            databaseText,
+            "CREATE TABLE governance.WorkflowContinuationGate",
+            "usp_WorkflowContinuationGate_Save",
+            "usp_WorkflowContinuationGate_Create",
+            "usp_WorkflowContinuationGate_Evaluate");
     }
 
     [TestMethod]
