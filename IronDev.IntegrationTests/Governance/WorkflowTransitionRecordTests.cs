@@ -347,7 +347,12 @@ public sealed class WorkflowTransitionRecordTests
                       ReadAllTextIfDirectoryExists(Path.Combine(root, "IronDev.Cli"));
         var databaseText = ReadAllTextIfDirectoryExists(Path.Combine(root, "Database"));
 
-        AssertDoesNotContainAny(apiText, "WorkflowTransitionRecord");
+        AssertDoesNotContainAny(
+            apiText,
+            "WorkflowTransitionExecutor",
+            "WorkflowTransitionRecord_Execute",
+            "WorkflowTransitionRecord_Continue",
+            "WorkflowTransitionRecord_ApproveRelease");
         AssertDoesNotContainAny(cliText, "WorkflowTransitionRecord");
         AssertDoesNotContainAny(
             databaseText,
