@@ -301,6 +301,20 @@ public sealed class IronDevApiClient : IIronDevApiClient
             cancellationToken);
     }
 
+    public Task<IronDevApiResponse<JsonElement?>> CreateGovernedReleaseGateAsync(
+        string projectId,
+        JsonElement request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(projectId))
+            throw new ArgumentException("Project id is required.", nameof(projectId));
+
+        return PostJsonEnvelopeAsync(
+            $"api/v1/projects/{Uri.EscapeDataString(projectId.Trim())}/release-readiness/gate/governed",
+            request,
+            cancellationToken);
+    }
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);

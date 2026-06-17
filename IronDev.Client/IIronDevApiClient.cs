@@ -127,6 +127,11 @@ public interface IIronDevApiClient
         System.Text.Json.JsonElement request,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> CreateGovernedReleaseGateAsync(
+        string projectId,
+        System.Text.Json.JsonElement request,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);

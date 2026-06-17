@@ -182,6 +182,8 @@ builder.Services.AddScoped<IWorkflowTransitionRecordStore, SqlWorkflowTransition
 builder.Services.AddScoped<IWorkflowTransitionRecordQueryService, WorkflowTransitionRecordQueryService>();
 builder.Services.AddScoped<IReleaseReadinessDecisionRecordStore, SqlReleaseReadinessDecisionRecordStore>();
 builder.Services.AddScoped<IReleaseReadinessDecisionRecordQueryService, ReleaseReadinessDecisionRecordQueryService>();
+builder.Services.AddSingleton<ReleaseReadinessGateEvaluator>();
+builder.Services.AddScoped<IGovernedReleaseGateService, GovernedReleaseGateService>();
 builder.Services.AddSingleton<IWorkflowContinuationGateEvaluator, WorkflowContinuationGateEvaluator>();
 builder.Services.AddScoped<IControlledWorkflowStateTransitionStore, SqlControlledWorkflowStateTransitionStore>();
 builder.Services.AddScoped<IGovernedWorkflowContinuationService, GovernedWorkflowContinuationService>();
