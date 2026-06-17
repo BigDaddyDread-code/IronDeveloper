@@ -10,6 +10,7 @@ import { ApprovalPackageReviewRoute } from '../features/governance/ApprovalPacka
 import { DogfoodReceiptViewerRoute } from '../features/governance/DogfoodReceiptViewerRoute';
 import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
+import { PatchArtifactPanelRoute } from '../features/governance/PatchArtifactPanelRoute';
 import { PolicySatisfactionPanelRoute } from '../features/governance/PolicySatisfactionPanelRoute';
 import { SourceApplyDryRunReceiptPanelRoute } from '../features/governance/SourceApplyDryRunReceiptPanelRoute';
 import { ToolGateDecisionRoute } from '../features/governance/ToolGateDecisionRoute';
@@ -71,6 +72,8 @@ export function IronDevShell() {
           <WorkflowRunStepViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/memory-proposals') ? (
           <MemoryProposalReviewRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/patch-artifacts') ? (
+          <PatchArtifactPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/dogfood-receipts') ? (
           <DogfoodReceiptViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/approval-packages') ? (
