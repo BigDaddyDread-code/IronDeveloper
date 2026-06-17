@@ -68,6 +68,59 @@ public sealed class ControlledRollbackExecutorTests
         Assert.AreEqual(before, await File.ReadAllTextAsync(Path.Combine(workspace, "src", "file.txt"), Encoding.UTF8));
     }
 
+    [TestMethod]
+    public async Task ControlledRollbackExecutor_RejectsDuplicateRollbackActionHashBeforeMutation()
+    {
+        var workspace = Workspace();
+        var fixture = RollbackFixture.Create(workspace,
+        [
+            Op.Modify("src/first.txt", "first-old", "first-new"),
+            Op.Modify("src/second.txt", "second-old", "second-new")
+        ]);
+        fixture.WriteAppliedState();
+        var firstFile = Path.Combine(workspace, "src", "first.txt");
+        var secondFile = Path.Combine(workspace, "src", "second.txt");
+        var beforeFirst = await File.ReadAllTextAsync(firstFile, Encoding.UTF8);
+        var beforeSecond = await File.ReadAllTextAsync(secondFile, Encoding.UTF8);
+        var actions = fixture.Request.RollbackPlan.FileActions.ToArray();
+        var duplicateHashAction = actions[1] with { RollbackActionHash = actions[0].RollbackActionHash };
+        var bad = fixture.Request with
+        {
+            RollbackPlan = fixture.Request.RollbackPlan with { FileActions = [actions[0], duplicateHashAction] }
+        };
+        var store = new RecordingRollbackStore();
+
+        var result = await new ControlledRollbackExecutor(store).RollbackAsync(bad);
+
+        AssertRejectedBeforeMutation(result, store);
+        AssertIssue(result, "DuplicateRollbackActionHash");
+        Assert.AreEqual(beforeFirst, await File.ReadAllTextAsync(firstFile, Encoding.UTF8));
+        Assert.AreEqual(beforeSecond, await File.ReadAllTextAsync(secondFile, Encoding.UTF8));
+    }
+
+    [TestMethod]
+    public async Task ControlledRollbackExecutor_RejectsDuplicateRollbackActionTargetBeforeMutation()
+    {
+        var workspace = Workspace();
+        var fixture = RollbackFixture.Create(workspace, [Op.Modify("src/file.txt", "old", "new")]);
+        fixture.WriteAppliedState();
+        var file = Path.Combine(workspace, "src", "file.txt");
+        var before = await File.ReadAllTextAsync(file, Encoding.UTF8);
+        var action = fixture.Request.RollbackPlan.FileActions[0];
+        var duplicateTargetAction = action with { RollbackActionHash = H("duplicate-target-different-action-hash") };
+        var bad = fixture.Request with
+        {
+            RollbackPlan = fixture.Request.RollbackPlan with { FileActions = [action, duplicateTargetAction] }
+        };
+        var store = new RecordingRollbackStore();
+
+        var result = await new ControlledRollbackExecutor(store).RollbackAsync(bad);
+
+        AssertRejectedBeforeMutation(result, store);
+        AssertIssue(result, "DuplicateRollbackActionTarget");
+        Assert.AreEqual(before, await File.ReadAllTextAsync(file, Encoding.UTF8));
+    }
+
     [DataTestMethod]
     [DataRow("../escape.txt")]
     [DataRow("src/../escape.txt")]
@@ -199,9 +252,13 @@ public sealed class ControlledRollbackExecutorTests
     {
         Assert.IsFalse(result.Succeeded);
         Assert.IsFalse(result.MutationOccurred);
+        Assert.IsFalse(result.PartialRollbackOccurred);
         Assert.IsNull(result.Receipt);
         Assert.AreEqual(0, store.Saved.Count);
     }
+
+    private static void AssertIssue(ControlledRollbackExecutionResult result, string code) =>
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == code), $"Expected issue {code}. Actual: {string.Join("; ", result.Issues.Select(issue => issue.Code))}");
 
     private static void AssertReceiptDoesNotGrantAuthority(RollbackExecutionReceipt receipt)
     {
