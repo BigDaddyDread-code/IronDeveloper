@@ -1900,6 +1900,57 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Runtime store validates supplied WorkflowTransitionRecord records and calls stored procedures only; no workflow transition executor, workflow mutation, workflow continuation, release approval/readiness, source apply, rollback execution, git, API, CLI, UI, agent, model, tool, memory, or retrieval path."
+                    },
+                    {
+                        "id":  "database.migrate-release-readiness-decision-record",
+                        "path":  "Database/migrate_release_readiness_decision_record.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+                                               "governance.ReleaseReadinessDecisionRecord",
+                                               "governance.usp_ReleaseReadinessDecisionRecord_Save",
+                                               "governance.usp_ReleaseReadinessDecisionRecord_Get",
+                                               "governance.usp_ReleaseReadinessDecisionRecord_GetByHash",
+                                               "governance.usp_ReleaseReadinessDecisionRecord_ListByReleaseReadinessReport",
+                                               "governance.usp_ReleaseReadinessDecisionRecord_ListByWorkflowRun",
+                                               "governance.usp_ReleaseReadinessDecisionRecord_ListBySubject",
+                                               "governance.TR_ReleaseReadinessDecisionRecord_ValidateInsert",
+                                               "governance.TR_ReleaseReadinessDecisionRecord_BlockUpdateDelete"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "PR218 Release Readiness Store"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Durable append-only storage for validated ReleaseReadinessDecisionRecord evidence only; does not run the readiness gate, decide readiness, approve release, approve deployment, approve merge, execute release, execute source apply, execute rollback, continue workflow, mutate workflow state, use git, expose API, expose CLI, expose UI, run agents/models/tools, promote memory, or activate retrieval."
+                    },
+                    {
+                        "id":  "runtime.release-readiness-decision-record-store",
+                        "path":  "IronDev.Infrastructure/Governance/SqlReleaseReadinessDecisionRecordStore.cs",
+                        "kind":  "runtime-store",
+                        "bucket":  "governed-persistence",
+                        "ownerArea":  "governance",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "governance.usp_ReleaseReadinessDecisionRecord_Save",
+                                              "governance.usp_ReleaseReadinessDecisionRecord_Get",
+                                              "governance.usp_ReleaseReadinessDecisionRecord_GetByHash",
+                                              "governance.usp_ReleaseReadinessDecisionRecord_ListByReleaseReadinessReport",
+                                              "governance.usp_ReleaseReadinessDecisionRecord_ListByWorkflowRun",
+                                              "governance.usp_ReleaseReadinessDecisionRecord_ListBySubject"
+                                          ],
+                        "referencedBy":  [
+                                             "IReleaseReadinessDecisionRecordStore"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Runtime store validates supplied ReleaseReadinessDecisionRecord records and calls stored procedures only; no readiness gate, release decision creation, release approval, deployment approval, merge approval, release execution, source apply, rollback execution, workflow continuation, git, API, CLI, UI, agent, model, tool, memory, or retrieval path."
                     }
                 ]
 }
