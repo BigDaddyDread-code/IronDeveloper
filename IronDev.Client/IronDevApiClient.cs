@@ -287,6 +287,20 @@ public sealed class IronDevApiClient : IIronDevApiClient
             cancellationToken);
     }
 
+    public Task<IronDevApiResponse<JsonElement?>> CreateGovernedWorkflowContinuationAsync(
+        string projectId,
+        JsonElement request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(projectId))
+            throw new ArgumentException("Project id is required.", nameof(projectId));
+
+        return PostJsonEnvelopeAsync(
+            $"api/v1/projects/{Uri.EscapeDataString(projectId.Trim())}/workflow-continuation/governed",
+            request,
+            cancellationToken);
+    }
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);

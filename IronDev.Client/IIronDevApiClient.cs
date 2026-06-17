@@ -122,6 +122,11 @@ public interface IIronDevApiClient
         bool includeDryRunSummaries = true,
         CancellationToken cancellationToken = default);
 
+    Task<IronDevApiResponse<System.Text.Json.JsonElement?>> CreateGovernedWorkflowContinuationAsync(
+        string projectId,
+        System.Text.Json.JsonElement request,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
