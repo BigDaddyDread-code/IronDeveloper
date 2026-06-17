@@ -12,6 +12,7 @@ import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimeli
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
 import { PatchArtifactPanelRoute } from '../features/governance/PatchArtifactPanelRoute';
 import { PolicySatisfactionPanelRoute } from '../features/governance/PolicySatisfactionPanelRoute';
+import { SourceApplyReviewPanelRoute } from '../features/governance/SourceApplyReviewPanelRoute';
 import { SourceApplyDryRunReceiptPanelRoute } from '../features/governance/SourceApplyDryRunReceiptPanelRoute';
 import { ToolGateDecisionRoute } from '../features/governance/ToolGateDecisionRoute';
 import { WorkflowRunStepViewerRoute } from '../features/governance/WorkflowRunStepViewerRoute';
@@ -82,6 +83,8 @@ export function IronDevShell() {
           <AcceptedApprovalPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/policy-satisfaction') ? (
           <PolicySatisfactionPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/source-apply-reviews') ? (
+          <SourceApplyReviewPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/source-apply-dry-run-receipts') ? (
           <SourceApplyDryRunReceiptPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/tool-gates') ? (
