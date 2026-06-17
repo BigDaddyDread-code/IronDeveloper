@@ -16,6 +16,7 @@ import { SourceApplyReviewPanelRoute } from '../features/governance/SourceApplyR
 import { RollbackEvidencePanelRoute } from '../features/governance/RollbackEvidencePanelRoute';
 import { SourceApplyDryRunReceiptPanelRoute } from '../features/governance/SourceApplyDryRunReceiptPanelRoute';
 import { ToolGateDecisionRoute } from '../features/governance/ToolGateDecisionRoute';
+import { WorkflowContinuationEvidencePanelRoute } from '../features/governance/WorkflowContinuationEvidencePanelRoute';
 import { WorkflowRunStepViewerRoute } from '../features/governance/WorkflowRunStepViewerRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
 import { BuildRoute } from '../features/chatToBuild/BuildRoute';
@@ -84,10 +85,12 @@ export function IronDevShell() {
           <AcceptedApprovalPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/policy-satisfaction') ? (
           <PolicySatisfactionPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
-              ) : window.location.pathname.startsWith('/governance/rollback-evidence') ? (
-                <RollbackEvidencePanelRoute route={activeRoute} onRouteReady={onRouteReady} />
-              ) : window.location.pathname.startsWith('/governance/source-apply-reviews') ? (
-                <SourceApplyReviewPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/workflow-continuation-evidence') ? (
+          <WorkflowContinuationEvidencePanelRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/rollback-evidence') ? (
+          <RollbackEvidencePanelRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/source-apply-reviews') ? (
+          <SourceApplyReviewPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/source-apply-dry-run-receipts') ? (
           <SourceApplyDryRunReceiptPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/tool-gates') ? (
