@@ -200,6 +200,9 @@ public static class IronDevCli
         if (IronDevCliWorkflowContinuation.IsWorkflowContinuationCommand(args))
             return await IronDevCliWorkflowContinuation.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliReleaseGate.IsReleaseGateCommand(args))
+            return await IronDevCliReleaseGate.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
