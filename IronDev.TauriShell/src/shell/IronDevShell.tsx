@@ -12,6 +12,7 @@ import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimeli
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
 import { PatchArtifactPanelRoute } from '../features/governance/PatchArtifactPanelRoute';
 import { PolicySatisfactionPanelRoute } from '../features/governance/PolicySatisfactionPanelRoute';
+import { ReleaseReadinessEvidencePanelRoute } from '../features/governance/ReleaseReadinessEvidencePanelRoute';
 import { SourceApplyReviewPanelRoute } from '../features/governance/SourceApplyReviewPanelRoute';
 import { RollbackEvidencePanelRoute } from '../features/governance/RollbackEvidencePanelRoute';
 import { SourceApplyDryRunReceiptPanelRoute } from '../features/governance/SourceApplyDryRunReceiptPanelRoute';
@@ -85,6 +86,8 @@ export function IronDevShell() {
           <AcceptedApprovalPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/policy-satisfaction') ? (
           <PolicySatisfactionPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/release-readiness-evidence') ? (
+          <ReleaseReadinessEvidencePanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/workflow-continuation-evidence') ? (
           <WorkflowContinuationEvidencePanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/rollback-evidence') ? (
