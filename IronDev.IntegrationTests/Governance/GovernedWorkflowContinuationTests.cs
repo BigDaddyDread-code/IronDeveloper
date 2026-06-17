@@ -1,4 +1,6 @@
 ﻿using IronDev.Core.Governance;
+using System.Security.Cryptography;
+using System.Text;
 using IronDev.Core.Workflow;
 using IronDev.Infrastructure.Governance;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -48,8 +50,9 @@ public sealed class GovernedWorkflowContinuationTests
         var transitionStore = new FakeTransitionStore(store);
         var recordStore = new FakeTransitionRecordStore();
         var service = new GovernedWorkflowContinuationService(store, transitionStore, recordStore);
-        var gate = ValidGate(run) with { Satisfied = false, Status = WorkflowContinuationGateStatuses.Blocked };
-        var request = ValidRequest(run) with
+        var request = ValidRequest(run);
+        var gate = request.WorkflowContinuationGateEvaluation with { Satisfied = false, Status = WorkflowContinuationGateStatuses.Blocked };
+        request = request with
         {
             WorkflowContinuationGateEvaluation = gate,
             WorkflowContinuationGateEvaluationHash = GovernedWorkflowContinuationHashing.ComputeGateEvaluationHash(gate)
@@ -63,6 +66,34 @@ public sealed class GovernedWorkflowContinuationTests
         Assert.AreEqual(0, transitionStore.CallCount);
         Assert.AreEqual(0, recordStore.Saved.Count);
         Assert.IsTrue(result.Issues.Any(issue => issue.Code == "GateNotSatisfied"));
+    }
+
+    [TestMethod]
+    public async Task GovernedContinuation_RejectsFabricatedGateEvenWhenSuppliedHashMatches()
+    {
+        var run = ValidRun();
+        var store = new FakeWorkflowRunStore(run);
+        var transitionStore = new FakeTransitionStore(store);
+        var recordStore = new FakeTransitionRecordStore();
+        var service = new GovernedWorkflowContinuationService(store, transitionStore, recordStore);
+        var request = ValidRequest(run);
+        var fabricatedGate = request.WorkflowContinuationGateEvaluation with
+        {
+            SourceApplyReceiptHash = H("fabricated-source-apply-receipt")
+        };
+        request = request with
+        {
+            WorkflowContinuationGateEvaluation = fabricatedGate,
+            WorkflowContinuationGateEvaluationHash = GovernedWorkflowContinuationHashing.ComputeGateEvaluationHash(fabricatedGate)
+        };
+
+        var result = await service.ContinueAsync(request);
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsFalse(result.WorkflowStateMutated);
+        Assert.AreEqual(0, transitionStore.CallCount);
+        Assert.AreEqual(0, recordStore.Saved.Count);
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == "FreshGateHashMismatch"), string.Join("; ", result.Issues.Select(issue => issue.Code)));
     }
 
     [TestMethod]
@@ -152,7 +183,8 @@ public sealed class GovernedWorkflowContinuationTests
 
     private static GovernedWorkflowContinuationRequest ValidRequest(WorkflowRun run)
     {
-        var gate = ValidGate(run);
+        var gateRequest = ValidGateRequest(run);
+        var gate = new WorkflowContinuationGateEvaluator().Evaluate(gateRequest);
         return new GovernedWorkflowContinuationRequest
         {
             GovernedWorkflowContinuationRequestId = Guid.NewGuid(),
@@ -165,46 +197,248 @@ public sealed class GovernedWorkflowContinuationTests
             ExpectedCurrentStepStateHash = GovernedWorkflowContinuationHashing.ComputeStepStateHash(run.Steps[0]),
             WorkflowContinuationGateEvaluation = gate,
             WorkflowContinuationGateEvaluationHash = GovernedWorkflowContinuationHashing.ComputeGateEvaluationHash(gate),
-            RequestedAtUtc = DateTimeOffset.UtcNow,
-            EvidenceReferences = ["workflow-continuation-request:pr214", "source-apply-receipt:pr214"],
-            BoundaryMaxims = ["Workflow continuation is not release approval.", "Workflow continuation does not execute source apply."]
+            AcceptedApproval = gateRequest.AcceptedApproval,
+            PolicySatisfaction = gateRequest.PolicySatisfaction,
+            SourceApplyRequest = gateRequest.SourceApplyRequest,
+            SourceApplyReceipt = gateRequest.SourceApplyReceipt,
+            RollbackExecutionReceipt = gateRequest.RollbackExecutionReceipt,
+            RollbackExecutionAuditReport = gateRequest.RollbackExecutionAuditReport,
+            RequestedAtUtc = gateRequest.RequestedAtUtc,
+            EvidenceReferences = gateRequest.EvidenceReferences,
+            BoundaryMaxims = gateRequest.BoundaryMaxims
         };
     }
 
-    private static WorkflowContinuationGateEvaluation ValidGate(WorkflowRun run) => new()
+    private static WorkflowContinuationGateRequest ValidGateRequest(WorkflowRun run)
     {
-        WorkflowContinuationGateEvaluationId = Guid.NewGuid(),
-        ProjectId = run.ProjectId,
-        WorkflowContinuationGateRequestId = Guid.NewGuid(),
-        Status = WorkflowContinuationGateStatuses.Satisfied,
-        Satisfied = true,
-        WorkflowRunId = run.WorkflowRunId.ToString("D"),
-        WorkflowStepId = run.Steps[0].WorkflowRunStepId.ToString("D"),
-        ExpectedWorkflowStateHash = GovernedWorkflowContinuationHashing.ComputeWorkflowStateHash(run),
-        SourceApplyRequestId = Guid.NewGuid(),
-        SourceApplyRequestHash = "sha256:source-apply-request-pr214",
-        SourceApplyReceiptId = Guid.NewGuid(),
-        SourceApplyReceiptHash = "sha256:source-apply-receipt-pr214",
-        RollbackExecutionReceiptId = null,
-        RollbackExecutionReceiptHash = null,
-        RollbackExecutionAuditReportId = null,
-        SourceApplySucceeded = true,
-        SourceApplyPartial = false,
-        RollbackWasExecuted = false,
-        RollbackSucceeded = false,
-        RollbackPartial = false,
-        RollbackAuditConsistent = false,
-        WorkflowStateMutated = false,
-        WorkflowContinuationExecuted = false,
-        ReleaseReadinessInferred = false,
-        ReleaseApproved = false,
-        HumanReviewRequired = true,
-        Issues = [],
-        EvaluatedAtUtc = DateTimeOffset.UtcNow,
-        EvidenceReferences = ["source-apply-request:pr214", "source-apply-receipt:pr214"],
-        BoundaryMaxims = ["Gate is not executor.", "Gate is not release approval."],
-        Boundary = WorkflowContinuationGateBoundaryText.Boundary
-    };
+        var now = new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero);
+        var sourceApplyRequestId = Guid.NewGuid();
+        var sourceApplyReceiptId = Guid.NewGuid();
+        var sourceApplyRequestHash = H("source-apply-request-pr214");
+        var subjectKind = "SourceApplyRequest";
+        var subjectId = sourceApplyRequestId.ToString("D");
+        var subjectHash = H("subject-pr214");
+        var baselineHash = H("baseline-pr214");
+        var workspaceHash = H("workspace-pr214");
+        var cleanBefore = H("clean-before-pr214");
+        var cleanAfter = H("clean-after-pr214");
+        var patchArtifactId = Guid.NewGuid();
+        var rollbackSupportReceiptId = Guid.NewGuid();
+        var rollbackPlanId = Guid.NewGuid();
+        var acceptedApprovalId = Guid.NewGuid();
+        var policySatisfactionId = Guid.NewGuid();
+        var sourceGateId = Guid.NewGuid();
+        var patchHash = H("patch-pr214");
+        var changeSetHash = H("change-set-pr214");
+        var rollbackSupportHash = H("rollback-support-pr214");
+        var rollbackPlanHash = H("rollback-plan-pr214");
+        var sourceGateHash = H("source-gate-pr214");
+        var operation = new SourceApplyRequestFileOperation
+        {
+            Path = "src/file.txt",
+            OperationKind = SourceApplyRequestFileOperationKinds.ModifyFile,
+            PreviousPath = null,
+            BeforeContentHash = H("old-pr214"),
+            AfterContentHash = H("new-pr214"),
+            DiffHash = H("diff-pr214"),
+            PatchArtifactChangeHash = H("patch-change-pr214"),
+            OperationHash = H("operation-pr214")
+        };
+        var sourceGate = new SourceApplyRequestGateEvaluationEvidence
+        {
+            SourceApplyGateEvaluationId = sourceGateId,
+            SourceApplyGateEvaluationHash = sourceGateHash,
+            Satisfied = true,
+            ProjectId = run.ProjectId,
+            AcceptedApprovalId = acceptedApprovalId,
+            AcceptedApprovalHash = H("accepted-approval-pr214"),
+            PolicySatisfactionId = policySatisfactionId,
+            PolicySatisfactionHash = H("policy-satisfaction-pr214"),
+            ControlledDryRunRequestId = Guid.NewGuid(),
+            DryRunExecutionAuditId = Guid.NewGuid(),
+            DryRunAuditHash = H("dry-run-audit-pr214"),
+            DryRunReceiptHash = H("dry-run-receipt-pr214"),
+            PatchArtifactId = patchArtifactId,
+            PatchHash = patchHash,
+            ChangeSetHash = changeSetHash,
+            RollbackSupportReceiptId = rollbackSupportReceiptId,
+            RollbackSupportReceiptHash = rollbackSupportHash,
+            RollbackPlanId = rollbackPlanId,
+            RollbackPlanHash = rollbackPlanHash,
+            RollbackGateEvaluationHash = H("rollback-gate-pr214"),
+            SubjectKind = subjectKind,
+            SubjectId = subjectId,
+            SubjectHash = subjectHash,
+            SourceSnapshotReference = "snapshot-main",
+            SourceBaselineHash = baselineHash,
+            WorkspaceBoundaryHash = workspaceHash,
+            ExpectedBranch = "main",
+            ExpectedCleanWorktreeHash = cleanBefore,
+            ExpiresAtUtc = now.AddHours(1),
+            EvidenceReferences = ["source-gate-evidence-pr214"],
+            BoundaryMaxims = ["Gate evidence is not execution."]
+        };
+        var sourceRequest = new SourceApplyRequest
+        {
+            SourceApplyRequestId = sourceApplyRequestId,
+            ProjectId = run.ProjectId,
+            SourceApplyGateEvaluationId = sourceGateId,
+            SourceApplyGateEvaluationHash = sourceGateHash,
+            SourceApplyGateSatisfied = true,
+            SourceApplyGateEvaluation = sourceGate,
+            AcceptedApprovalId = acceptedApprovalId,
+            AcceptedApprovalHash = sourceGate.AcceptedApprovalHash,
+            PolicySatisfactionId = policySatisfactionId,
+            PolicySatisfactionHash = sourceGate.PolicySatisfactionHash,
+            ControlledDryRunRequestId = sourceGate.ControlledDryRunRequestId,
+            DryRunExecutionAuditId = sourceGate.DryRunExecutionAuditId,
+            DryRunAuditHash = sourceGate.DryRunAuditHash,
+            DryRunReceiptHash = sourceGate.DryRunReceiptHash,
+            PatchArtifactId = patchArtifactId,
+            PatchHash = patchHash,
+            ChangeSetHash = changeSetHash,
+            RollbackSupportReceiptId = rollbackSupportReceiptId,
+            RollbackSupportReceiptHash = rollbackSupportHash,
+            RollbackPlanId = rollbackPlanId,
+            RollbackPlanHash = rollbackPlanHash,
+            RollbackGateEvaluationHash = sourceGate.RollbackGateEvaluationHash,
+            SubjectKind = subjectKind,
+            SubjectId = subjectId,
+            SubjectHash = subjectHash,
+            SourceSnapshotReference = sourceGate.SourceSnapshotReference,
+            SourceBaselineHash = baselineHash,
+            WorkspaceBoundaryHash = workspaceHash,
+            ExpectedBranch = "main",
+            ExpectedCleanWorktreeHash = cleanBefore,
+            FileOperations = [operation],
+            RequestedAtUtc = now,
+            ExpiresAtUtc = now.AddHours(1),
+            SourceApplyRequestHash = sourceApplyRequestHash,
+            EvidenceReferences = ["source-apply-request-evidence-pr214"],
+            BoundaryMaxims = ["Source apply request is not apply."],
+            Boundary = SourceApplyRequestBoundaryText.Boundary
+        };
+        var fileResult = new SourceApplyReceiptFileResult
+        {
+            Path = operation.Path,
+            PreviousPath = null,
+            OperationKind = operation.OperationKind,
+            PatchArtifactChangeHash = operation.PatchArtifactChangeHash,
+            OperationHash = operation.OperationHash,
+            BeforeContentHash = operation.BeforeContentHash,
+            AfterContentHash = operation.AfterContentHash,
+            PreconditionsSatisfied = true,
+            MutationApplied = true,
+            Created = false,
+            Modified = true,
+            Deleted = false,
+            Renamed = false,
+            Noop = false,
+            IssueCodes = [],
+            FileResultHash = "sha256:pending"
+        };
+        fileResult = fileResult with { FileResultHash = SourceApplyReceiptHashing.ComputeFileResultHash(fileResult) };
+        var sourceReceipt = new SourceApplyReceipt
+        {
+            SourceApplyReceiptId = sourceApplyReceiptId,
+            ProjectId = run.ProjectId,
+            ControlledSourceApplyRequestId = Guid.NewGuid(),
+            SourceApplyRequestId = sourceApplyRequestId,
+            SourceApplyRequestHash = sourceApplyRequestHash,
+            SourceApplyDryRunReceiptId = Guid.NewGuid(),
+            SourceApplyDryRunReceiptHash = H("source-apply-dry-run-receipt-pr214"),
+            SourceApplyGateEvaluationId = sourceGateId,
+            SourceApplyGateEvaluationHash = sourceGateHash,
+            PatchArtifactId = patchArtifactId,
+            PatchHash = patchHash,
+            ChangeSetHash = changeSetHash,
+            RollbackSupportReceiptId = rollbackSupportReceiptId,
+            RollbackSupportReceiptHash = rollbackSupportHash,
+            SourceBaselineHash = baselineHash,
+            WorkspaceBoundaryHash = workspaceHash,
+            ExpectedBranch = "main",
+            ExpectedCleanWorktreeHash = cleanBefore,
+            ObservedBranch = "main",
+            ObservedCleanWorktreeHashBeforeApply = cleanBefore,
+            ObservedCleanWorktreeHashAfterApply = cleanAfter,
+            MutationOccurred = true,
+            ApplySucceeded = true,
+            PartialApplyOccurred = false,
+            FileResults = [fileResult],
+            IssueCodes = [],
+            AppliedAtUtc = now.AddMinutes(1),
+            SourceApplyReceiptHash = "sha256:pending",
+            EvidenceReferences = ["source-apply-receipt-evidence-pr214"],
+            BoundaryMaxims = ["SourceApplyReceipt is mutation evidence, not release approval."],
+            Boundary = SourceApplyReceiptBoundaryText.Boundary
+        };
+        sourceReceipt = sourceReceipt with { SourceApplyReceiptHash = SourceApplyReceiptHashing.ComputeReceiptHash(sourceReceipt) };
+        var approval = new AcceptedApprovalRecord
+        {
+            AcceptedApprovalId = acceptedApprovalId,
+            ProjectId = run.ProjectId,
+            ApprovalTargetKind = subjectKind,
+            ApprovalTargetId = subjectId,
+            ApprovalTargetHash = subjectHash,
+            CapabilityCode = "workflow-continuation-gate-input",
+            ApprovalPurpose = AcceptedApprovalPurposes.WorkflowContinuationInput,
+            ApprovedByActorId = "human-reviewer",
+            ApprovedByActorDisplayName = "Human Reviewer",
+            AcceptedAtUtc = now.AddMinutes(-20),
+            ExpiresAtUtc = now.AddHours(1),
+            CorrelationId = "correlation-pr214",
+            CausationId = "cause-pr214",
+            EvidenceReferences = ["accepted-approval-evidence-pr214"],
+            BoundaryMaxims = ["Accepted approval is not workflow continuation."]
+        };
+        var policy = new PolicySatisfactionRecord
+        {
+            PolicySatisfactionId = policySatisfactionId,
+            ProjectId = run.ProjectId,
+            PolicyCode = "source-apply-policy",
+            PolicyVersion = "v1",
+            SubjectKind = subjectKind,
+            SubjectId = subjectId,
+            SubjectHash = subjectHash,
+            CapabilityCode = approval.CapabilityCode,
+            AcceptedApprovalId = acceptedApprovalId,
+            ApprovalRequirementHash = H("approval-requirement-pr214"),
+            ApprovalEvaluatedAtUtc = now.AddMinutes(-15),
+            SatisfiedAtUtc = now.AddMinutes(-14),
+            ExpiresAtUtc = now.AddHours(1),
+            CorrelationId = "correlation-pr214",
+            CausationId = "cause-policy-pr214",
+            EvidenceReferences = ["policy-satisfaction-evidence-pr214"],
+            BoundaryMaxims = ["Policy satisfaction is not workflow continuation."],
+            Boundary = PolicySatisfactionBoundaryText.Boundary
+        };
+
+        return new WorkflowContinuationGateRequest
+        {
+            WorkflowContinuationGateRequestId = Guid.NewGuid(),
+            ProjectId = run.ProjectId,
+            WorkflowRunId = run.WorkflowRunId.ToString("D"),
+            WorkflowStepId = run.Steps[0].WorkflowRunStepId.ToString("D"),
+            ExpectedWorkflowStateHash = GovernedWorkflowContinuationHashing.ComputeWorkflowStateHash(run),
+            SubjectKind = subjectKind,
+            SubjectId = subjectId,
+            SubjectHash = subjectHash,
+            AcceptedApproval = approval,
+            PolicySatisfaction = policy,
+            SourceApplyRequest = sourceRequest,
+            SourceApplyReceipt = sourceReceipt,
+            RequestedAtUtc = now,
+            EvidenceReferences = ["workflow-continuation-gate-evidence-pr214"],
+            BoundaryMaxims = ["Workflow continuation gate satisfaction is evidence only."],
+            Boundary = WorkflowContinuationGateBoundaryText.Boundary
+        };
+    }
+
+    private static string H(string value)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
 
     private static WorkflowRun ValidRun()
     {

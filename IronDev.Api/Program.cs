@@ -180,6 +180,7 @@ builder.Services.AddScoped<IWorkflowStepStore, SqlWorkflowStepStore>();
 builder.Services.AddScoped<IWorkflowCheckpointStore, SqlWorkflowCheckpointStore>();
 builder.Services.AddScoped<IWorkflowTransitionRecordStore, SqlWorkflowTransitionRecordStore>();
 builder.Services.AddScoped<IWorkflowTransitionRecordQueryService, WorkflowTransitionRecordQueryService>();
+builder.Services.AddSingleton<IWorkflowContinuationGateEvaluator, WorkflowContinuationGateEvaluator>();
 builder.Services.AddScoped<IControlledWorkflowStateTransitionStore, SqlControlledWorkflowStateTransitionStore>();
 builder.Services.AddScoped<IGovernedWorkflowContinuationService, GovernedWorkflowContinuationService>();
 builder.Services.AddScoped<IApplyDryRunStore, SqlApplyDryRunStore>();

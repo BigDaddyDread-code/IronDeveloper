@@ -10,15 +10,26 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
     private readonly IWorkflowRunStore _workflowRunStore;
     private readonly IControlledWorkflowStateTransitionStore _transitionStore;
     private readonly IWorkflowTransitionRecordStore _recordStore;
+    private readonly IWorkflowContinuationGateEvaluator _gateEvaluator;
 
     public GovernedWorkflowContinuationService(
         IWorkflowRunStore workflowRunStore,
         IControlledWorkflowStateTransitionStore transitionStore,
         IWorkflowTransitionRecordStore recordStore)
+        : this(workflowRunStore, transitionStore, recordStore, new WorkflowContinuationGateEvaluator())
+    {
+    }
+
+    public GovernedWorkflowContinuationService(
+        IWorkflowRunStore workflowRunStore,
+        IControlledWorkflowStateTransitionStore transitionStore,
+        IWorkflowTransitionRecordStore recordStore,
+        IWorkflowContinuationGateEvaluator gateEvaluator)
     {
         _workflowRunStore = workflowRunStore ?? throw new ArgumentNullException(nameof(workflowRunStore));
         _transitionStore = transitionStore ?? throw new ArgumentNullException(nameof(transitionStore));
         _recordStore = recordStore ?? throw new ArgumentNullException(nameof(recordStore));
+        _gateEvaluator = gateEvaluator ?? throw new ArgumentNullException(nameof(gateEvaluator));
     }
 
     public async Task<GovernedWorkflowContinuationResult> ContinueAsync(
@@ -28,6 +39,12 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
         var requestIssues = GovernedWorkflowContinuationValidation.ValidateRequest(request);
         if (request is null || requestIssues.Count > 0)
             return Rejected(requestIssues);
+
+        var freshGate = _gateEvaluator.Evaluate(BuildGateRequest(request));
+        var freshGateHash = GovernedWorkflowContinuationHashing.ComputeGateEvaluationHash(freshGate);
+        var freshGateIssues = ValidateFreshGate(request, freshGate, freshGateHash);
+        if (freshGateIssues.Count > 0)
+            return Rejected(freshGateIssues);
 
         if (!Guid.TryParse(request.WorkflowRunId, out var workflowRunId))
             return Rejected([Issue("InvalidWorkflowRunId", nameof(request.WorkflowRunId), "WorkflowRunId must be a GUID for governed continuation.")]);
@@ -69,7 +86,7 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
         if (mutatedCurrentStep is null)
             return FailedAfterMutation([Issue("WorkflowStepReloadFailed", nameof(request.CurrentWorkflowStepId), "Workflow state mutation completed but current workflow step could not be reloaded.")]);
 
-        var record = BuildTransitionRecord(request, run, currentStep, mutatedRun, mutatedCurrentStep, nextStep);
+        var record = BuildTransitionRecord(request, freshGate, freshGateHash, run, currentStep, mutatedRun, mutatedCurrentStep, nextStep);
         var recordValidation = WorkflowTransitionRecordValidation.Validate(record);
         if (!recordValidation.IsValid)
         {
@@ -130,13 +147,14 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
 
     private static WorkflowTransitionRecord BuildTransitionRecord(
         GovernedWorkflowContinuationRequest request,
+        WorkflowContinuationGateEvaluation freshGate,
+        string freshGateHash,
         WorkflowRun previousRun,
         WorkflowRunStep previousStep,
         WorkflowRun newRun,
         WorkflowRunStep newStep,
         WorkflowRunStep? nextStep)
     {
-        var gate = request.WorkflowContinuationGateEvaluation;
         var record = new WorkflowTransitionRecord
         {
             WorkflowTransitionRecordId = Guid.NewGuid(),
@@ -150,16 +168,16 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
             NewStepStateHash = GovernedWorkflowContinuationHashing.ComputeStepStateHash(newStep),
             PreviousStepId = previousStep.WorkflowRunStepId.ToString("D"),
             NextStepId = nextStep?.WorkflowRunStepId.ToString("D"),
-            WorkflowContinuationGateEvaluationId = gate.WorkflowContinuationGateEvaluationId,
-            WorkflowContinuationGateEvaluationHash = request.WorkflowContinuationGateEvaluationHash,
-            SourceApplyRequestId = gate.SourceApplyRequestId,
-            SourceApplyRequestHash = gate.SourceApplyRequestHash,
-            SourceApplyReceiptId = gate.SourceApplyReceiptId,
-            SourceApplyReceiptHash = gate.SourceApplyReceiptHash,
-            RollbackExecutionReceiptId = gate.RollbackExecutionReceiptId,
-            RollbackExecutionReceiptHash = gate.RollbackExecutionReceiptHash,
-            RollbackExecutionAuditReportId = gate.RollbackExecutionAuditReportId,
-            RollbackExecutionAuditReportHash = gate.RollbackExecutionAuditReportId.HasValue ? "sha256:rollback-audit-reference-from-gate" : null,
+            WorkflowContinuationGateEvaluationId = freshGate.WorkflowContinuationGateEvaluationId,
+            WorkflowContinuationGateEvaluationHash = freshGateHash,
+            SourceApplyRequestId = freshGate.SourceApplyRequestId,
+            SourceApplyRequestHash = freshGate.SourceApplyRequestHash,
+            SourceApplyReceiptId = freshGate.SourceApplyReceiptId,
+            SourceApplyReceiptHash = freshGate.SourceApplyReceiptHash,
+            RollbackExecutionReceiptId = freshGate.RollbackExecutionReceiptId,
+            RollbackExecutionReceiptHash = freshGate.RollbackExecutionReceiptHash,
+            RollbackExecutionAuditReportId = freshGate.RollbackExecutionAuditReportId,
+            RollbackExecutionAuditReportHash = freshGate.RollbackExecutionAuditReportId.HasValue ? "sha256:rollback-audit-reference-from-gate" : null,
             WorkflowStateMutated = true,
             StepCompleted = true,
             NextStepStarted = request.TransitionKind == WorkflowTransitionKinds.ContinueToNextStep,
@@ -170,12 +188,12 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
             TransitionedAtUtc = DateTimeOffset.UtcNow,
             WorkflowTransitionRecordHash = "sha256:placeholder",
             EvidenceReferences = request.EvidenceReferences
-                .Concat(gate.EvidenceReferences)
-                .Append($"workflow-continuation-gate:{gate.WorkflowContinuationGateEvaluationId:D}")
+                .Concat(freshGate.EvidenceReferences)
+                .Append($"workflow-continuation-gate:{freshGate.WorkflowContinuationGateEvaluationId:D}")
                 .Distinct(StringComparer.Ordinal)
                 .ToArray(),
             BoundaryMaxims = request.BoundaryMaxims
-                .Concat(gate.BoundaryMaxims)
+                .Concat(freshGate.BoundaryMaxims)
                 .Concat(GovernedWorkflowContinuationBoundaryText.Warnings)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray(),
@@ -183,6 +201,52 @@ public sealed class GovernedWorkflowContinuationService : IGovernedWorkflowConti
         };
 
         return record with { WorkflowTransitionRecordHash = WorkflowTransitionRecordHashing.ComputeRecordHash(record) };
+    }
+
+    private static WorkflowContinuationGateRequest BuildGateRequest(GovernedWorkflowContinuationRequest request) => new()
+    {
+        WorkflowContinuationGateRequestId = request.WorkflowContinuationGateEvaluation.WorkflowContinuationGateRequestId,
+        ProjectId = request.ProjectId,
+        WorkflowRunId = request.WorkflowRunId,
+        WorkflowStepId = request.CurrentWorkflowStepId,
+        ExpectedWorkflowStateHash = request.ExpectedWorkflowStateHash,
+        SubjectKind = request.SourceApplyRequest.SubjectKind,
+        SubjectId = request.SourceApplyRequest.SubjectId,
+        SubjectHash = request.SourceApplyRequest.SubjectHash,
+        AcceptedApproval = request.AcceptedApproval,
+        PolicySatisfaction = request.PolicySatisfaction,
+        SourceApplyRequest = request.SourceApplyRequest,
+        SourceApplyReceipt = request.SourceApplyReceipt,
+        RollbackExecutionReceipt = request.RollbackExecutionReceipt,
+        RollbackExecutionAuditReport = request.RollbackExecutionAuditReport,
+        RequestedAtUtc = request.RequestedAtUtc,
+        EvidenceReferences = request.EvidenceReferences,
+        BoundaryMaxims = request.BoundaryMaxims,
+        Boundary = WorkflowContinuationGateBoundaryText.Boundary
+    };
+
+    private static IReadOnlyList<GovernedWorkflowContinuationIssue> ValidateFreshGate(
+        GovernedWorkflowContinuationRequest request,
+        WorkflowContinuationGateEvaluation freshGate,
+        string freshGateHash)
+    {
+        var issues = new List<GovernedWorkflowContinuationIssue>();
+        if (!freshGate.Satisfied || !string.Equals(freshGate.Status, WorkflowContinuationGateStatuses.Satisfied, StringComparison.Ordinal))
+            issues.Add(Issue("FreshGateNotSatisfied", nameof(request.WorkflowContinuationGateEvaluation), "Recomputed workflow continuation gate is not satisfied."));
+        if (freshGate.Issues.Count > 0)
+            issues.AddRange(freshGate.Issues.Select(issue => Issue($"FreshGate.{issue.Code}", $"WorkflowContinuationGate.{issue.Field}", issue.Message)));
+        if (!MatchesHash(freshGateHash, request.WorkflowContinuationGateEvaluationHash))
+            issues.Add(Issue("FreshGateHashMismatch", nameof(request.WorkflowContinuationGateEvaluationHash), "Recomputed workflow continuation gate hash does not match the supplied gate hash."));
+        if (!MatchesHash(GovernedWorkflowContinuationHashing.ComputeGateEvaluationHash(request.WorkflowContinuationGateEvaluation), request.WorkflowContinuationGateEvaluationHash))
+            issues.Add(Issue("SuppliedGateHashMismatch", nameof(request.WorkflowContinuationGateEvaluation), "Supplied workflow continuation gate hash does not match the supplied gate object."));
+        if (!MatchesHash(freshGate.ExpectedWorkflowStateHash, request.ExpectedWorkflowStateHash))
+            issues.Add(Issue("FreshGateWorkflowStateHashMismatch", nameof(freshGate.ExpectedWorkflowStateHash), "Recomputed gate workflow state hash must match the continuation request."));
+        if (freshGate.SourceApplyRequestId != request.SourceApplyRequest.SourceApplyRequestId)
+            issues.Add(Issue("FreshGateSourceApplyRequestMismatch", nameof(freshGate.SourceApplyRequestId), "Recomputed gate source apply request must match supplied evidence."));
+        if (freshGate.SourceApplyReceiptId != request.SourceApplyReceipt.SourceApplyReceiptId)
+            issues.Add(Issue("FreshGateSourceApplyReceiptMismatch", nameof(freshGate.SourceApplyReceiptId), "Recomputed gate source apply receipt must match supplied evidence."));
+
+        return issues;
     }
 
     private static WorkflowRunStep? ResolveNextStep(

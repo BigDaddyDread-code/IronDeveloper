@@ -48,6 +48,12 @@ public sealed record GovernedWorkflowContinuationRequest
     public required string ExpectedCurrentStepStateHash { get; init; }
     public required WorkflowContinuationGateEvaluation WorkflowContinuationGateEvaluation { get; init; }
     public required string WorkflowContinuationGateEvaluationHash { get; init; }
+    public required AcceptedApprovalRecord AcceptedApproval { get; init; }
+    public required PolicySatisfactionRecord PolicySatisfaction { get; init; }
+    public required SourceApplyRequest SourceApplyRequest { get; init; }
+    public required SourceApplyReceipt SourceApplyReceipt { get; init; }
+    public RollbackExecutionReceipt? RollbackExecutionReceipt { get; init; }
+    public RollbackExecutionAuditReport? RollbackExecutionAuditReport { get; init; }
     public DateTimeOffset RequestedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public required IReadOnlyList<string> EvidenceReferences { get; init; }
     public required IReadOnlyList<string> BoundaryMaxims { get; init; }
@@ -178,6 +184,12 @@ public static class GovernedWorkflowContinuationValidation
         }
 
         ValidateGateEvaluation(request, issues);
+        AddValidationIssues(AcceptedApprovalValidation.Validate(request.AcceptedApproval).Issues, "AcceptedApproval", issues);
+        AddValidationIssues(PolicySatisfactionValidation.Validate(request.PolicySatisfaction).Issues, "PolicySatisfaction", issues);
+        AddValidationIssues(SourceApplyRequestValidation.Validate(request.SourceApplyRequest).Issues, "SourceApplyRequest", issues);
+        AddValidationIssues(SourceApplyReceiptValidation.Validate(request.SourceApplyReceipt).Issues, "SourceApplyReceipt", issues);
+        if (request.RollbackExecutionReceipt is not null)
+            AddValidationIssues(RollbackExecutionReceiptValidation.Validate(request.RollbackExecutionReceipt).Issues, "RollbackExecutionReceipt", issues);
         return issues;
     }
 
@@ -286,6 +298,36 @@ public static class GovernedWorkflowContinuationValidation
         if (value) Add(issues, code, field, message);
     }
 
+    private static void AddValidationIssues(IEnumerable<AcceptedApprovalValidationIssue> source, string prefix, List<GovernedWorkflowContinuationIssue> issues)
+    {
+        foreach (var issue in source)
+            Add(issues, $"{prefix}.{issue.Code}", $"{prefix}.{issue.Field}", issue.Message);
+    }
+
+    private static void AddValidationIssues(IEnumerable<PolicySatisfactionValidationIssue> source, string prefix, List<GovernedWorkflowContinuationIssue> issues)
+    {
+        foreach (var issue in source)
+            Add(issues, $"{prefix}.{issue.Code}", $"{prefix}.{issue.Field}", issue.Message);
+    }
+
+    private static void AddValidationIssues(IEnumerable<SourceApplyRequestValidationIssue> source, string prefix, List<GovernedWorkflowContinuationIssue> issues)
+    {
+        foreach (var issue in source)
+            Add(issues, $"{prefix}.{issue.Code}", $"{prefix}.{issue.Field}", issue.Message);
+    }
+
+    private static void AddValidationIssues(IEnumerable<SourceApplyReceiptValidationIssue> source, string prefix, List<GovernedWorkflowContinuationIssue> issues)
+    {
+        foreach (var issue in source)
+            Add(issues, $"{prefix}.{issue.Code}", $"{prefix}.{issue.Field}", issue.Message);
+    }
+
+    private static void AddValidationIssues(IEnumerable<RollbackExecutionReceiptValidationIssue> source, string prefix, List<GovernedWorkflowContinuationIssue> issues)
+    {
+        foreach (var issue in source)
+            Add(issues, $"{prefix}.{issue.Code}", $"{prefix}.{issue.Field}", issue.Message);
+    }
+
     private static void ScanText(string? value, string field, List<GovernedWorkflowContinuationIssue> issues)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
@@ -324,7 +366,6 @@ public static class GovernedWorkflowContinuationHashing
         ArgumentNullException.ThrowIfNull(evaluation);
         return Sha256Hex(Canonicalize(
             ("ProjectId", evaluation.ProjectId.ToString("D")),
-            ("WorkflowContinuationGateEvaluationId", evaluation.WorkflowContinuationGateEvaluationId.ToString("D")),
             ("WorkflowContinuationGateRequestId", evaluation.WorkflowContinuationGateRequestId.ToString("D")),
             ("Status", evaluation.Status),
             ("Satisfied", evaluation.Satisfied ? "true" : "false"),
