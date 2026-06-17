@@ -197,6 +197,9 @@ public static class IronDevCli
         if (IronDevCliApplyPreview.IsApplyPreviewCommand(args))
             return await IronDevCliApplyPreview.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliWorkflowContinuation.IsWorkflowContinuationCommand(args))
+            return await IronDevCliWorkflowContinuation.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 

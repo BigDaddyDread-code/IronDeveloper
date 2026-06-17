@@ -353,7 +353,11 @@ public sealed class WorkflowTransitionRecordTests
             "WorkflowTransitionRecord_Execute",
             "WorkflowTransitionRecord_Continue",
             "WorkflowTransitionRecord_ApproveRelease");
-        AssertDoesNotContainAny(cliText, "WorkflowTransitionRecord");
+        AssertDoesNotContainAny(
+            cliText,
+            "WorkflowTransitionRecord_Execute",
+            "WorkflowTransitionRecord_Continue",
+            "WorkflowTransitionRecord_ApproveRelease");
         AssertDoesNotContainAny(
             databaseText,
             "WorkflowTransitionExecutor",

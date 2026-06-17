@@ -401,6 +401,10 @@ AFTER UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
+    IF EXISTS (SELECT 1 FROM deleted) AND NOT EXISTS (SELECT 1 FROM inserted)
+        THROW 54050, 'Workflow run records are append-only.', 1;
+    IF TRY_CONVERT(BIT, SESSION_CONTEXT(N'IronDevGovernedWorkflowContinuation')) = 1
+        RETURN;
     THROW 54050, 'Workflow run records are append-only.', 1;
 END;
 GO
@@ -411,6 +415,10 @@ AFTER UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
+    IF EXISTS (SELECT 1 FROM deleted) AND NOT EXISTS (SELECT 1 FROM inserted)
+        THROW 54051, 'Workflow run steps are append-only.', 1;
+    IF TRY_CONVERT(BIT, SESSION_CONTEXT(N'IronDevGovernedWorkflowContinuation')) = 1
+        RETURN;
     THROW 54051, 'Workflow run steps are append-only.', 1;
 END;
 GO

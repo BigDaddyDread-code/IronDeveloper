@@ -693,9 +693,110 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE workflow.usp_WorkflowGovernedContinuation_Transition
+    @ProjectId UNIQUEIDENTIFIER,
+    @WorkflowRunId UNIQUEIDENTIFIER,
+    @CurrentWorkflowRunStepId UNIQUEIDENTIFIER,
+    @NextWorkflowRunStepId UNIQUEIDENTIFIER = NULL,
+    @TransitionKind NVARCHAR(80),
+    @ExpectedWorkflowStatus NVARCHAR(80),
+    @ExpectedCurrentStepStatus NVARCHAR(80),
+    @ExpectedNextStepStatus NVARCHAR(80) = NULL,
+    @NewWorkflowStatus NVARCHAR(80),
+    @NewCurrentStepStatus NVARCHAR(80),
+    @NewNextStepStatus NVARCHAR(80) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @TransitionKind NOT IN (N'ContinueToNextStep', N'MarkStepComplete')
+    BEGIN
+        SELECT CAST(0 AS BIT) AS Succeeded, N'UnsupportedTransitionKind' AS Code, N'TransitionKind' AS Field, N'Only ContinueToNextStep and MarkStepComplete are supported.' AS Message;
+        RETURN;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM workflow.WorkflowRun WHERE ProjectId = @ProjectId AND WorkflowRunId = @WorkflowRunId AND Status = @ExpectedWorkflowStatus)
+    BEGIN
+        SELECT CAST(0 AS BIT) AS Succeeded, N'WorkflowRunStateMismatch' AS Code, N'WorkflowRun' AS Field, N'Workflow run state changed before governed continuation.' AS Message;
+        RETURN;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM workflow.WorkflowRunStep WHERE ProjectId = @ProjectId AND WorkflowRunId = @WorkflowRunId AND WorkflowRunStepId = @CurrentWorkflowRunStepId AND Status = @ExpectedCurrentStepStatus)
+    BEGIN
+        SELECT CAST(0 AS BIT) AS Succeeded, N'CurrentStepStateMismatch' AS Code, N'WorkflowRunStep' AS Field, N'Current workflow step state changed before governed continuation.' AS Message;
+        RETURN;
+    END
+
+    IF @TransitionKind = N'ContinueToNextStep'
+    BEGIN
+        IF @NextWorkflowRunStepId IS NULL
+        BEGIN
+            SELECT CAST(0 AS BIT) AS Succeeded, N'NextStepRequired' AS Code, N'NextWorkflowRunStepId' AS Field, N'ContinueToNextStep requires a next workflow step.' AS Message;
+            RETURN;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM workflow.WorkflowRunStep WHERE ProjectId = @ProjectId AND WorkflowRunId = @WorkflowRunId AND WorkflowRunStepId = @NextWorkflowRunStepId AND Status = @ExpectedNextStepStatus)
+        BEGIN
+            SELECT CAST(0 AS BIT) AS Succeeded, N'NextStepStateMismatch' AS Code, N'NextWorkflowRunStepId' AS Field, N'Next workflow step state changed before governed continuation.' AS Message;
+            RETURN;
+        END
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        EXEC sys.sp_set_session_context @key = N'IronDevGovernedWorkflowContinuation', @value = 1;
+
+        UPDATE workflow.WorkflowRunStep
+        SET Status = @NewCurrentStepStatus
+        WHERE ProjectId = @ProjectId
+          AND WorkflowRunId = @WorkflowRunId
+          AND WorkflowRunStepId = @CurrentWorkflowRunStepId
+          AND Status = @ExpectedCurrentStepStatus;
+
+        IF @@ROWCOUNT <> 1
+            THROW 54510, 'Current workflow step transition failed.', 1;
+
+        IF @TransitionKind = N'ContinueToNextStep'
+        BEGIN
+            UPDATE workflow.WorkflowRunStep
+            SET Status = @NewNextStepStatus
+            WHERE ProjectId = @ProjectId
+              AND WorkflowRunId = @WorkflowRunId
+              AND WorkflowRunStepId = @NextWorkflowRunStepId
+              AND Status = @ExpectedNextStepStatus;
+
+            IF @@ROWCOUNT <> 1
+                THROW 54511, 'Next workflow step transition failed.', 1;
+        END
+
+        UPDATE workflow.WorkflowRun
+        SET Status = @NewWorkflowStatus
+        WHERE ProjectId = @ProjectId
+          AND WorkflowRunId = @WorkflowRunId
+          AND Status = @ExpectedWorkflowStatus;
+
+        IF @@ROWCOUNT <> 1
+            THROW 54512, 'Workflow run transition failed.', 1;
+
+        EXEC sys.sp_set_session_context @key = N'IronDevGovernedWorkflowContinuation', @value = NULL;
+
+        COMMIT TRANSACTION;
+        SELECT CAST(1 AS BIT) AS Succeeded, N'' AS Code, N'' AS Field, N'' AS Message;
+    END TRY
+    BEGIN CATCH
+        EXEC sys.sp_set_session_context @key = N'IronDevGovernedWorkflowContinuation', @value = NULL;
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
 GRANT EXECUTE ON OBJECT::workflow.usp_WorkflowStep_Create TO IronDevGovernanceEventRuntimeRole;
 GRANT EXECUTE ON OBJECT::workflow.usp_WorkflowStep_Get TO IronDevGovernanceEventRuntimeRole;
 GRANT EXECUTE ON OBJECT::workflow.usp_WorkflowStep_ListByRun TO IronDevGovernanceEventRuntimeRole;
 GRANT EXECUTE ON OBJECT::workflow.usp_WorkflowStep_ListByCorrelation TO IronDevGovernanceEventRuntimeRole;
 GRANT EXECUTE ON OBJECT::workflow.usp_WorkflowStep_ListBySubject TO IronDevGovernanceEventRuntimeRole;
+GRANT EXECUTE ON OBJECT::workflow.usp_WorkflowGovernedContinuation_Transition TO IronDevGovernanceEventRuntimeRole;
 GO
