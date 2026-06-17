@@ -10,6 +10,7 @@ import { ApprovalPackageReviewRoute } from '../features/governance/ApprovalPacka
 import { DogfoodReceiptViewerRoute } from '../features/governance/DogfoodReceiptViewerRoute';
 import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
+import { PolicySatisfactionPanelRoute } from '../features/governance/PolicySatisfactionPanelRoute';
 import { ToolGateDecisionRoute } from '../features/governance/ToolGateDecisionRoute';
 import { WorkflowRunStepViewerRoute } from '../features/governance/WorkflowRunStepViewerRoute';
 import { TicketsRoute } from '../features/tickets/TicketsRoute';
@@ -75,6 +76,8 @@ export function IronDevShell() {
           <ApprovalPackageReviewRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/accepted-approvals') ? (
           <AcceptedApprovalPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/policy-satisfaction') ? (
+          <PolicySatisfactionPanelRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/tool-gates') ? (
           <ToolGateDecisionRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : (
