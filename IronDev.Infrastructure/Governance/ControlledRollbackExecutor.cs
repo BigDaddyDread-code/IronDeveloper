@@ -174,6 +174,8 @@ public sealed class ControlledRollbackExecutor : IControlledRollbackExecutor
             .GroupBy(content => NormalizePathKey(content.Path), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
+        RejectDuplicateRollbackActions(request.RollbackPlan.FileActions, issues);
+
         foreach (var action in OrderedActions(request.RollbackPlan.FileActions))
         {
             var actionIssues = new List<string>();
@@ -246,6 +248,33 @@ public sealed class ControlledRollbackExecutor : IControlledRollbackExecutor
         }
 
         return new(fileResults, planned);
+    }
+
+    private static void RejectDuplicateRollbackActions(IEnumerable<RollbackPlanFileAction> actions, List<ControlledRollbackExecutionIssue> issues)
+    {
+        var hashCounts = actions
+            .GroupBy(action => Normalize(action.RollbackActionHash), StringComparer.OrdinalIgnoreCase)
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key) && group.Count() > 1);
+
+        foreach (var duplicate in hashCounts)
+        {
+            issues.Add(new(
+                "DuplicateRollbackActionHash",
+                nameof(RollbackPlan.FileActions),
+                $"Rollback plan contains duplicate rollback action hash {duplicate.Key}."));
+        }
+
+        var targetCounts = actions
+            .GroupBy(action => $"{Normalize(action.PlannedActionKind)}|{NormalizePathKey(action.Path)}|{NormalizePathKey(action.PreviousPath)}", StringComparer.OrdinalIgnoreCase)
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key) && group.Count() > 1);
+
+        foreach (var duplicate in targetCounts)
+        {
+            issues.Add(new(
+                "DuplicateRollbackActionTarget",
+                nameof(RollbackPlan.FileActions),
+                $"Rollback plan contains duplicate rollback action target {duplicate.Key}."));
+        }
     }
 
     private static async Task<RollbackExecutionReceiptFileResult> ApplyRollbackOperationAsync(PlannedRollbackOperation plan, CancellationToken cancellationToken)
