@@ -379,6 +379,10 @@ public static class ConscienceDecisionEvaluator
         if (classification == GovernedActionClassification.ForbiddenOrUnsupported)
             return Block("ForbiddenOrUnsupportedAction", "Forbidden or unsupported actions are not executable.");
 
+        var inventoryEntry = AuthorityActionInventory.Get(actionKind);
+        if (classification == GovernedActionClassification.AuthorityBearing && !inventoryEntry.AllowedInCurrentBlock)
+            return Block("ActionNotAllowedInCurrentBlock", "Authority-bearing action is registered but not executable in the current block.");
+
         if (decision is null)
             return Block("MissingConscienceDecision", "Authority-bearing actions require a Conscience decision.");
 

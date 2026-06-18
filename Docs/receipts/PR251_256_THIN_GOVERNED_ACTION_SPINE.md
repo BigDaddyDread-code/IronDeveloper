@@ -85,7 +85,7 @@ These events are local run artifacts. They are evidence that a patch-loop action
 - Conscience requirement
 - ThoughtLedger requirement
 - implementation status
-- executable in current block: false for high-risk paths
+- executable in current block from the inventory allowance: true for patch-loop non-authority events, false for high-risk future paths
 
 Authority-bearing actions are registered only. They are not executable in this block.
 
@@ -99,6 +99,8 @@ Block AB adds the Conscience decision shape:
 - NotImplemented
 
 The contract records risk, evidence refs, policy refs, block reasons, ThoughtLedger ref, expiry, and hash.
+
+Authority-bearing actions that are not allowed in the current block fail closed with `ActionNotAllowedInCurrentBlock` before any supplied Conscience decision can make them executable.
 
 This does not make IronDev autonomous.
 

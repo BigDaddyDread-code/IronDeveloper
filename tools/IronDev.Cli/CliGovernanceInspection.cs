@@ -74,7 +74,7 @@ internal static class IronDevCliGovernanceInspection
             entry.RequiresConscience,
             entry.RequiresThoughtLedger,
             entry.CurrentImplementationStatus,
-            executableInCurrentBlock = false
+            executableInCurrentBlock = entry.AllowedInCurrentBlock
         };
 
         if (json)
