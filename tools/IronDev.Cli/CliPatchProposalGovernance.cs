@@ -78,11 +78,19 @@ public static partial class IronDevCliPatchProposal
         PatchProposalRunDocument run,
         ScopeEvaluationResult scopeResult,
         bool skipTest,
+        bool testsBlockedByToolGate,
         ProcessResult? testResult,
         CancellationToken cancellationToken)
     {
         await RecordGovernanceEventAsync(run, GovernedActionKind.ChangedFilesDetected, "Changed files were detected for review.", ["changed-files.txt", "file-scope-result.md"], cancellationToken).ConfigureAwait(false);
-        await RecordGovernanceEventAsync(run, GovernedActionKind.WorkspaceTestsExecuted, skipTest ? "Workspace tests were explicitly skipped for review." : $"Workspace tests executed with exit code {testResult?.ExitCode ?? -1}.", ["test-output-summary.md"], cancellationToken).ConfigureAwait(false);
+        var testMessage = skipTest
+            ? "Workspace tests were explicitly skipped for review."
+            : scopeResult.BlockedFiles.Length > 0
+                ? "Workspace tests were blocked by file scope before execution."
+                : testsBlockedByToolGate
+                    ? "Workspace tests were blocked by workspace tool gate before execution."
+                    : $"Workspace tests executed with exit code {testResult?.ExitCode ?? -1}.";
+        await RecordGovernanceEventAsync(run, GovernedActionKind.WorkspaceTestsExecuted, testMessage, ["test-output-summary.md"], cancellationToken).ConfigureAwait(false);
         await RecordGovernanceEventAsync(run, GovernedActionKind.PatchArtifactExported, "Patch artifact was exported from the disposable workspace.", ["patch.diff", "changed-files.txt"], cancellationToken).ConfigureAwait(false);
         await RecordGovernanceEventAsync(run, GovernedActionKind.ReviewPackageCreated, $"Patch review package was created with {scopeResult.ChangedFiles.Length} changed file(s).", ["review-summary.md", "known-risks.md", "patch-risk-summary.md"], cancellationToken).ConfigureAwait(false);
     }

@@ -35,6 +35,7 @@ public static partial class IronDevCliPatchProposal
             "finish" => await HandleFinishAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "status" => await HandleStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "test" => await HandleTestAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "tools" => await HandlePatchToolsAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "list" => await HandleListAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "cleanup" => await HandleCleanupAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "governance" => await HandlePatchGovernanceAsync(args, output, error, cancellationToken).ConfigureAwait(false),
@@ -221,11 +222,6 @@ public static partial class IronDevCliPatchProposal
         var resolvedTest = await ResolveExistingRunTestCommandAsync(run, parsed.TestCommand, parsed.TestProfileName, cancellationToken).ConfigureAwait(false);
         if (resolvedTest.Error is not null)
             return WriteFailure(output, error, parsed.Json, "patch finish", resolvedTest.Error);
-
-        var effectiveTestCommand = resolvedTest.Command!;
-
-        if (!parsed.SkipTest && IsForbiddenCommand(effectiveTestCommand))
-            return WriteFailure(output, error, parsed.Json, "patch finish", "test command contains a forbidden source-control or release action.");
 
         var package = await WritePatchPackageAsync(run, resolvedTest, parsed.SkipTest, cancellationToken).ConfigureAwait(false);
 
@@ -777,6 +773,7 @@ public static partial class IronDevCliPatchProposal
         error.WriteLine("  irondev patch start --repo <repo-path> --task <task-file> (--test <command> | --test-profile <name>) [--allow <glob>] [--forbid <glob>] [--runs-root <path>] [--workspace-root <path>] [--run-id <id>] [--json]");
         error.WriteLine("  irondev patch finish --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--skip-test] [--json]");
         error.WriteLine("  irondev patch test --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--json]");
+        error.WriteLine("  irondev patch tools --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch status --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch list [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch cleanup --run <run-id-or-path> [--runs-root <path>] (--delete-workspace | --delete-run) [--json]");
