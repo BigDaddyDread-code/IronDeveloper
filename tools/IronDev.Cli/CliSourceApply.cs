@@ -9,7 +9,7 @@ using SourceApplyRequest = IronDev.Core.SourceApply.SourceApplyRequest;
 
 namespace IronDev.Cli;
 
-public static class IronDevCliSourceApply
+public static partial class IronDevCliSourceApply
 {
     private const string DefaultRunsFolderName = "irondev-patch-runs";
     private const string GovernanceEventsArtifactName = "governance-events.jsonl";
@@ -31,14 +31,19 @@ public static class IronDevCliSourceApply
     public static async Task<int> HandleAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         if (args.Length < 2)
-            return Usage(error, "source-apply requires a subcommand: approval-template, prepare, or status.");
+            return Usage(error, "source-apply requires a subcommand: approval-template, prepare, status, decision-template, apply, rollback-template, rollback, or applied-status.");
 
         return args[1].ToLowerInvariant() switch
         {
             "approval-template" => await HandleApprovalTemplateAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "prepare" => await HandlePrepareAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "status" => await HandleStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
-            "apply" or "commit" or "push" or "pr" or "merge" or "rollback" => Usage(error, $"source-apply {args[1]} is intentionally unsupported in Block AF."),
+            "decision-template" => await HandleDecisionTemplateAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "apply" => await HandleApplyAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "rollback-template" => await HandleRollbackTemplateAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "rollback" => await HandleRollbackAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "applied-status" => await HandleAppliedStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "commit" or "push" or "pr" or "merge" or "release" or "deploy" => Usage(error, $"source-apply {args[1]} is intentionally unsupported in Block AG."),
             _ => Usage(error, $"unsupported source-apply subcommand: {args[1]}")
         };
     }
@@ -526,6 +531,11 @@ public static class IronDevCliSourceApply
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply decision-template --run <run-id-or-path> --out <decision.json> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply apply --run <run-id-or-path> --decision <decision.json> --thought-ledger-ref <ref> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply rollback-template --run <run-id-or-path> --out <decision.json> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply rollback --run <run-id-or-path> --decision <decision.json> --thought-ledger-ref <ref> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply applied-status --run <run-id-or-path> [--runs-root <path>] [--json]");
         return 2;
     }
 
