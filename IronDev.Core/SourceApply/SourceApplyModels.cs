@@ -104,7 +104,9 @@ public static class SourceApplyApprovalBinding
     public static SourceApplyBindingReport Validate(SourceApplyRequest request, SourceApplyApprovalEvidence? approval)
     {
         var reasons = new List<string>();
-        var requestIdMatched = approval is not null && (string.IsNullOrWhiteSpace(approval.SourceApplyRequestId) || Same(approval.SourceApplyRequestId, request.SourceApplyRequestId));
+        var requestIdMatched = approval is not null &&
+            !string.IsNullOrWhiteSpace(approval.SourceApplyRequestId) &&
+            Same(approval.SourceApplyRequestId, request.SourceApplyRequestId);
         var runMatched = approval is not null && Same(approval.RunId, request.RunId);
         var patchMatched = approval is not null && Same(approval.PatchSha256, request.PatchSha256);
         var changedFilesMatched = approval is not null && SameSet(approval.ApprovedChangedFiles, request.ChangedFiles);
@@ -120,7 +122,9 @@ public static class SourceApplyApprovalBinding
 
         if (approval is null)
             reasons.Add("MissingApproval");
-        if (!requestIdMatched)
+        if (approval is not null && string.IsNullOrWhiteSpace(approval.SourceApplyRequestId))
+            reasons.Add("MissingSourceApplyRequestId");
+        else if (!requestIdMatched)
             reasons.Add("SourceApplyRequestIdMismatch");
         if (!runMatched)
             reasons.Add("RunIdMismatch");

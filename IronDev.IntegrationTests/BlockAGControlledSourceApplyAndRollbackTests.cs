@@ -72,6 +72,39 @@ public sealed class BlockAGControlledSourceApplyAndRollbackTests
     }
 
     [TestMethod]
+    public async Task BlockAG_AG1_ValidateApprovalBlocksDirectBindingDriftAndAuthorityGaps()
+    {
+        using var fixture = await ReadyFixture.CreateAsync("ag1-binding-gaps").ConfigureAwait(false);
+        var request = ReadJson<SourceApplyRequest>(Path.Combine(fixture.RunPath, "source-apply-request.json"));
+        var cases = new (string Name, Func<SourceApplyApprovalEvidence, SourceApplyApprovalEvidence> Mutate, string ExpectedReason)[]
+        {
+            ("missing-request-id", approval => approval with { SourceApplyRequestId = string.Empty }, "MissingSourceApplyRequestId"),
+            ("patch-hash-mismatch", approval => approval with { PatchSha256 = "sha256:different-patch" }, "PatchHashMismatch"),
+            ("changed-files-mismatch", approval => approval with { ApprovedChangedFiles = ["DIFFERENT.md"] }, "ChangedFilesHashMismatch"),
+            ("source-repo-mismatch", approval => approval with { SourceRepoIdentity = "different-source-repo" }, "SourceRepoIdentityMismatch"),
+            ("missing-conscience", approval => approval with { ConscienceDecisionId = string.Empty }, "MissingConscienceDecision"),
+            ("missing-thought-ledger", approval => approval with { ThoughtLedgerEntryId = string.Empty }, "MissingThoughtLedgerEntry"),
+            ("missing-approved-by", approval => approval with { ApprovedBy = string.Empty }, "MissingApprovedBy"),
+            ("overbroad-approval", approval => approval with { ApprovalText = approval.ApprovalText + " I also approve commit and push." }, "OverbroadApproval")
+        };
+
+        foreach (var item in cases)
+        {
+            var approvalPath = Path.Combine(fixture.RootPath, $"ag1-{item.Name}.json");
+            await WriteBoundApprovalAsync(fixture, request, approvalPath, item.Mutate).ConfigureAwait(false);
+
+            var validate = await RunCliAsync("source-apply", "validate-approval", "--run", fixture.RunPath, "--approval", approvalPath, "--json").ConfigureAwait(false);
+
+            Assert.AreEqual(1, validate.ExitCode, item.Name);
+            var report = ReadJson<SourceApplyBindingReport>(Path.Combine(fixture.RunPath, "source-apply-binding-report.json"));
+            Assert.IsFalse(report.BindingPassed, item.Name);
+            CollectionAssert.Contains(report.BlockingReasons, item.ExpectedReason, item.Name);
+            Assert.IsFalse(File.Exists(Path.Combine(fixture.RunPath, "source-apply-command-result.json")), item.Name);
+            Assert.AreEqual(string.Empty, Git("status", ["--porcelain=v1"], fixture.SourceRepoPath).Stdout.Trim(), item.Name);
+        }
+    }
+
+    [TestMethod]
     public void BlockAG_ActionSpine_ClassifiesControlledApplyAndRollbackActions()
     {
         foreach (var action in new[]
