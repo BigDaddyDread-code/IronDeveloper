@@ -70,6 +70,13 @@ public sealed class BlockACGovernedWorkspaceToolsTests
         using var fixture = BlockACFixture.Create();
         var request = fixture.ToolRequest("dotnet --version", fixture.WorkspacePath);
 
+        Assert.AreEqual(ToolRiskClassification.WorkspaceReadOnly, ToolCommandRiskClassifier.Classify("dotnet --version"));
+        Assert.AreEqual(ToolRiskClassification.WorkspaceMutating, ToolCommandRiskClassifier.Classify("dotnet build IronDev.slnx --no-restore"));
+        Assert.AreEqual(ToolRiskClassification.WorkspaceMutating, ToolCommandRiskClassifier.Classify("dotnet test IronDev.IntegrationTests/IronDev.IntegrationTests.csproj --no-restore"));
+
+        foreach (var command in new[] { "git status", "git diff", "git rev-parse HEAD", "git show HEAD", "git log --oneline" })
+            Assert.AreEqual(ToolRiskClassification.WorkspaceReadOnly, ToolCommandRiskClassifier.Classify(command), command);
+
         var allowed = WorkspaceToolGateEvaluator.Evaluate(request);
         Assert.AreEqual(WorkspaceToolGateDecisionOutcome.Allow, allowed.Decision);
         Assert.AreEqual(0, allowed.Reasons.Length);

@@ -116,7 +116,7 @@ It does not apply source.
 It does not execute rollback.
 It does not promote memory.
 It does not mutate accepted memory.
-It does not execute external tools.
+It does not add broad external tool adapters or allow tool execution outside the disposable workspace.
 It does not dispatch agents.
 It does not call models.
 It does not continue workflow.

@@ -165,10 +165,12 @@ public static class ToolCommandRiskClassifier
             return ToolRiskClassification.ReleaseDangerous;
 
         if (normalized.StartsWith("dotnet --version", StringComparison.Ordinal) ||
-            normalized.StartsWith("dotnet build", StringComparison.Ordinal) ||
-            normalized.StartsWith("dotnet test", StringComparison.Ordinal) ||
             GitReadOnlyCommands.Any(item => normalized.StartsWith(item, StringComparison.Ordinal)))
             return ToolRiskClassification.WorkspaceReadOnly;
+
+        if (normalized.StartsWith("dotnet build", StringComparison.Ordinal) ||
+            normalized.StartsWith("dotnet test", StringComparison.Ordinal))
+            return ToolRiskClassification.WorkspaceMutating;
 
         return ToolRiskClassification.WorkspaceMutating;
     }
