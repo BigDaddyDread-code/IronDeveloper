@@ -2883,6 +2883,7 @@ public static class IronDevCli
         error.WriteLine("  irondev patch start --repo <repo-path> --task <task-file> (--test <command> | --test-profile <name>) [--allow <glob>] [--forbid <glob>] [--runs-root <path>] [--workspace-root <path>] [--run-id <id>] [--json]");
         error.WriteLine("  irondev patch finish --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--skip-test] [--json]");
         error.WriteLine("  irondev patch test --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--json]");
+        error.WriteLine("  irondev patch tools --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch status --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch list [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch cleanup --run <run-id-or-path> [--runs-root <path>] (--delete-workspace | --delete-run) [--json]");

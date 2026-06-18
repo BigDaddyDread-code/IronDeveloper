@@ -228,8 +228,12 @@ public sealed class BlockZManualPatchProposalProductTests
             CancellationToken.None);
 
         Assert.AreEqual(1, finish);
-        StringAssert.Contains(finishOutput.ToString(), "forbidden source-control or release action");
-        Assert.IsFalse(File.Exists(Path.Combine(runPath, "patch.diff")));
+        StringAssert.Contains(finishOutput.ToString(), "BlockedByToolGate");
+        Assert.IsTrue(File.Exists(Path.Combine(runPath, "patch.diff")));
+        Assert.IsTrue(File.Exists(Path.Combine(runPath, "tool-gate-decisions.jsonl")));
+        Assert.IsTrue(File.Exists(Path.Combine(runPath, "tool-results.jsonl")));
+        StringAssert.Contains(await File.ReadAllTextAsync(Path.Combine(runPath, "tool-gate-decisions.jsonl")), "CommandRequestsGitPush");
+        StringAssert.Contains(await File.ReadAllTextAsync(Path.Combine(runPath, "tool-results.jsonl")), "\"wasExecuted\":false");
     }
 
     [TestMethod]

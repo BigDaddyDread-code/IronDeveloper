@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using IronDev.Core.Tools;
 
 namespace IronDev.Cli;
 
@@ -62,34 +63,40 @@ public static partial class IronDevCliPatchProposal
         if (resolution.Error is not null)
             return WriteFailure(output, error, parsed.Json, "patch test", resolution.Error);
 
-        if (IsForbiddenCommand(resolution.Command!))
-            return WriteFailure(output, error, parsed.Json, "patch test", "test command contains a forbidden source-control or release action.");
-
-        var result = await RunShellAsync(resolution.Command!, run.WorkspacePath, cancellationToken).ConfigureAwait(false);
-        WriteTestArtifacts(run, resolution.Command!, resolution.ProfileName, skipped: false, result);
+        var toolOutcome = await RunWorkspaceToolCommandAsync(run, ToolRequestKind.PatchRunTest, resolution.Command!, resolution.ProfileName, cancellationToken).ConfigureAwait(false);
+        if (toolOutcome.Result.WasExecuted)
+            WriteTestArtifacts(run, resolution.Command!, resolution.ProfileName, skipped: false, toolOutcome.ProcessResult);
+        else
+            WriteBlockedTestArtifacts(run, resolution.Command!, resolution.ProfileName, toolOutcome.GateDecision);
 
         run.TestCommand = resolution.Command!;
         run.TestProfileName = resolution.ProfileName;
-        run.TestExitCode = result.ExitCode;
-        run.TestStatus = result.ExitCode == 0 ? "Passed" : "Failed";
+        run.TestExitCode = toolOutcome.ProcessResult?.ExitCode;
+        run.TestStatus = toolOutcome.Result.WasExecuted
+            ? toolOutcome.ProcessResult?.ExitCode == 0 ? "Passed" : "Failed"
+            : "BlockedByToolGate";
         run.LastUpdatedUtc = DateTimeOffset.UtcNow;
-        run.Artifacts = MergeArtifacts(run.Artifacts, ["test-results.txt", "test-output-summary.md", "run-log.txt"]);
-        await RecordWorkspaceTestsExecutedGovernanceEventAsync(run, result, cancellationToken).ConfigureAwait(false);
-        await AppendRunLogAsync(run, $"patch test completed with exit code {result.ExitCode}", cancellationToken).ConfigureAwait(false);
+        run.Artifacts = MergeArtifacts(run.Artifacts, ["test-results.txt", "test-output-summary.md", "run-log.txt", ToolRequestsArtifactName, ToolGateDecisionsArtifactName, ToolResultsArtifactName, ToolOutputFolderName]);
+        if (toolOutcome.ProcessResult is not null)
+            await RecordWorkspaceTestsExecutedGovernanceEventAsync(run, toolOutcome.ProcessResult, cancellationToken).ConfigureAwait(false);
+        await AppendRunLogAsync(run, toolOutcome.Result.WasExecuted
+            ? $"patch test completed with exit code {toolOutcome.ProcessResult?.ExitCode ?? -1}"
+            : "patch test blocked by workspace tool gate before execution", cancellationToken).ConfigureAwait(false);
         await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
-        var data = BuildRunData(run, result.ExitCode == 0);
+        var testsPassed = toolOutcome.ProcessResult?.ExitCode == 0;
+        var data = BuildRunData(run, testsPassed);
         if (parsed.Json)
-            WriteJsonEnvelope(output, "patch test", result.ExitCode == 0 ? "succeeded" : "test_failed", data, result.ExitCode == 0 ? [] : ["test command returned a non-zero exit code."]);
+            WriteJsonEnvelope(output, "patch test", testsPassed ? "succeeded" : toolOutcome.Result.WasExecuted ? "test_failed" : "blocked", data, testsPassed ? [] : [toolOutcome.Result.WasExecuted ? "test command returned a non-zero exit code." : "workspace tool gate blocked the command before execution."]);
         else
         {
             output.WriteLine($"Patch test run: {run.RunId}");
             output.WriteLine($"Status: {run.TestStatus}");
-            output.WriteLine($"Exit code: {result.ExitCode}");
+            output.WriteLine($"Exit code: {toolOutcome.ProcessResult?.ExitCode.ToString() ?? "n/a"}");
             output.WriteLine($"Summary: {Path.Combine(run.RunPath, "test-output-summary.md")}");
         }
 
-        return result.ExitCode == 0 ? 0 : 1;
+        return testsPassed ? 0 : 1;
     }
 
     private static async Task<int> HandleListAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
@@ -244,14 +251,25 @@ public static partial class IronDevCliPatchProposal
         await File.WriteAllTextAsync(Path.Combine(run.RunPath, "file-scope-result.md"), RenderFileScopeResult(run, scopeResult), cancellationToken).ConfigureAwait(false);
 
         ProcessResult? testResult = null;
+        WorkspaceToolRunOutcome? toolOutcome = null;
         var testsBlockedByScope = scopeResult.BlockedFiles.Length > 0;
+        var testsBlockedByToolGate = false;
         if (!skipTest && !testsBlockedByScope && !string.IsNullOrWhiteSpace(testResolution.Command))
-            testResult = await RunShellAsync(testResolution.Command!, run.WorkspacePath, cancellationToken).ConfigureAwait(false);
+        {
+            toolOutcome = await RunWorkspaceToolCommandAsync(run, ToolRequestKind.PatchRunFinishTest, testResolution.Command!, testResolution.ProfileName, cancellationToken).ConfigureAwait(false);
+            if (toolOutcome.Result.WasExecuted)
+                testResult = toolOutcome.ProcessResult;
+            else
+                testsBlockedByToolGate = true;
+        }
 
-        WriteTestArtifacts(run, testResolution.Command!, testResolution.ProfileName, skipTest || testsBlockedByScope, testResult);
+        if (testsBlockedByToolGate && toolOutcome is not null)
+            WriteBlockedTestArtifacts(run, testResolution.Command!, testResolution.ProfileName, toolOutcome.GateDecision);
+        else
+            WriteTestArtifacts(run, testResolution.Command!, testResolution.ProfileName, skipTest || testsBlockedByScope, testResult);
 
-        var testsPassed = testsBlockedByScope || skipTest ? !testsBlockedByScope : testResult?.ExitCode == 0;
-        var testStatus = testsBlockedByScope ? "BlockedByFileScope" : skipTest ? "Skipped" : testResult?.ExitCode == 0 ? "Passed" : "Failed";
+        var testsPassed = testsBlockedByScope || skipTest ? !testsBlockedByScope : testsBlockedByToolGate ? false : testResult?.ExitCode == 0;
+        var testStatus = testsBlockedByScope ? "BlockedByFileScope" : skipTest ? "Skipped" : testsBlockedByToolGate ? "BlockedByToolGate" : testResult?.ExitCode == 0 ? "Passed" : "Failed";
 
         run.Status = testsBlockedByScope ? "BlockedByFileScope" : testsPassed ? "Finished" : "FinishedWithTestFailure";
         run.FinishedUtc = DateTimeOffset.UtcNow;
@@ -294,11 +312,15 @@ public static partial class IronDevCliPatchProposal
             "review-summary.md",
             "known-risks.md",
             "manual-apply-instructions.md",
+            ToolRequestsArtifactName,
+            ToolGateDecisionsArtifactName,
+            ToolResultsArtifactName,
+            ToolOutputFolderName,
             "run-log.txt"
         ];
 
         var warnings = BuildWarnings(run).Concat(scopeResult.BlockedFiles.Length > 0 ? ["file scope blocked one or more changed files."] : Array.Empty<string>()).ToArray();
-        await RecordPatchPackageGovernanceEventsAsync(run, scopeResult, skipTest, testResult, cancellationToken).ConfigureAwait(false);
+        await RecordPatchPackageGovernanceEventsAsync(run, scopeResult, skipTest, testsBlockedByToolGate, testResult, cancellationToken).ConfigureAwait(false);
         return new PatchPackageResult(scopeResult, testsPassed, warnings);
     }
 
