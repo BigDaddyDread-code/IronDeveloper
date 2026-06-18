@@ -30,9 +30,27 @@ A successful source apply leaves uncommitted working-tree changes in the source 
 
 A successful rollback removes those uncommitted working-tree changes only when the current diff matches the recorded post-apply diff.
 
+## AG1 approval binding
+
+Block AG now has an explicit approval-binding seam before source apply.
+
+The binding seam writes:
+
+- `source-apply-request.json`
+- `source-apply-request.md`
+- `source-apply-binding-report.json`
+- `source-apply-binding-report.md`
+
+The binding report proves the approval belongs to the same run, source-apply request, patch hash, changed files, source repository identity, and base commit. It also requires a Conscience decision reference, a ThoughtLedger entry reference, a human reviewer, and bounded approval language.
+
+Approval binding is evidence only. It does not apply source, grant commit permission, grant push permission, create pull requests, merge, release, deploy, rollback, continue workflow, satisfy policy, or promote memory.
+
 ## Added CLI surface
 
+- `irondev source-apply request --run <run-id> [--json]`
 - `irondev source-apply decision-template --run <run-id> --out <decision.json> [--json]`
+- `irondev source-apply validate-approval --run <run-id> --approval <approval.json> [--json]`
+- `irondev source-apply approval-status --run <run-id> [--json]`
 - `irondev source-apply apply --run <run-id> --decision <source-apply-decision.json> --thought-ledger-ref <ref> [--json]`
 - `irondev source-apply rollback-template --run <run-id> --out <rollback-decision.json> [--json]`
 - `irondev source-apply rollback --run <run-id> --decision <rollback-decision.json> --thought-ledger-ref <ref> [--json]`

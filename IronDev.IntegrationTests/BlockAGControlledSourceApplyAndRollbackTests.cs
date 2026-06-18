@@ -6,6 +6,7 @@ using IronDev.Cli;
 using IronDev.Core.Governance;
 using IronDev.Core.SourceApply;
 using SourceApplyReceipt = IronDev.Core.SourceApply.SourceApplyReceipt;
+using SourceApplyRequest = IronDev.Core.SourceApply.SourceApplyRequest;
 
 namespace IronDev.IntegrationTests;
 
@@ -17,6 +18,58 @@ public sealed class BlockAGControlledSourceApplyAndRollbackTests
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() }
     };
+
+    [TestMethod]
+    public async Task BlockAG_AG1_ValidateApprovalWritesBindingReportWithoutSourceMutation()
+    {
+        using var fixture = await ReadyFixture.CreateAsync("ag1-binding").ConfigureAwait(false);
+        var request = ReadJson<SourceApplyRequest>(Path.Combine(fixture.RunPath, "source-apply-request.json"));
+        var approvalPath = Path.Combine(fixture.RootPath, "ag1-approval.json");
+        await WriteBoundApprovalAsync(fixture, request, approvalPath).ConfigureAwait(false);
+
+        var validate = await RunCliAsync("source-apply", "validate-approval", "--run", fixture.RunPath, "--approval", approvalPath, "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(0, validate.ExitCode, validate.Error + validate.Output);
+        AssertArtifactExists(fixture.RunPath, "source-apply-binding-report.json");
+        AssertArtifactExists(fixture.RunPath, "source-apply-binding-report.md");
+        Assert.IsFalse(File.Exists(Path.Combine(fixture.RunPath, "source-apply-command-result.json")));
+        Assert.AreEqual(string.Empty, Git("status", ["--porcelain=v1"], fixture.SourceRepoPath).Stdout.Trim());
+
+        var report = ReadJson<SourceApplyBindingReport>(Path.Combine(fixture.RunPath, "source-apply-binding-report.json"));
+        Assert.IsTrue(report.BindingPassed);
+        Assert.IsTrue(report.SourceApplyRequestIdMatched);
+        Assert.IsTrue(report.RunIdMatched);
+        Assert.IsTrue(report.PatchHashMatched);
+        Assert.IsTrue(report.ChangedFilesHashMatched);
+        Assert.IsTrue(report.SourceRepoIdentityMatched);
+        Assert.IsTrue(report.BaseCommitMatched);
+        Assert.IsTrue(report.ConscienceDecisionPresent);
+        Assert.IsTrue(report.ThoughtLedgerEntryPresent);
+        Assert.IsTrue(report.ApprovalStatementBounded);
+
+        var status = await RunCliAsync("source-apply", "approval-status", "--run", fixture.RunPath, "--json").ConfigureAwait(false);
+        Assert.AreEqual(0, status.ExitCode, status.Error + status.Output);
+        StringAssert.Contains(status.Output, "\"bindingPassed\": true");
+    }
+
+    [TestMethod]
+    public async Task BlockAG_AG1_ValidateApprovalBlocksBaseCommitDrift()
+    {
+        using var fixture = await ReadyFixture.CreateAsync("ag1-base-drift").ConfigureAwait(false);
+        var request = ReadJson<SourceApplyRequest>(Path.Combine(fixture.RunPath, "source-apply-request.json"));
+        var approvalPath = Path.Combine(fixture.RootPath, "ag1-drifted-approval.json");
+        await WriteBoundApprovalAsync(fixture, request, approvalPath, approval => approval with { BaseCommit = "ffffffffffffffffffffffffffffffffffffffff" }).ConfigureAwait(false);
+
+        var validate = await RunCliAsync("source-apply", "validate-approval", "--run", fixture.RunPath, "--approval", approvalPath, "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(1, validate.ExitCode);
+        var report = ReadJson<SourceApplyBindingReport>(Path.Combine(fixture.RunPath, "source-apply-binding-report.json"));
+        Assert.IsFalse(report.BindingPassed);
+        Assert.IsFalse(report.BaseCommitMatched);
+        CollectionAssert.Contains(report.BlockingReasons, "BaseCommitMismatch");
+        Assert.IsFalse(File.Exists(Path.Combine(fixture.RunPath, "source-apply-command-result.json")));
+        Assert.AreEqual(string.Empty, Git("status", ["--porcelain=v1"], fixture.SourceRepoPath).Stdout.Trim());
+    }
 
     [TestMethod]
     public void BlockAG_ActionSpine_ClassifiesControlledApplyAndRollbackActions()
@@ -286,6 +339,31 @@ public sealed class BlockAGControlledSourceApplyAndRollbackTests
         var decision = draft with { DecisionHash = ConscienceDecisionHash.Compute(draft) };
         await File.WriteAllTextAsync(templatePath, JsonSerializer.Serialize(decision, JsonOptions)).ConfigureAwait(false);
         return templatePath;
+    }
+
+    private static async Task WriteBoundApprovalAsync(ReadyFixture fixture, SourceApplyRequest request, string approvalPath, Func<SourceApplyApprovalEvidence, SourceApplyApprovalEvidence>? mutate = null)
+    {
+        var template = ReadJson<SourceApplyApprovalEvidence>(Path.Combine(fixture.RunPath, "source-apply-approval-template.json"));
+        var approval = template with
+        {
+            SourceApplyRequestId = request.SourceApplyRequestId,
+            RunId = request.RunId,
+            SourceRepoIdentity = request.SourceRepoIdentity,
+            BaseCommit = request.BaseCommit,
+            PatchSha256 = request.PatchSha256,
+            ApprovedChangedFiles = request.ChangedFiles,
+            ApprovedBy = "human-reviewer",
+            ApprovedAtUtc = DateTimeOffset.UtcNow,
+            ConscienceDecisionId = $"conscience_{request.SourceApplyRequestId}",
+            ThoughtLedgerEntryId = $"thought_ledger_{request.SourceApplyRequestId}",
+            ApprovalText = "I approve this source-apply request for controlled working-tree application only. This approval does not permit commit, push, pull request creation, merge, release, deployment, or workflow continuation.",
+            HumanReviewRequired = true
+        };
+
+        if (mutate is not null)
+            approval = mutate(approval);
+
+        await File.WriteAllTextAsync(approvalPath, JsonSerializer.Serialize(approval, JsonOptions)).ConfigureAwait(false);
     }
 
     private static async Task<string> WriteAllowRollbackDecisionAsync(ReadyFixture fixture, string ledgerRef)
