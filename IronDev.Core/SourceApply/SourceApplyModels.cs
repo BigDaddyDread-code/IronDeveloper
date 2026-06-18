@@ -134,6 +134,8 @@ public sealed record SourceApplyDryRunResult
     public required string RunId { get; init; }
     public required string SourceApplyDryRunPlanId { get; init; }
     public required string RehearsalWorkspacePath { get; init; }
+    public required string RehearsalBaseCommit { get; init; }
+    public required string RehearsalHeadCommit { get; init; }
     public required string Command { get; init; }
     public required int ExitCode { get; init; }
     public required string StdoutPath { get; init; }

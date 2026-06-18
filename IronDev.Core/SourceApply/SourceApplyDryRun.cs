@@ -19,7 +19,7 @@ public static class SourceApplyDryRun
         {
             var message = "Apply rehearsal workspace must be outside the source repository.";
             await WriteOutputsAsync(stdoutPath, stderrPath, combinedPath, string.Empty, message, cancellationToken).ConfigureAwait(false);
-            return Result(plan, -1, false, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
+            return Result(plan, -1, false, string.Empty, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
         }
 
         if (Directory.Exists(plan.ApplyRehearsalWorkspacePath))
@@ -31,29 +31,48 @@ public static class SourceApplyDryRun
         if (clone.ExitCode != 0)
         {
             await WriteOutputsAsync(stdoutPath, stderrPath, combinedPath, clone.Stdout, clone.Stderr, cancellationToken).ConfigureAwait(false);
-            return Result(plan, clone.ExitCode, false, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
+            return Result(plan, clone.ExitCode, false, string.Empty, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
+        }
+
+        var checkout = await RunProcessAsync("git", ["checkout", "--detach", plan.BaseCommit], plan.ApplyRehearsalWorkspacePath, cancellationToken).ConfigureAwait(false);
+        if (checkout.ExitCode != 0)
+        {
+            var stderr = "BaseCommitCheckoutFailed" + Environment.NewLine + checkout.Stderr;
+            await WriteOutputsAsync(stdoutPath, stderrPath, combinedPath, checkout.Stdout, stderr, cancellationToken).ConfigureAwait(false);
+            return Result(plan, checkout.ExitCode, false, string.Empty, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
+        }
+
+        var head = await RunProcessAsync("git", ["rev-parse", "HEAD"], plan.ApplyRehearsalWorkspacePath, cancellationToken).ConfigureAwait(false);
+        var rehearsalHead = head.ExitCode == 0 ? head.Stdout.Trim() : string.Empty;
+        if (!string.Equals(rehearsalHead, plan.BaseCommit, StringComparison.OrdinalIgnoreCase))
+        {
+            var stderr = "RehearsalBaseCommitMismatch" + Environment.NewLine + $"expected: {plan.BaseCommit}" + Environment.NewLine + $"actual: {rehearsalHead}";
+            await WriteOutputsAsync(stdoutPath, stderrPath, combinedPath, head.Stdout, stderr, cancellationToken).ConfigureAwait(false);
+            return Result(plan, -1, false, rehearsalHead, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
         }
 
         var check = await RunProcessAsync("git", ["apply", "--check", plan.PatchPath], plan.ApplyRehearsalWorkspacePath, cancellationToken).ConfigureAwait(false);
         if (check.ExitCode != 0)
         {
             await WriteOutputsAsync(stdoutPath, stderrPath, combinedPath, check.Stdout, check.Stderr, cancellationToken).ConfigureAwait(false);
-            return Result(plan, check.ExitCode, false, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
+            return Result(plan, check.ExitCode, false, rehearsalHead, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
         }
 
         var apply = await RunProcessAsync("git", ["apply", plan.PatchPath], plan.ApplyRehearsalWorkspacePath, cancellationToken).ConfigureAwait(false);
         await WriteOutputsAsync(stdoutPath, stderrPath, combinedPath, check.Stdout + apply.Stdout, check.Stderr + apply.Stderr, cancellationToken).ConfigureAwait(false);
 
-        return Result(plan, apply.ExitCode, apply.ExitCode == 0, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
+        return Result(plan, apply.ExitCode, apply.ExitCode == 0, rehearsalHead, stdoutPath, stderrPath, combinedPath, started, DateTimeOffset.UtcNow);
     }
 
-    private static SourceApplyDryRunResult Result(SourceApplyDryRunPlan plan, int exitCode, bool applied, string stdoutPath, string stderrPath, string combinedPath, DateTimeOffset started, DateTimeOffset finished) =>
+    private static SourceApplyDryRunResult Result(SourceApplyDryRunPlan plan, int exitCode, bool applied, string rehearsalHead, string stdoutPath, string stderrPath, string combinedPath, DateTimeOffset started, DateTimeOffset finished) =>
         new()
         {
             SourceApplyDryRunResultId = $"source_apply_dry_run_{Guid.NewGuid():N}",
             RunId = plan.RunId,
             SourceApplyDryRunPlanId = plan.SourceApplyDryRunPlanId,
             RehearsalWorkspacePath = plan.ApplyRehearsalWorkspacePath,
+            RehearsalBaseCommit = plan.BaseCommit,
+            RehearsalHeadCommit = rehearsalHead,
             Command = "git apply --check && git apply (rehearsal workspace only)",
             ExitCode = exitCode,
             StdoutPath = stdoutPath,

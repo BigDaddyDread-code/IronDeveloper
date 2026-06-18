@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using IronDev.Cli;
 using IronDev.Core.Governance;
@@ -128,6 +129,70 @@ public sealed class BlockAFControlledSourceApplyFoundationTests
         {
             StringAssert.Contains(events, action);
         }
+    }
+
+    [TestMethod]
+    public async Task BlockAF_SourceApplyPrepare_RehearsesAgainstRunBaseCommitWhenSourceRepoMovesForwardCleanly()
+    {
+        using var fixture = await PatchRunFixture.CreateFinishedRunAsync("af-base-anchor").ConfigureAwait(false);
+        var baseCommit = RunProcess("git", ["rev-parse", "HEAD"], fixture.SourceRepoPath).Stdout.Trim();
+        await File.WriteAllTextAsync(Path.Combine(fixture.SourceRepoPath, "ADVANCE.md"), "Clean source repo advance after patch run.\n").ConfigureAwait(false);
+        AssertGitOk(RunProcess("git", ["add", "ADVANCE.md"], fixture.SourceRepoPath), "git add advance");
+        AssertGitOk(RunProcess("git", ["commit", "-m", "advance source after patch run"], fixture.SourceRepoPath), "git commit advance");
+        var movedHead = RunProcess("git", ["rev-parse", "HEAD"], fixture.SourceRepoPath).Stdout.Trim();
+        Assert.AreNotEqual(baseCommit, movedHead);
+
+        var approvalPath = Path.Combine(fixture.RootPath, "approval.json");
+        Assert.AreEqual(0, (await RunCliAsync("source-apply", "approval-template", "--run", fixture.RunPath, "--out", approvalPath, "--json").ConfigureAwait(false)).ExitCode);
+        var template = JsonSerializer.Deserialize<SourceApplyApprovalEvidence>(await File.ReadAllTextAsync(approvalPath).ConfigureAwait(false), JsonOptions)!;
+        var approval = template with
+        {
+            ApprovedBy = "human-reviewer",
+            ApprovalText = "Human reviewed the patch evidence and approves dry-run readiness evaluation only.",
+            ApprovedAtUtc = DateTimeOffset.UtcNow
+        };
+        await File.WriteAllTextAsync(approvalPath, JsonSerializer.Serialize(approval, JsonOptions)).ConfigureAwait(false);
+
+        var prepare = await RunCliAsync("source-apply", "prepare", "--run", fixture.RunPath, "--approval", approvalPath, "--apply-root", Path.Combine(fixture.RootPath, "apply-root"), "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(0, prepare.ExitCode, prepare.Error + prepare.Output);
+        var dryRun = ReadJson<SourceApplyDryRunResult>(Path.Combine(fixture.RunPath, "source-apply-dry-run-result.json"));
+        Assert.AreEqual(baseCommit, dryRun.RehearsalBaseCommit);
+        Assert.AreEqual(baseCommit, dryRun.RehearsalHeadCommit);
+        Assert.AreEqual(movedHead, RunProcess("git", ["rev-parse", "HEAD"], fixture.SourceRepoPath).Stdout.Trim());
+        Assert.AreEqual(string.Empty, RunProcess("git", ["status", "--porcelain=v1"], fixture.SourceRepoPath).Stdout.Trim());
+    }
+
+    [TestMethod]
+    public async Task BlockAF_SourceApplyPrepare_BlocksWhenRunBaseCommitCannotBeCheckedOut()
+    {
+        using var fixture = await PatchRunFixture.CreateFinishedRunAsync("af-invalid-base").ConfigureAwait(false);
+        var runJsonPath = Path.Combine(fixture.RunPath, "run.json");
+        var runNode = JsonNode.Parse(await File.ReadAllTextAsync(runJsonPath).ConfigureAwait(false))!.AsObject();
+        runNode["baseCommit"] = "ffffffffffffffffffffffffffffffffffffffff";
+        await File.WriteAllTextAsync(runJsonPath, runNode.ToJsonString(JsonOptions)).ConfigureAwait(false);
+
+        var approvalPath = Path.Combine(fixture.RootPath, "approval.json");
+        Assert.AreEqual(0, (await RunCliAsync("source-apply", "approval-template", "--run", fixture.RunPath, "--out", approvalPath, "--json").ConfigureAwait(false)).ExitCode);
+        var template = JsonSerializer.Deserialize<SourceApplyApprovalEvidence>(await File.ReadAllTextAsync(approvalPath).ConfigureAwait(false), JsonOptions)!;
+        var approval = template with
+        {
+            ApprovedBy = "human-reviewer",
+            ApprovalText = "Human reviewed the patch evidence and approves dry-run readiness evaluation only.",
+            ApprovedAtUtc = DateTimeOffset.UtcNow
+        };
+        await File.WriteAllTextAsync(approvalPath, JsonSerializer.Serialize(approval, JsonOptions)).ConfigureAwait(false);
+
+        var prepare = await RunCliAsync("source-apply", "prepare", "--run", fixture.RunPath, "--approval", approvalPath, "--apply-root", Path.Combine(fixture.RootPath, "apply-root"), "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(1, prepare.ExitCode);
+        var dryRun = ReadJson<SourceApplyDryRunResult>(Path.Combine(fixture.RunPath, "source-apply-dry-run-result.json"));
+        Assert.IsFalse(dryRun.PatchAppliedInRehearsalWorkspace);
+        Assert.AreEqual(string.Empty, dryRun.RehearsalHeadCommit);
+        StringAssert.Contains(File.ReadAllText(dryRun.StderrPath), "BaseCommitCheckoutFailed");
+        var readiness = ReadJson<SourceApplyReadinessReport>(Path.Combine(fixture.RunPath, "source-apply-readiness.json"));
+        Assert.AreEqual(SourceApplyReadiness.Blocked, readiness.Readiness);
+        CollectionAssert.Contains(readiness.Reasons, "DryRunFailed");
     }
 
     [TestMethod]
@@ -303,6 +368,9 @@ public sealed class BlockAFControlledSourceApplyFoundationTests
 
     private static void AssertArtifactExists(string directory, string name) =>
         Assert.IsTrue(File.Exists(Path.Combine(directory, name)), $"{name} should exist in {directory}.");
+
+    private static void AssertGitOk(ProcessResult result, string operation) =>
+        Assert.AreEqual(0, result.ExitCode, $"{operation} failed: {result.Stderr}{result.Stdout}");
 
     private static string CreateTempRoot()
     {
