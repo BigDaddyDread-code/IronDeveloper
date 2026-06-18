@@ -212,6 +212,9 @@ public static class IronDevCli
         if (IronDevCliPatchProposal.IsPatchCommand(args))
             return await IronDevCliPatchProposal.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliMemory.IsMemoryCommand(args))
+            return await IronDevCliMemory.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IsCommand(args, "ticket", "create"))
             return await HandleTicketCreateAsync(args, output, error, handler, cancellationToken);
         if (IsCommand(args, "ticket", "list"))
@@ -2894,6 +2897,11 @@ public static class IronDevCli
         error.WriteLine("  irondev patch cleanup --older-than-days <n> --delete-workspaces [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch governance --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch governance --inventory [--json]");
+        error.WriteLine("  irondev memory propose --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev memory proposals --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev memory promote --proposal <proposal-id-or-file> --conscience-decision <decision.json> --thought-ledger-ref <ref> [--memory-root <path>] [--runs-root <path>] [--scope run|project|portable] [--json]");
+        error.WriteLine("  irondev memory list [--memory-root <path>] [--json]");
+        error.WriteLine("  irondev memory show --key <memory-key> [--memory-root <path>] [--json]");
         error.WriteLine("  irondev ticket create --project-id <id> --file <ticket.json> [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket list --project-id <id> [--take 50] [--json] [--api-base-url <url>] [--token <jwt>]");
         error.WriteLine("  irondev ticket show --project-id <id> --ticket-id <id> [--json] [--api-base-url <url>] [--token <jwt>]");
