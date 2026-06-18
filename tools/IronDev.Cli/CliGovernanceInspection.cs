@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using IronDev.Core.Governance;
 
@@ -6,6 +6,7 @@ namespace IronDev.Cli;
 
 internal static class IronDevCliGovernanceInspection
 {
+    private const string DefaultRunsFolderName = "irondev-patch-runs";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
@@ -24,21 +25,27 @@ internal static class IronDevCliGovernanceInspection
         return args[1].ToLowerInvariant() switch
         {
             "inventory" => Task.FromResult(HandleInventory(args, output, error)),
+            "actions" => Task.FromResult(HandleInventory(args, output, error)),
             "classify" => Task.FromResult(HandleClassify(args, output, error)),
+            "action-envelope" => Task.FromResult(HandleActionEnvelope(args, output, error)),
+            "verify" => Task.FromResult(HandleVerify(args, output, error)),
+            "events" => Task.FromResult(HandleEvents(args, output, error)),
+            "allow" or "approve" or "execute" or "release" or "deploy" or "merge" => Task.FromResult(WriteFailure(error, $"governance {args[1]} is intentionally unsupported; AJ is inspection/envelope/verification only.")),
             _ => Task.FromResult(WriteFailure(error, $"unsupported governance command: {args[1]}"))
         };
     }
 
     private static int HandleInventory(string[] args, TextWriter output, TextWriter error)
     {
-        var json = HasFlag(args, "--json") || HasOutputJson(args);
+        var json = HasJson(args);
         if (json)
         {
             output.WriteLine(JsonSerializer.Serialize(new
             {
-                command = "governance inventory",
+                command = "governance actions",
                 status = "succeeded",
-                entries = AuthorityActionInventory.All
+                entries = AuthorityActionInventory.All,
+                boundary = Boundary()
             }, JsonOptions));
             return 0;
         }
@@ -46,18 +53,16 @@ internal static class IronDevCliGovernanceInspection
         output.WriteLine("Governed action inventory");
         output.WriteLine();
         foreach (var entry in AuthorityActionInventory.All)
-        {
             output.WriteLine($"- {entry.ActionKind}: {entry.Classification}; allowedInCurrentBlock={entry.AllowedInCurrentBlock}; requiresConscience={entry.RequiresConscience}; requiresThoughtLedger={entry.RequiresThoughtLedger}; status={entry.CurrentImplementationStatus}");
-        }
 
         output.WriteLine();
-        output.WriteLine("Authority-bearing actions are registered only in Block AB and are not executable in this block.");
+        output.WriteLine("Authority-bearing actions require the governed-action kernel. Inventory is not permission.");
         return 0;
     }
 
     private static int HandleClassify(string[] args, TextWriter output, TextWriter error)
     {
-        var json = HasFlag(args, "--json") || HasOutputJson(args);
+        var json = HasJson(args);
         var action = GetOption(args, "--action");
         if (string.IsNullOrWhiteSpace(action))
             return WriteFailure(error, "missing required option: --action <action-kind>");
@@ -74,7 +79,8 @@ internal static class IronDevCliGovernanceInspection
             entry.RequiresConscience,
             entry.RequiresThoughtLedger,
             entry.CurrentImplementationStatus,
-            executableInCurrentBlock = entry.AllowedInCurrentBlock
+            executableInCurrentBlock = entry.AllowedInCurrentBlock,
+            boundary = Boundary()
         };
 
         if (json)
@@ -88,15 +94,125 @@ internal static class IronDevCliGovernanceInspection
         output.WriteLine($"Requires Conscience: {entry.RequiresConscience}");
         output.WriteLine($"Requires ThoughtLedger: {entry.RequiresThoughtLedger}");
         output.WriteLine($"Implementation status: {entry.CurrentImplementationStatus}");
-        output.WriteLine("Executable in current block: false");
+        output.WriteLine($"Executable in current block: {entry.AllowedInCurrentBlock}");
+        return 0;
+    }
+
+    private static int HandleActionEnvelope(string[] args, TextWriter output, TextWriter error)
+    {
+        var json = HasJson(args);
+        var kindText = GetOption(args, "--kind");
+        var subject = GetOption(args, "--subject");
+        var run = GetOption(args, "--run");
+        var subjectKind = GetOption(args, "--subject-kind") ?? "GovernedSubject";
+        var requestedBy = GetOption(args, "--requested-by") ?? "IronDevCli";
+        var inputsRef = GetOption(args, "--inputs-ref") ?? "existing-artifact";
+
+        if (!Enum.TryParse<GovernedActionKind>(kindText, ignoreCase: true, out var kind) || kind == GovernedActionKind.Unknown)
+            return WriteFailure(error, "missing or invalid required option: --kind <governed-action-kind>");
+        if (string.IsNullOrWhiteSpace(subject))
+            return WriteFailure(error, "missing required option: --subject <subject-id>");
+        if (string.IsNullOrWhiteSpace(run))
+            return WriteFailure(error, "missing required option: --run <run-id-or-path>");
+
+        var envelope = GovernedActionEnvelope.FromInventory(kind, subjectKind, subject, requestedBy, inputsRef);
+        var runPath = ResolveRunPath(run);
+        GovernanceKernelArtifactWriter.AppendJsonLine(runPath, "governed-actions.jsonl", envelope);
+        var evt = new FileBackedGovernanceEventStore(runPath).Append(
+            runId: Path.GetFileName(runPath),
+            actionId: envelope.ActionId,
+            eventKind: GovernanceKernelEventKind.ActionRequested,
+            subjectKind: envelope.Subject.SubjectKind,
+            subjectId: envelope.Subject.SubjectId,
+            summary: $"Governed action envelope created for {kind}.",
+            evidenceRefs: envelope.EvidenceRefs.Select(item => item.EvidenceRefId));
+
+        if (json)
+        {
+            output.WriteLine(JsonSerializer.Serialize(new
+            {
+                command = "governance action-envelope",
+                status = "succeeded",
+                runPath,
+                envelope,
+                eventRecorded = evt.EventId,
+                boundary = Boundary()
+            }, JsonOptions));
+            return 0;
+        }
+
+        output.WriteLine($"Created governed action envelope: {envelope.ActionId}");
+        output.WriteLine($"Run path: {runPath}");
+        output.WriteLine("Boundary: envelope creation is not approval, permission, execution, release, merge, deployment, source apply, rollback, workflow continuation, or memory promotion.");
+        return 0;
+    }
+
+    private static int HandleVerify(string[] args, TextWriter output, TextWriter error)
+    {
+        var json = HasJson(args);
+        var run = GetOption(args, "--run");
+        if (string.IsNullOrWhiteSpace(run))
+            return WriteFailure(error, "missing required option: --run <run-id-or-path>");
+
+        var runPath = ResolveRunPath(run);
+        var result = GovernanceKernelArtifactWriter.VerifyAndWrite(runPath);
+        if (json)
+        {
+            output.WriteLine(JsonSerializer.Serialize(new
+            {
+                command = "governance verify",
+                status = result.Passed ? "succeeded" : "blocked",
+                runPath,
+                result,
+                boundary = Boundary()
+            }, JsonOptions));
+            return result.Passed ? 0 : 1;
+        }
+
+        output.WriteLine($"Governance kernel verification: {(result.Passed ? "passed" : "blocked")}");
+        output.WriteLine($"Events: {result.EventCount}; Actions: {result.ActionCount}; Gate evidence: {result.GateEvidenceCount}; Conscience: {result.ConscienceDecisionCount}; ThoughtLedger: {result.ThoughtLedgerCount}");
+        foreach (var issue in result.Issues)
+            output.WriteLine($"- {issue}");
+        return result.Passed ? 0 : 1;
+    }
+
+    private static int HandleEvents(string[] args, TextWriter output, TextWriter error)
+    {
+        var json = HasJson(args);
+        var run = GetOption(args, "--run");
+        if (string.IsNullOrWhiteSpace(run))
+            return WriteFailure(error, "missing required option: --run <run-id-or-path>");
+
+        var runPath = ResolveRunPath(run);
+        var events = new FileBackedGovernanceEventStore(runPath).ReadAll();
+        if (json)
+        {
+            output.WriteLine(JsonSerializer.Serialize(new
+            {
+                command = "governance events",
+                status = "succeeded",
+                runPath,
+                events,
+                boundary = Boundary()
+            }, JsonOptions));
+            return 0;
+        }
+
+        output.WriteLine($"Governance events: {runPath}");
+        foreach (var evt in events)
+            output.WriteLine($"- {evt.EventKind}: {evt.Summary}");
         return 0;
     }
 
     private static int WriteUsage(TextWriter error)
     {
         error.WriteLine("Usage:");
+        error.WriteLine("  irondev governance actions [--json]");
         error.WriteLine("  irondev governance inventory [--json]");
         error.WriteLine("  irondev governance classify --action <action-kind> [--json]");
+        error.WriteLine("  irondev governance action-envelope --kind <kind> --subject <subject-id> --run <run-id-or-path> [--subject-kind <kind>] [--requested-by <actor>] [--inputs-ref <artifact>] [--json]");
+        error.WriteLine("  irondev governance verify --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev governance events --run <run-id-or-path> [--json]");
         return 2;
     }
 
@@ -105,6 +221,9 @@ internal static class IronDevCliGovernanceInspection
         error.WriteLine(message);
         return 2;
     }
+
+    private static bool HasJson(string[] args) =>
+        HasFlag(args, "--json") || HasOutputJson(args);
 
     private static bool HasFlag(string[] args, string name) =>
         args.Any(arg => string.Equals(arg, name, StringComparison.OrdinalIgnoreCase));
@@ -131,4 +250,29 @@ internal static class IronDevCliGovernanceInspection
 
         return null;
     }
+
+    private static string ResolveRunPath(string run)
+    {
+        var candidate = Path.GetFullPath(run.Trim());
+        if (Path.IsPathRooted(run) || Directory.Exists(candidate) || File.Exists(Path.Combine(candidate, "run.json")))
+            return candidate;
+
+        return Path.Combine(Path.GetTempPath(), DefaultRunsFolderName, run.Trim());
+    }
+
+    private static object Boundary() => new
+    {
+        inspectionOnly = true,
+        envelopeOnly = true,
+        grantsAuthority = false,
+        approvesAction = false,
+        executesAction = false,
+        mutatesSource = false,
+        rollsBackSource = false,
+        promotesMemory = false,
+        continuesWorkflow = false,
+        releasesSoftware = false,
+        deploysSoftware = false,
+        mergesSource = false
+    };
 }
