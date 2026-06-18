@@ -45,6 +45,19 @@ public enum GovernedActionKind
     SourceApplyDryRunCompleted,
     RollbackPlanDrafted,
     SourceApplyReadinessReportCreated,
+    SourceApplyExecutionRequested,
+    SourceApplyExecutionGateEvaluated,
+    SourceApplyPreSnapshotCaptured,
+    SourceApplyCommandExecuted,
+    SourceApplyPostSnapshotCaptured,
+    SourceApplyReceiptCreated,
+    SourceRollback,
+    SourceRollbackRequested,
+    SourceRollbackGateEvaluated,
+    SourceRollbackCommandExecuted,
+    SourceRollbackReceiptCreated,
+    PostApplyValidationRequested,
+    PostApplyValidationCompleted,
     ToolExecution,
     MemoryPromotion,
     AcceptedMemoryMutation,
@@ -188,7 +201,15 @@ public static class GovernedActionClassifier
         GovernedActionKind.SourceApplyDryRunStarted,
         GovernedActionKind.SourceApplyDryRunCompleted,
         GovernedActionKind.RollbackPlanDrafted,
-        GovernedActionKind.SourceApplyReadinessReportCreated
+        GovernedActionKind.SourceApplyReadinessReportCreated,
+        GovernedActionKind.SourceApplyExecutionGateEvaluated,
+        GovernedActionKind.SourceApplyPreSnapshotCaptured,
+        GovernedActionKind.SourceApplyPostSnapshotCaptured,
+        GovernedActionKind.SourceApplyReceiptCreated,
+        GovernedActionKind.SourceRollbackGateEvaluated,
+        GovernedActionKind.SourceRollbackReceiptCreated,
+        GovernedActionKind.PostApplyValidationRequested,
+        GovernedActionKind.PostApplyValidationCompleted
     ];
 
     private static readonly HashSet<GovernedActionKind> AuthorityBearingActions =
@@ -200,6 +221,11 @@ public static class GovernedActionClassifier
         GovernedActionKind.MemoryPromotion,
         GovernedActionKind.AcceptedMemoryMutation,
         GovernedActionKind.SourceApply,
+        GovernedActionKind.SourceApplyExecutionRequested,
+        GovernedActionKind.SourceApplyCommandExecuted,
+        GovernedActionKind.SourceRollback,
+        GovernedActionKind.SourceRollbackRequested,
+        GovernedActionKind.SourceRollbackCommandExecuted,
         GovernedActionKind.RollbackExecution,
         GovernedActionKind.WorkflowContinuation,
         GovernedActionKind.ReleaseReadinessDecision,
@@ -294,10 +320,23 @@ public static class AuthorityActionInventory
         Patch(GovernedActionKind.SourceApplyDryRunCompleted, "Source-apply dry-run rehearsal completed in a disposable apply workspace."),
         Patch(GovernedActionKind.RollbackPlanDrafted, "Rollback plan draft was created for human review."),
         Patch(GovernedActionKind.SourceApplyReadinessReportCreated, "Source-apply readiness report was created as non-authoritative evidence."),
+        SourceApplyAuthority(GovernedActionKind.SourceApplyExecutionRequested, "Controlled source-apply execution was requested for a prepared patch run."),
+        Patch(GovernedActionKind.SourceApplyExecutionGateEvaluated, "Controlled source-apply execution gate was evaluated."),
+        Patch(GovernedActionKind.SourceApplyPreSnapshotCaptured, "Pre-apply source repository snapshot was captured."),
+        SourceApplyAuthority(GovernedActionKind.SourceApplyCommandExecuted, "Controlled git apply command executed against the source working tree."),
+        Patch(GovernedActionKind.SourceApplyPostSnapshotCaptured, "Post-apply source repository snapshot was captured."),
+        Patch(GovernedActionKind.SourceApplyReceiptCreated, "Controlled source-apply receipt was created."),
+        SourceApplyAuthority(GovernedActionKind.SourceRollback, "Controlled source rollback was requested for a previously applied patch."),
+        SourceApplyAuthority(GovernedActionKind.SourceRollbackRequested, "Controlled source rollback request evidence was created."),
+        Patch(GovernedActionKind.SourceRollbackGateEvaluated, "Controlled source rollback gate was evaluated."),
+        SourceApplyAuthority(GovernedActionKind.SourceRollbackCommandExecuted, "Controlled git apply --reverse command executed against the source working tree."),
+        Patch(GovernedActionKind.SourceRollbackReceiptCreated, "Controlled source rollback receipt was created."),
+        Patch(GovernedActionKind.PostApplyValidationRequested, "Post-apply validation was requested as review evidence."),
+        Patch(GovernedActionKind.PostApplyValidationCompleted, "Post-apply validation completed as review evidence."),
         Authority(GovernedActionKind.ToolExecution, "Run a tool with effects outside passive inspection."),
         Authority(GovernedActionKind.MemoryPromotion, "Promote memory from proposal/evidence into accepted memory."),
         Authority(GovernedActionKind.AcceptedMemoryMutation, "Mutate accepted memory directly."),
-        Authority(GovernedActionKind.SourceApply, "Apply source changes to a source repository."),
+        SourceApplyAuthority(GovernedActionKind.SourceApply, "Apply source changes to a source repository through the controlled source-apply path."),
         Authority(GovernedActionKind.RollbackExecution, "Execute rollback source mutation."),
         Authority(GovernedActionKind.WorkflowContinuation, "Continue workflow state after governed evidence."),
         Authority(GovernedActionKind.ReleaseReadinessDecision, "Record release readiness decision."),
@@ -370,6 +409,22 @@ public static class AuthorityActionInventory
             RequiredPolicyKinds = [],
             RequiredStores = ["FileBackedAcceptedMemoryStore"],
             ForbiddenDirectPaths = ["DirectAcceptedMemoryWrite", "AgentSelfApproval", "ModelOutputDirectToMemory", "PortableProjectLeak"],
+            CurrentImplementationStatus = AuthorityActionImplementationStatus.FutureBlock
+        };
+
+    private static AuthorityActionInventoryEntry SourceApplyAuthority(GovernedActionKind actionKind, string description) =>
+        new()
+        {
+            ActionKind = actionKind,
+            Classification = GovernedActionClassification.AuthorityBearing,
+            Description = description,
+            AllowedInCurrentBlock = true,
+            RequiresConscience = true,
+            RequiresThoughtLedger = true,
+            RequiredEvidenceKinds = ["SourceApplyRequest", "SourceApplyReadiness", "DryRunResult", "RollbackPlan", "ConscienceDecision", "ThoughtLedger", "SourceSnapshot", "ActionSpecificReceipt"],
+            RequiredPolicyKinds = ["HumanReview"],
+            RequiredStores = ["PatchRunArtifacts", "RunScopedGovernanceEvent"],
+            ForbiddenDirectPaths = ["GitCommit", "GitPush", "PullRequestCreation", "Merge", "Release", "Deploy", "WorkflowContinuation", "AgentSelfApproval"],
             CurrentImplementationStatus = AuthorityActionImplementationStatus.FutureBlock
         };
 

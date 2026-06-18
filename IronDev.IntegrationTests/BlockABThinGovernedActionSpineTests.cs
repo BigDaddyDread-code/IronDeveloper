@@ -43,15 +43,21 @@ public sealed class BlockABThinGovernedActionSpineTests
             Assert.AreEqual(GovernedActionClassifier.Classify(kind), entry.Classification);
         }
 
-        var blockAeAllowedAuthority = new HashSet<GovernedActionKind>
+        var currentBlockAllowedAuthority = new HashSet<GovernedActionKind>
         {
             GovernedActionKind.MemoryPromotionAccepted,
-            GovernedActionKind.AcceptedMemoryVersionAppended
+            GovernedActionKind.AcceptedMemoryVersionAppended,
+            GovernedActionKind.SourceApply,
+            GovernedActionKind.SourceApplyExecutionRequested,
+            GovernedActionKind.SourceApplyCommandExecuted,
+            GovernedActionKind.SourceRollback,
+            GovernedActionKind.SourceRollbackRequested,
+            GovernedActionKind.SourceRollbackCommandExecuted
         };
 
         foreach (var entry in AuthorityActionInventory.All.Where(entry => entry.Classification == GovernedActionClassification.AuthorityBearing))
         {
-            Assert.AreEqual(blockAeAllowedAuthority.Contains(entry.ActionKind), entry.AllowedInCurrentBlock, entry.ActionKind.ToString());
+            Assert.AreEqual(currentBlockAllowedAuthority.Contains(entry.ActionKind), entry.AllowedInCurrentBlock, entry.ActionKind.ToString());
             Assert.IsTrue(entry.RequiresConscience, entry.ActionKind.ToString());
             Assert.IsTrue(entry.RequiresThoughtLedger, entry.ActionKind.ToString());
             CollectionAssert.Contains(entry.RequiredEvidenceKinds, "ConscienceDecision");
@@ -69,9 +75,9 @@ public sealed class BlockABThinGovernedActionSpineTests
     [TestMethod]
     public void BlockAB_ConscienceAndThoughtLedgerContracts_FailClosedForAuthorityBearingActions()
     {
-        var blockedByCurrentBlock = ConscienceDecisionEvaluator.Evaluate(GovernedActionKind.SourceApply, decision: null);
-        Assert.IsFalse(blockedByCurrentBlock.IsExecutable);
-        Assert.AreEqual("ActionNotAllowedInCurrentBlock", blockedByCurrentBlock.Status);
+        var blockedWithoutDecision = ConscienceDecisionEvaluator.Evaluate(GovernedActionKind.SourceApply, decision: null);
+        Assert.IsFalse(blockedWithoutDecision.IsExecutable);
+        Assert.AreEqual("MissingConscienceDecision", blockedWithoutDecision.Status);
 
         var nonAuthority = ConscienceDecisionEvaluator.Evaluate(GovernedActionKind.PatchArtifactExported, decision: null);
         Assert.IsTrue(nonAuthority.IsExecutable);
@@ -95,7 +101,7 @@ public sealed class BlockABThinGovernedActionSpineTests
             PolicyRefs = ["policy-1"],
             RiskLevel = ConscienceDecisionRiskLevel.High,
             Decision = ConscienceDecisionOutcome.Block,
-            BlockReasons = ["Source apply is not allowed in Block AB."],
+            BlockReasons = ["Source apply requires controlled AG evidence."],
             RequiredHumanReview = true,
             ThoughtLedgerRef = "thought-ledger-1",
             DecisionHash = "pending",
@@ -109,9 +115,9 @@ public sealed class BlockABThinGovernedActionSpineTests
             DecisionHash = "pending"
         };
         var allowDecision = allowDraft with { DecisionHash = ConscienceDecisionHash.Compute(allowDraft) };
-        var allowedButStillBlocked = ConscienceDecisionEvaluator.Evaluate(GovernedActionKind.SourceApply, allowDecision);
-        Assert.IsFalse(allowedButStillBlocked.IsExecutable);
-        Assert.AreEqual("ActionNotAllowedInCurrentBlock", allowedButStillBlocked.Status);
+        var allowedByDecisionOnly = ConscienceDecisionEvaluator.Evaluate(GovernedActionKind.SourceApply, allowDecision);
+        Assert.IsTrue(allowedByDecisionOnly.IsExecutable);
+        Assert.AreEqual("ConscienceDecisionAllowsFutureExecution", allowedByDecisionOnly.Status);
 
         var decision = draft with { DecisionHash = ConscienceDecisionHash.Compute(draft) };
         var json = JsonSerializer.Serialize(decision, JsonOptions);
@@ -169,7 +175,7 @@ public sealed class BlockABThinGovernedActionSpineTests
         StringAssert.Contains(classify.StandardOutput, "AuthorityBearing");
         StringAssert.Contains(classify.StandardOutput, "\"requiresConscience\": true");
         StringAssert.Contains(classify.StandardOutput, "\"requiresThoughtLedger\": true");
-        StringAssert.Contains(classify.StandardOutput, "\"executableInCurrentBlock\": false");
+        StringAssert.Contains(classify.StandardOutput, "\"executableInCurrentBlock\": true");
 
         var forbidden = await RunCliAsync("governance", "classify", "--action", "DirectGitPush", "--json");
         Assert.AreEqual(0, forbidden.ExitCode, forbidden.StandardOutput + forbidden.StandardError);

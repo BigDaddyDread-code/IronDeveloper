@@ -18,7 +18,7 @@ public sealed class BlockAFControlledSourceApplyFoundationTests
     };
 
     [TestMethod]
-    public void BlockAF_ActionSpine_RegistersPreparationActionsWithoutMakingSourceApplyExecutable()
+    public void BlockAF_ActionSpine_RegistersPreparationActionsAndLeavesRealApplyBehindControlledAuthority()
     {
         foreach (var action in new[]
                  {
@@ -41,8 +41,9 @@ public sealed class BlockAFControlledSourceApplyFoundationTests
 
         var sourceApply = AuthorityActionInventory.Get(GovernedActionKind.SourceApply);
         Assert.AreEqual(GovernedActionClassification.AuthorityBearing, sourceApply.Classification);
-        Assert.IsFalse(sourceApply.AllowedInCurrentBlock);
-        Assert.IsFalse(ConscienceDecisionEvaluator.Evaluate(GovernedActionKind.SourceApply, AllowDecision()).IsExecutable);
+        Assert.IsTrue(sourceApply.AllowedInCurrentBlock);
+        Assert.IsTrue(sourceApply.RequiresConscience);
+        Assert.IsTrue(sourceApply.RequiresThoughtLedger);
     }
 
     [TestMethod]
@@ -287,7 +288,7 @@ public sealed class BlockAFControlledSourceApplyFoundationTests
     [TestMethod]
     public async Task BlockAF_ForbiddenSourceApplySubcommands_DoNotExist()
     {
-        foreach (var subcommand in new[] { "apply", "commit", "push", "pr", "merge", "rollback" })
+        foreach (var subcommand in new[] { "commit", "push", "pr", "merge", "release", "deploy" })
         {
             var result = await RunCliAsync("source-apply", subcommand, "--run", "any").ConfigureAwait(false);
             Assert.AreEqual(2, result.ExitCode, subcommand);
