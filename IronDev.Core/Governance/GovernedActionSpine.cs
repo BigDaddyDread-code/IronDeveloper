@@ -15,6 +15,7 @@ public enum GovernedActionKind
     WorkspaceToolRequestCreated,
     WorkspaceToolGateEvaluated,
     WorkspaceCommandExecuted,
+    WorkspaceToolExecution,
     WorkspaceToolResultRecorded,
     PatchContextBundleCreated,
     ModelPatchSuggestionRequested,
@@ -68,6 +69,9 @@ public enum GovernedActionKind
     ReleaseApproval,
     DeploymentApproval,
     MergeApproval,
+    TicketCreation,
+    SchedulerRunCreation,
+    AgentHandoffAuthorityClaim,
     ProductionDeployment,
     DirectGitCommitToSource,
     DirectGitPush,
@@ -175,6 +179,7 @@ public static class GovernedActionClassifier
         GovernedActionKind.WorkspaceToolRequestCreated,
         GovernedActionKind.WorkspaceToolGateEvaluated,
         GovernedActionKind.WorkspaceCommandExecuted,
+        GovernedActionKind.WorkspaceToolExecution,
         GovernedActionKind.WorkspaceToolResultRecorded,
         GovernedActionKind.PatchContextBundleCreated,
         GovernedActionKind.ModelPatchSuggestionRequested,
@@ -231,7 +236,9 @@ public static class GovernedActionClassifier
         GovernedActionKind.ReleaseReadinessDecision,
         GovernedActionKind.ReleaseApproval,
         GovernedActionKind.DeploymentApproval,
-        GovernedActionKind.MergeApproval
+        GovernedActionKind.MergeApproval,
+        GovernedActionKind.TicketCreation,
+        GovernedActionKind.SchedulerRunCreation
     ];
 
     public static GovernedActionClassification Classify(GovernedActionKind actionKind)
@@ -290,6 +297,7 @@ public static class AuthorityActionInventory
         Patch(GovernedActionKind.WorkspaceToolRequestCreated, "Workspace-scoped tool request was created for a patch run."),
         Patch(GovernedActionKind.WorkspaceToolGateEvaluated, "Workspace-scoped tool gate was evaluated for a patch run."),
         Patch(GovernedActionKind.WorkspaceCommandExecuted, "Workspace-confined command was executed for patch-run evidence."),
+        Patch(GovernedActionKind.WorkspaceToolExecution, "Workspace-confined tool execution was recorded as non-authority evidence."),
         Patch(GovernedActionKind.WorkspaceToolResultRecorded, "Workspace tool result evidence was recorded for a patch run."),
         Patch(GovernedActionKind.PatchContextBundleCreated, "Bounded patch task context bundle was created for model assistance."),
         Patch(GovernedActionKind.ModelPatchSuggestionRequested, "Model patch suggestion was requested as proposal evidence."),
@@ -343,6 +351,9 @@ public static class AuthorityActionInventory
         Authority(GovernedActionKind.ReleaseApproval, "Approve release."),
         Authority(GovernedActionKind.DeploymentApproval, "Approve deployment."),
         Authority(GovernedActionKind.MergeApproval, "Approve merge."),
+        Authority(GovernedActionKind.TicketCreation, "Create product work items through a governed future path."),
+        Authority(GovernedActionKind.SchedulerRunCreation, "Create scheduled or background runs through a governed future path."),
+        Forbidden(GovernedActionKind.AgentHandoffAuthorityClaim, "Agent handoff cannot transfer or claim authority."),
         Forbidden(GovernedActionKind.ProductionDeployment, "Direct production deployment is unsupported in this spine."),
         Forbidden(GovernedActionKind.DirectGitCommitToSource, "Direct source commit bypasses governed source apply."),
         Forbidden(GovernedActionKind.DirectGitPush, "Direct git push bypasses governed release/source controls."),
@@ -482,6 +493,7 @@ public enum ConscienceDecisionOutcome
 {
     Allow = 0,
     Block,
+    NeedsMoreEvidence,
     RequiresHumanReview,
     NotImplemented
 }
