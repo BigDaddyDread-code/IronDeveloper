@@ -64,6 +64,7 @@ public static partial class IronDevCliSourceApply
         var sourceApply = await ReadRequiredArtifactAsync<SourceApplyRequest>(runPath, "source-apply-request.json", cancellationToken).ConfigureAwait(false);
         var verification = await ReadRequiredArtifactAsync<PatchArtifactVerificationResult>(runPath, "patch-artifact-verification.json", cancellationToken).ConfigureAwait(false);
         var approval = await ReadRequiredArtifactAsync<SourceApplyApprovalEvidence>(runPath, "source-apply-approval-evidence.json", cancellationToken).ConfigureAwait(false);
+        var bindingReport = await ReadRequiredArtifactAsync<SourceApplyBindingReport>(runPath, "source-apply-binding-report.json", cancellationToken).ConfigureAwait(false);
         var readiness = await ReadRequiredArtifactAsync<SourceApplyReadinessReport>(runPath, "source-apply-readiness.json", cancellationToken).ConfigureAwait(false);
         var dryRun = await ReadRequiredArtifactAsync<SourceApplyDryRunResult>(runPath, "source-apply-dry-run-result.json", cancellationToken).ConfigureAwait(false);
         var rollbackDraft = await ReadRequiredArtifactAsync<RollbackPlanDraft>(runPath, "rollback-plan-draft.json", cancellationToken).ConfigureAwait(false);
@@ -71,6 +72,10 @@ public static partial class IronDevCliSourceApply
 
         if (sourceApply is null)
             return Failure(output, error, parsed.Json, "source-apply apply", "source-apply-request.json was not found. Run source-apply prepare first.");
+
+        var bindingReasons = BindingBlockReasons(sourceApply, approval, bindingReport);
+        if (bindingReasons.Length > 0)
+            return Failure(output, error, parsed.Json, "source-apply apply", $"source apply approval binding blocked: {string.Join(", ", bindingReasons)}");
 
         var request = new SourceApplyExecutionRequest
         {
@@ -140,6 +145,27 @@ public static partial class IronDevCliSourceApply
         }
 
         return receipt.Decision == SourceApplyReceiptDecision.AppliedToWorkingTree ? 0 : 1;
+    }
+
+    private static string[] BindingBlockReasons(SourceApplyRequest request, SourceApplyApprovalEvidence? approval, SourceApplyBindingReport? bindingReport)
+    {
+        var reasons = new List<string>();
+        if (bindingReport is null)
+        {
+            reasons.Add("MissingSourceApplyBindingReport");
+            return reasons.ToArray();
+        }
+
+        if (!bindingReport.BindingPassed)
+            reasons.Add("ApprovalBindingFailed");
+        if (!string.Equals(bindingReport.SourceApplyRequestId, request.SourceApplyRequestId, StringComparison.OrdinalIgnoreCase))
+            reasons.Add("BindingReportSourceApplyRequestMismatch");
+        if (approval is null)
+            reasons.Add("MissingApprovalEvidence");
+        else if (!string.Equals(bindingReport.SourceApplyApprovalId, approval.ApprovalEvidenceId, StringComparison.OrdinalIgnoreCase))
+            reasons.Add("BindingReportApprovalMismatch");
+
+        return reasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static async Task<int> HandleRollbackAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
