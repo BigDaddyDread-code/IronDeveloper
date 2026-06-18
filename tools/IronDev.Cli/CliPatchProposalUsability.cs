@@ -74,6 +74,7 @@ public static partial class IronDevCliPatchProposal
         run.TestStatus = result.ExitCode == 0 ? "Passed" : "Failed";
         run.LastUpdatedUtc = DateTimeOffset.UtcNow;
         run.Artifacts = MergeArtifacts(run.Artifacts, ["test-results.txt", "test-output-summary.md", "run-log.txt"]);
+        await RecordWorkspaceTestsExecutedGovernanceEventAsync(run, result, cancellationToken).ConfigureAwait(false);
         await AppendRunLogAsync(run, $"patch test completed with exit code {result.ExitCode}", cancellationToken).ConfigureAwait(false);
         await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
@@ -175,6 +176,7 @@ public static partial class IronDevCliPatchProposal
         run.LastUpdatedUtc = DateTimeOffset.UtcNow;
         await File.WriteAllTextAsync(Path.Combine(run.RunPath, "cleanup-summary.md"), RenderCleanupSummary(run, workspaceExisted), cancellationToken).ConfigureAwait(false);
         run.Artifacts = MergeArtifacts(run.Artifacts, ["cleanup-summary.md", "run-log.txt"]);
+        await RecordPatchWorkspaceCleanedGovernanceEventAsync(run, workspaceExisted, cancellationToken).ConfigureAwait(false);
         await AppendRunLogAsync(run, $"patch cleanup workspace status: {run.CleanupStatus}", cancellationToken).ConfigureAwait(false);
         await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
@@ -296,6 +298,7 @@ public static partial class IronDevCliPatchProposal
         ];
 
         var warnings = BuildWarnings(run).Concat(scopeResult.BlockedFiles.Length > 0 ? ["file scope blocked one or more changed files."] : Array.Empty<string>()).ToArray();
+        await RecordPatchPackageGovernanceEventsAsync(run, scopeResult, skipTest, testResult, cancellationToken).ConfigureAwait(false);
         return new PatchPackageResult(scopeResult, testsPassed, warnings);
     }
 
