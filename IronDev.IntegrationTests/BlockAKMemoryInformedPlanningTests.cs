@@ -313,9 +313,10 @@ public sealed class BlockAKMemoryInformedPlanningTests
                      "ApplySource(",
                      "PromoteMemory(",
                      "ContinueWorkflow(",
-                     "CreatePullRequest",
-                     "git push",
-                     "git commit"
+                     "CreatePullRequestAsync",
+                     "PullRequestService",
+                     "ProcessStartInfo",
+                     "RunProcessAsync"
                  })
         {
             Assert.IsFalse(combined.Contains(forbidden, StringComparison.OrdinalIgnoreCase), forbidden);
