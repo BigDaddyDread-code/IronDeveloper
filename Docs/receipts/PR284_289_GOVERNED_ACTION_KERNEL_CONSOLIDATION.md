@@ -35,6 +35,11 @@ ConscienceDecisionService is the authority decision point.
 ThoughtLedger is mandatory evidence for authority decisions.
 Governance events are append-only history.
 
+Gate evidence must match the governed-action family it is used for.
+Source-apply dry-run eligibility evidence cannot satisfy source mutation.
+Source-apply execution evidence cannot satisfy source rollback.
+Gate evidence must also be bound to the same governed action id before a Conscience decision can allow execution.
+
 ## Current coverage
 
 The kernel represents these action families:

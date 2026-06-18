@@ -421,8 +421,20 @@ public sealed class ConscienceDecisionService
             reasons.Add("MissingSubject");
         if (action.EvidenceRefs.Length == 0 && action.RequiredHumanReview)
             reasons.Add("MissingEvidence");
-        if (GovernedActionKernelRequirements.RequiresGateEvidence(action.ActionKind) && request.GateEvidenceRefs.Length == 0)
-            reasons.Add("MissingGateEvidence");
+        if (GovernedActionKernelRequirements.RequiresGateEvidence(action.ActionKind))
+        {
+            if (request.GateEvidenceRefs.Length == 0)
+            {
+                reasons.Add("MissingGateEvidence");
+            }
+            else if (!request.GateEvidenceRefs.Any(gate => GovernedActionKernelRequirements.GateEvidenceMatchesAction(action.ActionKind, gate.GateKind)))
+            {
+                reasons.Add("GateEvidenceKindMismatch");
+            }
+        }
+
+        if (request.GateEvidenceRefs.Any(gate => !string.Equals(gate.ActionId, action.ActionId, StringComparison.OrdinalIgnoreCase)))
+            reasons.Add("GateEvidenceActionMismatch");
         if (request.GateEvidenceRefs.Any(gate => gate.Decision != GateEvidenceDecision.Satisfied))
             reasons.Add("GateEvidenceNotSatisfied");
         if (request.ExpiresAtUtc is not null && request.ExpiresAtUtc <= createdAt)
@@ -532,24 +544,41 @@ public sealed class ConscienceDecisionService
 
 public static class GovernedActionKernelRequirements
 {
-    public static bool RequiresGateEvidence(GovernedActionKind actionKind) => actionKind is
+    public static bool RequiresGateEvidence(GovernedActionKind actionKind) =>
+        RequiredGateEvidenceKinds(actionKind).Length > 0;
+
+    public static bool GateEvidenceMatchesAction(GovernedActionKind actionKind, GateEvidenceKind gateKind) =>
+        RequiredGateEvidenceKinds(actionKind).Contains(gateKind);
+
+    public static GateEvidenceKind[] RequiredGateEvidenceKinds(GovernedActionKind actionKind) => actionKind switch
+    {
         GovernedActionKind.MemoryPromotion or
         GovernedActionKind.MemoryPromotionRequested or
         GovernedActionKind.MemoryPromotionAccepted or
-        GovernedActionKind.AcceptedMemoryVersionAppended or
-        GovernedActionKind.ToolExecution or
+        GovernedActionKind.AcceptedMemoryVersionAppended => [GateEvidenceKind.MemoryKeyGate],
+
+        GovernedActionKind.ToolExecution => [GateEvidenceKind.WorkspaceToolGate],
+
         GovernedActionKind.SourceApply or
         GovernedActionKind.SourceApplyExecutionRequested or
-        GovernedActionKind.SourceApplyCommandExecuted or
+        GovernedActionKind.SourceApplyCommandExecuted => [GateEvidenceKind.SourceApplyExecutionGate],
+
         GovernedActionKind.SourceRollback or
         GovernedActionKind.SourceRollbackRequested or
         GovernedActionKind.SourceRollbackCommandExecuted or
-        GovernedActionKind.RollbackExecution or
-        GovernedActionKind.WorkflowContinuation or
+        GovernedActionKind.RollbackExecution => [GateEvidenceKind.SourceRollbackGate],
+
+        GovernedActionKind.WorkflowContinuation => [GateEvidenceKind.WorkflowGate],
+
         GovernedActionKind.ReleaseReadinessDecision or
-        GovernedActionKind.ReleaseApproval or
-        GovernedActionKind.DeploymentApproval or
-        GovernedActionKind.MergeApproval;
+        GovernedActionKind.ReleaseApproval => [GateEvidenceKind.ReleaseGate],
+
+        GovernedActionKind.DeploymentApproval => [GateEvidenceKind.DeploymentGate],
+
+        GovernedActionKind.MergeApproval => [GateEvidenceKind.MergeGate],
+
+        _ => []
+    };
 }
 
 public enum GovernanceKernelEventKind

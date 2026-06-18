@@ -118,6 +118,77 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
     }
 
     [TestMethod]
+    public void BlockAJ_GateEvidence_MustMatchTheGovernedActionSplit()
+    {
+        var sourceApply = GovernedActionEnvelope.FromInventory(
+            GovernedActionKind.SourceApplyCommandExecuted,
+            "SourceApplyExecutionRequest",
+            "source-apply-exec-1",
+            "human-reviewer",
+            "source-apply-execution-request.json",
+            [Evidence("source-apply-readiness", "Source apply readiness evidence.")]);
+        var dryRunGate = GateEvidenceWriter.FromSourceApplyGate(sourceApply.ActionId, new SourceApplyGateDecision
+        {
+            SourceApplyGateDecisionId = "source-apply-gate-1",
+            RunId = "run-aj-split",
+            SourceApplyRequestId = "source-apply-request-1",
+            PatchArtifactVerificationId = "patch-verification-1",
+            Decision = SourceApplyGateDecisionOutcome.AllowDryRun,
+            Reasons = [],
+            EvaluatedAtUtc = DateTimeOffset.UtcNow
+        });
+        var executionGate = GateEvidenceWriter.FromSourceApplyExecutionGate(sourceApply.ActionId, new SourceApplyExecutionGateDecision
+        {
+            SourceApplyExecutionGateDecisionId = "source-apply-exec-gate-1",
+            RunId = "run-aj-split",
+            SourceApplyExecutionRequestId = "source-apply-exec-1",
+            SourceApplyRequestId = "source-apply-request-1",
+            Decision = SourceApplyExecutionGateDecisionOutcome.AllowApplyToWorkingTree,
+            Reasons = [],
+            EvaluatedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        var blockedByDryRunGate = DecideAllow(sourceApply, dryRunGate);
+        Assert.AreEqual(ConscienceDecisionValue.Block, blockedByDryRunGate.Decision);
+        CollectionAssert.Contains(blockedByDryRunGate.Reasons, "GateEvidenceKindMismatch");
+
+        var allowedByExecutionGate = DecideAllow(sourceApply, executionGate);
+        Assert.AreEqual(ConscienceDecisionValue.Allow, allowedByExecutionGate.Decision);
+        Assert.IsTrue(allowedByExecutionGate.AllowsExecution);
+
+        var rollback = GovernedActionEnvelope.FromInventory(
+            GovernedActionKind.SourceRollbackCommandExecuted,
+            "SourceRollbackRequest",
+            "source-rollback-1",
+            "human-reviewer",
+            "source-rollback-request.json",
+            [Evidence("source-rollback-request", "Source rollback request evidence.")]);
+        var executionGateBoundToRollback = executionGate with { ActionId = rollback.ActionId };
+        var rollbackGate = GateEvidenceWriter.FromSourceRollbackGate(rollback.ActionId, new SourceRollbackGateDecision
+        {
+            SourceRollbackGateDecisionId = "source-rollback-gate-1",
+            RunId = "run-aj-split",
+            SourceRollbackRequestId = "source-rollback-1",
+            SourceApplyReceiptId = "source-apply-receipt-1",
+            Decision = SourceRollbackGateDecisionOutcome.AllowRollback,
+            Reasons = [],
+            EvaluatedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        var blockedByApplyGate = DecideAllow(rollback, executionGateBoundToRollback);
+        Assert.AreEqual(ConscienceDecisionValue.Block, blockedByApplyGate.Decision);
+        CollectionAssert.Contains(blockedByApplyGate.Reasons, "GateEvidenceKindMismatch");
+
+        var allowedByRollbackGate = DecideAllow(rollback, rollbackGate);
+        Assert.AreEqual(ConscienceDecisionValue.Allow, allowedByRollbackGate.Decision);
+        Assert.IsTrue(allowedByRollbackGate.AllowsExecution);
+
+        var wrongActionBinding = DecideAllow(sourceApply, executionGate with { ActionId = "other-action" });
+        Assert.AreEqual(ConscienceDecisionValue.Block, wrongActionBinding.Decision);
+        CollectionAssert.Contains(wrongActionBinding.Reasons, "GateEvidenceActionMismatch");
+    }
+
+    [TestMethod]
     public void BlockAJ_ConscienceDecisionService_RequiresEvidenceGateAndThoughtLedger()
     {
         var action = GovernedActionEnvelope.FromInventory(
@@ -439,6 +510,18 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
         SafeSummary = summary,
         CreatedAtUtc = DateTimeOffset.UtcNow
     };
+
+    private static ConscienceDecisionRecord DecideAllow(GovernedActionEnvelope action, params GateEvidence[] gateEvidence) =>
+        new ConscienceDecisionService(new InMemoryThoughtLedgerWriter()).Decide(new ConscienceDecisionRequest
+        {
+            Action = action,
+            GateEvidenceRefs = gateEvidence,
+            PolicyRefs = ["human-review"],
+            RequestedBy = "human-reviewer",
+            ReasoningSummary = "Human-reviewed evidence is complete for this controlled operation.",
+            RequestedDecision = ConscienceDecisionValue.Allow,
+            ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(10)
+        });
 
     private static string CreateTempRunPath()
     {
