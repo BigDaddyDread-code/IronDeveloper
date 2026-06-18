@@ -389,6 +389,12 @@ public static class MemoryKeyGate
         if (proposal.EvidenceRefs.Length == 0)
             reasons.Add("MissingEvidence");
 
+        var content = proposal.Content ?? string.Empty;
+        var sanitisedContent = proposal.SanitisedContent ?? string.Empty;
+        var computedSanitisedContent = MemoryContentSafety.SanitiseMemoryContent(content);
+        if (!string.Equals(sanitisedContent, computedSanitisedContent, StringComparison.Ordinal))
+            reasons.Add("SanitisedContentDoesNotMatchComputedContent");
+
         if (string.IsNullOrWhiteSpace(proposal.ProposedKey) || proposal.ProposedKey.Length > 160)
             reasons.Add("InvalidKey");
 
@@ -404,16 +410,27 @@ public static class MemoryKeyGate
         if (proposal.ProposedScope == MemoryScope.Project && string.IsNullOrWhiteSpace(proposal.SourceProjectId))
             reasons.Add("ProjectMemoryMissingProjectId");
 
-        if (MemoryContentSafety.ContainsHiddenReasoning(proposal.Content) || proposal.SafetyFlags.ContainsHiddenChainOfThought)
+        if (MemoryContentSafety.ContainsHiddenReasoning(content) || proposal.SafetyFlags.ContainsHiddenChainOfThought)
             reasons.Add("ContentContainsHiddenReasoning");
+        if (MemoryContentSafety.ContainsHiddenReasoning(sanitisedContent))
+            reasons.Add("SanitisedContentContainsHiddenReasoning");
 
-        if (MemoryContentSafety.ContainsAuthorityClaim(proposal.Content) || proposal.SafetyFlags.ContainsAuthorityClaim)
+        if (MemoryContentSafety.ContainsAuthorityClaim(content) || proposal.SafetyFlags.ContainsAuthorityClaim)
             reasons.Add("ContentContainsAuthorityClaim");
+        if (MemoryContentSafety.ContainsAuthorityClaim(sanitisedContent))
+            reasons.Add("SanitisedContentContainsAuthorityClaim");
 
-        if (MemoryContentSafety.ContainsSecretShape(proposal.Content) || proposal.SafetyFlags.ContainsSecretShape)
+        if (MemoryContentSafety.ContainsSecretShape(content) || proposal.SafetyFlags.ContainsSecretShape)
             reasons.Add("ContentContainsSecretShape");
+        if (MemoryContentSafety.ContainsSecretShape(sanitisedContent))
+            reasons.Add("SanitisedContentContainsSecretShape");
 
-        if (proposal.Content.Length > 4000 || proposal.SanitisedContent.Length > 4000)
+        if (MemoryContentSafety.ContainsRawSourceCode(content) || proposal.SafetyFlags.ContainsRawSourceCode)
+            reasons.Add("ContentContainsRawSourceCode");
+        if (MemoryContentSafety.ContainsRawSourceCode(sanitisedContent))
+            reasons.Add("SanitisedContentContainsRawSourceCode");
+
+        if (content.Length > 4000 || sanitisedContent.Length > 4000)
             reasons.Add("ContentTooLong");
 
         if (!Enum.IsDefined(proposal.MemoryKind))
@@ -431,11 +448,18 @@ public static class MemoryKeyGate
                 CreatedBy = proposal.CreatedBy
             };
 
-            if (MemoryContentSafety.ContainsProjectSpecificDetail(proposal.Content, source) || proposal.SafetyFlags.ContainsProjectSpecificPortableDetail)
+            if (MemoryContentSafety.ContainsProjectSpecificDetail(content, source) ||
+                MemoryContentSafety.ContainsProjectSpecificDetail(sanitisedContent, source) ||
+                proposal.SafetyFlags.ContainsProjectSpecificPortableDetail)
                 reasons.Add("PortableMemoryContainsProjectSpecificDetail");
-            if (MemoryContentSafety.ContainsRawSourceCode(proposal.Content) || proposal.SafetyFlags.ContainsRawSourceCode)
+            if (MemoryContentSafety.ContainsRawSourceCode(content) ||
+                MemoryContentSafety.ContainsRawSourceCode(sanitisedContent) ||
+                proposal.SafetyFlags.ContainsRawSourceCode)
                 reasons.Add("PortableMemoryContainsCode");
-            if (proposal.Content.Contains("client", StringComparison.OrdinalIgnoreCase) || proposal.Content.Contains("customer", StringComparison.OrdinalIgnoreCase))
+            if (content.Contains("client", StringComparison.OrdinalIgnoreCase) ||
+                content.Contains("customer", StringComparison.OrdinalIgnoreCase) ||
+                sanitisedContent.Contains("client", StringComparison.OrdinalIgnoreCase) ||
+                sanitisedContent.Contains("customer", StringComparison.OrdinalIgnoreCase))
                 reasons.Add("PortableMemoryContainsClientDetail");
         }
 
@@ -569,7 +593,8 @@ public sealed class AcceptedMemoryStore
         else
             records.Add(record);
 
-        var contentHash = Sha256Hex(proposal.SanitisedContent);
+        var acceptedContent = MemoryContentSafety.SanitiseMemoryContent(proposal.Content);
+        var contentHash = Sha256Hex(acceptedContent);
         var version = new AcceptedMemoryVersion
         {
             MemoryVersionId = $"mem_ver_{Guid.NewGuid():N}",
@@ -579,8 +604,8 @@ public sealed class AcceptedMemoryStore
             PromotionRequestId = request.MemoryPromotionRequestId,
             ConscienceDecisionId = conscienceDecision.DecisionId,
             ThoughtLedgerRef = thoughtLedgerRef.Trim(),
-            Content = proposal.SanitisedContent,
-            SanitisedContent = proposal.SanitisedContent,
+            Content = acceptedContent,
+            SanitisedContent = acceptedContent,
             EvidenceRefs = proposal.EvidenceRefs,
             CreatedAtUtc = createdAt,
             ContentHash = contentHash,

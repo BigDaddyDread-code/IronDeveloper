@@ -74,8 +74,8 @@ git diff --check
 
 Results:
 
-- `BlockAESafeMemoryFromRealRuns`: 8/8 passed.
-- Patch CLI / Block Z-AA-AB-AC-AD-AE regression band: 212/212 passed.
+- `BlockAESafeMemoryFromRealRuns`: 10/10 passed.
+- Patch CLI / Block Z-AA-AB-AC-AD regression band: 204/204 passed.
 - `dotnet build IronDev.slnx --no-restore -v:minimal`: passed with 0 errors and existing warnings.
 - `git diff --check`: passed with LF/CRLF warnings only.
 
