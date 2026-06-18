@@ -37,6 +37,7 @@ public static partial class IronDevCliPatchProposal
             "test" => await HandleTestAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "list" => await HandleListAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "cleanup" => await HandleCleanupAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "governance" => await HandlePatchGovernanceAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             _ => WriteUsageError(error, $"unsupported patch subcommand: {args[1]}")
         };
     }
@@ -158,6 +159,8 @@ public static partial class IronDevCliPatchProposal
         };
 
         await AppendRunLogAsync(run, "patch start created disposable workspace", cancellationToken).ConfigureAwait(false);
+        await RecordPatchRunStartedGovernanceEventAsync(run, cancellationToken).ConfigureAwait(false);
+        await RecordDisposableWorkspaceCreatedGovernanceEventAsync(run, cancellationToken).ConfigureAwait(false);
         await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
         var data = new
@@ -287,6 +290,9 @@ public static partial class IronDevCliPatchProposal
         var run = await LoadRunAsync(runPath, cancellationToken).ConfigureAwait(false);
         if (run is null)
             return WriteFailure(output, error, parsed.Json, "patch status", $"run metadata was not found: {Path.Combine(runPath, "run.json")}");
+
+        await RecordPatchRunStatusReadGovernanceEventAsync(run, cancellationToken).ConfigureAwait(false);
+        await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
         var data = new
         {
@@ -775,6 +781,8 @@ public static partial class IronDevCliPatchProposal
         error.WriteLine("  irondev patch list [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch cleanup --run <run-id-or-path> [--runs-root <path>] (--delete-workspace | --delete-run) [--json]");
         error.WriteLine("  irondev patch cleanup --older-than-days <n> --delete-workspaces [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch governance --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch governance --inventory [--json]");
         return 2;
     }
 
