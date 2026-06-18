@@ -44,6 +44,8 @@ public static class SourceApplyExecutionGate
         }
         else
         {
+            if (string.IsNullOrWhiteSpace(approval.SourceApplyRequestId) || !Same(approval.SourceApplyRequestId, request.SourceApplyRequestId))
+                reasons.Add("ApprovalSourceApplyRequestMismatch");
             if (!Same(approval.RunId, request.RunId))
                 reasons.Add("ApprovalRunMismatch");
             if (!Same(approval.SourceRepoIdentity, request.SourceRepoIdentity))
@@ -56,6 +58,8 @@ public static class SourceApplyExecutionGate
                 reasons.Add("ApprovalChangedFilesMismatch");
             if (string.IsNullOrWhiteSpace(approval.ApprovedBy) || !approval.HumanReviewRequired)
                 reasons.Add("ApprovalMissingHumanReviewer");
+            if (!IsBoundedApprovalStatement(approval.ApprovalText))
+                reasons.Add("OverbroadApproval");
         }
 
         if (readiness is null)
@@ -129,6 +133,21 @@ public static class SourceApplyExecutionGate
 
     private static bool Same(string? left, string? right) =>
         string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsBoundedApprovalStatement(string? text) =>
+        !string.IsNullOrWhiteSpace(text) &&
+        text.Contains("I approve this source-apply request for controlled working-tree application only.", StringComparison.OrdinalIgnoreCase) &&
+        text.Contains("This approval does not permit commit, push, pull request creation, merge, release, deployment, or workflow continuation.", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve commit", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve push", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve pull request", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve pr", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve merge", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve release", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("approve deployment", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("continue workflow", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("ready to merge", StringComparison.OrdinalIgnoreCase) &&
+        !text.Contains("ready to release", StringComparison.OrdinalIgnoreCase);
 
     private static bool SameSet(string[] first, string[] second)
     {

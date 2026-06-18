@@ -59,6 +59,7 @@ public sealed record SourceApplyRequest
 public sealed record SourceApplyApprovalEvidence
 {
     public required string ApprovalEvidenceId { get; init; }
+    public string? SourceApplyRequestId { get; init; }
     public required string RunId { get; init; }
     public required string SourceRepoIdentity { get; init; }
     public required string BaseCommit { get; init; }
@@ -66,9 +67,140 @@ public sealed record SourceApplyApprovalEvidence
     public string[] ApprovedChangedFiles { get; init; } = [];
     public required string ApprovedBy { get; init; }
     public required DateTimeOffset ApprovedAtUtc { get; init; }
+    public string? ConscienceDecisionId { get; init; }
+    public string? ThoughtLedgerEntryId { get; init; }
     public required string ApprovalText { get; init; }
     public required bool HumanReviewRequired { get; init; }
     public SourceApplyBoundary Boundary { get; init; } = SourceApplyBoundary.None;
+}
+
+public sealed record SourceApplyBindingReport
+{
+    public required string SourceApplyBindingReportId { get; init; }
+    public required string SourceApplyRequestId { get; init; }
+    public required string SourceApplyApprovalId { get; init; }
+    public required string RunId { get; init; }
+    public required bool SourceApplyRequestIdMatched { get; init; }
+    public required bool RunIdMatched { get; init; }
+    public required bool PatchHashMatched { get; init; }
+    public required bool ChangedFilesHashMatched { get; init; }
+    public required bool SourceRepoIdentityMatched { get; init; }
+    public required bool BaseCommitMatched { get; init; }
+    public required bool ConscienceDecisionPresent { get; init; }
+    public required bool ThoughtLedgerEntryPresent { get; init; }
+    public required bool ApprovedByPresent { get; init; }
+    public required bool ApprovalStatementBounded { get; init; }
+    public required bool BindingPassed { get; init; }
+    public string[] BlockingReasons { get; init; } = [];
+    public required DateTimeOffset CreatedAtUtc { get; init; }
+    public SourceApplyBoundary Boundary { get; init; } = SourceApplyBoundary.None;
+}
+
+public static class SourceApplyApprovalBinding
+{
+    private const string RequiredApprovalStatement = "I approve this source-apply request for controlled working-tree application only.";
+    private const string ForbiddenAuthorityStatement = "commit, push, pull request creation, merge, release, deployment, or workflow continuation";
+
+    public static SourceApplyBindingReport Validate(SourceApplyRequest request, SourceApplyApprovalEvidence? approval)
+    {
+        var reasons = new List<string>();
+        var requestIdMatched = approval is not null &&
+            !string.IsNullOrWhiteSpace(approval.SourceApplyRequestId) &&
+            Same(approval.SourceApplyRequestId, request.SourceApplyRequestId);
+        var runMatched = approval is not null && Same(approval.RunId, request.RunId);
+        var patchMatched = approval is not null && Same(approval.PatchSha256, request.PatchSha256);
+        var changedFilesMatched = approval is not null && SameSet(approval.ApprovedChangedFiles, request.ChangedFiles);
+        var repoMatched = approval is not null && Same(approval.SourceRepoIdentity, request.SourceRepoIdentity);
+        var baseMatched = approval is not null && Same(approval.BaseCommit, request.BaseCommit);
+        var consciencePresent = approval is not null && !string.IsNullOrWhiteSpace(approval.ConscienceDecisionId);
+        var thoughtLedgerPresent = approval is not null && !string.IsNullOrWhiteSpace(approval.ThoughtLedgerEntryId);
+        var approvedByPresent = approval is not null && !string.IsNullOrWhiteSpace(approval.ApprovedBy) && approval.HumanReviewRequired;
+        var boundedStatement = approval is not null &&
+            approval.ApprovalText.Contains(RequiredApprovalStatement, StringComparison.OrdinalIgnoreCase) &&
+            approval.ApprovalText.Contains(ForbiddenAuthorityStatement, StringComparison.OrdinalIgnoreCase) &&
+            !ContainsOverbroadApproval(approval.ApprovalText);
+
+        if (approval is null)
+            reasons.Add("MissingApproval");
+        if (approval is not null && string.IsNullOrWhiteSpace(approval.SourceApplyRequestId))
+            reasons.Add("MissingSourceApplyRequestId");
+        else if (!requestIdMatched)
+            reasons.Add("SourceApplyRequestIdMismatch");
+        if (!runMatched)
+            reasons.Add("RunIdMismatch");
+        if (!patchMatched)
+            reasons.Add("PatchHashMismatch");
+        if (!changedFilesMatched)
+            reasons.Add("ChangedFilesHashMismatch");
+        if (!repoMatched)
+            reasons.Add("SourceRepoIdentityMismatch");
+        if (!baseMatched)
+            reasons.Add("BaseCommitMismatch");
+        if (!consciencePresent)
+            reasons.Add("MissingConscienceDecision");
+        if (!thoughtLedgerPresent)
+            reasons.Add("MissingThoughtLedgerEntry");
+        if (!approvedByPresent)
+            reasons.Add("MissingApprovedBy");
+        if (!boundedStatement)
+            reasons.Add("OverbroadApproval");
+
+        return new SourceApplyBindingReport
+        {
+            SourceApplyBindingReportId = $"source_apply_binding_{Guid.NewGuid():N}",
+            SourceApplyRequestId = request.SourceApplyRequestId,
+            SourceApplyApprovalId = approval?.ApprovalEvidenceId ?? string.Empty,
+            RunId = request.RunId,
+            SourceApplyRequestIdMatched = requestIdMatched,
+            RunIdMatched = runMatched,
+            PatchHashMatched = patchMatched,
+            ChangedFilesHashMatched = changedFilesMatched,
+            SourceRepoIdentityMatched = repoMatched,
+            BaseCommitMatched = baseMatched,
+            ConscienceDecisionPresent = consciencePresent,
+            ThoughtLedgerEntryPresent = thoughtLedgerPresent,
+            ApprovedByPresent = approvedByPresent,
+            ApprovalStatementBounded = boundedStatement,
+            BindingPassed = reasons.Count == 0,
+            BlockingReasons = reasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Boundary = SourceApplyBoundary.None
+        };
+    }
+
+    private static bool ContainsOverbroadApproval(string text)
+    {
+        foreach (var marker in new[]
+                 {
+                     "approve commit",
+                     "approve push",
+                     "approve pull request",
+                     "approve pr",
+                     "approve merge",
+                     "approve release",
+                     "approve deployment",
+                     "continue workflow",
+                     "ship it",
+                     "ready to merge",
+                     "ready to release"
+                 })
+        {
+            if (text.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool Same(string? left, string? right) =>
+        string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameSet(string[] first, string[] second)
+    {
+        var normalizedFirst = first.Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).OrderBy(item => item, StringComparer.OrdinalIgnoreCase).ToArray();
+        var normalizedSecond = second.Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).OrderBy(item => item, StringComparer.OrdinalIgnoreCase).ToArray();
+        return normalizedFirst.Length == normalizedSecond.Length && normalizedFirst.Zip(normalizedSecond).All(pair => Same(pair.First, pair.Second));
+    }
 }
 
 public enum PatchArtifactVerificationDecision

@@ -31,11 +31,14 @@ public static partial class IronDevCliSourceApply
     public static async Task<int> HandleAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         if (args.Length < 2)
-            return Usage(error, "source-apply requires a subcommand: approval-template, prepare, status, decision-template, apply, rollback-template, rollback, or applied-status.");
+            return Usage(error, "source-apply requires a subcommand: request, approval-template, validate-approval, approval-status, prepare, status, decision-template, apply, rollback-template, rollback, or applied-status.");
 
         return args[1].ToLowerInvariant() switch
         {
+            "request" => await HandleRequestAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "approval-template" => await HandleApprovalTemplateAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "validate-approval" => await HandleValidateApprovalAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "approval-status" => await HandleApprovalStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "prepare" => await HandlePrepareAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "status" => await HandleStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "decision-template" => await HandleDecisionTemplateAsync(args, output, error, cancellationToken).ConfigureAwait(false),
@@ -46,6 +49,35 @@ public static partial class IronDevCliSourceApply
             "commit" or "push" or "pr" or "merge" or "release" or "deploy" => Usage(error, $"source-apply {args[1]} is intentionally unsupported in Block AG."),
             _ => Usage(error, $"unsupported source-apply subcommand: {args[1]}")
         };
+    }
+
+    private static async Task<int> HandleRequestAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    {
+        var parsed = ParseStatus(args);
+        if (parsed.Error is not null)
+            return Failure(output, error, parsed.Json, "source-apply request", parsed.Error);
+
+        var loaded = LoadRun(parsed.Run!, parsed.RunsRootPath);
+        if (loaded.Run is null)
+            return Failure(output, error, parsed.Json, "source-apply request", $"run metadata was not found: {Path.Combine(loaded.RunPath, "run.json")}");
+
+        var verification = PatchArtifactVerifier.Verify(ToMetadata(loaded.Run, loaded.RunPath));
+        var request = BuildRequest(loaded.Run, loaded.RunPath, verification);
+        await WriteJsonFileAsync(Path.Combine(loaded.RunPath, "source-apply-request.json"), request, cancellationToken).ConfigureAwait(false);
+        await WriteJsonFileAsync(Path.Combine(loaded.RunPath, "patch-artifact-verification.json"), verification, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(loaded.RunPath, "source-apply-request.md"), RenderSourceApplyRequest(request), cancellationToken).ConfigureAwait(false);
+        await RecordGovernanceEventAsync(loaded.RunPath, request.RunId, GovernedActionKind.SourceApplyRequestCreated, request.SourceApplyRequestId, "Source-apply request evidence was created.", ["source-apply-request.json", "source-apply-request.md"], cancellationToken).ConfigureAwait(false);
+        await RecordGovernanceEventAsync(loaded.RunPath, request.RunId, GovernedActionKind.PatchArtifactVerified, verification.PatchArtifactVerificationId, $"Patch artifact verification returned {verification.Decision}.", ["patch-artifact-verification.json"], cancellationToken).ConfigureAwait(false);
+
+        if (parsed.Json)
+            WriteJson(output, "source-apply request", "succeeded", new { request, verification, boundary = SourceApplyBoundary.None }, []);
+        else
+        {
+            output.WriteLine($"Source apply request: {request.SourceApplyRequestId}");
+            output.WriteLine("Boundary: request is not approval, policy satisfaction, execution permission, or source mutation.");
+        }
+
+        return 0;
     }
 
     private static async Task<int> HandleApprovalTemplateAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
@@ -63,6 +95,7 @@ public static partial class IronDevCliSourceApply
         var template = new SourceApplyApprovalEvidence
         {
             ApprovalEvidenceId = $"approval_evidence_{Guid.NewGuid():N}",
+            SourceApplyRequestId = request.SourceApplyRequestId,
             RunId = request.RunId,
             SourceRepoIdentity = request.SourceRepoIdentity,
             BaseCommit = request.BaseCommit,
@@ -70,7 +103,9 @@ public static partial class IronDevCliSourceApply
             ApprovedChangedFiles = request.ChangedFiles,
             ApprovedBy = string.Empty,
             ApprovedAtUtc = DateTimeOffset.UtcNow,
-            ApprovalText = "HUMAN_REVIEW_REQUIRED: replace this text with explicit human approval for dry-run readiness evaluation only.",
+            ConscienceDecisionId = string.Empty,
+            ThoughtLedgerEntryId = string.Empty,
+            ApprovalText = "I approve this source-apply request for controlled working-tree application only. This approval does not permit commit, push, pull request creation, merge, release, deployment, or workflow continuation.",
             HumanReviewRequired = true,
             Boundary = SourceApplyBoundary.None
         };
@@ -84,6 +119,72 @@ public static partial class IronDevCliSourceApply
         {
             output.WriteLine($"Approval evidence template: {Path.GetFullPath(parsed.OutPath!)}");
             output.WriteLine("Boundary: this file is a template only; IronDev did not approve source apply.");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> HandleValidateApprovalAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    {
+        var parsed = ParseValidateApproval(args);
+        if (parsed.Error is not null)
+            return Failure(output, error, parsed.Json, "source-apply validate-approval", parsed.Error);
+
+        var loaded = LoadRun(parsed.Run!, parsed.RunsRootPath);
+        if (loaded.Run is null)
+            return Failure(output, error, parsed.Json, "source-apply validate-approval", $"run metadata was not found: {Path.Combine(loaded.RunPath, "run.json")}");
+
+        var request = await ReadOptionalArtifactAsync<SourceApplyRequest>(loaded.RunPath, "source-apply-request.json", cancellationToken).ConfigureAwait(false);
+        if (request is null)
+        {
+            var verification = PatchArtifactVerifier.Verify(ToMetadata(loaded.Run, loaded.RunPath));
+            request = BuildRequest(loaded.Run, loaded.RunPath, verification);
+            await WriteJsonFileAsync(Path.Combine(loaded.RunPath, "source-apply-request.json"), request, cancellationToken).ConfigureAwait(false);
+            await WriteJsonFileAsync(Path.Combine(loaded.RunPath, "patch-artifact-verification.json"), verification, cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(loaded.RunPath, "source-apply-request.md"), RenderSourceApplyRequest(request), cancellationToken).ConfigureAwait(false);
+        }
+
+        var approval = await ReadJsonFileAsync<SourceApplyApprovalEvidence>(parsed.ApprovalPath!, cancellationToken).ConfigureAwait(false);
+        await WriteJsonFileAsync(Path.Combine(loaded.RunPath, "source-apply-approval-evidence.json"), approval, cancellationToken).ConfigureAwait(false);
+        await RecordGovernanceEventAsync(loaded.RunPath, request.RunId, GovernedActionKind.SourceApplyApprovalEvidenceRead, approval.ApprovalEvidenceId, "Source-apply approval evidence was read for binding validation.", ["source-apply-approval-evidence.json"], cancellationToken).ConfigureAwait(false);
+
+        var report = SourceApplyApprovalBinding.Validate(request, approval);
+        await WriteJsonFileAsync(Path.Combine(loaded.RunPath, "source-apply-binding-report.json"), report, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(loaded.RunPath, "source-apply-binding-report.md"), RenderBindingReport(report), cancellationToken).ConfigureAwait(false);
+
+        if (parsed.Json)
+            WriteJson(output, "source-apply validate-approval", report.BindingPassed ? "succeeded" : "blocked", new { report, boundary = SourceApplyBoundary.None }, []);
+        else
+        {
+            output.WriteLine($"Source apply approval binding: {report.BindingPassed}");
+            if (report.BlockingReasons.Length > 0)
+                output.WriteLine($"Reasons: {string.Join(", ", report.BlockingReasons)}");
+            output.WriteLine("Boundary: approval binding is evidence only; no source apply was performed.");
+        }
+
+        return report.BindingPassed ? 0 : 1;
+    }
+
+    private static async Task<int> HandleApprovalStatusAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    {
+        var parsed = ParseStatus(args);
+        if (parsed.Error is not null)
+            return Failure(output, error, parsed.Json, "source-apply approval-status", parsed.Error);
+
+        var runPath = ResolveRunPath(parsed.Run!, parsed.RunsRootPath);
+        var reportPath = Path.Combine(runPath, "source-apply-binding-report.json");
+        if (!File.Exists(reportPath))
+            return Failure(output, error, parsed.Json, "source-apply approval-status", $"source-apply binding report was not found: {reportPath}");
+
+        var report = await ReadJsonFileAsync<SourceApplyBindingReport>(reportPath, cancellationToken).ConfigureAwait(false);
+        if (parsed.Json)
+            WriteJson(output, "source-apply approval-status", "succeeded", new { report, boundary = SourceApplyBoundary.None }, []);
+        else
+        {
+            output.WriteLine($"Source apply approval binding: {report.BindingPassed}");
+            if (report.BlockingReasons.Length > 0)
+                output.WriteLine($"Reasons: {string.Join(", ", report.BlockingReasons)}");
+            output.WriteLine("Boundary: approval-status is read-only and does not apply, approve, commit, push, merge, release, or continue workflow.");
         }
 
         return 0;
@@ -323,6 +424,66 @@ public static partial class IronDevCliSourceApply
         return builder.ToString();
     }
 
+    private static string RenderSourceApplyRequest(SourceApplyRequest request)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("# Source Apply Request");
+        builder.AppendLine();
+        builder.AppendLine($"Run: `{request.RunId}`");
+        builder.AppendLine($"Request: `{request.SourceApplyRequestId}`");
+        builder.AppendLine($"Source repo identity: `{request.SourceRepoIdentity}`");
+        builder.AppendLine($"Base commit: `{request.BaseCommit}`");
+        builder.AppendLine($"Patch hash: `{request.PatchSha256}`");
+        builder.AppendLine();
+        builder.AppendLine("## Boundary");
+        builder.AppendLine();
+        builder.AppendLine("This request is not approval.");
+        builder.AppendLine("This request is not policy satisfaction.");
+        builder.AppendLine("This request is not execution permission.");
+        builder.AppendLine("This request does not apply source.");
+        builder.AppendLine("This request does not commit, push, create a PR, merge, release, deploy, rollback, or continue workflow.");
+        return builder.ToString();
+    }
+
+    private static string RenderBindingReport(SourceApplyBindingReport report)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("# Source Apply Binding Report");
+        builder.AppendLine();
+        builder.AppendLine($"Run: `{report.RunId}`");
+        builder.AppendLine($"Request: `{report.SourceApplyRequestId}`");
+        builder.AppendLine($"Approval: `{report.SourceApplyApprovalId}`");
+        builder.AppendLine($"Binding passed: `{report.BindingPassed}`");
+        builder.AppendLine();
+        builder.AppendLine("## Checks");
+        builder.AppendLine();
+        builder.AppendLine($"- Request id matched: `{report.SourceApplyRequestIdMatched}`");
+        builder.AppendLine($"- Run id matched: `{report.RunIdMatched}`");
+        builder.AppendLine($"- Patch hash matched: `{report.PatchHashMatched}`");
+        builder.AppendLine($"- Changed files matched: `{report.ChangedFilesHashMatched}`");
+        builder.AppendLine($"- Source repo identity matched: `{report.SourceRepoIdentityMatched}`");
+        builder.AppendLine($"- Base commit matched: `{report.BaseCommitMatched}`");
+        builder.AppendLine($"- Conscience decision present: `{report.ConscienceDecisionPresent}`");
+        builder.AppendLine($"- ThoughtLedger entry present: `{report.ThoughtLedgerEntryPresent}`");
+        builder.AppendLine($"- Approved by present: `{report.ApprovedByPresent}`");
+        builder.AppendLine($"- Approval statement bounded: `{report.ApprovalStatementBounded}`");
+        builder.AppendLine();
+        builder.AppendLine("## Boundary");
+        builder.AppendLine();
+        builder.AppendLine("Approval binding is not source apply.");
+        builder.AppendLine("Approval binding is not commit, push, PR creation, merge, release, deployment, rollback, workflow continuation, policy satisfaction, or memory promotion.");
+        if (report.BlockingReasons.Length > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("## Blocking reasons");
+            builder.AppendLine();
+            foreach (var reason in report.BlockingReasons)
+                builder.AppendLine($"- `{reason}`");
+        }
+
+        return builder.ToString();
+    }
+
     private static SourceApplyRunMetadata ToMetadata(PatchRunForSourceApply run, string runPath) =>
         new()
         {
@@ -506,6 +667,12 @@ public static partial class IronDevCliSourceApply
         JsonSerializer.Deserialize<T>(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false), JsonOptions) ??
         throw new InvalidOperationException($"JSON file did not contain {typeof(T).Name}: {path}");
 
+    private static async Task<T?> ReadOptionalArtifactAsync<T>(string runPath, string artifactName, CancellationToken cancellationToken) where T : class
+    {
+        var path = Path.Combine(runPath, artifactName);
+        return File.Exists(path) ? await ReadJsonFileAsync<T>(path, cancellationToken).ConfigureAwait(false) : null;
+    }
+
     private static async Task AppendJsonLineAsync<T>(string path, T value, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)) ?? Directory.GetCurrentDirectory());
@@ -528,7 +695,10 @@ public static partial class IronDevCliSourceApply
     {
         error.WriteLine(message);
         error.WriteLine("Usage:");
+        error.WriteLine("  irondev source-apply request --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply validate-approval --run <run-id-or-path> --approval <approval.json> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev source-apply approval-status --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply decision-template --run <run-id-or-path> --out <decision.json> [--runs-root <path>] [--json]");
@@ -549,9 +719,37 @@ public static partial class IronDevCliSourceApply
         public static ParsedPrepareCommand Fail(bool json, string error) => new(null, null, null, null, json, error);
     }
 
+    private static ParsedValidateApprovalCommand ParseValidateApproval(string[] args)
+    {
+        string? run = null;
+        string? runsRoot = null;
+        string? approval = null;
+        var json = false;
+        for (var index = 2; index < args.Length; index++)
+        {
+            switch (args[index])
+            {
+                case "--run": if (!TryRead(args, ref index, out run)) return ParsedValidateApprovalCommand.Fail(json, "--run requires a value."); break;
+                case "--runs-root": if (!TryRead(args, ref index, out runsRoot)) return ParsedValidateApprovalCommand.Fail(json, "--runs-root requires a value."); break;
+                case "--approval": if (!TryRead(args, ref index, out approval)) return ParsedValidateApprovalCommand.Fail(json, "--approval requires a value."); break;
+                case "--json": json = true; break;
+                default: return ParsedValidateApprovalCommand.Fail(json, $"unsupported source-apply validate-approval option: {args[index]}");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(run)) return ParsedValidateApprovalCommand.Fail(json, "--run is required.");
+        if (string.IsNullOrWhiteSpace(approval)) return ParsedValidateApprovalCommand.Fail(json, "--approval is required.");
+        return new(run, runsRoot, approval, json, null);
+    }
+
     private sealed record ParsedStatusCommand(string? Run, string? RunsRootPath, bool Json, string? Error)
     {
         public static ParsedStatusCommand Fail(bool json, string error) => new(null, null, json, error);
+    }
+
+    private sealed record ParsedValidateApprovalCommand(string? Run, string? RunsRootPath, string? ApprovalPath, bool Json, string? Error)
+    {
+        public static ParsedValidateApprovalCommand Fail(bool json, string error) => new(null, null, null, json, error);
     }
 
     private sealed record ProcessResult(int ExitCode, string Stdout, string Stderr);
