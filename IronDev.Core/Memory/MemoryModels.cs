@@ -492,6 +492,7 @@ public sealed record AcceptedMemoryRecord
 {
     public required string MemoryId { get; init; }
     public required MemoryScope Scope { get; init; }
+    public required MemoryKind MemoryKind { get; init; }
     public string? ProjectId { get; init; }
     public required string Key { get; init; }
     public required int CurrentVersion { get; init; }
@@ -506,6 +507,7 @@ public sealed record AcceptedMemoryVersion
     public required string MemoryVersionId { get; init; }
     public required string MemoryId { get; init; }
     public required int Version { get; init; }
+    public required MemoryKind MemoryKind { get; init; }
     public required string ProposalId { get; init; }
     public required string PromotionRequestId { get; init; }
     public required string ConscienceDecisionId { get; init; }
@@ -579,6 +581,7 @@ public sealed class AcceptedMemoryStore
         {
             MemoryId = memoryId,
             Scope = proposal.ProposedScope,
+            MemoryKind = proposal.MemoryKind,
             ProjectId = proposal.ProposedScope == MemoryScope.Project ? proposal.SourceProjectId : null,
             Key = proposal.ProposedKey,
             CurrentVersion = nextVersion,
@@ -600,6 +603,7 @@ public sealed class AcceptedMemoryStore
             MemoryVersionId = $"mem_ver_{Guid.NewGuid():N}",
             MemoryId = memoryId,
             Version = nextVersion,
+            MemoryKind = proposal.MemoryKind,
             ProposalId = proposal.MemoryProposalId,
             PromotionRequestId = request.MemoryPromotionRequestId,
             ConscienceDecisionId = conscienceDecision.DecisionId,

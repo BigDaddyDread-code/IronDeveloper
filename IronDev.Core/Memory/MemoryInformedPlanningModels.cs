@@ -189,7 +189,7 @@ public static class AcceptedMemoryRetriever
                 MemoryId = record.MemoryId,
                 MemoryVersionId = version.MemoryVersionId,
                 MemoryScope = record.Scope,
-                MemoryKind = MemoryKind.EngineeringLesson,
+                MemoryKind = Enum.IsDefined(record.MemoryKind) ? record.MemoryKind : version.MemoryKind,
                 ProjectId = record.ProjectId,
                 ContentSummary = MemoryContentSafety.SanitiseSummary(safeContent),
                 SafeContent = safeContent,
@@ -321,9 +321,17 @@ public static class PlannerContextBuilder
             RelevantFiles = request.RelevantFiles.Select(MemoryContentSafety.SanitiseSummary).Where(item => !string.IsNullOrWhiteSpace(item)).ToArray(),
             AcceptedMemoryRefs = citations.Citations.Select(item => item.CitationId).ToArray(),
             MemoryCitationBundleId = citations.MemoryCitationBundleId,
-            KnownRisks = citedItems.Where(item => item.Staleness == MemoryPlanningStaleness.Stale || item.Caveats.Any(c => c.Contains("risk", StringComparison.OrdinalIgnoreCase)))
+            KnownRisks = citedItems.Where(item =>
+                    item.Staleness == MemoryPlanningStaleness.Stale ||
+                    item.MemoryKind is MemoryKind.FailureMode or MemoryKind.RiskPattern ||
+                    item.Caveats.Any(c => c.Contains("risk", StringComparison.OrdinalIgnoreCase)))
                 .Select(item => item.ContentSummary).ToArray(),
-            KnownConstraints = citedItems.SelectMany(item => item.Caveats).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            KnownConstraints = citedItems.SelectMany(item => item.Caveats)
+                .Concat(citedItems
+                    .Where(item => item.MemoryKind is MemoryKind.ProjectConvention or MemoryKind.ReviewHeuristic)
+                    .Select(item => item.ContentSummary))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
             SuggestedTestHints = citations.Citations.Where(item => item.UsedFor == MemoryCitationUsedFor.TestSuggestion)
                 .Select(item => $"Review test profile using memory citation {item.CitationId}.").ToArray(),
             CreatedAtUtc = now ?? DateTimeOffset.UtcNow,

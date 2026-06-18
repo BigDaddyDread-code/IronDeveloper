@@ -82,6 +82,42 @@ public sealed class BlockAKMemoryInformedPlanningTests
     }
 
     [TestMethod]
+    public void BlockAK_MemoryKind_DrivesCitationUseAndPlannerContext()
+    {
+        var root = CreateTempPath("ak-memory-kind");
+        try
+        {
+            var store = new AcceptedMemoryStore(root);
+            var risk = AppendAcceptedMemory(store, MemoryScope.Project, "project-alpha", "Boundary fixes can regress authority checks.", MemoryKind.RiskPattern);
+            var test = AppendAcceptedMemory(store, MemoryScope.Project, "project-alpha", "Run focused governance tests for authority fixes.", MemoryKind.TestCommandLesson);
+            var review = AppendAcceptedMemory(store, MemoryScope.Project, "project-alpha", "Review heuristics should check for hidden authority language.", MemoryKind.ReviewHeuristic);
+            var ai = AppendAcceptedMemory(store, MemoryScope.Project, "project-alpha", "AI assistance should propose smaller patch shapes.", MemoryKind.AiAssistanceLesson);
+
+            var retrieval = AcceptedMemoryRetriever.Retrieve(store, Request("run-ak-kind", "project-alpha"));
+            var citations = MemoryCitationWriter.CreateBundle(retrieval);
+            var context = PlannerContextBuilder.Build(ContextRequest("run-ak-kind"), retrieval, citations);
+
+            Assert.AreEqual(MemoryKind.RiskPattern, retrieval.Items.Single(item => item.MemoryId == risk.Record.MemoryId).MemoryKind);
+            Assert.AreEqual(MemoryKind.TestCommandLesson, retrieval.Items.Single(item => item.MemoryId == test.Record.MemoryId).MemoryKind);
+            Assert.AreEqual(MemoryKind.ReviewHeuristic, retrieval.Items.Single(item => item.MemoryId == review.Record.MemoryId).MemoryKind);
+            Assert.AreEqual(MemoryKind.AiAssistanceLesson, retrieval.Items.Single(item => item.MemoryId == ai.Record.MemoryId).MemoryKind);
+
+            Assert.AreEqual(MemoryCitationUsedFor.RiskWarning, citations.Citations.Single(item => item.MemoryId == risk.Record.MemoryId).UsedFor);
+            Assert.AreEqual(MemoryCitationUsedFor.TestSuggestion, citations.Citations.Single(item => item.MemoryId == test.Record.MemoryId).UsedFor);
+            Assert.AreEqual(MemoryCitationUsedFor.ConstraintReminder, citations.Citations.Single(item => item.MemoryId == review.Record.MemoryId).UsedFor);
+            Assert.AreEqual(MemoryCitationUsedFor.PatchStrategy, citations.Citations.Single(item => item.MemoryId == ai.Record.MemoryId).UsedFor);
+
+            Assert.IsTrue(context.KnownRisks.Any(item => item.Contains("authority checks", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(context.SuggestedTestHints.Any(item => item.Contains(citations.Citations.Single(citation => citation.MemoryId == test.Record.MemoryId).CitationId, StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(context.KnownConstraints.Any(item => item.Contains("hidden authority language", StringComparison.OrdinalIgnoreCase)));
+        }
+        finally
+        {
+            TryDelete(root);
+        }
+    }
+
+    [TestMethod]
     public void BlockAK_MemoryInformedPlanProposal_IsMapNotMotion()
     {
         var context = new PlannerContextBundle
@@ -262,8 +298,7 @@ public sealed class BlockAKMemoryInformedPlanningTests
         var files = new[]
         {
             Path.Combine(root, "IronDev.Core", "Memory", "MemoryInformedPlanningModels.cs"),
-            Path.Combine(root, "tools", "IronDev.Cli", "CliPlanning.cs"),
-            Path.Combine(root, "tools", "IronDev.Cli", "IronDevCli.cs")
+            Path.Combine(root, "tools", "IronDev.Cli", "CliPlanning.cs")
         };
         var combined = string.Join("\n", files.Select(File.ReadAllText));
 
@@ -294,7 +329,7 @@ public sealed class BlockAKMemoryInformedPlanningTests
         StringAssert.Contains(receipt, "Killjoy plan review is not authority.");
     }
 
-    private static AcceptedMemoryAppendResult AppendAcceptedMemory(AcceptedMemoryStore store, MemoryScope scope, string projectId, string content)
+    private static AcceptedMemoryAppendResult AppendAcceptedMemory(AcceptedMemoryStore store, MemoryScope scope, string projectId, string content, MemoryKind kind = MemoryKind.EngineeringLesson)
     {
         var source = new PatchRunMemorySource
         {
@@ -313,7 +348,7 @@ public sealed class BlockAKMemoryInformedPlanningTests
             SourceRepoPath = source.SourceRepoPath,
             SourceRepoIdentity = source.SourceRepoIdentity,
             ProposedScope = scope,
-            MemoryKind = MemoryKind.EngineeringLesson,
+            MemoryKind = kind,
             ProposedKey = scope == MemoryScope.Project
                 ? MemoryKeyNormalizer.BuildProjectKey(projectId, Guid.NewGuid().ToString("N"))
                 : scope == MemoryScope.Run
