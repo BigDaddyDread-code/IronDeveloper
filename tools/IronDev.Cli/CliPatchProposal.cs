@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace IronDev.Cli;
 
-public static class IronDevCliPatchProposal
+public static partial class IronDevCliPatchProposal
 {
     private const string RunSchemaVersion = "irondev.patch-run.v1";
     private const string DefaultRunsFolderName = "irondev-patch-runs";
@@ -34,6 +34,9 @@ public static class IronDevCliPatchProposal
             "start" => await HandleStartAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "finish" => await HandleFinishAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "status" => await HandleStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "test" => await HandleTestAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "list" => await HandleListAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "cleanup" => await HandleCleanupAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             _ => WriteUsageError(error, $"unsupported patch subcommand: {args[1]}")
         };
     }
@@ -83,6 +86,10 @@ public static class IronDevCliPatchProposal
         if (IsSameOrUnderPath(workspacePath, sourceRepoRoot))
             return WriteFailure(output, error, parsed.Json, "patch start", "workspace path must be outside the source repository.");
 
+        var resolvedTest = await ResolveStartTestCommandAsync(sourceRepoRoot, parsed.TestCommand, parsed.TestProfileName, cancellationToken).ConfigureAwait(false);
+        if (resolvedTest.Error is not null)
+            return WriteFailure(output, error, parsed.Json, "patch start", resolvedTest.Error);
+
         Directory.CreateDirectory(runPath);
 
         var baseCommit = await ReadGitValueAsync(sourceRepoRoot, ["rev-parse", "HEAD"], cancellationToken).ConfigureAwait(false);
@@ -91,6 +98,7 @@ public static class IronDevCliPatchProposal
 
         var baseBranch = await ReadGitValueAsync(sourceRepoRoot, ["branch", "--show-current"], cancellationToken).ConfigureAwait(false);
         var sourceStatus = await ReadGitValueAsync(sourceRepoRoot, ["status", "--porcelain=v1"], cancellationToken).ConfigureAwait(false);
+        var sourceIdentity = await ReadSourceIdentityAsync(sourceRepoRoot, cancellationToken).ConfigureAwait(false);
 
         var clone = await RunProcessAsync(
             "git",
@@ -103,6 +111,10 @@ public static class IronDevCliPatchProposal
 
         var copiedTaskPath = Path.Combine(runPath, "task.md");
         File.Copy(taskPath, copiedTaskPath, overwrite: false);
+        var workspaceCommit = await ReadGitValueAsync(workspacePath, ["rev-parse", "HEAD"], cancellationToken).ConfigureAwait(false);
+        var workspaceBranch = await ReadGitValueAsync(workspacePath, ["branch", "--show-current"], cancellationToken).ConfigureAwait(false);
+        var workspaceRef = await ReadGitValueAsync(workspacePath, ["rev-parse", "--abbrev-ref", "HEAD"], cancellationToken).ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
 
         var run = new PatchProposalRunDocument
         {
@@ -110,6 +122,7 @@ public static class IronDevCliPatchProposal
             RunId = runId,
             Status = "Started",
             SourceRepoPath = sourceRepoRoot,
+            SourceRepoIdentity = sourceIdentity,
             RunsRootPath = runsRoot,
             RunPath = runPath,
             WorkspacePath = workspacePath,
@@ -117,16 +130,34 @@ public static class IronDevCliPatchProposal
             TaskPath = copiedTaskPath,
             BaseBranch = string.IsNullOrWhiteSpace(baseBranch) ? "detached-or-unknown" : baseBranch.Trim(),
             BaseCommit = baseCommit.Trim(),
-            TestCommand = parsed.TestCommand!.Trim(),
-            StartedUtc = DateTimeOffset.UtcNow,
+            SourceStatusPorcelainAtStart = sourceStatus,
+            SourceRepoDirtyAtStart = !string.IsNullOrWhiteSpace(sourceStatus),
+            WorkspaceCommitAtStart = workspaceCommit.Trim(),
+            WorkspaceBranchAtStart = string.IsNullOrWhiteSpace(workspaceBranch) ? "detached-or-unknown" : workspaceBranch.Trim(),
+            WorkspaceRefAtStart = string.IsNullOrWhiteSpace(workspaceRef) ? "detached-or-unknown" : workspaceRef.Trim(),
+            TestCommand = resolvedTest.Command!,
+            TestProfileName = resolvedTest.ProfileName,
+            TestStatus = "NotRun",
+            AllowedFileGlobs = parsed.AllowPatterns.ToArray(),
+            ForbiddenFileGlobs = parsed.ForbidPatterns.ToArray(),
+            StartedUtc = now,
+            LastUpdatedUtc = now,
+            CleanupStatus = "NotCleaned",
             SourceRepoHadUncommittedChanges = !string.IsNullOrWhiteSpace(sourceStatus),
             SourceRepoMutated = false,
             SourceApplied = false,
             GitCommitCreated = false,
             GitPushPerformed = false,
-            Artifacts = ["task.md", "run.json"]
+            ApprovalGranted = false,
+            PolicySatisfied = false,
+            ReleaseApproved = false,
+            WorkflowContinued = false,
+            MemoryPromoted = false,
+            AgentDispatched = false,
+            Artifacts = ["task.md", "run.json", "run-log.txt"]
         };
 
+        await AppendRunLogAsync(run, "patch start created disposable workspace", cancellationToken).ConfigureAwait(false);
         await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
         var data = new
@@ -138,6 +169,11 @@ public static class IronDevCliPatchProposal
             run.TaskPath,
             run.BaseBranch,
             run.BaseCommit,
+            run.WorkspaceCommitAtStart,
+            run.TestProfileName,
+            run.TestCommand,
+            run.AllowedFileGlobs,
+            run.ForbiddenFileGlobs,
             run.SourceRepoMutated,
             run.SourceApplied,
             run.GitCommitCreated,
@@ -179,79 +215,16 @@ public static class IronDevCliPatchProposal
         if (!Directory.Exists(run.WorkspacePath))
             return WriteFailure(output, error, parsed.Json, "patch finish", $"workspace path does not exist: {run.WorkspacePath}");
 
-        var effectiveTestCommand = string.IsNullOrWhiteSpace(parsed.TestCommand)
-            ? run.TestCommand
-            : parsed.TestCommand.Trim();
+        var resolvedTest = await ResolveExistingRunTestCommandAsync(run, parsed.TestCommand, parsed.TestProfileName, cancellationToken).ConfigureAwait(false);
+        if (resolvedTest.Error is not null)
+            return WriteFailure(output, error, parsed.Json, "patch finish", resolvedTest.Error);
+
+        var effectiveTestCommand = resolvedTest.Command!;
 
         if (!parsed.SkipTest && IsForbiddenCommand(effectiveTestCommand))
             return WriteFailure(output, error, parsed.Json, "patch finish", "test command contains a forbidden source-control or release action.");
 
-        var stage = await RunGitAsync(run.WorkspacePath, ["add", "-A"], cancellationToken).ConfigureAwait(false);
-        if (stage.ExitCode != 0)
-            return WriteFailure(output, error, parsed.Json, "patch finish", $"could not stage disposable workspace changes for diff export: {stage.Stderr.Trim()}");
-
-        var patch = await RunGitAsync(run.WorkspacePath, ["diff", "--cached", "--binary", "HEAD"], cancellationToken).ConfigureAwait(false);
-        if (patch.ExitCode != 0)
-            return WriteFailure(output, error, parsed.Json, "patch finish", $"could not export patch diff: {patch.Stderr.Trim()}");
-
-        var changedFiles = await RunGitAsync(run.WorkspacePath, ["diff", "--cached", "--name-status", "HEAD"], cancellationToken).ConfigureAwait(false);
-        if (changedFiles.ExitCode != 0)
-            return WriteFailure(output, error, parsed.Json, "patch finish", $"could not detect changed files: {changedFiles.Stderr.Trim()}");
-
-        var patchPath = Path.Combine(run.RunPath, "patch.diff");
-        var changedFilesPath = Path.Combine(run.RunPath, "changed-files.txt");
-        await File.WriteAllTextAsync(patchPath, patch.Stdout, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(changedFilesPath, changedFiles.Stdout, cancellationToken).ConfigureAwait(false);
-
-        ProcessResult? testResult = null;
-        if (!parsed.SkipTest && !string.IsNullOrWhiteSpace(effectiveTestCommand))
-        {
-            testResult = await RunShellAsync(effectiveTestCommand, run.WorkspacePath, cancellationToken).ConfigureAwait(false);
-        }
-
-        var testResultsPath = Path.Combine(run.RunPath, "test-results.txt");
-        await File.WriteAllTextAsync(testResultsPath, RenderTestResults(effectiveTestCommand, parsed.SkipTest, testResult), cancellationToken).ConfigureAwait(false);
-
-        var changedFileLines = SplitLines(changedFiles.Stdout);
-        var patchHash = Sha256Hex(patch.Stdout);
-        var testsPassed = parsed.SkipTest || testResult?.ExitCode == 0;
-
-        await File.WriteAllTextAsync(
-            Path.Combine(run.RunPath, "review-summary.md"),
-            RenderReviewSummary(run, changedFileLines, patchHash, testsPassed),
-            cancellationToken).ConfigureAwait(false);
-
-        await File.WriteAllTextAsync(
-            Path.Combine(run.RunPath, "known-risks.md"),
-            RenderKnownRisks(run, changedFileLines.Length, patchHash, testsPassed, parsed.SkipTest),
-            cancellationToken).ConfigureAwait(false);
-
-        await File.WriteAllTextAsync(
-            Path.Combine(run.RunPath, "manual-apply-instructions.md"),
-            RenderManualApplyInstructions(run, patchHash),
-            cancellationToken).ConfigureAwait(false);
-
-        run.Status = testsPassed ? "Finished" : "FinishedWithTestFailure";
-        run.FinishedUtc = DateTimeOffset.UtcNow;
-        run.TestCommand = effectiveTestCommand;
-        run.TestExitCode = testResult?.ExitCode;
-        run.PatchSha256 = patchHash;
-        run.ChangedFiles = changedFileLines;
-        run.Artifacts =
-        [
-            "task.md",
-            "run.json",
-            "patch.diff",
-            "changed-files.txt",
-            "test-results.txt",
-            "review-summary.md",
-            "known-risks.md",
-            "manual-apply-instructions.md"
-        ];
-        run.SourceRepoMutated = false;
-        run.SourceApplied = false;
-        run.GitCommitCreated = false;
-        run.GitPushPerformed = false;
+        var package = await WritePatchPackageAsync(run, resolvedTest, parsed.SkipTest, cancellationToken).ConfigureAwait(false);
 
         await SaveRunAsync(run, cancellationToken).ConfigureAwait(false);
 
@@ -262,9 +235,14 @@ public static class IronDevCliPatchProposal
             run.RunPath,
             run.WorkspacePath,
             run.PatchSha256,
-            ChangedFileCount = changedFileLines.Length,
-            TestsPassed = testsPassed,
+            run.ChangedFileCount,
+            run.BlockedFileCount,
+            TestsPassed = package.TestsPassed,
             run.TestExitCode,
+            run.TestStatus,
+            run.SourceHeadChangedSinceStart,
+            run.SourceRepoDirtyAtStart,
+            run.CleanupStatus,
             run.SourceRepoMutated,
             run.SourceApplied,
             run.GitCommitCreated,
@@ -274,18 +252,25 @@ public static class IronDevCliPatchProposal
         };
 
         if (parsed.Json)
-            WriteJsonEnvelope(output, "patch finish", testsPassed ? "succeeded" : "test_failed", data, testsPassed ? [] : ["test command returned a non-zero exit code; review package was still written."]);
+        {
+            var status = package.ScopeResult.BlockedFiles.Length > 0
+                ? "blocked"
+                : package.TestsPassed ? "succeeded" : "test_failed";
+            WriteJsonEnvelope(output, "patch finish", status, data, package.Warnings);
+        }
         else
         {
             output.WriteLine($"Patch run finished: {run.RunId}");
             output.WriteLine($"Status: {run.Status}");
-            output.WriteLine($"Patch: {patchPath}");
-            output.WriteLine($"Changed files: {changedFilesPath}");
-            output.WriteLine($"Tests passed: {testsPassed}");
+            output.WriteLine($"Patch: {Path.Combine(run.RunPath, "patch.diff")}");
+            output.WriteLine($"Changed files: {Path.Combine(run.RunPath, "changed-files.txt")}");
+            output.WriteLine($"Tests passed: {package.TestsPassed}");
+            if (package.ScopeResult.BlockedFiles.Length > 0)
+                output.WriteLine("File scope: blocked");
             output.WriteLine("Boundary: review package only; source repository was not modified.");
         }
 
-        return testsPassed ? 0 : 1;
+        return package.ScopeResult.BlockedFiles.Length > 0 || !package.TestsPassed ? 1 : 0;
     }
 
     private static async Task<int> HandleStatusAsync(
@@ -312,8 +297,13 @@ public static class IronDevCliPatchProposal
             run.BaseBranch,
             run.BaseCommit,
             run.PatchSha256,
-            ChangedFileCount = run.ChangedFiles.Length,
+            run.ChangedFileCount,
+            run.BlockedFileCount,
             run.TestExitCode,
+            run.TestStatus,
+            run.SourceHeadChangedSinceStart,
+            run.SourceRepoDirtyAtStart,
+            run.CleanupStatus,
             run.SourceRepoMutated,
             run.SourceApplied,
             run.GitCommitCreated,
@@ -330,7 +320,12 @@ public static class IronDevCliPatchProposal
             output.WriteLine($"Status: {run.Status}");
             output.WriteLine($"Run path: {run.RunPath}");
             output.WriteLine($"Workspace: {run.WorkspacePath}");
-            output.WriteLine($"Changed files: {run.ChangedFiles.Length}");
+            output.WriteLine($"Changed files: {run.ChangedFileCount}");
+            output.WriteLine($"Test status: {run.TestStatus}");
+            if (run.SourceHeadChangedSinceStart)
+                output.WriteLine("Warning: source HEAD changed since run start.");
+            if (run.BlockedFileCount > 0)
+                output.WriteLine("Warning: file scope blocked one or more files.");
         }
 
         return 0;
@@ -341,9 +336,12 @@ public static class IronDevCliPatchProposal
         string? repoPath = null;
         string? taskPath = null;
         string? testCommand = null;
+        string? testProfileName = null;
         string? runsRootPath = null;
         string? workspaceRootPath = null;
         string? runId = null;
+        var allowPatterns = new List<string>();
+        var forbidPatterns = new List<string>();
         var json = HasJson(args);
 
         for (var index = 2; index < args.Length; index++)
@@ -362,6 +360,20 @@ public static class IronDevCliPatchProposal
                 case "--test":
                     if (!TryReadValue(args, ref index, out testCommand))
                         return ParsedStartCommand.Fail(json, "--test requires a value.");
+                    break;
+                case "--test-profile":
+                    if (!TryReadValue(args, ref index, out testProfileName))
+                        return ParsedStartCommand.Fail(json, "--test-profile requires a value.");
+                    break;
+                case "--allow":
+                    if (!TryReadValue(args, ref index, out var allowPattern))
+                        return ParsedStartCommand.Fail(json, "--allow requires a value.");
+                    allowPatterns.Add(allowPattern!);
+                    break;
+                case "--forbid":
+                    if (!TryReadValue(args, ref index, out var forbidPattern))
+                        return ParsedStartCommand.Fail(json, "--forbid requires a value.");
+                    forbidPatterns.Add(forbidPattern!);
                     break;
                 case "--runs-root":
                     if (!TryReadValue(args, ref index, out runsRootPath))
@@ -386,10 +398,10 @@ public static class IronDevCliPatchProposal
             return ParsedStartCommand.Fail(json, "--repo is required.");
         if (string.IsNullOrWhiteSpace(taskPath))
             return ParsedStartCommand.Fail(json, "--task is required.");
-        if (string.IsNullOrWhiteSpace(testCommand))
-            return ParsedStartCommand.Fail(json, "--test is required.");
+        if (!string.IsNullOrWhiteSpace(testCommand) && !string.IsNullOrWhiteSpace(testProfileName))
+            return ParsedStartCommand.Fail(json, "--test and --test-profile are mutually exclusive.");
 
-        return new ParsedStartCommand(repoPath, taskPath, testCommand, runsRootPath, workspaceRootPath, runId, json, null);
+        return new ParsedStartCommand(repoPath, taskPath, testCommand, testProfileName, runsRootPath, workspaceRootPath, runId, allowPatterns, forbidPatterns, json, null);
     }
 
     private static ParsedFinishCommand ParseFinish(string[] args)
@@ -397,6 +409,7 @@ public static class IronDevCliPatchProposal
         string? run = null;
         string? runsRootPath = null;
         string? testCommand = null;
+        string? testProfileName = null;
         var skipTest = false;
         var json = HasJson(args);
 
@@ -417,6 +430,10 @@ public static class IronDevCliPatchProposal
                     if (!TryReadValue(args, ref index, out testCommand))
                         return ParsedFinishCommand.Fail(json, "--test requires a value.");
                     break;
+                case "--test-profile":
+                    if (!TryReadValue(args, ref index, out testProfileName))
+                        return ParsedFinishCommand.Fail(json, "--test-profile requires a value.");
+                    break;
                 case "--skip-test":
                     skipTest = true;
                     break;
@@ -429,8 +446,10 @@ public static class IronDevCliPatchProposal
 
         if (string.IsNullOrWhiteSpace(run))
             return ParsedFinishCommand.Fail(json, "--run is required.");
+        if (!string.IsNullOrWhiteSpace(testCommand) && !string.IsNullOrWhiteSpace(testProfileName))
+            return ParsedFinishCommand.Fail(json, "--test and --test-profile are mutually exclusive.");
 
-        return new ParsedFinishCommand(run, runsRootPath, testCommand, skipTest, json, null);
+        return new ParsedFinishCommand(run, runsRootPath, testCommand, testProfileName, skipTest, json, null);
     }
 
     private static ParsedStatusCommand ParseStatus(string[] args)
@@ -597,8 +616,13 @@ public static class IronDevCliPatchProposal
         builder.AppendLine($"Run ID: `{run.RunId}`");
         builder.AppendLine($"Base branch: `{run.BaseBranch}`");
         builder.AppendLine($"Base commit: `{run.BaseCommit}`");
+        builder.AppendLine($"Source HEAD at finish: `{run.SourceHeadCommitAtFinish}`");
+        builder.AppendLine(run.SourceHeadChangedSinceStart
+            ? "Source HEAD changed since run start."
+            : "Source HEAD did not change since run start.");
         builder.AppendLine($"Patch SHA-256: `{patchHash}`");
         builder.AppendLine($"Tests passed: `{testsPassed}`");
+        builder.AppendLine($"File scope: {(run.BlockedFileCount == 0 ? "allowed" : "blocked")}");
         builder.AppendLine();
         builder.AppendLine("## Boundary");
         builder.AppendLine();
@@ -689,12 +713,16 @@ public static class IronDevCliPatchProposal
         disposableWorkspaceOnly = true,
         sourceRepositoryMutated = false,
         sourceApplied = false,
+        gitCommitCreated = false,
+        gitPushPerformed = false,
+        pullRequestCreated = false,
         approvalGranted = false,
         policySatisfied = false,
         releaseApproved = false,
         workflowContinued = false,
         memoryPromoted = false,
-        agentDispatched = false
+        agentDispatched = false,
+        modelCalled = false
     };
 
     private static void WriteJsonEnvelope(TextWriter output, string command, string status, object data, IReadOnlyList<string> warnings)
@@ -740,9 +768,13 @@ public static class IronDevCliPatchProposal
     {
         error.WriteLine($"IRONDEV_PATCH_USAGE: {message}");
         error.WriteLine("Usage:");
-        error.WriteLine("  irondev patch start --repo <repo-path> --task <task-file> --test <command> [--runs-root <path>] [--workspace-root <path>] [--run-id <id>] [--json]");
-        error.WriteLine("  irondev patch finish --run <run-id-or-path> [--runs-root <path>] [--test <command>] [--skip-test] [--json]");
+        error.WriteLine("  irondev patch start --repo <repo-path> --task <task-file> (--test <command> | --test-profile <name>) [--allow <glob>] [--forbid <glob>] [--runs-root <path>] [--workspace-root <path>] [--run-id <id>] [--json]");
+        error.WriteLine("  irondev patch finish --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--skip-test] [--json]");
+        error.WriteLine("  irondev patch test --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--json]");
         error.WriteLine("  irondev patch status --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch list [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch cleanup --run <run-id-or-path> [--runs-root <path>] (--delete-workspace | --delete-run) [--json]");
+        error.WriteLine("  irondev patch cleanup --older-than-days <n> --delete-workspaces [--runs-root <path>] [--json]");
         return 2;
     }
 
@@ -832,26 +864,30 @@ public static class IronDevCliPatchProposal
         string? RepoPath,
         string? TaskPath,
         string? TestCommand,
+        string? TestProfileName,
         string? RunsRootPath,
         string? WorkspaceRootPath,
         string? RunId,
+        List<string> AllowPatterns,
+        List<string> ForbidPatterns,
         bool Json,
         string? Error)
     {
         public static ParsedStartCommand Fail(bool json, string error) =>
-            new(null, null, null, null, null, null, json, error);
+            new(null, null, null, null, null, null, null, [], [], json, error);
     }
 
     private sealed record ParsedFinishCommand(
         string? Run,
         string? RunsRootPath,
         string? TestCommand,
+        string? TestProfileName,
         bool SkipTest,
         bool Json,
         string? Error)
     {
         public static ParsedFinishCommand Fail(bool json, string error) =>
-            new(null, null, null, false, json, error);
+            new(null, null, null, null, false, json, error);
     }
 
     private sealed record ParsedStatusCommand(
@@ -872,6 +908,7 @@ public static class IronDevCliPatchProposal
         public string RunId { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string SourceRepoPath { get; set; } = string.Empty;
+        public string SourceRepoIdentity { get; set; } = string.Empty;
         public string RunsRootPath { get; set; } = string.Empty;
         public string RunPath { get; set; } = string.Empty;
         public string WorkspacePath { get; set; } = string.Empty;
@@ -879,17 +916,45 @@ public static class IronDevCliPatchProposal
         public string TaskPath { get; set; } = string.Empty;
         public string BaseBranch { get; set; } = string.Empty;
         public string BaseCommit { get; set; } = string.Empty;
+        public string SourceStatusPorcelainAtStart { get; set; } = string.Empty;
+        public string SourceStatusPorcelainAtFinish { get; set; } = string.Empty;
+        public bool SourceRepoDirtyAtStart { get; set; }
+        public bool SourceRepoDirtyAtFinish { get; set; }
+        public bool SourceHeadChangedSinceStart { get; set; }
+        public bool SourceDirtyStateChangedSinceStart { get; set; }
+        public string SourceHeadCommitAtFinish { get; set; } = string.Empty;
+        public string WorkspaceCommitAtStart { get; set; } = string.Empty;
+        public string WorkspaceCommitAtFinish { get; set; } = string.Empty;
+        public string WorkspaceBranchAtStart { get; set; } = string.Empty;
+        public string WorkspaceBranchAtFinish { get; set; } = string.Empty;
+        public string WorkspaceRefAtStart { get; set; } = string.Empty;
+        public string WorkspaceRefAtFinish { get; set; } = string.Empty;
         public string TestCommand { get; set; } = string.Empty;
+        public string? TestProfileName { get; set; }
+        public string TestStatus { get; set; } = "NotRun";
+        public string[] AllowedFileGlobs { get; set; } = [];
+        public string[] ForbiddenFileGlobs { get; set; } = [];
         public DateTimeOffset StartedUtc { get; set; }
         public DateTimeOffset? FinishedUtc { get; set; }
+        public DateTimeOffset LastUpdatedUtc { get; set; }
+        public string CleanupStatus { get; set; } = "NotCleaned";
+        public DateTimeOffset? CleanupUpdatedUtc { get; set; }
         public bool SourceRepoHadUncommittedChanges { get; set; }
         public bool SourceRepoMutated { get; set; }
         public bool SourceApplied { get; set; }
         public bool GitCommitCreated { get; set; }
         public bool GitPushPerformed { get; set; }
+        public bool ApprovalGranted { get; set; }
+        public bool PolicySatisfied { get; set; }
+        public bool ReleaseApproved { get; set; }
+        public bool WorkflowContinued { get; set; }
+        public bool MemoryPromoted { get; set; }
+        public bool AgentDispatched { get; set; }
         public int? TestExitCode { get; set; }
         public string? PatchSha256 { get; set; }
         public string[] ChangedFiles { get; set; } = [];
+        public int ChangedFileCount { get; set; }
+        public int BlockedFileCount { get; set; }
         public string[] Artifacts { get; set; } = [];
     }
 }
