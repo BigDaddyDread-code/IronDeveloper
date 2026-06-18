@@ -46,7 +46,7 @@ It does not dispatch agents.
 It does not call models.
 It does not add API, SQL, UI, scheduler, worker, or autonomous runtime behavior.
 
-`patch.diff` is review evidence only. Human review and the governed source-apply path remain required before source changes can be applied.
+`patch.diff` is review evidence only. Human manual application or a future governed source-apply path remains required before source changes can be applied. This PR performs neither.
 
 ## Validation intent
 

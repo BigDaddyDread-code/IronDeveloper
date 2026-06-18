@@ -83,6 +83,13 @@ public sealed class BlockZManualPatchProposalProductTests
         StringAssert.Contains(summary, "review evidence only");
         StringAssert.Contains(summary, "source repository was not modified");
 
+        var manualApply = await File.ReadAllTextAsync(Path.Combine(runPath, "manual-apply-instructions.md"));
+        StringAssert.Contains(manualApply, "Human review is required");
+        StringAssert.Contains(manualApply, "git apply --check");
+        StringAssert.Contains(manualApply, "git apply");
+        StringAssert.Contains(manualApply, "manual human application outside IronDev");
+        Assert.IsFalse(manualApply.Contains("move it through the governed source-apply path", StringComparison.OrdinalIgnoreCase));
+
         var runJson = await File.ReadAllTextAsync(Path.Combine(runPath, "run.json"));
         using var runDocument = JsonDocument.Parse(runJson);
         Assert.AreEqual("Finished", runDocument.RootElement.GetProperty("status").GetString());
