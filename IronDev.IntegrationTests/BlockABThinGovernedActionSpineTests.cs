@@ -43,9 +43,15 @@ public sealed class BlockABThinGovernedActionSpineTests
             Assert.AreEqual(GovernedActionClassifier.Classify(kind), entry.Classification);
         }
 
+        var blockAeAllowedAuthority = new HashSet<GovernedActionKind>
+        {
+            GovernedActionKind.MemoryPromotionAccepted,
+            GovernedActionKind.AcceptedMemoryVersionAppended
+        };
+
         foreach (var entry in AuthorityActionInventory.All.Where(entry => entry.Classification == GovernedActionClassification.AuthorityBearing))
         {
-            Assert.IsFalse(entry.AllowedInCurrentBlock, entry.ActionKind.ToString());
+            Assert.AreEqual(blockAeAllowedAuthority.Contains(entry.ActionKind), entry.AllowedInCurrentBlock, entry.ActionKind.ToString());
             Assert.IsTrue(entry.RequiresConscience, entry.ActionKind.ToString());
             Assert.IsTrue(entry.RequiresThoughtLedger, entry.ActionKind.ToString());
             CollectionAssert.Contains(entry.RequiredEvidenceKinds, "ConscienceDecision");

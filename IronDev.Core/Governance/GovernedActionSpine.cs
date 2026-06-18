@@ -29,6 +29,14 @@ public enum GovernedActionKind
     PatchRunStatusRead,
     PatchRunListed,
     PatchWorkspaceCleaned,
+    MemoryProposalCreated,
+    MemoryProposalInspected,
+    MemoryKeyGateEvaluated,
+    MemoryPromotionRequested,
+    MemoryPromotionBlocked,
+    MemoryPromotionAccepted,
+    AcceptedMemoryVersionAppended,
+    AcceptedMemoryInspected,
     ToolExecution,
     MemoryPromotion,
     AcceptedMemoryMutation,
@@ -75,6 +83,8 @@ public sealed record GovernedActionBoundary
     public bool ReleaseApproved { get; init; }
     public bool WorkflowContinued { get; init; }
     public bool MemoryPromoted { get; init; }
+    public bool MemorySelfPromoted { get; init; }
+    public bool AcceptedMemoryVersionAppended { get; init; }
     public bool AgentDispatched { get; init; }
     public bool ModelCalled { get; init; }
 
@@ -157,12 +167,20 @@ public static class GovernedActionClassifier
         GovernedActionKind.ReviewPackageCreated,
         GovernedActionKind.PatchRunStatusRead,
         GovernedActionKind.PatchRunListed,
-        GovernedActionKind.PatchWorkspaceCleaned
+        GovernedActionKind.PatchWorkspaceCleaned,
+        GovernedActionKind.MemoryProposalCreated,
+        GovernedActionKind.MemoryProposalInspected,
+        GovernedActionKind.MemoryKeyGateEvaluated,
+        GovernedActionKind.MemoryPromotionBlocked,
+        GovernedActionKind.AcceptedMemoryInspected
     ];
 
     private static readonly HashSet<GovernedActionKind> AuthorityBearingActions =
     [
         GovernedActionKind.ToolExecution,
+        GovernedActionKind.MemoryPromotionRequested,
+        GovernedActionKind.MemoryPromotionAccepted,
+        GovernedActionKind.AcceptedMemoryVersionAppended,
         GovernedActionKind.MemoryPromotion,
         GovernedActionKind.AcceptedMemoryMutation,
         GovernedActionKind.SourceApply,
@@ -244,6 +262,14 @@ public static class AuthorityActionInventory
         Patch(GovernedActionKind.PatchRunStatusRead, "Patch run status was inspected."),
         Patch(GovernedActionKind.PatchRunListed, "Patch runs were listed."),
         Patch(GovernedActionKind.PatchWorkspaceCleaned, "Disposable patch workspace was cleaned."),
+        Patch(GovernedActionKind.MemoryProposalCreated, "Memory proposal was created from patch-run evidence."),
+        Patch(GovernedActionKind.MemoryProposalInspected, "Memory proposal evidence was inspected."),
+        Patch(GovernedActionKind.MemoryKeyGateEvaluated, "Memory key/content gate was evaluated."),
+        Authority(GovernedActionKind.MemoryPromotionRequested, "Memory promotion was requested for governed review."),
+        Patch(GovernedActionKind.MemoryPromotionBlocked, "Memory promotion was blocked before accepted-memory append."),
+        MemoryAuthority(GovernedActionKind.MemoryPromotionAccepted, "Memory promotion was accepted through proposal, key gate, Conscience, and ThoughtLedger evidence."),
+        MemoryAuthority(GovernedActionKind.AcceptedMemoryVersionAppended, "Accepted memory version was appended after governed promotion."),
+        Patch(GovernedActionKind.AcceptedMemoryInspected, "Accepted memory evidence was inspected."),
         Authority(GovernedActionKind.ToolExecution, "Run a tool with effects outside passive inspection."),
         Authority(GovernedActionKind.MemoryPromotion, "Promote memory from proposal/evidence into accepted memory."),
         Authority(GovernedActionKind.AcceptedMemoryMutation, "Mutate accepted memory directly."),
@@ -305,6 +331,22 @@ public static class AuthorityActionInventory
             RequiredStores = ["FutureGovernedActionStore"],
             ForbiddenDirectPaths = ["DirectExecution", "ReceiptTextOnly", "UIStateOnly", "AgentSelfApproval"],
             CurrentImplementationStatus = AuthorityActionImplementationStatus.RegisteredOnly
+        };
+
+    private static AuthorityActionInventoryEntry MemoryAuthority(GovernedActionKind actionKind, string description) =>
+        new()
+        {
+            ActionKind = actionKind,
+            Classification = GovernedActionClassification.AuthorityBearing,
+            Description = description,
+            AllowedInCurrentBlock = true,
+            RequiresConscience = true,
+            RequiresThoughtLedger = true,
+            RequiredEvidenceKinds = ["MemoryProposal", "MemoryKeyGate", "ConscienceDecision", "ThoughtLedger", "MemoryPromotionReceipt"],
+            RequiredPolicyKinds = [],
+            RequiredStores = ["FileBackedAcceptedMemoryStore"],
+            ForbiddenDirectPaths = ["DirectAcceptedMemoryWrite", "AgentSelfApproval", "ModelOutputDirectToMemory", "PortableProjectLeak"],
+            CurrentImplementationStatus = AuthorityActionImplementationStatus.FutureBlock
         };
 
     private static AuthorityActionInventoryEntry Forbidden(GovernedActionKind actionKind, string description) =>
