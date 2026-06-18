@@ -27,6 +27,10 @@ public static class SourceApplyExecutionGate
                 reasons.Add("SourceApplyRequestRunMismatch");
             if (!Same(request.SourceApplyRequestId, sourceApplyRequest.SourceApplyRequestId))
                 reasons.Add("SourceApplyRequestIdMismatch");
+            if (!Same(request.SourceRepoIdentity, sourceApplyRequest.SourceRepoIdentity))
+                reasons.Add("SourceApplyRequestRepoMismatch");
+            if (!Same(request.BaseCommit, sourceApplyRequest.BaseCommit))
+                reasons.Add("SourceApplyRequestBaseCommitMismatch");
             if (!Same(request.PatchSha256, sourceApplyRequest.PatchSha256))
                 reasons.Add("SourceApplyRequestPatchHashMismatch");
         }
@@ -42,6 +46,10 @@ public static class SourceApplyExecutionGate
         {
             if (!Same(approval.RunId, request.RunId))
                 reasons.Add("ApprovalRunMismatch");
+            if (!Same(approval.SourceRepoIdentity, request.SourceRepoIdentity))
+                reasons.Add("ApprovalSourceRepoMismatch");
+            if (!Same(approval.BaseCommit, request.BaseCommit))
+                reasons.Add("ApprovalBaseCommitMismatch");
             if (!Same(approval.PatchSha256, request.PatchSha256))
                 reasons.Add("ApprovalPatchHashMismatch");
             if (!SameSet(approval.ApprovedChangedFiles, request.ChangedFiles))

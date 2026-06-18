@@ -132,6 +132,46 @@ public sealed class BlockAGControlledSourceApplyAndRollbackTests
     }
 
     [TestMethod]
+    public async Task BlockAG_SourceApply_BlocksWhenApprovalSourceRepoIdentityIsTampered()
+    {
+        using var fixture = await ReadyFixture.CreateAsync("ag-approval-repo-mismatch").ConfigureAwait(false);
+        var approvalPath = Path.Combine(fixture.RunPath, "source-apply-approval-evidence.json");
+        var approval = ReadJson<SourceApplyApprovalEvidence>(approvalPath) with { SourceRepoIdentity = "different-source-repo" };
+        await File.WriteAllTextAsync(approvalPath, JsonSerializer.Serialize(approval, JsonOptions)).ConfigureAwait(false);
+        var decisionPath = await WriteAllowApplyDecisionAsync(fixture, "thought-ledger:block-ag-approval-repo").ConfigureAwait(false);
+
+        var apply = await RunCliAsync("source-apply", "apply", "--run", fixture.RunPath, "--decision", decisionPath, "--thought-ledger-ref", "thought-ledger:block-ag-approval-repo", "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(1, apply.ExitCode);
+        var receipt = ReadJson<SourceApplyReceipt>(Path.Combine(fixture.RunPath, "source-apply-receipt.json"));
+        Assert.AreEqual(SourceApplyReceiptDecision.Blocked, receipt.Decision);
+        CollectionAssert.Contains(receipt.Reasons, "ApprovalSourceRepoMismatch");
+        Assert.IsFalse(receipt.SourceAppliedToWorkingTree);
+        Assert.IsFalse(File.Exists(Path.Combine(fixture.RunPath, "source-apply-command-result.json")));
+        Assert.AreEqual(string.Empty, Git("status", ["--porcelain=v1"], fixture.SourceRepoPath).Stdout.Trim());
+    }
+
+    [TestMethod]
+    public async Task BlockAG_SourceApply_BlocksWhenApprovalBaseCommitIsTampered()
+    {
+        using var fixture = await ReadyFixture.CreateAsync("ag-approval-base-mismatch").ConfigureAwait(false);
+        var approvalPath = Path.Combine(fixture.RunPath, "source-apply-approval-evidence.json");
+        var approval = ReadJson<SourceApplyApprovalEvidence>(approvalPath) with { BaseCommit = "ffffffffffffffffffffffffffffffffffffffff" };
+        await File.WriteAllTextAsync(approvalPath, JsonSerializer.Serialize(approval, JsonOptions)).ConfigureAwait(false);
+        var decisionPath = await WriteAllowApplyDecisionAsync(fixture, "thought-ledger:block-ag-approval-base").ConfigureAwait(false);
+
+        var apply = await RunCliAsync("source-apply", "apply", "--run", fixture.RunPath, "--decision", decisionPath, "--thought-ledger-ref", "thought-ledger:block-ag-approval-base", "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(1, apply.ExitCode);
+        var receipt = ReadJson<SourceApplyReceipt>(Path.Combine(fixture.RunPath, "source-apply-receipt.json"));
+        Assert.AreEqual(SourceApplyReceiptDecision.Blocked, receipt.Decision);
+        CollectionAssert.Contains(receipt.Reasons, "ApprovalBaseCommitMismatch");
+        Assert.IsFalse(receipt.SourceAppliedToWorkingTree);
+        Assert.IsFalse(File.Exists(Path.Combine(fixture.RunPath, "source-apply-command-result.json")));
+        Assert.AreEqual(string.Empty, Git("status", ["--porcelain=v1"], fixture.SourceRepoPath).Stdout.Trim());
+    }
+
+    [TestMethod]
     public async Task BlockAG_Rollback_ReversesOnlyMatchingAppliedWorkingTree()
     {
         using var fixture = await ReadyFixture.CreateAsync("ag-rollback").ConfigureAwait(false);
