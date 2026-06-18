@@ -407,10 +407,10 @@ public sealed class ConscienceDecisionService
         {
             var decisionId = $"conscience_{Guid.NewGuid():N}";
             var ledger = WriteThoughtLedger(decisionId, null, request, ConscienceDecisionValue.Block, createdAt);
-            var reasons = ledger.Succeeded && ledger.Entry is not null
+            var missingActionReasons = ledger.Succeeded && ledger.Entry is not null
                 ? new[] { "MissingAction" }
                 : [.. ledger.Issues, "LedgerWriteFailed", "MissingAction"];
-            return BuildMissingActionRecord(decisionId, request, reasons, ledger.Entry?.ThoughtLedgerEntryId, createdAt);
+            return BuildMissingActionRecord(decisionId, request, missingActionReasons, ledger.Entry?.ThoughtLedgerEntryId, createdAt);
         }
 
         if (string.IsNullOrWhiteSpace(action.ActionId))
@@ -569,7 +569,16 @@ public enum GovernanceKernelEventKind
     RollbackRequired,
     RollbackExecuted,
     MemoryPromotionRecorded,
-    AuthorityBypassBlocked
+    AuthorityBypassBlocked,
+    AcceptedMemoryRetrievalRequested,
+    AcceptedMemoryRetrieved,
+    MemoryCitationBundleCreated,
+    PlannerContextBundleCreated,
+    MemoryInformedPlanProposed,
+    PlanRiskReportCreated,
+    SuggestedTestProfileCreated,
+    KilljoyPlanReviewCreated,
+    PlanningBoundaryReportCreated
 }
 
 public sealed record GovernedActionKernelEvent
