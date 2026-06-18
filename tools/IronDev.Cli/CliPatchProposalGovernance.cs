@@ -130,7 +130,8 @@ public static partial class IronDevCliPatchProposal
         GovernedActionKind actionKind,
         string message,
         string[] evidenceRefs,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        GovernedActionBoundary? boundary = null)
     {
         var action = GovernedAction.Create(
             actionKind,
@@ -139,7 +140,10 @@ public static partial class IronDevCliPatchProposal
             requestedBy: "IronDevCli",
             sourceComponent: "IronDev.Cli.patch",
             runId: run.RunId,
-            evidenceRefs: evidenceRefs);
+            evidenceRefs: evidenceRefs) with
+        {
+            Boundary = boundary ?? GovernedActionBoundary.None
+        };
 
         var governanceEvent = RunScopedGovernanceEvent.FromAction(action, eventType: "ActionRecorded", message);
         Directory.CreateDirectory(run.RunPath);

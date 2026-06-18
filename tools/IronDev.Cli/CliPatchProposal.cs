@@ -36,6 +36,10 @@ public static partial class IronDevCliPatchProposal
             "status" => await HandleStatusAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "test" => await HandleTestAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "tools" => await HandlePatchToolsAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "assist" => await HandlePatchAssistAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "refine" => await HandlePatchRefineAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "review" => await HandlePatchReviewAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "ai" => await HandlePatchAiInspectAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "list" => await HandleListAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "cleanup" => await HandleCleanupAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "governance" => await HandlePatchGovernanceAsync(args, output, error, cancellationToken).ConfigureAwait(false),
@@ -774,6 +778,10 @@ public static partial class IronDevCliPatchProposal
         error.WriteLine("  irondev patch finish --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--skip-test] [--json]");
         error.WriteLine("  irondev patch test --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--json]");
         error.WriteLine("  irondev patch tools --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch assist --run <run-id-or-path> [--provider deterministic|configured] [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch refine --run <run-id-or-path> [--max-iterations <n>] [--provider deterministic|configured] [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch review --run <run-id-or-path> [--provider deterministic|configured] [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch ai --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch status --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch list [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch cleanup --run <run-id-or-path> [--runs-root <path>] (--delete-workspace | --delete-run) [--json]");

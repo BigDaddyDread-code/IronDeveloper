@@ -2884,6 +2884,10 @@ public static class IronDevCli
         error.WriteLine("  irondev patch finish --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--skip-test] [--json]");
         error.WriteLine("  irondev patch test --run <run-id-or-path> [--runs-root <path>] [--test <command> | --test-profile <name>] [--json]");
         error.WriteLine("  irondev patch tools --run <run-id-or-path> [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch assist --run <run-id-or-path> [--provider deterministic|configured] [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch refine --run <run-id-or-path> [--max-iterations <n>] [--provider deterministic|configured] [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch review --run <run-id-or-path> [--provider deterministic|configured] [--runs-root <path>] [--json]");
+        error.WriteLine("  irondev patch ai --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch status --run <run-id-or-path> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch list [--runs-root <path>] [--json]");
         error.WriteLine("  irondev patch cleanup --run <run-id-or-path> [--runs-root <path>] (--delete-workspace | --delete-run) [--json]");
