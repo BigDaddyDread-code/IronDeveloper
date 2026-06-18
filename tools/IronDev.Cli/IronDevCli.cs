@@ -206,6 +206,9 @@ public static class IronDevCli
         if (IronDevCliGovernanceInspection.IsGovernanceCommand(args))
             return await IronDevCliGovernanceInspection.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliPlanning.IsPlanCommand(args))
+            return await IronDevCliPlanning.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
@@ -2905,6 +2908,11 @@ public static class IronDevCli
         error.WriteLine("  irondev memory promote --proposal <proposal-id-or-file> --conscience-decision <decision.json> --thought-ledger-ref <ref> [--memory-root <path>] [--runs-root <path>] [--scope run|project|portable] [--json]");
         error.WriteLine("  irondev memory list [--memory-root <path>] [--json]");
         error.WriteLine("  irondev memory show --key <memory-key> [--memory-root <path>] [--json]");
+        error.WriteLine("  irondev plan memory-context --run <run-id-or-path> --task <task.md> [--project-id <id>] [--memory-root <path>] [--json]");
+        error.WriteLine("  irondev plan context --run <run-id-or-path> --task <task.md> [--json]");
+        error.WriteLine("  irondev plan propose --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev plan review --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev plan status --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");

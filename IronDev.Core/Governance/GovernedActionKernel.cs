@@ -569,7 +569,16 @@ public enum GovernanceKernelEventKind
     RollbackRequired,
     RollbackExecuted,
     MemoryPromotionRecorded,
-    AuthorityBypassBlocked
+    AuthorityBypassBlocked,
+    AcceptedMemoryRetrievalRequested,
+    AcceptedMemoryRetrieved,
+    MemoryCitationBundleCreated,
+    PlannerContextBundleCreated,
+    MemoryInformedPlanProposed,
+    PlanRiskReportCreated,
+    SuggestedTestProfileCreated,
+    KilljoyPlanReviewCreated,
+    PlanningBoundaryReportCreated
 }
 
 public sealed record GovernedActionKernelEvent
