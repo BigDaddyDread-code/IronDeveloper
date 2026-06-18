@@ -266,11 +266,13 @@ public static class ConscienceDecisionValidator
             issues.Add("MissingEvidenceForAllow");
         if (record.Decision == ConscienceDecisionValue.Allow && GovernedActionKernelRequirements.RequiresGateEvidence(record.ActionKind) && record.GateEvidenceRefs.Length == 0)
             issues.Add("MissingGateEvidenceForAllow");
-        if (record.Decision == ConscienceDecisionValue.Allow && string.IsNullOrWhiteSpace(record.ThoughtLedgerEntryId))
-            issues.Add("MissingThoughtLedgerForAllow");
+        if (string.IsNullOrWhiteSpace(record.ThoughtLedgerEntryId))
+            issues.Add("MissingThoughtLedger");
         if (record.ExpiresAtUtc is not null && record.ExpiresAtUtc <= (now ?? DateTimeOffset.UtcNow))
             issues.Add("DecisionExpired");
-        if (!string.IsNullOrWhiteSpace(record.DecisionHash) && !string.Equals(record.DecisionHash, ConscienceDecisionRecordHash.Compute(record), StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(record.DecisionHash))
+            issues.Add("MissingDecisionHash");
+        else if (!string.Equals(record.DecisionHash, ConscienceDecisionRecordHash.Compute(record), StringComparison.OrdinalIgnoreCase))
             issues.Add("DecisionHashMismatch");
         if (record.Decision is ConscienceDecisionValue.Block or ConscienceDecisionValue.NeedsMoreEvidence)
             issues.Add($"DecisionIs{record.Decision}");
@@ -403,7 +405,12 @@ public sealed class ConscienceDecisionService
         var action = request.Action;
         if (action is null)
         {
-            return BlockRecord("MissingAction", request, createdAt, ["MissingAction"]);
+            var decisionId = $"conscience_{Guid.NewGuid():N}";
+            var ledger = WriteThoughtLedger(decisionId, null, request, ConscienceDecisionValue.Block, createdAt);
+            var reasons = ledger.Succeeded && ledger.Entry is not null
+                ? new[] { "MissingAction" }
+                : [.. ledger.Issues, "LedgerWriteFailed", "MissingAction"];
+            return BuildMissingActionRecord(decisionId, request, reasons, ledger.Entry?.ThoughtLedgerEntryId, createdAt);
         }
 
         if (string.IsNullOrWhiteSpace(action.ActionId))
@@ -424,55 +431,70 @@ public sealed class ConscienceDecisionService
             reasons.Add("UnsafeThoughtLedgerSummary");
 
         var intendedDecision = reasons.Count == 0 ? request.RequestedDecision : ConscienceDecisionValue.Block;
-        if (intendedDecision == ConscienceDecisionValue.Allow)
-        {
-            var decisionId = $"conscience_{Guid.NewGuid():N}";
-            var ledger = _thoughtLedgerWriter.Write(new ThoughtLedgerWriteRequest
-            {
-                ActionId = action.ActionId,
-                DecisionId = decisionId,
-                ActionKind = action.ActionKind,
-                SubjectKind = action.Subject.SubjectKind,
-                SubjectId = action.Subject.SubjectId,
-                ReasoningSummary = request.ReasoningSummary,
-                EvidenceRefs = action.EvidenceRefs.Select(item => item.EvidenceRefId).ToArray(),
-                RiskLevel = action.RiskLevel,
-                Decision = intendedDecision
-            }, createdAt);
-
-            if (!ledger.Succeeded || ledger.Entry is null)
-                return BuildRecord(decisionId, action, request, ConscienceDecisionValue.Block, [.. reasons, .. ledger.Issues, "LedgerWriteFailed"], null, createdAt);
-
-            return BuildRecord(decisionId, action, request, ConscienceDecisionValue.Allow, [], ledger.Entry.ThoughtLedgerEntryId, createdAt);
-        }
 
         if (intendedDecision == ConscienceDecisionValue.NeedsMoreEvidence)
             reasons.Add("NeedsMoreEvidenceCannotAuthorizeExecution");
 
-        return BuildRecord($"conscience_{Guid.NewGuid():N}", action, request, intendedDecision, reasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), null, createdAt);
+        var finalReasons = intendedDecision == ConscienceDecisionValue.Allow
+            ? Array.Empty<string>()
+            : reasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var finalDecision = intendedDecision;
+        var finalDecisionId = $"conscience_{Guid.NewGuid():N}";
+        var finalLedger = WriteThoughtLedger(finalDecisionId, action, request, finalDecision, createdAt);
+        if (!finalLedger.Succeeded || finalLedger.Entry is null)
+            return BuildRecord(finalDecisionId, action, request, ConscienceDecisionValue.Block, [.. finalReasons, .. finalLedger.Issues, "LedgerWriteFailed"], null, createdAt);
+
+        return BuildRecord(finalDecisionId, action, request, finalDecision, finalReasons, finalLedger.Entry.ThoughtLedgerEntryId, createdAt);
     }
 
-    private static ConscienceDecisionRecord BlockRecord(string decisionId, ConscienceDecisionRequest request, DateTimeOffset createdAt, string[] reasons) => new()
+    private ThoughtLedgerWriteResult WriteThoughtLedger(
+        string decisionId,
+        GovernedActionEnvelope? action,
+        ConscienceDecisionRequest request,
+        ConscienceDecisionValue decision,
+        DateTimeOffset createdAt) => _thoughtLedgerWriter.Write(new ThoughtLedgerWriteRequest
+        {
+            ActionId = action?.ActionId ?? string.Empty,
+            DecisionId = decisionId,
+            ActionKind = action?.ActionKind ?? GovernedActionKind.Unknown,
+            SubjectKind = action?.Subject.SubjectKind ?? string.Empty,
+            SubjectId = action?.Subject.SubjectId ?? string.Empty,
+            ReasoningSummary = request.ReasoningSummary,
+            EvidenceRefs = action?.EvidenceRefs.Select(item => item.EvidenceRefId).ToArray() ?? [],
+            RiskLevel = action?.RiskLevel ?? GovernedActionRiskLevel.Critical,
+            Decision = decision
+        }, createdAt);
+
+    private static ConscienceDecisionRecord BuildMissingActionRecord(
+        string decisionId,
+        ConscienceDecisionRequest request,
+        string[] reasons,
+        string? thoughtLedgerEntryId,
+        DateTimeOffset createdAt)
     {
-        DecisionId = $"conscience_{Guid.NewGuid():N}",
-        ActionId = string.Empty,
-        ActionKind = GovernedActionKind.Unknown,
-        SubjectKind = string.Empty,
-        SubjectId = string.Empty,
-        RequestedBy = request.RequestedBy,
-        EvidenceRefs = [],
-        GateEvidenceRefs = [],
-        PolicyRefs = request.PolicyRefs,
-        RiskLevel = GovernedActionRiskLevel.Critical,
-        Decision = ConscienceDecisionValue.Block,
-        Reasons = reasons,
-        RequiredHumanReview = true,
-        ThoughtLedgerEntryId = null,
-        DecisionHash = string.Empty,
-        ExpiresAtUtc = request.ExpiresAtUtc,
-        CreatedAtUtc = createdAt,
-        Boundary = GovernedActionBoundary.None
-    };
+        var draft = new ConscienceDecisionRecord
+        {
+            DecisionId = decisionId,
+            ActionId = string.Empty,
+            ActionKind = GovernedActionKind.Unknown,
+            SubjectKind = string.Empty,
+            SubjectId = string.Empty,
+            RequestedBy = request.RequestedBy,
+            EvidenceRefs = [],
+            GateEvidenceRefs = [],
+            PolicyRefs = request.PolicyRefs,
+            RiskLevel = GovernedActionRiskLevel.Critical,
+            Decision = ConscienceDecisionValue.Block,
+            Reasons = reasons.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            RequiredHumanReview = true,
+            ThoughtLedgerEntryId = thoughtLedgerEntryId,
+            DecisionHash = string.Empty,
+            ExpiresAtUtc = request.ExpiresAtUtc,
+            CreatedAtUtc = createdAt,
+            Boundary = GovernedActionBoundary.None
+        };
+        return draft with { DecisionHash = ConscienceDecisionRecordHash.Compute(draft) };
+    }
 
     private static ConscienceDecisionRecord BuildRecord(
         string decisionId,

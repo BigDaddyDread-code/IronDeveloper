@@ -141,7 +141,8 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
             Boundary = GovernedActionBoundary.None
         };
 
-        var service = new ConscienceDecisionService(new InMemoryThoughtLedgerWriter());
+        var writer = new InMemoryThoughtLedgerWriter();
+        var service = new ConscienceDecisionService(writer);
         var allow = service.Decide(new ConscienceDecisionRequest
         {
             Action = action,
@@ -156,6 +157,7 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
         Assert.IsNotNull(allow.ThoughtLedgerEntryId);
         Assert.IsTrue(allow.AllowsExecution);
         Assert.IsTrue(ConscienceDecisionValidator.Validate(allow).IsValidForFutureExecution);
+        Assert.AreEqual(ConscienceDecisionRecordHash.Compute(allow), allow.DecisionHash);
 
         var missingGate = service.Decide(new ConscienceDecisionRequest
         {
@@ -167,6 +169,9 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
         });
         Assert.AreEqual(ConscienceDecisionValue.Block, missingGate.Decision);
         CollectionAssert.Contains(missingGate.Reasons, "MissingGateEvidence");
+        Assert.IsNotNull(missingGate.ThoughtLedgerEntryId);
+        Assert.IsTrue(writer.Entries.Any(entry => entry.ThoughtLedgerEntryId == missingGate.ThoughtLedgerEntryId && entry.Decision == ConscienceDecisionValue.Block));
+        Assert.AreEqual(ConscienceDecisionRecordHash.Compute(missingGate), missingGate.DecisionHash);
         Assert.IsFalse(missingGate.AllowsExecution);
 
         var failedLedger = new ConscienceDecisionService(new InMemoryThoughtLedgerWriter { ForceFailure = true }).Decide(new ConscienceDecisionRequest
@@ -179,6 +184,57 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
         });
         Assert.AreEqual(ConscienceDecisionValue.Block, failedLedger.Decision);
         CollectionAssert.Contains(failedLedger.Reasons, "LedgerWriteFailed");
+
+        var failedBlockLedger = new ConscienceDecisionService(new InMemoryThoughtLedgerWriter { ForceFailure = true }).Decide(new ConscienceDecisionRequest
+        {
+            Action = action,
+            GateEvidenceRefs = [gate],
+            RequestedBy = "human-reviewer",
+            ReasoningSummary = "Ledger failure must also block explicit block decisions.",
+            RequestedDecision = ConscienceDecisionValue.Block
+        });
+        Assert.AreEqual(ConscienceDecisionValue.Block, failedBlockLedger.Decision);
+        CollectionAssert.Contains(failedBlockLedger.Reasons, "LedgerWriteFailed");
+        Assert.IsNull(failedBlockLedger.ThoughtLedgerEntryId);
+        CollectionAssert.Contains(ConscienceDecisionValidator.Validate(failedBlockLedger).Issues, "MissingThoughtLedger");
+
+        var failedNeedsMoreLedger = new ConscienceDecisionService(new InMemoryThoughtLedgerWriter { ForceFailure = true }).Decide(new ConscienceDecisionRequest
+        {
+            Action = action,
+            GateEvidenceRefs = [gate],
+            RequestedBy = "human-reviewer",
+            ReasoningSummary = "Ledger failure must also block needs-more-evidence decisions.",
+            RequestedDecision = ConscienceDecisionValue.NeedsMoreEvidence
+        });
+        Assert.AreEqual(ConscienceDecisionValue.Block, failedNeedsMoreLedger.Decision);
+        CollectionAssert.Contains(failedNeedsMoreLedger.Reasons, "LedgerWriteFailed");
+        Assert.IsNull(failedNeedsMoreLedger.ThoughtLedgerEntryId);
+        CollectionAssert.Contains(ConscienceDecisionValidator.Validate(failedNeedsMoreLedger).Issues, "MissingThoughtLedger");
+
+        var blockWriter = new InMemoryThoughtLedgerWriter();
+        var explicitBlock = new ConscienceDecisionService(blockWriter).Decide(new ConscienceDecisionRequest
+        {
+            Action = action,
+            GateEvidenceRefs = [gate],
+            RequestedBy = "human-reviewer",
+            ReasoningSummary = "The evidence is insufficient for this authority-bearing action.",
+            RequestedDecision = ConscienceDecisionValue.Block
+        });
+        Assert.AreEqual(ConscienceDecisionValue.Block, explicitBlock.Decision);
+        Assert.IsNotNull(explicitBlock.ThoughtLedgerEntryId);
+        Assert.IsTrue(blockWriter.Entries.Any(entry => entry.ThoughtLedgerEntryId == explicitBlock.ThoughtLedgerEntryId && entry.Decision == ConscienceDecisionValue.Block));
+        Assert.AreEqual(ConscienceDecisionRecordHash.Compute(explicitBlock), explicitBlock.DecisionHash);
+        Assert.IsFalse(explicitBlock.AllowsExecution);
+
+        var allowMissingHash = allow with { DecisionHash = string.Empty };
+        var allowMissingHashValidation = ConscienceDecisionValidator.Validate(allowMissingHash);
+        Assert.IsFalse(allowMissingHashValidation.IsValidForFutureExecution);
+        CollectionAssert.Contains(allowMissingHashValidation.Issues, "MissingDecisionHash");
+
+        var blockMissingHash = explicitBlock with { DecisionHash = string.Empty };
+        var blockMissingHashValidation = ConscienceDecisionValidator.Validate(blockMissingHash);
+        Assert.IsFalse(blockMissingHashValidation.IsValidForFutureExecution);
+        CollectionAssert.Contains(blockMissingHashValidation.Issues, "MissingDecisionHash");
     }
 
     [TestMethod]
@@ -216,7 +272,8 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
         Assert.AreEqual(ConscienceDecisionValue.Block, unsafeDecision.Decision);
         CollectionAssert.Contains(unsafeDecision.Reasons, "UnsafeThoughtLedgerSummary");
 
-        var needsMore = new ConscienceDecisionService(new InMemoryThoughtLedgerWriter()).Decide(new ConscienceDecisionRequest
+        var needsMoreWriter = new InMemoryThoughtLedgerWriter();
+        var needsMore = new ConscienceDecisionService(needsMoreWriter).Decide(new ConscienceDecisionRequest
         {
             Action = action,
             GateEvidenceRefs = [gate],
@@ -225,6 +282,9 @@ public sealed class BlockAJGovernedActionKernelConsolidationTests
             RequestedDecision = ConscienceDecisionValue.NeedsMoreEvidence
         });
         Assert.AreEqual(ConscienceDecisionValue.NeedsMoreEvidence, needsMore.Decision);
+        Assert.IsNotNull(needsMore.ThoughtLedgerEntryId);
+        Assert.IsTrue(needsMoreWriter.Entries.Any(entry => entry.ThoughtLedgerEntryId == needsMore.ThoughtLedgerEntryId && entry.Decision == ConscienceDecisionValue.NeedsMoreEvidence));
+        Assert.AreEqual(ConscienceDecisionRecordHash.Compute(needsMore), needsMore.DecisionHash);
         Assert.IsFalse(ConscienceDecisionValidator.Validate(needsMore).IsValidForFutureExecution);
         Assert.IsFalse(needsMore.AllowsExecution);
     }
