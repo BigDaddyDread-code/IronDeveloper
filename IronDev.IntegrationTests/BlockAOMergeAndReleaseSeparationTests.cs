@@ -93,6 +93,10 @@ public sealed class BlockAOMergeAndReleaseSeparationTests
         Assert.AreEqual(MergeReadinessOutcome.ReadyForMergeDecision, ready.Outcome);
         AssertBoundary(ready.Boundary);
 
+        var draft = MergeReadinessEvidencePackager.Build(CreateMergeInput(request) with { PullRequestDraft = true });
+        Assert.AreEqual(MergeReadinessOutcome.NeedsMoreMergeEvidence, draft.Outcome);
+        CollectionAssert.Contains(draft.MergeEvidenceGaps, "DraftPullRequestRequiresReadyForReviewEvidence");
+
         Assert.AreEqual(MergeReadinessOutcome.BlockedByCi, MergeReadinessEvidencePackager.Build(CreateMergeInput(request) with { CiState = FeedbackCiState.Failed }).Outcome);
         Assert.AreEqual(MergeReadinessOutcome.BlockedByFeedback, MergeReadinessEvidencePackager.Build(CreateMergeInput(request) with { RequestedChangeCount = 1 }).Outcome);
         Assert.AreEqual(MergeReadinessOutcome.BlockedByUnsafeMaterial, MergeReadinessEvidencePackager.Build(CreateMergeInput(request) with { UnsafeMaterialFindings = 1 }).Outcome);
@@ -115,10 +119,42 @@ public sealed class BlockAOMergeAndReleaseSeparationTests
         Assert.AreEqual(ReleaseReadinessEvidenceOutcome.BlockedByUnsafeMaterial, ReleaseReadinessEvidencePackager.Build(CreateReleaseInput(request) with { UnsafeMaterialFindings = 1 }).Outcome);
         Assert.AreEqual(ReleaseReadinessEvidenceOutcome.BlockedByArtifactMismatch, ReleaseReadinessEvidencePackager.Build(CreateReleaseInput(request) with { ArtifactConsistencyBlockers = 1 }).Outcome);
         Assert.AreEqual(ReleaseReadinessEvidenceOutcome.BlockedByMissingRecoveryEvidence, ReleaseReadinessEvidencePackager.Build(CreateReleaseInput(request) with { RecoveryEvidenceExists = false }).Outcome);
+        var missingCandidate = ReleaseReadinessEvidencePackager.Build(CreateReleaseInput(request) with { ReleaseCandidateRef = null });
+        Assert.AreEqual(ReleaseReadinessEvidenceOutcome.NeedsMoreReleaseEvidence, missingCandidate.Outcome);
+        CollectionAssert.Contains(missingCandidate.ReleaseEvidenceGaps, "MissingReleaseCandidateRef");
+        var pullRequestUrlCandidate = ReleaseReadinessEvidencePackager.Build(CreateReleaseInput(request) with { ReleaseCandidateRef = request.PullRequestUrl });
+        Assert.AreEqual(ReleaseReadinessEvidenceOutcome.NeedsMoreReleaseEvidence, pullRequestUrlCandidate.Outcome);
+        CollectionAssert.Contains(pullRequestUrlCandidate.ReleaseEvidenceGaps, "InvalidReleaseCandidateRef:PullRequestUrl");
         Assert.IsFalse(MergeReleaseBypassEvaluator.CanRelease(ready));
         Assert.IsFalse(MergeReleaseBypassEvaluator.CanDeploy(ready));
         Assert.IsFalse(MergeReleaseBypassEvaluator.CanTag(ready));
         Assert.IsFalse(MergeReleaseBypassEvaluator.CanPublish(ready));
+    }
+
+    [TestMethod]
+    public async Task BlockAO_Cli_MergedPullRequestWithoutReleaseCandidateRefNeedsMoreReleaseEvidence()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var runPath = Path.Combine(root, "run-ao-missing-release-candidate");
+            var receipt = WritePullRequestArtifacts(runPath);
+            WriteMergeEvidenceArtifacts(runPath, receipt, FeedbackCiState.Passed, requestedChanges: 0);
+            WriteReleaseEvidenceArtifacts(runPath, receipt, merged: true, hasReleaseCandidate: false);
+
+            Assert.AreEqual(0, (await RunCliAsync("merge-release", "request", "--run", runPath, "--repo", receipt.RepositoryFullName, "--pr", receipt.PullRequestNumber.ToString(), "--expected-head", receipt.ExpectedHeadSha, "--json").ConfigureAwait(false)).ExitCode);
+            Assert.AreEqual(1, (await RunCliAsync("merge-release", "release-evidence", "--run", runPath, "--json").ConfigureAwait(false)).ExitCode);
+
+            var release = ReadJson<ReleaseReadinessEvidencePackage>(Path.Combine(runPath, "release-readiness-evidence-package.json"));
+            Assert.AreEqual(ReleaseReadinessEvidenceOutcome.NeedsMoreReleaseEvidence, release!.Outcome);
+            Assert.IsNull(release.ReleaseCandidateRef);
+            CollectionAssert.Contains(release.ReleaseEvidenceGaps, "MissingReleaseCandidateRef");
+            AssertBoundary(release.Boundary);
+        }
+        finally
+        {
+            TryDelete(root);
+        }
     }
 
     [TestMethod]
@@ -188,7 +224,9 @@ public sealed class BlockAOMergeAndReleaseSeparationTests
         StringAssert.Contains(receipt, "AO6 bypass tests and receipt.");
         StringAssert.Contains(receipt, "CI pass is not merge permission.");
         StringAssert.Contains(receipt, "Review approval is not merge permission.");
+        StringAssert.Contains(receipt, "A draft pull request is not merge readiness.");
         StringAssert.Contains(receipt, "Merge readiness is not release readiness.");
+        StringAssert.Contains(receipt, "A merged pull request is not release candidate evidence.");
         StringAssert.Contains(receipt, "Release readiness is not release execution.");
     }
 
@@ -219,7 +257,7 @@ public sealed class BlockAOMergeAndReleaseSeparationTests
         PullRequestReceiptExists = true,
         PullRequestStatusExists = true,
         ObservedHeadSha = request.ExpectedHeadSha,
-        PullRequestDraft = true,
+        PullRequestDraft = false,
         CommitReadinessReviewExists = true,
         CommitReadinessDecision = CommitReadinessDecision.ReadyForHumanCommitReview,
         CiObservationExists = true,
@@ -353,7 +391,7 @@ public sealed class BlockAOMergeAndReleaseSeparationTests
         });
     }
 
-    private static void WriteReleaseEvidenceArtifacts(string runPath, PullRequestCreationReceipt receipt, bool merged)
+    private static void WriteReleaseEvidenceArtifacts(string runPath, PullRequestCreationReceipt receipt, bool merged, bool hasReleaseCandidate = true, bool draft = false)
     {
         WriteJson(Path.Combine(runPath, "dogfood-run.json"), ProductHardeningDogfood.CreateRun(new ProductDogfoodRunRequest
         {
@@ -383,8 +421,10 @@ public sealed class BlockAOMergeAndReleaseSeparationTests
         WriteJson(Path.Combine(runPath, "release-readiness-decision-record.json"), new { releaseReadinessDecisionId = "release_decision_ao", decision = readiness.Outcome, releases = false, deploys = false, merges = false });
         File.WriteAllText(Path.Combine(runPath, "dogfood-known-risks.md"), "Release evidence is not release execution.");
         WriteJson(Path.Combine(runPath, "resume-report.json"), new { resumeReportId = "resume_ao", continuesWorkflow = false });
+        if (merged && hasReleaseCandidate)
+            File.WriteAllText(Path.Combine(runPath, "release-candidate-ref.txt"), "merge-commit-sha");
         var status = ReadJson<PullRequestStatusReport>(Path.Combine(runPath, "pull-request-status.json"))!;
-        WriteJson(Path.Combine(runPath, "pull-request-status.json"), status with { Merged = merged, Draft = !merged });
+        WriteJson(Path.Combine(runPath, "pull-request-status.json"), status with { Merged = merged, Draft = draft });
     }
 
     private static void AssertBoundary(MergeReleaseSeparationBoundary boundary)

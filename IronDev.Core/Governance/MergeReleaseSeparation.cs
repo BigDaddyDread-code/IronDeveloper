@@ -76,7 +76,9 @@ public static class MergeReleaseSeparationBoundaryText
         It does not continue workflow.
         CI pass is not merge permission.
         Review approval is not merge permission.
+        A draft pull request is not merge readiness.
         Merge readiness is not release readiness.
+        A merged pull request is not release candidate evidence.
         Release readiness is not release execution.
         """;
 }
@@ -201,7 +203,7 @@ public static class MergeReadinessEvidencePackager
         if (!input.FeedbackReadinessReportExists) gaps.Add("MissingFeedbackReadinessReport");
         if (!input.ArtifactConsistencyReportExists) gaps.Add("MissingArtifactConsistencyReport");
         if (!input.UnsafeMaterialReportExists) gaps.Add("MissingUnsafeMaterialReport");
-        if (input.PullRequestStatusExists && !input.PullRequestDraft) gaps.Add("PullRequestNoLongerDraftRequiresFutureReadyForReviewEvidence");
+        if (input.PullRequestStatusExists && input.PullRequestDraft) gaps.Add("DraftPullRequestRequiresReadyForReviewEvidence");
         if (input.CommitReadinessReviewExists && input.CommitReadinessDecision != CommitReadinessDecision.ReadyForHumanCommitReview)
             gaps.Add($"CommitReadinessNotReady:{input.CommitReadinessDecision}");
         if (input.CiObservationExists && input.CiState is FeedbackCiState.Pending or FeedbackCiState.Missing or FeedbackCiState.Unknown)
@@ -309,6 +311,8 @@ public static class ReleaseReadinessEvidencePackager
         if (!input.UnsafeMaterialReportExists) gaps.Add("MissingUnsafeMaterialReport");
         if (!input.KnownRisksDocumented) gaps.Add("MissingKnownRisks");
         if (!input.RecoveryEvidenceExists) gaps.Add("MissingRecoveryEvidence");
+        if (input.PullRequestMerged && string.IsNullOrWhiteSpace(input.ReleaseCandidateRef)) gaps.Add("MissingReleaseCandidateRef");
+        if (input.PullRequestMerged && IsPullRequestUrl(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:PullRequestUrl");
         if (input.ProductHardeningEvidenceExists && !input.ProductHardeningPassed) blockers.Add("ProductHardeningEvidenceBlocksReleaseDecision");
         if (input.ReleaseReadinessReportExists && IsNotReady(input.ReleaseReadinessReportOutcome)) blockers.Add($"ReleaseReadinessReportBlocksReleaseDecision:{input.ReleaseReadinessReportOutcome}");
         if (input.UnsafeMaterialFindings > 0) blockers.Add("UnsafeMaterialFindingsBlockReleaseDecision");
@@ -354,6 +358,9 @@ public static class ReleaseReadinessEvidencePackager
 
     private static bool IsNeedsMoreEvidence(string? outcome) =>
         !string.IsNullOrWhiteSpace(outcome) && outcome.Contains("NeedsMoreEvidence", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPullRequestUrl(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Contains("/pull/", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record MergeReleaseBoundaryMap
@@ -427,6 +434,10 @@ public static class MergeReleaseBoundaryMapper
         Contains(value, "product-hardening") ||
         Contains(value, "dogfood-") ||
         Contains(value, "release-readiness") ||
+        Contains(value, "release-candidate") ||
+        Contains(value, "merge-commit") ||
+        Contains(value, "build-artifact") ||
+        Contains(value, "package-hash") ||
         Contains(value, "known-risks") ||
         Contains(value, "resume-report") ||
         Contains(value, "recovery") ||

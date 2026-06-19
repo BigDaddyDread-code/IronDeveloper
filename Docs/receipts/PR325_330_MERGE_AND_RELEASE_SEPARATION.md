@@ -23,8 +23,10 @@ It does not continue workflow.
 CI pass is not merge permission.
 Review approval is not merge permission.
 No known blocking feedback is not merge permission.
+A draft pull request is not merge readiness.
 Merge readiness is not release readiness.
 A merge decision is not a release decision.
+A merged pull request is not release candidate evidence.
 A merged PR is not a deployment.
 Release readiness is not release execution.
 A release-readiness report is not a release.
@@ -96,6 +98,8 @@ Forbidden cross-use:
 - Release readiness cannot be merge readiness.
 - Draft PR creation cannot be merge readiness.
 - No known blocking feedback cannot be release readiness.
+- A draft pull request cannot be merge decision readiness.
+- A pull request URL cannot be release candidate evidence.
 
 ## Bypass Proof
 

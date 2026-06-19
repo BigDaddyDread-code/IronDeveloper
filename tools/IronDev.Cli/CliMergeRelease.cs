@@ -296,7 +296,7 @@ internal static class IronDevCliMergeRelease
             Request = request,
             PullRequestStatusExists = prStatus is not null,
             PullRequestMerged = prStatus?.Merged ?? false,
-            ReleaseCandidateRef = prStatus?.Merged == true ? prStatus.PullRequestUrl : null,
+            ReleaseCandidateRef = ReadReleaseCandidateRef(runPath),
             ProductHardeningEvidenceExists = dogfood is not null || File.Exists(Path.Combine(runPath, "product-hardening-bypass-report.json")),
             ProductHardeningPassed = dogfood?.Outcome == ProductHardeningAuditOutcome.Pass,
             ReleaseReadinessReportExists = File.Exists(releaseReportPath),
@@ -430,6 +430,36 @@ internal static class IronDevCliMergeRelease
         catch
         {
             return 1;
+        }
+    }
+
+    private static string? ReadReleaseCandidateRef(string runPath)
+    {
+        var textPath = Path.Combine(runPath, "release-candidate-ref.txt");
+        if (File.Exists(textPath))
+        {
+            var value = File.ReadAllText(textPath).Trim();
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        var jsonPath = Path.Combine(runPath, "release-candidate.json");
+        if (!File.Exists(jsonPath))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(jsonPath));
+            return ReadString(doc.RootElement, "releaseCandidateRef") ??
+                   ReadString(doc.RootElement, "mergeCommitSha") ??
+                   ReadString(doc.RootElement, "artifactSha") ??
+                   ReadString(doc.RootElement, "packageHash") ??
+                   ReadString(doc.RootElement, "tagName") ??
+                   ReadString(doc.RootElement, "buildArtifactId");
+        }
+        catch
+        {
+            return null;
         }
     }
 
