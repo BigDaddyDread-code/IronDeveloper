@@ -637,7 +637,8 @@ public enum GovernanceKernelEventKind
     MergeReleaseBypassReportCreated,
     FeedbackRemediationPackageCreated,
     FeedbackPatchProposalCreated,
-    PrUpdatePackageCreated
+    PrUpdatePackageCreated,
+    PrBranchUpdateExecuted
 }
 
 public sealed record GovernedActionKernelEvent
