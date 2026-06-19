@@ -221,6 +221,9 @@ public static class IronDevCli
         if (IronDevCliFeedback.IsFeedbackCommand(args))
             return await IronDevCliFeedback.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliFeedbackPatch.IsFeedbackPatchCommand(args))
+            return await IronDevCliFeedbackPatch.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -2956,6 +2959,10 @@ public static class IronDevCli
         error.WriteLine("  irondev feedback package --status --package <feedback-remediation-package.json> [--json]");
         error.WriteLine("  irondev feedback package --records --package <feedback-remediation-package.json> [--json]");
         error.WriteLine("  irondev feedback status --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback-patch propose --package <feedback-package.json> --out <path> [--pr <number>] [--head <sha>] [--base <sha>] [--candidate <id>] [--json]");
+        error.WriteLine("  irondev feedback-patch inspect --proposal <proposal.json> [--json]");
+        error.WriteLine("  irondev feedback-patch status --proposal <proposal.json> [--json]");
+        error.WriteLine("  irondev feedback-patch records --proposal <proposal.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
