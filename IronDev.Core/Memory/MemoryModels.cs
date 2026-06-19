@@ -369,6 +369,9 @@ public static class MemoryContentSafety
         return value.Trim();
     }
 
+    public static string ContentHash(string? sanitisedContent) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sanitisedContent ?? string.Empty))).ToLowerInvariant();
+
     private static bool ContainsAny(string? content, IEnumerable<string> markers) =>
         !string.IsNullOrWhiteSpace(content) && markers.Any(marker => content.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
@@ -512,11 +515,13 @@ public sealed record AcceptedMemoryVersion
     public required string PromotionRequestId { get; init; }
     public required string ConscienceDecisionId { get; init; }
     public required string ThoughtLedgerRef { get; init; }
+    public string? SourceRunId { get; init; }
+    public string? AcceptedBy { get; init; }
     public required string Content { get; init; }
     public required string SanitisedContent { get; init; }
     public MemoryEvidenceRef[] EvidenceRefs { get; init; } = [];
-    public required DateTimeOffset CreatedAtUtc { get; init; }
-    public required string ContentHash { get; init; }
+    public DateTimeOffset CreatedAtUtc { get; init; }
+    public string ContentHash { get; init; } = string.Empty;
     public MemoryBoundary Boundary { get; init; } = MemoryBoundary.None;
 }
 
@@ -597,7 +602,7 @@ public sealed class AcceptedMemoryStore
             records.Add(record);
 
         var acceptedContent = MemoryContentSafety.SanitiseMemoryContent(proposal.Content);
-        var contentHash = Sha256Hex(acceptedContent);
+        var contentHash = MemoryContentSafety.ContentHash(acceptedContent);
         var version = new AcceptedMemoryVersion
         {
             MemoryVersionId = $"mem_ver_{Guid.NewGuid():N}",
@@ -608,6 +613,8 @@ public sealed class AcceptedMemoryStore
             PromotionRequestId = request.MemoryPromotionRequestId,
             ConscienceDecisionId = conscienceDecision.DecisionId,
             ThoughtLedgerRef = thoughtLedgerRef.Trim(),
+            SourceRunId = proposal.RunId.Trim(),
+            AcceptedBy = request.RequestedBy.Trim(),
             Content = acceptedContent,
             SanitisedContent = acceptedContent,
             EvidenceRefs = proposal.EvidenceRefs,
@@ -673,10 +680,7 @@ public sealed class AcceptedMemoryStore
         public AcceptedMemoryRecord[] Records { get; init; } = [];
     }
 
-    private static string ShortHash(string value) => Sha256Hex(value)[..16];
-
-    private static string Sha256Hex(string value) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value ?? string.Empty))).ToLowerInvariant();
+    private static string ShortHash(string value) => MemoryContentSafety.ContentHash(value)[..16];
 }
 
 public sealed record MemoryPromotionEvaluationResult
