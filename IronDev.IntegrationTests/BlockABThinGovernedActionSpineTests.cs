@@ -52,7 +52,8 @@ public sealed class BlockABThinGovernedActionSpineTests
             GovernedActionKind.SourceApplyCommandExecuted,
             GovernedActionKind.SourceRollback,
             GovernedActionKind.SourceRollbackRequested,
-            GovernedActionKind.SourceRollbackCommandExecuted
+            GovernedActionKind.SourceRollbackCommandExecuted,
+            GovernedActionKind.DraftPullRequestCreation
         };
 
         foreach (var entry in AuthorityActionInventory.All.Where(entry => entry.Classification == GovernedActionClassification.AuthorityBearing))

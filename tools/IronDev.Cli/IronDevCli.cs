@@ -215,6 +215,9 @@ public static class IronDevCli
         if (IronDevCliCommitPackage.IsCommitPackageCommand(args))
             return await IronDevCliCommitPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliPullRequest.IsPullRequestCommand(args))
+            return await IronDevCliPullRequest.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
@@ -2927,6 +2930,12 @@ public static class IronDevCli
         error.WriteLine("  irondev commit-package message --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev commit-package review --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev commit-package status --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev pull-request request --run <run-id-or-path> --repo <owner/name> --base <branch> --head <branch> --expected-head <sha> [--json]");
+        error.WriteLine("  irondev pull-request validate --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev pull-request text --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev pull-request gate --run <run-id-or-path> --decision <decision.json> --thought-ledger-ref <ref> [--json]");
+        error.WriteLine("  irondev pull-request create-draft --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev pull-request status --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");
