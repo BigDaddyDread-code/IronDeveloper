@@ -39,8 +39,11 @@ public sealed class BlockATReadyForReviewSeparationTests
                 "ready", "package",
                 "--repo", "owner/repo",
                 "--pr", "466",
+                "--state", "open",
+                "--draft", "true",
                 "--branch", "phase/close-feedback-loop",
                 "--head", ReadyHead,
+                "--observed-head", ReadyHead,
                 "--base", "main",
                 "--base-sha", BaseSha,
                 "--as-receipt", asReceiptPath,
@@ -71,6 +74,71 @@ public sealed class BlockATReadyForReviewSeparationTests
             var records = await RunCliAsync("ready", "records", "--package", Path.Combine(outPath, "ready-for-review-package.json")).ConfigureAwait(false);
             Assert.AreEqual(0, records.ExitCode, records.Output + records.Error);
             StringAssert.Contains(records.Output, "phase/close-feedback-loop");
+        }
+        finally
+        {
+            TryDelete(root);
+        }
+    }
+
+    [TestMethod]
+    public async Task BlockAT_Cli_RequiresObservedPrStateEvidenceBeforeEligibility()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var asReceiptPath = Path.Combine(root, "as-receipt.json");
+            var validationPath = Path.Combine(root, "validation-receipt.json");
+            var phaseReceiptPath = Path.Combine(root, "phase-receipt.md");
+            WriteJson(asReceiptPath, CreateBranchUpdateReceipt());
+            WriteJson(validationPath, CreateValidationReceipt(ReadyHead));
+            File.WriteAllText(phaseReceiptPath, PhaseReceiptText());
+
+            var missingObservedOut = Path.Combine(root, "missing-observed");
+            var missingObserved = await RunCliAsync(ReadyPackageArgs(missingObservedOut, asReceiptPath, validationPath, phaseReceiptPath, observedHead: null)).ConfigureAwait(false);
+            Assert.AreEqual(1, missingObserved.ExitCode);
+            StringAssert.Contains(missingObserved.Error, "Missing required option: --observed-head");
+            Assert.IsFalse(File.Exists(Path.Combine(missingObservedOut, "ready-for-review-package.json")));
+
+            var missingStateOut = Path.Combine(root, "missing-state");
+            var missingState = await RunCliAsync(ReadyPackageArgs(missingStateOut, asReceiptPath, validationPath, phaseReceiptPath, state: null)).ConfigureAwait(false);
+            Assert.AreEqual(1, missingState.ExitCode);
+            StringAssert.Contains(missingState.Error, "Missing required option: --state");
+            Assert.IsFalse(File.Exists(Path.Combine(missingStateOut, "ready-for-review-package.json")));
+
+            var missingDraftOut = Path.Combine(root, "missing-draft");
+            var missingDraft = await RunCliAsync(ReadyPackageArgs(missingDraftOut, asReceiptPath, validationPath, phaseReceiptPath, draft: null)).ConfigureAwait(false);
+            Assert.AreEqual(1, missingDraft.ExitCode);
+            StringAssert.Contains(missingDraft.Error, "Missing required option: --draft");
+            Assert.IsFalse(File.Exists(Path.Combine(missingDraftOut, "ready-for-review-package.json")));
+
+            var driftOut = Path.Combine(root, "head-drift");
+            var drift = await RunCliAsync(ReadyPackageArgs(driftOut, asReceiptPath, validationPath, phaseReceiptPath, observedHead: new string('d', 40))).ConfigureAwait(false);
+            Assert.AreEqual(1, drift.ExitCode);
+            var driftPackage = ReadJson<ReadyForReviewEligibilityPackage>(Path.Combine(driftOut, "ready-for-review-package.json"));
+            Assert.IsNotNull(driftPackage);
+            Assert.AreEqual(ReadyForReviewEligibilityVerdict.Blocked, driftPackage!.Verdict);
+            Assert.IsFalse(driftPackage.CanMarkReadyForReview);
+            CollectionAssert.Contains(driftPackage.BlockReasons, ReadyForReviewBlockReason.HeadShaMismatch);
+
+            var readyOut = Path.Combine(root, "already-ready");
+            var ready = await RunCliAsync(ReadyPackageArgs(readyOut, asReceiptPath, validationPath, phaseReceiptPath, draft: "false")).ConfigureAwait(false);
+            Assert.AreEqual(1, ready.ExitCode);
+            var readyPackage = ReadJson<ReadyForReviewEligibilityPackage>(Path.Combine(readyOut, "ready-for-review-package.json"));
+            Assert.IsNotNull(readyPackage);
+            Assert.AreEqual(ReadyForReviewEligibilityVerdict.Blocked, readyPackage!.Verdict);
+            Assert.IsFalse(readyPackage.CanMarkReadyForReview);
+            CollectionAssert.Contains(readyPackage.BlockReasons, ReadyForReviewBlockReason.PullRequestNotDraft);
+            CollectionAssert.Contains(readyPackage.BlockReasons, ReadyForReviewBlockReason.PullRequestAlreadyReady);
+
+            var closedOut = Path.Combine(root, "closed");
+            var closed = await RunCliAsync(ReadyPackageArgs(closedOut, asReceiptPath, validationPath, phaseReceiptPath, state: "closed")).ConfigureAwait(false);
+            Assert.AreEqual(1, closed.ExitCode);
+            var closedPackage = ReadJson<ReadyForReviewEligibilityPackage>(Path.Combine(closedOut, "ready-for-review-package.json"));
+            Assert.IsNotNull(closedPackage);
+            Assert.AreEqual(ReadyForReviewEligibilityVerdict.Blocked, closedPackage!.Verdict);
+            Assert.IsFalse(closedPackage.CanMarkReadyForReview);
+            CollectionAssert.Contains(closedPackage.BlockReasons, ReadyForReviewBlockReason.PullRequestNotOpen);
         }
         finally
         {
@@ -381,6 +449,51 @@ public sealed class BlockATReadyForReviewSeparationTests
         Assert.IsFalse(boundary.CanMutateWorkspace);
         Assert.IsFalse(boundary.CanCommit);
         Assert.IsFalse(boundary.CanPush);
+    }
+
+    private static string[] ReadyPackageArgs(
+        string outPath,
+        string asReceiptPath,
+        string validationPath,
+        string phaseReceiptPath,
+        string? state = "open",
+        string? draft = "true",
+        string? observedHead = "__ready_head__")
+    {
+        var args = new List<string>
+        {
+            "ready",
+            "package",
+            "--repo",
+            "owner/repo",
+            "--pr",
+            "466",
+            "--branch",
+            "phase/close-feedback-loop",
+            "--head",
+            ReadyHead,
+            "--base",
+            "main",
+            "--base-sha",
+            BaseSha,
+            "--as-receipt",
+            asReceiptPath,
+            "--validation",
+            validationPath,
+            "--phase-receipt",
+            phaseReceiptPath,
+            "--out",
+            outPath
+        };
+
+        if (state is not null)
+            args.AddRange(["--state", state]);
+        if (draft is not null)
+            args.AddRange(["--draft", draft]);
+        if (observedHead is not null)
+            args.AddRange(["--observed-head", observedHead == "__ready_head__" ? ReadyHead : observedHead]);
+
+        return args.ToArray();
     }
 
     private static void WriteJson<T>(string path, T value) =>

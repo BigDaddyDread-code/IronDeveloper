@@ -2980,7 +2980,7 @@ public static class IronDevCli
         error.WriteLine("  irondev pr-branch-update status --receipt <receipt.json> [--json]");
         error.WriteLine("  irondev pr-branch-update records --receipt <receipt.json> [--json]");
         error.WriteLine("  irondev pr-branch-update rollback-plan --receipt <receipt.json> [--json]");
-        error.WriteLine("  irondev ready package --pr <number> --repo <owner/name> --head <sha> --base <branch> --base-sha <sha> --branch <branch> --as-receipt <receipt.json> --validation <receipt.json> --phase-receipt <receipt.md> --out <path> [--state open] [--draft true] [--json]");
+        error.WriteLine("  irondev ready package --pr <number> --repo <owner/name> --state <open|closed> --draft <true|false> --head <sha> --observed-head <sha> --base <branch> --base-sha <sha> --branch <branch> --as-receipt <receipt.json> --validation <receipt.json> --phase-receipt <receipt.md> --out <path> [--json]");
         error.WriteLine("  irondev ready inspect --package <ready-package.json> [--json]");
         error.WriteLine("  irondev ready status --package <ready-package.json> [--json]");
         error.WriteLine("  irondev ready records --package <ready-package.json> [--json]");

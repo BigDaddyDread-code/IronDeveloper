@@ -304,7 +304,7 @@ public static class ReadyForReviewSeparationBuilder
         PullRequestDraft = input.PullRequestDraft,
         HeadBranch = FeedbackText.Safe(input.HeadBranch),
         ExpectedHeadSha = FeedbackText.Safe(input.ExpectedHeadSha),
-        ObservedHeadSha = FeedbackText.Safe(input.ObservedHeadSha ?? input.ExpectedHeadSha),
+        ObservedHeadSha = FeedbackText.Safe(input.ObservedHeadSha),
         BaseBranch = FeedbackText.Safe(input.BaseBranch),
         BaseSha = FeedbackText.Safe(input.BaseSha)
     };
@@ -320,6 +320,7 @@ public static class ReadyForReviewSeparationBuilder
             target.PullRequestNumber <= 0 ||
             string.IsNullOrWhiteSpace(target.HeadBranch) ||
             string.IsNullOrWhiteSpace(target.ExpectedHeadSha) ||
+            string.IsNullOrWhiteSpace(target.ObservedHeadSha) ||
             string.IsNullOrWhiteSpace(target.BaseBranch) ||
             string.IsNullOrWhiteSpace(target.BaseSha))
         {

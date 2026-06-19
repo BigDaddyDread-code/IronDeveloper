@@ -204,7 +204,7 @@ internal static class IronDevCliReadyForReview
         string? outPath = null;
         string? repo = null;
         string? prUrl = null;
-        string? state = "open";
+        string? state = null;
         string? headBranch = null;
         string? expectedHead = null;
         string? observedHead = null;
@@ -217,7 +217,7 @@ internal static class IronDevCliReadyForReview
         string? phaseReceipt = null;
         string? createdBy = null;
         int? pr = null;
-        bool? draft = true;
+        bool? draft = null;
         var validation = new List<string>();
         var json = false;
         for (var index = 2; index < args.Length; index++)
@@ -267,8 +267,11 @@ internal static class IronDevCliReadyForReview
         if (pr is null) return ParsedPackage.Fail(json, "Missing required option: --pr <number>.");
         if (string.IsNullOrWhiteSpace(headBranch)) return ParsedPackage.Fail(json, "Missing required option: --branch <branch>.");
         if (string.IsNullOrWhiteSpace(expectedHead)) return ParsedPackage.Fail(json, "Missing required option: --head <sha>.");
+        if (string.IsNullOrWhiteSpace(observedHead)) return ParsedPackage.Fail(json, "Missing required option: --observed-head <sha>.");
         if (string.IsNullOrWhiteSpace(baseBranch)) return ParsedPackage.Fail(json, "Missing required option: --base <branch>.");
         if (string.IsNullOrWhiteSpace(baseSha)) return ParsedPackage.Fail(json, "Missing required option: --base-sha <sha>.");
+        if (string.IsNullOrWhiteSpace(state)) return ParsedPackage.Fail(json, "Missing required option: --state <open|closed>.");
+        if (draft is null) return ParsedPackage.Fail(json, "Missing required option: --draft <true|false>.");
         if (validation.Count == 0) return ParsedPackage.Fail(json, "Missing required option: --validation <validation-receipt.json>.");
         if (string.IsNullOrWhiteSpace(phaseReceipt)) return ParsedPackage.Fail(json, "Missing required option: --phase-receipt <receipt.md>.");
         if (string.IsNullOrWhiteSpace(asReceipt) && string.IsNullOrWhiteSpace(noBranchUpdateRequired)) return ParsedPackage.Fail(json, "Missing required option: --as-receipt <receipt.json> or --no-branch-update-required <evidence.json>.");
@@ -349,8 +352,8 @@ internal static class IronDevCliReadyForReview
     {
         error.WriteLine(message);
         error.WriteLine("Usage:");
-        error.WriteLine("  irondev ready package --pr <number> --repo <owner/name> --head <sha> --base <branch> --base-sha <sha> --branch <branch> --as-receipt <receipt.json> --validation <receipt.json> --phase-receipt <receipt.md> --out <path> [--state open] [--draft true] [--pr-url <url>] [--observed-head <sha>] [--created-by <name>] [--json]");
-        error.WriteLine("  irondev ready package --pr <number> --repo <owner/name> --head <sha> --base <branch> --base-sha <sha> --branch <branch> --no-branch-update-required <evidence.json> --validation <receipt.json> --phase-receipt <receipt.md> --out <path> [--json]");
+        error.WriteLine("  irondev ready package --pr <number> --repo <owner/name> --state <open|closed> --draft <true|false> --head <sha> --observed-head <sha> --base <branch> --base-sha <sha> --branch <branch> --as-receipt <receipt.json> --validation <receipt.json> --phase-receipt <receipt.md> --out <path> [--pr-url <url>] [--created-by <name>] [--json]");
+        error.WriteLine("  irondev ready package --pr <number> --repo <owner/name> --state <open|closed> --draft <true|false> --head <sha> --observed-head <sha> --base <branch> --base-sha <sha> --branch <branch> --no-branch-update-required <evidence.json> --validation <receipt.json> --phase-receipt <receipt.md> --out <path> [--json]");
         error.WriteLine("  irondev ready inspect --package <ready-package.json> [--json]");
         error.WriteLine("  irondev ready status --package <ready-package.json> [--json]");
         error.WriteLine("  irondev ready records --package <ready-package.json> [--json]");
