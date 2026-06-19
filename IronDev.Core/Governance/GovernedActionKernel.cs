@@ -638,7 +638,8 @@ public enum GovernanceKernelEventKind
     FeedbackRemediationPackageCreated,
     FeedbackPatchProposalCreated,
     PrUpdatePackageCreated,
-    PrBranchUpdateExecuted
+    PrBranchUpdateExecuted,
+    ReadyForReviewPackageCreated
 }
 
 public sealed record GovernedActionKernelEvent
