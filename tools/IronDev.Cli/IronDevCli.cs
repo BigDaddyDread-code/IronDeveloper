@@ -221,6 +221,9 @@ public static class IronDevCli
         if (IronDevCliFeedback.IsFeedbackCommand(args))
             return await IronDevCliFeedback.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
+            return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
@@ -2946,6 +2949,12 @@ public static class IronDevCli
         error.WriteLine("  irondev feedback plan --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback readiness --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback status --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
+        error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev merge-release boundary-map --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev merge-release records --run <run-id-or-path> [--reviewed-by <name>] [--json]");
+        error.WriteLine("  irondev merge-release status --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");
