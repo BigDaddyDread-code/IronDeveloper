@@ -105,8 +105,12 @@ internal static class IronDevCliPrUpdatePackage
             SourceApplyEvidence = sourceApplyEvidence,
             SourceApplyPending = sourceApplyEvidence is null,
             ExpectedPostUpdateHeadSha = parsed.ExpectedPostUpdateHeadSha,
+            ExpectedDiffHash = parsed.ExpectedDiffHash,
             ExpectedCommitMessage = parsed.CommitMessage,
-            ExpectedCommitBody = parsed.CommitBody
+            ExpectedCommitBody = parsed.CommitBody,
+            CommitAllowed = parsed.CommitAllowed,
+            PushAllowed = parsed.PushAllowed,
+            TargetRemote = parsed.TargetRemote
         });
         var outDirectory = ResolveOutputDirectory(parsed.OutPath!);
         Directory.CreateDirectory(outDirectory);
@@ -211,10 +215,14 @@ internal static class IronDevCliPrUpdatePackage
         string? createdBy = null;
         string? sourceApply = null;
         string? expectedPostUpdateHead = null;
+        string? expectedDiffHash = null;
         string? commitMessage = null;
         string? commitBody = null;
+        string? targetRemote = null;
         int? pr = null;
         bool? draft = null;
+        bool commitAllowed = false;
+        bool pushAllowed = false;
         var validation = new List<string>();
         var json = false;
         for (var index = 2; index < args.Length; index++)
@@ -234,8 +242,12 @@ internal static class IronDevCliPrUpdatePackage
                 case "--created-by": if (!TryRead(args, ref index, out createdBy)) return ParsedPackage.Fail(json, "--created-by requires a value."); break;
                 case "--source-apply": if (!TryRead(args, ref index, out sourceApply)) return ParsedPackage.Fail(json, "--source-apply requires a value."); break;
                 case "--expected-post-update-head": if (!TryRead(args, ref index, out expectedPostUpdateHead)) return ParsedPackage.Fail(json, "--expected-post-update-head requires a value."); break;
+                case "--expected-diff-hash": if (!TryRead(args, ref index, out expectedDiffHash)) return ParsedPackage.Fail(json, "--expected-diff-hash requires a value."); break;
                 case "--commit-message": if (!TryRead(args, ref index, out commitMessage)) return ParsedPackage.Fail(json, "--commit-message requires a value."); break;
                 case "--commit-body": if (!TryRead(args, ref index, out commitBody)) return ParsedPackage.Fail(json, "--commit-body requires a value."); break;
+                case "--target-remote": if (!TryRead(args, ref index, out targetRemote)) return ParsedPackage.Fail(json, "--target-remote requires a value."); break;
+                case "--commit-allowed": commitAllowed = true; break;
+                case "--push-allowed": pushAllowed = true; break;
                 case "--pr":
                     if (!TryRead(args, ref index, out var prValue) || !int.TryParse(prValue, out var parsedPr)) return ParsedPackage.Fail(json, "--pr requires a number.");
                     pr = parsedPr;
@@ -262,7 +274,7 @@ internal static class IronDevCliPrUpdatePackage
         if (string.IsNullOrWhiteSpace(baseBranch)) return ParsedPackage.Fail(json, "Missing required option: --base-branch <branch>.");
         if (string.IsNullOrWhiteSpace(baseSha)) return ParsedPackage.Fail(json, "Missing required option: --base-sha <sha>.");
 
-        return new ParsedPackage(proposal, validation, outPath, repo, pr, prUrl, state, draft, targetBranch, expectedHead, baseBranch, baseSha, createdBy, sourceApply, expectedPostUpdateHead, commitMessage, commitBody, json, null);
+        return new ParsedPackage(proposal, validation, outPath, repo, pr, prUrl, state, draft, targetBranch, expectedHead, baseBranch, baseSha, createdBy, sourceApply, expectedPostUpdateHead, expectedDiffHash, commitMessage, commitBody, commitAllowed, pushAllowed, targetRemote, json, null);
     }
 
     private static ParsedRead ParseRead(string[] args)
@@ -331,7 +343,7 @@ internal static class IronDevCliPrUpdatePackage
     {
         error.WriteLine(message);
         error.WriteLine("Usage:");
-        error.WriteLine("  irondev pr-update package --pr <number> --proposal <proposal.json> --validation <receipt.json> --out <path> --repo <owner/name> --pr-url <url> --state <open|closed> --draft <true|false> --target-branch <branch> --expected-head <sha> --base-branch <branch> --base-sha <sha> [--source-apply <receipt.json>] [--expected-post-update-head <sha>] [--json]");
+        error.WriteLine("  irondev pr-update package --pr <number> --proposal <proposal.json> --validation <receipt.json> --out <path> --repo <owner/name> --pr-url <url> --state <open|closed> --draft <true|false> --target-branch <branch> --expected-head <sha> --base-branch <branch> --base-sha <sha> [--source-apply <receipt.json>] [--expected-post-update-head <sha>] [--expected-diff-hash <sha256:...>] [--commit-allowed] [--push-allowed] [--target-remote origin] [--json]");
         error.WriteLine("  irondev pr-update inspect --package <package.json> [--json]");
         error.WriteLine("  irondev pr-update status --package <package.json> [--json]");
         error.WriteLine("  irondev pr-update records --package <package.json> [--json]");
@@ -376,12 +388,16 @@ internal static class IronDevCliPrUpdatePackage
         string? CreatedBy,
         string? SourceApplyPath,
         string? ExpectedPostUpdateHeadSha,
+        string? ExpectedDiffHash,
         string? CommitMessage,
         string? CommitBody,
+        bool CommitAllowed,
+        bool PushAllowed,
+        string? TargetRemote,
         bool Json,
         string? Error)
     {
-        public static ParsedPackage Fail(bool json, string error) => new(null, [], null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, json, error);
+        public static ParsedPackage Fail(bool json, string error) => new(null, [], null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, false, null, json, error);
     }
 
     private sealed record ParsedRead(string? PackagePath, bool Json, string? Error)

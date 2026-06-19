@@ -89,6 +89,7 @@ public sealed record PrUpdateExpectedState
     public string[] ExpectedChangedFiles { get; init; } = [];
     public required string ExpectedCommitMessage { get; init; }
     public required string ExpectedCommitBody { get; init; }
+    public string? ExpectedDiffHash { get; init; }
     public required bool SourceApplyPending { get; init; }
     public string? ExpectedPostUpdateHeadSha { get; init; }
 }
@@ -137,6 +138,9 @@ public sealed record PrUpdateBranchUpdateConstraints
 {
     public required string TargetBranch { get; init; }
     public required string ExpectedCurrentHeadSha { get; init; }
+    public bool CommitAllowed { get; init; }
+    public bool PushAllowed { get; init; }
+    public string TargetRemote { get; init; } = "origin";
     public required bool ForcePushAllowed { get; init; }
     public required bool ReadyForReviewAllowed { get; init; }
     public required bool ReviewerRequestAllowed { get; init; }
@@ -155,6 +159,10 @@ public sealed record ControlledPrUpdatePackageInput
     public string? ExpectedPostUpdateHeadSha { get; init; }
     public string? ExpectedCommitMessage { get; init; }
     public string? ExpectedCommitBody { get; init; }
+    public string? ExpectedDiffHash { get; init; }
+    public bool CommitAllowed { get; init; }
+    public bool PushAllowed { get; init; }
+    public string? TargetRemote { get; init; }
     public string? RollbackStrategy { get; init; }
     public DateTimeOffset? CreatedAtUtc { get; init; }
 }
@@ -266,6 +274,7 @@ public static class ControlledPrUpdatePackageBuilder
                 ExpectedChangedFiles = expectedChangedFiles,
                 ExpectedCommitMessage = FeedbackText.Safe(input.ExpectedCommitMessage ?? $"Apply feedback patch proposal {proposal?.PatchProposalId ?? "missing"}"),
                 ExpectedCommitBody = FeedbackText.Safe(input.ExpectedCommitBody ?? "Future AS executor must create the actual commit only after package eligibility is re-verified."),
+                ExpectedDiffHash = FeedbackText.SafeOrNull(input.ExpectedDiffHash),
                 SourceApplyPending = sourceApplyPending,
                 ExpectedPostUpdateHeadSha = expectedPostUpdateHead
             },
@@ -276,6 +285,9 @@ public static class ControlledPrUpdatePackageBuilder
             {
                 TargetBranch = safeTarget.TargetBranch,
                 ExpectedCurrentHeadSha = safeTarget.ExpectedCurrentHeadSha,
+                CommitAllowed = input.CommitAllowed,
+                PushAllowed = input.PushAllowed,
+                TargetRemote = FeedbackText.Safe(input.TargetRemote ?? "origin"),
                 ForcePushAllowed = false,
                 ReadyForReviewAllowed = false,
                 ReviewerRequestAllowed = false,
