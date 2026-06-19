@@ -2951,6 +2951,10 @@ public static class IronDevCli
         error.WriteLine("  irondev feedback classify --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback plan --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback readiness --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback package --pr <number> --head <sha> --out <path> [--run <run-id-or-path>] [--repo <owner/name>] [--json]");
+        error.WriteLine("  irondev feedback package --from-receipt <validation-receipt.json> --out <path> [--json]");
+        error.WriteLine("  irondev feedback package --status --package <feedback-remediation-package.json> [--json]");
+        error.WriteLine("  irondev feedback package --records --package <feedback-remediation-package.json> [--json]");
         error.WriteLine("  irondev feedback status --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
