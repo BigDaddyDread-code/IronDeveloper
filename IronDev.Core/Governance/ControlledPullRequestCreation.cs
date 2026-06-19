@@ -538,6 +538,8 @@ public static class DraftPullRequestExecutor
     {
         var issues = new List<string>();
         if (gate.Decision != PullRequestCreationGateDecision.CreateDraftPullRequest) issues.Add("GateDidNotAllowCreateDraftPullRequest");
+        if (!string.Equals(gate.AllowedOperation, nameof(PullRequestCreationGateDecision.CreateDraftPullRequest), StringComparison.Ordinal)) issues.Add("PullRequestCreationGateOperationMismatch");
+        if (!string.Equals(gate.PullRequestCreationRequestId, request.PullRequestCreationRequestId, StringComparison.OrdinalIgnoreCase)) issues.Add("PullRequestCreationGateRequestMismatch");
         if (!request.DraftRequired) issues.Add("DraftRequiredMissing");
         if (!observedHead.Exists) issues.Add("RemoteHeadBranchMissing");
         if (!string.Equals(observedHead.HeadSha, request.ExpectedHeadSha, StringComparison.OrdinalIgnoreCase)) issues.Add("ExpectedHeadShaMismatch");

@@ -180,6 +180,45 @@ public sealed class BlockAMControlledPullRequestCreationTests
     }
 
     [TestMethod]
+    public async Task BlockAM_Executor_BlocksReusedOrMalformedGateBeforeDraftCreation()
+    {
+        var fixture = CreateCoreFixture();
+        var branch = PullRequestBranchValidator.Validate(
+            fixture.Request,
+            new RemoteBranchState { RepositoryFullName = fixture.Request.RepositoryFullName, BranchName = fixture.Request.HeadBranch, Exists = true, HeadSha = fixture.Request.ExpectedHeadSha },
+            new RemoteBranchState { RepositoryFullName = fixture.Request.RepositoryFullName, BranchName = fixture.Request.BaseBranch, Exists = true, HeadSha = new string('b', 40) },
+            new ExistingPullRequestState());
+        var evidence = PullRequestEvidenceValidator.Validate(fixture.Request, fixture.CommitReview, fixture.Bundle, fixture.CommitBoundary, [], []);
+        var proposal = PullRequestTextProposalBuilder.Build(fixture.Request, fixture.Manifest, fixture.Bundle, fixture.CommitReview);
+        var gate = PullRequestCreationGateBuilder.Build(fixture.Request, branch, evidence, proposal, fixture.CommitReview, CreateConscience(fixture.Request, ConscienceDecisionOutcome.Allow), "thought-ledger:am");
+
+        foreach (var (mutatedGate, expectedIssue) in new[]
+                 {
+                     (gate with { PullRequestCreationRequestId = "pr_req_other" }, "PullRequestCreationGateRequestMismatch"),
+                     (gate with { PullRequestCreationRequestId = string.Empty }, "PullRequestCreationGateRequestMismatch"),
+                     (gate with { AllowedOperation = "Merge" }, "PullRequestCreationGateOperationMismatch")
+                 })
+        {
+            var fake = new FakeDraftPullRequestCreator();
+            var result = await DraftPullRequestExecutor.CreateDraftAsync(
+                fixture.Request,
+                mutatedGate,
+                proposal,
+                new RemoteBranchState { RepositoryFullName = fixture.Request.RepositoryFullName, BranchName = fixture.Request.HeadBranch, Exists = true, HeadSha = fixture.Request.ExpectedHeadSha },
+                new ExistingPullRequestState(),
+                fake,
+                "tester",
+                CancellationToken.None).ConfigureAwait(false);
+
+            Assert.AreEqual(PullRequestCreationExecutionStatus.Blocked, result.Status, expectedIssue);
+            CollectionAssert.Contains(result.Issues, expectedIssue);
+            Assert.AreEqual(0, fake.Commands.Count, expectedIssue);
+            Assert.IsNull(result.Receipt, expectedIssue);
+            Assert.IsNull(result.StatusReport, expectedIssue);
+        }
+    }
+
+    [TestMethod]
     public async Task BlockAM_Cli_BlocksAuthorityShapedSubcommands()
     {
         foreach (var forbidden in new[] { "create", "create-ready", "ready", "request-reviewers", "approve", "merge", "release", "deploy", "push", "commit", "continue" })
