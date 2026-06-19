@@ -607,7 +607,14 @@ public enum GovernanceKernelEventKind
     PlanRiskReportCreated,
     SuggestedTestProfileCreated,
     KilljoyPlanReviewCreated,
-    PlanningBoundaryReportCreated
+    PlanningBoundaryReportCreated,
+    CommitPackageRequestCreated,
+    CommitFileManifestCreated,
+    CommitEvidenceBundleCreated,
+    CommitMessageProposalCreated,
+    CommitReadinessReviewCreated,
+    CommitPackageBoundaryReportCreated,
+    CommitPackageBypassReportCreated
 }
 
 public sealed record GovernedActionKernelEvent
