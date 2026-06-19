@@ -224,6 +224,9 @@ public static class IronDevCli
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliValidation.IsValidationCommand(args))
+            return await IronDevCliValidation.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
@@ -2955,6 +2958,12 @@ public static class IronDevCli
         error.WriteLine("  irondev merge-release boundary-map --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release records --run <run-id-or-path> [--reviewed-by <name>] [--json]");
         error.WriteLine("  irondev merge-release status --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev validate plan [--changed-files <path>] [--base <ref>] [--head <ref>] [--phase <name>] [--block <name>] [--out <path>] [--json]");
+        error.WriteLine("  irondev validate run --lane <known-lane> --artifacts <dir> [--timeout-seconds <n>] [--cwd <path>] [--json]");
+        error.WriteLine("  irondev validate run --ad-hoc --artifacts <dir> --command <exe> [--arg <arg>]... [--timeout-seconds <n>] [--cwd <path>] [--json]");
+        error.WriteLine("  irondev validate lanes [--json]");
+        error.WriteLine("  irondev validate receipt (--path <receipt.json> | --artifacts <dir> [--last]) [--json]");
+        error.WriteLine("  irondev validate inventory [--json]");
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");
