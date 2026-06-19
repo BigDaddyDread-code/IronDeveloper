@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using IronDev.Core.Governance;
+using IronDev.Core.Validation;
 
 namespace IronDev.Cli;
 
@@ -18,6 +19,7 @@ internal static class IronDevCliFeedback
     private static readonly string[] ForbiddenSubcommands =
     [
         "fix",
+        "approve",
         "apply",
         "commit",
         "push",
@@ -52,6 +54,9 @@ internal static class IronDevCliFeedback
         "feedback-known-risks.md",
         "feedback-readiness-report.json",
         "feedback-readiness-report.md",
+        "feedback-remediation-package.json",
+        "feedback-remediation-package-receipt.json",
+        "feedback-remediation-summary.md",
         "feedback-status.json",
         "feedback-loop-bypass-report.json",
         "feedback-loop-bypass-report.md",
@@ -64,11 +69,11 @@ internal static class IronDevCliFeedback
     public static async Task<int> HandleAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         if (args.Length < 2)
-            return Usage(error, "feedback requires a subcommand: request, ci, review, classify, plan, readiness, or status.");
+            return Usage(error, "feedback requires a subcommand: request, ci, review, classify, plan, readiness, package, or status.");
 
         var subcommand = args[1].ToLowerInvariant();
         if (ForbiddenSubcommands.Contains(subcommand, StringComparer.OrdinalIgnoreCase))
-            return Usage(error, $"feedback {args[1]} is intentionally unsupported; Block AN observes feedback only.");
+            return Usage(error, $"feedback {args[1]} is intentionally unsupported; feedback evidence is not remediation authority.");
 
         return subcommand switch
         {
@@ -78,6 +83,7 @@ internal static class IronDevCliFeedback
             "classify" => await HandleClassifyAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "plan" => await HandlePlanAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "readiness" => await HandleReadinessAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "package" => await HandlePackageAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "status" => HandleStatus(args, output, error),
             _ => Usage(error, $"unsupported feedback subcommand: {args[1]}")
         };
@@ -315,6 +321,72 @@ internal static class IronDevCliFeedback
         return 0;
     }
 
+    private static async Task<int> HandlePackageAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    {
+        var parsed = ParsePackage(args);
+        if (parsed.Error is not null)
+            return Failure(output, error, parsed.Json, "feedback package", parsed.Error);
+
+        if (parsed.Mode == PackageMode.Status || parsed.Mode == PackageMode.Records)
+        {
+            var package = ReadJson<FeedbackRemediationPackage>(ResolvePackagePath(parsed.PackagePath!));
+            if (package is null)
+                return Failure(output, error, parsed.Json, "feedback package", "feedback remediation package is missing or invalid.");
+
+            if (parsed.Mode == PackageMode.Records)
+            {
+                if (parsed.Json)
+                    WriteJson(output, "feedback package records", "succeeded", new { package.RemediationCandidates, package.FeedbackItems }, []);
+                else
+                {
+                    foreach (var candidate in package.RemediationCandidates)
+                        output.WriteLine($"{candidate.Disposition}: {candidate.Rationale}");
+                }
+            }
+            else if (parsed.Json)
+            {
+                WriteJson(output, "feedback package status", "succeeded", new
+                {
+                    package.FeedbackRemediationPackageId,
+                    package.RunId,
+                    package.PullRequestNumber,
+                    package.CurrentHeadSha,
+                    itemCount = package.FeedbackItems.Length,
+                    candidateCount = package.RemediationCandidates.Length,
+                    boundary = package.Boundary
+                }, []);
+            }
+            else
+            {
+                output.WriteLine($"Feedback package: {package.FeedbackRemediationPackageId}");
+                output.WriteLine($"Items: {package.FeedbackItems.Length}");
+                output.WriteLine($"Candidates: {package.RemediationCandidates.Length}");
+                output.WriteLine("Boundary: package is evidence only and cannot propose patches or update PRs.");
+            }
+
+            return 0;
+        }
+
+        var outPath = parsed.OutPath!;
+        var input = parsed.Mode == PackageMode.FromReceipt
+            ? BuildPackageInputFromValidationReceipt(parsed.FromReceiptPath!, outPath)
+            : BuildPackageInputFromObservedFeedback(parsed, outPath);
+        var artifacts = FeedbackRemediationPackager.Build(input);
+        await WritePackageArtifactsAsync(outPath, artifacts, cancellationToken).ConfigureAwait(false);
+        RecordEvent(ResolveOutputDirectory(outPath), GovernanceKernelEventKind.FeedbackRemediationPackageCreated, artifacts.Package.FeedbackRemediationPackageId, "Feedback remediation package was created.", ["feedback-remediation-package.json", "feedback-remediation-package-receipt.json"]);
+
+        if (parsed.Json)
+            WriteJson(output, "feedback package", "succeeded", new { outPath = ResolveOutputDirectory(outPath), artifacts.Package, artifacts.Receipt }, []);
+        else
+        {
+            output.WriteLine($"Feedback remediation package: {artifacts.Package.FeedbackRemediationPackageId}");
+            output.WriteLine($"Receipt: {artifacts.Receipt.FeedbackRemediationPackageReceiptId}");
+            output.WriteLine("Boundary: AP package is evidence only and cannot propose patches, apply source changes, update PR branches, or continue workflow.");
+        }
+
+        return 0;
+    }
+
     private static async Task<string?> ReadPullRequestHeadAsync(string repositoryFullName, int pullRequestNumber, CancellationToken cancellationToken)
     {
         var result = await RunProcessAsync("gh", ["pr", "view", pullRequestNumber.ToString(), "--repo", repositoryFullName, "--json", "headRefOid"], Directory.GetCurrentDirectory(), cancellationToken).ConfigureAwait(false);
@@ -505,6 +577,163 @@ internal static class IronDevCliFeedback
         return File.Exists(path) ? File.ReadAllLines(path).Where(line => !string.IsNullOrWhiteSpace(line)).ToArray() : [];
     }
 
+    private static FeedbackRemediationPackageInput BuildPackageInputFromObservedFeedback(ParsedPackage parsed, string outPath)
+    {
+        var runPath = ResolveOutputDirectory(parsed.Run ?? outPath);
+        var request = ReadJson<FeedbackLoopRequest>(Path.Combine(runPath, "feedback-loop-request.json"));
+        var ci = ReadJson<CiObservationSnapshot>(Path.Combine(runPath, "ci-observation-snapshot.json"));
+        var review = ReadJson<ReviewFeedbackSnapshot>(Path.Combine(runPath, "review-feedback-snapshot.json"));
+        var items = new List<FeedbackItemInput>();
+        if (ci is not null)
+            items.AddRange(BuildItemsFromCi(ci));
+        if (review is not null)
+            items.AddRange(BuildItemsFromReview(review));
+
+        return new FeedbackRemediationPackageInput
+        {
+            RunId = request?.RunId ?? RunId(runPath),
+            RepositoryFullName = parsed.RepositoryFullName ?? request?.RepositoryFullName ?? "unknown/repository",
+            PullRequestNumber = parsed.PullRequestNumber ?? request?.PullRequestNumber ?? 0,
+            CurrentHeadSha = parsed.HeadSha ?? request?.ExpectedHeadSha ?? "unknown",
+            PullRequestUrl = request?.PullRequestUrl,
+            Items = items.ToArray(),
+            EvidenceRefs = ReadArtifactNames(runPath)
+        };
+    }
+
+    private static FeedbackRemediationPackageInput BuildPackageInputFromValidationReceipt(string receiptPath, string outPath)
+    {
+        var receipt = ReadJson<ValidationRunReceipt>(Path.GetFullPath(receiptPath)) ?? throw new InvalidOperationException("validation receipt is missing or invalid.");
+        var items = new List<FeedbackItemInput>();
+        foreach (var failure in receipt.FailureClassifications.DefaultIfEmpty(ValidationFailureKind.Passed).Where(kind => kind != ValidationFailureKind.Passed))
+        {
+            items.Add(new FeedbackItemInput
+            {
+                SourceKind = FeedbackSourceKind.LocalValidationReceipt,
+                SourceId = $"{receipt.ValidationRunId}:{failure}",
+                CommitSha = receipt.CommitSha,
+                RawExcerpt = $"{failure} in validation receipt {receipt.ValidationRunId}. Verdict: {receipt.Verdict}.",
+                CreatedAtUtc = receipt.FinishedUtc
+            });
+        }
+
+        foreach (var dirty in receipt.DirtyChangedFiles)
+        {
+            items.Add(new FeedbackItemInput
+            {
+                SourceKind = FeedbackSourceKind.LocalValidationReceipt,
+                SourceId = $"{receipt.ValidationRunId}:dirty:{dirty.Path}",
+                CommitSha = receipt.CommitSha,
+                FilePath = dirty.Path,
+                RawExcerpt = $"Dirty generated artifact: {dirty.Path}. {dirty.Reason}",
+                CreatedAtUtc = receipt.FinishedUtc
+            });
+        }
+
+        return new FeedbackRemediationPackageInput
+        {
+            RunId = receipt.ValidationRunId,
+            RepositoryFullName = "local/validation",
+            PullRequestNumber = 0,
+            CurrentHeadSha = receipt.CommitSha,
+            Items = items.ToArray(),
+            EvidenceRefs = [Path.GetFileName(receiptPath)],
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
+
+    private static IEnumerable<FeedbackItemInput> BuildItemsFromCi(CiObservationSnapshot ci)
+    {
+        foreach (var failure in ci.Failures)
+        {
+            yield return new FeedbackItemInput
+            {
+                SourceKind = FeedbackSourceKind.GitHubCheckRun,
+                SourceId = failure.Source,
+                SourceUrl = failure.Url,
+                CommitSha = ci.ObservedHeadSha ?? ci.ExpectedHeadSha,
+                RawExcerpt = FeedbackText.Summary($"{failure.Message} {failure.Excerpt}", maxLength: 500),
+                CreatedAtUtc = ci.ObservedAtUtc
+            };
+        }
+    }
+
+    private static IEnumerable<FeedbackItemInput> BuildItemsFromReview(ReviewFeedbackSnapshot review)
+    {
+        foreach (var comment in review.InlineComments)
+            yield return ToFeedbackItem(FeedbackSourceKind.GitHubReviewComment, comment, review.ExpectedHeadSha, threadId: null);
+        foreach (var comment in review.TopLevelComments)
+            yield return ToFeedbackItem(FeedbackSourceKind.GitHubIssueComment, comment, review.ExpectedHeadSha, threadId: null);
+        foreach (var thread in review.UnresolvedThreads)
+        {
+            yield return new FeedbackItemInput
+            {
+                SourceKind = FeedbackSourceKind.GitHubReviewThread,
+                SourceId = thread.ThreadId,
+                SourceUrl = thread.Url,
+                ThreadId = thread.ThreadId,
+                CommitSha = thread.HeadSha ?? review.ExpectedHeadSha,
+                RawExcerpt = thread.Summary,
+                IsResolved = thread.IsResolved,
+                CreatedAtUtc = review.ObservedAtUtc
+            };
+        }
+    }
+
+    private static FeedbackItemInput ToFeedbackItem(FeedbackSourceKind kind, ReviewCommentSummary comment, string expectedHeadSha, string? threadId) => new()
+    {
+        SourceKind = kind,
+        SourceId = comment.Url ?? $"{kind}:{comment.Author}:{comment.Path}:{comment.Line}",
+        SourceUrl = comment.Url,
+        Author = comment.Author,
+        CommitSha = comment.HeadSha ?? expectedHeadSha,
+        FilePath = comment.Path,
+        Line = comment.Line,
+        ThreadId = threadId,
+        RawExcerpt = comment.BodySummary,
+        CreatedAtUtc = comment.CreatedAtUtc
+    };
+
+    private static async Task WritePackageArtifactsAsync(string outPath, FeedbackRemediationPackageArtifacts artifacts, CancellationToken cancellationToken)
+    {
+        var outDirectory = ResolveOutputDirectory(outPath);
+        Directory.CreateDirectory(outDirectory);
+        var packagePath = ResolvePackagePath(outPath, forWrite: true);
+        await File.WriteAllTextAsync(packagePath, JsonSerializer.Serialize(artifacts.Package, JsonOptions), cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(outDirectory, "feedback-remediation-package-receipt.json"), JsonSerializer.Serialize(artifacts.Receipt, JsonOptions), cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(outDirectory, "feedback-remediation-summary.md"), RenderPackageSummary(artifacts), cancellationToken).ConfigureAwait(false);
+        await File.WriteAllLinesAsync(Path.Combine(outDirectory, "feedback-remediation-candidates.jsonl"), artifacts.Package.RemediationCandidates.Select(item => JsonSerializer.Serialize(item, JsonOptions)), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string RenderPackageSummary(FeedbackRemediationPackageArtifacts artifacts) => $"""
+        # Feedback Remediation Package
+
+        Verdict: `{artifacts.Receipt.Verdict}`
+        Items: `{artifacts.Receipt.FeedbackItemCount}`
+        Candidates: `{artifacts.Receipt.RemediationCandidateCount}`
+
+        Candidates:
+        {RenderBullets(artifacts.Package.RemediationCandidates.Select(item => $"{item.Disposition}: {item.Rationale}"))}
+
+        Boundary: AP packages feedback into remediation evidence only. It does not propose patches, apply source changes, update PR branches, approve, mark ready, request reviewers, merge, release, deploy, or continue workflow.
+        """;
+
+    private static string ResolvePackagePath(string path, bool forWrite = false)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (Directory.Exists(fullPath) || !Path.HasExtension(fullPath) || forWrite && !string.Equals(Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase))
+            return Path.Combine(fullPath, "feedback-remediation-package.json");
+        return fullPath;
+    }
+
+    private static string ResolveOutputDirectory(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return Path.HasExtension(fullPath) && string.Equals(Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetDirectoryName(fullPath) ?? Directory.GetCurrentDirectory()
+            : fullPath;
+    }
+
     private static string[] ReadArtifactNames(string runPath) =>
         Directory.Exists(runPath)
             ? Directory.EnumerateFiles(runPath).Select(Path.GetFileName).Where(item => !string.IsNullOrWhiteSpace(item)).Cast<string>().OrderBy(item => item, StringComparer.OrdinalIgnoreCase).ToArray()
@@ -576,6 +805,58 @@ internal static class IronDevCliFeedback
         return string.IsNullOrWhiteSpace(run) ? ParsedRunOnly.Fail(json, "Missing required option: --run <run-id-or-path>.") : new ParsedRunOnly(run, json, null);
     }
 
+    private static ParsedPackage ParsePackage(string[] args)
+    {
+        string? run = null;
+        string? repo = null;
+        string? head = null;
+        string? outPath = null;
+        string? fromReceipt = null;
+        string? packagePath = null;
+        int? pr = null;
+        var status = false;
+        var records = false;
+        var json = false;
+        for (var index = 2; index < args.Length; index++)
+        {
+            switch (args[index])
+            {
+                case "--run": if (!TryRead(args, ref index, out run)) return ParsedPackage.Fail(json, "--run requires a value."); break;
+                case "--repo": if (!TryRead(args, ref index, out repo)) return ParsedPackage.Fail(json, "--repo requires a value."); break;
+                case "--head": if (!TryRead(args, ref index, out head)) return ParsedPackage.Fail(json, "--head requires a value."); break;
+                case "--out": if (!TryRead(args, ref index, out outPath)) return ParsedPackage.Fail(json, "--out requires a value."); break;
+                case "--from-receipt": if (!TryRead(args, ref index, out fromReceipt)) return ParsedPackage.Fail(json, "--from-receipt requires a value."); break;
+                case "--package": if (!TryRead(args, ref index, out packagePath)) return ParsedPackage.Fail(json, "--package requires a value."); break;
+                case "--pr":
+                    if (!TryRead(args, ref index, out var prValue) || !int.TryParse(prValue, out var parsedPr)) return ParsedPackage.Fail(json, "--pr requires a number.");
+                    pr = parsedPr;
+                    break;
+                case "--status": status = true; break;
+                case "--records": records = true; break;
+                case "--json": json = true; break;
+                default: return ParsedPackage.Fail(json, $"unsupported option: {args[index]}");
+            }
+        }
+
+        if (status || records)
+        {
+            if (string.IsNullOrWhiteSpace(packagePath)) return ParsedPackage.Fail(json, "Missing required option: --package <feedback-remediation-package.json>.");
+            return new ParsedPackage(status ? PackageMode.Status : PackageMode.Records, run, repo, pr, head, outPath, fromReceipt, packagePath, json, null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(fromReceipt))
+        {
+            if (!File.Exists(fromReceipt)) return ParsedPackage.Fail(json, $"validation receipt not found: {fromReceipt}");
+            if (string.IsNullOrWhiteSpace(outPath)) return ParsedPackage.Fail(json, "Missing required option: --out <path>.");
+            return new ParsedPackage(PackageMode.FromReceipt, run, repo, pr, head, outPath, fromReceipt, packagePath, json, null);
+        }
+
+        if (pr is null) return ParsedPackage.Fail(json, "Missing required option: --pr <number>.");
+        if (string.IsNullOrWhiteSpace(head)) return ParsedPackage.Fail(json, "Missing required option: --head <sha>.");
+        if (string.IsNullOrWhiteSpace(outPath)) return ParsedPackage.Fail(json, "Missing required option: --out <path>.");
+        return new ParsedPackage(PackageMode.FromObservedFeedback, run, repo, pr, head, outPath, fromReceipt, packagePath, json, null);
+    }
+
     private static bool TryRead(string[] args, ref int index, out string value)
     {
         value = string.Empty;
@@ -629,6 +910,10 @@ internal static class IronDevCliFeedback
         error.WriteLine("  irondev feedback classify --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback plan --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback readiness --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback package --pr <number> --head <sha> --out <path> [--run <run-id-or-path>] [--repo <owner/name>] [--json]");
+        error.WriteLine("  irondev feedback package --from-receipt <validation-receipt.json> --out <path> [--json]");
+        error.WriteLine("  irondev feedback package --status --package <feedback-remediation-package.json> [--json]");
+        error.WriteLine("  irondev feedback package --records --package <feedback-remediation-package.json> [--json]");
         error.WriteLine("  irondev feedback status --run <run-id-or-path> [--json]");
         return 2;
     }
@@ -675,6 +960,29 @@ internal static class IronDevCliFeedback
     private sealed record ParsedRunOnly(string? Run, bool Json, string? Error)
     {
         public static ParsedRunOnly Fail(bool json, string error) => new(null, json, error);
+    }
+
+    private enum PackageMode
+    {
+        FromObservedFeedback = 0,
+        FromReceipt,
+        Status,
+        Records
+    }
+
+    private sealed record ParsedPackage(
+        PackageMode Mode,
+        string? Run,
+        string? RepositoryFullName,
+        int? PullRequestNumber,
+        string? HeadSha,
+        string? OutPath,
+        string? FromReceiptPath,
+        string? PackagePath,
+        bool Json,
+        string? Error)
+    {
+        public static ParsedPackage Fail(bool json, string error) => new(PackageMode.FromObservedFeedback, null, null, null, null, null, null, null, json, error);
     }
 
     private sealed record ProcessResult(int ExitCode, string Stdout, string Stderr);

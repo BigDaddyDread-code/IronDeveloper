@@ -221,6 +221,15 @@ public static class IronDevCli
         if (IronDevCliFeedback.IsFeedbackCommand(args))
             return await IronDevCliFeedback.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliFeedbackPatch.IsFeedbackPatchCommand(args))
+            return await IronDevCliFeedbackPatch.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
+        if (IronDevCliPrUpdatePackage.IsPrUpdateCommand(args))
+            return await IronDevCliPrUpdatePackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
+        if (IronDevCliPrBranchUpdate.IsPrBranchUpdateCommand(args))
+            return await IronDevCliPrBranchUpdate.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -2951,7 +2960,23 @@ public static class IronDevCli
         error.WriteLine("  irondev feedback classify --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback plan --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev feedback readiness --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback package --pr <number> --head <sha> --out <path> [--run <run-id-or-path>] [--repo <owner/name>] [--json]");
+        error.WriteLine("  irondev feedback package --from-receipt <validation-receipt.json> --out <path> [--json]");
+        error.WriteLine("  irondev feedback package --status --package <feedback-remediation-package.json> [--json]");
+        error.WriteLine("  irondev feedback package --records --package <feedback-remediation-package.json> [--json]");
         error.WriteLine("  irondev feedback status --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback-patch propose --package <feedback-package.json> --out <path> [--pr <number>] [--head <sha>] [--base <sha>] [--candidate <id>] [--json]");
+        error.WriteLine("  irondev feedback-patch inspect --proposal <proposal.json> [--json]");
+        error.WriteLine("  irondev feedback-patch status --proposal <proposal.json> [--json]");
+        error.WriteLine("  irondev feedback-patch records --proposal <proposal.json> [--json]");
+        error.WriteLine("  irondev pr-update package --pr <number> --proposal <proposal.json> --validation <receipt.json> --out <path> --repo <owner/name> --pr-url <url> --state <open|closed> --draft <true|false> --target-branch <branch> --expected-head <sha> --base-branch <branch> --base-sha <sha> [--source-apply <receipt.json>] [--expected-post-update-head <sha>] [--expected-diff-hash <sha256:...>] [--commit-allowed] [--push-allowed] [--target-remote origin] [--json]");
+        error.WriteLine("  irondev pr-update inspect --package <package.json> [--json]");
+        error.WriteLine("  irondev pr-update status --package <package.json> [--json]");
+        error.WriteLine("  irondev pr-update records --package <package.json> [--json]");
+        error.WriteLine("  irondev pr-branch-update execute --package <package.json> --workspace <repo-path> --out <path> [--remote origin] [--expected-pr <number>] [--json]");
+        error.WriteLine("  irondev pr-branch-update status --receipt <receipt.json> [--json]");
+        error.WriteLine("  irondev pr-branch-update records --receipt <receipt.json> [--json]");
+        error.WriteLine("  irondev pr-branch-update rollback-plan --receipt <receipt.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
