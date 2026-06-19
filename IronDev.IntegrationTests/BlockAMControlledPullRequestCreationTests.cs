@@ -196,6 +196,7 @@ public sealed class BlockAMControlledPullRequestCreationTests
                  {
                      (gate with { PullRequestCreationRequestId = "pr_req_other" }, "PullRequestCreationGateRequestMismatch"),
                      (gate with { PullRequestCreationRequestId = string.Empty }, "PullRequestCreationGateRequestMismatch"),
+                     (gate with { AllowedOperation = null }, "PullRequestCreationGateOperationMismatch"),
                      (gate with { AllowedOperation = "Merge" }, "PullRequestCreationGateOperationMismatch")
                  })
         {
