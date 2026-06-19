@@ -218,6 +218,9 @@ public static class IronDevCli
         if (IronDevCliPullRequest.IsPullRequestCommand(args))
             return await IronDevCliPullRequest.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliFeedback.IsFeedbackCommand(args))
+            return await IronDevCliFeedback.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliWorkflowInspection.IsWorkflowInspectCommand(args))
             return await IronDevCliWorkflowInspection.HandleAsync(args, output, error, ReadEnvironment(), handler, cancellationToken).ConfigureAwait(false);
 
@@ -2936,6 +2939,13 @@ public static class IronDevCli
         error.WriteLine("  irondev pull-request gate --run <run-id-or-path> --decision <decision.json> --thought-ledger-ref <ref> [--json]");
         error.WriteLine("  irondev pull-request create-draft --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev pull-request status --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
+        error.WriteLine("  irondev feedback ci --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback review --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback classify --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback plan --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback readiness --run <run-id-or-path> [--json]");
+        error.WriteLine("  irondev feedback status --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev source-apply approval-template --run <run-id-or-path> --out <approval.json> [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply prepare --run <run-id-or-path> [--approval <approval.json>] [--apply-root <path>] [--runs-root <path>] [--json]");
         error.WriteLine("  irondev source-apply status --run <run-id-or-path> [--runs-root <path>] [--json]");

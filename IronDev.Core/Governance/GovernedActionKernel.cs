@@ -621,7 +621,14 @@ public enum GovernanceKernelEventKind
     PullRequestTextProposalCreated,
     PullRequestCreationGateCreated,
     DraftPullRequestCreated,
-    PullRequestCreationBypassReportCreated
+    PullRequestCreationBypassReportCreated,
+    FeedbackLoopRequestCreated,
+    CiObservationSnapshotCreated,
+    ReviewFeedbackSnapshotCreated,
+    FeedbackClassificationReportCreated,
+    FeedbackRemediationPlanCreated,
+    FeedbackReadinessReportCreated,
+    FeedbackLoopBypassReportCreated
 }
 
 public sealed record GovernedActionKernelEvent
