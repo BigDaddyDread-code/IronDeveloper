@@ -82,7 +82,7 @@ public sealed class BlockALControlledCommitPackageTests
             AssertBoundary(manifest.Boundary);
 
             var stagingPlan = ReadJson<CommitStagingPlan>(Path.Combine(runPath, "commit-staging-plan.json"));
-            Assert.IsTrue(stagingPlan!.StagingCommandsForHuman.Any(item => item.Contains("git add -- README.md", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(stagingPlan!.StagingCommandsForHuman.Any(item => string.Equals(item, "git add -- 'README.md'", StringComparison.OrdinalIgnoreCase)));
             AssertBoundary(stagingPlan.Boundary);
 
             var bundle = ReadJson<CommitEvidenceBundle>(Path.Combine(runPath, "commit-evidence-bundle.json"));
@@ -111,6 +111,43 @@ public sealed class BlockALControlledCommitPackageTests
             Assert.IsFalse(bypass.DeployPerformed);
             Assert.IsFalse(bypass.WorkflowContinued);
             AssertBoundary(bypass.Boundary);
+
+            var staged = await GitValueAsync(sourceRepo, "diff", "--cached", "--name-only").ConfigureAwait(false);
+            var headAfter = await GitValueAsync(sourceRepo, "rev-parse", "HEAD").ConfigureAwait(false);
+            Assert.AreEqual(string.Empty, staged);
+            Assert.AreEqual(headBefore, headAfter);
+        }
+        finally
+        {
+            TryDelete(root);
+        }
+    }
+
+    [TestMethod]
+    public async Task BlockAL_StagingPlan_QuotesShellSignificantPathsWithoutMutatingGitIndex()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var sourceRepo = Path.Combine(root, "repo");
+            var runPath = Path.Combine(root, "run-al-quoted-paths");
+            var baseHead = await CreateSourceRepoAsync(sourceRepo).ConfigureAwait(false);
+            var trickyFiles = new[] { "file with spaces.txt", "semi;colon.txt", "it's.txt", "cost$dollar.txt" };
+            WriteCompleteRunArtifacts(runPath, baseHead, trickyFiles);
+            foreach (var file in trickyFiles)
+                await File.WriteAllTextAsync(Path.Combine(sourceRepo, file), "changed path requiring safe staging instruction").ConfigureAwait(false);
+
+            var headBefore = await GitValueAsync(sourceRepo, "rev-parse", "HEAD").ConfigureAwait(false);
+            Assert.AreEqual(0, (await RunCliAsync("commit-package", "request", "--run", runPath, "--source-repo", sourceRepo, "--json").ConfigureAwait(false)).ExitCode);
+            Assert.AreEqual(0, (await RunCliAsync("commit-package", "manifest", "--run", runPath, "--source-repo", sourceRepo, "--json").ConfigureAwait(false)).ExitCode);
+
+            var stagingPlan = ReadJson<CommitStagingPlan>(Path.Combine(runPath, "commit-staging-plan.json"));
+            CollectionAssert.Contains(stagingPlan!.StagingCommandsForHuman, "git add -- 'file with spaces.txt'");
+            CollectionAssert.Contains(stagingPlan.StagingCommandsForHuman, "git add -- 'semi;colon.txt'");
+            CollectionAssert.Contains(stagingPlan.StagingCommandsForHuman, "git add -- 'it''s.txt'");
+            CollectionAssert.Contains(stagingPlan.StagingCommandsForHuman, "git add -- 'cost$dollar.txt'");
+            Assert.IsFalse(stagingPlan.StagingCommandsForHuman.Any(item => item.Contains("git add -- file with spaces.txt", StringComparison.OrdinalIgnoreCase)));
+            AssertBoundary(stagingPlan.Boundary);
 
             var staged = await GitValueAsync(sourceRepo, "diff", "--cached", "--name-only").ConfigureAwait(false);
             var headAfter = await GitValueAsync(sourceRepo, "rev-parse", "HEAD").ConfigureAwait(false);

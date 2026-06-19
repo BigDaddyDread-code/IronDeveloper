@@ -200,7 +200,7 @@ public static class CommitFileManifestBuilder
         ProposedIncludedFiles = manifest.IncludedFiles,
         ProposedExcludedFiles = manifest.ExcludedFiles,
         StagingCommandsForHuman = manifest.IncludedFiles
-            .Select(file => $"git add -- {file}")
+            .Select(file => $"git add -- {PowerShellSingleQuotedArgument(file)}")
             .Concat(["git diff --cached --check"])
             .ToArray(),
         Warnings = manifest.UnexpectedFiles.Length == 0
@@ -209,6 +209,9 @@ public static class CommitFileManifestBuilder
         CreatedAtUtc = now ?? DateTimeOffset.UtcNow,
         Boundary = new()
     };
+
+    private static string PowerShellSingleQuotedArgument(string value) =>
+        $"'{CommitPackageText.Safe(value).Replace("'", "''")}'";
 }
 
 public sealed record CommitEvidenceBundleInput
