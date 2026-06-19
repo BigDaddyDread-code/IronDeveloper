@@ -19,9 +19,18 @@ It does not approve actions.
 
 ## What landed
 
+- AK1 reads accepted memory only.
+- AK2 requires citations for memory influence.
+- AK3 builds planner context.
+- AK4 creates a plan proposal.
+- AK5 reviews the plan for authority leaks.
+- AK6 proves memory cannot bypass authority.
 - Accepted memory retrieval contract and deterministic retriever.
 - Memory context item model.
 - Memory citation and citation bundle contract.
+- Memory citation validation for id, hash, scope, kind, and project binding.
+- Memory citation validation rechecks citations against accepted-memory store content.
+- Legacy accepted memory without newer metadata remains loadable.
 - Planner context bundle.
 - Memory-informed plan proposal.
 - Plan risk report.
@@ -61,17 +70,23 @@ Memory must not override Conscience.
 The `irondev plan` CLI writes run-scoped planning artifacts:
 
 - `accepted-memory-retrieval-request.json`
+- `accepted-memory-retrieval.json`
 - `accepted-memory-retrieval-result.json`
 - `memory-context.json`
 - `memory-context.md`
+- `memory-citations.json`
 - `memory-citations.jsonl`
 - `memory-citation-bundle.json`
+- `planner-context.json`
 - `planner-context-bundle.json`
 - `planner-context.md`
+- `memory-informed-plan.json`
 - `plan-proposal.json`
 - `plan-proposal.md`
+- `plan-risk-report.json`
 - `plan-risks.md`
 - `suggested-test-profile.json`
+- `planning-boundary-report.json`
 - `planner-boundary-report.json`
 - `planner-boundary-report.md`
 - `killjoy-plan-review.json`

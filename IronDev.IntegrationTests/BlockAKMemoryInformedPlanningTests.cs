@@ -38,12 +38,75 @@ public sealed class BlockAKMemoryInformedPlanningTests
             Assert.IsFalse(result.Items.Any(item => item.SafeContent.Contains("Other project", StringComparison.OrdinalIgnoreCase)));
             Assert.IsFalse(result.Items.Any(item => item.SafeContent.Contains("staged-only", StringComparison.OrdinalIgnoreCase)));
             Assert.IsTrue(result.Warnings.Any(item => item.StartsWith("PortableMemoryProjectSpecificDetailExcluded", StringComparison.OrdinalIgnoreCase)));
+            var projectItem = result.Items.Single(item => item.MemoryId == project.Record.MemoryId);
+            Assert.AreEqual("run-memory", projectItem.SourceRunId);
+            Assert.AreEqual("human-reviewer", projectItem.AcceptedBy);
+            Assert.AreEqual(project.Version.ContentHash, projectItem.ContentHash);
+            StringAssert.StartsWith(projectItem.CitationRef, "accepted-memory:");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(projectItem.SafeSummary));
             AssertBoundary(result.Boundary);
         }
         finally
         {
             TryDelete(root);
             TryDelete(run);
+        }
+    }
+
+    [TestMethod]
+    public void BlockAK_AcceptedMemoryRetriever_LoadsLegacyAcceptedMemoryWithoutNewMetadata()
+    {
+        var root = CreateTempPath("ak-legacy-memory");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "accepted-memory-versions", "mem_legacy"));
+            File.WriteAllText(Path.Combine(root, "accepted-memory-index.json"),
+                """
+                {
+                  "records": [
+                    {
+                      "memoryId": "mem_legacy",
+                      "scope": "Project",
+                      "memoryKind": "EngineeringLesson",
+                      "projectId": "project-alpha",
+                      "key": "project:project-alpha:legacy",
+                      "currentVersion": 1,
+                      "createdAtUtc": "2026-01-01T00:00:00+00:00",
+                      "updatedAtUtc": "2026-01-02T00:00:00+00:00",
+                      "isSuperseded": false
+                    }
+                  ]
+                }
+                """);
+            File.WriteAllText(Path.Combine(root, "accepted-memory-versions", "mem_legacy", "1.json"),
+                """
+                {
+                  "memoryVersionId": "mem_ver_legacy",
+                  "memoryId": "mem_legacy",
+                  "version": 1,
+                  "memoryKind": "EngineeringLesson",
+                  "proposalId": "legacy-proposal",
+                  "promotionRequestId": "legacy-promotion",
+                  "conscienceDecisionId": "legacy-decision",
+                  "thoughtLedgerRef": "legacy-ledger",
+                  "content": "Use old memory safely.",
+                  "sanitisedContent": "Use old memory safely.",
+                  "evidenceRefs": [],
+                  "boundary": {}
+                }
+                """);
+
+            var result = AcceptedMemoryRetriever.Retrieve(new AcceptedMemoryStore(root), Request("run-ak-legacy", "project-alpha"));
+            var item = result.Items.Single();
+
+            Assert.AreEqual("legacy-proposal", item.SourceRunId);
+            Assert.AreEqual("unknown-reviewer", item.AcceptedBy);
+            Assert.AreEqual(MemoryContentSafety.ContentHash("Use old memory safely."), item.ContentHash);
+            Assert.AreEqual(DateTimeOffset.Parse("2026-01-02T00:00:00+00:00"), item.AcceptedAtUtc);
+        }
+        finally
+        {
+            TryDelete(root);
         }
     }
 
@@ -63,17 +126,47 @@ public sealed class BlockAKMemoryInformedPlanningTests
                 Citations = allCitations.Citations.Where(item => item.MemoryId == first.Record.MemoryId).ToArray()
             };
 
-            var context = PlannerContextBuilder.Build(ContextRequest("run-ak-citations"), retrieval, partialBundle);
+            var context = PlannerContextBuilder.Build(ContextRequest("run-ak-citations"), store, partialBundle);
 
             Assert.AreEqual(1, context.AcceptedMemoryRefs.Length);
             Assert.AreEqual(partialBundle.MemoryCitationBundleId, context.MemoryCitationBundleId);
-            Assert.IsFalse(context.KnownConstraints.Any(item => item.Contains("authority", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(context.IgnoredMemory.Any(item => item.StartsWith("accepted-memory:", StringComparison.OrdinalIgnoreCase)));
+            StringAssert.Contains(context.ContextBoundary, "cannot approve");
+            Assert.IsFalse(context.KnownConstraints.Any(item => item.Contains("approval granted", StringComparison.OrdinalIgnoreCase)));
             AssertBoundary(context.Boundary);
+            var validation = MemoryCitationValidator.Validate(partialBundle, retrieval, "project-alpha");
+            Assert.IsTrue(validation.IsValid, string.Join(",", validation.Issues));
+            var storeValidation = MemoryCitationValidator.Validate(partialBundle, store, "project-alpha");
+            Assert.IsTrue(storeValidation.IsValid, string.Join(",", storeValidation.Issues));
             foreach (var citation in partialBundle.Citations)
             {
+                Assert.AreEqual(MemoryKind.EngineeringLesson, citation.MemoryKind);
+                Assert.AreEqual("run-memory", citation.SourceRunId);
+                Assert.AreEqual("human-reviewer", citation.AcceptedBy);
+                Assert.AreEqual(first.Version.ContentHash, citation.ContentHash);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(citation.RelevanceReason));
                 Assert.IsFalse(MemoryCitationWriter.IsAuthorityUse(citation.UsedFor));
                 Assert.IsFalse(citation.Caveat.Contains("approval", StringComparison.OrdinalIgnoreCase));
             }
+
+            var wrongId = partialBundle with
+            {
+                Citations = [partialBundle.Citations[0] with { MemoryId = "mem-not-retrieved" }]
+            };
+            CollectionAssert.Contains(MemoryCitationValidator.Validate(wrongId, retrieval, "project-alpha").Issues, "UnknownMemoryId:mem-not-retrieved");
+
+            var wrongHash = partialBundle with
+            {
+                Citations = [partialBundle.Citations[0] with { ContentHash = new string('b', 64) }]
+            };
+            Assert.IsTrue(MemoryCitationValidator.Validate(wrongHash, retrieval, "project-alpha").Issues.Any(issue => issue.StartsWith("ContentHashMismatch", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(MemoryCitationValidator.Validate(wrongHash, store, "project-alpha").Issues.Any(issue => issue.StartsWith("ContentHashMismatch", StringComparison.OrdinalIgnoreCase)));
+
+            var wrongProject = partialBundle with
+            {
+                Citations = [partialBundle.Citations[0] with { ProjectId = "project-other" }]
+            };
+            Assert.IsTrue(MemoryCitationValidator.Validate(wrongProject, retrieval, "project-alpha").Issues.Any(issue => issue.StartsWith("ProjectScopeMismatch", StringComparison.OrdinalIgnoreCase)));
         }
         finally
         {
@@ -124,15 +217,20 @@ public sealed class BlockAKMemoryInformedPlanningTests
         {
             PlannerContextBundleId = "planner-context-1",
             RunId = "run-ak-plan",
+            ProjectId = "project-alpha",
             TaskSummary = "Add a small boundary fix.",
+            CurrentGoal = "Add a small boundary fix.",
             RepoIdentity = "repo",
             BaseCommit = "abc123",
             RelevantFiles = ["IronDev.Core/Foo.cs"],
             AcceptedMemoryRefs = ["mem-cite-1"],
             MemoryCitationBundleId = "bundle-1",
+            Constraints = ["Do not add authority."],
             KnownRisks = ["Boundary fixes need focused tests."],
             KnownConstraints = ["Project memory is scoped to this project only."],
             SuggestedTestHints = ["Run focused boundary tests."],
+            IgnoredMemory = [],
+            ContextBoundary = "Planner context is advisory and cannot approve or execute.",
             CreatedAtUtc = DateTimeOffset.UtcNow,
             Boundary = MemoryPlanningBoundary.ContextEvidence
         };
@@ -148,7 +246,15 @@ public sealed class BlockAKMemoryInformedPlanningTests
                     CitationId = "mem-cite-1",
                     MemoryId = "mem-1",
                     MemoryVersionId = "mem-ver-1",
+                    MemoryKind = MemoryKind.EngineeringLesson,
                     MemoryScope = MemoryScope.Project,
+                    ProjectId = "project-alpha",
+                    SourceRunId = "run-memory",
+                    AcceptedAtUtc = DateTimeOffset.UtcNow,
+                    AcceptedBy = "human-reviewer",
+                    SafeSummary = "Use narrow scoped patches.",
+                    ContentHash = new string('a', 64),
+                    RelevanceReason = "Accepted memory provides planning context.",
                     EvidenceRefs = ["evidence-1"],
                     UsedFor = MemoryCitationUsedFor.PlanContext,
                     Caveat = "Project memory is scoped to this project only."
@@ -163,7 +269,11 @@ public sealed class BlockAKMemoryInformedPlanningTests
         var stepKinds = Enum.GetNames<MemoryInformedPlanStepKind>();
 
         Assert.AreEqual(MemoryInformedPlanStatus.Proposed, plan.PlanStatus);
+        Assert.AreEqual("project-alpha", plan.ProjectId);
+        Assert.AreEqual("Add a small boundary fix.", plan.Goal);
         Assert.IsTrue(plan.RequiredHumanReview);
+        Assert.IsTrue(plan.EvidenceRequirements.Any(item => item.Contains("Human review", StringComparison.OrdinalIgnoreCase)));
+        StringAssert.Contains(plan.NonAuthorityBoundary, "not executable");
         Assert.IsFalse(statuses.Any(IsForbiddenAuthorityName));
         Assert.IsFalse(stepKinds.Any(IsForbiddenAuthorityName));
         Assert.IsFalse(plan.Boundary.CanApprove);
@@ -181,6 +291,8 @@ public sealed class BlockAKMemoryInformedPlanningTests
         {
             PlanProposalId = "plan-authority",
             RunId = "run-ak-review",
+            ProjectId = "project-alpha",
+            Goal = "Review a bad authority-shaped plan.",
             PlannerContextBundleId = "ctx",
             PlanStatus = MemoryInformedPlanStatus.Proposed,
             PlanSteps =
@@ -197,9 +309,11 @@ public sealed class BlockAKMemoryInformedPlanningTests
             ],
             Assumptions = ["approval granted by memory"],
             Risks = [],
+            EvidenceRequirements = ["Human review remains required."],
             SuggestedTestProfile = SuggestedTestProfileKind.Focused,
             MemoryCitations = ["mem-cite"],
             RequiredHumanReview = true,
+            NonAuthorityBoundary = "This plan proposal is not approved or executable.",
             CreatedAtUtc = DateTimeOffset.UtcNow,
             Boundary = MemoryPlanningBoundary.ContextEvidence
         };
@@ -217,7 +331,9 @@ public sealed class BlockAKMemoryInformedPlanningTests
         var boundary = MemoryPlanReviewBuilder.BuildBoundaryReport(plan, citations);
 
         Assert.IsTrue(review.AuthorityClaimsFound);
-        Assert.AreEqual(KilljoyPlanSeverity.Warning, review.Severity);
+        Assert.AreEqual(KilljoyPlanDecision.Blocked, review.Decision);
+        Assert.AreEqual(KilljoyPlanSeverity.Blocker, review.Severity);
+        Assert.IsTrue(review.StructuredFindings.Any(item => item.Category == "AuthorityLeak"));
         AssertBoundary(review.Boundary);
         CollectionAssert.Contains(boundary.ForbiddenClaimsFound, "AuthorityClaim");
         Assert.IsFalse(boundary.Boundary.CanApprove);
@@ -239,7 +355,7 @@ public sealed class BlockAKMemoryInformedPlanningTests
 
             var memoryContext = await RunCliAsync("plan", "memory-context", "--run", runPath, "--task", taskPath, "--project-id", "project-alpha", "--memory-root", memoryRoot, "--json");
             Assert.AreEqual(0, memoryContext.ExitCode, memoryContext.Error + memoryContext.Output);
-            var context = await RunCliAsync("plan", "context", "--run", runPath, "--task", taskPath, "--repo-identity", "repo-alpha", "--base-commit", "abc123", "--relevant-file", "IronDev.Core/Memory/Foo.cs", "--json");
+            var context = await RunCliAsync("plan", "context", "--run", runPath, "--task", taskPath, "--project-id", "project-alpha", "--memory-root", memoryRoot, "--repo-identity", "repo-alpha", "--base-commit", "abc123", "--relevant-file", "IronDev.Core/Memory/Foo.cs", "--json");
             Assert.AreEqual(0, context.ExitCode, context.Error + context.Output);
             var propose = await RunCliAsync("plan", "propose", "--run", runPath, "--json");
             Assert.AreEqual(0, propose.ExitCode, propose.Error + propose.Output);
@@ -251,17 +367,23 @@ public sealed class BlockAKMemoryInformedPlanningTests
             foreach (var artifact in new[]
                      {
                          "accepted-memory-retrieval-request.json",
+                         "accepted-memory-retrieval.json",
                          "accepted-memory-retrieval-result.json",
                          "memory-context.json",
                          "memory-context.md",
+                         "memory-citations.json",
                          "memory-citations.jsonl",
                          "memory-citation-bundle.json",
+                         "planner-context.json",
                          "planner-context-bundle.json",
                          "planner-context.md",
+                         "memory-informed-plan.json",
                          "plan-proposal.json",
                          "plan-proposal.md",
+                         "plan-risk-report.json",
                          "plan-risks.md",
                          "suggested-test-profile.json",
+                         "planning-boundary-report.json",
                          "planner-boundary-report.json",
                          "planner-boundary-report.md",
                          "killjoy-plan-review.json",
@@ -272,16 +394,86 @@ public sealed class BlockAKMemoryInformedPlanningTests
                 Assert.IsTrue(File.Exists(Path.Combine(runPath, artifact)), artifact);
             }
 
+            var retrieval = ReadJson<AcceptedMemoryRetrievalResult>(Path.Combine(runPath, "accepted-memory-retrieval.json"));
+            Assert.AreEqual("human-reviewer", retrieval!.Items.Single().AcceptedBy);
+            var plan = ReadJson<MemoryInformedPlanProposal>(Path.Combine(runPath, "memory-informed-plan.json"));
+            StringAssert.Contains(plan!.NonAuthorityBoundary, "not executable");
+            var killjoy = ReadJson<KilljoyPlanReview>(Path.Combine(runPath, "killjoy-plan-review.json"));
+            Assert.AreEqual(KilljoyPlanDecision.NoBlockingIssuesFound, killjoy!.Decision);
+
             var events = File.ReadAllText(Path.Combine(runPath, "governance-events.jsonl"));
             StringAssert.Contains(events, nameof(GovernanceKernelEventKind.AcceptedMemoryRetrieved));
             StringAssert.Contains(events, nameof(GovernanceKernelEventKind.MemoryInformedPlanProposed));
             StringAssert.Contains(events, nameof(GovernanceKernelEventKind.KilljoyPlanReviewCreated));
 
-            foreach (var forbidden in new[] { "execute", "apply", "approve", "promote-memory", "continue", "release", "deploy", "merge" })
+            foreach (var forbidden in new[] { "execute", "apply", "rollback", "approve", "promote-memory", "append-memory", "continue", "release", "deploy", "merge", "commit", "push", "pull-request" })
             {
                 var result = await RunCliAsync("plan", forbidden, "--run", runPath);
                 Assert.AreEqual(2, result.ExitCode, forbidden);
                 StringAssert.Contains(result.Error, "intentionally unsupported");
+            }
+
+            var forgedRunPath = CreateTempPath("ak-cli-forged-run");
+            try
+            {
+                Directory.CreateDirectory(forgedRunPath);
+                var forgedContent = "Forged memory should not enter planner context.";
+                var forgedRetrieval = new AcceptedMemoryRetrievalResult
+                {
+                    RetrievalResultId = "mem_retrieval_forged",
+                    RetrievalRequestId = "mem_retrieval_req_forged",
+                    RunId = Path.GetFileName(forgedRunPath),
+                    RetrievedAtUtc = DateTimeOffset.UtcNow,
+                    Items =
+                    [
+                        new MemoryContextItem
+                        {
+                            MemoryId = "mem_forged",
+                            MemoryVersionId = "mem_ver_forged",
+                            MemoryScope = MemoryScope.Project,
+                            MemoryKind = MemoryKind.EngineeringLesson,
+                            ProjectId = "project-alpha",
+                            SourceRunId = "run-forged",
+                            AcceptedBy = "forged-reviewer",
+                            ContentSummary = forgedContent,
+                            SafeSummary = forgedContent,
+                            SafeContent = forgedContent,
+                            CitationRef = "accepted-memory:mem_forged:mem_ver_forged",
+                            ContentHash = MemoryContentSafety.ContentHash(forgedContent),
+                            SourceEvidenceRefs = [],
+                            AcceptedAtUtc = DateTimeOffset.UtcNow,
+                            LastVerifiedAtUtc = DateTimeOffset.UtcNow,
+                            Staleness = MemoryPlanningStaleness.Current,
+                            Confidence = "AcceptedMemoryEvidence",
+                            Caveats = ["Project memory is scoped to this project only."]
+                        }
+                    ],
+                    Boundary = MemoryPlanningBoundary.ReadOnlyEvidence
+                };
+                File.WriteAllText(Path.Combine(forgedRunPath, "accepted-memory-retrieval-result.json"), JsonSerializer.Serialize(forgedRetrieval, JsonOptions));
+                File.WriteAllText(Path.Combine(forgedRunPath, "memory-citation-bundle.json"), JsonSerializer.Serialize(MemoryCitationWriter.CreateBundle(forgedRetrieval), JsonOptions));
+
+                var forgedContext = await RunCliAsync("plan", "context", "--run", forgedRunPath, "--task", taskPath, "--project-id", "project-alpha", "--memory-root", memoryRoot, "--json");
+                Assert.AreEqual(1, forgedContext.ExitCode, forgedContext.Output + forgedContext.Error);
+                StringAssert.Contains(forgedContext.Output + forgedContext.Error, "UnknownMemoryId:mem_forged");
+            }
+            finally
+            {
+                TryDelete(forgedRunPath);
+            }
+
+            var oneShotRunPath = CreateTempPath("ak-cli-one-shot-run");
+            try
+            {
+                var oneShot = await RunCliAsync("memory", "plan", "--run", oneShotRunPath, "--memory-root", memoryRoot, "--project", "project-alpha", "--task", taskPath, "--repo-identity", "repo-alpha", "--base-commit", "abc123", "--json");
+                Assert.AreEqual(0, oneShot.ExitCode, oneShot.Error + oneShot.Output);
+                AssertArtifactExists(oneShotRunPath, "accepted-memory-retrieval.json");
+                AssertArtifactExists(oneShotRunPath, "memory-informed-plan.json");
+                AssertArtifactExists(oneShotRunPath, "killjoy-plan-review.json");
+            }
+            finally
+            {
+                TryDelete(oneShotRunPath);
             }
         }
         finally
@@ -328,6 +520,12 @@ public sealed class BlockAKMemoryInformedPlanningTests
         StringAssert.Contains(receipt, "Memory citations are mandatory.");
         StringAssert.Contains(receipt, "Plan proposal is not authority.");
         StringAssert.Contains(receipt, "Killjoy plan review is not authority.");
+        StringAssert.Contains(receipt, "AK1 reads accepted memory only.");
+        StringAssert.Contains(receipt, "AK2 requires citations for memory influence.");
+        StringAssert.Contains(receipt, "AK3 builds planner context.");
+        StringAssert.Contains(receipt, "AK4 creates a plan proposal.");
+        StringAssert.Contains(receipt, "AK5 reviews the plan for authority leaks.");
+        StringAssert.Contains(receipt, "AK6 proves memory cannot bypass authority.");
     }
 
     private static AcceptedMemoryAppendResult AppendAcceptedMemory(AcceptedMemoryStore store, MemoryScope scope, string projectId, string content, MemoryKind kind = MemoryKind.EngineeringLesson)
@@ -437,9 +635,12 @@ public sealed class BlockAKMemoryInformedPlanningTests
     private static PlannerContextBuildRequest ContextRequest(string runId) => new()
     {
         RunId = runId,
+        ProjectId = "project-alpha",
         TaskSummary = "Fix a boundary bug.",
+        CurrentGoal = "Fix a boundary bug.",
         RepoIdentity = "repo",
         BaseCommit = "abc123",
+        Constraints = ["Do not add authority."],
         RelevantFiles = ["IronDev.Core/Memory/Foo.cs"]
     };
 
@@ -498,6 +699,12 @@ public sealed class BlockAKMemoryInformedPlanningTests
             // Best-effort test cleanup only.
         }
     }
+
+    private static void AssertArtifactExists(string path, string artifact) =>
+        Assert.IsTrue(File.Exists(Path.Combine(path, artifact)), artifact);
+
+    private static T? ReadJson<T>(string path) =>
+        File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), JsonOptions) : default;
 
     private static string FindRepositoryRoot()
     {

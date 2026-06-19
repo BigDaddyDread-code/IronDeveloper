@@ -2908,6 +2908,7 @@ public static class IronDevCli
         error.WriteLine("  irondev memory promote --proposal <proposal-id-or-file> --conscience-decision <decision.json> --thought-ledger-ref <ref> [--memory-root <path>] [--runs-root <path>] [--scope run|project|portable] [--json]");
         error.WriteLine("  irondev memory list [--memory-root <path>] [--json]");
         error.WriteLine("  irondev memory show --key <memory-key> [--memory-root <path>] [--json]");
+        error.WriteLine("  irondev memory plan --run <run-id-or-path> --memory-root <path> --project <id> --task <task.md-or-text> [--json]");
         error.WriteLine("  irondev plan memory-context --run <run-id-or-path> --task <task.md> [--project-id <id>] [--memory-root <path>] [--json]");
         error.WriteLine("  irondev plan context --run <run-id-or-path> --task <task.md> [--json]");
         error.WriteLine("  irondev plan propose --run <run-id-or-path> [--json]");

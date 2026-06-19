@@ -23,10 +23,14 @@ internal static class IronDevCliPlanning
     };
 
     public static bool IsPlanCommand(string[] args) =>
-        args.Length > 0 && string.Equals(args[0], "plan", StringComparison.OrdinalIgnoreCase);
+        args.Length > 0 && string.Equals(args[0], "plan", StringComparison.OrdinalIgnoreCase) ||
+        args.Length > 1 && string.Equals(args[0], "memory", StringComparison.OrdinalIgnoreCase) && string.Equals(args[1], "plan", StringComparison.OrdinalIgnoreCase);
 
     public static async Task<int> HandleAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
+        if (args.Length > 1 && string.Equals(args[0], "memory", StringComparison.OrdinalIgnoreCase) && string.Equals(args[1], "plan", StringComparison.OrdinalIgnoreCase))
+            return await HandleMemoryPlanAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (args.Length < 2)
             return Usage(error, "plan requires a subcommand: memory-context, context, propose, review, or status.");
 
@@ -37,9 +41,84 @@ internal static class IronDevCliPlanning
             "propose" => await HandleProposeAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "review" => await HandleReviewAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "status" => HandleStatus(args, output, error),
-            "execute" or "apply" or "approve" or "promote-memory" or "continue" or "release" or "deploy" or "merge" => Usage(error, $"plan {args[1]} is intentionally unsupported; AK is planning evidence only."),
+            "execute" or "apply" or "rollback" or "approve" or "promote-memory" or "append-memory" or "continue" or "continue-workflow" or "release" or "deploy" or "merge" or "commit" or "push" or "pull-request" or "create-pr" => Usage(error, $"plan {args[1]} is intentionally unsupported; AK is planning evidence only."),
             _ => Usage(error, $"unsupported plan subcommand: {args[1]}")
         };
+    }
+
+    private static async Task<int> HandleMemoryPlanAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    {
+        var normalized = new[] { "plan", "memory-context" }.Concat(args.Skip(2)).ToArray();
+        var parsed = ParseTaskRunCommand(normalized);
+        if (parsed.Error is not null)
+            return Failure(output, error, parsed.Json, "memory plan", parsed.Error);
+
+        var runPath = ResolveRunPath(parsed.Run!);
+        Directory.CreateDirectory(runPath);
+        var taskSummary = await ReadTaskSummaryAsync(parsed.TaskPath!, cancellationToken).ConfigureAwait(false);
+        var projectId = parsed.ProjectId ?? "project-unknown";
+        var request = new AcceptedMemoryRetrievalRequest
+        {
+            RetrievalRequestId = $"mem_retrieval_req_{Guid.NewGuid():N}",
+            RunId = Path.GetFileName(runPath),
+            ProjectId = projectId,
+            TaskSummary = taskSummary,
+            RepoIdentity = parsed.RepoIdentity ?? "repo-unknown",
+            AllowedMemoryScopes = [MemoryScope.Project, MemoryScope.PortableEngineering, MemoryScope.Run],
+            RequestedBy = "IronDevCli",
+            RequestedAtUtc = DateTimeOffset.UtcNow,
+            MaxResults = parsed.MaxResults ?? 10,
+            Boundary = MemoryPlanningBoundary.ReadOnlyEvidence
+        };
+
+        var store = new AcceptedMemoryStore(parsed.MemoryRootPath ?? DefaultMemoryRoot());
+        var result = AcceptedMemoryRetriever.Retrieve(store, request);
+        var citations = MemoryCitationWriter.CreateBundle(result);
+        var citationValidation = MemoryCitationValidator.Validate(citations, store, projectId);
+        if (!citationValidation.IsValid)
+            return Failure(output, error, parsed.Json, "memory plan", "memory citations are invalid: " + string.Join(",", citationValidation.Issues));
+
+        var context = PlannerContextBuilder.Build(new PlannerContextBuildRequest
+        {
+            RunId = Path.GetFileName(runPath),
+            ProjectId = projectId,
+            TaskSummary = taskSummary,
+            CurrentGoal = taskSummary,
+            RepoIdentity = parsed.RepoIdentity ?? "repo-unknown",
+            BaseCommit = parsed.BaseCommit ?? "base-unknown",
+            Constraints = ["Memory is planning evidence only."],
+            RelevantFiles = parsed.RelevantFiles.ToArray()
+        }, result, citations);
+        var plan = MemoryInformedPlanProposalBuilder.Build(context, citations);
+        var risk = MemoryPlanReviewBuilder.BuildRiskReport(plan, context);
+        var testProfile = MemoryPlanReviewBuilder.BuildSuggestedTestProfile(plan);
+        var boundary = MemoryPlanReviewBuilder.BuildBoundaryReport(plan, citations);
+        var review = MemoryPlanReviewBuilder.Review(plan, citations);
+
+        await WriteMemoryContextArtifactsAsync(runPath, request, result, citations, cancellationToken).ConfigureAwait(false);
+        await WritePlannerContextArtifactsAsync(runPath, context, cancellationToken).ConfigureAwait(false);
+        await WritePlanArtifactsAsync(runPath, plan, risk, testProfile, boundary, cancellationToken).ConfigureAwait(false);
+        await WriteReviewArtifactsAsync(runPath, review, cancellationToken).ConfigureAwait(false);
+        RecordEvent(runPath, GovernanceKernelEventKind.AcceptedMemoryRetrievalRequested, request.RetrievalRequestId, "Accepted memory retrieval was requested for planning.", ["accepted-memory-retrieval-request.json"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.AcceptedMemoryRetrieved, result.RetrievalResultId, "Accepted memory was retrieved as planning evidence.", ["accepted-memory-retrieval.json", "memory-context.json"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.MemoryCitationBundleCreated, citations.MemoryCitationBundleId, "Memory citation bundle was created.", ["memory-citation-bundle.json", "memory-citations.json"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.PlannerContextBundleCreated, context.PlannerContextBundleId, "Planner context bundle was created from cited memory.", ["planner-context.json", "planner-context.md"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.MemoryInformedPlanProposed, plan.PlanProposalId, "Memory-informed plan was proposed as review evidence.", ["memory-informed-plan.json", "plan-proposal.md"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.PlanRiskReportCreated, risk.PlanRiskReportId, "Plan risk report was created.", ["plan-risk-report.json", "plan-risks.md"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.SuggestedTestProfileCreated, testProfile.SuggestedTestProfileId, "Suggested test profile was created.", ["suggested-test-profile.json"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.PlanningBoundaryReportCreated, boundary.PlanningBoundaryReportId, "Planning boundary report was created.", ["planning-boundary-report.json", "planner-boundary-report.md"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.KilljoyPlanReviewCreated, review.KilljoyPlanReviewId, "Killjoy plan review was created.", ["killjoy-plan-review.json", "killjoy-plan-review.md"]);
+
+        if (parsed.Json)
+            WriteJson(output, "memory plan", "succeeded", new { runPath, result, citations, context, plan, risk, testProfile, boundary, review }, []);
+        else
+        {
+            output.WriteLine($"Memory-informed plan: {plan.PlanProposalId}");
+            output.WriteLine($"Run path: {runPath}");
+            output.WriteLine("Boundary: memory can help the plan. Memory cannot approve, execute, promote, continue, mutate, release, deploy, or merge.");
+        }
+
+        return 0;
     }
 
     private static async Task<int> HandleMemoryContextAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
@@ -69,16 +148,10 @@ internal static class IronDevCliPlanning
         var result = AcceptedMemoryRetriever.Retrieve(store, request);
         var citations = MemoryCitationWriter.CreateBundle(result);
 
-        await WriteJsonAsync(runPath, "accepted-memory-retrieval-request.json", request, cancellationToken).ConfigureAwait(false);
-        await WriteJsonAsync(runPath, "accepted-memory-retrieval-result.json", result, cancellationToken).ConfigureAwait(false);
-        await WriteJsonAsync(runPath, "memory-context.json", result.Items, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(Path.Combine(runPath, "memory-context.md"), RenderMemoryContext(result), cancellationToken).ConfigureAwait(false);
-        foreach (var citation in citations.Citations)
-            await AppendJsonLineAsync(Path.Combine(runPath, "memory-citations.jsonl"), citation, cancellationToken).ConfigureAwait(false);
-        await WriteJsonAsync(runPath, "memory-citation-bundle.json", citations, cancellationToken).ConfigureAwait(false);
+        await WriteMemoryContextArtifactsAsync(runPath, request, result, citations, cancellationToken).ConfigureAwait(false);
         RecordEvent(runPath, GovernanceKernelEventKind.AcceptedMemoryRetrievalRequested, request.RetrievalRequestId, "Accepted memory retrieval was requested for planning.", ["accepted-memory-retrieval-request.json"]);
-        RecordEvent(runPath, GovernanceKernelEventKind.AcceptedMemoryRetrieved, result.RetrievalResultId, "Accepted memory was retrieved as planning evidence.", ["accepted-memory-retrieval-result.json", "memory-context.json"]);
-        RecordEvent(runPath, GovernanceKernelEventKind.MemoryCitationBundleCreated, citations.MemoryCitationBundleId, "Memory citation bundle was created.", ["memory-citation-bundle.json", "memory-citations.jsonl"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.AcceptedMemoryRetrieved, result.RetrievalResultId, "Accepted memory was retrieved as planning evidence.", ["accepted-memory-retrieval.json", "memory-context.json"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.MemoryCitationBundleCreated, citations.MemoryCitationBundleId, "Memory citation bundle was created.", ["memory-citation-bundle.json", "memory-citations.json"]);
 
         if (parsed.Json)
             WriteJson(output, "plan memory-context", "succeeded", new { runPath, result, citations }, []);
@@ -99,24 +172,32 @@ internal static class IronDevCliPlanning
             return Failure(output, error, parsed.Json, "plan context", parsed.Error);
 
         var runPath = ResolveRunPath(parsed.Run!);
-        var retrieval = ReadJson<AcceptedMemoryRetrievalResult>(Path.Combine(runPath, "accepted-memory-retrieval-result.json"));
+        var retrievalArtifact = ReadJson<AcceptedMemoryRetrievalResult>(Path.Combine(runPath, "accepted-memory-retrieval-result.json"));
         var citations = ReadJson<MemoryCitationBundle>(Path.Combine(runPath, "memory-citation-bundle.json"));
-        if (retrieval is null || citations is null)
+        if (retrievalArtifact is null || citations is null)
             return Failure(output, error, parsed.Json, "plan context", "memory context artifacts are missing; run 'irondev plan memory-context' first.");
 
         var taskSummary = await ReadTaskSummaryAsync(parsed.TaskPath!, cancellationToken).ConfigureAwait(false);
+        var projectId = parsed.ProjectId ?? "project-unknown";
+        var store = new AcceptedMemoryStore(parsed.MemoryRootPath ?? DefaultMemoryRoot());
+        var citationValidation = MemoryCitationValidator.Validate(citations, store, projectId);
+        if (!citationValidation.IsValid)
+            return Failure(output, error, parsed.Json, "plan context", "memory citations are invalid: " + string.Join(",", citationValidation.Issues));
+
         var context = PlannerContextBuilder.Build(new PlannerContextBuildRequest
         {
             RunId = Path.GetFileName(runPath),
+            ProjectId = projectId,
             TaskSummary = taskSummary,
+            CurrentGoal = taskSummary,
             RepoIdentity = parsed.RepoIdentity ?? "repo-unknown",
             BaseCommit = parsed.BaseCommit ?? "base-unknown",
+            Constraints = ["Memory is planning evidence only."],
             RelevantFiles = parsed.RelevantFiles.ToArray()
-        }, retrieval, citations);
+        }, store, citations);
 
-        await WriteJsonAsync(runPath, "planner-context-bundle.json", context, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(Path.Combine(runPath, "planner-context.md"), RenderPlannerContext(context), cancellationToken).ConfigureAwait(false);
-        RecordEvent(runPath, GovernanceKernelEventKind.PlannerContextBundleCreated, context.PlannerContextBundleId, "Planner context bundle was created from cited memory.", ["planner-context-bundle.json", "planner-context.md"]);
+        await WritePlannerContextArtifactsAsync(runPath, context, cancellationToken).ConfigureAwait(false);
+        RecordEvent(runPath, GovernanceKernelEventKind.PlannerContextBundleCreated, context.PlannerContextBundleId, "Planner context bundle was created from cited memory.", ["planner-context.json", "planner-context.md"]);
 
         if (parsed.Json)
             WriteJson(output, "plan context", "succeeded", new { runPath, context }, []);
@@ -146,16 +227,11 @@ internal static class IronDevCliPlanning
         var testProfile = MemoryPlanReviewBuilder.BuildSuggestedTestProfile(plan);
         var boundary = MemoryPlanReviewBuilder.BuildBoundaryReport(plan, citations);
 
-        await WriteJsonAsync(runPath, "plan-proposal.json", plan, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(Path.Combine(runPath, "plan-proposal.md"), RenderPlan(plan), cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(Path.Combine(runPath, "plan-risks.md"), RenderRiskReport(risk), cancellationToken).ConfigureAwait(false);
-        await WriteJsonAsync(runPath, "suggested-test-profile.json", testProfile, cancellationToken).ConfigureAwait(false);
-        await WriteJsonAsync(runPath, "planner-boundary-report.json", boundary, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(Path.Combine(runPath, "planner-boundary-report.md"), RenderBoundaryReport(boundary), cancellationToken).ConfigureAwait(false);
-        RecordEvent(runPath, GovernanceKernelEventKind.MemoryInformedPlanProposed, plan.PlanProposalId, "Memory-informed plan was proposed as review evidence.", ["plan-proposal.json", "plan-proposal.md"]);
-        RecordEvent(runPath, GovernanceKernelEventKind.PlanRiskReportCreated, risk.PlanRiskReportId, "Plan risk report was created.", ["plan-risks.md"]);
+        await WritePlanArtifactsAsync(runPath, plan, risk, testProfile, boundary, cancellationToken).ConfigureAwait(false);
+        RecordEvent(runPath, GovernanceKernelEventKind.MemoryInformedPlanProposed, plan.PlanProposalId, "Memory-informed plan was proposed as review evidence.", ["memory-informed-plan.json", "plan-proposal.md"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.PlanRiskReportCreated, risk.PlanRiskReportId, "Plan risk report was created.", ["plan-risk-report.json", "plan-risks.md"]);
         RecordEvent(runPath, GovernanceKernelEventKind.SuggestedTestProfileCreated, testProfile.SuggestedTestProfileId, "Suggested test profile was created.", ["suggested-test-profile.json"]);
-        RecordEvent(runPath, GovernanceKernelEventKind.PlanningBoundaryReportCreated, boundary.PlanningBoundaryReportId, "Planning boundary report was created.", ["planner-boundary-report.json", "planner-boundary-report.md"]);
+        RecordEvent(runPath, GovernanceKernelEventKind.PlanningBoundaryReportCreated, boundary.PlanningBoundaryReportId, "Planning boundary report was created.", ["planning-boundary-report.json", "planner-boundary-report.md"]);
 
         if (parsed.Json)
             WriteJson(output, "plan propose", "succeeded", new { runPath, plan, risk, testProfile, boundary }, []);
@@ -182,8 +258,7 @@ internal static class IronDevCliPlanning
             return Failure(output, error, parsed.Json, "plan review", "plan proposal artifacts are missing; run 'irondev plan propose' first.");
 
         var review = MemoryPlanReviewBuilder.Review(plan, citations);
-        await WriteJsonAsync(runPath, "killjoy-plan-review.json", review, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(Path.Combine(runPath, "killjoy-plan-review.md"), RenderKilljoyReview(review), cancellationToken).ConfigureAwait(false);
+        await WriteReviewArtifactsAsync(runPath, review, cancellationToken).ConfigureAwait(false);
         RecordEvent(runPath, GovernanceKernelEventKind.KilljoyPlanReviewCreated, review.KilljoyPlanReviewId, "Killjoy plan review was created.", ["killjoy-plan-review.json", "killjoy-plan-review.md"]);
 
         if (parsed.Json)
@@ -206,10 +281,16 @@ internal static class IronDevCliPlanning
         var runPath = ResolveRunPath(parsed.Run!);
         var artifacts = new[]
         {
+            "accepted-memory-retrieval.json",
             "accepted-memory-retrieval-result.json",
+            "memory-citations.json",
             "memory-citation-bundle.json",
+            "planner-context.json",
             "planner-context-bundle.json",
+            "memory-informed-plan.json",
             "plan-proposal.json",
+            "plan-risk-report.json",
+            "planning-boundary-report.json",
             "planner-boundary-report.json",
             "killjoy-plan-review.json",
             "governance-events.jsonl"
@@ -253,6 +334,9 @@ internal static class IronDevCliPlanning
                     break;
                 case "--project-id":
                     if (!TryRead(args, ref index, out projectId)) return ParsedTaskRunCommand.Fail(parsed.Json, "--project-id requires a value.");
+                    break;
+                case "--project":
+                    if (!TryRead(args, ref index, out projectId)) return ParsedTaskRunCommand.Fail(parsed.Json, "--project requires a value.");
                     break;
                 case "--memory-root":
                     if (!TryRead(args, ref index, out memoryRoot)) return ParsedTaskRunCommand.Fail(parsed.Json, "--memory-root requires a value.");
@@ -329,7 +413,7 @@ internal static class IronDevCliPlanning
         builder.AppendLine("Boundary: accepted memory is planning evidence only. It is not approval, execution, memory promotion, source apply, workflow continuation, release, merge, or deployment.");
         builder.AppendLine();
         foreach (var item in result.Items)
-            builder.AppendLine($"- `{item.MemoryId}` / `{item.MemoryVersionId}` / `{item.MemoryScope}`: {item.ContentSummary}");
+            builder.AppendLine($"- `{item.CitationRef}` / `{item.MemoryKind}` / `{item.MemoryScope}` / hash `{item.ContentHash}`: {item.SafeSummary}");
         foreach (var warning in result.Warnings)
             builder.AppendLine($"- Warning: `{warning}`");
         return builder.ToString();
@@ -341,10 +425,13 @@ internal static class IronDevCliPlanning
         builder.AppendLine("# Planner Context Bundle");
         builder.AppendLine();
         builder.AppendLine($"Run: `{context.RunId}`");
+        builder.AppendLine($"Project: `{context.ProjectId}`");
         builder.AppendLine($"Task: {context.TaskSummary}");
+        builder.AppendLine($"Goal: {context.CurrentGoal}");
         builder.AppendLine($"Memory citations: `{context.AcceptedMemoryRefs.Length}`");
+        builder.AppendLine($"Ignored memory: `{context.IgnoredMemory.Length}`");
         builder.AppendLine();
-        builder.AppendLine("Boundary: context is fuel. It is not the driver.");
+        builder.AppendLine($"Boundary: {context.ContextBoundary}");
         return builder.ToString();
     }
 
@@ -354,12 +441,16 @@ internal static class IronDevCliPlanning
         builder.AppendLine("# Memory-Informed Plan Proposal");
         builder.AppendLine();
         builder.AppendLine($"Plan: `{plan.PlanProposalId}`");
+        builder.AppendLine($"Project: `{plan.ProjectId}`");
+        builder.AppendLine($"Goal: {plan.Goal}");
         builder.AppendLine($"Status: `{plan.PlanStatus}`");
         builder.AppendLine();
         foreach (var step in plan.PlanSteps)
             builder.AppendLine($"- `{step.StepKind}`: {step.Description}");
+        foreach (var requirement in plan.EvidenceRequirements)
+            builder.AppendLine($"- Evidence required: {requirement}");
         builder.AppendLine();
-        builder.AppendLine("Boundary: a plan is a map, not motion.");
+        builder.AppendLine($"Boundary: {plan.NonAuthorityBoundary}");
         return builder.ToString();
     }
 
@@ -392,12 +483,55 @@ internal static class IronDevCliPlanning
         var builder = new StringBuilder();
         builder.AppendLine("# Killjoy Plan Review");
         builder.AppendLine();
+        builder.AppendLine($"Decision: `{review.Decision}`");
         builder.AppendLine($"Severity: `{review.Severity}`");
-        foreach (var finding in review.Findings)
-            builder.AppendLine($"- {finding}");
+        foreach (var finding in review.StructuredFindings)
+            builder.AppendLine($"- `{finding.Category}` / `{finding.Severity}`: {finding.Message} Fix: {finding.SuggestedFix}");
+        if (review.StructuredFindings.Length == 0)
+            foreach (var finding in review.Findings)
+                builder.AppendLine($"- {finding}");
         builder.AppendLine();
         builder.AppendLine("Boundary: Killjoy can complain. Killjoy cannot approve.");
         return builder.ToString();
+    }
+
+    private static async Task WriteMemoryContextArtifactsAsync(string runPath, AcceptedMemoryRetrievalRequest request, AcceptedMemoryRetrievalResult result, MemoryCitationBundle citations, CancellationToken cancellationToken)
+    {
+        await WriteJsonAsync(runPath, "accepted-memory-retrieval-request.json", request, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "accepted-memory-retrieval.json", result, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "accepted-memory-retrieval-result.json", result, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "memory-context.json", result.Items, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(runPath, "memory-context.md"), RenderMemoryContext(result), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "memory-citations.json", citations.Citations, cancellationToken).ConfigureAwait(false);
+        foreach (var citation in citations.Citations)
+            await AppendJsonLineAsync(Path.Combine(runPath, "memory-citations.jsonl"), citation, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "memory-citation-bundle.json", citations, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WritePlannerContextArtifactsAsync(string runPath, PlannerContextBundle context, CancellationToken cancellationToken)
+    {
+        await WriteJsonAsync(runPath, "planner-context.json", context, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "planner-context-bundle.json", context, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(runPath, "planner-context.md"), RenderPlannerContext(context), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WritePlanArtifactsAsync(string runPath, MemoryInformedPlanProposal plan, PlanRiskReport risk, SuggestedTestProfile testProfile, PlanningBoundaryReport boundary, CancellationToken cancellationToken)
+    {
+        await WriteJsonAsync(runPath, "memory-informed-plan.json", plan, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "plan-proposal.json", plan, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(runPath, "plan-proposal.md"), RenderPlan(plan), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "plan-risk-report.json", risk, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(runPath, "plan-risks.md"), RenderRiskReport(risk), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "suggested-test-profile.json", testProfile, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "planning-boundary-report.json", boundary, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(runPath, "planner-boundary-report.json", boundary, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(runPath, "planner-boundary-report.md"), RenderBoundaryReport(boundary), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WriteReviewArtifactsAsync(string runPath, KilljoyPlanReview review, CancellationToken cancellationToken)
+    {
+        await WriteJsonAsync(runPath, "killjoy-plan-review.json", review, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(runPath, "killjoy-plan-review.md"), RenderKilljoyReview(review), cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task WriteJsonAsync<T>(string runPath, string artifactName, T value, CancellationToken cancellationToken)
