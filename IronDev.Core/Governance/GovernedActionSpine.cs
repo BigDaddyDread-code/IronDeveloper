@@ -69,6 +69,7 @@ public enum GovernedActionKind
     ReleaseApproval,
     DeploymentApproval,
     MergeApproval,
+    DraftPullRequestCreation,
     TicketCreation,
     SchedulerRunCreation,
     AgentHandoffAuthorityClaim,
@@ -237,6 +238,7 @@ public static class GovernedActionClassifier
         GovernedActionKind.ReleaseApproval,
         GovernedActionKind.DeploymentApproval,
         GovernedActionKind.MergeApproval,
+        GovernedActionKind.DraftPullRequestCreation,
         GovernedActionKind.TicketCreation,
         GovernedActionKind.SchedulerRunCreation
     ];
@@ -351,6 +353,7 @@ public static class AuthorityActionInventory
         Authority(GovernedActionKind.ReleaseApproval, "Approve release."),
         Authority(GovernedActionKind.DeploymentApproval, "Approve deployment."),
         Authority(GovernedActionKind.MergeApproval, "Approve merge."),
+        DraftPullRequestAuthority(GovernedActionKind.DraftPullRequestCreation, "Create one controlled draft pull request from verified branch evidence."),
         Authority(GovernedActionKind.TicketCreation, "Create product work items through a governed future path."),
         Authority(GovernedActionKind.SchedulerRunCreation, "Create scheduled or background runs through a governed future path."),
         Forbidden(GovernedActionKind.AgentHandoffAuthorityClaim, "Agent handoff cannot transfer or claim authority."),
@@ -436,6 +439,22 @@ public static class AuthorityActionInventory
             RequiredPolicyKinds = ["HumanReview"],
             RequiredStores = ["PatchRunArtifacts", "RunScopedGovernanceEvent"],
             ForbiddenDirectPaths = ["GitCommit", "GitPush", "PullRequestCreation", "Merge", "Release", "Deploy", "WorkflowContinuation", "AgentSelfApproval"],
+            CurrentImplementationStatus = AuthorityActionImplementationStatus.FutureBlock
+        };
+
+    private static AuthorityActionInventoryEntry DraftPullRequestAuthority(GovernedActionKind actionKind, string description) =>
+        new()
+        {
+            ActionKind = actionKind,
+            Classification = GovernedActionClassification.AuthorityBearing,
+            Description = description,
+            AllowedInCurrentBlock = true,
+            RequiresConscience = true,
+            RequiresThoughtLedger = true,
+            RequiredEvidenceKinds = ["CommitPackage", "BranchHeadValidation", "PullRequestTextProposal", "ConscienceDecision", "ThoughtLedger", "DraftPullRequestReceipt"],
+            RequiredPolicyKinds = ["HumanReview"],
+            RequiredStores = ["PatchRunArtifacts", "GitHubPullRequest"],
+            ForbiddenDirectPaths = ["GitCommit", "GitPush", "BranchCreation", "ReadyForReview", "RequestReviewers", "Merge", "Release", "Deploy", "WorkflowContinuation", "AgentSelfApproval"],
             CurrentImplementationStatus = AuthorityActionImplementationStatus.FutureBlock
         };
 

@@ -614,7 +614,14 @@ public enum GovernanceKernelEventKind
     CommitMessageProposalCreated,
     CommitReadinessReviewCreated,
     CommitPackageBoundaryReportCreated,
-    CommitPackageBypassReportCreated
+    CommitPackageBypassReportCreated,
+    PullRequestCreationRequestCreated,
+    PullRequestBranchValidationCreated,
+    PullRequestEvidenceValidationCreated,
+    PullRequestTextProposalCreated,
+    PullRequestCreationGateCreated,
+    DraftPullRequestCreated,
+    PullRequestCreationBypassReportCreated
 }
 
 public sealed record GovernedActionKernelEvent
