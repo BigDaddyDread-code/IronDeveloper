@@ -5,7 +5,7 @@ using IronDev.Core.Validation;
 
 namespace IronDev.Cli;
 
-internal static class IronDevCliReadyForReview
+internal static partial class IronDevCliReadyForReview
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -16,8 +16,10 @@ internal static class IronDevCliReadyForReview
     private static readonly string[] ForbiddenSubcommands =
     [
         "mark-ready",
+        "execute-request-reviewers",
         "request-reviewers",
         "approve",
+        "review",
         "resolve-comments",
         "merge",
         "auto-merge",
@@ -36,7 +38,7 @@ internal static class IronDevCliReadyForReview
     public static async Task<int> HandleAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         if (args.Length < 2)
-            return Usage(error, "ready requires a subcommand: package, inspect, status, or records.");
+            return Usage(error, "ready requires a subcommand: package, inspect, status, records, execute, execution-status, or execution-records.");
 
         var subcommand = args[1].ToLowerInvariant();
         if (ForbiddenSubcommands.Contains(subcommand, StringComparer.OrdinalIgnoreCase))
@@ -45,9 +47,12 @@ internal static class IronDevCliReadyForReview
         return subcommand switch
         {
             "package" => await HandlePackageAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "execute" => await HandleExecuteAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "inspect" => HandleRead(args, output, error, "inspect"),
             "status" => HandleRead(args, output, error, "status"),
             "records" => HandleRead(args, output, error, "records"),
+            "execution-status" => HandleExecutionRead(args, output, error, "execution-status"),
+            "execution-records" => HandleExecutionRead(args, output, error, "execution-records"),
             _ => Usage(error, $"unsupported ready subcommand: {args[1]}")
         };
     }
@@ -357,6 +362,9 @@ internal static class IronDevCliReadyForReview
         error.WriteLine("  irondev ready inspect --package <ready-package.json> [--json]");
         error.WriteLine("  irondev ready status --package <ready-package.json> [--json]");
         error.WriteLine("  irondev ready records --package <ready-package.json> [--json]");
+        error.WriteLine("  irondev ready execute --package <ready-for-review-package.json> --repo <owner/name> --pr <number> --observed-head <sha> --out <path> [--json]");
+        error.WriteLine("  irondev ready execution-status --receipt <ready-for-review-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev ready execution-records --receipt <ready-for-review-execution-receipt.json> [--json]");
         return 2;
     }
 
@@ -411,4 +419,5 @@ internal static class IronDevCliReadyForReview
     {
         public static ParsedRead Fail(bool json, string error) => new(null, json, error);
     }
+
 }
