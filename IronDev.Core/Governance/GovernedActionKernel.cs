@@ -628,7 +628,13 @@ public enum GovernanceKernelEventKind
     FeedbackClassificationReportCreated,
     FeedbackRemediationPlanCreated,
     FeedbackReadinessReportCreated,
-    FeedbackLoopBypassReportCreated
+    FeedbackLoopBypassReportCreated,
+    MergeReleaseSeparationRequestCreated,
+    MergeReadinessEvidencePackageCreated,
+    ReleaseReadinessEvidencePackageCreated,
+    MergeReleaseBoundaryMapCreated,
+    MergeReleaseSeparationRecordsCreated,
+    MergeReleaseBypassReportCreated
 }
 
 public sealed record GovernedActionKernelEvent
