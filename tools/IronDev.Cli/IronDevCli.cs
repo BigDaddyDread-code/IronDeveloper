@@ -242,6 +242,9 @@ public static class IronDevCli
         if (IronDevCliMergeDecisionPackage.IsMergeDecisionCommand(args))
             return await IronDevCliMergeDecisionPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliReleaseCandidatePackage.IsReleaseCandidateCommand(args))
+            return await IronDevCliReleaseCandidatePackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3010,6 +3013,10 @@ public static class IronDevCli
         error.WriteLine("  irondev merge-decision inspect --package <merge-decision-package.json> [--json]");
         error.WriteLine("  irondev merge-decision status --package <merge-decision-package.json> [--json]");
         error.WriteLine("  irondev merge-decision records --package <merge-decision-package.json> [--json]");
+        error.WriteLine("  irondev release-candidate package --merge-receipt <merge-execution-receipt.json> --repo <owner/name> --source-branch <main|release-branch> --candidate-commit <sha> --observed-source-head <sha> --version <version> --tag <tag-name> --channel <internal|preview|release-candidate|stable|hotfix> --validation <validation-run-receipt.json> --release-notes <release-notes.json> --decision approved-for-release-executor --decision-by <github-login> --decision-rationale <text> --created-by <github-login> --out <path> [--json]");
+        error.WriteLine("  irondev release-candidate inspect --package <release-candidate-package.json> [--json]");
+        error.WriteLine("  irondev release-candidate status --package <release-candidate-package.json> [--json]");
+        error.WriteLine("  irondev release-candidate records --package <release-candidate-package.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
