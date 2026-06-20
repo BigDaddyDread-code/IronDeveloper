@@ -648,7 +648,8 @@ public enum GovernanceKernelEventKind
     ReleaseCandidatePackageCreated,
     ReleaseReadinessDecisionPackageCreated,
     ReleaseExecuted,
-    DeploymentReadinessSeparationPackageCreated
+    DeploymentReadinessSeparationPackageCreated,
+    DeploymentReadinessDecisionPackageCreated
 }
 
 public sealed record GovernedActionKernelEvent
