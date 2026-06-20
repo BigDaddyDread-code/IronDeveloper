@@ -642,7 +642,8 @@ public enum GovernanceKernelEventKind
     ReadyForReviewPackageCreated,
     ReadyForReviewExecuted,
     ReviewerRequestPackageCreated,
-    ReviewerRequestExecuted
+    ReviewerRequestExecuted,
+    MergeDecisionPackageCreated
 }
 
 public sealed record GovernedActionKernelEvent
