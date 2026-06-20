@@ -651,7 +651,8 @@ public enum GovernanceKernelEventKind
     DeploymentReadinessSeparationPackageCreated,
     DeploymentReadinessDecisionPackageCreated,
     DeploymentExecuted,
-    PostDeployVerificationPackageCreated
+    PostDeployVerificationPackageCreated,
+    TaskSwitchBoundaryCampaignCompleted
 }
 
 public sealed record GovernedActionKernelEvent
