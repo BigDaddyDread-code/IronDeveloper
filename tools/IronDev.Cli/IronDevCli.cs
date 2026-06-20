@@ -263,6 +263,9 @@ public static class IronDevCli
         if (IronDevCliPostDeployVerification.IsPostDeployVerificationCommand(args))
             return await IronDevCliPostDeployVerification.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliTaskSwitchBoundaryCampaign.IsTaskSwitchBoundaryCampaignCommand(args))
+            return await IronDevCliTaskSwitchBoundaryCampaign.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3055,6 +3058,11 @@ public static class IronDevCli
         error.WriteLine("  irondev post-deploy-verification inspect --package <post-deploy-verification-package.json> [--json]");
         error.WriteLine("  irondev post-deploy-verification status --package <post-deploy-verification-package.json> [--json]");
         error.WriteLine("  irondev post-deploy-verification records --package <post-deploy-verification-package.json> [--json]");
+        error.WriteLine("  irondev task-switch-boundary-campaign run --campaign-id <campaign-id> --scenario-set <default|phase5|full> --out <path> [--json]");
+        error.WriteLine("  irondev task-switch-boundary-campaign inspect --campaign <campaign-output-dir> [--json]");
+        error.WriteLine("  irondev task-switch-boundary-campaign summary --campaign <campaign-output-dir> [--json]");
+        error.WriteLine("  irondev task-switch-boundary-campaign failures --campaign <campaign-output-dir> [--json]");
+        error.WriteLine("  irondev task-switch-boundary-campaign friction --campaign <campaign-output-dir> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
