@@ -45,6 +45,8 @@ CanMutateWorkspace = false
 
 BA requires an eligible AZ release candidate package, current release source state, current tag/release state, final release validation evidence from executed result lanes, valid artifact readiness evidence or an explicit artifact-not-required reason, an explicit release readiness decision, and a valid release channel.
 
+The explicit release readiness decision must be made after the AZ package, current release source observation, current tag/release observation, final validation completion, and artifact readiness evidence creation. A premature decision is stale evidence.
+
 Result lane evidence proves validation execution. Required lane names only declare intent.
 
 Packaging or regression validation lanes may be marked not applicable only with an explicit non-empty reason. A not-applicable lane without a reason does not satisfy required final release validation.
