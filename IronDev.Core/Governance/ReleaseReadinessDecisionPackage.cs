@@ -766,6 +766,36 @@ public static class ReleaseReadinessDecisionPackageBuilder
             blocked.Add(ReleaseReadinessDecisionPackageBlockReason.ReleaseReadinessDecisionStale);
             issues.Add("ReleaseReadinessDecisionArtifactManifestStale");
         }
+
+        if (DecisionPredatesCurrentEvidence(input, decision.DecisionMadeAtUtc))
+        {
+            blocked.Add(ReleaseReadinessDecisionPackageBlockReason.ReleaseReadinessDecisionStale);
+            issues.Add("ReleaseReadinessDecisionPredatesCurrentEvidence");
+        }
+    }
+
+    private static bool DecisionPredatesCurrentEvidence(
+        ReleaseReadinessDecisionPackageInput input,
+        DateTimeOffset decisionMadeAtUtc)
+    {
+        if (input.ReleaseCandidatePackage is not null &&
+            decisionMadeAtUtc < input.ReleaseCandidatePackage.CreatedAtUtc)
+            return true;
+
+        if (input.CurrentReleaseSourceState is not null &&
+            decisionMadeAtUtc < input.CurrentReleaseSourceState.ObservedAtUtc)
+            return true;
+
+        if (input.CurrentTagReleaseState is not null &&
+            decisionMadeAtUtc < input.CurrentTagReleaseState.ObservedAtUtc)
+            return true;
+
+        if (input.FinalReleaseValidationEvidence?.FinishedAtUtc is DateTimeOffset validationFinished &&
+            decisionMadeAtUtc < validationFinished)
+            return true;
+
+        return input.ReleaseArtifactReadinessEvidence is not null &&
+            decisionMadeAtUtc < input.ReleaseArtifactReadinessEvidence.CreatedAtUtc;
     }
 
     private static string? ValidateReleaseChannel(

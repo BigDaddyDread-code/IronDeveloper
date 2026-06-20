@@ -223,6 +223,34 @@ public sealed class BlockBAReleaseReadinessDecisionPackageTests
     }
 
     [TestMethod]
+    public void BlockBA_Package_BlocksDecisionMadeBeforeFinalReadinessEvidence()
+    {
+        var input = CreateInput();
+        var releaseCandidate = input.ReleaseCandidatePackage!;
+        var sourceState = input.CurrentReleaseSourceState!;
+        var tagState = input.CurrentTagReleaseState!;
+        var validation = input.FinalReleaseValidationEvidence!;
+        var artifact = input.ReleaseArtifactReadinessEvidence!;
+        var cases = new (string Name, ReleaseReadinessDecisionEvidence Decision)[]
+        {
+            ("before-az-package", CreateDecision() with { DecisionMadeAtUtc = releaseCandidate.CreatedAtUtc.AddTicks(-1) }),
+            ("before-source-observation", CreateDecision() with { DecisionMadeAtUtc = sourceState.ObservedAtUtc.AddTicks(-1) }),
+            ("before-tag-release-observation", CreateDecision() with { DecisionMadeAtUtc = tagState.ObservedAtUtc.AddTicks(-1) }),
+            ("before-final-validation", CreateDecision() with { DecisionMadeAtUtc = validation.FinishedAtUtc!.Value.AddTicks(-1) }),
+            ("before-artifact-readiness", CreateDecision() with { DecisionMadeAtUtc = artifact.CreatedAtUtc.AddTicks(-1) })
+        };
+
+        foreach (var item in cases)
+        {
+            var package = ReleaseReadinessDecisionPackageBuilder.Build(input with { ReleaseReadinessDecision = item.Decision }).Package;
+
+            Assert.IsFalse(package.CanReleaseForExecutor, item.Name);
+            CollectionAssert.Contains(package.BlockReasons, ReleaseReadinessDecisionPackageBlockReason.ReleaseReadinessDecisionStale, item.Name);
+            Assert.IsTrue(package.PackageIssues.Any(issue => issue.Contains("ReleaseReadinessDecisionPredatesCurrentEvidence", StringComparison.OrdinalIgnoreCase)), item.Name);
+        }
+    }
+
+    [TestMethod]
     public void BlockBA_Boundary_RemainsEvidenceOnly()
     {
         var package = ReleaseReadinessDecisionPackageBuilder.Build(CreateInput()).Package;
@@ -257,6 +285,7 @@ public sealed class BlockBAReleaseReadinessDecisionPackageTests
         Assert.IsFalse(cli.Contains("kubectl", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(cli.Contains("az webapp", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(cli.Contains("terraform apply", StringComparison.OrdinalIgnoreCase));
+        StringAssert.Contains(cli, "PackageReadyForReleaseExecutor ? 0 : 1");
 
         var receipt = File.ReadAllText(Path.Combine(root, "Docs", "receipts", "BA_RELEASE_READINESS_DECISION_PACKAGE.md"));
         StringAssert.Contains(receipt, "Release candidate package is not release readiness decision.");

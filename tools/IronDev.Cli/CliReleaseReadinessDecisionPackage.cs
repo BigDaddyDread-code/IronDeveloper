@@ -126,7 +126,7 @@ internal static class IronDevCliReleaseReadinessDecisionPackage
             output.WriteLine("Boundary: package evidence does not tag, release, publish, deploy, promote memory, or continue workflow.");
         }
 
-        return artifacts.Package.PackageVerdict is ReleaseReadinessDecisionPackageVerdict.PackageBlocked or ReleaseReadinessDecisionPackageVerdict.PackageRejected ? 1 : 0;
+        return artifacts.Package.PackageVerdict == ReleaseReadinessDecisionPackageVerdict.PackageReadyForReleaseExecutor ? 0 : 1;
     }
 
     private static int HandleRead(string[] args, TextWriter output, TextWriter error, string mode)
