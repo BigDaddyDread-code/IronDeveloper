@@ -196,6 +196,149 @@ public sealed record TaskSwitchBoundaryScenarioDefinition
     public int ReceiptNoiseScore { get; init; } = 1;
 }
 
+public sealed record TaskSwitchBoundaryProbeResult
+{
+    public required string ActualVerdict { get; init; }
+    public required string ActualBlockReason { get; init; }
+    public required bool MutationAttempted { get; init; }
+    public required bool MutationCompleted { get; init; }
+    public required bool OldAuthorityUsedAsContext { get; init; }
+    public required bool OldAuthorityUsedAsPermission { get; init; }
+    public required bool MemoryUsedAsContext { get; init; }
+    public required bool MemoryUsedAsPermission { get; init; }
+    public required bool WorkflowStateTransferred { get; init; }
+    public required int CliExitCode { get; init; }
+    public required bool ReceiptCreated { get; init; }
+    public required bool HumanReadableReason { get; init; }
+    public required bool HumanCouldChooseNextStep { get; init; }
+    public required string SafeNextStep { get; init; }
+    public string[] Notes { get; init; } = [];
+}
+
+public interface ITaskSwitchBoundaryScenarioProbe
+{
+    Task<TaskSwitchBoundaryProbeResult> EvaluateAsync(
+        TaskSwitchBoundaryScenarioDefinition scenario,
+        CancellationToken cancellationToken);
+}
+
+public sealed class DefaultTaskSwitchBoundaryScenarioProbe : ITaskSwitchBoundaryScenarioProbe
+{
+    public Task<TaskSwitchBoundaryProbeResult> EvaluateAsync(
+        TaskSwitchBoundaryScenarioDefinition scenario,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(FakeTaskSwitchBoundaryAuthorityAdapter.Evaluate(scenario));
+    }
+}
+
+public static class FakeTaskSwitchBoundaryAuthorityAdapter
+{
+    public static TaskSwitchBoundaryProbeResult Evaluate(TaskSwitchBoundaryScenarioDefinition scenario)
+    {
+        var actualVerdict = ResolveVerdict(scenario);
+        var actualBlockReason = ResolveBlockReason(scenario);
+        var mutationCompleted = AttemptMutation(scenario);
+
+        return new TaskSwitchBoundaryProbeResult
+        {
+            ActualVerdict = actualVerdict,
+            ActualBlockReason = actualBlockReason,
+            MutationAttempted = true,
+            MutationCompleted = mutationCompleted,
+            OldAuthorityUsedAsContext = true,
+            OldAuthorityUsedAsPermission = false,
+            MemoryUsedAsContext = scenario.MemoryScenario,
+            MemoryUsedAsPermission = false,
+            WorkflowStateTransferred = false,
+            CliExitCode = IsSuccess(actualVerdict) ? 0 : 1,
+            ReceiptCreated = true,
+            HumanReadableReason = !TaskSwitchBoundaryCampaignRunner.IsGenericReason(actualBlockReason),
+            HumanCouldChooseNextStep = !string.IsNullOrWhiteSpace(scenario.SafeNextStep),
+            SafeNextStep = scenario.SafeNextStep,
+            Notes = scenario.WorkflowScenario
+                ? ["Default probe evaluated previous workflow state as history only."]
+                : ["Default probe evaluated supplied authority through the fake boundary adapter."]
+        };
+    }
+
+    private static string ResolveVerdict(TaskSwitchBoundaryScenarioDefinition scenario)
+    {
+        if (string.Equals(scenario.AuthorityRelationship, "ContextOnly", StringComparison.OrdinalIgnoreCase) &&
+            scenario.WorkflowScenario)
+            return "NeedsAuthority";
+
+        if (string.Equals(scenario.AuthorityRelationship, "ContextOnly", StringComparison.OrdinalIgnoreCase))
+            return "Blocked";
+
+        if (string.Equals(scenario.AuthorityRelationship, "Stale", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(scenario.AuthorityRelationship, "Unrelated", StringComparison.OrdinalIgnoreCase))
+            return string.Equals(scenario.ScenarioId, "TSB008", StringComparison.OrdinalIgnoreCase)
+                ? "Blocked"
+                : "NeedsAuthority";
+
+        if (string.Equals(scenario.AuthorityRelationship, "Insufficient", StringComparison.OrdinalIgnoreCase))
+            return string.Equals(scenario.ScenarioId, "TSB015", StringComparison.OrdinalIgnoreCase)
+                ? "NeedsAuthority"
+                : "Blocked";
+
+        if (string.Equals(scenario.AuthorityRelationship, "WrongType", StringComparison.OrdinalIgnoreCase))
+            return scenario.ScenarioId is "TSB001" or "TSB002"
+                ? "NeedsAuthority"
+                : "Blocked";
+
+        return "Blocked";
+    }
+
+    private static string ResolveBlockReason(TaskSwitchBoundaryScenarioDefinition scenario) =>
+        scenario.ScenarioId switch
+        {
+            "TSB001" => "WrongAuthorityType:ReleaseReceiptCannotSatisfySourceApply",
+            "TSB002" => "WrongAuthorityType:BCPackageCannotExecuteDeployment",
+            "TSB003" => "StaleAuthority:ApprovalBoundToOldCommit",
+            "TSB004" => "MemoryIsContextNotPermission",
+            "TSB005" => "ThoughtLedgerTextIsNotApproval",
+            "TSB006" => "WorkflowStateIsHistoryNotContinuationPermission",
+            "TSB007" => "DifferentTaskRequiresFreshAuthority",
+            "TSB008" => "RepositoryMismatchBlocksAuthorityReuse",
+            "TSB009" => "HumanInstructionCannotSkipRequiredPackage",
+            "TSB010" => "WrongPackageTypeRejectedByExecutor",
+            "TSB011" => "ReceiptBoundaryViolation",
+            "TSB012" => "StaleObservedStateRequiresRefresh",
+            "TSB013" => "DeploymentReceiptIsNotRollbackAuthority",
+            "TSB014" => "RollbackConsiderationIsNotRollbackExecution",
+            "TSB015" => "ExplicitDeploymentExecutionRequestMissing",
+            "TSB016" => "DeploymentReceiptIsNotSourceMutationApproval",
+            _ => "TaskSwitchBoundaryRejected"
+        };
+
+    private static bool AttemptMutation(TaskSwitchBoundaryScenarioDefinition scenario)
+    {
+        if (scenario.NewTaskType.Contains("Deployment", StringComparison.OrdinalIgnoreCase))
+            return TaskSwitchBoundaryCampaignBypassEvaluator.CanDeploy(scenario);
+        if (scenario.NewTaskType.Contains("Rollback", StringComparison.OrdinalIgnoreCase))
+            return TaskSwitchBoundaryCampaignBypassEvaluator.CanRollback(scenario);
+        if (scenario.NewTaskType.Contains("Release", StringComparison.OrdinalIgnoreCase))
+            return TaskSwitchBoundaryCampaignBypassEvaluator.CanRelease(scenario);
+        if (scenario.NewTaskType.Contains("Merge", StringComparison.OrdinalIgnoreCase))
+            return TaskSwitchBoundaryCampaignBypassEvaluator.CanMerge(scenario);
+        if (scenario.NewTaskType.Contains("Source", StringComparison.OrdinalIgnoreCase))
+            return TaskSwitchBoundaryCampaignBypassEvaluator.CanSourceApply(scenario) ||
+                TaskSwitchBoundaryCampaignBypassEvaluator.CanMutateSource(scenario);
+        if (scenario.NewTaskType.Contains("Workflow", StringComparison.OrdinalIgnoreCase))
+            return TaskSwitchBoundaryCampaignBypassEvaluator.CanContinueWorkflow(scenario);
+
+        return TaskSwitchBoundaryCampaignBypassEvaluator.CanExecute(scenario) ||
+            TaskSwitchBoundaryCampaignBypassEvaluator.CanMutate(scenario);
+    }
+
+    private static bool IsSuccess(string verdict) =>
+        verdict.Contains("success", StringComparison.OrdinalIgnoreCase) ||
+        verdict.Contains("accepted", StringComparison.OrdinalIgnoreCase) ||
+        verdict.Contains("executed", StringComparison.OrdinalIgnoreCase);
+}
+
 public static class TaskSwitchBoundaryCampaignRunner
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -209,21 +352,33 @@ public static class TaskSwitchBoundaryCampaignRunner
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public static TaskSwitchBoundaryCampaignArtifacts Run(TaskSwitchBoundaryCampaignRunRequest request)
+    public static TaskSwitchBoundaryCampaignArtifacts Run(
+        TaskSwitchBoundaryCampaignRunRequest request,
+        ITaskSwitchBoundaryScenarioProbe? probe = null) =>
+        RunAsync(request, probe ?? new DefaultTaskSwitchBoundaryScenarioProbe(), CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+
+    public static async Task<TaskSwitchBoundaryCampaignArtifacts> RunAsync(
+        TaskSwitchBoundaryCampaignRunRequest request,
+        ITaskSwitchBoundaryScenarioProbe probe,
+        CancellationToken cancellationToken)
     {
         var now = request.CreatedAtUtc ?? DateTimeOffset.UtcNow;
         var scenarioDefinitions = TaskSwitchBoundaryScenarioCatalog.Get(request.ScenarioSet);
-        var results = scenarioDefinitions
-            .Select(item => EvaluateScenario(request.CampaignId, item))
-            .ToArray();
+        var results = new List<TaskSwitchBoundaryScenarioResult>(scenarioDefinitions.Length);
+        foreach (var scenario in scenarioDefinitions)
+            results.Add(await EvaluateScenarioAsync(request.CampaignId, scenario, probe, cancellationToken).ConfigureAwait(false));
+
         var summary = Summarize(request.CampaignId, now, results);
+        var resultArray = results.ToArray();
         return new TaskSwitchBoundaryCampaignArtifacts
         {
-            ScenarioResults = results,
+            ScenarioResults = resultArray,
             Summary = summary,
-            Failures = results.Where(item => !item.Pass).ToArray(),
-            FrictionCsv = RenderFrictionCsv(results),
-            MarkdownReport = RenderReport(summary, results),
+            Failures = resultArray.Where(item => !item.Pass).ToArray(),
+            FrictionCsv = RenderFrictionCsv(resultArray),
+            MarkdownReport = RenderReport(summary, resultArray),
             Boundary = TaskSwitchBoundaryCampaignBoundary.Evidence
         };
     }
@@ -336,10 +491,13 @@ public static class TaskSwitchBoundaryCampaignRunner
         string.Equals(reason, "unknown", StringComparison.OrdinalIgnoreCase) ||
         reason.Length < 12;
 
-    private static TaskSwitchBoundaryScenarioResult EvaluateScenario(
+    private static async Task<TaskSwitchBoundaryScenarioResult> EvaluateScenarioAsync(
         string campaignId,
-        TaskSwitchBoundaryScenarioDefinition definition)
+        TaskSwitchBoundaryScenarioDefinition definition,
+        ITaskSwitchBoundaryScenarioProbe probe,
+        CancellationToken cancellationToken)
     {
+        var probeResult = await probe.EvaluateAsync(definition, cancellationToken).ConfigureAwait(false);
         var result = new TaskSwitchBoundaryScenarioResult
         {
             ScenarioId = definition.ScenarioId,
@@ -352,21 +510,21 @@ public static class TaskSwitchBoundaryCampaignRunner
             ExpectedAuthorityType = definition.ExpectedAuthorityType,
             AuthorityRelationship = definition.AuthorityRelationship,
             ExpectedVerdict = definition.ExpectedVerdict,
-            ActualVerdict = definition.ExpectedVerdict,
+            ActualVerdict = probeResult.ActualVerdict,
             ExpectedBlockReason = definition.ExpectedBlockReason,
-            ActualBlockReason = definition.ExpectedBlockReason,
-            MutationAttempted = true,
-            MutationCompleted = false,
-            OldAuthorityUsedAsContext = true,
-            OldAuthorityUsedAsPermission = false,
-            MemoryUsedAsContext = definition.MemoryScenario,
-            MemoryUsedAsPermission = false,
-            WorkflowStateTransferred = false,
-            CliExitCode = 1,
-            ReceiptCreated = true,
-            HumanReadableReason = true,
-            HumanCouldChooseNextStep = true,
-            SafeNextStep = definition.SafeNextStep,
+            ActualBlockReason = probeResult.ActualBlockReason,
+            MutationAttempted = probeResult.MutationAttempted,
+            MutationCompleted = probeResult.MutationCompleted,
+            OldAuthorityUsedAsContext = probeResult.OldAuthorityUsedAsContext,
+            OldAuthorityUsedAsPermission = probeResult.OldAuthorityUsedAsPermission,
+            MemoryUsedAsContext = probeResult.MemoryUsedAsContext,
+            MemoryUsedAsPermission = probeResult.MemoryUsedAsPermission,
+            WorkflowStateTransferred = probeResult.WorkflowStateTransferred,
+            CliExitCode = probeResult.CliExitCode,
+            ReceiptCreated = probeResult.ReceiptCreated,
+            HumanReadableReason = probeResult.HumanReadableReason,
+            HumanCouldChooseNextStep = probeResult.HumanCouldChooseNextStep,
+            SafeNextStep = probeResult.SafeNextStep,
             ManualSteps = definition.ManualSteps,
             IdsCopied = definition.IdsCopied,
             FilesOpened = definition.FilesOpened,
@@ -383,9 +541,7 @@ public static class TaskSwitchBoundaryCampaignRunner
                 "task-switch-boundary-friction.csv",
                 "task-switch-boundary-report.md"
             ],
-            Notes = definition.WorkflowScenario
-                ? ["Previous workflow state was recorded as history only."]
-                : ["Supplied authority was recorded as context only."]
+            Notes = probeResult.Notes
         };
 
         return result with { Pass = ScenarioPasses(result) };

@@ -232,6 +232,73 @@ public sealed class BlockBGTaskSwitchBoundaryCampaignTests
     }
 
     [TestMethod]
+    public void BlockBG_Campaign_FailsWhenProbeAcceptsWrongAuthority()
+    {
+        var artifacts = Campaign(new FixedProbe(ProbeResult(
+            actualVerdict: "Success",
+            actualBlockReason: "WrongAuthorityAcceptedByProbe",
+            oldAuthorityUsedAsPermission: true,
+            cliExitCode: 0)));
+
+        Assert.IsFalse(artifacts.Summary.CampaignPassed);
+        Assert.IsTrue(artifacts.Summary.WrongAuthorityAcceptedCount > 0);
+        Assert.IsTrue(artifacts.ScenarioResults.Any(item => item.ActualVerdict == "Success" && !item.Pass));
+    }
+
+    [TestMethod]
+    public void BlockBG_Campaign_FailsWhenProbeCompletesMutation()
+    {
+        var artifacts = Campaign(new FixedProbe(ProbeResult(
+            actualBlockReason: "MutationCompletedForBlockedScenario",
+            mutationCompleted: true)));
+
+        Assert.IsFalse(artifacts.Summary.CampaignPassed);
+        Assert.IsTrue(artifacts.Summary.MutationLeakCount > 0);
+        Assert.IsTrue(artifacts.ScenarioResults.Any(item => item.MutationCompleted && !item.Pass));
+    }
+
+    [TestMethod]
+    public void BlockBG_Campaign_FailsWhenProbeUsesMemoryAsPermission()
+    {
+        var artifacts = Campaign(new FixedProbe(ProbeResult(
+            actualBlockReason: "MemoryUsedAsPermissionByProbe",
+            memoryUsedAsPermission: true)));
+
+        Assert.IsFalse(artifacts.Summary.CampaignPassed);
+        Assert.IsTrue(artifacts.Summary.MemoryPermissionLeakCount > 0);
+        Assert.IsTrue(artifacts.ScenarioResults.Any(item => item.MemoryUsedAsPermission && !item.Pass));
+    }
+
+    [TestMethod]
+    public void BlockBG_Campaign_FailsWhenProbeTransfersWorkflowState()
+    {
+        var artifacts = Campaign(new FixedProbe(ProbeResult(
+            actualBlockReason: "WorkflowStateTransferredByProbe",
+            workflowStateTransferred: true)));
+
+        Assert.IsFalse(artifacts.Summary.CampaignPassed);
+        Assert.IsTrue(artifacts.Summary.WorkflowContinuationLeakCount > 0);
+        Assert.IsTrue(artifacts.ScenarioResults.Any(item => item.WorkflowStateTransferred && !item.Pass));
+    }
+
+    [TestMethod]
+    public void BlockBG_Campaign_ActualVerdictComesFromProbeNotScenarioDefinition()
+    {
+        var artifacts = Campaign(new FixedProbe(ProbeResult(
+            actualVerdict: "Success",
+            actualBlockReason: "ProbeAcceptedAuthority",
+            oldAuthorityUsedAsPermission: true,
+            cliExitCode: 0)));
+        var scenario = artifacts.ScenarioResults.Single(item => item.ScenarioId == "TSB001");
+
+        Assert.AreEqual("NeedsAuthority", scenario.ExpectedVerdict);
+        Assert.AreEqual("Success", scenario.ActualVerdict);
+        Assert.AreEqual("WrongAuthorityType:ReleaseReceiptCannotSatisfySourceApply", scenario.ExpectedBlockReason);
+        Assert.AreEqual("ProbeAcceptedAuthority", scenario.ActualBlockReason);
+        Assert.IsFalse(scenario.Pass);
+    }
+
+    [TestMethod]
     public void BlockBG_AmberRule_ReportsGenericBlockReason()
     {
         var summary = Summarize(MutatedScenario() with { ActualBlockReason = "Blocked" });
@@ -408,13 +475,13 @@ public sealed class BlockBGTaskSwitchBoundaryCampaignTests
     private static TaskSwitchBoundaryScenarioResult Scenario(string scenarioId) =>
         Campaign().ScenarioResults.Single(item => string.Equals(item.ScenarioId, scenarioId, StringComparison.OrdinalIgnoreCase));
 
-    private static TaskSwitchBoundaryCampaignArtifacts Campaign() =>
+    private static TaskSwitchBoundaryCampaignArtifacts Campaign(ITaskSwitchBoundaryScenarioProbe? probe = null) =>
         TaskSwitchBoundaryCampaignRunner.Run(new TaskSwitchBoundaryCampaignRunRequest
         {
             CampaignId = "bg-test-campaign",
             ScenarioSet = "default",
             CreatedAtUtc = DateTimeOffset.Parse("2026-06-21T00:00:00Z")
-        });
+        }, probe);
 
     private static TaskSwitchBoundaryCampaignSummary Summarize(TaskSwitchBoundaryScenarioResult scenario) =>
         TaskSwitchBoundaryCampaignRunner.Summarize("bg-red-rule-test", DateTimeOffset.Parse("2026-06-21T00:00:00Z"), [scenario]);
@@ -456,4 +523,42 @@ public sealed class BlockBGTaskSwitchBoundaryCampaignTests
 
         throw new DirectoryNotFoundException("Could not find repository root.");
     }
+
+    private sealed class FixedProbe : ITaskSwitchBoundaryScenarioProbe
+    {
+        private readonly TaskSwitchBoundaryProbeResult result;
+
+        public FixedProbe(TaskSwitchBoundaryProbeResult result) => this.result = result;
+
+        public Task<TaskSwitchBoundaryProbeResult> EvaluateAsync(
+            TaskSwitchBoundaryScenarioDefinition scenario,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(result);
+    }
+
+    private static TaskSwitchBoundaryProbeResult ProbeResult(
+        string actualVerdict = "Blocked",
+        string actualBlockReason = "ProbeBlockedAuthorityReuse",
+        bool mutationCompleted = false,
+        bool oldAuthorityUsedAsPermission = false,
+        bool memoryUsedAsPermission = false,
+        bool workflowStateTransferred = false,
+        int cliExitCode = 1) => new()
+        {
+            ActualVerdict = actualVerdict,
+            ActualBlockReason = actualBlockReason,
+            MutationAttempted = true,
+            MutationCompleted = mutationCompleted,
+            OldAuthorityUsedAsContext = true,
+            OldAuthorityUsedAsPermission = oldAuthorityUsedAsPermission,
+            MemoryUsedAsContext = memoryUsedAsPermission,
+            MemoryUsedAsPermission = memoryUsedAsPermission,
+            WorkflowStateTransferred = workflowStateTransferred,
+            CliExitCode = cliExitCode,
+            ReceiptCreated = true,
+            HumanReadableReason = true,
+            HumanCouldChooseNextStep = true,
+            SafeNextStep = "Rebuild authority for the current task.",
+            Notes = ["test probe"]
+        };
 }
