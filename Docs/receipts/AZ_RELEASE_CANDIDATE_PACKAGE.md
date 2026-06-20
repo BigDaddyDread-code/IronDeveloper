@@ -43,6 +43,8 @@ AZ requires executed AY merge evidence, verified post-merge state, candidate com
 
 Result lane evidence proves validation execution. Required lane names only declare intent.
 
+Packaging or regression validation lanes may be marked not applicable only with an explicit non-empty reason. A not-applicable lane without a reason does not satisfy required release validation.
+
 ## Review Line
 
 Block AZ packages release-candidate readiness for a merged commit. It does not tag, release, publish, deploy, promote memory, or continue workflow.

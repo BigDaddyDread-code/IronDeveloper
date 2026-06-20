@@ -120,6 +120,58 @@ public sealed class BlockAZReleaseCandidatePackageTests
     }
 
     [TestMethod]
+    public void BlockAZ_Package_BlocksNotApplicableReleaseValidationWithoutReason()
+    {
+        var cases = new (string Name, ReleaseValidationEvidence Evidence)[]
+        {
+            ("packaging-without-reason", CreateValidationEvidence(
+                resultFamilies: ReleaseCandidatePackageBuilder.RequiredValidationFamilies.Where(item => item != "Packaging").ToArray()) with
+            {
+                NotApplicableLaneNames = ["Packaging"],
+                NotApplicableLaneReasons = []
+            }),
+            ("regression-without-reason", CreateValidationEvidence(
+                resultFamilies: ReleaseCandidatePackageBuilder.RequiredValidationFamilies.Where(item => item != "Regression").ToArray()) with
+            {
+                NotApplicableLaneNames = ["Regression"],
+                NotApplicableLaneReasons = [" "]
+            })
+        };
+
+        foreach (var item in cases)
+        {
+            var package = ReleaseCandidatePackageBuilder.Build(CreateInput() with { ReleaseValidationEvidence = item.Evidence }).Package;
+
+            Assert.IsFalse(package.CanReleaseForExecutor, item.Name);
+            CollectionAssert.Contains(package.BlockReasons, ReleaseCandidatePackageBlockReason.RequiredReleaseValidationMissing, item.Name);
+            Assert.IsTrue(package.PackageIssues.Any(issue => issue.Contains("NotApplicableReasonMissing", StringComparison.OrdinalIgnoreCase)), item.Name);
+        }
+    }
+
+    [TestMethod]
+    public void BlockAZ_Package_AllowsReasonedNotApplicablePackagingAndRegressionLanes()
+    {
+        var evidence = CreateValidationEvidence(
+            resultFamilies: ReleaseCandidatePackageBuilder.RequiredValidationFamilies
+                .Where(item => item != "Packaging" && item != "Regression")
+                .ToArray()) with
+        {
+            NotApplicableLaneNames = ["Packaging", "Regression"],
+            NotApplicableLaneReasons =
+            [
+                "No package artifact is produced for this release-candidate evidence slice.",
+                "Regression is covered by the stable phase lane for this candidate."
+            ]
+        };
+
+        var package = ReleaseCandidatePackageBuilder.Build(CreateInput() with { ReleaseValidationEvidence = evidence }).Package;
+
+        Assert.AreEqual(ReleaseCandidatePackageVerdict.PackageReadyForReleaseExecutor, package.PackageVerdict);
+        Assert.IsTrue(package.CanReleaseForExecutor);
+        CollectionAssert.DoesNotContain(package.BlockReasons, ReleaseCandidatePackageBlockReason.RequiredReleaseValidationMissing);
+    }
+
+    [TestMethod]
     public void BlockAZ_Package_BlocksInvalidVersionOrExistingRelease()
     {
         var cases = new (string Name, ReleaseVersionEvidence? Evidence, ReleaseCandidatePackageBlockReason Expected)[]

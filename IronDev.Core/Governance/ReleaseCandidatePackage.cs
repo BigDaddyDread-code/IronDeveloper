@@ -571,7 +571,7 @@ public static class ReleaseCandidatePackageBuilder
         }
 
         var executedFamilies = evidence.ResultLaneNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var notApplicable = evidence.NotApplicableLaneNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var notApplicable = GetReasonedNotApplicableLanes(evidence, blocked, issues);
         var missingRequired = RequiredValidationFamilies
             .Where(required => !executedFamilies.Any(name => ContainsToken(name, required)))
             .Where(required => !notApplicable.Any(name => ContainsToken(name, required)))
@@ -582,6 +582,32 @@ public static class ReleaseCandidatePackageBuilder
             foreach (var missing in missingRequired.Concat(evidence.MissingLaneNames).Distinct(StringComparer.OrdinalIgnoreCase))
                 issues.Add($"RequiredReleaseValidationMissing:{missing}");
         }
+    }
+
+    private static string[] GetReasonedNotApplicableLanes(
+        ReleaseValidationEvidence evidence,
+        List<ReleaseCandidatePackageBlockReason> blocked,
+        List<string> issues)
+    {
+        var reasonedLanes = new List<string>();
+        for (var index = 0; index < evidence.NotApplicableLaneNames.Length; index++)
+        {
+            var laneName = evidence.NotApplicableLaneNames[index];
+            if (string.IsNullOrWhiteSpace(laneName))
+                continue;
+
+            if (index >= evidence.NotApplicableLaneReasons.Length ||
+                string.IsNullOrWhiteSpace(evidence.NotApplicableLaneReasons[index]))
+            {
+                blocked.Add(ReleaseCandidatePackageBlockReason.RequiredReleaseValidationMissing);
+                issues.Add($"RequiredReleaseValidationMissing:{laneName}:NotApplicableReasonMissing");
+                continue;
+            }
+
+            reasonedLanes.Add(laneName);
+        }
+
+        return reasonedLanes.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static void ValidateVersion(
