@@ -260,6 +260,9 @@ public static class IronDevCli
         if (IronDevCliDeploymentExecution.IsDeploymentExecutionCommand(args))
             return await IronDevCliDeploymentExecution.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliPostDeployVerification.IsPostDeployVerificationCommand(args))
+            return await IronDevCliPostDeployVerification.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3048,6 +3051,10 @@ public static class IronDevCli
         error.WriteLine("  irondev deployment-execution inspect --receipt <deployment-execution-receipt.json> [--json]");
         error.WriteLine("  irondev deployment-execution status --receipt <deployment-execution-receipt.json> [--json]");
         error.WriteLine("  irondev deployment-execution records --receipt <deployment-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev post-deploy-verification package --deployment-execution-receipt <deployment-execution-receipt.json> --observation <post-deploy-observation.json> --repo <owner/name> --candidate-commit <sha> --version <version> --tag <tag-name> --channel <internal|preview|release-candidate|stable|hotfix> --deployment-target <target-name> --deployment-environment <environment> --artifact-name <artifact-name> --artifact-sha256 <sha256> --created-by <github-login> --out <path> [--json]");
+        error.WriteLine("  irondev post-deploy-verification inspect --package <post-deploy-verification-package.json> [--json]");
+        error.WriteLine("  irondev post-deploy-verification status --package <post-deploy-verification-package.json> [--json]");
+        error.WriteLine("  irondev post-deploy-verification records --package <post-deploy-verification-package.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");

@@ -650,7 +650,8 @@ public enum GovernanceKernelEventKind
     ReleaseExecuted,
     DeploymentReadinessSeparationPackageCreated,
     DeploymentReadinessDecisionPackageCreated,
-    DeploymentExecuted
+    DeploymentExecuted,
+    PostDeployVerificationPackageCreated
 }
 
 public sealed record GovernedActionKernelEvent
