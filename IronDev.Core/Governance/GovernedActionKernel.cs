@@ -640,7 +640,8 @@ public enum GovernanceKernelEventKind
     PrUpdatePackageCreated,
     PrBranchUpdateExecuted,
     ReadyForReviewPackageCreated,
-    ReadyForReviewExecuted
+    ReadyForReviewExecuted,
+    ReviewerRequestPackageCreated
 }
 
 public sealed record GovernedActionKernelEvent

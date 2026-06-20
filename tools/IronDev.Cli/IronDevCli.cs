@@ -233,6 +233,9 @@ public static class IronDevCli
         if (IronDevCliReadyForReview.IsReadyCommand(args))
             return await IronDevCliReadyForReview.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliReviewerRequestPackage.IsReviewerRequestCommand(args))
+            return await IronDevCliReviewerRequestPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -2987,6 +2990,10 @@ public static class IronDevCli
         error.WriteLine("  irondev ready execute --package <ready-for-review-package.json> --repo <owner/name> --pr <number> --observed-head <sha> --out <path> [--json]");
         error.WriteLine("  irondev ready execution-status --receipt <ready-for-review-execution-receipt.json> [--json]");
         error.WriteLine("  irondev ready execution-records --receipt <ready-for-review-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev reviewer-request package --repo <owner/name> --pr <number> --state open --draft false --branch <head-branch> --head <sha> --observed-head <sha> --base <base-branch> --base-sha <sha> --author <login> --ready-receipt <receipt.json> --reviewer <login> --team <team-slug> --rationale <text> --created-by <login> --out <path> [--json]");
+        error.WriteLine("  irondev reviewer-request inspect --package <reviewer-request-package.json> [--json]");
+        error.WriteLine("  irondev reviewer-request status --package <reviewer-request-package.json> [--json]");
+        error.WriteLine("  irondev reviewer-request records --package <reviewer-request-package.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
