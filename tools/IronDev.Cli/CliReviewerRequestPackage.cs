@@ -4,7 +4,7 @@ using IronDev.Core.Governance;
 
 namespace IronDev.Cli;
 
-internal static class IronDevCliReviewerRequestPackage
+internal static partial class IronDevCliReviewerRequestPackage
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -14,7 +14,6 @@ internal static class IronDevCliReviewerRequestPackage
 
     private static readonly string[] ForbiddenSubcommands =
     [
-        "execute",
         "request",
         "request-reviewers",
         "remove-reviewers",
@@ -40,7 +39,7 @@ internal static class IronDevCliReviewerRequestPackage
     public static async Task<int> HandleAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         if (args.Length < 2)
-            return Usage(error, "reviewer-request requires a subcommand: package, inspect, status, or records.");
+            return Usage(error, "reviewer-request requires a subcommand: package, inspect, status, records, execute, execution-status, or execution-records.");
 
         var subcommand = args[1].ToLowerInvariant();
         if (ForbiddenSubcommands.Contains(subcommand, StringComparer.OrdinalIgnoreCase))
@@ -49,9 +48,12 @@ internal static class IronDevCliReviewerRequestPackage
         return subcommand switch
         {
             "package" => await HandlePackageAsync(args, output, error, cancellationToken).ConfigureAwait(false),
+            "execute" => await HandleExecuteAsync(args, output, error, cancellationToken).ConfigureAwait(false),
             "inspect" => HandleRead(args, output, error, "inspect"),
             "status" => HandleRead(args, output, error, "status"),
             "records" => HandleRead(args, output, error, "records"),
+            "execution-status" => HandleExecutionRead(args, output, error, "execution-status"),
+            "execution-records" => HandleExecutionRead(args, output, error, "execution-records"),
             _ => Usage(error, $"unsupported reviewer-request subcommand: {args[1]}")
         };
     }
@@ -363,6 +365,9 @@ internal static class IronDevCliReviewerRequestPackage
         error.WriteLine("  irondev reviewer-request inspect --package <reviewer-request-package.json> [--json]");
         error.WriteLine("  irondev reviewer-request status --package <reviewer-request-package.json> [--json]");
         error.WriteLine("  irondev reviewer-request records --package <reviewer-request-package.json> [--json]");
+        error.WriteLine("  irondev reviewer-request execute --package <reviewer-request-package.json> --repo <owner/name> --pr <number> --observed-head <sha> --out <path> [--requested-by <login>] [--json]");
+        error.WriteLine("  irondev reviewer-request execution-status --receipt <reviewer-request-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev reviewer-request execution-records --receipt <reviewer-request-execution-receipt.json> [--json]");
         return 2;
     }
 
