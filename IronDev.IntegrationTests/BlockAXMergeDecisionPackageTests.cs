@@ -114,7 +114,11 @@ public sealed class BlockAXMergeDecisionPackageTests
             ("failed", CreateValidationEvidence() with { Verdict = ValidationRunVerdict.Failed, FailedLaneNames = ["Build"] }, MergeDecisionPackageBlockReason.ValidationFailed),
             ("missing-lane", CreateValidationEvidence(requiredFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "Build").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing),
             ("diff-check-missing", CreateValidationEvidence(requiredFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "DiffCheck").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing),
-            ("phase-missing", CreateValidationEvidence(requiredFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "PhaseAuthority").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing)
+            ("phase-missing", CreateValidationEvidence(requiredFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "PhaseAuthority").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing),
+            ("declared-build-not-executed", CreateValidationEvidence(resultFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "Build").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing),
+            ("declared-diff-check-not-executed", CreateValidationEvidence(resultFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "DiffCheck").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing),
+            ("declared-phase-authority-not-executed", CreateValidationEvidence(resultFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "PhaseAuthority").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing),
+            ("declared-merge-decision-authority-not-executed", CreateValidationEvidence(resultFamilies: MergeDecisionPackageBuilder.RequiredValidationFamilies.Where(item => item != "MergeDecisionAuthority").ToArray()), MergeDecisionPackageBlockReason.RequiredValidationMissing)
         };
 
         foreach (var item in cases)
@@ -338,14 +342,14 @@ public sealed class BlockAXMergeDecisionPackageTests
         ReviewEvidenceReceiptId = "review_evidence_ax"
     };
 
-    private static MergeValidationEvidence CreateValidationEvidence(string[]? requiredFamilies = null) => new()
+    private static MergeValidationEvidence CreateValidationEvidence(string[]? requiredFamilies = null, string[]? resultFamilies = null) => new()
     {
         ValidationRunId = "validation_run_ax",
         ValidationPlanId = "validation_plan_ax",
         CommitSha = HeadSha,
         Verdict = ValidationRunVerdict.Passed,
         RequiredLaneNames = requiredFamilies ?? MergeDecisionPackageBuilder.RequiredValidationFamilies,
-        ResultLaneNames = requiredFamilies ?? MergeDecisionPackageBuilder.RequiredValidationFamilies,
+        ResultLaneNames = resultFamilies ?? requiredFamilies ?? MergeDecisionPackageBuilder.RequiredValidationFamilies,
         MissingLaneNames = [],
         FailedLaneNames = [],
         StartedAtUtc = DateTimeOffset.Parse("2026-06-20T06:40:00Z"),

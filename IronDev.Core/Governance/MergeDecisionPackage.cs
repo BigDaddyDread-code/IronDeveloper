@@ -591,12 +591,11 @@ public static class MergeDecisionPackageBuilder
             issues.Add("ValidationFailed");
         }
 
-        var observedFamilies = evidence.RequiredLaneNames
-            .Concat(evidence.ResultLaneNames)
+        var executedFamilies = evidence.ResultLaneNames
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var missingRequired = RequiredValidationFamilies
-            .Where(required => !observedFamilies.Any(name => ContainsToken(name, required)))
+            .Where(required => !executedFamilies.Any(name => ContainsToken(name, required)))
             .ToArray();
         if (missingRequired.Length > 0 || evidence.MissingLaneNames.Length > 0)
         {
