@@ -248,6 +248,9 @@ public static class IronDevCli
         if (IronDevCliReleaseReadinessDecisionPackage.IsReleaseReadinessCommand(args))
             return await IronDevCliReleaseReadinessDecisionPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliReleaseExecution.IsReleaseExecutionCommand(args))
+            return await IronDevCliReleaseExecution.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
