@@ -254,6 +254,9 @@ public static class IronDevCli
         if (IronDevCliDeploymentReadinessSeparation.IsDeploymentReadinessSeparationCommand(args))
             return await IronDevCliDeploymentReadinessSeparation.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliDeploymentReadinessDecision.IsDeploymentReadinessDecisionCommand(args))
+            return await IronDevCliDeploymentReadinessDecision.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3034,6 +3037,10 @@ public static class IronDevCli
         error.WriteLine("  irondev deployment-readiness-separation inspect --package <deployment-readiness-separation-package.json> [--json]");
         error.WriteLine("  irondev deployment-readiness-separation status --package <deployment-readiness-separation-package.json> [--json]");
         error.WriteLine("  irondev deployment-readiness-separation records --package <deployment-readiness-separation-package.json> [--json]");
+        error.WriteLine("  irondev deployment-readiness-decision package --deployment-readiness-separation-package <deployment-readiness-separation-package.json> --repo <owner/name> --candidate-commit <sha> --version <version> --tag <tag-name> --channel <internal|preview|release-candidate|stable|hotfix> --deployment-target <target-name> --deployment-environment <environment> --artifact-name <name> --artifact-sha256 <sha256> --decision approved-for-controlled-deployment-executor --decision-by <github-login> --decision-rationale <text> --created-by <github-login> --out <path> [--json]");
+        error.WriteLine("  irondev deployment-readiness-decision inspect --package <deployment-readiness-decision-package.json> [--json]");
+        error.WriteLine("  irondev deployment-readiness-decision status --package <deployment-readiness-decision-package.json> [--json]");
+        error.WriteLine("  irondev deployment-readiness-decision records --package <deployment-readiness-decision-package.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
