@@ -442,6 +442,8 @@ public static class PostDeployVerificationPackageBuilder
             issues.Add("PostDeployObservationMissingSourceOrTimestamp");
         }
 
+        ValidateObservationIdentity(input, observation, blocked, issues);
+
         if (!observation.ObservationSucceeded)
         {
             rollbackConsideration.Add(PostDeployVerificationBlockReason.PostDeployObservationFailed);
@@ -449,7 +451,6 @@ public static class PostDeployVerificationPackageBuilder
             return;
         }
 
-        ValidateObservationIdentity(input, observation, blocked, issues);
         ValidateObservedDeployment(input, observation, failed, rollbackConsideration, issues);
         ValidateHealthCheck(observation, failed, rollbackConsideration, issues);
     }

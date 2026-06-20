@@ -112,6 +112,26 @@ public sealed class BlockBFPostDeployVerificationRollbackSeparationTests
     }
 
     [TestMethod]
+    public void BlockBF_Package_BlocksFailedObservationWithIdentityMismatch()
+    {
+        var cases = new (string Name, PostDeployObservationEvidence Observation, PostDeployVerificationBlockReason Reason)[]
+        {
+            ("repo", CreateObservation(repository: "other/repo", observationSucceeded: false), PostDeployVerificationBlockReason.RepositoryMismatch),
+            ("target", CreateObservation(target: "staging", observationSucceeded: false), PostDeployVerificationBlockReason.DeploymentTargetMismatch),
+            ("environment", CreateObservation(environment: "prod-east", observationSucceeded: false), PostDeployVerificationBlockReason.DeploymentEnvironmentMismatch)
+        };
+
+        foreach (var item in cases)
+        {
+            var artifacts = Build(CreateInput() with { Observation = item.Observation });
+
+            Assert.AreEqual(PostDeployVerificationPackageVerdict.VerificationBlocked, artifacts.Package.PackageVerdict, item.Name);
+            AssertContainsReason(artifacts.Package, item.Reason);
+            AssertContainsReason(artifacts.Package, PostDeployVerificationBlockReason.PostDeployObservationFailed);
+        }
+    }
+
+    [TestMethod]
     public void BlockBF_Package_BlocksReceiptBoundaryWithRollbackAuthority()
     {
         var receipt = CreateReceipt() with { Boundary = DeploymentExecutionBoundary.Executor with { CanExecuteRollback = true } };
