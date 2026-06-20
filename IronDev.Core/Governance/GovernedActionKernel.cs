@@ -644,7 +644,10 @@ public enum GovernanceKernelEventKind
     ReviewerRequestPackageCreated,
     ReviewerRequestExecuted,
     MergeDecisionPackageCreated,
-    MergeExecuted
+    MergeExecuted,
+    ReleaseCandidatePackageCreated,
+    ReleaseReadinessDecisionPackageCreated,
+    ReleaseExecuted
 }
 
 public sealed record GovernedActionKernelEvent
