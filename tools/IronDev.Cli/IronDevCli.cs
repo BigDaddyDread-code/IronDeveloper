@@ -236,6 +236,12 @@ public static class IronDevCli
         if (IronDevCliReviewerRequestPackage.IsReviewerRequestCommand(args))
             return await IronDevCliReviewerRequestPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliControlledMergeExecution.IsMergeCommand(args))
+            return await IronDevCliControlledMergeExecution.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
+        if (IronDevCliMergeDecisionPackage.IsMergeDecisionCommand(args))
+            return await IronDevCliMergeDecisionPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -2997,6 +3003,13 @@ public static class IronDevCli
         error.WriteLine("  irondev reviewer-request execute --package <reviewer-request-package.json> --repo <owner/name> --pr <number> --observed-head <sha> --out <path> [--requested-by <login>] [--json]");
         error.WriteLine("  irondev reviewer-request execution-status --receipt <reviewer-request-execution-receipt.json> [--json]");
         error.WriteLine("  irondev reviewer-request execution-records --receipt <reviewer-request-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev merge execute --package <merge-decision-package.json> --repo <owner/name> --pr <number> --observed-head <sha> --out <path> [--requested-by <login>] [--dry-run] [--json]");
+        error.WriteLine("  irondev merge execution-status --receipt <merge-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev merge execution-records --receipt <merge-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev merge-decision package --repo <owner/name> --pr <number> --state open --draft false --branch <head-branch> --head <sha> --observed-head <sha> --base <base-branch> --base-sha <sha> --author <login> --mergeable <true|false> --merge-state-status <status> --is-behind-base <true|false> --has-conflicts <true|false> --reviewer-request-receipt <receipt.json> --review-evidence <review-evidence.json> --validation <validation-run-receipt.json> --decision <approved-for-merge-executor|blocked|rejected> --decision-by <login> --decision-rationale <text> --merge-strategy <merge-commit|squash|rebase> --created-by <login> --out <path> [--json]");
+        error.WriteLine("  irondev merge-decision inspect --package <merge-decision-package.json> [--json]");
+        error.WriteLine("  irondev merge-decision status --package <merge-decision-package.json> [--json]");
+        error.WriteLine("  irondev merge-decision records --package <merge-decision-package.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
