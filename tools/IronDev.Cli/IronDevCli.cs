@@ -2994,6 +2994,9 @@ public static class IronDevCli
         error.WriteLine("  irondev reviewer-request inspect --package <reviewer-request-package.json> [--json]");
         error.WriteLine("  irondev reviewer-request status --package <reviewer-request-package.json> [--json]");
         error.WriteLine("  irondev reviewer-request records --package <reviewer-request-package.json> [--json]");
+        error.WriteLine("  irondev reviewer-request execute --package <reviewer-request-package.json> --repo <owner/name> --pr <number> --observed-head <sha> --out <path> [--requested-by <login>] [--json]");
+        error.WriteLine("  irondev reviewer-request execution-status --receipt <reviewer-request-execution-receipt.json> [--json]");
+        error.WriteLine("  irondev reviewer-request execution-records --receipt <reviewer-request-execution-receipt.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");

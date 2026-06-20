@@ -189,7 +189,7 @@ public sealed class BlockAVControlledReviewerRequestPackageTests
     [TestMethod]
     public async Task BlockAV_Cli_BlocksExecutionReviewMergeReleaseAndContinuationVerbs()
     {
-        foreach (var forbidden in new[] { "execute", "request", "request-reviewers", "remove-reviewers", "ready", "approve", "review", "resolve-comments", "reply", "merge", "auto-merge", "release", "deploy", "tag", "publish", "promote-memory", "continue" })
+        foreach (var forbidden in new[] { "request", "request-reviewers", "remove-reviewers", "ready", "approve", "review", "resolve-comments", "reply", "merge", "auto-merge", "release", "deploy", "tag", "publish", "promote-memory", "continue" })
         {
             var result = await RunCliAsync("reviewer-request", forbidden, "--package", "reviewer-request-package.json").ConfigureAwait(false);
             Assert.AreEqual(2, result.ExitCode, forbidden);
