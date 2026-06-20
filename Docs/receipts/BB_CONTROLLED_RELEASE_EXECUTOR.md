@@ -56,7 +56,10 @@ BB requires:
 - no existing candidate tag
 - no existing candidate GitHub release
 - release notes for GitHub release creation
-- expected artifact files and checksum matches for artifact upload
+- artifact upload authority bound to the BA release artifact readiness evidence
+- requested artifact names and checksums matching the BA artifact readiness evidence
+- no requested artifacts outside the BA artifact readiness evidence
+- expected local artifact files and checksum matches for artifact upload
 - post-execution observation and verification
 
 The action order is deterministic:
@@ -72,6 +75,10 @@ GitHub release creation cannot satisfy tag creation. If a GitHub release is requ
 Artifact upload cannot satisfy release creation. If artifact upload is requested, explicit GitHub release creation must also be requested and completed first.
 
 Existing tags or releases block release execution. They are not treated as success.
+
+Tag and release lookup failures fail closed unless the lookup is explicitly a not-found result.
+
+Mutation-reported artifact names are recorded in the receipt, but they do not satisfy post-state verification. Expected release artifacts must appear in the observed post-state release assets.
 
 Partial execution is visible and non-success. BB does not automatically rollback or continue workflow after partial execution.
 

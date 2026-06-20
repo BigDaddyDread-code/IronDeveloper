@@ -182,7 +182,7 @@ public static class ControlledReleaseExecutor
 
         ValidateActions(request, issues);
         ValidateReleaseNotes(request, issues);
-        ValidateArtifacts(request, issues);
+        ValidateArtifacts(package, request, issues);
     }
 
     private static void ValidateActions(ReleaseExecutionRequest request, List<string> issues)
@@ -235,16 +235,25 @@ public static class ControlledReleaseExecutor
         }
     }
 
-    private static void ValidateArtifacts(ReleaseExecutionRequest request, List<string> issues)
+    private static void ValidateArtifacts(ReleaseReadinessDecisionPackage? package, ReleaseExecutionRequest request, List<string> issues)
     {
         if (!request.ApprovedActions.Contains(ReleaseExecutionAction.UploadReleaseArtifacts))
             return;
+
+        var readiness = package?.ReleaseArtifactReadinessEvidence;
+        if (readiness is null || !readiness.ArtifactsRequired || !readiness.ArtifactsReady)
+        {
+            issues.Add("ArtifactUploadRequiresReadyBAArtifactEvidence");
+        }
 
         if (request.Artifacts.Length == 0)
         {
             issues.Add("MissingArtifact");
             return;
         }
+
+        if (readiness is not null)
+            ValidateArtifactsAuthorizedByPackage(readiness, request, issues);
 
         foreach (var artifact in request.Artifacts)
         {
@@ -259,6 +268,51 @@ public static class ControlledReleaseExecutor
             {
                 issues.Add($"ArtifactChecksumMismatch:{artifact.Name}");
             }
+        }
+    }
+
+    private static void ValidateArtifactsAuthorizedByPackage(
+        ReleaseArtifactReadinessEvidence readiness,
+        ReleaseExecutionRequest request,
+        List<string> issues)
+    {
+        var packageArtifacts = readiness.Artifacts
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select((item, index) => new
+            {
+                Name = item.Trim(),
+                Checksum = index < readiness.Checksums.Length ? readiness.Checksums[index] : null
+            })
+            .ToArray();
+        var packageNames = new HashSet<string>(packageArtifacts.Select(item => item.Name), StringComparer.OrdinalIgnoreCase);
+        var requestNames = new HashSet<string>(request.Artifacts.Select(item => item.Name), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var artifact in request.Artifacts)
+        {
+            var packageArtifact = packageArtifacts.FirstOrDefault(item => Same(item.Name, artifact.Name));
+            if (packageArtifact is null)
+            {
+                issues.Add($"ArtifactNotAuthorizedByReleaseReadinessPackage:{artifact.Name}");
+                continue;
+            }
+
+            var requestedChecksum = !string.IsNullOrWhiteSpace(artifact.Sha256)
+                ? artifact.Sha256
+                : File.Exists(artifact.Path)
+                    ? BbReleaseExecutionHashing.FileHash(artifact.Path)
+                    : null;
+            if (string.IsNullOrWhiteSpace(packageArtifact.Checksum) ||
+                string.IsNullOrWhiteSpace(requestedChecksum) ||
+                !Same(packageArtifact.Checksum, requestedChecksum))
+            {
+                issues.Add($"ArtifactChecksumMismatch:{artifact.Name}");
+            }
+        }
+
+        foreach (var packageArtifactName in packageNames)
+        {
+            if (!requestNames.Contains(packageArtifactName))
+                issues.Add($"MissingArtifact:{packageArtifactName}");
         }
     }
 
@@ -341,13 +395,9 @@ public static class ControlledReleaseExecutor
         if (request.ApprovedActions.Contains(ReleaseExecutionAction.UploadReleaseArtifacts))
         {
             var observedArtifacts = new HashSet<string>(observed.ExistingReleaseArtifactNames, StringComparer.OrdinalIgnoreCase);
-            var mutationArtifacts = new HashSet<string>(
-                mutations.Where(item => item.Action == ReleaseExecutionAction.UploadReleaseArtifacts)
-                    .SelectMany(item => item.UploadedArtifacts),
-                StringComparer.OrdinalIgnoreCase);
             foreach (var artifact in request.Artifacts.Select(item => item.Name))
             {
-                if (!observedArtifacts.Contains(artifact) && !mutationArtifacts.Contains(artifact))
+                if (!observedArtifacts.Contains(artifact))
                     issues.Add($"PostStateArtifactMissing:{artifact}");
             }
         }
@@ -491,6 +541,7 @@ public static class ControlledReleaseExecutor
             if (issue.Contains("ReleaseReadinessPackageRejected", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.ReleaseReadinessPackageRejected;
             if (issue.Contains("ReleaseReadinessPackageBlocked", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.ReleaseReadinessPackageBlocked;
             if (issue.Contains("ReleaseReadinessBoundaryAuthorityViolation", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.ReleaseReadinessBoundaryAuthorityViolation;
+            if (issue.Contains("ArtifactNotAuthorizedByReleaseReadinessPackage", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.ArtifactNotAuthorizedByReleaseReadinessPackage;
             if (issue.Contains("ReleaseReadinessPackage", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.ReleaseReadinessPackageNotReady;
             if (issue.Contains("ReleaseExecutionNotConfirmed", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.ReleaseExecutionNotConfirmed;
             if (issue.Contains("RequestPackageMismatch", StringComparison.OrdinalIgnoreCase)) return ReleaseExecutionFailureKind.RequestPackageMismatch;

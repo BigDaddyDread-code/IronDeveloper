@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using IronDev.Cli;
 using IronDev.Core.Governance;
 using IronDev.Core.Validation;
@@ -11,6 +13,12 @@ public sealed class BlockBBControlledReleaseExecutorTests
 {
     private static readonly string CandidateCommitSha = new('c', 40);
     private const string ReleaseNotesBody = "Release notes for the controlled BB release executor.";
+    private const string ArtifactContent = "controlled release artifact";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     [TestMethod]
     public async Task BlockBB_Executor_ExecutesApprovedTagReleaseArtifactActionsAndWritesReceipt()
@@ -215,7 +223,7 @@ public sealed class BlockBBControlledReleaseExecutorTests
         var package = CreatePackage();
         var request = CreateRequest(package) with
         {
-            Artifacts = [new ReleaseExecutionArtifact { Name = "missing.zip", Path = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.zip"), Sha256 = new string('f', 64) }]
+            Artifacts = [new ReleaseExecutionArtifact { Name = "artifact.zip", Path = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.zip"), Sha256 = HashText(ArtifactContent) }]
         };
         var gateway = new FakeReleaseExecutionGateway();
 
@@ -245,6 +253,23 @@ public sealed class BlockBBControlledReleaseExecutorTests
     }
 
     [TestMethod]
+    public async Task BlockBB_Executor_BlocksArtifactUploadNotAuthorizedByBAPackage()
+    {
+        var package = CreatePackage();
+        var artifact = CreateArtifact() with { Name = "unexpected.zip" };
+        var request = CreateRequest(package) with { Artifacts = [artifact] };
+        var gateway = new FakeReleaseExecutionGateway();
+
+        var result = await ControlledReleaseExecutor.ExecuteAsync(package, request, gateway).ConfigureAwait(false);
+
+        Assert.AreEqual(ReleaseExecutionVerdict.Blocked, result.Verdict);
+        Assert.AreEqual(ReleaseExecutionFailureKind.ArtifactNotAuthorizedByReleaseReadinessPackage, result.FailureKind);
+        Assert.IsTrue(result.Issues.Any(issue => issue.Contains("ArtifactNotAuthorizedByReleaseReadinessPackage:unexpected.zip", StringComparison.OrdinalIgnoreCase)));
+        Assert.AreEqual(0, gateway.ObserveCalls);
+        Assert.AreEqual(0, gateway.TotalMutationCalls);
+    }
+
+    [TestMethod]
     public async Task BlockBB_Executor_PostVerifiesCreatedTagReleaseAndArtifacts()
     {
         var package = CreatePackage();
@@ -259,6 +284,25 @@ public sealed class BlockBBControlledReleaseExecutorTests
         Assert.AreEqual(ReleaseExecutionFailureKind.PostStateVerificationFailed, result.FailureKind);
         Assert.IsFalse(result.Receipt!.PostStateVerified);
         Assert.AreEqual(2, gateway.ObserveCalls);
+    }
+
+    [TestMethod]
+    public async Task BlockBB_Executor_FailsPostVerificationWhenUploadedArtifactNotObserved()
+    {
+        var package = CreatePackage();
+        var request = CreateRequest(package);
+        var gateway = new FakeReleaseExecutionGateway();
+        gateway.Observations.Enqueue(GoodPreState(package));
+        gateway.Observations.Enqueue(GoodPostState(package, request) with { ExistingReleaseArtifactNames = [] });
+
+        var result = await ControlledReleaseExecutor.ExecuteAsync(package, request, gateway).ConfigureAwait(false);
+
+        Assert.AreEqual(ReleaseExecutionVerdict.Failed, result.Verdict);
+        Assert.AreEqual(ReleaseExecutionFailureKind.PostStateVerificationFailed, result.FailureKind);
+        Assert.IsFalse(result.Receipt!.PostStateVerified);
+        Assert.IsTrue(result.Issues.Any(issue => issue.Contains("PostStateArtifactMissing:artifact.zip", StringComparison.OrdinalIgnoreCase)));
+        Assert.AreEqual(2, gateway.ObserveCalls);
+        Assert.AreEqual(1, gateway.UploadArtifactCalls);
     }
 
     [TestMethod]
@@ -330,6 +374,26 @@ public sealed class BlockBBControlledReleaseExecutorTests
     }
 
     [TestMethod]
+    public async Task BlockBB_Cli_StatusJsonUsesReadOnlyBoundary()
+    {
+        var package = CreatePackage();
+        var request = CreateRequest(package);
+        var receipt = CreateExecutedReceipt(package, request);
+        var path = Path.Combine(Path.GetTempPath(), $"release-execution-receipt-{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, JsonSerializer.Serialize(receipt, JsonOptions));
+
+        var result = await RunCliAsync("release-execution", "status", "--receipt", path, "--json").ConfigureAwait(false);
+
+        Assert.AreEqual(0, result.ExitCode, result.Error);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+        Assert.IsFalse(root.GetProperty("boundary").GetProperty("canCreateTag").GetBoolean());
+        Assert.IsFalse(root.GetProperty("boundary").GetProperty("canCreateGitHubRelease").GetBoolean());
+        Assert.IsFalse(root.GetProperty("boundary").GetProperty("canUploadReleaseArtifacts").GetBoolean());
+        Assert.IsTrue(root.GetProperty("data").GetProperty("boundary").GetProperty("canCreateTag").GetBoolean());
+    }
+
+    [TestMethod]
     public async Task BlockBB_Cli_RejectsDeployPublishPackagePromoteMemoryContinueCommitPushMergeRollbackVerbs()
     {
         foreach (var forbidden in new[] { "deploy", "publish-package", "promote-memory", "continue", "continue-workflow", "commit", "push", "merge", "source-apply", "rollback", "rollback-execute" })
@@ -371,6 +435,50 @@ public sealed class BlockBBControlledReleaseExecutorTests
         StringAssert.Contains(receipt, "No hidden package publication.");
         StringAssert.Contains(receipt, "No hidden memory promotion.");
         StringAssert.Contains(receipt, "No hidden workflow continuation.");
+    }
+
+    [TestMethod]
+    public async Task BlockBB_Gateway_FailsClosedWhenTagLookupFailsNon404()
+    {
+        var package = CreatePackage();
+        var request = CreateRequest(package);
+        var gateway = new IronDevCliReleaseExecution.GitHubCliReleaseExecutionGateway((_, arguments, _, _) =>
+        {
+            var path = string.Join("/", arguments);
+            if (path.Contains("/branches/", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(0, $"{{\"commit\":{{\"sha\":\"{CandidateCommitSha}\"}}}}", string.Empty));
+            if (path.Contains("/git/ref/tags/", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(1, string.Empty, "gh: server error (HTTP 500)"));
+            return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(0, "{}", string.Empty));
+        });
+
+        var observed = await gateway.ObserveAsync(package, request, CancellationToken.None).ConfigureAwait(false);
+
+        Assert.IsFalse(observed.ObservationSucceeded);
+        StringAssert.Contains(observed.ObservationError, "tag lookup failed");
+    }
+
+    [TestMethod]
+    public async Task BlockBB_Gateway_FailsClosedWhenReleaseLookupFailsNon404()
+    {
+        var package = CreatePackage();
+        var request = CreateRequest(package);
+        var gateway = new IronDevCliReleaseExecution.GitHubCliReleaseExecutionGateway((_, arguments, _, _) =>
+        {
+            var path = string.Join("/", arguments);
+            if (path.Contains("/branches/", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(0, $"{{\"commit\":{{\"sha\":\"{CandidateCommitSha}\"}}}}", string.Empty));
+            if (path.Contains("/git/ref/tags/", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(1, string.Empty, "gh: Not Found (HTTP 404)"));
+            if (path.Contains("/releases/tags/", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(1, string.Empty, "gh: rate limit exceeded (HTTP 403)"));
+            return Task.FromResult(new IronDevCliReleaseExecution.ReleaseCommandProcessResult(0, "{}", string.Empty));
+        });
+
+        var observed = await gateway.ObserveAsync(package, request, CancellationToken.None).ConfigureAwait(false);
+
+        Assert.IsFalse(observed.ObservationSucceeded);
+        StringAssert.Contains(observed.ObservationError, "release lookup failed");
     }
 
     private static ReleaseReadinessDecisionPackage CreatePackage() => new()
@@ -430,7 +538,7 @@ public sealed class BlockBBControlledReleaseExecutorTests
             BuildRunId = "build_bb",
             CommitSha = CandidateCommitSha,
             Artifacts = ["artifact.zip"],
-            Checksums = [new string('f', 64)],
+            Checksums = [HashText(ArtifactContent)],
             StorageLocation = "local-test",
             ArtifactsRequired = true,
             ArtifactsReady = true,
@@ -491,7 +599,7 @@ public sealed class BlockBBControlledReleaseExecutorTests
     private static ReleaseExecutionArtifact CreateArtifact()
     {
         var path = Path.Combine(Path.GetTempPath(), $"bb-artifact-{Guid.NewGuid():N}.zip");
-        File.WriteAllText(path, "controlled release artifact");
+        File.WriteAllText(path, ArtifactContent);
         return new ReleaseExecutionArtifact
         {
             Name = "artifact.zip",
@@ -527,6 +635,45 @@ public sealed class BlockBBControlledReleaseExecutorTests
             ExistingReleaseUrl = "https://github.com/owner/repo/releases/tag/v1.2.3",
             ExistingReleaseArtifactNames = request.Artifacts.Select(item => item.Name).ToArray(),
             ObservedAtUtc = DateTimeOffset.Parse("2026-06-20T11:11:00Z")
+        };
+
+    private static ReleaseExecutionReceipt CreateExecutedReceipt(
+        ReleaseReadinessDecisionPackage package,
+        ReleaseExecutionRequest request) => new()
+        {
+            ReleaseExecutionId = "release_exec_test",
+            ReleaseExecutionRequestId = request.ReleaseExecutionRequestId,
+            ReleaseReadinessDecisionPackageId = package.ReleaseReadinessDecisionPackageId,
+            Repository = package.Repository,
+            ReleaseSourceBranch = package.ReleaseSourceBranch,
+            CandidateCommitSha = package.CandidateCommitSha,
+            CandidateVersion = package.CandidateVersion,
+            CandidateTagName = package.CandidateTagName,
+            ReleaseChannel = package.ReleaseChannel,
+            PreState = GoodPreState(package),
+            PostState = GoodPostState(package, request),
+            ApprovedActions = request.ApprovedActions,
+            CompletedActions = request.ApprovedActions,
+            PreStateVerified = true,
+            TagCreated = true,
+            GitHubReleaseCreated = true,
+            ReleaseArtifactsUploaded = true,
+            CreatedTagSha = package.CandidateCommitSha,
+            GitHubReleaseId = "release-123",
+            GitHubReleaseUrl = "https://github.com/owner/repo/releases/tag/v1.2.3",
+            UploadedArtifacts = request.Artifacts.Select(item => item.Name).ToArray(),
+            PostStateVerified = true,
+            DeploymentAttempted = false,
+            PackagePublicationAttempted = false,
+            MemoryPromotionAttempted = false,
+            WorkflowContinuationAttempted = false,
+            RollbackExecutionAttempted = false,
+            ExecutionVerdict = ReleaseExecutionVerdict.ExecutedAndVerified,
+            FailureClassification = ReleaseExecutionFailureKind.None,
+            RequestedBy = request.RequestedBy,
+            RequestedAtUtc = request.RequestedAtUtc!.Value,
+            ExecutedAtUtc = DateTimeOffset.Parse("2026-06-20T11:11:00Z"),
+            Boundary = ReleaseExecutionBoundary.Executor
         };
 
     private static ReleaseExecutionMutationResult FailedMutation(ReleaseExecutionAction action, string error) => new()

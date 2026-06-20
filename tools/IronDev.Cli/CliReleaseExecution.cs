@@ -5,7 +5,7 @@ using IronDev.Core.Governance;
 
 namespace IronDev.Cli;
 
-internal static class IronDevCliReleaseExecution
+public static class IronDevCliReleaseExecution
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -87,7 +87,7 @@ internal static class IronDevCliReleaseExecution
         }
 
         if (parsed.Json)
-            WriteJson(output, "release-execution execute", result.Verdict == ReleaseExecutionVerdict.ExecutedAndVerified ? "succeeded" : "blocked", new { outDirectory, receipt = result.Receipt }, result.Issues);
+            WriteJson(output, "release-execution execute", result.Verdict == ReleaseExecutionVerdict.ExecutedAndVerified ? "succeeded" : "blocked", new { outDirectory, receipt = result.Receipt }, result.Issues, ReleaseExecutionBoundary.Executor);
         else if (result.Verdict == ReleaseExecutionVerdict.ExecutedAndVerified && result.Receipt is not null)
         {
             output.WriteLine("Release execution completed and verified.");
@@ -119,7 +119,7 @@ internal static class IronDevCliReleaseExecution
             object data = mode == "records"
                 ? new { receipt.PreState, receipt.PostState, receipt.MutationResults, receipt.Issues, receipt.Boundary }
                 : new { receipt.ReleaseExecutionId, receipt.ReleaseReadinessDecisionPackageId, receipt.Repository, receipt.CandidateTagName, receipt.ExecutionVerdict, receipt.FailureClassification, receipt.PostStateVerified, receipt.Boundary };
-            WriteJson(output, $"release-execution {mode}", "succeeded", data, []);
+            WriteJson(output, $"release-execution {mode}", "succeeded", data, [], ReleaseExecutionBoundary.ReadOnly);
         }
         else if (mode == "records")
         {
@@ -332,13 +332,13 @@ internal static class IronDevCliReleaseExecution
     private static int Failure(TextWriter output, TextWriter error, bool json, string command, string message)
     {
         if (json)
-            WriteJson(output, command, "failed", null, [message]);
+            WriteJson(output, command, "failed", null, [message], ReleaseExecutionBoundary.ReadOnly);
         else
             error.WriteLine(message);
         return 1;
     }
 
-    private static void WriteJson(TextWriter output, string command, string status, object? data, string[] errors)
+    private static void WriteJson(TextWriter output, string command, string status, object? data, string[] errors, ReleaseExecutionBoundary boundary)
     {
         output.WriteLine(JsonSerializer.Serialize(new
         {
@@ -347,7 +347,7 @@ internal static class IronDevCliReleaseExecution
             status,
             data,
             errors,
-            boundary = ReleaseExecutionBoundary.Executor
+            boundary
         }, JsonOptions));
     }
 
@@ -366,15 +366,28 @@ internal static class IronDevCliReleaseExecution
         public static ParsedReceiptRead Fail(bool json, string error) => new(null, json, error);
     }
 
-    private sealed class GitHubCliReleaseExecutionGateway : IReleaseExecutionGateway
+    public sealed class GitHubCliReleaseExecutionGateway : IReleaseExecutionGateway
     {
+        private readonly Func<string, IReadOnlyList<string>, string, CancellationToken, Task<ReleaseCommandProcessResult>> _runProcessAsync;
+
+        public GitHubCliReleaseExecutionGateway()
+            : this(RunProcessAsync)
+        {
+        }
+
+        public GitHubCliReleaseExecutionGateway(
+            Func<string, IReadOnlyList<string>, string, CancellationToken, Task<ReleaseCommandProcessResult>> runProcessAsync)
+        {
+            _runProcessAsync = runProcessAsync;
+        }
+
         public async Task<ReleaseExecutionObservedState> ObserveAsync(
             ReleaseReadinessDecisionPackage package,
             ReleaseExecutionRequest request,
             CancellationToken cancellationToken)
         {
             var observedAt = DateTimeOffset.UtcNow;
-            var branch = await RunProcessAsync(
+            var branch = await _runProcessAsync(
                 "gh",
                 ["api", $"repos/{request.Repository}/branches/{request.ReleaseSourceBranch}"],
                 Directory.GetCurrentDirectory(),
@@ -385,16 +398,22 @@ internal static class IronDevCliReleaseExecution
             try
             {
                 var branchSha = ReadBranchSha(branch.Stdout);
-                var tag = await RunProcessAsync(
+                var tag = await _runProcessAsync(
                     "gh",
                     ["api", $"repos/{request.Repository}/git/ref/tags/{request.CandidateTagName}"],
                     Directory.GetCurrentDirectory(),
                     cancellationToken).ConfigureAwait(false);
-                var release = await RunProcessAsync(
+                if (tag.ExitCode != 0 && !IsNotFound(tag))
+                    return FailedObservation(request, observedAt, $"tag lookup failed: {tag.StderrOrStdout()}");
+
+                var release = await _runProcessAsync(
                     "gh",
                     ["api", $"repos/{request.Repository}/releases/tags/{request.CandidateTagName}"],
                     Directory.GetCurrentDirectory(),
                     cancellationToken).ConfigureAwait(false);
+                if (release.ExitCode != 0 && !IsNotFound(release))
+                    return FailedObservation(request, observedAt, $"release lookup failed: {release.StderrOrStdout()}");
+
                 var tagSha = tag.ExitCode == 0 ? ReadNestedString(tag.Stdout, "object", "sha") : null;
                 var releaseInfo = release.ExitCode == 0 ? ReadReleaseInfo(release.Stdout) : (false, null, null, Array.Empty<string>());
                 return new ReleaseExecutionObservedState
@@ -427,7 +446,7 @@ internal static class IronDevCliReleaseExecution
             ReleaseExecutionRequest request,
             CancellationToken cancellationToken)
         {
-            var result = await RunProcessAsync(
+            var result = await _runProcessAsync(
                 "gh",
                 ["api", "--method", "POST", $"repos/{request.Repository}/git/refs", "-f", $"ref=refs/tags/{request.CandidateTagName}", "-f", $"sha={request.CandidateCommitSha}"],
                 Directory.GetCurrentDirectory(),
@@ -452,7 +471,7 @@ internal static class IronDevCliReleaseExecution
             ReleaseExecutionRequest request,
             CancellationToken cancellationToken)
         {
-            var result = await RunProcessAsync(
+            var result = await _runProcessAsync(
                 "gh",
                 ["api", "--method", "POST", $"repos/{request.Repository}/releases", "-f", $"tag_name={request.CandidateTagName}", "-f", $"target_commitish={request.CandidateCommitSha}", "-f", $"name={request.ReleaseName ?? request.CandidateTagName}", "-f", $"body={ReadReleaseNotes(request)}"],
                 Directory.GetCurrentDirectory(),
@@ -483,7 +502,7 @@ internal static class IronDevCliReleaseExecution
             var errors = new List<string>();
             foreach (var artifact in request.Artifacts)
             {
-                var result = await RunProcessAsync(
+                var result = await _runProcessAsync(
                     "gh",
                     ["release", "upload", request.CandidateTagName, artifact.Path, "--repo", request.Repository],
                     Directory.GetCurrentDirectory(),
@@ -522,6 +541,14 @@ internal static class IronDevCliReleaseExecution
             ObservationSucceeded = false,
             ObservationError = error
         };
+
+        private static bool IsNotFound(ReleaseCommandProcessResult result)
+        {
+            var text = $"{result.Stdout}{Environment.NewLine}{result.Stderr}";
+            return text.Contains("HTTP 404", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("\"status\":\"404\"", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("status code: 404", StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static async Task<ReleaseCommandProcessResult> RunProcessAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken)
@@ -583,7 +610,7 @@ internal static class IronDevCliReleaseExecution
             ? value.GetString()
             : null;
 
-    private sealed record ReleaseCommandProcessResult(int ExitCode, string Stdout, string Stderr)
+    public sealed record ReleaseCommandProcessResult(int ExitCode, string Stdout, string Stderr)
     {
         public string StderrOrStdout() => string.IsNullOrWhiteSpace(Stderr) ? Stdout : Stderr;
     }

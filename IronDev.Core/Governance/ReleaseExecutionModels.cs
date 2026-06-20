@@ -42,6 +42,7 @@ public enum ReleaseExecutionFailureKind
     ReleaseNotesChecksumMismatch,
     MissingArtifact,
     ArtifactChecksumMismatch,
+    ArtifactNotAuthorizedByReleaseReadinessPackage,
 
     ObservationFailed,
     SourceBranchMoved,
@@ -92,6 +93,13 @@ public sealed record ReleaseExecutionBoundary
     public static ReleaseExecutionBoundary Executor { get; } = new();
 
     public static ReleaseExecutionBoundary Blocked { get; } = new()
+    {
+        CanCreateTag = false,
+        CanCreateGitHubRelease = false,
+        CanUploadReleaseArtifacts = false
+    };
+
+    public static ReleaseExecutionBoundary ReadOnly { get; } = new()
     {
         CanCreateTag = false,
         CanCreateGitHubRelease = false,
