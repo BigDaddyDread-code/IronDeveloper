@@ -245,6 +245,9 @@ public static class IronDevCli
         if (IronDevCliReleaseCandidatePackage.IsReleaseCandidateCommand(args))
             return await IronDevCliReleaseCandidatePackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliReleaseReadinessDecisionPackage.IsReleaseReadinessCommand(args))
+            return await IronDevCliReleaseReadinessDecisionPackage.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3017,6 +3020,10 @@ public static class IronDevCli
         error.WriteLine("  irondev release-candidate inspect --package <release-candidate-package.json> [--json]");
         error.WriteLine("  irondev release-candidate status --package <release-candidate-package.json> [--json]");
         error.WriteLine("  irondev release-candidate records --package <release-candidate-package.json> [--json]");
+        error.WriteLine("  irondev release-readiness package --release-candidate-package <release-candidate-package.json> --repo <owner/name> --source-branch <main|release-branch> --candidate-commit <sha> --version <version> --tag <tag-name> --channel <internal|preview|release-candidate|stable|hotfix> --source-state <release-source-state.json> --tag-release-state <tag-release-state.json> --validation <validation-run-receipt.json> --artifact-readiness <artifact-readiness.json> --decision approved-for-release-executor --decision-by <github-login> --decision-rationale <text> --created-by <github-login> --out <path> [--json]");
+        error.WriteLine("  irondev release-readiness inspect --package <release-readiness-decision-package.json> [--json]");
+        error.WriteLine("  irondev release-readiness status --package <release-readiness-decision-package.json> [--json]");
+        error.WriteLine("  irondev release-readiness records --package <release-readiness-decision-package.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
