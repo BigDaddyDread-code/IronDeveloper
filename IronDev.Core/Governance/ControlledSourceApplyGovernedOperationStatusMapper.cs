@@ -227,6 +227,11 @@ public static class ControlledSourceApplyGovernedOperationStatusMapper
         {
             yield return $"{input.StatusKind}SourceApplyCannotCarryMissingEvidence";
         }
+        if (input.StatusKind == ControlledSourceApplyStatusKind.Eligible)
+        {
+            foreach (var issue in ValidateEligibleEvidence(input))
+                yield return issue;
+        }
         if (input.StatusKind == ControlledSourceApplyStatusKind.Blocked && ValuesOrEmpty(input.BlockedReasons).All(string.IsNullOrWhiteSpace))
             yield return "SourceApplyBlockedReasonRequired";
         if (input.StatusKind == ControlledSourceApplyStatusKind.Blocked &&
@@ -239,12 +244,31 @@ public static class ControlledSourceApplyGovernedOperationStatusMapper
         {
             yield return "SourceApplyCompletedReceiptRequired";
         }
+        if (input.StatusKind == ControlledSourceApplyStatusKind.Completed &&
+            !HasRefPrefix(input.ReceiptRefs, "source-apply-receipt"))
+        {
+            yield return "SourceApplyCompletedReceiptRefRequired";
+        }
         if (input.StatusKind == ControlledSourceApplyStatusKind.Expired &&
             input.ExpiresAtUtc is null &&
             !ContainsAny(ValuesOrEmpty(input.BlockedReasons), ["expir", "stale"]))
         {
             yield return "SourceApplyExpiryEvidenceRequired";
         }
+    }
+
+    private static IEnumerable<string> ValidateEligibleEvidence(ControlledSourceApplyStatusInput input)
+    {
+        if (!HasRefPrefix(input.EvidenceRefs, "accepted-source-apply-request"))
+            yield return "EligibleSourceApplyAcceptedRequestRequired";
+        if (!HasRefPrefix(input.EvidenceRefs, "dry-run"))
+            yield return "EligibleSourceApplyDryRunRequired";
+        if (!HasRefPrefix(input.EvidenceRefs, "patch-artifact"))
+            yield return "EligibleSourceApplyPatchArtifactRequired";
+        if (!HasRefPrefix(input.EvidenceRefs, "rollback-plan"))
+            yield return "EligibleSourceApplyRollbackSupportRequired";
+        if (!HasRefPrefix(input.EvidenceRefs, "worktree-state"))
+            yield return "EligibleSourceApplyWorktreeStateRequired";
     }
 
     private static IEnumerable<string> DetectAuthorityRedFlags(ControlledSourceApplyStatusInput input)
@@ -312,6 +336,10 @@ public static class ControlledSourceApplyGovernedOperationStatusMapper
 
     private static bool ContainsAny(IEnumerable<string?> values, IReadOnlyList<string> markers) =>
         values.Any(value => markers.Any(marker => value?.Contains(marker, StringComparison.OrdinalIgnoreCase) == true));
+
+    private static bool HasRefPrefix(IReadOnlyList<string>? values, string prefix) =>
+        ValuesOrEmpty(values).Any(value =>
+            value.Trim().StartsWith($"{prefix}:", StringComparison.OrdinalIgnoreCase));
 
     private static IEnumerable<string> ValuesOrEmpty(IReadOnlyList<string>? values) =>
         values ?? [];

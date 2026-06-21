@@ -211,6 +211,73 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
     }
 
     [TestMethod]
+    public void BlockBKSourceApply_Eligible_RequiresAcceptedSourceApplyRequestRef()
+    {
+        var result = Map(EligibleInput() with
+        {
+            EvidenceRefs = WithoutEvidencePrefix(EligibleInput(), "accepted-source-apply-request")
+        });
+
+        AssertInvalid(result, "EligibleSourceApplyAcceptedRequestRequired");
+    }
+
+    [TestMethod]
+    public void BlockBKSourceApply_Eligible_RequiresDryRunRef()
+    {
+        var result = Map(EligibleInput() with
+        {
+            EvidenceRefs = WithoutEvidencePrefix(EligibleInput(), "dry-run")
+        });
+
+        AssertInvalid(result, "EligibleSourceApplyDryRunRequired");
+    }
+
+    [TestMethod]
+    public void BlockBKSourceApply_Eligible_RequiresPatchArtifactRef()
+    {
+        var result = Map(EligibleInput() with
+        {
+            EvidenceRefs = WithoutEvidencePrefix(EligibleInput(), "patch-artifact")
+        });
+
+        AssertInvalid(result, "EligibleSourceApplyPatchArtifactRequired");
+    }
+
+    [TestMethod]
+    public void BlockBKSourceApply_Eligible_RequiresRollbackSupportRef()
+    {
+        var result = Map(EligibleInput() with
+        {
+            EvidenceRefs = WithoutEvidencePrefix(EligibleInput(), "rollback-plan")
+        });
+
+        AssertInvalid(result, "EligibleSourceApplyRollbackSupportRequired");
+    }
+
+    [TestMethod]
+    public void BlockBKSourceApply_Eligible_RequiresWorktreeStateRef()
+    {
+        var result = Map(EligibleInput() with
+        {
+            EvidenceRefs = WithoutEvidencePrefix(EligibleInput(), "worktree-state")
+        });
+
+        AssertInvalid(result, "EligibleSourceApplyWorktreeStateRequired");
+    }
+
+    [TestMethod]
+    public void BlockBKSourceApply_Eligible_WithOnlyIdentityRefsIsInvalid()
+    {
+        var result = Map(EligibleInput() with { EvidenceRefs = [] });
+
+        AssertInvalid(result, "EligibleSourceApplyAcceptedRequestRequired");
+        AssertInvalid(result, "EligibleSourceApplyDryRunRequired");
+        AssertInvalid(result, "EligibleSourceApplyPatchArtifactRequired");
+        AssertInvalid(result, "EligibleSourceApplyRollbackSupportRequired");
+        AssertInvalid(result, "EligibleSourceApplyWorktreeStateRequired");
+    }
+
+    [TestMethod]
     public void BlockBKSourceApply_Running_MapsToRunningAndDoesNotImplySuccess()
     {
         var result = Map(RunningInput());
@@ -247,6 +314,15 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
 
         AssertInvalid(result, "SourceApplyCompletedReceiptRequired");
         AssertInvalid(result, "CompletedStatusRequiresReceiptReference");
+        AssertInvalid(result, "SourceApplyCompletedReceiptRefRequired");
+    }
+
+    [TestMethod]
+    public void BlockBKSourceApply_Completed_RequiresSourceApplyReceiptRef()
+    {
+        var result = Map(CompletedInput() with { ReceiptRefs = ["source-apply-failure-receipt:failure-123"] });
+
+        AssertInvalid(result, "SourceApplyCompletedReceiptRefRequired");
     }
 
     [TestMethod]
@@ -485,9 +561,11 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
         StringAssert.Contains(doc, "Source apply status cannot execute.");
         StringAssert.Contains(doc, "Source apply status cannot mutate source.");
         StringAssert.Contains(doc, "Eligible status is explanation, not execution authority.");
+        StringAssert.Contains(doc, "Eligible status requires refs that explain eligibility.");
         StringAssert.Contains(doc, "Completed source apply is not commit authority.");
         StringAssert.Contains(doc, "Completed source apply is not push authority.");
         StringAssert.Contains(doc, "Completed source apply is not PR authority.");
+        StringAssert.Contains(doc, "Completed status requires a source-apply-receipt reference.");
         StringAssert.Contains(doc, "A source apply receipt is not rollback execution authority.");
         StringAssert.Contains(doc, "Source apply status can show the loaded gate. It cannot pull the lever.");
     }
@@ -572,6 +650,11 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
             BlockedReasons = ["Accepted source apply request expired."],
             ExpiresAtUtc = DateTimeOffset.Parse("2026-06-21T03:00:00Z")
         };
+
+    private static IReadOnlyList<string> WithoutEvidencePrefix(ControlledSourceApplyStatusInput input, string prefix) =>
+        input.EvidenceRefs
+            .Where(value => !value.StartsWith($"{prefix}:", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
 
     private static void AssertValid(ControlledSourceApplyGovernedOperationStatusMappingResult result)
     {
