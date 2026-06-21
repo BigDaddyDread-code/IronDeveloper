@@ -36,6 +36,7 @@ BI does not infer authority from prior runs.
 BI does not infer authority from old receipts.
 BI does not infer authority from workflow history.
 BI does not infer authority from cross-project memory.
+BI does not infer authority from cross-repository memory.
 
 Portable engineering memory may carry sanitized lessons.
 Portable engineering memory must not carry project authority.
@@ -158,7 +159,7 @@ remember-as-authority
 
 ## Review Line
 
-Block BI adds memory non-authority hardening that detects and blocks attempts to use memory, ThoughtLedger text, prior run summaries, old approvals, workflow history, or cross-project memory as current authority. It allows memory to be recorded as planning context only. It does not promote memory, approve, satisfy policy, execute, retry, release, deploy, rollback, source-apply, mutate source, mutate environments, continue workflow, or infer permission.
+Block BI hardens memory non-authority. Memory can inform context, but it cannot approve, satisfy policy, execute, mutate, promote itself, continue workflow, refresh stale authority, or cross project/repository boundaries as current authority.
 
 ## Killjoy
 
