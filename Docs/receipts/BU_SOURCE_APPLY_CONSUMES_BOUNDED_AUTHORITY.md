@@ -24,6 +24,7 @@ It does not add frontend/API/CLI.
 It does not add commit, push, PR, merge, release, or deployment authority.
 
 Source apply authority must bind repo, branch, run id, patch hash, file scope, and expiry.
+Repository, branch, and run id scopes must be single explicit values; wildcard, `any`, or `all` scopes fail closed.
 Run authority can approve source apply only for the patch it actually governed.
 
 ## Authority Paths

@@ -75,6 +75,46 @@ public sealed class BlockBUSourceApplyConsumesBoundedAuthorityTests
     }
 
     [TestMethod]
+    public void BlockBU_RequestScope_RejectsWildcardRepoBranchRun()
+    {
+        foreach (var repository in new[] { "*", "all", "any", "owner/*" })
+        {
+            AssertBlocked(
+                SourceApplyAuthorityEvaluator.Evaluate(ValidRequest() with
+                {
+                    Repository = repository,
+                    AcceptedApplyRequest = null,
+                    BoundedRunAuthorityGrant = null
+                }),
+                "RepositoryMustBeSingleExplicitScope");
+        }
+
+        foreach (var branch in new[] { "*", "all", "any", "feature/*" })
+        {
+            AssertBlocked(
+                SourceApplyAuthorityEvaluator.Evaluate(ValidRequest() with
+                {
+                    Branch = branch,
+                    AcceptedApplyRequest = null,
+                    BoundedRunAuthorityGrant = null
+                }),
+                "BranchMustBeSingleExplicitScope");
+        }
+
+        foreach (var runId in new[] { "*", "all", "any", "run-*" })
+        {
+            AssertBlocked(
+                SourceApplyAuthorityEvaluator.Evaluate(ValidRequest() with
+                {
+                    RunId = runId,
+                    AcceptedApplyRequest = null,
+                    BoundedRunAuthorityGrant = null
+                }),
+                "RunIdMustBeSingleExplicitScope");
+        }
+    }
+
+    [TestMethod]
     public void BlockBU_AcceptedApplyRequestPath_BlocksBindingFailures()
     {
         AssertBlockedForAccepted(ValidAcceptedRequest() with { Repository = "other/repo" }, "AcceptedApplyRequest:RepositoryMismatch");
@@ -88,6 +128,31 @@ public sealed class BlockBUSourceApplyConsumesBoundedAuthorityTests
         AssertBlockedForAccepted(ValidAcceptedRequest() with { ExpiresAtUtc = default }, "AcceptedApplyRequest:AcceptedApplyRequestExpiresAtUtcRequired");
         AssertBlockedForAccepted(ValidAcceptedRequest() with { ExpiresAtUtc = ObservedAtUtc.AddTicks(-1) }, "AcceptedApplyRequest:AcceptedApplyRequestExpired");
         AssertBlockedForAccepted(ValidAcceptedRequest() with { ExpiresAtUtc = ObservedAtUtc }, "AcceptedApplyRequest:AcceptedApplyRequestExpired");
+    }
+
+    [TestMethod]
+    public void BlockBU_AcceptedApplyRequestPath_RejectsWildcardScope()
+    {
+        foreach (var repository in new[] { "*", "all", "any", "owner/*" })
+        {
+            AssertBlockedForAccepted(
+                ValidAcceptedRequest() with { Repository = repository },
+                "AcceptedApplyRequest:RepositoryMustBeSingleExplicitScope");
+        }
+
+        foreach (var branch in new[] { "*", "all", "any", "feature/*" })
+        {
+            AssertBlockedForAccepted(
+                ValidAcceptedRequest() with { Branch = branch },
+                "AcceptedApplyRequest:BranchMustBeSingleExplicitScope");
+        }
+
+        foreach (var runId in new[] { "*", "all", "any", "run-*" })
+        {
+            AssertBlockedForAccepted(
+                ValidAcceptedRequest() with { RunId = runId },
+                "AcceptedApplyRequest:RunIdMustBeSingleExplicitScope");
+        }
     }
 
     [TestMethod]
@@ -126,6 +191,31 @@ public sealed class BlockBUSourceApplyConsumesBoundedAuthorityTests
         AssertBlockedForGrant(ValidGrant() with { ForbiddenFileGlobs = ["IronDev.Core/Governance/SourceApply/**"] }, $"BoundedRunAuthority:AffectedFileForbidden:{FilePath}");
         AssertBlockedForGrant(ValidGrant() with { ExpiresAtUtc = default }, "BoundedRunAuthority:BoundedRunExpiresAtUtcRequired");
         AssertBlockedForGrant(ValidGrant() with { ExpiresAtUtc = ObservedAtUtc }, "BoundedRunAuthority:BoundedRunExpired");
+    }
+
+    [TestMethod]
+    public void BlockBU_BoundedRunAuthorityPath_RejectsWildcardScope()
+    {
+        foreach (var repository in new[] { "*", "all", "any", "owner/*" })
+        {
+            AssertBlockedForGrant(
+                ValidGrant() with { Repository = repository },
+                "BoundedRunAuthority:BoundedRunRepositoryMustBeSingleExplicitScope");
+        }
+
+        foreach (var branch in new[] { "*", "all", "any", "feature/*" })
+        {
+            AssertBlockedForGrant(
+                ValidGrant() with { Branch = branch },
+                "BoundedRunAuthority:BoundedRunBranchMustBeSingleExplicitScope");
+        }
+
+        foreach (var runId in new[] { "*", "all", "any", "run-*" })
+        {
+            AssertBlockedForGrant(
+                ValidGrant() with { RunId = runId },
+                "BoundedRunAuthority:BoundedRunRunIdMustBeSingleExplicitScope");
+        }
     }
 
     [TestMethod]
@@ -292,7 +382,7 @@ public sealed class BlockBUSourceApplyConsumesBoundedAuthorityTests
         var root = FindRepositoryRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "IronDev.Core", "Governance", "SourceApply"),
-            "*Authority*.cs",
+            "*.cs",
             SearchOption.TopDirectoryOnly);
         var text = string.Join(Environment.NewLine, files.Select(File.ReadAllText));
 

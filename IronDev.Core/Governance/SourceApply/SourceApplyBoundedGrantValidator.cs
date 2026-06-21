@@ -66,6 +66,9 @@ public static class SourceApplyBoundedGrantValidator
         }
 
         RequireText(grant.GrantId, "BoundedRunGrantIdRequired", blocked);
+        ValidateSingleExplicitScope(grant.Repository, "BoundedRunRepository", blocked);
+        ValidateSingleExplicitScope(grant.Branch, "BoundedRunBranch", blocked);
+        ValidateSingleExplicitScope(grant.RunId, "BoundedRunRunId", blocked);
         Match(grant.Repository, request.Repository, "BoundedRunRepositoryMismatch", blocked);
         Match(grant.Branch, request.Branch, "BoundedRunBranchMismatch", blocked);
         Match(grant.RunId, request.RunId, "BoundedRunRunIdMismatch", blocked);
@@ -371,6 +374,24 @@ public static class SourceApplyBoundedGrantValidator
 
         if (!string.Equals(principalKind, "Human", StringComparison.OrdinalIgnoreCase))
             blocked.Add($"{label}Forbidden:{principalKind}");
+    }
+
+    internal static void ValidateSingleExplicitScope(string? value, string label, ICollection<string> blocked)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            blocked.Add($"{label}Required");
+            return;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Contains('*', StringComparison.Ordinal) ||
+            trimmed.Contains('?', StringComparison.Ordinal) ||
+            trimmed.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("any", StringComparison.OrdinalIgnoreCase))
+        {
+            blocked.Add($"{label}MustBeSingleExplicitScope");
+        }
     }
 
     private static void Match(string actual, string expected, string issue, ICollection<string> blocked)

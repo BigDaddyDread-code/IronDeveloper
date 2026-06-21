@@ -134,9 +134,9 @@ public static class SourceApplyAuthorityEvaluator
         ICollection<string> missing,
         ICollection<string> forbidden)
     {
-        RequireText(request.Repository, "RepositoryRequired", blocked);
-        RequireText(request.Branch, "BranchRequired", blocked);
-        RequireText(request.RunId, "RunIdRequired", blocked);
+        SourceApplyBoundedGrantValidator.ValidateSingleExplicitScope(request.Repository, "Repository", blocked);
+        SourceApplyBoundedGrantValidator.ValidateSingleExplicitScope(request.Branch, "Branch", blocked);
+        SourceApplyBoundedGrantValidator.ValidateSingleExplicitScope(request.RunId, "RunId", blocked);
 
         if (string.IsNullOrWhiteSpace(request.PatchHash))
             missing.Add("PatchHashRequired");
@@ -179,6 +179,9 @@ public static class SourceApplyAuthorityEvaluator
 
         RequireText(accepted.RequestId, "RequestIdRequired", blocked);
         RequireText(accepted.EvidenceRef, "EvidenceRefRequired", blocked);
+        SourceApplyBoundedGrantValidator.ValidateSingleExplicitScope(accepted.Repository, "Repository", blocked);
+        SourceApplyBoundedGrantValidator.ValidateSingleExplicitScope(accepted.Branch, "Branch", blocked);
+        SourceApplyBoundedGrantValidator.ValidateSingleExplicitScope(accepted.RunId, "RunId", blocked);
         Match(accepted.Repository, request.Repository, "RepositoryMismatch", blocked);
         Match(accepted.Branch, request.Branch, "BranchMismatch", blocked);
         Match(accepted.RunId, request.RunId, "RunIdMismatch", blocked);
