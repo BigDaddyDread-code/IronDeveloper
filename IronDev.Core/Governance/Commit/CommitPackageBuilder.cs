@@ -55,7 +55,7 @@ public static class CommitPackageBuilder
         ValidateRequestEnvelope(request, blocked, missing);
         ValidateSourceApplyReceipt(request, blocked, missing);
         ValidateExpectedDiff(request, blocked, missing);
-        ValidateCommitEligibility(request, blocked, missing);
+        ValidateCommitAuthority(request, blocked, missing);
         ValidateMessageEvidence(request, blocked, missing);
         ValidateValidationRequirement(request, blocked, missing);
 
@@ -104,6 +104,9 @@ public static class CommitPackageBuilder
         Match(receipt.Branch, request.Branch, "SourceApplyReceiptBranchMismatch", blocked);
         Match(receipt.RunId, request.RunId, "SourceApplyReceiptRunIdMismatch", blocked);
         Match(receipt.PatchHash, request.PatchHash, "SourceApplyReceiptPatchHashMismatch", blocked);
+        ValidateSingleExplicitScope(receipt.Repository, "SourceApplyReceiptRepository", blocked);
+        ValidateSingleExplicitScope(receipt.Branch, "SourceApplyReceiptBranch", blocked);
+        ValidateSingleExplicitScope(receipt.RunId, "SourceApplyReceiptRunId", blocked);
         ValidateFilePaths(receipt.AppliedFilePaths, "SourceApplyReceiptAppliedFilePaths", blocked, missing);
 
         if (receipt.AppliedAtUtc == default)
@@ -136,6 +139,9 @@ public static class CommitPackageBuilder
         Match(diff.Branch, request.Branch, "ExpectedDiffBranchMismatch", blocked);
         Match(diff.RunId, request.RunId, "ExpectedDiffRunIdMismatch", blocked);
         Match(diff.PatchHash, request.PatchHash, "ExpectedDiffPatchHashMismatch", blocked);
+        ValidateSingleExplicitScope(diff.Repository, "ExpectedDiffRepository", blocked);
+        ValidateSingleExplicitScope(diff.Branch, "ExpectedDiffBranch", blocked);
+        ValidateSingleExplicitScope(diff.RunId, "ExpectedDiffRunId", blocked);
 
         if (string.IsNullOrWhiteSpace(diff.ExpectedDiffHash))
             missing.Add("expected-diff-hash");
@@ -156,12 +162,53 @@ public static class CommitPackageBuilder
         }
     }
 
-    private static void ValidateCommitEligibility(
+    private static void ValidateCommitAuthority(
         CommitPackageRequest request,
         ICollection<string> blocked,
         ICollection<string> missing)
     {
-        var decision = request.CommitEligibilityDecision;
+        var authority = request.CommitAuthority;
+        if (authority is null)
+        {
+            blocked.Add("CommitOperationAuthorityRequired");
+            missing.Add("commit-operation-authority");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(authority.EvidenceRef))
+            missing.Add("commit-operation-authority");
+        else if (!authority.EvidenceRef.StartsWith("operation-eligibility-decision:", StringComparison.OrdinalIgnoreCase) &&
+                 !authority.EvidenceRef.StartsWith("commit-operation-authority:", StringComparison.OrdinalIgnoreCase))
+        {
+            blocked.Add("CommitOperationAuthorityEvidenceRefInvalid");
+        }
+
+        Match(authority.Repository, request.Repository, "CommitAuthorityRepositoryMismatch", blocked);
+        Match(authority.Branch, request.Branch, "CommitAuthorityBranchMismatch", blocked);
+        Match(authority.RunId, request.RunId, "CommitAuthorityRunIdMismatch", blocked);
+        Match(authority.PatchHash, request.PatchHash, "CommitAuthorityPatchHashMismatch", blocked);
+        ValidateSingleExplicitScope(authority.Repository, "CommitAuthorityRepository", blocked);
+        ValidateSingleExplicitScope(authority.Branch, "CommitAuthorityBranch", blocked);
+        ValidateSingleExplicitScope(authority.RunId, "CommitAuthorityRunId", blocked);
+        ValidateFilePaths(authority.FilePaths, "CommitAuthorityFilePaths", blocked, missing);
+
+        if (request.ExpectedDiff is not null &&
+            HasValues(request.ExpectedDiff.ExpectedChangedFilePaths) &&
+            HasValues(authority.FilePaths) &&
+            !SameSet(request.ExpectedDiff.ExpectedChangedFilePaths, authority.FilePaths))
+        {
+            blocked.Add("CommitAuthorityDoesNotMatchExpectedDiff");
+        }
+
+        if (request.SourceApplyReceipt is not null &&
+            HasValues(request.SourceApplyReceipt.AppliedFilePaths) &&
+            HasValues(authority.FilePaths) &&
+            !SameSet(request.SourceApplyReceipt.AppliedFilePaths, authority.FilePaths))
+        {
+            blocked.Add("CommitAuthorityDoesNotMatchSourceApplyReceipt");
+        }
+
+        var decision = authority.Decision;
         if (decision is null)
         {
             blocked.Add("CommitOperationAuthorityRequired");
@@ -355,6 +402,7 @@ public static class CommitPackageBuilder
             Ref("branch", request?.Branch),
             Ref("run", request?.RunId),
             Ref("patch-hash", request?.PatchHash),
+            request?.CommitAuthority?.EvidenceRef,
             request?.ExpectedDiff?.EvidenceRef,
             request?.MessageEvidence?.EvidenceRef,
             .. ReferenceValuesOrEmpty(request?.ValidationRequirement?.ValidationEvidenceRefs),

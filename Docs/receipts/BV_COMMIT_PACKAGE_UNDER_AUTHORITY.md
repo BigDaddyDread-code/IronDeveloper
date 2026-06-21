@@ -33,6 +33,7 @@ Validation passed is not commit authority.
 Clean expected diff evidence is not commit authority.
 Commit message evidence is not commit authority.
 Commit operation authority is required separately.
+Commit operation authority must bind the same repository, branch, run id, patch hash, and file set as the source-apply receipt and expected diff evidence.
 
 ## Authority Chain
 
@@ -44,6 +45,7 @@ It does not prove the system may commit.
 
 Commit operation eligibility must be for `Commit`, must be eligible, and must carry no blocked reasons or missing evidence.
 Any `SourceApply`, `PatchPackageWrite`, `Push`, or other operation eligibility decision fails closed.
+Commit operation eligibility must be wrapped in scoped commit authority evidence before BV can consume it.
 
 Validation must be satisfied or explicitly blocked.
 Explicitly blocked validation maps the package to `Blocked`, not `Eligible`.

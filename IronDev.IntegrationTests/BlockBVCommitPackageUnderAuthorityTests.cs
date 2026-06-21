@@ -1,6 +1,7 @@
 using System.Reflection;
 using IronDev.Core.Governance;
 using BvCommitMessageEvidence = IronDev.Core.Governance.Commit.CommitMessageEvidence;
+using BvCommitOperationAuthorityEvidence = IronDev.Core.Governance.Commit.CommitOperationAuthorityEvidence;
 using BvCommitPackageBuilder = IronDev.Core.Governance.Commit.CommitPackageBuilder;
 using BvCommitPackageRequest = IronDev.Core.Governance.Commit.CommitPackageRequest;
 using BvCommitPackageResult = IronDev.Core.Governance.Commit.CommitPackageResult;
@@ -52,7 +53,7 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
         AssertBlocked(ValidRequest() with { SourceApplyReceipt = ValidSourceApplyReceipt() with { PatchHash = "sha256:other" } }, "SourceApplyReceiptPatchHashMismatch");
         AssertBlocked(ValidRequest() with { SourceApplyReceipt = ValidSourceApplyReceipt() with { AppliedFilePaths = ["../outside.cs"] } }, "SourceApplyReceiptAppliedFilePathsUnsafe:../outside.cs");
 
-        var result = BvCommitPackageBuilder.Build(ValidRequest() with { CommitEligibilityDecision = null });
+        var result = BvCommitPackageBuilder.Build(ValidRequest() with { CommitAuthority = null });
         AssertBlocked(result, "CommitOperationAuthorityRequired");
         AssertContains(result.OperationStatus.ForbiddenActions, "do not treat source apply receipt as commit authority");
     }
@@ -78,8 +79,17 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
     [TestMethod]
     public void BlockBV_CommitOperationAuthority_CannotBeSatisfiedByOtherOperations()
     {
-        AssertBlocked(ValidRequest() with { CommitEligibilityDecision = null }, "CommitOperationAuthorityRequired");
-        AssertMissing(ValidRequest() with { CommitEligibilityDecision = null }, "commit-operation-eligibility-decision");
+        AssertBlocked(ValidRequest() with { CommitAuthority = null }, "CommitOperationAuthorityRequired");
+        AssertMissing(ValidRequest() with { CommitAuthority = null }, "commit-operation-authority");
+        AssertMissing(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { EvidenceRef = "" } }, "commit-operation-authority");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { EvidenceRef = "authority:wrong" } }, "CommitOperationAuthorityEvidenceRefInvalid");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Repository = "other/repo" } }, "CommitAuthorityRepositoryMismatch");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Branch = "other-branch" } }, "CommitAuthorityBranchMismatch");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { RunId = "other-run" } }, "CommitAuthorityRunIdMismatch");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { PatchHash = "sha256:other" } }, "CommitAuthorityPatchHashMismatch");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { FilePaths = ["../outside.cs"] } }, "CommitAuthorityFilePathsUnsafe:../outside.cs");
+        AssertBlocked(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { FilePaths = ["Docs/receipts/BV.md"] } }, "CommitAuthorityDoesNotMatchExpectedDiff");
+        AssertMissing(ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Decision = null } }, "commit-operation-eligibility-decision");
 
         foreach (var operation in new[]
         {
@@ -89,18 +99,18 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
         })
         {
             AssertBlocked(
-                ValidRequest() with { CommitEligibilityDecision = EligibleDecision(operation) },
+                ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Decision = EligibleDecision(operation) } },
                 "CommitOperationAuthorityRequired");
         }
 
         AssertBlocked(
-            ValidRequest() with { CommitEligibilityDecision = EligibleDecision(RunAuthorityOperationKind.Commit) with { IsEligibleUnderProfileAndGrant = false } },
+            ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Decision = EligibleDecision(RunAuthorityOperationKind.Commit) with { IsEligibleUnderProfileAndGrant = false } } },
             "CommitEligibilityDecisionNotEligible");
         AssertBlocked(
-            ValidRequest() with { CommitEligibilityDecision = EligibleDecision(RunAuthorityOperationKind.Commit) with { BlockedReasons = ["GrantExpired"] } },
+            ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Decision = EligibleDecision(RunAuthorityOperationKind.Commit) with { BlockedReasons = ["GrantExpired"] } } },
             "CommitEligibilityDecisionBlocked");
         AssertBlocked(
-            ValidRequest() with { CommitEligibilityDecision = EligibleDecision(RunAuthorityOperationKind.Commit) with { MissingEvidence = ["commit-approval"] } },
+            ValidRequest() with { CommitAuthority = ValidCommitAuthority() with { Decision = EligibleDecision(RunAuthorityOperationKind.Commit) with { MissingEvidence = ["commit-approval"] } } },
             "CommitEligibilityDecisionMissingEvidence");
     }
 
@@ -238,7 +248,7 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
         {
             var result = BvCommitPackageBuilder.Build(ValidRequest() with
             {
-                CommitEligibilityDecision = null,
+                CommitAuthority = null,
                 EvidenceRefs = [hostile],
                 ReceiptRefs = [hostile]
             });
@@ -313,6 +323,7 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
                 typeof(IronDev.Core.Governance.Commit.CommitPackageManifest),
                 typeof(BvCommitPackageResult),
                 typeof(BvCommitPackageBuilder),
+                typeof(BvCommitOperationAuthorityEvidence),
                 typeof(BvCommitMessageEvidence),
                 typeof(BvSourceApplyReceiptEvidence),
                 typeof(BvExpectedDiffEvidence),
@@ -362,7 +373,7 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
             PatchHash = PatchHash,
             SourceApplyReceipt = ValidSourceApplyReceipt(),
             ExpectedDiff = ValidExpectedDiff(),
-            CommitEligibilityDecision = EligibleDecision(RunAuthorityOperationKind.Commit),
+            CommitAuthority = ValidCommitAuthority(),
             MessageEvidence = ValidMessage(),
             ValidationRequirement = ValidValidationRequirement(),
             ObservedAtUtc = ObservedAtUtc,
@@ -398,6 +409,18 @@ public sealed class BlockBVCommitPackageUnderAuthorityTests
             ExpectedDiffHash = DiffHash,
             ExpectedChangedFilePaths = [FilePath],
             IsCleanExpectedDiff = true
+        };
+
+    private static BvCommitOperationAuthorityEvidence ValidCommitAuthority() =>
+        new()
+        {
+            EvidenceRef = "operation-eligibility-decision:commit-bv-001",
+            Repository = Repository,
+            Branch = Branch,
+            RunId = RunId,
+            PatchHash = PatchHash,
+            FilePaths = [FilePath],
+            Decision = EligibleDecision(RunAuthorityOperationKind.Commit)
         };
 
     private static BvCommitMessageEvidence ValidMessage() =>

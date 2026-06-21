@@ -13,7 +13,7 @@ public sealed record CommitPackageRequest
 
     public required SourceApplyReceiptEvidence? SourceApplyReceipt { get; init; }
     public required ExpectedDiffEvidence? ExpectedDiff { get; init; }
-    public required OperationEligibilityDecision? CommitEligibilityDecision { get; init; }
+    public required CommitOperationAuthorityEvidence? CommitAuthority { get; init; }
     public required CommitMessageEvidence? MessageEvidence { get; init; }
     public required CommitValidationRequirementEvidence? ValidationRequirement { get; init; }
 
