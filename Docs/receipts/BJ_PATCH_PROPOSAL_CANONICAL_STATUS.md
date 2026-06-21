@@ -55,7 +55,7 @@ PatchProposal never maps to SourceApply eligibility.
 
 The mapper writes OperationKind = PatchProposal and validates every mapped status through GovernedOperationStatusValidator.
 
-ReadyForReview statuses include a status artifact reference so the canonical completed-status rule has a receipt-like reference without inventing mutation authority.
+ReadyForReview statuses include a patch-proposal status artifact reference only to satisfy canonical completed-status traceability. It is not a mutation receipt and does not carry authority.
 
 Unsafe status text is red-flagged when it implies that patch proposal evidence, validation, review summaries, known risks, memory, UI state, or old proposals approve or authorize later operations.
 

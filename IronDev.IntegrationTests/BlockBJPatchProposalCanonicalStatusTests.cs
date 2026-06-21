@@ -81,6 +81,30 @@ public sealed class BlockBJPatchProposalCanonicalStatusTests
     }
 
     [TestMethod]
+    public void BlockBJPatchProposal_ReadyForReview_CannotCarryBlockedReasons()
+    {
+        var result = Map(ReadyInput() with
+        {
+            BlockedReasons = ["Validation evidence is missing."]
+        });
+
+        AssertInvalid(result, "ReadyPatchProposalCannotCarryBlockedReasons");
+        Assert.AreEqual(GovernedOperationState.Completed, result.Status.State);
+    }
+
+    [TestMethod]
+    public void BlockBJPatchProposal_ReadyForReview_CannotCarryMissingEvidence()
+    {
+        var result = Map(ReadyInput() with
+        {
+            MissingEvidence = ["validation-result:focused"]
+        });
+
+        AssertInvalid(result, "ReadyPatchProposalCannotCarryMissingEvidence");
+        Assert.AreEqual(GovernedOperationState.Completed, result.Status.State);
+    }
+
+    [TestMethod]
     public void BlockBJPatchProposal_Blocked_MapsToBlockedAndExplainsWhy()
     {
         var result = Map(BlockedMissingValidationInput());

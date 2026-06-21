@@ -182,6 +182,16 @@ public static class PatchProposalGovernedOperationStatusMapper
             yield return "PatchProposalIdRequired";
         if (string.IsNullOrWhiteSpace(input.PatchHash))
             yield return "PatchHashRequired";
+        if (input.StatusKind == PatchProposalStatusKind.ReadyForReview &&
+            ValuesOrEmpty(input.BlockedReasons).Any(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            yield return "ReadyPatchProposalCannotCarryBlockedReasons";
+        }
+        if (input.StatusKind == PatchProposalStatusKind.ReadyForReview &&
+            ValuesOrEmpty(input.MissingEvidence).Any(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            yield return "ReadyPatchProposalCannotCarryMissingEvidence";
+        }
         if (input.StatusKind == PatchProposalStatusKind.Blocked && ValuesOrEmpty(input.BlockedReasons).All(string.IsNullOrWhiteSpace))
             yield return "PatchProposalBlockedReasonRequired";
         if (input.StatusKind == PatchProposalStatusKind.Blocked &&
