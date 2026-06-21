@@ -1,4 +1,5 @@
 using IronDev.Core.Governance;
+using IronDev.Core.Governance.RollbackStatus;
 
 namespace IronDev.Core.Governance.RollbackExecution;
 
@@ -74,6 +75,7 @@ public static class ControlledRollbackExecutor
 
         var preflightIssues = new List<string>();
         ValidateRequestEnvelope(request, preflightIssues);
+        ValidateApplyReceipt(request, preflightIssues);
         ValidateTarget(request, preflightIssues);
         ValidateAuthorityOrPolicyPath(request, preflightIssues);
 
@@ -215,6 +217,28 @@ public static class ControlledRollbackExecutor
             issues.Add("PartialRollbackRisk");
 
         ValidateExpectedFiles(target.ExpectedFiles, issues);
+    }
+
+    private static void ValidateApplyReceipt(
+        ControlledRollbackExecutionRequest request,
+        ICollection<string> issues)
+    {
+        var receipt = request.ApplyReceipt;
+        if (receipt is null)
+        {
+            issues.Add("RollbackApplyReceiptRequired");
+            return;
+        }
+
+        MatchReceipt(receipt.ReceiptRef, request.SourceApplyReceiptRef, issues);
+        Match(receipt.Repository, request.Repository, "RollbackApplyReceiptRepositoryMismatch", issues);
+        Match(receipt.Branch, request.Branch, "RollbackApplyReceiptBranchMismatch", issues);
+        Match(receipt.RunId, request.RunId, "RollbackApplyReceiptRunIdMismatch", issues);
+        Match(receipt.PatchHash, request.PatchHash, "RollbackApplyReceiptPatchHashMismatch", issues);
+        if (!receipt.IsSourceApplyReceipt)
+            issues.Add("RollbackApplyReceiptNotSourceApply");
+        if (!receipt.IsApplyReceiptAcceptedForRollback)
+            issues.Add("RollbackApplyReceiptNotAcceptedForRollback");
     }
 
     private static void ValidateAuthorityOrPolicyPath(
@@ -412,6 +436,10 @@ public static class ControlledRollbackExecutor
             CommitDisabled = true,
             PushDisabled = true,
             PullRequestDisabled = true,
+            MergeDisabled = true,
+            ReleaseDisabled = true,
+            DeploymentDisabled = true,
+            MemoryWriteDisabled = true,
             WorkflowContinuationDisabled = true
         };
 
@@ -525,6 +553,7 @@ public static class ControlledRollbackExecutor
             Ref("run", request?.RunId),
             Ref("patch-hash", request?.PatchHash),
             Ref("source-apply-receipt", request?.SourceApplyReceiptRef),
+            request?.ApplyReceipt?.ReceiptRef,
             request?.Target?.EvidenceRef,
             request?.Authority?.EvidenceRef,
             request?.PolicyApprovedPath?.EvidenceRef,

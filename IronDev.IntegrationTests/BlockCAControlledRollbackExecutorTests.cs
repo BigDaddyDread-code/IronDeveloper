@@ -1,6 +1,7 @@
 using System.Reflection;
 using IronDev.Core.Governance;
 using IronDev.Core.Governance.RollbackExecution;
+using IronDev.Core.Governance.RollbackStatus;
 using ControlledRollbackExecutionRequest = IronDev.Core.Governance.RollbackExecution.ControlledRollbackExecutionRequest;
 using ControlledRollbackExecutionResult = IronDev.Core.Governance.RollbackExecution.ControlledRollbackExecutionResult;
 using ControlledRollbackExecutor = IronDev.Core.Governance.RollbackExecution.ControlledRollbackExecutor;
@@ -48,6 +49,10 @@ public sealed class BlockCAControlledRollbackExecutorTests
         Assert.IsTrue(gateway.LastRequest.CommitDisabled);
         Assert.IsTrue(gateway.LastRequest.PushDisabled);
         Assert.IsTrue(gateway.LastRequest.PullRequestDisabled);
+        Assert.IsTrue(gateway.LastRequest.MergeDisabled);
+        Assert.IsTrue(gateway.LastRequest.ReleaseDisabled);
+        Assert.IsTrue(gateway.LastRequest.DeploymentDisabled);
+        Assert.IsTrue(gateway.LastRequest.MemoryWriteDisabled);
         Assert.IsTrue(gateway.LastRequest.WorkflowContinuationDisabled);
         AssertValid(result);
     }
@@ -125,6 +130,36 @@ public sealed class BlockCAControlledRollbackExecutorTests
                 gateway).ConfigureAwait(false);
 
             Assert.AreEqual(ControlledRollbackExecutionVerdict.Blocked, result.Verdict, item.Name);
+            AssertHasIssue(result, item.ExpectedIssue, item.Name);
+            Assert.AreEqual(0, inspector.PreCalls, item.Name);
+            Assert.AreEqual(0, gateway.RollbackCalls, item.Name);
+            AssertValid(result);
+        }
+    }
+
+    [TestMethod]
+    public async Task BlockCA_Executor_VerifiesSourceApplyReceiptBeforeGateway()
+    {
+        var cases = new (string Name, ControlledRollbackExecutionRequest Request, string ExpectedIssue)[]
+        {
+            ("missing", ValidRequest() with { ApplyReceipt = null }, "RollbackApplyReceiptRequired"),
+            ("ref", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { ReceiptRef = "source-apply-receipt:other" } }, "RollbackApplyReceiptMismatch"),
+            ("repo", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { Repository = "other/repo" } }, "RollbackApplyReceiptRepositoryMismatch"),
+            ("branch", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { Branch = "other-branch" } }, "RollbackApplyReceiptBranchMismatch"),
+            ("run", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { RunId = "other-run" } }, "RollbackApplyReceiptRunIdMismatch"),
+            ("patch", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { PatchHash = "sha256:other" } }, "RollbackApplyReceiptPatchHashMismatch"),
+            ("not-source-apply", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { IsSourceApplyReceipt = false } }, "RollbackApplyReceiptNotSourceApply"),
+            ("not-accepted", ValidRequest() with { ApplyReceipt = ValidApplyReceipt() with { IsApplyReceiptAcceptedForRollback = false } }, "RollbackApplyReceiptNotAcceptedForRollback")
+        };
+
+        foreach (var item in cases)
+        {
+            var inspector = new FakeRollbackWorktreeInspector { PreStates = [GoodPreState()] };
+            var gateway = new FakeControlledRollbackGateway();
+            var result = await ControlledRollbackExecutor.ExecuteAsync(item.Request, inspector, gateway).ConfigureAwait(false);
+
+            Assert.AreEqual(ControlledRollbackExecutionVerdict.Blocked, result.Verdict, item.Name);
+            Assert.IsFalse(result.IsRollbackExecuted, item.Name);
             AssertHasIssue(result, item.ExpectedIssue, item.Name);
             Assert.AreEqual(0, inspector.PreCalls, item.Name);
             Assert.AreEqual(0, gateway.RollbackCalls, item.Name);
@@ -482,12 +517,25 @@ public sealed class BlockCAControlledRollbackExecutorTests
             RunId = RunId,
             PatchHash = PatchHash,
             SourceApplyReceiptRef = SourceApplyReceiptRef,
+            ApplyReceipt = ValidApplyReceipt(),
             Target = ValidTarget(),
             Authority = ValidAuthority(),
             PolicyApprovedPath = null,
             ObservedAtUtc = ObservedAtUtc,
             EvidenceRefs = ["controlled-rollback-execution-request:ca-001"],
             ReceiptRefs = []
+        };
+
+    private static RollbackApplyReceiptEvidence ValidApplyReceipt() =>
+        new()
+        {
+            ReceiptRef = SourceApplyReceiptRef,
+            Repository = Repository,
+            Branch = Branch,
+            RunId = RunId,
+            PatchHash = PatchHash,
+            IsSourceApplyReceipt = true,
+            IsApplyReceiptAcceptedForRollback = true
         };
 
     private static RollbackTargetEvidence ValidTarget() =>

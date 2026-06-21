@@ -16,6 +16,8 @@ Rollback eligibility is not rollback execution.
 
 Rollback executes only under explicit rollback authority or a narrow policy-approved rollback path.
 
+Source-apply receipt evidence must exist, match the rollback request, be a source-apply receipt, and be accepted for rollback.
+
 Rollback verifies source apply receipt, rollback target, expected files, pre-state, receipt, and post-state.
 
 Partial rollback risk blocks rollback.

@@ -17,5 +17,9 @@ public sealed record ControlledRollbackGatewayRequest
     public required bool CommitDisabled { get; init; }
     public required bool PushDisabled { get; init; }
     public required bool PullRequestDisabled { get; init; }
+    public required bool MergeDisabled { get; init; }
+    public required bool ReleaseDisabled { get; init; }
+    public required bool DeploymentDisabled { get; init; }
+    public required bool MemoryWriteDisabled { get; init; }
     public required bool WorkflowContinuationDisabled { get; init; }
 }

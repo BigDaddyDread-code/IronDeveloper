@@ -1,4 +1,5 @@
 using IronDev.Core.Governance;
+using IronDev.Core.Governance.RollbackStatus;
 
 namespace IronDev.Core.Governance.RollbackExecution;
 
@@ -13,6 +14,7 @@ public sealed record ControlledRollbackExecutionRequest
 
     public required string SourceApplyReceiptRef { get; init; }
 
+    public required RollbackApplyReceiptEvidence? ApplyReceipt { get; init; }
     public required RollbackTargetEvidence? Target { get; init; }
     public required RollbackExecutionAuthorityEvidence? Authority { get; init; }
     public RollbackPolicyApprovedPathEvidence? PolicyApprovedPath { get; init; }
