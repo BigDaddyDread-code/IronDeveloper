@@ -23,7 +23,7 @@ public sealed record GovernedOperationStatus
 public sealed record GovernedOperationStatusBoundary
 {
     public bool StatusOnly { get; init; } = true;
-    public bool EvidenceOnly { get; init; } = true;
+    public bool ReferenceOnly { get; init; } = true;
     public bool CanApprove { get; init; }
     public bool CanSatisfyPolicy { get; init; }
     public bool CanExecute { get; init; }

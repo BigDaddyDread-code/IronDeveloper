@@ -136,7 +136,7 @@ public static class GovernedOperationStatusValidator
         ICollection<string> redFlags,
         ICollection<string> amberFlags)
     {
-        foreach (var action in status.NextSafeActions.Where(item => !string.IsNullOrWhiteSpace(item)))
+        foreach (var action in ValuesOrEmpty(status.NextSafeActions).Where(item => !string.IsNullOrWhiteSpace(item)))
         {
             if (IsGuidanceAction(action))
                 continue;
@@ -191,29 +191,32 @@ public static class GovernedOperationStatusValidator
             issues.Add(issue);
     }
 
-    private static bool IsEmpty(IReadOnlyList<string> values) =>
-        values.Count == 0 || values.All(string.IsNullOrWhiteSpace);
+    private static bool IsEmpty(IReadOnlyList<string>? values) =>
+        values is null || values.Count == 0 || values.All(string.IsNullOrWhiteSpace);
 
-    private static bool ContainsText(IEnumerable<string> values, string marker) =>
-        values.Any(value => value.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    private static bool ContainsText(IEnumerable<string?> values, string marker) =>
+        values.Any(value => value?.Contains(marker, StringComparison.OrdinalIgnoreCase) == true);
 
-    private static IEnumerable<string> AllTextFields(GovernedOperationStatus status)
+    private static IEnumerable<string?> AllTextFields(GovernedOperationStatus status)
     {
         yield return status.OperationId;
         yield return status.OperationKind;
         yield return status.Subject;
 
-        foreach (var value in status.BlockedReasons)
+        foreach (var value in ValuesOrEmpty(status.BlockedReasons))
             yield return value;
-        foreach (var value in status.MissingEvidence)
+        foreach (var value in ValuesOrEmpty(status.MissingEvidence))
             yield return value;
-        foreach (var value in status.NextSafeActions)
+        foreach (var value in ValuesOrEmpty(status.NextSafeActions))
             yield return value;
-        foreach (var value in status.ForbiddenActions)
+        foreach (var value in ValuesOrEmpty(status.ForbiddenActions))
             yield return value;
-        foreach (var value in status.EvidenceRefs)
+        foreach (var value in ValuesOrEmpty(status.EvidenceRefs))
             yield return value;
-        foreach (var value in status.ReceiptRefs)
+        foreach (var value in ValuesOrEmpty(status.ReceiptRefs))
             yield return value;
     }
+
+    private static IEnumerable<string> ValuesOrEmpty(IReadOnlyList<string>? values) =>
+        values ?? [];
 }

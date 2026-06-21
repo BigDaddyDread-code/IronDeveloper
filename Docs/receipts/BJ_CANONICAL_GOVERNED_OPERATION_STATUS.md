@@ -25,6 +25,7 @@ Status is not source mutation.
 Status is not a receipt.
 Status is not evidence by itself.
 
+BJ status is status-only and reference-only.
 NextSafeActions are guidance, not permission.
 EvidenceRefs do not satisfy authority unless the relevant evaluator says so.
 ReceiptRefs do not become new authority.

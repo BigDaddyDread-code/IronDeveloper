@@ -158,6 +158,26 @@ public sealed class BlockBJCanonicalGovernedOperationStatusTests
     }
 
     [TestMethod]
+    public void BlockBJ_NullCollections_ReturnInvalidInsteadOfThrowing()
+    {
+        var status = BlockedStatus() with
+        {
+            BlockedReasons = null!,
+            MissingEvidence = null!,
+            NextSafeActions = null!,
+            ForbiddenActions = null!,
+            EvidenceRefs = null!,
+            ReceiptRefs = null!
+        };
+
+        var result = Validate(status);
+
+        AssertInvalid(result, "BlockedReasonRequired");
+        AssertInvalid(result, "BlockedStatusNeedsEvidenceOrNextSafeAction");
+        AssertInvalid(result, "ForbiddenActionsRequiredForAuthorityBearingOperation");
+    }
+
+    [TestMethod]
     public void BlockBJ_State_MustBeExplicit()
     {
         var result = Validate(BlockedStatus() with { State = (GovernedOperationState)0 });
@@ -266,7 +286,7 @@ public sealed class BlockBJCanonicalGovernedOperationStatusTests
         var boundary = GovernedOperationStatusBoundary.Status;
 
         Assert.IsTrue(boundary.StatusOnly);
-        Assert.IsTrue(boundary.EvidenceOnly);
+        Assert.IsTrue(boundary.ReferenceOnly);
         Assert.IsFalse(boundary.CanApprove);
         Assert.IsFalse(boundary.CanSatisfyPolicy);
         Assert.IsFalse(boundary.CanExecute);
