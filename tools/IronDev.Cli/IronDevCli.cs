@@ -272,6 +272,9 @@ public static class IronDevCli
         if (IronDevCliMemoryNonAuthority.IsMemoryNonAuthorityCommand(args))
             return await IronDevCliMemoryNonAuthority.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliGovernedOperationStatusInspect.IsOperationStatusCommand(args))
+            return await IronDevCliGovernedOperationStatusInspect.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3078,6 +3081,7 @@ public static class IronDevCli
         error.WriteLine("  irondev memory-non-authority inspect --report <path> [--json]");
         error.WriteLine("  irondev memory-non-authority red-findings --report <path> [--json]");
         error.WriteLine("  irondev memory-non-authority amber-findings --report <path> [--json]");
+        error.WriteLine("  irondev operation-status inspect --status <operation-status.json> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
