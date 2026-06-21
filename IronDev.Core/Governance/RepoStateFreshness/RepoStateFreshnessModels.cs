@@ -95,7 +95,9 @@ public enum RepoStateFreshnessIssueKind
     RemoteChanged = 11,
     StaleValidation = 12,
     ValidationMismatch = 13,
-    ContradictoryEvidence = 14
+    ContradictoryEvidence = 14,
+    MissingRequiredStateEvidence = 15,
+    InvalidOperationKind = 16
 }
 
 public sealed record RepoStateFreshnessResult

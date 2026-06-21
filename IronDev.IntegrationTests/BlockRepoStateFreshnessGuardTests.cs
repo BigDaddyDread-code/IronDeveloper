@@ -290,6 +290,157 @@ public sealed class BlockRepoStateFreshnessGuardTests
     }
 
     [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankBaseBranch()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { BaseBranch = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.BaseBranch", "expected-base-branch");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankBaseSha()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { BaseSha = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.BaseSha", "expected-base-sha");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankHeadBranch()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { HeadBranch = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.HeadBranch", "expected-head-branch");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankHeadSha()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { HeadSha = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.HeadSha", "expected-head-sha");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankPatchHash()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { PatchHash = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.PatchHash", "expected-patch-hash");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankValidationBaseSha()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { ValidationBaseSha = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.ValidationBaseSha", "expected-validation-base-sha");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankValidationHeadSha()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { ValidationHeadSha = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.ValidationHeadSha", "expected-validation-head-sha");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForBlankValidationPatchHash()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with { ValidationPatchHash = " " }
+        });
+
+        AssertMissingRequired(result, "MissingRequiredStateEvidence:Expected.ValidationPatchHash", "expected-validation-patch-hash");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedWhenExpectedAndObservedAreBothBlank()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Expected = FreshExpectation() with
+            {
+                BaseBranch = "",
+                BaseSha = "",
+                HeadBranch = "",
+                HeadSha = "",
+                PatchHash = "",
+                ValidationBaseSha = "",
+                ValidationHeadSha = "",
+                ValidationPatchHash = ""
+            },
+            Observed = FreshObservation() with
+            {
+                BaseBranch = "",
+                BaseSha = "",
+                HeadBranch = "",
+                HeadSha = ""
+            }
+        });
+
+        AssertBlocked(result, RepoStateFreshnessIssueKind.MissingRequiredStateEvidence, RepoStateFreshnessVerdict.Blocked);
+        AssertContains(result.MissingEvidenceRefs, "expected-base-branch");
+        AssertContains(result.MissingEvidenceRefs, "observed-base-branch");
+        AssertContains(result.MissingEvidenceRefs, "expected-head-sha");
+        AssertContains(result.MissingEvidenceRefs, "observed-head-sha");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForInvalidOperationKind()
+    {
+        var result = Evaluate(FreshRequest((RunAuthorityOperationKind)999));
+
+        AssertBlocked(result, RepoStateFreshnessIssueKind.InvalidOperationKind, RepoStateFreshnessVerdict.Blocked);
+        AssertContains(result.MissingEvidenceRefs, "valid-operation-kind");
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForInvalidWorktreeState()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Observed = FreshObservation() with { WorktreeState = (RepoWorktreeState)999 }
+        });
+
+        AssertBlocked(result, RepoStateFreshnessIssueKind.UnknownWorktree, RepoStateFreshnessVerdict.Blocked);
+    }
+
+    [TestMethod]
+    public void FreshnessGuard_FailsClosedForInvalidPatchApplicability()
+    {
+        var result = Evaluate(FreshRequest() with
+        {
+            Observed = FreshObservation() with { PatchApplicability = (PatchApplicability)999 }
+        });
+
+        AssertBlocked(result, RepoStateFreshnessIssueKind.PatchApplicabilityUnknown, RepoStateFreshnessVerdict.Blocked);
+    }
+
+    [TestMethod]
     public void FreshnessGuard_ResultBoundaryForbidsAllMutation()
     {
         var boundary = Evaluate(FreshRequest()).Boundary;
@@ -487,6 +638,16 @@ public sealed class BlockRepoStateFreshnessGuardTests
             result.IssueKinds.Contains(issue),
             $"Expected {issue} in: {string.Join(", ", result.IssueKinds)}");
         AssertContains(result.BlockingReasons, issue.ToString());
+    }
+
+    private static void AssertMissingRequired(
+        RepoStateFreshnessResult result,
+        string expectedReason,
+        string expectedMissingEvidence)
+    {
+        AssertBlocked(result, RepoStateFreshnessIssueKind.MissingRequiredStateEvidence, RepoStateFreshnessVerdict.Blocked);
+        AssertContains(result.BlockingReasons, expectedReason);
+        AssertContains(result.MissingEvidenceRefs, expectedMissingEvidence);
     }
 
     private static void AssertContains(IEnumerable<string> values, string expected)

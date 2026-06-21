@@ -22,6 +22,8 @@ Yesterday's clean state is not today's authority.
 - Validation base mismatch.
 - Validation head mismatch.
 - Validation patch hash mismatch.
+- Missing required request, expected state, or observed state fields.
+- Invalid governed operation kind.
 - Multiple failures in the same evaluation.
 
 ## Authority Boundary
@@ -104,10 +106,10 @@ This PR adds no executor, provider gateway, direct git execution, source mutatio
 
 ## Validation
 
-- Focused PR21: 32/32.
+- Focused PR21: 44/44.
 - PR20 interrupted recovery focused lane: 31/31.
 - CA rollback executor focused lane: 16/16.
-- BJ through PR21 authority corridor: 505/505.
+- BJ through PR21 authority corridor: 517/517.
 - Build: 0 errors / 4 warnings.
 - `git diff --check`: passed.
 - `git diff --cached --check`: passed with normal LF/CRLF warnings.
