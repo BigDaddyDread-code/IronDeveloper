@@ -17,7 +17,8 @@ Recovery diagnosis explains the wreckage. It does not drive the tow truck.
 - Commit package created but no commit.
 - Commit created but no push.
 - Push completed but no pull request.
-- Contradictory evidence.
+- Contradictory evidence, including non-passing validation followed by downstream evidence.
+- Incomplete downstream receipt evidence, including commit receipt without commit hash, push receipt without remote branch evidence, and draft pull request receipt without completed push evidence.
 
 ## Authority Boundary
 
@@ -40,6 +41,8 @@ Workspace created is not patch created.
 Patch created is not validation.
 
 Validation failed is not approval.
+
+Failed, inconclusive, or unknown validation followed by downstream evidence is chain contamination, not recovery state.
 
 Apply started is not apply completed.
 
@@ -84,11 +87,13 @@ This PR adds no executor, provider gateway, source mutation, rollback execution,
 
 ## Validation
 
-- Focused PR20: 26/26.
+- Focused PR20: 31/31.
 - CA rollback executor focused lane: 16/16.
-- BJ through CA plus PR20 boundary corridor: 468/468.
+- BJ through CA plus PR20 boundary corridor: 473/473.
 - Build: 0 errors / 4 warnings.
 - `git diff --check`: passed.
+- `git diff --cached --check`: passed with normal LF/CRLF warnings.
+- `git diff --check HEAD~1 HEAD`: passed.
 
 ## Killjoy
 

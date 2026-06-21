@@ -130,16 +130,57 @@ public static class InterruptedRunRecoveryDiagnosisService
     private static IReadOnlyList<string> FindContradictions(InterruptedRunEvidenceSnapshot evidence)
     {
         var contradictions = new List<string>();
+        AddValidationContradictions(evidence, contradictions);
+
         if (HasDraftPullRequest(evidence) && !HasPushReceipt(evidence))
             contradictions.Add("DraftPullRequestReceiptWithoutPushReceipt");
+        if (HasDraftPullRequest(evidence) && !HasPush(evidence))
+            contradictions.Add("DraftPullRequestReceiptWithoutCompletedPushEvidence");
+        if (HasPushReceipt(evidence) && !HasValues(evidence.RemoteBranchEvidenceRefs))
+            contradictions.Add("PushReceiptWithoutRemoteBranchEvidence");
         if (HasPushReceipt(evidence) && !HasCommitReceipt(evidence))
             contradictions.Add("PushReceiptWithoutCommitReceipt");
+        if (HasCommitReceipt(evidence) && !HasValues(evidence.CommitHashEvidenceRefs))
+            contradictions.Add("CommitReceiptWithoutCommitHashEvidence");
         if (HasCommitReceipt(evidence) && !HasCompletedSourceApply(evidence))
             contradictions.Add("CommitReceiptWithoutCompletedSourceApplyReceipt");
         if (HasCompletedSourceApply(evidence) && evidence.WorktreeState == InterruptedRunWorktreeState.ApplyFailed)
             contradictions.Add("CompletedSourceApplyReceiptContradictsFailedWorktreeEvidence");
 
         return Clean(contradictions);
+    }
+
+    private static void AddValidationContradictions(
+        InterruptedRunEvidenceSnapshot evidence,
+        ICollection<string> contradictions)
+    {
+        if (!HasValidationResult(evidence) || evidence.ValidationOutcome == InterruptedRunValidationOutcome.Passed)
+            return;
+
+        var prefix = evidence.ValidationOutcome switch
+        {
+            InterruptedRunValidationOutcome.Failed => "ValidationFailed",
+            InterruptedRunValidationOutcome.Inconclusive => "ValidationInconclusive",
+            InterruptedRunValidationOutcome.Unknown => "ValidationUnknown",
+            _ => "ValidationInvalid"
+        };
+
+        if (HasSourceApplyStarted(evidence))
+            contradictions.Add($"{prefix}WithSourceApplyStartedEvidence");
+        if (HasCompletedSourceApply(evidence))
+            contradictions.Add($"{prefix}WithCompletedSourceApplyReceipt");
+        if (HasCommitPackage(evidence))
+            contradictions.Add($"{prefix}WithCommitPackageEvidence");
+        if (HasCommitReceipt(evidence))
+            contradictions.Add($"{prefix}WithCommitReceipt");
+        if (HasValues(evidence.CommitHashEvidenceRefs))
+            contradictions.Add($"{prefix}WithCommitHashEvidence");
+        if (HasPushReceipt(evidence))
+            contradictions.Add($"{prefix}WithPushReceipt");
+        if (HasValues(evidence.RemoteBranchEvidenceRefs))
+            contradictions.Add($"{prefix}WithRemoteBranchEvidence");
+        if (HasDraftPullRequest(evidence))
+            contradictions.Add($"{prefix}WithDraftPullRequestReceipt");
     }
 
     private static IReadOnlyList<string> MissingForIncompleteSourceApply(InterruptedRunEvidenceSnapshot evidence)

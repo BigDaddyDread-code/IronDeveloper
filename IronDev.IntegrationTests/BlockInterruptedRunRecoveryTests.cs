@@ -112,6 +112,79 @@ public sealed class BlockInterruptedRunRecoveryTests
     }
 
     [TestMethod]
+    public void RecoveryFailsClosedForFailedValidationWithDownstreamEvidence()
+    {
+        foreach (var (downstreamEvidence, expectedReason) in new[]
+        {
+            ("source-apply-started", "ValidationFailedWithSourceApplyStartedEvidence"),
+            ("completed-source-apply", "ValidationFailedWithCompletedSourceApplyReceipt"),
+            ("commit-package", "ValidationFailedWithCommitPackageEvidence"),
+            ("commit-receipt", "ValidationFailedWithCommitReceipt"),
+            ("push-receipt", "ValidationFailedWithPushReceipt")
+        })
+        {
+            var report = Diagnose(WithDownstreamEvidence(
+                ValidatedPatch(InterruptedRunValidationOutcome.Failed),
+                downstreamEvidence));
+
+            AssertContradictory(report, expectedReason);
+        }
+    }
+
+    [TestMethod]
+    public void RecoveryFailsClosedForNonPassingValidationWithDownstreamEvidence()
+    {
+        foreach (var (outcome, expectedReason) in new[]
+        {
+            (InterruptedRunValidationOutcome.Inconclusive, "ValidationInconclusiveWithSourceApplyStartedEvidence"),
+            (InterruptedRunValidationOutcome.Unknown, "ValidationUnknownWithSourceApplyStartedEvidence")
+        })
+        {
+            var report = Diagnose(ValidatedPatch(outcome) with
+            {
+                SourceApplyStartedEvidenceRefs = ["source-apply-started:pr20"],
+                WorktreeState = InterruptedRunWorktreeState.Dirty
+            });
+
+            AssertContradictory(report, expectedReason);
+        }
+    }
+
+    [TestMethod]
+    public void RecoveryFailsClosedForCommitReceiptWithoutCommitHashEvidence()
+    {
+        var report = Diagnose(AfterCompletedApply() with
+        {
+            CommitReceiptRefs = ["controlled-commit-receipt:pr20"]
+        });
+
+        AssertContradictory(report, "CommitReceiptWithoutCommitHashEvidence");
+    }
+
+    [TestMethod]
+    public void RecoveryFailsClosedForPushReceiptWithoutRemoteBranchEvidence()
+    {
+        var report = Diagnose(AfterCommit() with
+        {
+            PushReceiptRefs = ["controlled-push-receipt:pr20"]
+        });
+
+        AssertContradictory(report, "PushReceiptWithoutRemoteBranchEvidence");
+    }
+
+    [TestMethod]
+    public void RecoveryFailsClosedForDraftPullRequestReceiptWithoutCompletedPushEvidence()
+    {
+        var report = Diagnose(AfterCommit() with
+        {
+            PushReceiptRefs = ["controlled-push-receipt:pr20"],
+            DraftPullRequestReceiptRefs = ["draft-pull-request-receipt:pr20"]
+        });
+
+        AssertContradictory(report, "DraftPullRequestReceiptWithoutCompletedPushEvidence");
+    }
+
+    [TestMethod]
     public void RecoveryDoesNotInferValidationFromPatchText()
     {
         var report = Diagnose(BaseEvidence() with
@@ -357,6 +430,36 @@ public sealed class BlockInterruptedRunRecoveryTests
             RemoteBranchEvidenceRefs = ["remote-branch:pr20"]
         };
 
+    private static InterruptedRunEvidenceSnapshot WithDownstreamEvidence(
+        InterruptedRunEvidenceSnapshot evidence,
+        string downstreamEvidence) =>
+        downstreamEvidence switch
+        {
+            "source-apply-started" => evidence with
+            {
+                SourceApplyStartedEvidenceRefs = ["source-apply-started:pr20"],
+                WorktreeState = InterruptedRunWorktreeState.Dirty
+            },
+            "completed-source-apply" => evidence with
+            {
+                CompletedSourceApplyReceiptRefs = ["source-apply-receipt:pr20"],
+                WorktreeState = InterruptedRunWorktreeState.Clean
+            },
+            "commit-package" => evidence with
+            {
+                CommitPackageEvidenceRefs = ["commit-package:pr20"]
+            },
+            "commit-receipt" => evidence with
+            {
+                CommitReceiptRefs = ["controlled-commit-receipt:pr20"]
+            },
+            "push-receipt" => evidence with
+            {
+                PushReceiptRefs = ["controlled-push-receipt:pr20"]
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(downstreamEvidence), downstreamEvidence, "Unknown downstream evidence.")
+        };
+
     private static void AssertReport(
         InterruptedRunRecoveryReport report,
         InterruptedRunStage stage,
@@ -365,6 +468,14 @@ public sealed class BlockInterruptedRunRecoveryTests
         Assert.AreEqual(stage, report.DetectedStage);
         Assert.AreEqual(state, report.RecoveryState);
         Assert.AreEqual(RunId, report.RunId);
+    }
+
+    private static void AssertContradictory(InterruptedRunRecoveryReport report, string expectedReason)
+    {
+        AssertReport(report, InterruptedRunStage.Unknown, InterruptedRunRecoveryState.NeedsHumanReview);
+        AssertContains(report.MissingEvidenceRefs, "consistent-run-evidence");
+        AssertContains(report.BlockingReasons, expectedReason);
+        AssertContains(report.NextSafeActions, "inspect contradictory evidence and request human recovery review");
     }
 
     private static void AssertContains(IEnumerable<string> values, string expected)
