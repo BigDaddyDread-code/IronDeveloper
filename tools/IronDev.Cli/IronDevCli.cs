@@ -269,6 +269,9 @@ public static class IronDevCli
         if (IronDevCliAuthorityUx.IsAuthorityUxCommand(args))
             return await IronDevCliAuthorityUx.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
+        if (IronDevCliMemoryNonAuthority.IsMemoryNonAuthorityCommand(args))
+            return await IronDevCliMemoryNonAuthority.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
+
         if (IronDevCliMergeRelease.IsMergeReleaseCommand(args))
             return await IronDevCliMergeRelease.HandleAsync(args, output, error, cancellationToken).ConfigureAwait(false);
 
@@ -3070,6 +3073,11 @@ public static class IronDevCli
         error.WriteLine("  irondev authority-ux inspect --report <authority-ux-output-dir> [--json]");
         error.WriteLine("  irondev authority-ux red-findings --report <authority-ux-output-dir> [--json]");
         error.WriteLine("  irondev authority-ux amber-findings --report <authority-ux-output-dir> [--json]");
+        error.WriteLine("  irondev memory-non-authority evaluate-scenarios --scenario-set <default|full> --report-id <report-id> --out <path> [--json]");
+        error.WriteLine("  irondev memory-non-authority evaluate --attempts <memory-authority-attempts.jsonl> --report-id <report-id> --out <path> [--json]");
+        error.WriteLine("  irondev memory-non-authority inspect --report <path> [--json]");
+        error.WriteLine("  irondev memory-non-authority red-findings --report <path> [--json]");
+        error.WriteLine("  irondev memory-non-authority amber-findings --report <path> [--json]");
         error.WriteLine("  irondev merge-release request --run <run-id-or-path> --repo <owner/name> --pr <number> --expected-head <sha> [--json]");
         error.WriteLine("  irondev merge-release merge-evidence --run <run-id-or-path> [--json]");
         error.WriteLine("  irondev merge-release release-evidence --run <run-id-or-path> [--json]");
