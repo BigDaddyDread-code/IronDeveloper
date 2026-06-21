@@ -9,6 +9,7 @@ public sealed record BoundedRunAuthorityGrant
     public required IReadOnlyCollection<RunAuthorityOperationKind> AllowedOperationKinds { get; init; }
     public required IReadOnlyCollection<string> AllowedFileGlobs { get; init; }
     public required IReadOnlyCollection<string> ForbiddenFileGlobs { get; init; }
+    public string? PatchHash { get; init; }
     public required DateTimeOffset ExpiresAtUtc { get; init; }
     public required int MaxMutations { get; init; }
     public required IReadOnlyCollection<BoundedRunAuthorityRequiredValidation> RequiredValidation { get; init; }

@@ -33,6 +33,7 @@ public static class BoundedRunAuthorityGrantValidator
         ValidateAllowedOperations(grant.AllowedOperationKinds, issues);
         ValidateFileGlobs(grant.AllowedFileGlobs, "AllowedFileGlobs", requireNonEmpty: true, issues);
         ValidateFileGlobs(grant.ForbiddenFileGlobs, "ForbiddenFileGlobs", requireNonEmpty: false, issues);
+        ValidatePatchHash(grant.PatchHash, issues);
         ValidateExpiry(grant.ExpiresAtUtc, observedAtUtc, issues);
         if (grant.MaxMutations < 0)
             issues.Add("BoundedRunMaxMutationsCannotBeNegative");
@@ -133,6 +134,15 @@ public static class BoundedRunAuthorityGrantValidator
                     issues.Add("BoundedRunRequiredValidationEvidenceRefPrefixRequired");
             }
         }
+    }
+
+    private static void ValidatePatchHash(string? patchHash, ICollection<string> issues)
+    {
+        if (patchHash is null)
+            return;
+
+        if (!OperationEligibilityPatchHashRules.IsSafePatchHash(patchHash))
+            issues.Add("BoundedRunPatchHashInvalid");
     }
 
     private static void ValidateGrantedBy(BoundedRunAuthorityGrantedBy? grantedBy, ICollection<string> issues)
