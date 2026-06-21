@@ -93,6 +93,15 @@ public sealed class BlockBNDisposableWorkspacePatchPackageTests
     }
 
     [TestMethod]
+    public void BlockBN_Builder_RejectsWorkspacePathInsideDurableSourceRoot()
+    {
+        using var fixture = Fixture.Create(workspaceInsideSource: true);
+        var result = fixture.Build();
+
+        AssertBlockedWithoutPackage(result, "DisposableWorkspaceCannotBeInsideSourceRoot");
+    }
+
+    [TestMethod]
     public void BlockBN_Builder_RejectsOutputPathInsideDurableSourceRoot()
     {
         using var fixture = Fixture.Create(outputInsideSource: true);
@@ -109,6 +118,30 @@ public sealed class BlockBNDisposableWorkspacePatchPackageTests
         var result = fixture.Build();
 
         AssertBlockedWithoutPackage(result, "PatchDiffRequired");
+    }
+
+    [TestMethod]
+    public void BlockBN_Builder_RejectsAllowedPathGlobsUntilPatchPathInspectionExists()
+    {
+        using var fixture = Fixture.Create();
+        var result = DisposableWorkspacePatchPackageBuilder.Build(fixture.Request() with
+        {
+            AllowedPathGlobs = ["IronDev.Core/**"]
+        });
+
+        AssertBlockedWithoutPackage(result, "AllowedPathGlobsUnsupportedInPatchPackageSlice");
+    }
+
+    [TestMethod]
+    public void BlockBN_Builder_RejectsForbiddenPathGlobsUntilPatchPathInspectionExists()
+    {
+        using var fixture = Fixture.Create();
+        var result = DisposableWorkspacePatchPackageBuilder.Build(fixture.Request() with
+        {
+            ForbiddenPathGlobs = ["*.csproj", ".github/**"]
+        });
+
+        AssertBlockedWithoutPackage(result, "ForbiddenPathGlobsUnsupportedInPatchPackageSlice");
     }
 
     [TestMethod]
@@ -146,6 +179,19 @@ public sealed class BlockBNDisposableWorkspacePatchPackageTests
         AssertFileContains(result, "review-summary.md", "Task: Add proposal-only package evidence.");
         AssertFileContains(result, "review-summary.md", $"Patch hash: {result.PatchHash}");
         AssertFileContains(result, "review-summary.md", "request controlled source apply for patch hash");
+    }
+
+    [TestMethod]
+    public void BlockBN_MissingValidationRefs_ReviewSummaryDoesNotRecommendControlledSourceApply()
+    {
+        using var fixture = Fixture.Create();
+        var result = DisposableWorkspacePatchPackageBuilder.Build(fixture.Request(validationRefs: []));
+
+        Assert.IsTrue(result.IsPackageCreated);
+        Assert.AreEqual(GovernedOperationState.Blocked, result.Status.State);
+        var summary = File.ReadAllText(Path.Combine(result.PackagePath, "review-summary.md"));
+        Assert.IsFalse(summary.Contains("request controlled source apply", StringComparison.OrdinalIgnoreCase), summary);
+        StringAssert.Contains(summary, "collect missing validation evidence");
     }
 
     [TestMethod]
@@ -454,6 +500,8 @@ public sealed class BlockBNDisposableWorkspacePatchPackageTests
         StringAssert.Contains(doc, "Known risks are evidence only.");
         StringAssert.Contains(doc, "Operation status is explanation only.");
         StringAssert.Contains(doc, "NextSafeActions are guidance only.");
+        StringAssert.Contains(doc, "Allowed and forbidden path globs are rejected in this slice until patch path inspection exists.");
+        StringAssert.Contains(doc, "A disposable workspace must not be the durable source root or a child of the durable source root.");
         StringAssert.Contains(doc, "A patch package can hand the reviewer the file. It cannot put the file into source.");
     }
 
@@ -533,11 +581,16 @@ public sealed class BlockBNDisposableWorkspacePatchPackageTests
             bool writeMarker = true,
             bool writePatch = true,
             bool workspaceEqualsSource = false,
+            bool workspaceInsideSource = false,
             bool outputInsideSource = false)
         {
             var root = Path.Combine(Path.GetTempPath(), $"bn-patch-package-{Guid.NewGuid():N}");
             var source = Path.Combine(root, "source");
-            var workspace = workspaceEqualsSource ? source : Path.Combine(root, "workspace");
+            var workspace = workspaceEqualsSource
+                ? source
+                : workspaceInsideSource
+                    ? Path.Combine(source, "fake-disposable-workspace")
+                    : Path.Combine(root, "workspace");
             var output = outputInsideSource ? Path.Combine(source, "package-output") : Path.Combine(root, "output");
 
             Directory.CreateDirectory(source);

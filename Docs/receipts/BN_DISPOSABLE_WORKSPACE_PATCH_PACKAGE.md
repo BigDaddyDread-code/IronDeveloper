@@ -44,7 +44,11 @@ NextSafeActions are guidance only.
 
 ## Boundary
 
-The builder requires ProposalOnly PatchPackageWrite eligibility, disposable workspace proof, a workspace marker, and an existing patch.diff artifact. It refuses a workspace that is the durable source root and refuses package output inside the durable source root.
+The builder requires ProposalOnly PatchPackageWrite eligibility, disposable workspace proof, a workspace marker, and an existing patch.diff artifact. It refuses a workspace that is the durable source root or a child of the durable source root, and refuses package output inside the durable source root.
+
+A disposable workspace must not be the durable source root or a child of the durable source root.
+
+Allowed and forbidden path globs are rejected in this slice until patch path inspection exists.
 
 Completed packages remain PatchProposal status. Missing validation refs produce a blocked PatchProposal status; package existence must not be treated as validation, approval, policy satisfaction, or source apply authority.
 

@@ -80,7 +80,7 @@ public static class DisposableWorkspacePatchPackageBuilder
             CreatedAtUtc = request.ObservedAtUtc
         };
 
-        File.WriteAllText(Path.Combine(packagePath, "review-summary.md"), RenderReviewSummary(request, manifest), Encoding.UTF8);
+        File.WriteAllText(Path.Combine(packagePath, "review-summary.md"), RenderReviewSummary(request, manifest, statusMapping.Status), Encoding.UTF8);
         File.WriteAllText(Path.Combine(packagePath, "known-risks.md"), RenderKnownRisks(request), Encoding.UTF8);
         File.WriteAllText(Path.Combine(packagePath, "validation-summary.md"), RenderValidationSummary(request), Encoding.UTF8);
         File.WriteAllText(Path.Combine(packagePath, "patch-package-manifest.json"), JsonSerializer.Serialize(manifest, JsonOptions), Encoding.UTF8);
@@ -209,7 +209,10 @@ public static class DisposableWorkspacePatchPackageBuilder
         $"operation-status:{packageId}"
     ];
 
-    private static string RenderReviewSummary(DisposableWorkspacePatchPackageRequest request, DisposableWorkspacePatchPackageManifest manifest) =>
+    private static string RenderReviewSummary(
+        DisposableWorkspacePatchPackageRequest request,
+        DisposableWorkspacePatchPackageManifest manifest,
+        GovernedOperationStatus status) =>
         string.Join(Environment.NewLine,
         [
             "# Disposable Workspace Patch Package Review Summary",
@@ -229,8 +232,8 @@ public static class DisposableWorkspacePatchPackageBuilder
                 ? ["- Validation not supplied for this package."]
                 : manifest.ValidationRefs.Select(value => $"- {value}")),
             string.Empty,
-            "Next safe action:",
-            $"- request controlled source apply for patch hash {manifest.PatchHash}",
+            "Next safe actions:",
+            .. status.NextSafeActions.Select(value => $"- {value}"),
             string.Empty,
             "Forbidden actions:",
             .. manifest.ForbiddenActions.Select(value => $"- {value}")

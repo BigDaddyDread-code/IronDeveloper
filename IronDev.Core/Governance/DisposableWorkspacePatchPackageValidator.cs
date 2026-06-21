@@ -28,6 +28,10 @@ public static class DisposableWorkspacePatchPackageValidator
         RequireText(request.Branch, "PatchPackageBranchRequired", issues);
         RequireText(request.ProposalId, "PatchPackageProposalIdRequired", issues);
         RequireText(request.TaskSummary, "PatchPackageTaskSummaryRequired", issues);
+        if (ValuesOrEmpty(request.AllowedPathGlobs).Any(value => !string.IsNullOrWhiteSpace(value)))
+            issues.Add("AllowedPathGlobsUnsupportedInPatchPackageSlice");
+        if (ValuesOrEmpty(request.ForbiddenPathGlobs).Any(value => !string.IsNullOrWhiteSpace(value)))
+            issues.Add("ForbiddenPathGlobsUnsupportedInPatchPackageSlice");
 
         var marker = ReadMarker(markerPath, issues);
         var sourceRoot = marker is null
@@ -49,10 +53,12 @@ public static class DisposableWorkspacePatchPackageValidator
         }
 
         if (!string.IsNullOrWhiteSpace(workspaceRoot) &&
-            !string.IsNullOrWhiteSpace(sourceRoot) &&
-            SamePath(workspaceRoot, sourceRoot))
+            !string.IsNullOrWhiteSpace(sourceRoot))
         {
-            issues.Add("DisposableWorkspaceCannotEqualSourceRoot");
+            if (SamePath(workspaceRoot, sourceRoot))
+                issues.Add("DisposableWorkspaceCannotEqualSourceRoot");
+            else if (IsSameOrChild(workspaceRoot, sourceRoot))
+                issues.Add("DisposableWorkspaceCannotBeInsideSourceRoot");
         }
 
         if (!string.IsNullOrWhiteSpace(outputRoot) &&
@@ -145,4 +151,7 @@ public static class DisposableWorkspacePatchPackageValidator
 
     private static string NormalizePath(string path) =>
         Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    private static IEnumerable<string> ValuesOrEmpty(IReadOnlyList<string>? values) =>
+        values ?? [];
 }
