@@ -222,6 +222,17 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
     }
 
     [TestMethod]
+    public void BlockBKSourceApply_Eligible_RequiresPolicySatisfactionRef()
+    {
+        var result = Map(EligibleInput() with
+        {
+            EvidenceRefs = WithoutEvidencePrefix(EligibleInput(), "policy-satisfaction")
+        });
+
+        AssertInvalid(result, "EligibleSourceApplyPolicySatisfactionRequired");
+    }
+
+    [TestMethod]
     public void BlockBKSourceApply_Eligible_RequiresDryRunRef()
     {
         var result = Map(EligibleInput() with
@@ -271,6 +282,7 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
         var result = Map(EligibleInput() with { EvidenceRefs = [] });
 
         AssertInvalid(result, "EligibleSourceApplyAcceptedRequestRequired");
+        AssertInvalid(result, "EligibleSourceApplyPolicySatisfactionRequired");
         AssertInvalid(result, "EligibleSourceApplyDryRunRequired");
         AssertInvalid(result, "EligibleSourceApplyPatchArtifactRequired");
         AssertInvalid(result, "EligibleSourceApplyRollbackSupportRequired");
@@ -562,6 +574,7 @@ public sealed class BlockBKControlledSourceApplyCanonicalStatusTests
         StringAssert.Contains(doc, "Source apply status cannot mutate source.");
         StringAssert.Contains(doc, "Eligible status is explanation, not execution authority.");
         StringAssert.Contains(doc, "Eligible status requires refs that explain eligibility.");
+        StringAssert.Contains(doc, "Eligible status requires a policy-satisfaction ref as explanatory evidence.");
         StringAssert.Contains(doc, "Completed source apply is not commit authority.");
         StringAssert.Contains(doc, "Completed source apply is not push authority.");
         StringAssert.Contains(doc, "Completed source apply is not PR authority.");

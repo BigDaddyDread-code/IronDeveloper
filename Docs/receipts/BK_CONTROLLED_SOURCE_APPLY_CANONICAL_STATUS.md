@@ -36,7 +36,9 @@ Source apply status cannot continue workflow.
 
 Eligible status is explanation, not execution authority.
 Eligible status requires refs that explain eligibility.
-Eligible status requires accepted source-apply request, dry-run, patch artifact, rollback support, and worktree-state refs.
+Eligible status requires accepted source-apply request, policy-satisfaction, dry-run, patch artifact, rollback support, and worktree-state refs.
+Eligible status requires a policy-satisfaction ref as explanatory evidence.
+Policy satisfaction remains reference-only unless the relevant evaluator accepts it.
 Completed source apply is not commit authority.
 Completed source apply is not push authority.
 Completed source apply is not PR authority.

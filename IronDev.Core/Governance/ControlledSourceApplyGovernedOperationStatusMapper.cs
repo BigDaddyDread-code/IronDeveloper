@@ -261,6 +261,8 @@ public static class ControlledSourceApplyGovernedOperationStatusMapper
     {
         if (!HasRefPrefix(input.EvidenceRefs, "accepted-source-apply-request"))
             yield return "EligibleSourceApplyAcceptedRequestRequired";
+        if (!HasRefPrefix(input.EvidenceRefs, "policy-satisfaction"))
+            yield return "EligibleSourceApplyPolicySatisfactionRequired";
         if (!HasRefPrefix(input.EvidenceRefs, "dry-run"))
             yield return "EligibleSourceApplyDryRunRequired";
         if (!HasRefPrefix(input.EvidenceRefs, "patch-artifact"))
