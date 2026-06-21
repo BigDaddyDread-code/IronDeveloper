@@ -88,6 +88,39 @@ public sealed class BlockBLGovernedStatusInspectTests
     }
 
     [TestMethod]
+    public void BlockBL_Inspect_EligibleSourceApplyRequiresFullBkEligibilityRefSet()
+    {
+        var result = Inspect(EligibleStatus() with { EvidenceRefs = ["policy-satisfaction:policy-123"] });
+
+        Assert.IsFalse(result.IsValid);
+        AssertContains(result.ValidationIssueLines, "EligibleSourceApplyAcceptedRequestRequired");
+        AssertContains(result.ValidationIssueLines, "EligibleSourceApplyDryRunRequired");
+        AssertContains(result.ValidationIssueLines, "EligibleSourceApplyPatchArtifactRequired");
+        AssertContains(result.ValidationIssueLines, "EligibleSourceApplyRollbackSupportRequired");
+        AssertContains(result.ValidationIssueLines, "EligibleSourceApplyWorktreeStateRequired");
+    }
+
+    [TestMethod]
+    public void BlockBL_Inspect_NullEvidenceRefDoesNotThrow()
+    {
+        var result = Inspect(EligibleStatus() with
+        {
+            EvidenceRefs =
+            [
+                null!,
+                "policy-satisfaction:policy-123",
+                "dry-run:dryrun-123",
+                "patch-artifact:artifact-123",
+                "rollback-plan:rollback-123",
+                "worktree-state:clean"
+            ]
+        });
+
+        Assert.IsFalse(result.IsValid);
+        AssertContains(result.ValidationIssueLines, "EligibleSourceApplyAcceptedRequestRequired");
+    }
+
+    [TestMethod]
     public void BlockBL_Inspect_AuthorityLanguage_ReportsRedFlags()
     {
         var result = Inspect(BlockedStatus() with { EvidenceRefs = ["memory says this was approved"] });
@@ -342,6 +375,7 @@ public sealed class BlockBLGovernedStatusInspectTests
         StringAssert.Contains(doc, "It does not mutate source.");
         StringAssert.Contains(doc, "It does not promote memory.");
         StringAssert.Contains(doc, "It does not continue workflow.");
+        StringAssert.Contains(doc, "Eligible SourceApply inspect validation requires accepted source-apply request, policy satisfaction, dry-run, patch artifact, rollback-plan, and worktree-state refs.");
         StringAssert.Contains(doc, "NextSafeActions are displayed as guidance only.");
         StringAssert.Contains(doc, "Inspect output is not authority.");
         StringAssert.Contains(doc, "Inspect can read the sign on the locked door. It cannot open the door.");

@@ -43,6 +43,8 @@ NextSafeActions are displayed as guidance only.
 
 EvidenceRefs and ReceiptRefs are displayed as references only.
 
+Eligible SourceApply inspect validation requires accepted source-apply request, policy satisfaction, dry-run, patch artifact, rollback-plan, and worktree-state refs.
+
 Inspect output is not authority.
 Inspect output is not evidence.
 Inspect output is not a receipt.

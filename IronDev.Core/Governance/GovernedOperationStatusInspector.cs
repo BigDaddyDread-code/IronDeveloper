@@ -81,10 +81,14 @@ public static class GovernedOperationStatusInspector
         var redFlags = validation.RedFlags.ToList();
 
         if (string.Equals(status.OperationKind, "SourceApply", StringComparison.OrdinalIgnoreCase) &&
-            status.State == GovernedOperationState.Eligible &&
-            !HasRefPrefix(status.EvidenceRefs, "policy-satisfaction"))
+            status.State == GovernedOperationState.Eligible)
         {
-            issues.Add("EligibleSourceApplyPolicySatisfactionRequired");
+            RequireSourceApplyEligibleRef(status, issues, "accepted-source-apply-request", "EligibleSourceApplyAcceptedRequestRequired");
+            RequireSourceApplyEligibleRef(status, issues, "policy-satisfaction", "EligibleSourceApplyPolicySatisfactionRequired");
+            RequireSourceApplyEligibleRef(status, issues, "dry-run", "EligibleSourceApplyDryRunRequired");
+            RequireSourceApplyEligibleRef(status, issues, "patch-artifact", "EligibleSourceApplyPatchArtifactRequired");
+            RequireSourceApplyEligibleRef(status, issues, "rollback-plan", "EligibleSourceApplyRollbackSupportRequired");
+            RequireSourceApplyEligibleRef(status, issues, "worktree-state", "EligibleSourceApplyWorktreeStateRequired");
         }
 
         return validation with
@@ -95,8 +99,19 @@ public static class GovernedOperationStatusInspector
         };
     }
 
+    private static void RequireSourceApplyEligibleRef(
+        GovernedOperationStatus status,
+        ICollection<string> issues,
+        string prefix,
+        string issue)
+    {
+        if (!HasRefPrefix(status.EvidenceRefs, prefix))
+            issues.Add(issue);
+    }
+
     private static bool HasRefPrefix(IReadOnlyList<string>? values, string prefix) =>
-        ValuesOrEmpty(values).Any(value => value.StartsWith($"{prefix}:", StringComparison.OrdinalIgnoreCase));
+        ValuesOrEmpty(values).Any(value =>
+            value?.StartsWith($"{prefix}:", StringComparison.OrdinalIgnoreCase) == true);
 
     private static IReadOnlyList<string> BuildStateLines(GovernedOperationStatus status)
     {
