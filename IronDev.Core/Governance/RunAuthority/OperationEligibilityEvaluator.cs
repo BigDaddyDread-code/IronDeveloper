@@ -194,11 +194,17 @@ public static class OperationEligibilityEvaluator
             return;
 
         if (request.MutationsAlreadyConsumed >= 0 &&
-            request.RequestedMutationCount >= 0 &&
-            request.MutationsAlreadyConsumed + request.RequestedMutationCount > request.Grant.MaxMutations)
+            request.RequestedMutationCount >= 0)
         {
-            blocked.Add("MutationBudgetExceeded");
-            forbidden.Add("do not treat zero max mutations as unlimited");
+            var consumed = (long)request.MutationsAlreadyConsumed;
+            var requested = (long)request.RequestedMutationCount;
+            var max = (long)request.Grant.MaxMutations;
+
+            if (consumed + requested > max)
+            {
+                blocked.Add("MutationBudgetExceeded");
+                forbidden.Add("do not treat zero max mutations as unlimited");
+            }
         }
 
         checks.Add("durable mutation accounting remains a future runner responsibility");
@@ -236,7 +242,7 @@ public static class OperationEligibilityEvaluator
                 blocked.Add($"RequiredValidationEvidenceRefPrefixMismatch:{required.ValidationKind}");
 
             foreach (var candidate in candidates)
-                ValidateEvidence(candidate, required, request, blocked);
+                ValidateEvidence(candidate, required, request, blocked, missing);
         }
 
         forbidden.Add("do not treat validation evidence as approval");
@@ -249,7 +255,8 @@ public static class OperationEligibilityEvaluator
         OperationEligibilityValidationEvidence evidence,
         BoundedRunAuthorityRequiredValidation required,
         OperationEligibilityRequest request,
-        ICollection<string> blocked)
+        ICollection<string> blocked,
+        ICollection<string> missing)
     {
         if (string.IsNullOrWhiteSpace(evidence.ValidationKind))
             blocked.Add("ValidationEvidenceKindRequired");
@@ -260,9 +267,22 @@ public static class OperationEligibilityEvaluator
         if (required.MustPass && evidence.Outcome != OperationEligibilityValidationOutcome.Passed)
             blocked.Add($"RequiredValidationMustPass:{required.ValidationKind}:{evidence.Outcome}");
 
-        if (IsPatchBound(request.OperationKind) &&
-            !string.IsNullOrWhiteSpace(evidence.PatchHash) &&
-            !string.Equals(evidence.PatchHash, request.PatchHash, StringComparison.OrdinalIgnoreCase))
+        if (!IsPatchBound(request.OperationKind))
+            return;
+
+        if (string.IsNullOrWhiteSpace(evidence.PatchHash))
+        {
+            missing.Add($"ValidationEvidencePatchHashRequired:{required.ValidationKind}");
+            return;
+        }
+
+        if (!OperationEligibilityPatchHashRules.IsSafePatchHash(evidence.PatchHash))
+        {
+            blocked.Add($"ValidationEvidencePatchHashInvalid:{required.ValidationKind}");
+            return;
+        }
+
+        if (!string.Equals(evidence.PatchHash, request.PatchHash, StringComparison.OrdinalIgnoreCase))
         {
             blocked.Add($"ValidationEvidencePatchHashMismatch:{required.ValidationKind}");
         }
@@ -272,6 +292,7 @@ public static class OperationEligibilityEvaluator
         BoundedRunAuthorityRequiredValidation required,
         OperationEligibilityValidationEvidence evidence) =>
         required.EvidenceRefPrefixes is not null &&
+        !string.IsNullOrWhiteSpace(evidence.EvidenceRef) &&
         required.EvidenceRefPrefixes.Any(prefix =>
             !string.IsNullOrWhiteSpace(prefix) &&
             evidence.EvidenceRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));

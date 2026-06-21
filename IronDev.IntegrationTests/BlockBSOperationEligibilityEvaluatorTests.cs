@@ -218,6 +218,22 @@ public sealed class BlockBSOperationEligibilityEvaluatorTests
         AssertBlocked(
             OperationEligibilityEvaluator.Evaluate(ValidRequest() with { Grant = ValidGrant() with { MaxMutations = 0 }, RequestedMutationCount = 1 }),
             "MutationBudgetExceeded");
+        AssertBlocked(
+            OperationEligibilityEvaluator.Evaluate(ValidRequest() with
+            {
+                Grant = ValidGrant() with { MaxMutations = int.MaxValue },
+                MutationsAlreadyConsumed = int.MaxValue,
+                RequestedMutationCount = 1
+            }),
+            "MutationBudgetExceeded");
+        AssertBlocked(
+            OperationEligibilityEvaluator.Evaluate(ValidRequest() with
+            {
+                Grant = ValidGrant() with { MaxMutations = int.MaxValue },
+                MutationsAlreadyConsumed = int.MaxValue,
+                RequestedMutationCount = int.MaxValue
+            }),
+            "MutationBudgetExceeded");
 
         var zeroNoMutation = OperationEligibilityEvaluator.Evaluate(ValidRequest() with { Grant = ValidGrant() with { MaxMutations = 0 }, RequestedMutationCount = 0 });
         var exactBudget = OperationEligibilityEvaluator.Evaluate(ValidRequest() with { MutationsAlreadyConsumed = 1, RequestedMutationCount = 0 });
@@ -241,6 +257,9 @@ public sealed class BlockBSOperationEligibilityEvaluatorTests
         AssertBlocked(
             OperationEligibilityEvaluator.Evaluate(ValidRequest() with { ValidationEvidence = [ValidationEvidence() with { EvidenceRef = "other:bs" }] }),
             "RequiredValidationEvidenceRefPrefixMismatch:FocusedBS");
+        AssertBlocked(
+            OperationEligibilityEvaluator.Evaluate(ValidRequest() with { ValidationEvidence = [ValidationEvidence() with { EvidenceRef = null! }] }),
+            "ValidationEvidenceRefRequired:FocusedBS");
 
         foreach (var outcome in new[] { OperationEligibilityValidationOutcome.Failed, OperationEligibilityValidationOutcome.Inconclusive, OperationEligibilityValidationOutcome.Unknown })
         {
@@ -252,6 +271,19 @@ public sealed class BlockBSOperationEligibilityEvaluatorTests
         AssertBlocked(
             OperationEligibilityEvaluator.Evaluate(ValidRequest() with { ValidationEvidence = [ValidationEvidence() with { PatchHash = "sha256:other" }] }),
             "ValidationEvidencePatchHashMismatch:FocusedBS");
+        AssertMissing(
+            OperationEligibilityEvaluator.Evaluate(ValidRequest() with { ValidationEvidence = [ValidationEvidence() with { PatchHash = null }] }),
+            "ValidationEvidencePatchHashRequired:FocusedBS");
+        AssertMissing(
+            OperationEligibilityEvaluator.Evaluate(ValidRequest() with { ValidationEvidence = [ValidationEvidence() with { PatchHash = "" }] }),
+            "ValidationEvidencePatchHashRequired:FocusedBS");
+
+        foreach (var badHash in new[] { "latest", "approved", "unknown" })
+        {
+            AssertBlocked(
+                OperationEligibilityEvaluator.Evaluate(ValidRequest() with { ValidationEvidence = [ValidationEvidence() with { PatchHash = badHash }] }),
+                "ValidationEvidencePatchHashInvalid:FocusedBS");
+        }
     }
 
     [TestMethod]
