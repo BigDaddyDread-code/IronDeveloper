@@ -462,7 +462,7 @@ public static class MemoryNonAuthorityReportBuilder
         if (IsUnsafeNextStep(decision.SafeNextStep))
             yield return "UnsafeNextStepWouldMutate";
         if (decision.Notes.Contains("RawMemoryPayloadOmitted", StringComparer.OrdinalIgnoreCase))
-            yield return "RawMemoryPayloadWritten";
+            yield return "RawMemoryPayloadDetected";
     }
 
     private static IEnumerable<string> BuildAmberFlags(MemoryNonAuthorityDecision decision)

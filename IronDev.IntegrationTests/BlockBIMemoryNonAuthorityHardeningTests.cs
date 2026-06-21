@@ -201,7 +201,7 @@ public sealed class BlockBIMemoryNonAuthorityHardeningTests
         var decision = MemoryNonAuthorityReportBuilder.EvaluateAttempt(attempt);
 
         Assert.IsFalse(decision.HumanSummary.Contains("secret approval details", StringComparison.Ordinal));
-        AssertRedFlag(decision, "RawMemoryPayloadWritten");
+        AssertRedFlag(decision, "RawMemoryPayloadDetected");
     }
 
     [TestMethod]
@@ -239,6 +239,10 @@ public sealed class BlockBIMemoryNonAuthorityHardeningTests
     [TestMethod]
     public void BlockBI_RedFlag_WhenCrossProjectAuthorityAccepted() =>
         AssertRedFlag(RedDecision() with { CrossProjectAuthorityAccepted = true }, "CrossProjectAuthorityAccepted");
+
+    [TestMethod]
+    public void BlockBI_RedFlag_WhenCrossRepositoryAuthorityAccepted() =>
+        AssertRedFlag(RedDecision() with { CrossRepositoryAuthorityAccepted = true }, "CrossRepositoryAuthorityAccepted");
 
     [TestMethod]
     public void BlockBI_RedFlag_WhenUnsafeNextStepWouldMutate() =>
@@ -411,6 +415,7 @@ public sealed class BlockBIMemoryNonAuthorityHardeningTests
         var doc = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "Docs", "receipts", "BI_MEMORY_NON_AUTHORITY_HARDENING.md"));
         StringAssert.Contains(doc, "BI does not promote memory.");
         StringAssert.Contains(doc, "BI does not write memory to the memory store.");
+        StringAssert.Contains(doc, "BI does not infer authority from cross-repository memory.");
         StringAssert.Contains(doc, "Memory must not authorize action.");
         StringAssert.Contains(doc, "Portable engineering memory must not carry project authority.");
     }
