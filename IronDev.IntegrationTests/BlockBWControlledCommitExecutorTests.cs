@@ -118,6 +118,31 @@ public sealed class BlockBWControlledCommitExecutorTests
     }
 
     [TestMethod]
+    public async Task BlockBW_Executor_RequiresInspectorAndGateway()
+    {
+        var request = ValidExecutionRequest();
+        var gateway = new FakeControlledCommitGateway();
+
+        var missingInspector = await ControlledCommitExecutor.ExecuteAsync(request, null!, gateway).ConfigureAwait(false);
+
+        Assert.AreEqual(ControlledCommitExecutionVerdict.Blocked, missingInspector.Verdict);
+        Assert.IsFalse(missingInspector.IsCommitExecuted);
+        AssertHasIssue(missingInspector, "CommitWorktreeInspectorRequired");
+        Assert.AreEqual(0, gateway.CommitCalls);
+        AssertValid(missingInspector);
+
+        var inspector = new FakeCommitWorktreeInspector { PreObservations = [GoodPreObservation()] };
+        var missingGateway = await ControlledCommitExecutor.ExecuteAsync(request, inspector, null!).ConfigureAwait(false);
+
+        Assert.AreEqual(ControlledCommitExecutionVerdict.Blocked, missingGateway.Verdict);
+        Assert.IsFalse(missingGateway.IsCommitExecuted);
+        AssertHasIssue(missingGateway, "ControlledCommitGatewayRequired");
+        Assert.AreEqual(0, inspector.PreCalls);
+        Assert.AreEqual(0, inspector.PostCalls);
+        AssertValid(missingGateway);
+    }
+
+    [TestMethod]
     public async Task BlockBW_Executor_BlocksPreCommitObservationDriftBeforeGateway()
     {
         var cases = new (string Name, CommitWorktreeObservation Observation, string ExpectedIssue)[]
@@ -128,7 +153,9 @@ public sealed class BlockBWControlledCommitExecutorTests
             ("head", GoodPreObservation() with { HeadCommitId = "" }, "PreCommitHeadCommitIdRequired"),
             ("diff", GoodPreObservation() with { CurrentDiffHash = "sha256:other" }, "PreCommitDiffHashMismatch"),
             ("changed", GoodPreObservation() with { ChangedFilePaths = [FilePath, "Docs/unexpected.md"] }, "PreCommitChangedFileSetMismatch"),
+            ("null-staged", GoodPreObservation() with { StagedFilePaths = null! }, "PreCommitStagedFilePathsRequired"),
             ("staged", GoodPreObservation() with { StagedFilePaths = ["Docs/staged.md"] }, "PreCommitStagedFilesNotEmpty"),
+            ("null-untracked", GoodPreObservation() with { UntrackedFilePaths = null! }, "PreCommitUntrackedFilePathsRequired"),
             ("untracked", GoodPreObservation() with { UntrackedFilePaths = ["Docs/new.md"] }, "PreCommitUntrackedFilesNotEmpty"),
             ("forbidden", GoodPreObservation() with { ChangedFilePaths = [FilePath, "IronDev.Core/obj/project.assets.json"] }, "ForbiddenFileObserved:IronDev.Core/obj/project.assets.json")
         };
@@ -188,8 +215,11 @@ public sealed class BlockBWControlledCommitExecutorTests
             ("repo", GoodPostObservation() with { Repository = "other/repo" }, "PostCommitObservationRepositoryMismatch"),
             ("branch", GoodPostObservation() with { Branch = "other-branch" }, "PostCommitObservationBranchMismatch"),
             ("head", GoodPostObservation() with { HeadCommitId = "other-commit" }, "PostCommitHeadCommitIdMismatch"),
+            ("null-changed", GoodPostObservation() with { RemainingChangedFilePaths = null! }, "PostCommitRemainingChangedFilePathsRequired"),
             ("changed", GoodPostObservation() with { RemainingChangedFilePaths = ["Docs/dirty.md"] }, "PostCommitRemainingChangedFiles"),
+            ("null-staged", GoodPostObservation() with { RemainingStagedFilePaths = null! }, "PostCommitRemainingStagedFilePathsRequired"),
             ("staged", GoodPostObservation() with { RemainingStagedFilePaths = ["Docs/staged.md"] }, "PostCommitRemainingStagedFiles"),
+            ("null-untracked", GoodPostObservation() with { RemainingUntrackedFilePaths = null! }, "PostCommitRemainingUntrackedFilePathsRequired"),
             ("untracked", GoodPostObservation() with { RemainingUntrackedFilePaths = ["Docs/untracked.md"] }, "PostCommitRemainingUntrackedFiles")
         };
 
@@ -264,6 +294,7 @@ public sealed class BlockBWControlledCommitExecutorTests
             "Process.Start",
             "File.Write",
             "Directory.CreateDirectory",
+            "git",
             "dotnet",
             "tf",
             "cmd.exe",
@@ -530,7 +561,7 @@ public sealed class BlockBWControlledCommitExecutorTests
 
     private static bool ContainsForbiddenSurface(string text, string forbidden)
     {
-        if (forbidden is "dotnet" or "tf")
+        if (forbidden is "git" or "dotnet" or "tf")
         {
             return text.Split(
                     [' ', '\t', '\r', '\n', '"', '\'', '`', '(', ')', '[', ']', '{', '}', ';', ',', '.', ':'],

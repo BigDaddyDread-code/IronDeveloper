@@ -53,6 +53,34 @@ public static class ControlledCommitExecutor
         }
 
         now = request.ObservedAtUtc == default ? now : request.ObservedAtUtc;
+        if (inspector is null)
+        {
+            return BuildResult(
+                request,
+                ControlledCommitExecutionVerdict.Blocked,
+                ControlledCommitFailureKind.WorktreeObservationFailed,
+                isCommitExecuted: false,
+                receipt: null,
+                preObservation: null,
+                postObservation: null,
+                issues: ["CommitWorktreeInspectorRequired"],
+                now);
+        }
+
+        if (gateway is null)
+        {
+            return BuildResult(
+                request,
+                ControlledCommitExecutionVerdict.Blocked,
+                ControlledCommitFailureKind.GatewayFailed,
+                isCommitExecuted: false,
+                receipt: null,
+                preObservation: null,
+                postObservation: null,
+                issues: ["ControlledCommitGatewayRequired"],
+                now);
+        }
+
         var preflightIssues = new List<string>();
         ValidateRequestEnvelope(request, options, preflightIssues);
         ValidateCommitPackage(request, preflightIssues);
@@ -375,6 +403,9 @@ public static class ControlledCommitExecutor
         Match(observation.Repository, request.Repository, "PostCommitObservationRepositoryMismatch", issues);
         Match(observation.Branch, request.Branch, "PostCommitObservationBranchMismatch", issues);
         Match(observation.HeadCommitId, receipt.CommitId, "PostCommitHeadCommitIdMismatch", issues);
+        RequireCollection(observation.RemainingChangedFilePaths, "PostCommitRemainingChangedFilePathsRequired", issues);
+        RequireCollection(observation.RemainingStagedFilePaths, "PostCommitRemainingStagedFilePathsRequired", issues);
+        RequireCollection(observation.RemainingUntrackedFilePaths, "PostCommitRemainingUntrackedFilePathsRequired", issues);
         if (HasValues(observation.RemainingChangedFilePaths))
             issues.Add("PostCommitRemainingChangedFiles");
         if (HasValues(observation.RemainingStagedFilePaths))
@@ -547,7 +578,13 @@ public static class ControlledCommitExecutor
         ICollection<string> issues,
         bool allowEmpty = false)
     {
-        if (filePaths is null || filePaths.Count == 0)
+        if (filePaths is null)
+        {
+            issues.Add($"{label}Required");
+            return;
+        }
+
+        if (filePaths.Count == 0)
         {
             if (!allowEmpty)
                 issues.Add($"{label}Required");
@@ -561,6 +598,15 @@ public static class ControlledCommitExecutor
             if (IsForbiddenFile(filePath, options))
                 issues.Add($"ForbiddenFileObserved:{filePath}");
         }
+    }
+
+    private static void RequireCollection(
+        IReadOnlyCollection<string>? values,
+        string issue,
+        ICollection<string> issues)
+    {
+        if (values is null)
+            issues.Add(issue);
     }
 
     private static bool IsSafeExactRelativeFilePath(string? filePath)
