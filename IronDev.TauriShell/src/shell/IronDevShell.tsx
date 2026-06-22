@@ -11,6 +11,7 @@ import { DogfoodReceiptViewerRoute } from '../features/governance/DogfoodReceipt
 import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
 import { PatchArtifactPanelRoute } from '../features/governance/PatchArtifactPanelRoute';
+import { PatchPackageViewerRoute } from '../features/governance/PatchPackageViewerRoute';
 import { PolicySatisfactionPanelRoute } from '../features/governance/PolicySatisfactionPanelRoute';
 import { OperationStatusViewerRoute } from '../features/governance/OperationStatusViewerRoute';
 import { ReleaseReadinessEvidencePanelRoute } from '../features/governance/ReleaseReadinessEvidencePanelRoute';
@@ -77,6 +78,9 @@ export function IronDevShell() {
           <OperationStatusViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/workflows/runs') ? (
           <WorkflowRunStepViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/patch-packages') ||
+          window.location.pathname.startsWith('/patch-packages') ? (
+          <PatchPackageViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/memory-proposals') ? (
           <MemoryProposalReviewRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/patch-artifacts') ? (
