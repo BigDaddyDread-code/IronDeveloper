@@ -211,10 +211,12 @@ builder.Services.AddSingleton<IGovernedOperationStatusReadRepository, GovernedOp
 builder.Services.AddSingleton<IEvidenceMetadataReadRepository, EvidenceMetadataReadRepository>();
 builder.Services.AddSingleton<IReceiptMetadataReadRepository, ReceiptMetadataReadRepository>();
 builder.Services.AddSingleton<IOperationTimelineReadRepository, OperationTimelineReadRepository>();
+builder.Services.AddSingleton<IPatchPackageMetadataReadRepository, PatchPackageMetadataReadRepository>();
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, OperationStatusFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, EvidenceMetadataFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, ReceiptMetadataFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, OperationTimelineFrontendReadinessBackendTruthSource>();
+builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, PatchPackageMetadataFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, RunReportFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessReadApi, BackendFrontendReadinessReadApi>();
 builder.Services.AddSingleton<IFrontendControlledActionRequestService, FrontendControlledActionRequestService>();

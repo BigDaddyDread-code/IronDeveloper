@@ -1,0 +1,21 @@
+using IronDev.Core.Governance;
+
+namespace IronDev.Infrastructure.Governance;
+
+public sealed class PatchPackageMetadataFrontendReadinessBackendTruthSource : FrontendReadinessBackendTruthSource
+{
+    private readonly IPatchPackageMetadataReadRepository _repository;
+
+    public PatchPackageMetadataFrontendReadinessBackendTruthSource(IPatchPackageMetadataReadRepository repository) =>
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+
+    public override string SourceName => "patch-package-metadata-repository";
+
+    public override FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(
+        string packageId,
+        FrontendReadinessReadScope scope)
+    {
+        var result = _repository.GetByPackageId(packageId, scope);
+        return result.Found ? result.Metadata : null;
+    }
+}
