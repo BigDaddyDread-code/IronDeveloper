@@ -208,6 +208,7 @@ builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, Approva
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
 builder.Services.AddSingleton<IFrontendReadinessReadApi>(FrontendReadinessReadApi.Empty);
+builder.Services.AddSingleton<IFrontendControlledActionRequestService, FrontendControlledActionRequestService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))

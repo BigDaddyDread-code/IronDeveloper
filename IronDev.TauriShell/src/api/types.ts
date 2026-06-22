@@ -949,3 +949,72 @@ export interface FrontendReadinessApiEnvelope<TData> {
   warnings: string[];
   errors: FrontendReadinessApiError[];
 }
+
+export type ControlledActionRequestKind = 'SourceApply' | 'Commit' | 'Push' | 'DraftPullRequest' | 'Rollback';
+
+export interface FrontendActionRequestBoundary {
+  canCreateRequest?: boolean | null;
+  canApprove?: boolean | null;
+  canAcceptApproval?: boolean | null;
+  canSatisfyPolicy?: boolean | null;
+  canExecute?: boolean | null;
+  canMutateSource?: boolean | null;
+  canRollback?: boolean | null;
+  canCommit?: boolean | null;
+  canPush?: boolean | null;
+  canCreatePullRequest?: boolean | null;
+  canMarkReadyForReview?: boolean | null;
+  canMerge?: boolean | null;
+  canRelease?: boolean | null;
+  canDeploy?: boolean | null;
+  canPromoteMemory?: boolean | null;
+  canContinueWorkflow?: boolean | null;
+}
+
+export interface ControlledActionRequestCreateRequest {
+  requestId: string;
+  operationId: string;
+  requestKind: string;
+  repository: string;
+  branch: string;
+  runId: string;
+  patchPackageId?: string | null;
+  patchHash?: string | null;
+  proposedFilePaths?: string[] | null;
+  sourceApplyReceiptRef?: string | null;
+  commitPackageId?: string | null;
+  commitMessageEvidenceRef?: string | null;
+  commitSha?: string | null;
+  remoteTarget?: string | null;
+  pushIntent?: string | null;
+  headBranch?: string | null;
+  baseBranch?: string | null;
+  pushedCommitSha?: string | null;
+  draftPullRequestPackageId?: string | null;
+  pullRequestTextPackageRef?: string | null;
+  rollbackTargetReceiptRef?: string | null;
+  rollbackScopePaths?: string[] | null;
+  humanIntent: string;
+  evidenceRefs: string[];
+  receiptRefs: string[];
+  requestedAtUtc: string;
+}
+
+export interface ControlledActionRequestCreateResponse {
+  requestId: string;
+  operationId: string;
+  requestKind: string;
+  state: string;
+  blockedReasons: string[];
+  missingEvidence: string[];
+  nextSafeActions: string[];
+  forbiddenActions: string[];
+  evidenceRefs: string[];
+  receiptRefs: string[];
+  authorityWarnings: string[];
+  boundary: FrontendActionRequestBoundary;
+  requestCreated: boolean;
+  executionStarted: boolean;
+  sourceMutated: boolean;
+  workflowContinued: boolean;
+}

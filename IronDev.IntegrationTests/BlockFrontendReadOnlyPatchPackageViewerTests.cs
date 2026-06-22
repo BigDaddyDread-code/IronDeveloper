@@ -338,7 +338,11 @@ public sealed class BlockFrontendReadOnlyPatchPackageViewerTests
         foreach (var marker in forbidden)
             Assert.IsFalse(source.Contains(marker, StringComparison.OrdinalIgnoreCase), marker);
 
-        Assert.IsFalse(apiSource.Contains("[HttpPost", StringComparison.OrdinalIgnoreCase));
+        StringAssert.Contains(apiSource, "[HttpPost(\"action-requests\")]");
+        StringAssert.Contains(apiSource, "IFrontendControlledActionRequestService");
+        Assert.IsFalse(apiSource.Contains("[HttpPut", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(apiSource.Contains("[HttpPatch", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(apiSource.Contains("[HttpDelete", StringComparison.OrdinalIgnoreCase));
         StringAssert.Contains(clientSource, "getFrontendPatchPackageArtifacts");
         StringAssert.Contains(clientSource, "/artifacts");
         StringAssert.Contains(clientSource, "{ method: 'GET', signal }");

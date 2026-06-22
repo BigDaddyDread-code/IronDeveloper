@@ -310,7 +310,6 @@ public sealed class BlockFrontendReadOnlyReadinessApiTests
         var text = string.Join(Environment.NewLine, files.Select(File.ReadAllText));
         var forbidden = new[]
         {
-            "[HttpPost",
             "[HttpPut",
             "[HttpPatch",
             "[HttpDelete",
@@ -335,6 +334,10 @@ public sealed class BlockFrontendReadOnlyReadinessApiTests
 
         foreach (var value in forbidden)
             Assert.IsFalse(text.Contains(value, StringComparison.OrdinalIgnoreCase), value);
+
+        var controller = File.ReadAllText(Path.Combine(root, "IronDev.Api", "Controllers", "FrontendReadinessController.cs"));
+        StringAssert.Contains(controller, "[HttpPost(\"action-requests\")]");
+        StringAssert.Contains(controller, "IFrontendControlledActionRequestService");
     }
 
     [TestMethod]
@@ -501,6 +504,10 @@ public sealed class BlockFrontendReadOnlyReadinessApiTests
         Assert.IsTrue(methods.Any(method => HasGetRoute(method, "validation-results/{validationResultId}/metadata")));
         Assert.IsTrue(methods.Any(method => HasGetRoute(method, "evidence/{evidenceRef}/metadata")));
         Assert.IsTrue(methods.Any(method => HasGetRoute(method, "receipts/{receiptRef}/metadata")));
+        Assert.IsTrue(methods.Any(method => HasPostRoute(method, "action-requests")));
+        Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpPutAttribute), inherit: false).Any()));
+        Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpPatchAttribute), inherit: false).Any()));
+        Assert.IsFalse(methods.Any(method => method.GetCustomAttributes(typeof(HttpDeleteAttribute), inherit: false).Any()));
     }
 
     [TestMethod]
@@ -518,6 +525,11 @@ public sealed class BlockFrontendReadOnlyReadinessApiTests
     private static bool HasGetRoute(System.Reflection.MethodInfo method, string route) =>
         method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false)
             .OfType<HttpGetAttribute>()
+            .Any(attribute => string.Equals(attribute.Template, route, StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasPostRoute(System.Reflection.MethodInfo method, string route) =>
+        method.GetCustomAttributes(typeof(HttpPostAttribute), inherit: false)
+            .OfType<HttpPostAttribute>()
             .Any(attribute => string.Equals(attribute.Template, route, StringComparison.OrdinalIgnoreCase));
 
     private static FrontendReadinessController Controller(GovernedOperationStatus? status = null) =>

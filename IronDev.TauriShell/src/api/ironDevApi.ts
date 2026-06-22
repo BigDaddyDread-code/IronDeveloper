@@ -6,6 +6,8 @@ import type {
   ChatCompletionResponse,
   ChatMessage,
   ChatTurnAuditResponse,
+  ControlledActionRequestCreateRequest,
+  ControlledActionRequestCreateResponse,
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
@@ -649,6 +651,17 @@ class IronDevApiClient {
       `/api/frontend-readiness/patch-packages/${encodeURIComponent(packageId)}/artifacts${queryString}`,
       { method: 'GET', signal }
     );
+  }
+
+  async createFrontendControlledActionRequest(
+    request: ControlledActionRequestCreateRequest,
+    signal?: AbortSignal
+  ): Promise<ControlledActionRequestCreateResponse> {
+    return this.request<ControlledActionRequestCreateResponse>('/api/frontend-readiness/action-requests', {
+      method: 'POST',
+      body: request,
+      signal
+    });
   }
 
   async getDogfoodLoopReceipt(
