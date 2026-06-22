@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace IronDev.Core.Governance;
 
 public interface IFrontendReadinessReadApi
@@ -251,6 +253,7 @@ public sealed record FrontendReadBoundary
     public static FrontendReadBoundary ReadOnlyStatus { get; } = new();
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum FrontendReadinessReadStateKind
 {
     Available,
@@ -265,6 +268,7 @@ public enum FrontendReadinessReadStateKind
     Unknown
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum FrontendReadinessFreshnessKind
 {
     Current,

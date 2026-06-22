@@ -1,5 +1,6 @@
 using IronDev.Core.Governance;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IronDev.Api.Controllers;
@@ -21,6 +22,9 @@ public sealed class FrontendReadinessController : ControllerBase
     }
 
     [HttpGet("operations/{operationId}/status")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>> GetOperationStatus(
         string operationId,
         [FromQuery] bool compact = false) =>
@@ -31,6 +35,9 @@ public sealed class FrontendReadinessController : ControllerBase
             compact);
 
     [HttpGet("operations/{operationId}/timeline")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendOperationTimelineReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendOperationTimelineReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendOperationTimelineReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendOperationTimelineReadModel>> GetOperationTimeline(
         string operationId,
         [FromQuery] bool compact = false) =>
@@ -41,6 +48,9 @@ public sealed class FrontendReadinessController : ControllerBase
             compact);
 
     [HttpGet("patch-packages/{packageId}/metadata")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendPatchPackageMetadataReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendPatchPackageMetadataReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendPatchPackageMetadataReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendPatchPackageMetadataReadModel>> GetPatchPackageMetadata(
         string packageId,
         [FromQuery] bool compact = false) =>
@@ -51,6 +61,9 @@ public sealed class FrontendReadinessController : ControllerBase
             compact);
 
     [HttpGet("patch-packages/{packageId}/artifacts")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>> GetPatchPackageArtifacts(
         string packageId,
         [FromQuery] bool compact = false) =>
@@ -61,6 +74,9 @@ public sealed class FrontendReadinessController : ControllerBase
             compact);
 
     [HttpGet("validation-results/{validationResultId}/metadata")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendValidationResultMetadataReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendValidationResultMetadataReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendValidationResultMetadataReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendValidationResultMetadataReadModel>> GetValidationResultMetadata(
         string validationResultId,
         [FromQuery] bool compact = false) =>
@@ -71,6 +87,9 @@ public sealed class FrontendReadinessController : ControllerBase
             compact);
 
     [HttpGet("evidence/{evidenceRef}/metadata")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendEvidenceMetadataReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendEvidenceMetadataReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendEvidenceMetadataReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendEvidenceMetadataReadModel>> GetEvidenceMetadata(
         string evidenceRef,
         [FromQuery] bool compact = false) =>
@@ -81,6 +100,9 @@ public sealed class FrontendReadinessController : ControllerBase
             compact);
 
     [HttpGet("receipts/{receiptRef}/metadata")]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendReceiptMetadataReadModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendReceiptMetadataReadModel>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FrontendReadinessApiEnvelope<FrontendReceiptMetadataReadModel>), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendReceiptMetadataReadModel>> GetReceiptMetadata(
         string receiptRef,
         [FromQuery] bool compact = false) =>
