@@ -259,9 +259,171 @@ public enum FrontendReadinessReadStateKind
     Redacted,
     Unavailable,
     Invalid,
+    Expired,
     Stale,
     NotVisible,
     Unknown
+}
+
+public enum FrontendReadinessFreshnessKind
+{
+    Current,
+    Stale,
+    Expired,
+    Unknown,
+    NotApplicable
+}
+
+public sealed record FrontendReadinessFreshnessState
+{
+    public required FrontendReadinessFreshnessKind Kind { get; init; }
+    public required bool FreshnessKnown { get; init; }
+    public required bool IsStale { get; init; }
+    public required bool IsExpired { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public required DateTimeOffset EvaluatedAtUtc { get; init; }
+    public required IReadOnlyCollection<string> Reasons { get; init; }
+    public required IReadOnlyCollection<string> Warnings { get; init; }
+}
+
+public static class FrontendReadinessFreshnessClassifier
+{
+    private static readonly string[] NoAuthorityWarnings =
+    [
+        "Freshness is not approval.",
+        "Freshness is not policy satisfaction.",
+        "Freshness is not source apply authority.",
+        "Freshness does not allow mutation or workflow continuation."
+    ];
+
+    public static FrontendReadinessFreshnessState Evaluate(
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        bool explicitStale,
+        bool freshnessKnown,
+        DateTimeOffset evaluatedAtUtc,
+        string subject)
+    {
+        var cleanSubject = string.IsNullOrWhiteSpace(subject) ? "FrontendReadiness" : subject.Trim();
+        if (!freshnessKnown || !observedAtUtc.HasValue || observedAtUtc.Value == default)
+            return Unknown($"{cleanSubject}FreshnessUnknown", observedAtUtc, expiresAtUtc, evaluatedAtUtc);
+
+        if (expiresAtUtc.HasValue && expiresAtUtc.Value <= evaluatedAtUtc)
+            return Expired($"{cleanSubject}Expired", observedAtUtc, expiresAtUtc, evaluatedAtUtc);
+
+        if (explicitStale)
+            return Stale($"{cleanSubject}Stale", observedAtUtc, expiresAtUtc, evaluatedAtUtc);
+
+        return Current($"{cleanSubject}Current", observedAtUtc, expiresAtUtc, evaluatedAtUtc);
+    }
+
+    public static FrontendReadinessFreshnessState Current(
+        string reason,
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        DateTimeOffset evaluatedAtUtc) =>
+        Create(
+            FrontendReadinessFreshnessKind.Current,
+            freshnessKnown: true,
+            isStale: false,
+            isExpired: false,
+            reason,
+            observedAtUtc,
+            expiresAtUtc,
+            evaluatedAtUtc);
+
+    public static FrontendReadinessFreshnessState Stale(
+        string reason,
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        DateTimeOffset evaluatedAtUtc) =>
+        Create(
+            FrontendReadinessFreshnessKind.Stale,
+            freshnessKnown: true,
+            isStale: true,
+            isExpired: false,
+            reason,
+            observedAtUtc,
+            expiresAtUtc,
+            evaluatedAtUtc,
+            warnings: ["Stale is not safe."]);
+
+    public static FrontendReadinessFreshnessState Expired(
+        string reason,
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        DateTimeOffset evaluatedAtUtc) =>
+        Create(
+            FrontendReadinessFreshnessKind.Expired,
+            freshnessKnown: true,
+            isStale: true,
+            isExpired: true,
+            reason,
+            observedAtUtc,
+            expiresAtUtc,
+            evaluatedAtUtc,
+            warnings: ["Expired is not current."]);
+
+    public static FrontendReadinessFreshnessState Unknown(
+        string reason,
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        DateTimeOffset evaluatedAtUtc) =>
+        Create(
+            FrontendReadinessFreshnessKind.Unknown,
+            freshnessKnown: false,
+            isStale: true,
+            isExpired: false,
+            reason,
+            observedAtUtc,
+            expiresAtUtc,
+            evaluatedAtUtc,
+            warnings: ["Freshness unknown is not current."]);
+
+    public static FrontendReadinessFreshnessState NotApplicable(
+        string reason,
+        DateTimeOffset evaluatedAtUtc) =>
+        Create(
+            FrontendReadinessFreshnessKind.NotApplicable,
+            freshnessKnown: false,
+            isStale: false,
+            isExpired: false,
+            reason,
+            observedAtUtc: null,
+            expiresAtUtc: null,
+            evaluatedAtUtc,
+            warnings: ["Freshness is not applicable to this read state."]);
+
+    private static FrontendReadinessFreshnessState Create(
+        FrontendReadinessFreshnessKind kind,
+        bool freshnessKnown,
+        bool isStale,
+        bool isExpired,
+        string reason,
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        DateTimeOffset evaluatedAtUtc,
+        IReadOnlyCollection<string>? warnings = null) =>
+        new()
+        {
+            Kind = kind,
+            FreshnessKnown = freshnessKnown,
+            IsStale = isStale,
+            IsExpired = isExpired,
+            ObservedAtUtc = observedAtUtc,
+            ExpiresAtUtc = expiresAtUtc,
+            EvaluatedAtUtc = evaluatedAtUtc,
+            Reasons = Clean([reason]),
+            Warnings = Clean((warnings ?? []).Concat(NoAuthorityWarnings))
+        };
+
+    private static IReadOnlyList<string> Clean(IEnumerable<string> values) =>
+        values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 }
 
 public sealed record FrontendReadinessReadState
@@ -272,8 +434,10 @@ public sealed record FrontendReadinessReadState
     public required bool IsFallback { get; init; }
     public required bool IsRedacted { get; init; }
     public required bool IsStale { get; init; }
+    public required bool IsExpired { get; init; }
     public required bool IsAuthorityGrant { get; init; }
     public required bool AllowsMutation { get; init; }
+    public required FrontendReadinessFreshnessState Freshness { get; init; }
     public required IReadOnlyCollection<string> Reasons { get; init; }
     public required IReadOnlyCollection<string> MissingRefs { get; init; }
     public required IReadOnlyCollection<string> Warnings { get; init; }
@@ -286,6 +450,22 @@ public sealed record FrontendReadinessReadState
             hasData: true,
             isFinal: true,
             reasons: reasons.Length == 0 ? ["DataAvailable"] : reasons,
+            freshness: FrontendReadinessFreshnessClassifier.Current(
+                "ReadStateFreshnessCurrent",
+                DateTimeOffset.UnixEpoch,
+                null,
+                DateTimeOffset.UnixEpoch),
+            nextSafeActions: ["inspect returned frontend-readiness data"]);
+
+    public static FrontendReadinessReadState Available(
+        FrontendReadinessFreshnessState freshness,
+        params string[] reasons) =>
+        Create(
+            FrontendReadinessReadStateKind.Available,
+            hasData: true,
+            isFinal: true,
+            reasons: reasons.Length == 0 ? ["DataAvailable"] : reasons,
+            freshness: freshness,
             nextSafeActions: ["inspect returned frontend-readiness data"]);
 
     public static FrontendReadinessReadState NotFound(string reason, params string[] missingRefs) =>
@@ -295,6 +475,9 @@ public sealed record FrontendReadinessReadState
             isFinal: true,
             reasons: [reason],
             missingRefs: missingRefs,
+            freshness: FrontendReadinessFreshnessClassifier.NotApplicable(
+                "ReadStateFreshnessNotApplicable",
+                DateTimeOffset.UnixEpoch),
             nextSafeActions: ["inspect backend read source"]);
 
     public static FrontendReadinessReadState Empty(string reason) =>
@@ -303,6 +486,20 @@ public sealed record FrontendReadinessReadState
             hasData: true,
             isFinal: true,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Unknown(
+                "EmptyReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
+            nextSafeActions: ["inspect backend read source"]);
+
+    public static FrontendReadinessReadState Empty(string reason, FrontendReadinessFreshnessState freshness) =>
+        Create(
+            FrontendReadinessReadStateKind.Empty,
+            hasData: true,
+            isFinal: true,
+            reasons: [reason],
+            freshness: freshness,
             nextSafeActions: ["inspect backend read source"]);
 
     public static FrontendReadinessReadState Redacted(string reason) =>
@@ -312,6 +509,11 @@ public sealed record FrontendReadinessReadState
             isFinal: true,
             isRedacted: true,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Unknown(
+                "RedactedReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
             warnings: ["Unsafe or private material was redacted."],
             nextSafeActions: ["inspect safe metadata producer"]);
 
@@ -321,6 +523,11 @@ public sealed record FrontendReadinessReadState
             hasData: false,
             isFinal: false,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Unknown(
+                "UnavailableReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
             warnings: ["Canonical backend truth was unavailable and no fallback was used."],
             nextSafeActions: ["restore backend truth source"]);
 
@@ -330,6 +537,11 @@ public sealed record FrontendReadinessReadState
             hasData: true,
             isFinal: true,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Unknown(
+                "InvalidReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
             warnings: ["Invalid stored metadata cannot be treated as frontend readiness data."],
             nextSafeActions: ["inspect backend record producer"]);
 
@@ -340,8 +552,52 @@ public sealed record FrontendReadinessReadState
             isFinal: true,
             isStale: true,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Stale(
+                reason,
+                DateTimeOffset.UnixEpoch,
+                null,
+                DateTimeOffset.UnixEpoch),
             warnings: ["Stale validation evidence is not approval or mutation authority."],
             nextSafeActions: ["refresh validation evidence"]);
+
+    public static FrontendReadinessReadState Stale(string reason, FrontendReadinessFreshnessState freshness) =>
+        Create(
+            FrontendReadinessReadStateKind.Stale,
+            hasData: true,
+            isFinal: true,
+            isStale: true,
+            reasons: [reason],
+            freshness: freshness,
+            warnings: ["Stale validation evidence is not approval or mutation authority."],
+            nextSafeActions: ["refresh validation evidence"]);
+
+    public static FrontendReadinessReadState Expired(string reason) =>
+        Create(
+            FrontendReadinessReadStateKind.Expired,
+            hasData: true,
+            isFinal: true,
+            isStale: true,
+            isExpired: true,
+            reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Expired(
+                reason,
+                DateTimeOffset.UnixEpoch,
+                DateTimeOffset.UnixEpoch,
+                DateTimeOffset.UnixEpoch),
+            warnings: ["Expired data is not current and is not authority."],
+            nextSafeActions: ["refresh backend truth source"]);
+
+    public static FrontendReadinessReadState Expired(string reason, FrontendReadinessFreshnessState freshness) =>
+        Create(
+            FrontendReadinessReadStateKind.Expired,
+            hasData: true,
+            isFinal: true,
+            isStale: true,
+            isExpired: true,
+            reasons: [reason],
+            freshness: freshness,
+            warnings: ["Expired data is not current and is not authority."],
+            nextSafeActions: ["refresh backend truth source"]);
 
     public static FrontendReadinessReadState NotVisible(string reason = "NotFoundOrNotVisible") =>
         Create(
@@ -349,6 +605,11 @@ public sealed record FrontendReadinessReadState
             hasData: false,
             isFinal: true,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Unknown(
+                "NotVisibleReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
             warnings: ["Requested data was not visible in the current read scope."],
             nextSafeActions: ["inspect tenant or visibility scope"]);
 
@@ -358,6 +619,11 @@ public sealed record FrontendReadinessReadState
             hasData: false,
             isFinal: false,
             reasons: [reason],
+            freshness: FrontendReadinessFreshnessClassifier.Unknown(
+                "UnknownReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
             warnings: ["Unknown read state is not success."],
             nextSafeActions: ["inspect backend read source"]);
 
@@ -369,8 +635,10 @@ public sealed record FrontendReadinessReadState
         IReadOnlyCollection<string>? missingRefs = null,
         IReadOnlyCollection<string>? warnings = null,
         IReadOnlyCollection<string>? nextSafeActions = null,
+        FrontendReadinessFreshnessState? freshness = null,
         bool isRedacted = false,
-        bool isStale = false) =>
+        bool isStale = false,
+        bool isExpired = false) =>
         new()
         {
             Kind = kind,
@@ -378,12 +646,18 @@ public sealed record FrontendReadinessReadState
             IsFinal = isFinal,
             IsFallback = false,
             IsRedacted = isRedacted,
-            IsStale = isStale,
+            IsStale = isStale || (freshness?.IsStale ?? false),
+            IsExpired = isExpired || (freshness?.IsExpired ?? false),
             IsAuthorityGrant = false,
             AllowsMutation = false,
+            Freshness = freshness ?? FrontendReadinessFreshnessClassifier.Unknown(
+                "ReadStateFreshnessUnknown",
+                null,
+                null,
+                DateTimeOffset.UnixEpoch),
             Reasons = Clean(reasons),
             MissingRefs = Clean(missingRefs ?? []),
-            Warnings = Clean((warnings ?? []).Concat(NoAuthorityWarnings)),
+            Warnings = Clean((warnings ?? []).Concat(freshness?.Warnings ?? []).Concat(NoAuthorityWarnings)),
             NextSafeActions = Clean(nextSafeActions ?? []),
             Boundary = FrontendReadBoundary.ReadOnlyStatus
         };
@@ -406,58 +680,180 @@ public sealed record FrontendReadinessReadState
 
 public static class FrontendReadinessReadStateClassifier
 {
-    public static FrontendReadinessReadState OperationStatus(FrontendOperationStatusReadModel? model, string requestedRef) =>
+    public static FrontendReadinessReadState OperationStatus(
+        FrontendOperationStatusReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc) =>
         model is null
             ? FrontendReadinessReadState.NotFound("OperationStatusNotFound", requestedRef)
             : model.BlockedReasons.Contains("StoredOperationStatusInvalid", StringComparer.OrdinalIgnoreCase)
                 ? FrontendReadinessReadState.Invalid("StoredOperationStatusInvalid")
-                : FrontendReadinessReadState.Available("OperationStatusAvailable");
+                : StateFromFreshness(
+                    "OperationStatusAvailable",
+                    Freshness(
+                        model.ObservedAtUtc == default ? null : model.ObservedAtUtc,
+                        model.ExpiresAtUtc,
+                        explicitStale: false,
+                        freshnessKnown: model.ObservedAtUtc != default,
+                        evaluatedAtUtc,
+                        "OperationStatus"));
 
-    public static FrontendReadinessReadState EvidenceMetadata(FrontendEvidenceMetadataReadModel? model, string requestedRef) =>
+    public static FrontendReadinessReadState OperationStatus(FrontendOperationStatusReadModel? model, string requestedRef) =>
+        OperationStatus(model, requestedRef, DateTimeOffset.UtcNow);
+
+    public static FrontendReadinessReadState EvidenceMetadata(
+        FrontendEvidenceMetadataReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc) =>
         model is null
             ? FrontendReadinessReadState.NotFound("EvidenceMetadataNotFound", requestedRef)
             : IsRedactedEvidence(model)
                 ? FrontendReadinessReadState.Redacted("EvidenceMetadataUnsafe")
-                : FrontendReadinessReadState.Available("EvidenceMetadataAvailable");
+                : StateFromFreshness(
+                    "EvidenceMetadataAvailable",
+                    Freshness(
+                        observedAtUtc: model.ObservedAtUtc,
+                        expiresAtUtc: model.ExpiresAtUtc,
+                        explicitStale: false,
+                        freshnessKnown: model.FreshnessKnown,
+                        evaluatedAtUtc: evaluatedAtUtc,
+                        subject: "EvidenceMetadata"));
 
-    public static FrontendReadinessReadState ReceiptMetadata(FrontendReceiptMetadataReadModel? model, string requestedRef) =>
+    public static FrontendReadinessReadState EvidenceMetadata(FrontendEvidenceMetadataReadModel? model, string requestedRef) =>
+        EvidenceMetadata(model, requestedRef, DateTimeOffset.UtcNow);
+
+    public static FrontendReadinessReadState ReceiptMetadata(
+        FrontendReceiptMetadataReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc) =>
         model is null
             ? FrontendReadinessReadState.NotFound("ReceiptMetadataNotFound", requestedRef)
             : IsRedactedReceipt(model)
                 ? FrontendReadinessReadState.Redacted("ReceiptMetadataUnsafe")
-                : FrontendReadinessReadState.Available("ReceiptMetadataAvailable");
+                : StateFromFreshness(
+                    "ReceiptMetadataAvailable",
+                    Freshness(
+                        observedAtUtc: model.ObservedAtUtc,
+                        expiresAtUtc: model.ExpiresAtUtc,
+                        explicitStale: false,
+                        freshnessKnown: model.FreshnessKnown,
+                        evaluatedAtUtc: evaluatedAtUtc,
+                        subject: "ReceiptMetadata"));
+
+    public static FrontendReadinessReadState ReceiptMetadata(FrontendReceiptMetadataReadModel? model, string requestedRef) =>
+        ReceiptMetadata(model, requestedRef, DateTimeOffset.UtcNow);
+
+    public static FrontendReadinessReadState OperationTimeline(
+        FrontendOperationTimelineReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc)
+    {
+        if (model is null)
+            return FrontendReadinessReadState.NotFound("OperationTimelineNotFound", requestedRef);
+
+        if (model.Entries.Any(IsRedactedTimelineEntry))
+            return FrontendReadinessReadState.Redacted("TimelineEventRedacted");
+
+        var observedAt = model.ObservedAtUtc ?? LatestObservedAt(model.Entries);
+        var freshness = Freshness(
+            observedAtUtc: observedAt,
+            expiresAtUtc: model.ExpiresAtUtc,
+            explicitStale: false,
+            freshnessKnown: model.FreshnessKnown && observedAt.HasValue,
+            evaluatedAtUtc: evaluatedAtUtc,
+            subject: "OperationTimeline");
+
+        return model.Entries.Count == 0
+            ? FrontendReadinessReadState.Empty("NoVisibleTimelineEntries", freshness)
+            : StateFromFreshness("OperationTimelineAvailable", freshness);
+    }
 
     public static FrontendReadinessReadState OperationTimeline(FrontendOperationTimelineReadModel? model, string requestedRef) =>
-        model is null
-            ? FrontendReadinessReadState.NotFound("OperationTimelineNotFound", requestedRef)
-            : model.Entries.Count == 0
-                ? FrontendReadinessReadState.Empty("NoVisibleTimelineEntries")
-                : model.Entries.Any(IsRedactedTimelineEntry)
-                    ? FrontendReadinessReadState.Redacted("TimelineEventRedacted")
-                    : FrontendReadinessReadState.Available("OperationTimelineAvailable");
+        OperationTimeline(model, requestedRef, DateTimeOffset.UtcNow);
 
-    public static FrontendReadinessReadState PatchPackageMetadata(FrontendPatchPackageMetadataReadModel? model, string requestedRef) =>
+    public static FrontendReadinessReadState PatchPackageMetadata(
+        FrontendPatchPackageMetadataReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc) =>
         model is null
             ? FrontendReadinessReadState.NotFound("PatchPackageMetadataNotFound", requestedRef)
             : IsRedactedPatchPackage(model)
                 ? FrontendReadinessReadState.Redacted("PatchPackageMetadataUnsafe")
-                : FrontendReadinessReadState.Available("PatchPackageMetadataAvailable");
+                : StateFromFreshness(
+                    "PatchPackageMetadataAvailable",
+                    Freshness(
+                        observedAtUtc: model.ObservedAtUtc,
+                        expiresAtUtc: model.ExpiresAtUtc,
+                        explicitStale: false,
+                        freshnessKnown: model.FreshnessKnown,
+                        evaluatedAtUtc: evaluatedAtUtc,
+                        subject: "PatchPackageMetadata"));
 
-    public static FrontendReadinessReadState PatchPackageArtifacts(FrontendPatchPackageArtifactsReadModel? model, string requestedRef) =>
+    public static FrontendReadinessReadState PatchPackageMetadata(FrontendPatchPackageMetadataReadModel? model, string requestedRef) =>
+        PatchPackageMetadata(model, requestedRef, DateTimeOffset.UtcNow);
+
+    public static FrontendReadinessReadState PatchPackageArtifacts(
+        FrontendPatchPackageArtifactsReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc) =>
         model is null
             ? FrontendReadinessReadState.NotFound("PatchPackageArtifactsNotFound", requestedRef)
-            : model.ValidationIsStale
-                ? FrontendReadinessReadState.Stale("PatchPackageValidationStale")
-                : FrontendReadinessReadState.Available("PatchPackageArtifactsAvailable");
+            : StateFromFreshness(
+                "PatchPackageArtifactsAvailable",
+                Freshness(model.ObservedAtUtc, model.ExpiresAtUtc, model.ValidationIsStale, model.FreshnessKnown, evaluatedAtUtc, "PatchPackageArtifacts"),
+                staleReason: model.ValidationIsStale ? "PatchPackageValidationStale" : "PatchPackageArtifactsStale",
+                forceStale: model.ValidationIsStale);
 
-    public static FrontendReadinessReadState ValidationResultMetadata(FrontendValidationResultMetadataReadModel? model, string requestedRef) =>
+    public static FrontendReadinessReadState PatchPackageArtifacts(FrontendPatchPackageArtifactsReadModel? model, string requestedRef) =>
+        PatchPackageArtifacts(model, requestedRef, DateTimeOffset.UtcNow);
+
+    public static FrontendReadinessReadState ValidationResultMetadata(
+        FrontendValidationResultMetadataReadModel? model,
+        string requestedRef,
+        DateTimeOffset evaluatedAtUtc) =>
         model is null
             ? FrontendReadinessReadState.NotFound("ValidationResultMetadataNotFound", requestedRef)
             : IsRedactedValidation(model)
                 ? FrontendReadinessReadState.Redacted("ValidationResultMetadataUnsafe")
-                : model.IsStale
-                    ? FrontendReadinessReadState.Stale("ValidationResultStale")
-                    : FrontendReadinessReadState.Available("ValidationResultMetadataAvailable");
+                : StateFromFreshness(
+                    "ValidationResultMetadataAvailable",
+                    Freshness(model.ObservedAtUtc, model.ExpiresAtUtc, model.IsStale, model.FreshnessKnown, evaluatedAtUtc, "ValidationResultMetadata"),
+                    staleReason: "ValidationResultStale",
+                    forceStale: model.IsStale);
+
+    public static FrontendReadinessReadState ValidationResultMetadata(FrontendValidationResultMetadataReadModel? model, string requestedRef) =>
+        ValidationResultMetadata(model, requestedRef, DateTimeOffset.UtcNow);
+
+    private static FrontendReadinessReadState StateFromFreshness(
+        string availableReason,
+        FrontendReadinessFreshnessState freshness,
+        string? staleReason = null,
+        bool forceStale = false) =>
+        freshness.Kind switch
+        {
+            FrontendReadinessFreshnessKind.Expired => FrontendReadinessReadState.Expired($"{availableReason}Expired", freshness),
+            FrontendReadinessFreshnessKind.Stale => FrontendReadinessReadState.Stale(staleReason ?? $"{availableReason}Stale", freshness),
+            _ when forceStale => FrontendReadinessReadState.Stale(staleReason ?? $"{availableReason}Stale", freshness),
+            _ => FrontendReadinessReadState.Available(freshness, availableReason)
+        };
+
+    private static FrontendReadinessFreshnessState Freshness(
+        DateTimeOffset? observedAtUtc,
+        DateTimeOffset? expiresAtUtc,
+        bool explicitStale,
+        bool freshnessKnown,
+        DateTimeOffset evaluatedAtUtc,
+        string subject) =>
+        FrontendReadinessFreshnessClassifier.Evaluate(
+            observedAtUtc,
+            expiresAtUtc,
+            explicitStale,
+            freshnessKnown,
+            evaluatedAtUtc,
+            subject);
+
+    private static DateTimeOffset? LatestObservedAt(IReadOnlyCollection<FrontendTimelineEntry> entries) =>
+        entries.Count == 0 ? null : entries.Max(entry => entry.ObservedAtUtc);
 
     private static bool IsRedactedEvidence(FrontendEvidenceMetadataReadModel model) =>
         string.Equals(model.EvidenceKind, "RedactedEvidenceMetadata", StringComparison.OrdinalIgnoreCase) ||
@@ -508,6 +904,9 @@ public sealed record FrontendOperationTimelineReadModel
     public required string OperationId { get; init; }
     public required IReadOnlyCollection<FrontendTimelineEntry> Entries { get; init; }
     public required FrontendReadBoundary Boundary { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public bool FreshnessKnown { get; init; } = true;
 }
 
 public sealed record FrontendTimelineEntry
@@ -537,6 +936,9 @@ public sealed record FrontendPatchPackageMetadataReadModel
     public required string KnownRisksRef { get; init; }
 
     public required FrontendReadBoundary Boundary { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public bool FreshnessKnown { get; init; } = true;
 }
 
 public sealed record FrontendPatchPackageArtifactsReadModel
@@ -566,6 +968,9 @@ public sealed record FrontendPatchPackageArtifactsReadModel
 
     public required IReadOnlyCollection<string> AuthorityWarnings { get; init; }
     public required FrontendReadBoundary Boundary { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public bool FreshnessKnown { get; init; } = true;
 }
 
 public sealed record FrontendValidationResultMetadataReadModel
@@ -587,6 +992,9 @@ public sealed record FrontendValidationResultMetadataReadModel
     public required IReadOnlyCollection<string> ReceiptRefs { get; init; }
 
     public required FrontendReadBoundary Boundary { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public bool FreshnessKnown { get; init; } = true;
 }
 
 public sealed record FrontendEvidenceMetadataReadModel
@@ -598,6 +1006,9 @@ public sealed record FrontendEvidenceMetadataReadModel
     public bool ContainsRawPayload { get; init; }
     public required IReadOnlyCollection<string> Warnings { get; init; }
     public required FrontendReadBoundary Boundary { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public bool FreshnessKnown { get; init; }
 }
 
 public sealed record FrontendReceiptMetadataReadModel
@@ -610,6 +1021,9 @@ public sealed record FrontendReceiptMetadataReadModel
     public bool ContinuesWorkflow { get; init; }
     public required IReadOnlyCollection<string> Warnings { get; init; }
     public required FrontendReadBoundary Boundary { get; init; }
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; init; }
+    public bool FreshnessKnown { get; init; }
 }
 
 public sealed record FrontendReadinessReadSnapshot

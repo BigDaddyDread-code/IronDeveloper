@@ -109,6 +109,7 @@ public sealed class FrontendReadinessController : ControllerBase
             Status = status,
             Data = data,
             ReadState = readState,
+            Freshness = readState.Freshness,
             Boundary = FrontendReadBoundary.ReadOnlyStatus,
             MutationOccurred = false,
             Warnings = Warnings(compactWarning).Concat(readState.Warnings).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -188,6 +189,8 @@ public sealed class FrontendReadinessController : ControllerBase
         {
             FrontendReadinessReadStateKind.NotVisible => "not_visible",
             FrontendReadinessReadStateKind.Unavailable => "unavailable",
+            FrontendReadinessReadStateKind.Expired => "expired",
+            FrontendReadinessReadStateKind.Stale => "stale",
             FrontendReadinessReadStateKind.Unknown => "unknown",
             _ => "not_found"
         };
@@ -198,6 +201,7 @@ public sealed record FrontendReadinessApiEnvelope<TData>
     public required string Status { get; init; }
     public TData? Data { get; init; }
     public required FrontendReadinessReadState ReadState { get; init; }
+    public required FrontendReadinessFreshnessState Freshness { get; init; }
     public required FrontendReadBoundary Boundary { get; init; }
     public bool MutationOccurred { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];

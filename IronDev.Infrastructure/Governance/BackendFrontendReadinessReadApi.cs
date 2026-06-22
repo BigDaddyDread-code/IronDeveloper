@@ -523,7 +523,10 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
         {
             OperationId = detail.RunId,
             Entries = entries,
-            Boundary = FrontendReadBoundary.ReadOnlyStatus
+            Boundary = FrontendReadBoundary.ReadOnlyStatus,
+            ObservedAtUtc = entries.Count == 0 ? observedAt.Value : entries.Max(entry => entry.ObservedAtUtc),
+            ExpiresAtUtc = null,
+            FreshnessKnown = true
         };
     }
 
@@ -539,6 +542,7 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             return null;
 
         var freshnessProven = HasFreshnessEvidence(detail);
+        var observedAt = TryObservedAt(detail, events);
         return new FrontendValidationResultMetadataReadModel
         {
             ValidationResultId = $"run-validation:{detail.RunId}",
@@ -554,7 +558,10 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             IsStale = !freshnessProven,
             EvidenceRefs = EvidenceRefs(detail).ToArray(),
             ReceiptRefs = [],
-            Boundary = FrontendReadBoundary.ReadOnlyStatus
+            Boundary = FrontendReadBoundary.ReadOnlyStatus,
+            ObservedAtUtc = observedAt,
+            ExpiresAtUtc = null,
+            FreshnessKnown = freshnessProven
         };
     }
 
@@ -576,7 +583,10 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             ReferenceOnly = true,
             ContainsRawPayload = false,
             Warnings = ["Run evidence metadata is reference-only.", "Run evidence does not approve or continue workflow."],
-            Boundary = FrontendReadBoundary.ReadOnlyStatus
+            Boundary = FrontendReadBoundary.ReadOnlyStatus,
+            ObservedAtUtc = TryObservedAt(detail, LoadEvents(detail.RunId)),
+            ExpiresAtUtc = null,
+            FreshnessKnown = true
         };
     }
 
@@ -596,7 +606,10 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             GrantsAuthority = false,
             ContinuesWorkflow = false,
             Warnings = ["Run report receipt metadata is reference-only.", "Run report receipt does not grant authority."],
-            Boundary = FrontendReadBoundary.ReadOnlyStatus
+            Boundary = FrontendReadBoundary.ReadOnlyStatus,
+            ObservedAtUtc = TryObservedAt(detail, LoadEvents(detail.RunId)),
+            ExpiresAtUtc = null,
+            FreshnessKnown = true
         };
     }
 
