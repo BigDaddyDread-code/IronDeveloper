@@ -9,13 +9,16 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
 {
     private readonly IReadOnlyList<IFrontendReadinessBackendTruthSource> _sources;
     private readonly ICurrentTenantContext? _tenantContext;
+    private readonly Func<DateTimeOffset> _utcNow;
 
     public BackendFrontendReadinessReadApi(
         IEnumerable<IFrontendReadinessBackendTruthSource> sources,
-        ICurrentTenantContext? tenantContext = null)
+        ICurrentTenantContext? tenantContext = null,
+        Func<DateTimeOffset>? utcNow = null)
     {
         _sources = sources?.ToArray() ?? throw new ArgumentNullException(nameof(sources));
         _tenantContext = tenantContext;
+        _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
     public FrontendOperationStatusReadModel? GetOperationStatus(string operationId)
@@ -46,6 +49,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("OperationStatusNotFound", operationId);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadOperationStatus(key, ReadScope()),
             status =>
@@ -61,7 +65,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
 
                 return FrontendReadinessReadStateClassifier.OperationStatus(
                     new FrontendReadinessReadApi(snapshot).GetOperationStatus(key),
-                    key);
+                    key,
+                    evaluatedAtUtc);
             },
             FrontendReadinessReadState.NotFound("OperationStatusNotFound", key));
     }
@@ -94,6 +99,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("OperationTimelineNotFound", operationId);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadOperationTimeline(key, ReadScope()),
             timeline => FrontendReadinessReadStateClassifier.OperationTimeline(
@@ -105,7 +111,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
                         [timeline.OperationId] = timeline
                     }
                 }).GetOperationTimeline(key),
-                key),
+                key,
+                evaluatedAtUtc),
             FrontendReadinessReadState.NotFound("OperationTimelineNotFound", key));
     }
 
@@ -137,6 +144,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("PatchPackageMetadataNotFound", packageId);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadPatchPackageMetadata(key, ReadScope()),
             metadata => FrontendReadinessReadStateClassifier.PatchPackageMetadata(
@@ -148,7 +156,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
                         [metadata.PackageId] = metadata
                     }
                 }).GetPatchPackageMetadata(key),
-                key),
+                key,
+                evaluatedAtUtc),
             FrontendReadinessReadState.NotFound("PatchPackageMetadataNotFound", key));
     }
 
@@ -180,6 +189,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("PatchPackageArtifactsNotFound", packageId);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadPatchPackageArtifacts(key, ReadScope()),
             artifacts => FrontendReadinessReadStateClassifier.PatchPackageArtifacts(
@@ -191,7 +201,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
                         [artifacts.PackageId] = artifacts
                     }
                 }).GetPatchPackageArtifacts(key),
-                key),
+                key,
+                evaluatedAtUtc),
             FrontendReadinessReadState.NotFound("PatchPackageArtifactsNotFound", key));
     }
 
@@ -223,6 +234,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("ValidationResultMetadataNotFound", validationResultId);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadValidationResultMetadata(key, ReadScope()),
             metadata => FrontendReadinessReadStateClassifier.ValidationResultMetadata(
@@ -234,7 +246,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
                         [metadata.ValidationResultId] = metadata
                     }
                 }).GetValidationResultMetadata(key),
-                key),
+                key,
+                evaluatedAtUtc),
             FrontendReadinessReadState.NotFound("ValidationResultMetadataNotFound", key));
     }
 
@@ -266,6 +279,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("EvidenceMetadataNotFound", evidenceRef);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadEvidenceMetadata(key, ReadScope()),
             metadata => FrontendReadinessReadStateClassifier.EvidenceMetadata(
@@ -277,7 +291,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
                         [metadata.EvidenceRef] = metadata
                     }
                 }).GetEvidenceMetadata(key),
-                key),
+                key,
+                evaluatedAtUtc),
             FrontendReadinessReadState.NotFound("EvidenceMetadataNotFound", key));
     }
 
@@ -309,6 +324,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return FrontendReadinessReadState.NotFound("ReceiptMetadataNotFound", receiptRef);
 
+        var evaluatedAtUtc = EvaluationTimeUtc();
         return ReadStateFromSources(
             source => source.ReadReceiptMetadata(key, ReadScope()),
             metadata => FrontendReadinessReadStateClassifier.ReceiptMetadata(
@@ -320,9 +336,12 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
                         [metadata.ReceiptRef] = metadata
                     }
                 }).GetReceiptMetadata(key),
-                key),
+                key,
+                evaluatedAtUtc),
             FrontendReadinessReadState.NotFound("ReceiptMetadataNotFound", key));
     }
+
+    private DateTimeOffset EvaluationTimeUtc() => _utcNow();
 
     private TResult? FirstReadable<TSourceValue, TResult>(
         Func<IFrontendReadinessBackendTruthSource, FrontendReadinessBackendReadResult<TSourceValue>> read,

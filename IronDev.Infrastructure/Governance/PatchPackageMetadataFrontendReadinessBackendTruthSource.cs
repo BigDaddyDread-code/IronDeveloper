@@ -20,7 +20,7 @@ public sealed class PatchPackageMetadataFrontendReadinessBackendTruthSource : Fr
             result.Found,
             result.Metadata,
             result.Issues,
-            model => FrontendReadinessReadStateClassifier.PatchPackageMetadata(model, packageId),
+            _ => FrontendReadinessReadState.Available("PatchPackageMetadataAvailable"),
             "PatchPackageMetadataNotFound");
     }
 

@@ -538,6 +538,104 @@ public sealed class BlockA09FrontendReadinessFreshnessMarkerContractTests
     }
 
     [TestMethod]
+    public void BackendReadApi_OperationStatusUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            OperationStatuses = Map(Status(observedAtUtc: ObservedAtUtc))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetOperationStatusReadState(OperationId);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
+    public void BackendReadApi_EvidenceMetadataUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            EvidenceMetadata = Map(EvidenceRef, Evidence(observedAtUtc: ObservedAtUtc))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetEvidenceMetadataReadState(EvidenceRef);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
+    public void BackendReadApi_ReceiptMetadataUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            ReceiptMetadata = Map(ReceiptRef, Receipt(observedAtUtc: ObservedAtUtc))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetReceiptMetadataReadState(ReceiptRef);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
+    public void BackendReadApi_TimelineUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            Timelines = Map(OperationId, Timeline(entries: [TimelineEntry()]))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetOperationTimelineReadState(OperationId);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
+    public void BackendReadApi_PatchPackageMetadataUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            PatchPackages = Map(PackageId, PatchPackage(observedAtUtc: ObservedAtUtc))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetPatchPackageMetadataReadState(PackageId);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
+    public void BackendReadApi_PatchPackageArtifactsUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            PatchPackageArtifacts = Map(PackageId, Artifacts(observedAtUtc: ObservedAtUtc))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetPatchPackageArtifactsReadState(PackageId);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
+    public void BackendReadApi_ValidationMetadataUsesSuppliedEvaluationTime()
+    {
+        var evaluatedAtUtc = Now.AddMinutes(2);
+        var source = new SeededBackendTruthSource
+        {
+            ValidationResults = Map(ValidationResultId, Validation(observedAtUtc: ObservedAtUtc))
+        };
+
+        var state = BackendApi(source, evaluatedAtUtc).GetValidationResultMetadataReadState(ValidationResultId);
+
+        Assert.AreEqual(evaluatedAtUtc, state.Freshness.EvaluatedAtUtc);
+    }
+
+    [TestMethod]
     public void A09_BackendApi_NotVisibleKeepsUnknownFreshness()
     {
         var source = new SeededBackendTruthSource(tenantId: 7)
@@ -603,6 +701,16 @@ public sealed class BlockA09FrontendReadinessFreshnessMarkerContractTests
         var source = SourceSlice(
             "public static class FrontendReadinessFreshnessClassifier",
             "public sealed record FrontendReadinessReadState");
+
+        AssertNotContains(source, "DateTimeOffset.UtcNow");
+    }
+
+    [TestMethod]
+    public void StaticScan_A09ReadStateClassifierDoesNotCallUtcNow()
+    {
+        var source = SourceSlice(
+            "public static class FrontendReadinessReadStateClassifier",
+            "public sealed record FrontendOperationStatusReadModel");
 
         AssertNotContains(source, "DateTimeOffset.UtcNow");
     }
@@ -728,6 +836,18 @@ public sealed class BlockA09FrontendReadinessFreshnessMarkerContractTests
                 ExpiresAtUtc = model.ExpiresAtUtc
             }
         };
+
+    private static IReadOnlyDictionary<string, TModel> Map<TModel>(string key, TModel model)
+        where TModel : class =>
+        new Dictionary<string, TModel>(StringComparer.OrdinalIgnoreCase)
+        {
+            [key] = model
+        };
+
+    private static BackendFrontendReadinessReadApi BackendApi(
+        SeededBackendTruthSource source,
+        DateTimeOffset evaluatedAtUtc) =>
+        new([source], new TestTenantContext(42), () => evaluatedAtUtc);
 
     private static GovernedOperationStatus ToGovernedStatus(FrontendOperationStatusReadModel model) =>
         new()
@@ -1014,17 +1134,68 @@ public sealed class BlockA09FrontendReadinessFreshnessMarkerContractTests
         public override int? TenantId => _tenantId;
         public IReadOnlyDictionary<string, GovernedOperationStatus> OperationStatuses { get; init; } =
             new Dictionary<string, GovernedOperationStatus>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendOperationTimelineReadModel> Timelines { get; init; } =
+            new Dictionary<string, FrontendOperationTimelineReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendPatchPackageMetadataReadModel> PatchPackages { get; init; } =
+            new Dictionary<string, FrontendPatchPackageMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendPatchPackageArtifactsReadModel> PatchPackageArtifacts { get; init; } =
+            new Dictionary<string, FrontendPatchPackageArtifactsReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendValidationResultMetadataReadModel> ValidationResults { get; init; } =
+            new Dictionary<string, FrontendValidationResultMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendEvidenceMetadataReadModel> EvidenceMetadata { get; init; } =
+            new Dictionary<string, FrontendEvidenceMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendReceiptMetadataReadModel> ReceiptMetadata { get; init; } =
+            new Dictionary<string, FrontendReceiptMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
 
         public override FrontendReadinessBackendReadResult<GovernedOperationStatus> ReadOperationStatus(
             string operationId,
-            FrontendReadinessReadScope scope)
+            FrontendReadinessReadScope scope) =>
+            Read(OperationStatuses, operationId, scope, "OperationStatusAvailable", "OperationStatusNotFound");
+
+        public override FrontendReadinessBackendReadResult<FrontendOperationTimelineReadModel> ReadOperationTimeline(
+            string operationId,
+            FrontendReadinessReadScope scope) =>
+            Read(Timelines, operationId, scope, "OperationTimelineAvailable", "OperationTimelineNotFound");
+
+        public override FrontendReadinessBackendReadResult<FrontendPatchPackageMetadataReadModel> ReadPatchPackageMetadata(
+            string packageId,
+            FrontendReadinessReadScope scope) =>
+            Read(PatchPackages, packageId, scope, "PatchPackageMetadataAvailable", "PatchPackageMetadataNotFound");
+
+        public override FrontendReadinessBackendReadResult<FrontendPatchPackageArtifactsReadModel> ReadPatchPackageArtifacts(
+            string packageId,
+            FrontendReadinessReadScope scope) =>
+            Read(PatchPackageArtifacts, packageId, scope, "PatchPackageArtifactsAvailable", "PatchPackageArtifactsNotFound");
+
+        public override FrontendReadinessBackendReadResult<FrontendValidationResultMetadataReadModel> ReadValidationResultMetadata(
+            string validationResultId,
+            FrontendReadinessReadScope scope) =>
+            Read(ValidationResults, validationResultId, scope, "ValidationResultMetadataAvailable", "ValidationResultMetadataNotFound");
+
+        public override FrontendReadinessBackendReadResult<FrontendEvidenceMetadataReadModel> ReadEvidenceMetadata(
+            string evidenceRef,
+            FrontendReadinessReadScope scope) =>
+            Read(EvidenceMetadata, evidenceRef, scope, "EvidenceMetadataAvailable", "EvidenceMetadataNotFound");
+
+        public override FrontendReadinessBackendReadResult<FrontendReceiptMetadataReadModel> ReadReceiptMetadata(
+            string receiptRef,
+            FrontendReadinessReadScope scope) =>
+            Read(ReceiptMetadata, receiptRef, scope, "ReceiptMetadataAvailable", "ReceiptMetadataNotFound");
+
+        private FrontendReadinessBackendReadResult<TModel> Read<TModel>(
+            IReadOnlyDictionary<string, TModel> values,
+            string key,
+            FrontendReadinessReadScope scope,
+            string availableReason,
+            string notFoundReason)
+            where TModel : class
         {
             if (!IsVisibleTo(scope))
-                return FrontendReadinessBackendReadResult<GovernedOperationStatus>.WithoutData(FrontendReadinessReadState.NotVisible());
+                return FrontendReadinessBackendReadResult<TModel>.WithoutData(FrontendReadinessReadState.NotVisible());
 
-            return OperationStatuses.TryGetValue(operationId, out var status)
-                ? FrontendReadinessBackendReadResult<GovernedOperationStatus>.WithData(status, FrontendReadinessReadState.Available("OperationStatusAvailable"))
-                : FrontendReadinessBackendReadResult<GovernedOperationStatus>.WithoutData(FrontendReadinessReadState.NotFound("OperationStatusNotFound"));
+            return values.TryGetValue(key, out var value)
+                ? FrontendReadinessBackendReadResult<TModel>.WithData(value, FrontendReadinessReadState.Available(availableReason))
+                : FrontendReadinessBackendReadResult<TModel>.WithoutData(FrontendReadinessReadState.NotFound(notFoundReason));
         }
     }
 

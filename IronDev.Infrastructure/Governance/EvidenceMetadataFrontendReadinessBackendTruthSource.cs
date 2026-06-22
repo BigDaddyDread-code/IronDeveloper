@@ -20,7 +20,7 @@ public sealed class EvidenceMetadataFrontendReadinessBackendTruthSource : Fronte
             result.Found,
             result.Metadata,
             result.Issues,
-            model => FrontendReadinessReadStateClassifier.EvidenceMetadata(model, evidenceRef),
+            _ => FrontendReadinessReadState.Available("EvidenceMetadataAvailable"),
             "EvidenceMetadataNotFound");
     }
 

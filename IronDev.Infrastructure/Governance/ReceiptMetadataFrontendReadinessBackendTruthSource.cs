@@ -20,7 +20,7 @@ public sealed class ReceiptMetadataFrontendReadinessBackendTruthSource : Fronten
             result.Found,
             result.Metadata,
             result.Issues,
-            model => FrontendReadinessReadStateClassifier.ReceiptMetadata(model, receiptRef),
+            _ => FrontendReadinessReadState.Available("ReceiptMetadataAvailable"),
             "ReceiptMetadataNotFound");
     }
 

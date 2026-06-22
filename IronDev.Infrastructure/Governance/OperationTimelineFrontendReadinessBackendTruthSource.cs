@@ -20,7 +20,7 @@ public sealed class OperationTimelineFrontendReadinessBackendTruthSource : Front
             result.Found,
             result.Timeline,
             result.Issues,
-            model => FrontendReadinessReadStateClassifier.OperationTimeline(model, operationId),
+            _ => FrontendReadinessReadState.Available("OperationTimelineAvailable"),
             "OperationTimelineNotFound");
     }
 

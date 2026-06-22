@@ -20,7 +20,7 @@ public sealed class ValidationResultMetadataFrontendReadinessBackendTruthSource 
             result.Found,
             result.Metadata,
             result.Issues,
-            model => FrontendReadinessReadStateClassifier.ValidationResultMetadata(model, validationResultId),
+            _ => FrontendReadinessReadState.Available("ValidationResultMetadataAvailable"),
             "ValidationResultMetadataNotFound");
     }
 

@@ -698,9 +698,6 @@ public static class FrontendReadinessReadStateClassifier
                         evaluatedAtUtc,
                         "OperationStatus"));
 
-    public static FrontendReadinessReadState OperationStatus(FrontendOperationStatusReadModel? model, string requestedRef) =>
-        OperationStatus(model, requestedRef, DateTimeOffset.UtcNow);
-
     public static FrontendReadinessReadState EvidenceMetadata(
         FrontendEvidenceMetadataReadModel? model,
         string requestedRef,
@@ -719,9 +716,6 @@ public static class FrontendReadinessReadStateClassifier
                         evaluatedAtUtc: evaluatedAtUtc,
                         subject: "EvidenceMetadata"));
 
-    public static FrontendReadinessReadState EvidenceMetadata(FrontendEvidenceMetadataReadModel? model, string requestedRef) =>
-        EvidenceMetadata(model, requestedRef, DateTimeOffset.UtcNow);
-
     public static FrontendReadinessReadState ReceiptMetadata(
         FrontendReceiptMetadataReadModel? model,
         string requestedRef,
@@ -739,9 +733,6 @@ public static class FrontendReadinessReadStateClassifier
                         freshnessKnown: model.FreshnessKnown,
                         evaluatedAtUtc: evaluatedAtUtc,
                         subject: "ReceiptMetadata"));
-
-    public static FrontendReadinessReadState ReceiptMetadata(FrontendReceiptMetadataReadModel? model, string requestedRef) =>
-        ReceiptMetadata(model, requestedRef, DateTimeOffset.UtcNow);
 
     public static FrontendReadinessReadState OperationTimeline(
         FrontendOperationTimelineReadModel? model,
@@ -768,9 +759,6 @@ public static class FrontendReadinessReadStateClassifier
             : StateFromFreshness("OperationTimelineAvailable", freshness);
     }
 
-    public static FrontendReadinessReadState OperationTimeline(FrontendOperationTimelineReadModel? model, string requestedRef) =>
-        OperationTimeline(model, requestedRef, DateTimeOffset.UtcNow);
-
     public static FrontendReadinessReadState PatchPackageMetadata(
         FrontendPatchPackageMetadataReadModel? model,
         string requestedRef,
@@ -789,9 +777,6 @@ public static class FrontendReadinessReadStateClassifier
                         evaluatedAtUtc: evaluatedAtUtc,
                         subject: "PatchPackageMetadata"));
 
-    public static FrontendReadinessReadState PatchPackageMetadata(FrontendPatchPackageMetadataReadModel? model, string requestedRef) =>
-        PatchPackageMetadata(model, requestedRef, DateTimeOffset.UtcNow);
-
     public static FrontendReadinessReadState PatchPackageArtifacts(
         FrontendPatchPackageArtifactsReadModel? model,
         string requestedRef,
@@ -803,9 +788,6 @@ public static class FrontendReadinessReadStateClassifier
                 Freshness(model.ObservedAtUtc, model.ExpiresAtUtc, model.ValidationIsStale, model.FreshnessKnown, evaluatedAtUtc, "PatchPackageArtifacts"),
                 staleReason: model.ValidationIsStale ? "PatchPackageValidationStale" : "PatchPackageArtifactsStale",
                 forceStale: model.ValidationIsStale);
-
-    public static FrontendReadinessReadState PatchPackageArtifacts(FrontendPatchPackageArtifactsReadModel? model, string requestedRef) =>
-        PatchPackageArtifacts(model, requestedRef, DateTimeOffset.UtcNow);
 
     public static FrontendReadinessReadState ValidationResultMetadata(
         FrontendValidationResultMetadataReadModel? model,
@@ -820,9 +802,6 @@ public static class FrontendReadinessReadStateClassifier
                     Freshness(model.ObservedAtUtc, model.ExpiresAtUtc, model.IsStale, model.FreshnessKnown, evaluatedAtUtc, "ValidationResultMetadata"),
                     staleReason: "ValidationResultStale",
                     forceStale: model.IsStale);
-
-    public static FrontendReadinessReadState ValidationResultMetadata(FrontendValidationResultMetadataReadModel? model, string requestedRef) =>
-        ValidationResultMetadata(model, requestedRef, DateTimeOffset.UtcNow);
 
     private static FrontendReadinessReadState StateFromFreshness(
         string availableReason,
@@ -1096,9 +1075,13 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     ];
 
     private readonly FrontendReadinessReadSnapshot _snapshot;
+    private readonly Func<DateTimeOffset> _utcNow;
 
-    public FrontendReadinessReadApi(FrontendReadinessReadSnapshot snapshot) =>
+    public FrontendReadinessReadApi(FrontendReadinessReadSnapshot snapshot, Func<DateTimeOffset>? utcNow = null)
+    {
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
+        _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+    }
 
     public static FrontendReadinessReadApi Empty { get; } = new(FrontendReadinessReadSnapshot.Empty);
 
@@ -1131,7 +1114,7 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetOperationStatusReadState(string operationId) =>
-        FrontendReadinessReadStateClassifier.OperationStatus(GetOperationStatus(operationId), operationId);
+        FrontendReadinessReadStateClassifier.OperationStatus(GetOperationStatus(operationId), operationId, EvaluationTimeUtc());
 
     public FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId)
     {
@@ -1157,7 +1140,7 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetOperationTimelineReadState(string operationId) =>
-        FrontendReadinessReadStateClassifier.OperationTimeline(GetOperationTimeline(operationId), operationId);
+        FrontendReadinessReadStateClassifier.OperationTimeline(GetOperationTimeline(operationId), operationId, EvaluationTimeUtc());
 
     public FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId)
     {
@@ -1185,7 +1168,7 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetPatchPackageMetadataReadState(string packageId) =>
-        FrontendReadinessReadStateClassifier.PatchPackageMetadata(GetPatchPackageMetadata(packageId), packageId);
+        FrontendReadinessReadStateClassifier.PatchPackageMetadata(GetPatchPackageMetadata(packageId), packageId, EvaluationTimeUtc());
 
     public FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId)
     {
@@ -1221,7 +1204,7 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetPatchPackageArtifactsReadState(string packageId) =>
-        FrontendReadinessReadStateClassifier.PatchPackageArtifacts(GetPatchPackageArtifacts(packageId), packageId);
+        FrontendReadinessReadStateClassifier.PatchPackageArtifacts(GetPatchPackageArtifacts(packageId), packageId, EvaluationTimeUtc());
 
     public FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId)
     {
@@ -1250,7 +1233,7 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetValidationResultMetadataReadState(string validationResultId) =>
-        FrontendReadinessReadStateClassifier.ValidationResultMetadata(GetValidationResultMetadata(validationResultId), validationResultId);
+        FrontendReadinessReadStateClassifier.ValidationResultMetadata(GetValidationResultMetadata(validationResultId), validationResultId, EvaluationTimeUtc());
 
     public FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef)
     {
@@ -1273,7 +1256,7 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetEvidenceMetadataReadState(string evidenceRef) =>
-        FrontendReadinessReadStateClassifier.EvidenceMetadata(GetEvidenceMetadata(evidenceRef), evidenceRef);
+        FrontendReadinessReadStateClassifier.EvidenceMetadata(GetEvidenceMetadata(evidenceRef), evidenceRef, EvaluationTimeUtc());
 
     public FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef)
     {
@@ -1297,7 +1280,9 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
     }
 
     public FrontendReadinessReadState GetReceiptMetadataReadState(string receiptRef) =>
-        FrontendReadinessReadStateClassifier.ReceiptMetadata(GetReceiptMetadata(receiptRef), receiptRef);
+        FrontendReadinessReadStateClassifier.ReceiptMetadata(GetReceiptMetadata(receiptRef), receiptRef, EvaluationTimeUtc());
+
+    private DateTimeOffset EvaluationTimeUtc() => _utcNow();
 
     private static IReadOnlyList<string> EnsureForbiddenActions(IReadOnlyCollection<string> values) =>
         Clean(values.Concat(RequiredForbiddenActions));

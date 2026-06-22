@@ -37,6 +37,8 @@ Freshness does not allow mutation or workflow continuation.
 
 Expired evidence takes precedence over stale evidence. Redacted and invalid read states keep their safety state instead of becoming current.
 
+Freshness evaluation time is captured at the read/API boundary and passed through to the read-state classifier. The classifier does not read the system clock internally.
+
 ## Read-State Mapping
 
 Frontend readiness read states now carry:
@@ -53,10 +55,10 @@ Compact mode cannot hide freshness warnings.
 ## Validation
 
 - Restore: `dotnet restore IronDev.slnx` passed with existing NU1510 warnings.
-- Focused A09: `BlockA09FrontendReadinessFreshnessMarkerContractTests` passed 67/67.
+- Focused A09: `BlockA09FrontendReadinessFreshnessMarkerContractTests` passed 75/75.
 - A08 compatibility: `BlockA08FrontendReadinessEmptyStateContractTests` passed 62/62.
-- A01-A09 read adapter stack: passed 378/378.
-- Frontend/read-only readiness lane: passed 485/485.
+- A01-A09 read adapter stack: passed 386/386.
+- Frontend/readiness read-only lane plus A01-A09: passed 574/574.
 - Build: `dotnet build IronDev.slnx --no-restore -v:minimal` passed with 0 errors / 4 warnings.
 - `git diff --check`: passed with normal LF/CRLF warnings.
 
