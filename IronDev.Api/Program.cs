@@ -207,6 +207,8 @@ builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflow
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
+builder.Services.AddSingleton<IGovernedOperationStatusReadRepository, GovernedOperationStatusReadRepository>();
+builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, OperationStatusFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, RunReportFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessReadApi, BackendFrontendReadinessReadApi>();
 builder.Services.AddSingleton<IFrontendControlledActionRequestService, FrontendControlledActionRequestService>();
