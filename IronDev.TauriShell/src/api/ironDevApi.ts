@@ -15,6 +15,8 @@ import type {
   GovernanceTraceDetailData,
   GovernanceTraceListData,
   GovernanceTraceQuery,
+  FrontendOperationStatusReadModel,
+  FrontendReadinessApiEnvelope,
   ToolGateApiEnvelope,
   ToolGateDecisionDetailData,
   ToolRequestDetailData,
@@ -607,6 +609,18 @@ class IronDevApiClient {
       `/api/v1/workflow/runs/${encodeURIComponent(workflowRunId)}/steps/${encodeURIComponent(
         workflowRunStepId
       )}${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getFrontendOperationStatus(
+    operationId: string,
+    compact: boolean,
+    signal?: AbortSignal
+  ): Promise<FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>> {
+    const queryString = toQueryString({ compact });
+    return this.request<FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>>(
+      `/api/frontend-readiness/operations/${encodeURIComponent(operationId)}/status${queryString}`,
       { method: 'GET', signal }
     );
   }
