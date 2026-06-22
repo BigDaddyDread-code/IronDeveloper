@@ -29,8 +29,12 @@ The frontend may look through the window. It may not paint the scenery.
 - Production API startup now registers `BackendFrontendReadinessReadApi` for `IFrontendReadinessReadApi`.
 - Production API startup registers `RunReportFrontendReadinessBackendTruthSource` as the first backend truth source.
 - The backend adapter composes registered `IFrontendReadinessBackendTruthSource` instances and reuses the existing frontend readiness sanitizer before returning models.
-- Tenant-scoped sources are visible only when their tenant id matches the current request tenant.
+- Backend sources are read through `FrontendReadinessReadScope`.
+- Tenant-scoped seeded sources are visible only when their source tenant id matches the current request tenant.
+- Run-report records must carry tenant metadata and the record tenant must match the current request tenant.
 - If no backend source can prove a record, the read API returns not-found/empty rather than synthetic success.
+- Run-report status and validation metadata require a trustworthy observed timestamp from the report file or run events.
+- Run-report validation metadata is stale with `FreshnessUnknown` unless freshness evidence is present.
 
 ## Endpoints Covered
 
@@ -89,9 +93,9 @@ A01 does not turn on any authority-bearing frontend readiness flags:
 
 ## Validation
 
-- Focused A01: 16/16 passed
-- Existing PR29/PR30/PR31/PR32 frontend readiness lane plus A01: 204/204 passed
-- Stable governance/status corridor through A01: 1029/1029 passed
+- Focused A01: 20/20 passed
+- Existing PR29/PR30/PR31/PR32 frontend readiness lane plus A01: 208/208 passed
+- Stable governance/status corridor through A01: 1033/1033 passed
 - Build: 0 errors / 4 warnings
 - `git diff --check`: passed with normal LF/CRLF warnings
 - `git diff --cached --check`: passed
@@ -109,6 +113,9 @@ Reject this PR if:
 - validation metadata becomes policy satisfaction
 - timeline output becomes workflow continuation
 - tenant-scoped sources can be read cross-tenant
+- tenantless run-report records can be read
+- validation freshness is inferred from current time instead of recorded evidence
+- validation freshness defaults to not-stale without freshness evidence
 - raw patch, prompt, completion, tool-output, hidden reasoning, or private material is exposed
 - UI files are added
 - mutation endpoints or executors are wired

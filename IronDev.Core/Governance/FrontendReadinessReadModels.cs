@@ -16,6 +16,16 @@ public interface IFrontendReadinessBackendTruthSource
     string SourceName { get; }
     int? TenantId { get; }
 
+    bool IsVisibleTo(FrontendReadinessReadScope scope);
+
+    GovernedOperationStatus? GetOperationStatus(string operationId, FrontendReadinessReadScope scope);
+    FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId, FrontendReadinessReadScope scope);
+    FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId, FrontendReadinessReadScope scope);
+    FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId, FrontendReadinessReadScope scope);
+    FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId, FrontendReadinessReadScope scope);
+    FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef, FrontendReadinessReadScope scope);
+    FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef, FrontendReadinessReadScope scope);
+
     GovernedOperationStatus? GetOperationStatus(string operationId);
     FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId);
     FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId);
@@ -25,10 +35,41 @@ public interface IFrontendReadinessBackendTruthSource
     FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef);
 }
 
+public sealed record FrontendReadinessReadScope(int TenantId)
+{
+    public bool HasTenant => TenantId > 0;
+
+    public static FrontendReadinessReadScope Unscoped { get; } = new(0);
+}
+
 public abstract class FrontendReadinessBackendTruthSource : IFrontendReadinessBackendTruthSource
 {
     public abstract string SourceName { get; }
     public virtual int? TenantId => null;
+
+    public virtual bool IsVisibleTo(FrontendReadinessReadScope scope) =>
+        TenantId is null || (scope.HasTenant && scope.TenantId == TenantId.Value);
+
+    public virtual GovernedOperationStatus? GetOperationStatus(string operationId, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetOperationStatus(operationId) : null;
+
+    public virtual FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetOperationTimeline(operationId) : null;
+
+    public virtual FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetPatchPackageMetadata(packageId) : null;
+
+    public virtual FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetPatchPackageArtifacts(packageId) : null;
+
+    public virtual FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetValidationResultMetadata(validationResultId) : null;
+
+    public virtual FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetEvidenceMetadata(evidenceRef) : null;
+
+    public virtual FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef, FrontendReadinessReadScope scope) =>
+        IsVisibleTo(scope) ? GetReceiptMetadata(receiptRef) : null;
 
     public virtual GovernedOperationStatus? GetOperationStatus(string operationId) => null;
     public virtual FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId) => null;

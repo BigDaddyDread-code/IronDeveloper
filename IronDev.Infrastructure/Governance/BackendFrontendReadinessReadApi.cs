@@ -1,6 +1,7 @@
 using IronDev.Core.Auth;
 using IronDev.Core.Governance;
 using IronDev.Core.RunReports;
+using System.Text.Json;
 
 namespace IronDev.Infrastructure.Governance;
 
@@ -23,7 +24,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetOperationStatus(key), status =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetOperationStatus(key, scope), status =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -44,7 +46,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetOperationTimeline(key), timeline =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetOperationTimeline(key, scope), timeline =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -65,7 +68,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetPatchPackageMetadata(key), metadata =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetPatchPackageMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -86,7 +90,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetPatchPackageArtifacts(key), artifacts =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetPatchPackageArtifacts(key, scope), artifacts =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -107,7 +112,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetValidationResultMetadata(key), metadata =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetValidationResultMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -128,7 +134,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetEvidenceMetadata(key), metadata =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetEvidenceMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -149,7 +156,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         if (key is null)
             return null;
 
-        return FirstVisible(source => source.GetReceiptMetadata(key), metadata =>
+        var scope = ReadScope();
+        return FirstVisible(source => source.GetReceiptMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -170,7 +178,8 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         where TSourceValue : class
         where TResult : class
     {
-        foreach (var source in _sources.Where(IsVisible))
+        var scope = ReadScope();
+        foreach (var source in _sources.Where(source => source.IsVisibleTo(scope)))
         {
             var value = read(source);
             if (value is null)
@@ -184,15 +193,10 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         return null;
     }
 
-    private bool IsVisible(IFrontendReadinessBackendTruthSource source)
-    {
-        if (source.TenantId is null)
-            return true;
-
-        return _tenantContext is not null &&
-            _tenantContext.TenantId > 0 &&
-            _tenantContext.TenantId == source.TenantId.Value;
-    }
+    private FrontendReadinessReadScope ReadScope() =>
+        _tenantContext is null
+            ? FrontendReadinessReadScope.Unscoped
+            : new FrontendReadinessReadScope(_tenantContext.TenantId);
 
     private static string? Normalize(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -220,10 +224,15 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
 
     public override string SourceName => "run-reports";
 
-    public override GovernedOperationStatus? GetOperationStatus(string operationId)
+    public override GovernedOperationStatus? GetOperationStatus(string operationId, FrontendReadinessReadScope scope)
     {
-        var detail = LoadRun(operationId);
+        var detail = LoadRun(operationId, scope);
         if (detail is null)
+            return null;
+
+        var events = LoadEvents(detail.RunId);
+        var observedAt = TryObservedAt(detail, events);
+        if (observedAt is null)
             return null;
 
         var state = MapState(detail.Status);
@@ -248,15 +257,20 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             ForbiddenActions = ReadOnlyForbiddenActions,
             EvidenceRefs = evidenceRefs,
             ReceiptRefs = receiptRefs,
-            ObservedAtUtc = ObservedAt(detail),
+            ObservedAtUtc = observedAt.Value,
             ExpiresAtUtc = null
         };
     }
 
-    public override FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId)
+    public override FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId, FrontendReadinessReadScope scope)
     {
-        var detail = LoadRun(operationId);
+        var detail = LoadRun(operationId, scope);
         if (detail is null)
+            return null;
+
+        var events = LoadEvents(detail.RunId);
+        var observedAt = TryObservedAt(detail, events);
+        if (observedAt is null)
             return null;
 
         var entries = new List<FrontendTimelineEntry>();
@@ -267,7 +281,7 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             Summary = string.IsNullOrWhiteSpace(stage.Summary) ? $"{stage.AgentName} {stage.Status}".Trim() : stage.Summary,
             EvidenceRefs = EvidenceRefs(detail).ToArray(),
             ReceiptRefs = [],
-            ObservedAtUtc = ObservedAt(detail)
+            ObservedAtUtc = observedAt.Value
         }));
         entries.AddRange(detail.Attempts.Select((attempt, index) => new FrontendTimelineEntry
         {
@@ -276,10 +290,9 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             Summary = string.IsNullOrWhiteSpace(attempt.Summary) ? attempt.Status : attempt.Summary,
             EvidenceRefs = EvidenceRefs(detail).ToArray(),
             ReceiptRefs = [],
-            ObservedAtUtc = ObservedAt(detail)
+            ObservedAtUtc = observedAt.Value
         }));
 
-        var events = LoadEvents(detail.RunId);
         entries.AddRange(events.Select(runEvent => new FrontendTimelineEntry
         {
             EntryId = $"run-event:{runEvent.EventId:D}",
@@ -299,7 +312,7 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
                 Summary = string.IsNullOrWhiteSpace(detail.Summary) ? detail.Status : detail.Summary,
                 EvidenceRefs = EvidenceRefs(detail).ToArray(),
                 ReceiptRefs = [],
-                ObservedAtUtc = ObservedAt(detail)
+                ObservedAtUtc = observedAt.Value
             });
         }
 
@@ -311,13 +324,18 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
         };
     }
 
-    public override FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId)
+    public override FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId, FrontendReadinessReadScope scope)
     {
         var runId = StripPrefix(validationResultId, "run-validation:");
-        var detail = LoadRun(runId);
+        var detail = LoadRun(runId, scope);
         if (detail is null)
             return null;
 
+        var events = LoadEvents(detail.RunId);
+        if (TryObservedAt(detail, events) is null)
+            return null;
+
+        var freshnessProven = HasFreshnessEvidence(detail);
         return new FrontendValidationResultMetadataReadModel
         {
             ValidationResultId = $"run-validation:{detail.RunId}",
@@ -329,20 +347,20 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
             WhatRan = detail.Attempts.Select(attempt => attempt.Type).Where(NotBlank).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             WhatPassed = detail.Attempts.Where(attempt => IsPassing(attempt.Status)).Select(attempt => attempt.Type).Where(NotBlank).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             WhatFailed = detail.Attempts.Where(attempt => IsFailing(attempt.Status)).Select(attempt => attempt.Type).Where(NotBlank).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-            WhatWasSkipped = [],
-            IsStale = false,
+            WhatWasSkipped = freshnessProven ? [] : ["FreshnessUnknown"],
+            IsStale = !freshnessProven,
             EvidenceRefs = EvidenceRefs(detail).ToArray(),
             ReceiptRefs = [],
             Boundary = FrontendReadBoundary.ReadOnlyStatus
         };
     }
 
-    public override FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef)
+    public override FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef, FrontendReadinessReadScope scope)
     {
         if (!TryParseIndexedRef(evidenceRef, "run-evidence:", out var runId, out var index))
             return null;
 
-        var detail = LoadRun(runId);
+        var detail = LoadRun(runId, scope);
         if (detail is null || index < 0 || index >= detail.Evidence.Count)
             return null;
 
@@ -359,10 +377,10 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
         };
     }
 
-    public override FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef)
+    public override FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef, FrontendReadinessReadScope scope)
     {
         var runId = StripPrefix(receiptRef, "run-report:");
-        var detail = LoadRun(runId);
+        var detail = LoadRun(runId, scope);
         if (detail is null)
             return null;
 
@@ -379,10 +397,17 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
         };
     }
 
-    private RunReportDetail? LoadRun(string runId) =>
-        string.IsNullOrWhiteSpace(runId)
-            ? null
-            : _runReports.GetRunAsync(runId).ConfigureAwait(false).GetAwaiter().GetResult();
+    private RunReportDetail? LoadRun(string runId, FrontendReadinessReadScope scope)
+    {
+        if (string.IsNullOrWhiteSpace(runId))
+            return null;
+
+        var detail = _runReports.GetRunAsync(runId).ConfigureAwait(false).GetAwaiter().GetResult();
+        if (detail is null)
+            return null;
+
+        return CanReadRun(detail, scope) ? detail : null;
+    }
 
     private IReadOnlyList<RunEventDto> LoadEvents(string runId) =>
         string.IsNullOrWhiteSpace(runId)
@@ -403,13 +428,48 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
         return GovernedOperationState.Blocked;
     }
 
-    private static DateTimeOffset ObservedAt(RunReportDetail detail)
+    private static DateTimeOffset? TryObservedAt(RunReportDetail detail, IReadOnlyList<RunEventDto> events)
     {
         if (!string.IsNullOrWhiteSpace(detail.ReportPath) && File.Exists(detail.ReportPath))
             return new DateTimeOffset(File.GetLastWriteTimeUtc(detail.ReportPath), TimeSpan.Zero);
 
-        return DateTimeOffset.UtcNow;
+        if (events.Count > 0)
+            return events.Max(runEvent => runEvent.TimestampUtc);
+
+        return null;
     }
+
+    private static bool CanReadRun(RunReportDetail detail, FrontendReadinessReadScope scope)
+    {
+        var tenantId = ReadTenantId(detail);
+        if (string.IsNullOrWhiteSpace(tenantId) || !scope.HasTenant)
+            return false;
+
+        return string.Equals(tenantId, scope.TenantId.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ReadTenantId(RunReportDetail detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail.ReportPath) || !File.Exists(detail.ReportPath))
+            return null;
+
+        try
+        {
+            using var stream = File.OpenRead(detail.ReportPath);
+            using var document = JsonDocument.Parse(stream);
+            return ReadString(document.RootElement, "TenantId", "tenantId", "Tenant", "tenant");
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static bool HasFreshnessEvidence(RunReportDetail detail) =>
+        detail.Evidence.Any(evidence =>
+            Contains(evidence.Type, "freshness") ||
+            Contains(evidence.Summary, "freshness") ||
+            Contains(evidence.Path, "freshness"));
 
     private static string Subject(RunReportDetail detail) =>
         $"run:{detail.RunId} project:{detail.Project}";
@@ -456,4 +516,36 @@ public sealed class RunReportFrontendReadinessBackendTruthSource : FrontendReadi
 
     private static bool NotBlank(string value) =>
         !string.IsNullOrWhiteSpace(value);
+
+    private static string? ReadString(JsonElement root, params string[] names)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+            return null;
+
+        foreach (var name in names)
+        {
+            if (root.TryGetProperty(name, out var direct))
+                return direct.ValueKind switch
+                {
+                    JsonValueKind.String => direct.GetString(),
+                    JsonValueKind.Number => direct.GetRawText(),
+                    _ => null
+                };
+
+            foreach (var property in root.EnumerateObject())
+            {
+                if (!string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                return property.Value.ValueKind switch
+                {
+                    JsonValueKind.String => property.Value.GetString(),
+                    JsonValueKind.Number => property.Value.GetRawText(),
+                    _ => null
+                };
+            }
+        }
+
+        return null;
+    }
 }

@@ -2,6 +2,7 @@ using IronDev.Api.Controllers;
 using IronDev.Core.Auth;
 using IronDev.Core.Governance;
 using IronDev.Infrastructure.Governance;
+using IronDev.Infrastructure.Services.RunReports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -156,6 +157,48 @@ public sealed class BlockA01FrontendReadinessBackendTruthTests
     }
 
     [TestMethod]
+    public void FrontendReadiness_RunReportSourceRequiresRecordTenantMatch()
+    {
+        using var fixture = RunReportFixture.Create(tenantId: 42, includeFreshnessEvidence: false);
+        var wrongTenant = RunReportApi(fixture.Root, 41);
+        var matchingTenant = RunReportApi(fixture.Root, 42);
+
+        Assert.IsNull(wrongTenant.GetOperationStatus(fixture.RunId));
+        Assert.IsNotNull(matchingTenant.GetOperationStatus(fixture.RunId));
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RunReportSourceBlocksTenantlessRecords()
+    {
+        using var fixture = RunReportFixture.Create(tenantId: null, includeFreshnessEvidence: false);
+        var api = RunReportApi(fixture.Root, 42);
+
+        Assert.IsNull(api.GetOperationStatus(fixture.RunId));
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RunReportValidationFreshnessUnknownIsStale()
+    {
+        using var fixture = RunReportFixture.Create(tenantId: 42, includeFreshnessEvidence: false);
+        var metadata = RunReportApi(fixture.Root, 42).GetValidationResultMetadata($"run-validation:{fixture.RunId}");
+
+        Assert.IsNotNull(metadata);
+        Assert.IsTrue(metadata.IsStale);
+        AssertContains(metadata.WhatWasSkipped, "FreshnessUnknown");
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RunReportValidationFreshnessEvidenceCanMarkNotStale()
+    {
+        using var fixture = RunReportFixture.Create(tenantId: 42, includeFreshnessEvidence: true);
+        var metadata = RunReportApi(fixture.Root, 42).GetValidationResultMetadata($"run-validation:{fixture.RunId}");
+
+        Assert.IsNotNull(metadata);
+        Assert.IsFalse(metadata.IsStale);
+        Assert.IsFalse(metadata.WhatWasSkipped.Contains("FreshnessUnknown", StringComparer.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
     public void StaticScan_FrontendReadinessAddsNoMutationEndpoints()
     {
         var root = FindRepositoryRoot();
@@ -219,6 +262,11 @@ public sealed class BlockA01FrontendReadinessBackendTruthTests
 
     private static FrontendReadinessController Controller() =>
         new(Api());
+
+    private static IFrontendReadinessReadApi RunReportApi(string root, int tenantId) =>
+        new BackendFrontendReadinessReadApi(
+            [new RunReportFrontendReadinessBackendTruthSource(new FileRunReportService(root), new InMemoryRunEventStore())],
+            new TestTenantContext(tenantId));
 
     private static SeededBackendTruthSource Source() =>
         new()
@@ -421,5 +469,55 @@ public sealed class BlockA01FrontendReadinessBackendTruthTests
     private sealed class TestTenantContext(int tenantId) : ICurrentTenantContext
     {
         public int TenantId { get; } = tenantId;
+    }
+
+    private sealed class RunReportFixture : IDisposable
+    {
+        public required string Root { get; init; }
+        public required string RunId { get; init; }
+
+        public static RunReportFixture Create(int? tenantId, bool includeFreshnessEvidence)
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"IronDev-A01-{Guid.NewGuid():N}");
+            var runId = $"run-a01-{Guid.NewGuid():N}";
+            var runRoot = Path.Combine(root, runId);
+            Directory.CreateDirectory(runRoot);
+
+            if (includeFreshnessEvidence)
+            {
+                var evidenceRoot = Path.Combine(runRoot, "evidence");
+                Directory.CreateDirectory(evidenceRoot);
+                File.WriteAllText(Path.Combine(evidenceRoot, "repo-freshness.txt"), "repo freshness observed");
+            }
+
+            var tenantLine = tenantId is null ? "" : $"""
+                  "TenantId": "{tenantId}",
+            """;
+            File.WriteAllText(Path.Combine(runRoot, "report.json"), $$"""
+                {
+                  {{tenantLine}}
+                  "Project": "IronDev",
+                  "Title": "A01 backend truth run",
+                  "Status": "Completed",
+                  "Summary": "A01 backend truth run completed.",
+                  "Build": {
+                    "Status": "Passed",
+                    "Command": "dotnet build IronDev.slnx"
+                  }
+                }
+                """);
+
+            return new RunReportFixture
+            {
+                Root = root,
+                RunId = runId
+            };
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Root))
+                Directory.Delete(Root, recursive: true);
+        }
     }
 }
