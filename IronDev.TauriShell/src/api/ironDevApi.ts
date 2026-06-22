@@ -16,6 +16,8 @@ import type {
   GovernanceTraceListData,
   GovernanceTraceQuery,
   FrontendOperationStatusReadModel,
+  FrontendPatchPackageArtifactsReadModel,
+  FrontendPatchPackageMetadataReadModel,
   FrontendReadinessApiEnvelope,
   ToolGateApiEnvelope,
   ToolGateDecisionDetailData,
@@ -621,6 +623,30 @@ class IronDevApiClient {
     const queryString = toQueryString({ compact });
     return this.request<FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>>(
       `/api/frontend-readiness/operations/${encodeURIComponent(operationId)}/status${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getFrontendPatchPackageMetadata(
+    packageId: string,
+    compact: boolean,
+    signal?: AbortSignal
+  ): Promise<FrontendReadinessApiEnvelope<FrontendPatchPackageMetadataReadModel>> {
+    const queryString = toQueryString({ compact });
+    return this.request<FrontendReadinessApiEnvelope<FrontendPatchPackageMetadataReadModel>>(
+      `/api/frontend-readiness/patch-packages/${encodeURIComponent(packageId)}/metadata${queryString}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getFrontendPatchPackageArtifacts(
+    packageId: string,
+    compact: boolean,
+    signal?: AbortSignal
+  ): Promise<FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>> {
+    const queryString = toQueryString({ compact });
+    return this.request<FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>>(
+      `/api/frontend-readiness/patch-packages/${encodeURIComponent(packageId)}/artifacts${queryString}`,
       { method: 'GET', signal }
     );
   }

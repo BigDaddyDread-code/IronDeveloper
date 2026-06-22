@@ -47,6 +47,17 @@ public sealed class FrontendReadinessController : ControllerBase
             : Ok(Envelope("found", model, compactWarning: compact));
     }
 
+    [HttpGet("patch-packages/{packageId}/artifacts")]
+    public ActionResult<FrontendReadinessApiEnvelope<FrontendPatchPackageArtifactsReadModel>> GetPatchPackageArtifacts(
+        string packageId,
+        [FromQuery] bool compact = false)
+    {
+        var model = _readApi.GetPatchPackageArtifacts(packageId);
+        return model is null
+            ? NotFound(Envelope<FrontendPatchPackageArtifactsReadModel>("not_found", null, Error("packageId", "Patch package artifacts were not found.")))
+            : Ok(Envelope("found", model, compactWarning: compact));
+    }
+
     [HttpGet("validation-results/{validationResultId}/metadata")]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendValidationResultMetadataReadModel>> GetValidationResultMetadata(
         string validationResultId,

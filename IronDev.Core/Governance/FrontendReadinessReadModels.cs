@@ -5,6 +5,7 @@ public interface IFrontendReadinessReadApi
     FrontendOperationStatusReadModel? GetOperationStatus(string operationId);
     FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId);
     FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId);
+    FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId);
     FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId);
     FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef);
     FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef);
@@ -93,6 +94,35 @@ public sealed record FrontendPatchPackageMetadataReadModel
     public required FrontendReadBoundary Boundary { get; init; }
 }
 
+public sealed record FrontendPatchPackageArtifactsReadModel
+{
+    public required string PackageId { get; init; }
+    public required string Repository { get; init; }
+    public required string Branch { get; init; }
+    public required string RunId { get; init; }
+    public required string PatchHash { get; init; }
+
+    public required string PatchDiffText { get; init; }
+    public required string ReviewSummaryText { get; init; }
+    public required string KnownRisksText { get; init; }
+    public required string ValidationSummaryText { get; init; }
+
+    public required string ValidationOutcome { get; init; }
+    public required IReadOnlyCollection<string> WhatRan { get; init; }
+    public required IReadOnlyCollection<string> WhatPassed { get; init; }
+    public required IReadOnlyCollection<string> WhatFailed { get; init; }
+    public required IReadOnlyCollection<string> WhatWasSkipped { get; init; }
+    public required bool ValidationIsStale { get; init; }
+
+    public required IReadOnlyCollection<string> ProposedFilePaths { get; init; }
+    public required IReadOnlyCollection<string> ArtifactRefs { get; init; }
+    public required IReadOnlyCollection<string> EvidenceRefs { get; init; }
+    public required IReadOnlyCollection<string> ReceiptRefs { get; init; }
+
+    public required IReadOnlyCollection<string> AuthorityWarnings { get; init; }
+    public required FrontendReadBoundary Boundary { get; init; }
+}
+
 public sealed record FrontendValidationResultMetadataReadModel
 {
     public required string ValidationResultId { get; init; }
@@ -147,6 +177,9 @@ public sealed record FrontendReadinessReadSnapshot
 
     public IReadOnlyDictionary<string, FrontendPatchPackageMetadataReadModel> PatchPackages { get; init; } =
         new Dictionary<string, FrontendPatchPackageMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyDictionary<string, FrontendPatchPackageArtifactsReadModel> PatchPackageArtifacts { get; init; } =
+        new Dictionary<string, FrontendPatchPackageArtifactsReadModel>(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyDictionary<string, FrontendValidationResultMetadataReadModel> ValidationResults { get; init; } =
         new Dictionary<string, FrontendValidationResultMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
@@ -282,6 +315,39 @@ public sealed class FrontendReadinessReadApi : IFrontendReadinessReadApi
             ReceiptRefs = CleanRefs(metadata.ReceiptRefs),
             ReviewSummaryRef = CleanText(metadata.ReviewSummaryRef),
             KnownRisksRef = CleanText(metadata.KnownRisksRef),
+            Boundary = FrontendReadBoundary.ReadOnlyStatus
+        };
+    }
+
+    public FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(packageId) ||
+            !_snapshot.PatchPackageArtifacts.TryGetValue(packageId.Trim(), out var artifacts))
+        {
+            return null;
+        }
+
+        return artifacts with
+        {
+            PackageId = CleanText(artifacts.PackageId),
+            Repository = CleanText(artifacts.Repository),
+            Branch = CleanText(artifacts.Branch),
+            RunId = CleanText(artifacts.RunId),
+            PatchHash = CleanText(artifacts.PatchHash),
+            PatchDiffText = CleanText(artifacts.PatchDiffText),
+            ReviewSummaryText = CleanText(artifacts.ReviewSummaryText),
+            KnownRisksText = CleanText(artifacts.KnownRisksText),
+            ValidationSummaryText = CleanText(artifacts.ValidationSummaryText),
+            ValidationOutcome = CleanText(artifacts.ValidationOutcome),
+            WhatRan = Clean(artifacts.WhatRan),
+            WhatPassed = Clean(artifacts.WhatPassed),
+            WhatFailed = Clean(artifacts.WhatFailed),
+            WhatWasSkipped = Clean(artifacts.WhatWasSkipped),
+            ProposedFilePaths = Clean(artifacts.ProposedFilePaths),
+            ArtifactRefs = CleanRefs(artifacts.ArtifactRefs),
+            EvidenceRefs = CleanRefs(artifacts.EvidenceRefs),
+            ReceiptRefs = CleanRefs(artifacts.ReceiptRefs),
+            AuthorityWarnings = Clean(BoundaryWarnings.Concat(artifacts.AuthorityWarnings)),
             Boundary = FrontendReadBoundary.ReadOnlyStatus
         };
     }

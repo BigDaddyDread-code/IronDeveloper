@@ -895,6 +895,45 @@ export interface FrontendOperationStatusReadModel {
   expiresAtUtc?: string | null;
 }
 
+export interface FrontendPatchPackageMetadataReadModel {
+  packageId: string;
+  repository: string;
+  branch: string;
+  runId: string;
+  patchHash: string;
+  proposedFilePaths: string[];
+  artifactRefs: string[];
+  evidenceRefs: string[];
+  receiptRefs: string[];
+  reviewSummaryRef: string;
+  knownRisksRef: string;
+  boundary: FrontendReadBoundary;
+}
+
+export interface FrontendPatchPackageArtifactsReadModel {
+  packageId: string;
+  repository: string;
+  branch: string;
+  runId: string;
+  patchHash: string;
+  patchDiffText: string;
+  reviewSummaryText: string;
+  knownRisksText: string;
+  validationSummaryText: string;
+  validationOutcome: string;
+  whatRan: string[];
+  whatPassed: string[];
+  whatFailed: string[];
+  whatWasSkipped: string[];
+  validationIsStale: boolean;
+  proposedFilePaths: string[];
+  artifactRefs: string[];
+  evidenceRefs: string[];
+  receiptRefs: string[];
+  authorityWarnings: string[];
+  boundary: FrontendReadBoundary;
+}
+
 export interface FrontendReadinessApiError {
   category?: string | null;
   code?: string | null;
