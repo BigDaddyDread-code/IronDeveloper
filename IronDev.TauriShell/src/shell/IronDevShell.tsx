@@ -7,6 +7,7 @@ import { useWorkspaceNavigation } from '../state/useWorkspaceNavigation';
 import { RunReportsRoute } from '../features/runReports/RunReportsRoute';
 import { AcceptedApprovalPanelRoute } from '../features/governance/AcceptedApprovalPanelRoute';
 import { ApprovalPackageReviewRoute } from '../features/governance/ApprovalPackageReviewRoute';
+import { ControlledActionRequestRoute } from '../features/governance/ControlledActionRequestRoute';
 import { DogfoodReceiptViewerRoute } from '../features/governance/DogfoodReceiptViewerRoute';
 import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimelineRoute';
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
@@ -76,6 +77,9 @@ export function IronDevShell() {
       case 'governance':
         return window.location.pathname.startsWith('/operations/') ? (
           <OperationStatusViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/governance/action-requests') ||
+          window.location.pathname.startsWith('/action-requests') ? (
+          <ControlledActionRequestRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/workflows/runs') ? (
           <WorkflowRunStepViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/patch-packages') ||

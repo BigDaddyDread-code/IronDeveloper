@@ -197,7 +197,11 @@ public sealed class BlockFrontendThinOperationStatusViewerTests
     {
         var controller = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "IronDev.Api", "Controllers", "FrontendReadinessController.cs"));
         StringAssert.Contains(controller, "[HttpGet(\"operations/{operationId}/status\")]");
-        Assert.IsFalse(controller.Contains("[HttpPost", StringComparison.OrdinalIgnoreCase));
+        StringAssert.Contains(controller, "[HttpPost(\"action-requests\")]");
+        StringAssert.Contains(controller, "IFrontendControlledActionRequestService");
+        Assert.IsFalse(controller.Contains("[HttpPut", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(controller.Contains("[HttpPatch", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(controller.Contains("[HttpDelete", StringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]

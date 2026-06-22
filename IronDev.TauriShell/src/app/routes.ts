@@ -98,7 +98,9 @@ export function routeForPath(pathname: string) {
     normalized.startsWith('/governance/') ||
     normalized.startsWith('/workflows/') ||
     normalized.startsWith('/operations/') ||
-    normalized.startsWith('/patch-packages/')
+    normalized.startsWith('/patch-packages/') ||
+    normalized === '/action-requests' ||
+    normalized.startsWith('/action-requests/')
   ) {
     return routeForId('governance');
   }

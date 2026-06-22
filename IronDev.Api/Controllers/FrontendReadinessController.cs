@@ -10,9 +10,15 @@ namespace IronDev.Api.Controllers;
 public sealed class FrontendReadinessController : ControllerBase
 {
     private readonly IFrontendReadinessReadApi _readApi;
+    private readonly IFrontendControlledActionRequestService _actionRequestService;
 
-    public FrontendReadinessController(IFrontendReadinessReadApi readApi) =>
+    public FrontendReadinessController(
+        IFrontendReadinessReadApi readApi,
+        IFrontendControlledActionRequestService? actionRequestService = null)
+    {
         _readApi = readApi ?? throw new ArgumentNullException(nameof(readApi));
+        _actionRequestService = actionRequestService ?? new FrontendControlledActionRequestService();
+    }
 
     [HttpGet("operations/{operationId}/status")]
     public ActionResult<FrontendReadinessApiEnvelope<FrontendOperationStatusReadModel>> GetOperationStatus(
@@ -91,6 +97,14 @@ public sealed class FrontendReadinessController : ControllerBase
             : Ok(Envelope("found", model, compactWarning: compact));
     }
 
+    [HttpPost("action-requests")]
+    public ActionResult<ControlledActionRequestCreateResponse> CreateActionRequest(
+        [FromBody] ControlledActionRequestCreateRequest request)
+    {
+        var response = _actionRequestService.Create(request);
+        return Ok(response);
+    }
+
     private static FrontendReadinessApiEnvelope<TData> Envelope<TData>(
         string status,
         TData? data,
@@ -110,7 +124,7 @@ public sealed class FrontendReadinessController : ControllerBase
     {
         var warnings = new List<string>
         {
-            "Frontend readiness API is read-only.",
+            "Frontend readiness read endpoints are read-only.",
             "Frontend readiness output is not approval, policy satisfaction, execution authority, memory promotion, or workflow continuation.",
             "Forbidden actions and missing evidence remain visible; compact mode cannot hide them."
         };
