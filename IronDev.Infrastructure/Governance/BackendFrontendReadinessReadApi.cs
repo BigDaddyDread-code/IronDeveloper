@@ -25,7 +25,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetOperationStatus(key, scope), status =>
+        return FirstReadable(source => source.ReadOperationStatus(key, scope), status =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -40,6 +40,32 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
+    public FrontendReadinessReadState GetOperationStatusReadState(string operationId)
+    {
+        var key = Normalize(operationId);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("OperationStatusNotFound", operationId);
+
+        return ReadStateFromSources(
+            source => source.ReadOperationStatus(key, ReadScope()),
+            status =>
+            {
+                var snapshot = new FrontendReadinessReadSnapshot
+                {
+                    OperationStatuses = new Dictionary<string, GovernedOperationStatus>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = status,
+                        [status.OperationId] = status
+                    }
+                };
+
+                return FrontendReadinessReadStateClassifier.OperationStatus(
+                    new FrontendReadinessReadApi(snapshot).GetOperationStatus(key),
+                    key);
+            },
+            FrontendReadinessReadState.NotFound("OperationStatusNotFound", key));
+    }
+
     public FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId)
     {
         var key = Normalize(operationId);
@@ -47,7 +73,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetOperationTimeline(key, scope), timeline =>
+        return FirstReadable(source => source.ReadOperationTimeline(key, scope), timeline =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -62,6 +88,27 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
+    public FrontendReadinessReadState GetOperationTimelineReadState(string operationId)
+    {
+        var key = Normalize(operationId);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("OperationTimelineNotFound", operationId);
+
+        return ReadStateFromSources(
+            source => source.ReadOperationTimeline(key, ReadScope()),
+            timeline => FrontendReadinessReadStateClassifier.OperationTimeline(
+                new FrontendReadinessReadApi(new FrontendReadinessReadSnapshot
+                {
+                    Timelines = new Dictionary<string, FrontendOperationTimelineReadModel>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = timeline,
+                        [timeline.OperationId] = timeline
+                    }
+                }).GetOperationTimeline(key),
+                key),
+            FrontendReadinessReadState.NotFound("OperationTimelineNotFound", key));
+    }
+
     public FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId)
     {
         var key = Normalize(packageId);
@@ -69,7 +116,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetPatchPackageMetadata(key, scope), metadata =>
+        return FirstReadable(source => source.ReadPatchPackageMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -84,6 +131,27 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
+    public FrontendReadinessReadState GetPatchPackageMetadataReadState(string packageId)
+    {
+        var key = Normalize(packageId);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("PatchPackageMetadataNotFound", packageId);
+
+        return ReadStateFromSources(
+            source => source.ReadPatchPackageMetadata(key, ReadScope()),
+            metadata => FrontendReadinessReadStateClassifier.PatchPackageMetadata(
+                new FrontendReadinessReadApi(new FrontendReadinessReadSnapshot
+                {
+                    PatchPackages = new Dictionary<string, FrontendPatchPackageMetadataReadModel>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = metadata,
+                        [metadata.PackageId] = metadata
+                    }
+                }).GetPatchPackageMetadata(key),
+                key),
+            FrontendReadinessReadState.NotFound("PatchPackageMetadataNotFound", key));
+    }
+
     public FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId)
     {
         var key = Normalize(packageId);
@@ -91,7 +159,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetPatchPackageArtifacts(key, scope), artifacts =>
+        return FirstReadable(source => source.ReadPatchPackageArtifacts(key, scope), artifacts =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -106,6 +174,27 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
+    public FrontendReadinessReadState GetPatchPackageArtifactsReadState(string packageId)
+    {
+        var key = Normalize(packageId);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("PatchPackageArtifactsNotFound", packageId);
+
+        return ReadStateFromSources(
+            source => source.ReadPatchPackageArtifacts(key, ReadScope()),
+            artifacts => FrontendReadinessReadStateClassifier.PatchPackageArtifacts(
+                new FrontendReadinessReadApi(new FrontendReadinessReadSnapshot
+                {
+                    PatchPackageArtifacts = new Dictionary<string, FrontendPatchPackageArtifactsReadModel>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = artifacts,
+                        [artifacts.PackageId] = artifacts
+                    }
+                }).GetPatchPackageArtifacts(key),
+                key),
+            FrontendReadinessReadState.NotFound("PatchPackageArtifactsNotFound", key));
+    }
+
     public FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId)
     {
         var key = Normalize(validationResultId);
@@ -113,7 +202,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetValidationResultMetadata(key, scope), metadata =>
+        return FirstReadable(source => source.ReadValidationResultMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -128,6 +217,27 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
+    public FrontendReadinessReadState GetValidationResultMetadataReadState(string validationResultId)
+    {
+        var key = Normalize(validationResultId);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("ValidationResultMetadataNotFound", validationResultId);
+
+        return ReadStateFromSources(
+            source => source.ReadValidationResultMetadata(key, ReadScope()),
+            metadata => FrontendReadinessReadStateClassifier.ValidationResultMetadata(
+                new FrontendReadinessReadApi(new FrontendReadinessReadSnapshot
+                {
+                    ValidationResults = new Dictionary<string, FrontendValidationResultMetadataReadModel>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = metadata,
+                        [metadata.ValidationResultId] = metadata
+                    }
+                }).GetValidationResultMetadata(key),
+                key),
+            FrontendReadinessReadState.NotFound("ValidationResultMetadataNotFound", key));
+    }
+
     public FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef)
     {
         var key = Normalize(evidenceRef);
@@ -135,7 +245,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetEvidenceMetadata(key, scope), metadata =>
+        return FirstReadable(source => source.ReadEvidenceMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -150,6 +260,27 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
+    public FrontendReadinessReadState GetEvidenceMetadataReadState(string evidenceRef)
+    {
+        var key = Normalize(evidenceRef);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("EvidenceMetadataNotFound", evidenceRef);
+
+        return ReadStateFromSources(
+            source => source.ReadEvidenceMetadata(key, ReadScope()),
+            metadata => FrontendReadinessReadStateClassifier.EvidenceMetadata(
+                new FrontendReadinessReadApi(new FrontendReadinessReadSnapshot
+                {
+                    Evidence = new Dictionary<string, FrontendEvidenceMetadataReadModel>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = metadata,
+                        [metadata.EvidenceRef] = metadata
+                    }
+                }).GetEvidenceMetadata(key),
+                key),
+            FrontendReadinessReadState.NotFound("EvidenceMetadataNotFound", key));
+    }
+
     public FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef)
     {
         var key = Normalize(receiptRef);
@@ -157,7 +288,7 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
             return null;
 
         var scope = ReadScope();
-        return FirstVisible(source => source.GetReceiptMetadata(key, scope), metadata =>
+        return FirstReadable(source => source.ReadReceiptMetadata(key, scope), metadata =>
         {
             var snapshot = new FrontendReadinessReadSnapshot
             {
@@ -172,25 +303,97 @@ public sealed class BackendFrontendReadinessReadApi : IFrontendReadinessReadApi
         });
     }
 
-    private TResult? FirstVisible<TSourceValue, TResult>(
-        Func<IFrontendReadinessBackendTruthSource, TSourceValue?> read,
+    public FrontendReadinessReadState GetReceiptMetadataReadState(string receiptRef)
+    {
+        var key = Normalize(receiptRef);
+        if (key is null)
+            return FrontendReadinessReadState.NotFound("ReceiptMetadataNotFound", receiptRef);
+
+        return ReadStateFromSources(
+            source => source.ReadReceiptMetadata(key, ReadScope()),
+            metadata => FrontendReadinessReadStateClassifier.ReceiptMetadata(
+                new FrontendReadinessReadApi(new FrontendReadinessReadSnapshot
+                {
+                    Receipts = new Dictionary<string, FrontendReceiptMetadataReadModel>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        [key] = metadata,
+                        [metadata.ReceiptRef] = metadata
+                    }
+                }).GetReceiptMetadata(key),
+                key),
+            FrontendReadinessReadState.NotFound("ReceiptMetadataNotFound", key));
+    }
+
+    private TResult? FirstReadable<TSourceValue, TResult>(
+        Func<IFrontendReadinessBackendTruthSource, FrontendReadinessBackendReadResult<TSourceValue>> read,
         Func<TSourceValue, TResult?> sanitize)
         where TSourceValue : class
         where TResult : class
     {
         var scope = ReadScope();
-        foreach (var source in _sources.Where(source => source.IsVisibleTo(scope)))
+        foreach (var source in _sources)
         {
-            var value = read(source);
-            if (value is null)
+            if (!source.IsVisibleTo(scope))
+                return null;
+
+            FrontendReadinessBackendReadResult<TSourceValue> result;
+            try
+            {
+                result = read(source);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            if (result.ReadState.Kind == FrontendReadinessReadStateKind.NotFound && result.Data is null)
                 continue;
 
-            var sanitized = sanitize(value);
+            if (result.Data is null)
+                return null;
+
+            var sanitized = sanitize(result.Data);
             if (sanitized is not null)
                 return sanitized;
         }
 
         return null;
+    }
+
+    private FrontendReadinessReadState ReadStateFromSources<TSourceValue>(
+        Func<IFrontendReadinessBackendTruthSource, FrontendReadinessBackendReadResult<TSourceValue>> read,
+        Func<TSourceValue, FrontendReadinessReadState> classify,
+        FrontendReadinessReadState notFoundState)
+        where TSourceValue : class
+    {
+        var scope = ReadScope();
+        foreach (var source in _sources)
+        {
+            if (!source.IsVisibleTo(scope))
+                return FrontendReadinessReadState.NotVisible();
+
+            FrontendReadinessBackendReadResult<TSourceValue> result;
+            try
+            {
+                result = read(source);
+            }
+            catch (Exception)
+            {
+                return FrontendReadinessReadState.Unavailable();
+            }
+
+            if (result.ReadState.Kind == FrontendReadinessReadStateKind.NotFound && result.Data is null)
+                continue;
+
+            if (result.Data is null)
+                return result.ReadState;
+
+            return result.ReadState.Kind == FrontendReadinessReadStateKind.Available
+                ? classify(result.Data)
+                : result.ReadState;
+        }
+
+        return notFoundState;
     }
 
     private FrontendReadinessReadScope ReadScope() =>

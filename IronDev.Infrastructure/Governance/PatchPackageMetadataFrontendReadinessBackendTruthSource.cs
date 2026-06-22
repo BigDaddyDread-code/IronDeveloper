@@ -11,11 +11,23 @@ public sealed class PatchPackageMetadataFrontendReadinessBackendTruthSource : Fr
 
     public override string SourceName => "patch-package-metadata-repository";
 
-    public override FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(
+    public override FrontendReadinessBackendReadResult<FrontendPatchPackageMetadataReadModel> ReadPatchPackageMetadata(
         string packageId,
         FrontendReadinessReadScope scope)
     {
         var result = _repository.GetByPackageId(packageId, scope);
-        return result.Found ? result.Metadata : null;
+        return FromRepositoryResult(
+            result.Found,
+            result.Metadata,
+            result.Issues,
+            model => FrontendReadinessReadStateClassifier.PatchPackageMetadata(model, packageId),
+            "PatchPackageMetadataNotFound");
+    }
+
+    public override FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(
+        string packageId,
+        FrontendReadinessReadScope scope)
+    {
+        return ReadPatchPackageMetadata(packageId, scope).Data;
     }
 }
