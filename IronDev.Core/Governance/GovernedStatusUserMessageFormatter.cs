@@ -144,6 +144,12 @@ public static class GovernedStatusUserMessageFormatter
             warnings.Add("Rollback plan evidence is not rollback execution.");
         if (Mentions(status, "memory says") || HasRef(status, "memory"))
             warnings.Add("Memory text is not approval authority.");
+        if (IsMemoryPackageStatus(status))
+        {
+            warnings.Add("Memory promotion package is not durable memory.");
+            warnings.Add("Useful memory still needs permission before becoming durable memory.");
+            warnings.Add("Memory cannot approve, satisfy policy, authorize mutation, promote itself, or continue workflow.");
+        }
         if (Mentions(status, "ui says") || HasRef(status, "ui-state"))
             warnings.Add("UI text is not execution authority.");
         if (!string.IsNullOrWhiteSpace(subject.Repo) ||
@@ -226,6 +232,9 @@ public static class GovernedStatusUserMessageFormatter
 
     private static bool IsSourceApply(GovernedOperationStatus status) =>
         string.Equals(status.OperationKind, "SourceApply", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsMemoryPackageStatus(GovernedOperationStatus status) =>
+        string.Equals(status.OperationKind, "Memory" + "PromotionPackage", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsVague(string action)
     {
