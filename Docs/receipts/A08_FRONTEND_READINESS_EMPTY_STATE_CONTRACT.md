@@ -20,7 +20,9 @@ Changed surfaces:
 - `FrontendReadinessReadState`
 - `FrontendReadinessReadStateKind`
 - `FrontendReadinessReadStateClassifier`
+- `FrontendReadinessBackendReadResult`
 - `BackendFrontendReadinessReadApi`
+- repository-backed frontend-readiness truth sources
 - `FrontendReadinessController`
 - focused A08 integration tests
 
@@ -76,13 +78,17 @@ Compact output must still preserve the read state, missing refs, forbidden actio
 
 Tenant visibility failures must not fall through to fallback optimism.
 
+Record-level tenant visibility failures must be preserved as `NotVisible` at the source boundary. They must not collapse into ordinary null/not-found and they must not allow fallback sources to answer.
+
+Only true `NotFound` may continue to fallback. `NotVisible`, `Unavailable`, `Invalid`, `Redacted`, and `Stale` are stop states.
+
 ## Validation
 
 Focused A08 validation:
 
 ```text
 dotnet test IronDev.IntegrationTests\IronDev.IntegrationTests.csproj --filter "FullyQualifiedName~BlockA08FrontendReadinessEmptyStateContractTests" --logger "console;verbosity=minimal"
-Passed: 54/54
+Passed: 62/62
 ```
 
 ## Killjoy

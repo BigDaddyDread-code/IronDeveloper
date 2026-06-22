@@ -11,11 +11,23 @@ public sealed class ValidationResultMetadataFrontendReadinessBackendTruthSource 
 
     public override string SourceName => "validation-result-metadata-repository";
 
-    public override FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(
+    public override FrontendReadinessBackendReadResult<FrontendValidationResultMetadataReadModel> ReadValidationResultMetadata(
         string validationResultId,
         FrontendReadinessReadScope scope)
     {
         var result = _repository.GetByValidationResultId(validationResultId, scope);
-        return result.Found ? result.Metadata : null;
+        return FromRepositoryResult(
+            result.Found,
+            result.Metadata,
+            result.Issues,
+            model => FrontendReadinessReadStateClassifier.ValidationResultMetadata(model, validationResultId),
+            "ValidationResultMetadataNotFound");
+    }
+
+    public override FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(
+        string validationResultId,
+        FrontendReadinessReadScope scope)
+    {
+        return ReadValidationResultMetadata(validationResultId, scope).Data;
     }
 }

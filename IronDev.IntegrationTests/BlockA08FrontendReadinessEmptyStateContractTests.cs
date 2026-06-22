@@ -324,6 +324,121 @@ public sealed class BlockA08FrontendReadinessEmptyStateContractTests
     }
 
     [TestMethod]
+    public void FrontendReadiness_RecordLevelWrongTenantEvidenceDoesNotFallback()
+    {
+        var canonical = new EvidenceMetadataFrontendReadinessBackendTruthSource(
+            new EvidenceMetadataReadRepository([EvidenceRecord(tenantId: 41)]));
+        var fallback = new SeededBackendTruthSource { Evidence = Map(Evidence(summary: "fallback evidence should not win")) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetEvidenceMetadata(EvidenceRef));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.NotVisible, envelope.ReadState.Kind);
+        Assert.IsNull(envelope.Data);
+        AssertContains(envelope.ReadState.Reasons, "RecordNotVisible");
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelWrongTenantReceiptDoesNotFallback()
+    {
+        var canonical = new ReceiptMetadataFrontendReadinessBackendTruthSource(
+            new ReceiptMetadataReadRepository([ReceiptRecord(tenantId: 41)]));
+        var fallback = new SeededBackendTruthSource { Receipts = Map(Receipt()) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetReceiptMetadata(ReceiptRef));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.NotVisible, envelope.ReadState.Kind);
+        Assert.IsNull(envelope.Data);
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelWrongTenantTimelineDoesNotFallback()
+    {
+        var canonical = new OperationTimelineFrontendReadinessBackendTruthSource(
+            new OperationTimelineReadRepository([TimelineRecord(tenantId: 41)]));
+        var fallback = new SeededBackendTruthSource { Timelines = Map(Timeline()) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetOperationTimeline(OperationId));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.NotVisible, envelope.ReadState.Kind);
+        Assert.IsNull(envelope.Data);
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelWrongTenantPatchPackageDoesNotFallback()
+    {
+        var canonical = new PatchPackageMetadataFrontendReadinessBackendTruthSource(
+            new PatchPackageMetadataReadRepository([PatchPackageRecord(tenantId: 41)]));
+        var fallback = new SeededBackendTruthSource { PatchPackages = Map(PatchPackage()) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetPatchPackageMetadata(PackageId));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.NotVisible, envelope.ReadState.Kind);
+        Assert.IsNull(envelope.Data);
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelWrongTenantValidationDoesNotFallback()
+    {
+        var canonical = new ValidationResultMetadataFrontendReadinessBackendTruthSource(
+            new ValidationResultMetadataReadRepository([ValidationRecord(tenantId: 41)]));
+        var fallback = new SeededBackendTruthSource { ValidationResults = Map(Validation(outcome: "FallbackPassed")) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetValidationResultMetadata(ValidationResultId));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.NotVisible, envelope.ReadState.Kind);
+        Assert.IsNull(envelope.Data);
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelTenantlessTenantScopedRecordDoesNotFallback()
+    {
+        var canonical = new EvidenceMetadataFrontendReadinessBackendTruthSource(
+            new EvidenceMetadataReadRepository([EvidenceRecord(tenantId: null)]));
+        var fallback = new SeededBackendTruthSource { Evidence = Map(Evidence(summary: "fallback evidence should not win")) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetEvidenceMetadata(EvidenceRef));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.NotVisible, envelope.ReadState.Kind);
+        Assert.IsNull(envelope.Data);
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelRedactedCanonicalDoesNotFallback()
+    {
+        var canonical = new EvidenceMetadataFrontendReadinessBackendTruthSource(
+            new EvidenceMetadataReadRepository([EvidenceRecord(containsRawPayload: true)]));
+        var fallback = new SeededBackendTruthSource { Evidence = Map(Evidence(summary: "fallback evidence should not win")) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetEvidenceMetadata(EvidenceRef));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.Redacted, envelope.ReadState.Kind);
+        Assert.IsNotNull(envelope.Data);
+        Assert.AreNotEqual("fallback evidence should not win", envelope.Data!.Summary);
+    }
+
+    [TestMethod]
+    public void FrontendReadiness_RecordLevelInvalidCanonicalDoesNotFallback()
+    {
+        var invalidStatus = Status(operationKind: string.Empty);
+        var canonical = new OperationStatusFrontendReadinessBackendTruthSource(
+            new GovernedOperationStatusReadRepository([OperationStatusRecord(invalidStatus)]));
+        var fallback = new SeededBackendTruthSource { Statuses = Map(Status(operationKind: "FallbackStatus")) };
+        var api = new BackendFrontendReadinessReadApi([canonical, fallback], new TestTenantContext(42));
+
+        var envelope = Envelope(Controller(api).GetOperationStatus(OperationId));
+
+        Assert.AreEqual(FrontendReadinessReadStateKind.Invalid, envelope.ReadState.Kind);
+        Assert.AreNotEqual("FallbackStatus", envelope.Data!.OperationKind);
+    }
+
+    [TestMethod]
     public void FrontendReadiness_InvalidCanonicalStateDoesNotFallbackToRunReport()
     {
         var invalid = Status(blockedReasons: ["StoredOperationStatusInvalid"]);
@@ -690,12 +805,112 @@ public sealed class BlockA08FrontendReadinessEmptyStateContractTests
             Boundary = FrontendReadBoundary.ReadOnlyStatus
         };
 
+    private static GovernedOperationStatusReadRecord OperationStatusRecord(
+        GovernedOperationStatus status,
+        int? tenantId = 42) =>
+        new()
+        {
+            OperationId = OperationId,
+            Status = status,
+            TenantId = tenantId
+        };
+
+    private static EvidenceMetadataReadRecord EvidenceRecord(
+        int? tenantId = 42,
+        bool containsRawPayload = false) =>
+        new()
+        {
+            EvidenceRef = EvidenceRef,
+            EvidenceKind = "ValidationEvidence",
+            Summary = "Evidence metadata.",
+            TenantId = tenantId,
+            ContainsRawPayload = containsRawPayload,
+            Warnings = ["Evidence is reference-only."],
+            AuthorityWarnings = ["Evidence is not authority."],
+            ObservedAtUtc = ObservedAtUtc
+        };
+
+    private static ReceiptMetadataReadRecord ReceiptRecord(int? tenantId = 42) =>
+        new()
+        {
+            ReceiptRef = ReceiptRef,
+            ReceiptKind = "ValidationReceipt",
+            Summary = "Receipt metadata.",
+            OperationId = OperationId,
+            OperationKind = "SourceApply",
+            Subject = "receipt:a08",
+            TenantId = tenantId,
+            Warnings = ["Receipt is reference-only."],
+            AuthorityWarnings = ["Receipt is not authority."],
+            ObservedAtUtc = ObservedAtUtc
+        };
+
+    private static OperationTimelineEventReadRecord TimelineRecord(int? tenantId = 42) =>
+        new()
+        {
+            OperationId = OperationId,
+            EntryId = "timeline-entry:a08",
+            EventKind = "BackendReadObserved",
+            Summary = "Backend read observed.",
+            TenantId = tenantId,
+            ObservedAtUtc = ObservedAtUtc,
+            EvidenceRefs = [EvidenceRef],
+            ReceiptRefs = [ReceiptRef]
+        };
+
+    private static PatchPackageMetadataReadRecord PatchPackageRecord(int? tenantId = 42) =>
+        new()
+        {
+            PackageId = PackageId,
+            Repository = "BigDaddyDread-code/IronDeveloper",
+            Branch = "frontend/readiness-empty-state-contract",
+            RunId = "run-a08",
+            PatchHash = "sha256:a08",
+            ProposedFilePaths = ["IronDev.Core/Governance/FrontendReadinessReadModels.cs"],
+            ArtifactRefs = ["patch-artifact:a08"],
+            EvidenceRefs = [EvidenceRef],
+            ReceiptRefs = [ReceiptRef],
+            ReviewSummaryRef = "review-summary:a08",
+            KnownRisksRef = "known-risks:a08",
+            TenantId = tenantId,
+            ObservedAtUtc = ObservedAtUtc,
+            Warnings = ["Patch package metadata is reference-only."],
+            AuthorityWarnings = ["Patch package metadata is not source apply authority."]
+        };
+
+    private static ValidationResultMetadataReadRecord ValidationRecord(int? tenantId = 42) =>
+        new()
+        {
+            ValidationResultId = ValidationResultId,
+            Repository = "BigDaddyDread-code/IronDeveloper",
+            Branch = "frontend/readiness-empty-state-contract",
+            RunId = "run-a08",
+            PatchHash = "sha256:a08",
+            Outcome = "Passed",
+            WhatRan = ["A08 focused"],
+            WhatPassed = ["A08 focused"],
+            WhatFailed = [],
+            WhatWasSkipped = [],
+            EvidenceRefs = [EvidenceRef],
+            ReceiptRefs = [ReceiptRef],
+            FreshnessKnown = true,
+            TenantId = tenantId,
+            ObservedAtUtc = ObservedAtUtc,
+            ExpiresAtUtc = ObservedAtUtc.AddHours(1),
+            Warnings = ["Validation result metadata is reference-only."],
+            AuthorityWarnings = ["Validation result metadata is not approval."]
+        };
+
     private static IReadOnlyDictionary<string, T> Map<T>(T item)
     {
         var key = item switch
         {
             GovernedOperationStatus status => status.OperationId,
             FrontendEvidenceMetadataReadModel evidence => evidence.EvidenceRef,
+            FrontendReceiptMetadataReadModel receipt => receipt.ReceiptRef,
+            FrontendOperationTimelineReadModel timeline => timeline.OperationId,
+            FrontendPatchPackageMetadataReadModel patchPackage => patchPackage.PackageId,
+            FrontendValidationResultMetadataReadModel validation => validation.ValidationResultId,
             _ => throw new InvalidOperationException("Unsupported map item.")
         };
 
@@ -788,12 +1003,32 @@ public sealed class BlockA08FrontendReadinessEmptyStateContractTests
             new Dictionary<string, GovernedOperationStatus>(StringComparer.OrdinalIgnoreCase);
         public IReadOnlyDictionary<string, FrontendEvidenceMetadataReadModel> Evidence { get; init; } =
             new Dictionary<string, FrontendEvidenceMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendReceiptMetadataReadModel> Receipts { get; init; } =
+            new Dictionary<string, FrontendReceiptMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendOperationTimelineReadModel> Timelines { get; init; } =
+            new Dictionary<string, FrontendOperationTimelineReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendPatchPackageMetadataReadModel> PatchPackages { get; init; } =
+            new Dictionary<string, FrontendPatchPackageMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, FrontendValidationResultMetadataReadModel> ValidationResults { get; init; } =
+            new Dictionary<string, FrontendValidationResultMetadataReadModel>(StringComparer.OrdinalIgnoreCase);
 
         public override GovernedOperationStatus? GetOperationStatus(string operationId) =>
             Statuses.GetValueOrDefault(operationId);
 
         public override FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef) =>
             Evidence.GetValueOrDefault(evidenceRef);
+
+        public override FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef) =>
+            Receipts.GetValueOrDefault(receiptRef);
+
+        public override FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId) =>
+            Timelines.GetValueOrDefault(operationId);
+
+        public override FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId) =>
+            PatchPackages.GetValueOrDefault(packageId);
+
+        public override FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId) =>
+            ValidationResults.GetValueOrDefault(validationResultId);
     }
 
     private sealed class ThrowingSource : FrontendReadinessBackendTruthSource

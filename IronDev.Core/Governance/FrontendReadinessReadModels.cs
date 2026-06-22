@@ -25,6 +25,14 @@ public interface IFrontendReadinessBackendTruthSource
 
     bool IsVisibleTo(FrontendReadinessReadScope scope);
 
+    FrontendReadinessBackendReadResult<GovernedOperationStatus> ReadOperationStatus(string operationId, FrontendReadinessReadScope scope);
+    FrontendReadinessBackendReadResult<FrontendOperationTimelineReadModel> ReadOperationTimeline(string operationId, FrontendReadinessReadScope scope);
+    FrontendReadinessBackendReadResult<FrontendPatchPackageMetadataReadModel> ReadPatchPackageMetadata(string packageId, FrontendReadinessReadScope scope);
+    FrontendReadinessBackendReadResult<FrontendPatchPackageArtifactsReadModel> ReadPatchPackageArtifacts(string packageId, FrontendReadinessReadScope scope);
+    FrontendReadinessBackendReadResult<FrontendValidationResultMetadataReadModel> ReadValidationResultMetadata(string validationResultId, FrontendReadinessReadScope scope);
+    FrontendReadinessBackendReadResult<FrontendEvidenceMetadataReadModel> ReadEvidenceMetadata(string evidenceRef, FrontendReadinessReadScope scope);
+    FrontendReadinessBackendReadResult<FrontendReceiptMetadataReadModel> ReadReceiptMetadata(string receiptRef, FrontendReadinessReadScope scope);
+
     GovernedOperationStatus? GetOperationStatus(string operationId, FrontendReadinessReadScope scope);
     FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId, FrontendReadinessReadScope scope);
     FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId, FrontendReadinessReadScope scope);
@@ -42,6 +50,29 @@ public interface IFrontendReadinessBackendTruthSource
     FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef);
 }
 
+public sealed record FrontendReadinessBackendReadResult<TData>
+    where TData : class
+{
+    public TData? Data { get; init; }
+    public required FrontendReadinessReadState ReadState { get; init; }
+
+    public static FrontendReadinessBackendReadResult<TData> WithData(
+        TData data,
+        FrontendReadinessReadState state) =>
+        new()
+        {
+            Data = data,
+            ReadState = state
+        };
+
+    public static FrontendReadinessBackendReadResult<TData> WithoutData(FrontendReadinessReadState state) =>
+        new()
+        {
+            Data = null,
+            ReadState = state
+        };
+}
+
 public sealed record FrontendReadinessReadScope(int TenantId)
 {
     public bool HasTenant => TenantId > 0;
@@ -56,6 +87,69 @@ public abstract class FrontendReadinessBackendTruthSource : IFrontendReadinessBa
 
     public virtual bool IsVisibleTo(FrontendReadinessReadScope scope) =>
         TenantId is null || (scope.HasTenant && scope.TenantId == TenantId.Value);
+
+    public virtual FrontendReadinessBackendReadResult<GovernedOperationStatus> ReadOperationStatus(
+        string operationId,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            operationId,
+            scope,
+            GetOperationStatus,
+            "OperationStatusNotFound");
+
+    public virtual FrontendReadinessBackendReadResult<FrontendOperationTimelineReadModel> ReadOperationTimeline(
+        string operationId,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            operationId,
+            scope,
+            GetOperationTimeline,
+            "OperationTimelineNotFound");
+
+    public virtual FrontendReadinessBackendReadResult<FrontendPatchPackageMetadataReadModel> ReadPatchPackageMetadata(
+        string packageId,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            packageId,
+            scope,
+            GetPatchPackageMetadata,
+            "PatchPackageMetadataNotFound");
+
+    public virtual FrontendReadinessBackendReadResult<FrontendPatchPackageArtifactsReadModel> ReadPatchPackageArtifacts(
+        string packageId,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            packageId,
+            scope,
+            GetPatchPackageArtifacts,
+            "PatchPackageArtifactsNotFound");
+
+    public virtual FrontendReadinessBackendReadResult<FrontendValidationResultMetadataReadModel> ReadValidationResultMetadata(
+        string validationResultId,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            validationResultId,
+            scope,
+            GetValidationResultMetadata,
+            "ValidationResultMetadataNotFound");
+
+    public virtual FrontendReadinessBackendReadResult<FrontendEvidenceMetadataReadModel> ReadEvidenceMetadata(
+        string evidenceRef,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            evidenceRef,
+            scope,
+            GetEvidenceMetadata,
+            "EvidenceMetadataNotFound");
+
+    public virtual FrontendReadinessBackendReadResult<FrontendReceiptMetadataReadModel> ReadReceiptMetadata(
+        string receiptRef,
+        FrontendReadinessReadScope scope) =>
+        ReadDefault(
+            receiptRef,
+            scope,
+            GetReceiptMetadata,
+            "ReceiptMetadataNotFound");
 
     public virtual GovernedOperationStatus? GetOperationStatus(string operationId, FrontendReadinessReadScope scope) =>
         IsVisibleTo(scope) ? GetOperationStatus(operationId) : null;
@@ -85,6 +179,52 @@ public abstract class FrontendReadinessBackendTruthSource : IFrontendReadinessBa
     public virtual FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId) => null;
     public virtual FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef) => null;
     public virtual FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef) => null;
+
+    protected static FrontendReadinessBackendReadResult<TData> FromRepositoryResult<TData>(
+        bool found,
+        TData? data,
+        IReadOnlyCollection<string> issues,
+        Func<TData, FrontendReadinessReadState> classify,
+        string notFoundReason)
+        where TData : class
+    {
+        if (found && data is not null)
+            return FrontendReadinessBackendReadResult<TData>.WithData(data, classify(data));
+
+        if (IsVisibilityIssue(issues))
+            return FrontendReadinessBackendReadResult<TData>.WithoutData(FrontendReadinessReadState.NotVisible("RecordNotVisible"));
+
+        if (IsInvalidIssue(issues))
+            return FrontendReadinessBackendReadResult<TData>.WithoutData(FrontendReadinessReadState.Invalid(issues.First()));
+
+        return FrontendReadinessBackendReadResult<TData>.WithoutData(FrontendReadinessReadState.NotFound(notFoundReason));
+    }
+
+    private FrontendReadinessBackendReadResult<TData> ReadDefault<TData>(
+        string id,
+        FrontendReadinessReadScope scope,
+        Func<string, FrontendReadinessReadScope, TData?> read,
+        string notFoundReason)
+        where TData : class
+    {
+        if (!IsVisibleTo(scope))
+            return FrontendReadinessBackendReadResult<TData>.WithoutData(FrontendReadinessReadState.NotVisible());
+
+        var data = read(id, scope);
+        return data is null
+            ? FrontendReadinessBackendReadResult<TData>.WithoutData(FrontendReadinessReadState.NotFound(notFoundReason, id))
+            : FrontendReadinessBackendReadResult<TData>.WithData(data, FrontendReadinessReadState.Available("BackendTruthAvailable"));
+    }
+
+    private static bool IsVisibilityIssue(IEnumerable<string> issues) =>
+        issues.Any(issue =>
+            issue.Contains("Tenant", StringComparison.OrdinalIgnoreCase) ||
+            issue.Contains("NotVisible", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsInvalidIssue(IEnumerable<string> issues) =>
+        issues.Any(issue =>
+            issue.Contains("Invalid", StringComparison.OrdinalIgnoreCase) ||
+            issue.Contains("Required", StringComparison.OrdinalIgnoreCase));
 }
 
 public sealed record FrontendReadBoundary

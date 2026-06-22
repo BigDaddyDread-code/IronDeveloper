@@ -11,11 +11,23 @@ public sealed class ReceiptMetadataFrontendReadinessBackendTruthSource : Fronten
 
     public override string SourceName => "receipt-metadata-repository";
 
-    public override FrontendReceiptMetadataReadModel? GetReceiptMetadata(
+    public override FrontendReadinessBackendReadResult<FrontendReceiptMetadataReadModel> ReadReceiptMetadata(
         string receiptRef,
         FrontendReadinessReadScope scope)
     {
         var result = _repository.GetByReceiptRef(receiptRef, scope);
-        return result.Found ? result.Metadata : null;
+        return FromRepositoryResult(
+            result.Found,
+            result.Metadata,
+            result.Issues,
+            model => FrontendReadinessReadStateClassifier.ReceiptMetadata(model, receiptRef),
+            "ReceiptMetadataNotFound");
+    }
+
+    public override FrontendReceiptMetadataReadModel? GetReceiptMetadata(
+        string receiptRef,
+        FrontendReadinessReadScope scope)
+    {
+        return ReadReceiptMetadata(receiptRef, scope).Data;
     }
 }

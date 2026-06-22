@@ -11,11 +11,23 @@ public sealed class OperationTimelineFrontendReadinessBackendTruthSource : Front
 
     public override string SourceName => "operation-timeline-repository";
 
-    public override FrontendOperationTimelineReadModel? GetOperationTimeline(
+    public override FrontendReadinessBackendReadResult<FrontendOperationTimelineReadModel> ReadOperationTimeline(
         string operationId,
         FrontendReadinessReadScope scope)
     {
         var result = _repository.GetByOperationId(operationId, scope);
-        return result.Found ? result.Timeline : null;
+        return FromRepositoryResult(
+            result.Found,
+            result.Timeline,
+            result.Issues,
+            model => FrontendReadinessReadStateClassifier.OperationTimeline(model, operationId),
+            "OperationTimelineNotFound");
+    }
+
+    public override FrontendOperationTimelineReadModel? GetOperationTimeline(
+        string operationId,
+        FrontendReadinessReadScope scope)
+    {
+        return ReadOperationTimeline(operationId, scope).Data;
     }
 }

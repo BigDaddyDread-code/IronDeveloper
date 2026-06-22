@@ -11,11 +11,23 @@ public sealed class EvidenceMetadataFrontendReadinessBackendTruthSource : Fronte
 
     public override string SourceName => "evidence-metadata-repository";
 
-    public override FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(
+    public override FrontendReadinessBackendReadResult<FrontendEvidenceMetadataReadModel> ReadEvidenceMetadata(
         string evidenceRef,
         FrontendReadinessReadScope scope)
     {
         var result = _repository.GetByEvidenceRef(evidenceRef, scope);
-        return result.Found ? result.Metadata : null;
+        return FromRepositoryResult(
+            result.Found,
+            result.Metadata,
+            result.Issues,
+            model => FrontendReadinessReadStateClassifier.EvidenceMetadata(model, evidenceRef),
+            "EvidenceMetadataNotFound");
+    }
+
+    public override FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(
+        string evidenceRef,
+        FrontendReadinessReadScope scope)
+    {
+        return ReadEvidenceMetadata(evidenceRef, scope).Data;
     }
 }
