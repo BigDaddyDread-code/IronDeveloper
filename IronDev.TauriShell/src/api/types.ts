@@ -857,3 +857,56 @@ export interface WorkflowReadOnlyApiEnvelope<TData> {
   warnings?: string[];
   errors?: WorkflowReadOnlyIssue[];
 }
+
+export interface FrontendReadBoundary {
+  readOnly?: boolean | null;
+  statusOnly?: boolean | null;
+  canCreateApproval?: boolean | null;
+  canAcceptApproval?: boolean | null;
+  canSatisfyPolicy?: boolean | null;
+  canExecute?: boolean | null;
+  canMutateSource?: boolean | null;
+  canRollback?: boolean | null;
+  canCommit?: boolean | null;
+  canPush?: boolean | null;
+  canCreatePullRequest?: boolean | null;
+  canMarkReadyForReview?: boolean | null;
+  canMerge?: boolean | null;
+  canRelease?: boolean | null;
+  canDeploy?: boolean | null;
+  canPromoteMemory?: boolean | null;
+  canContinueWorkflow?: boolean | null;
+}
+
+export interface FrontendOperationStatusReadModel {
+  operationId: string;
+  operationKind: string;
+  subject: string;
+  state: string;
+  blockedReasons: string[];
+  missingEvidence: string[];
+  nextSafeActions: string[];
+  forbiddenActions: string[];
+  evidenceRefs: string[];
+  receiptRefs: string[];
+  authorityWarnings: string[];
+  boundary: FrontendReadBoundary;
+  observedAtUtc: string;
+  expiresAtUtc?: string | null;
+}
+
+export interface FrontendReadinessApiError {
+  category?: string | null;
+  code?: string | null;
+  field?: string | null;
+  message?: string | null;
+}
+
+export interface FrontendReadinessApiEnvelope<TData> {
+  status: string;
+  data?: TData | null;
+  boundary: FrontendReadBoundary;
+  mutationOccurred: boolean;
+  warnings: string[];
+  errors: FrontendReadinessApiError[];
+}

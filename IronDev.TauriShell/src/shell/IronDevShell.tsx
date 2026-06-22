@@ -12,6 +12,7 @@ import { GovernanceTimelineRoute } from '../features/governance/GovernanceTimeli
 import { MemoryProposalReviewRoute } from '../features/governance/MemoryProposalReviewRoute';
 import { PatchArtifactPanelRoute } from '../features/governance/PatchArtifactPanelRoute';
 import { PolicySatisfactionPanelRoute } from '../features/governance/PolicySatisfactionPanelRoute';
+import { OperationStatusViewerRoute } from '../features/governance/OperationStatusViewerRoute';
 import { ReleaseReadinessEvidencePanelRoute } from '../features/governance/ReleaseReadinessEvidencePanelRoute';
 import { SourceApplyReviewPanelRoute } from '../features/governance/SourceApplyReviewPanelRoute';
 import { RollbackEvidencePanelRoute } from '../features/governance/RollbackEvidencePanelRoute';
@@ -72,7 +73,9 @@ export function IronDevShell() {
       case 'runs':
         return <RunReportsRoute route={activeRoute} onRouteReady={onRouteReady} />;
       case 'governance':
-        return window.location.pathname.startsWith('/workflows/runs') ? (
+        return window.location.pathname.startsWith('/operations/') ? (
+          <OperationStatusViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
+        ) : window.location.pathname.startsWith('/workflows/runs') ? (
           <WorkflowRunStepViewerRoute route={activeRoute} onRouteReady={onRouteReady} />
         ) : window.location.pathname.startsWith('/governance/memory-proposals') ? (
           <MemoryProposalReviewRoute route={activeRoute} onRouteReady={onRouteReady} />
