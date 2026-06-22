@@ -207,7 +207,8 @@ builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflow
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
-builder.Services.AddSingleton<IFrontendReadinessReadApi>(FrontendReadinessReadApi.Empty);
+builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, RunReportFrontendReadinessBackendTruthSource>();
+builder.Services.AddScoped<IFrontendReadinessReadApi, BackendFrontendReadinessReadApi>();
 builder.Services.AddSingleton<IFrontendControlledActionRequestService, FrontendControlledActionRequestService>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();

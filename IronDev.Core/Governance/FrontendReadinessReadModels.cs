@@ -11,6 +11,34 @@ public interface IFrontendReadinessReadApi
     FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef);
 }
 
+public interface IFrontendReadinessBackendTruthSource
+{
+    string SourceName { get; }
+    int? TenantId { get; }
+
+    GovernedOperationStatus? GetOperationStatus(string operationId);
+    FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId);
+    FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId);
+    FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId);
+    FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId);
+    FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef);
+    FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef);
+}
+
+public abstract class FrontendReadinessBackendTruthSource : IFrontendReadinessBackendTruthSource
+{
+    public abstract string SourceName { get; }
+    public virtual int? TenantId => null;
+
+    public virtual GovernedOperationStatus? GetOperationStatus(string operationId) => null;
+    public virtual FrontendOperationTimelineReadModel? GetOperationTimeline(string operationId) => null;
+    public virtual FrontendPatchPackageMetadataReadModel? GetPatchPackageMetadata(string packageId) => null;
+    public virtual FrontendPatchPackageArtifactsReadModel? GetPatchPackageArtifacts(string packageId) => null;
+    public virtual FrontendValidationResultMetadataReadModel? GetValidationResultMetadata(string validationResultId) => null;
+    public virtual FrontendEvidenceMetadataReadModel? GetEvidenceMetadata(string evidenceRef) => null;
+    public virtual FrontendReceiptMetadataReadModel? GetReceiptMetadata(string receiptRef) => null;
+}
+
 public sealed record FrontendReadBoundary
 {
     public bool ReadOnly { get; init; } = true;
