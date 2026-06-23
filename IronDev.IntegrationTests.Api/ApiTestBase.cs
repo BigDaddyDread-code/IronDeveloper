@@ -54,6 +54,8 @@ public abstract class ApiTestBase
                     builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
                     builder.UseSetting("LocalTest:WorkspaceRoot", Path.Combine(Path.GetTempPath(), "IronDevTestWorkspaces"));
                     builder.UseSetting("LocalTest:LogsRoot", Path.Combine(Path.GetTempPath(), "IronDevTestLogs"));
+                    builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:1420");
+                    builder.UseSetting("Cors:AllowedOrigins:1", "http://127.0.0.1:1420");
 
                     builder.ConfigureAppConfiguration((context, cfg) =>
                     {
