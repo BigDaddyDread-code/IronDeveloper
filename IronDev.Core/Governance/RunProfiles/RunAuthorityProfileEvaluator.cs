@@ -7,7 +7,7 @@ public static class RunAuthorityProfileEvaluator
         RunAuthorityOperationKind requestedOperation)
     {
         var validation = RunAuthorityProfileValidator.Validate(profile);
-        var profileKind = profile?.Kind ?? RunAuthorityProfileKind.Unknown;
+        var profileKind = profile?.Kind ?? AuthorityProfileKind.Unknown;
         var blockedReasons = new List<string>();
         var forbiddenActions = new List<string>();
         var requiredIndependentChecks = new List<string>();
@@ -65,7 +65,7 @@ public static class RunAuthorityProfileEvaluator
     }
 
     private static RunAuthorityDecision Decision(
-        RunAuthorityProfileKind profileKind,
+        AuthorityProfileKind profileKind,
         RunAuthorityOperationKind requestedOperation,
         bool isAllowedByProfile,
         IReadOnlyCollection<string> blockedReasons,

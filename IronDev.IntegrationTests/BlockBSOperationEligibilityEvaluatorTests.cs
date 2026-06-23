@@ -55,7 +55,7 @@ public sealed class BlockBSOperationEligibilityEvaluatorTests
     public void BlockBS_Evaluator_FailsClosedForInvalidProfileOrProfileDeniedOperation()
     {
         AssertBlocked(
-            OperationEligibilityEvaluator.Evaluate(ValidRequest() with { Profile = ValidProfile() with { Kind = RunAuthorityProfileKind.Unknown } }),
+            OperationEligibilityEvaluator.Evaluate(ValidRequest() with { Profile = ValidProfile() with { Kind = AuthorityProfileKind.Unknown } }),
             "RunAuthorityProfileCheckFailed");
         AssertBlocked(
             OperationEligibilityEvaluator.Evaluate(ValidRequest() with { Profile = ValidProfile() with { CanCommit = true } }),
@@ -456,7 +456,7 @@ public sealed class BlockBSOperationEligibilityEvaluatorTests
         new()
         {
             ProfileId = "proposal-only",
-            Kind = RunAuthorityProfileKind.ProposalOnly,
+            Kind = AuthorityProfileKind.ProposalOnly,
             AllowedOperations = ProposalSafeOperations,
             ForbiddenOperations = RunAuthorityProfileValidator.ProposalOnlyForbiddenOperations,
             CanReadRepo = true,
