@@ -374,27 +374,67 @@ static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
     if (!string.Equals(environmentInfo.Environment, "LocalTest", StringComparison.OrdinalIgnoreCase))
         return;
 
-    if (string.IsNullOrWhiteSpace(environmentInfo.Database) ||
-        !environmentInfo.Database.Contains("Test", StringComparison.OrdinalIgnoreCase))
+    if (!IsSafeLocalTestDatabaseName(environmentInfo.Database))
     {
-        throw new InvalidOperationException("LocalTest must use an isolated test database whose name contains 'Test'.");
+        throw new InvalidOperationException("LocalTest must use an isolated test database with a clear test marker.");
     }
 
-    if (string.IsNullOrWhiteSpace(environmentInfo.WorkspaceRoot) ||
-        !environmentInfo.WorkspaceRoot.Contains("Test", StringComparison.OrdinalIgnoreCase))
+    if (!IsSafeLocalTestPath(environmentInfo.WorkspaceRoot, "workspace"))
     {
-        throw new InvalidOperationException("LocalTest must use an isolated workspace root whose path contains 'Test'.");
+        throw new InvalidOperationException("LocalTest must use an isolated workspace root with a clear test marker.");
     }
 
-    if (string.IsNullOrWhiteSpace(environmentInfo.LogsRoot) ||
-        !environmentInfo.LogsRoot.Contains("Test", StringComparison.OrdinalIgnoreCase))
+    if (!IsSafeLocalTestPath(environmentInfo.LogsRoot, "logs"))
     {
-        throw new InvalidOperationException("LocalTest must use an isolated logs root whose path contains 'Test'.");
+        throw new InvalidOperationException("LocalTest must use an isolated logs root with a clear test marker.");
     }
 
     if (environmentInfo.DangerRealRepoWritesEnabled)
         throw new InvalidOperationException("LocalTest cannot enable dangerous real repo writes.");
 }
+
+static bool IsSafeLocalTestDatabaseName(string database)
+{
+    var segments = SplitLocalTestSafetySegments(database);
+    return HasExplicitTestSegment(segments) && !HasProductionLikeSegment(segments);
+}
+
+static bool IsSafeLocalTestPath(string path, string expectedLabel)
+{
+    var segments = SplitLocalTestSafetySegments(path);
+    if (segments.Length == 0 || HasProductionLikeSegment(segments))
+        return false;
+
+    if (HasExplicitTestSegment(segments))
+        return true;
+
+    return expectedLabel.Equals("workspace", StringComparison.OrdinalIgnoreCase)
+        ? segments.Any(segment =>
+            segment.Equals("IronDevTestWorkspaces", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("TestWorkspace", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("TestWorkspaces", StringComparison.OrdinalIgnoreCase))
+        : segments.Any(segment =>
+            segment.Equals("IronDevTestLogs", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("TestLog", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("TestLogs", StringComparison.OrdinalIgnoreCase));
+}
+
+static bool HasExplicitTestSegment(IReadOnlyCollection<string> segments) =>
+    segments.Any(segment => segment.Equals("Test", StringComparison.OrdinalIgnoreCase));
+
+static bool HasProductionLikeSegment(IReadOnlyCollection<string> segments) =>
+    segments.Any(segment =>
+        segment.Contains("Prod", StringComparison.OrdinalIgnoreCase) ||
+        segment.Contains("Production", StringComparison.OrdinalIgnoreCase) ||
+        segment.Contains("Live", StringComparison.OrdinalIgnoreCase) ||
+        segment.Contains("Accept", StringComparison.OrdinalIgnoreCase));
+
+static string[] SplitLocalTestSafetySegments(string value) =>
+    string.IsNullOrWhiteSpace(value)
+        ? []
+        : value.Split(
+            ['\\', '/', '_', '-', '.', ':', ' ', '\t', '\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 static string[] ResolveAllowedCorsOrigins(IConfiguration configuration, IWebHostEnvironment environment)
 {
