@@ -1,5 +1,9 @@
 # Block P0 to Y Authority Roadmap
 
+> [!IMPORTANT]
+> **Status: Historical / Fully Completed**
+> This roadmap was the plan for rolling out the backend authority chain. All Blocks (P through Y) have been implemented and validated via regression testing. The current active plans are tracked in [ROADMAP.md](file:///c:/Users/bob/source/repos/AIDeveloper/Docs/ROADMAP.md).
+
 ## Purpose
 
 This document records the post-PR166 backend authority rollout plan.

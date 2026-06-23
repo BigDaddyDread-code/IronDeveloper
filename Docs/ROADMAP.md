@@ -1,22 +1,34 @@
 # IronDev Roadmap
 
-## Current governed L4 authority roadmap
+## Historical Authority Spine Rollout (Blocks P to Y)
 
-**Status: Active planning after PR166**
+The original backend authority rollout plan (detailed in [BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md](file:///c:/Users/bob/source/repos/AIDeveloper/Docs/BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md)) is fully completed. It established the core validation and authority chain:
+`accepted approval record -> policy satisfaction record -> controlled dry-run -> patch artifact -> controlled source apply -> rollback -> workflow continuation -> release readiness gate`
 
-The current backend authority rollout is tracked in `Docs/BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md`.
+Framing the project as currently in "Block L" with source-write authority as next, or listing repository writes/PR creation as future rollout work, is historical. The backend authority spine is fully built.
 
-The governing chain is:
+---
 
-accepted approval record -> policy satisfaction record -> controlled dry-run -> patch artifact -> controlled source apply -> rollback -> workflow continuation -> release readiness gate
+## Active Roadmap: Frontend Readiness & Controlled Requests
 
-The next immediate slice is PR167 - Block P Authority Validation Baseline.
+The current active roadmap focuses on bringing backend truth to a read-only frontend readiness API, building thin status and patch viewers, and preparing the controlled action request UI.
 
-PR167 paints the authority lanes. It does not drive in them.
+### Active Sequence:
+1. **PR29B: Real Read-Only Backend Truth Wiring**
+   - *Core Requirement:* Wire the `IFrontendReadinessReadApi` (introduced in PR29) to read and expose real backend database truth (e.g., actual operation states, timelines, and validation results).
+   - *Constraint:* The PR29 readiness API contract/endpoint structure alone is not enough; it must query and reflect the real backend database truth.
+2. **PR30: Thin Operation Status Viewer**
+   - Consume the read-only API to render operation status details (kind, state, blocked reasons, missing evidence, warnings).
+3. **PR31: Patch Package Viewer**
+   - Render read-only metadata for patch packages (repositories, branches, proposed files, etc.).
+4. **PR32: Controlled Action Request UI**
+   - Render UI triggers to request (but not execute) governed actions: `SourceApply`, `Commit`, `Push`, `DraftPullRequest`, and `Rollback`.
 
-The first real authority implementation block after that is Block P - Accepted Approval.
-
-Approval package is not accepted approval. Accepted approval must be a backend-owned durable record.
+### Out of Scope:
+- **No Frontend UI** during the backend truth wiring (PR29B).
+- **No New Authority** is introduced. The UI may only request actions; eligibility and execution are determined strictly by the backend.
+- **No Memory Expansion** or modification.
+- **No Release/Deploy Controls** or mutations.
 
 ---
 
