@@ -30,9 +30,25 @@ public class ApiHarnessTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task EnvironmentEndpoint_ShouldReportIsolatedTestDatabase()
+    public async Task EnvironmentEndpoint_ShouldRejectAnonymousRequest()
     {
         var response = await Client.GetAsync("/api/environment");
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        var responseText = await response.Content.ReadAsStringAsync();
+        Assert.IsFalse(responseText.Contains("IronDeveloper_Test", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(responseText.Contains("WorkspaceRoot", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(responseText.Contains("LogsRoot", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(responseText.Contains("DangerRealRepoWritesEnabled", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public async Task EnvironmentEndpoint_ShouldReportIsolatedTestDatabaseForAuthenticatedRequest()
+    {
+        var token = await LoginAsync();
+        using var client = GetAuthedClient(token);
+
+        var response = await client.GetAsync("/api/environment");
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<EnvironmentInfoDto>();
@@ -40,6 +56,8 @@ public class ApiHarnessTests : ApiTestBase
         Assert.AreEqual("Test", body!.Environment);
         Assert.AreEqual("IronDeveloper_Test", body.Database);
         Assert.IsTrue(body.IsTestEnvironment);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(body.WorkspaceRoot));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(body.LogsRoot));
     }
 
     [TestMethod]

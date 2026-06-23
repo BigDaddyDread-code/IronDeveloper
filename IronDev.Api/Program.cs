@@ -300,7 +300,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 
 app.MapGet("/api/environment", () => Results.Ok(environmentInfo))
    .WithName("Environment")
-   .AllowAnonymous();
+   .RequireAuthorization();
 
 app.MapControllers();
 
