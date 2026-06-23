@@ -27,7 +27,25 @@ function Invoke-GovernanceBoundaryTestLane {
         --filter $Filter
 }
 
+function Invoke-ApiBoundaryTestLane {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Filter
+    )
+
+    Write-Section $Name
+    dotnet test $script:ApiProject `
+        --no-restore `
+        --no-build `
+        --logger "console;verbosity=minimal" `
+        --filter $Filter
+}
+
 $script:Project = "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj"
+$script:ApiProject = "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj"
 
 Write-Section "Governance boundary CI"
 Write-Host "GitHub Actions CI reports evidence only."
@@ -55,6 +73,13 @@ $compatibilityBoundaryFilter = @(
     "FullyQualifiedName~BlockBUSourceApplyConsumesBoundedAuthorityTests"
 ) -join "|"
 
+$apiBoundaryFilter = @(
+    "FullyQualifiedName~BlockOOperationalReadinessApiSurfaceTests",
+    "FullyQualifiedName~OperationalDebuggingApiContractTests",
+    "FullyQualifiedName~RunsEndpointContractTests",
+    "FullyQualifiedName~WorkflowContinuationApiRegressionTests"
+) -join "|"
+
 Invoke-GovernanceBoundaryTestLane `
     -Name "B-series profile boundary tests" `
     -Filter $bSeriesBoundaryFilter
@@ -62,6 +87,10 @@ Invoke-GovernanceBoundaryTestLane `
 Invoke-GovernanceBoundaryTestLane `
     -Name "BQ-BU compatibility boundary tests" `
     -Filter $compatibilityBoundaryFilter
+
+Invoke-ApiBoundaryTestLane `
+    -Name "API boundary tests" `
+    -Filter $apiBoundaryFilter
 
 Write-Section "Governance boundary CI complete"
 Write-Host "A green check is evidence, not permission."
