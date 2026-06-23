@@ -26,7 +26,7 @@ No configuration file was removed or renamed in PR 55.
 | Key | Owning option class or consumer | Required or optional | Default behaviour | Test coverage | Status | Changed in PR 55 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ConnectionStrings:IronDeveloperDb` | `SqlConnectionFactory`, `IntegrationTestBase`, API test host | Required for SQL-backed runtime/tests | Empty or missing connection fails when SQL connection is used. | SQL-backed integration and API host tests. | Active | No |
-| `Jwt:Key` | `JwtTokenService`, API auth setup | Required for API host | API startup throws if missing. | API auth tests. | Active | No |
+| `Jwt:Key` / `Jwt__Key` / `IRONDEV_JWT_KEY` | `JwtSigningKeyResolver`, `JwtTokenService`, API auth setup | Required for API host, but must be supplied by environment/secret configuration rather than committed appsettings. | API startup throws if missing or too short. | API auth tests and C06 JWT configuration hardening tests. | Active | No |
 | `Jwt:Issuer` | API auth setup, `JwtTokenService` | Required for token validation semantics | Uses configured issuer for JWT validation. | API auth tests. | Active | No |
 | `Jwt:Audience` | API auth setup, `JwtTokenService` | Required for token validation semantics | Uses configured audience for JWT validation. | API auth tests. | Active | No |
 | `Jwt:ExpiryMinutes` | `JwtTokenService` | Optional | Token service uses configured value where present. | API auth tests. | Active | No |

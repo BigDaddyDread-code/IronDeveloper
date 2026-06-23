@@ -28,7 +28,7 @@ public sealed class JwtTokenService : IJwtTokenService
     public JwtTokenService(IConfiguration configuration)
     {
         var section = configuration.GetSection("Jwt");
-        _key = section["Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.");
+        _key = JwtSigningKeyResolver.Resolve(configuration);
         _issuer = section["Issuer"] ?? "irondev-api";
         _audience = section["Audience"] ?? "irondev-client";
         _expiryMinutes = int.TryParse(section["ExpiryMinutes"], out var exp) ? exp : 60;
@@ -58,5 +58,37 @@ public sealed class JwtTokenService : IJwtTokenService
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}
+
+public static class JwtSigningKeyResolver
+{
+    public const int MinimumSigningKeyLength = 32;
+    public const string MissingSigningKeyMessage =
+        "JWT signing key is not configured. Set Jwt__Key or IRONDEV_JWT_KEY outside committed appsettings.";
+    public const string ShortSigningKeyMessage =
+        "JWT signing key must be at least 32 characters.";
+
+    public static string Resolve(IConfiguration configuration) =>
+        Resolve(configuration, Environment.GetEnvironmentVariable);
+
+    public static string Resolve(
+        IConfiguration configuration,
+        Func<string, string?> environmentVariableReader)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environmentVariableReader);
+
+        var key = configuration["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(key))
+            key = environmentVariableReader("IRONDEV_JWT_KEY");
+
+        if (string.IsNullOrWhiteSpace(key))
+            throw new InvalidOperationException(MissingSigningKeyMessage);
+
+        if (key.Length < MinimumSigningKeyLength)
+            throw new InvalidOperationException(ShortSigningKeyMessage);
+
+        return key;
     }
 }
