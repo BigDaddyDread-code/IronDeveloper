@@ -36,3 +36,18 @@ jobs:
       - name: Governance boundary tests
         shell: pwsh
         run: ./Scripts/ci/run-governance-boundary-ci.ps1
+
+      - name: Verify evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/governance-boundary
+
+      - name: Upload governance boundary evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-boundary-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/governance-boundary
+          retention-days: 14
+          if-no-files-found: error
