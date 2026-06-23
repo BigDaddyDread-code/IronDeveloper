@@ -95,7 +95,8 @@ $securityBoundaryFilter = @(
     "FullyQualifiedName~BlockC11SecretScanningRegressionTests",
     "FullyQualifiedName~BlockC12LocalTestSafetyRegressionTests",
     "FullyQualifiedName~BlockC13ProductionEnvironmentSafetyRegressionTests",
-    "FullyQualifiedName~BlockC14SensitiveApiRateLimitAuthBoundaryTests"
+    "FullyQualifiedName~BlockC14SensitiveApiRateLimitAuthBoundaryTests",
+    "FullyQualifiedName~BlockC15SecurityAuditLogBoundaryTests"
 ) -join "|"
 
 $apiBoundaryFilter = @(

@@ -29,6 +29,7 @@ using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
 using IronDev.Infrastructure.Services.Promotion;
 using IronDev.Infrastructure.Services.Workspaces;
+using IronDev.Infrastructure.Security;
 using IronDev.Infrastructure.Tracing;
 using IronDev.Infrastructure.Agents;
 using IronDev.Infrastructure.Governance;
@@ -282,6 +283,7 @@ builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, ValidationResul
 builder.Services.AddScoped<IFrontendReadinessBackendTruthSource, RunReportFrontendReadinessBackendTruthSource>();
 builder.Services.AddScoped<IFrontendReadinessReadApi, BackendFrontendReadinessReadApi>();
 builder.Services.AddSingleton<IFrontendControlledActionRequestService, FrontendControlledActionRequestService>();
+builder.Services.AddSingleton<ISecurityAuditLog, SecurityAuditLog>();
 
 var aiOptions = builder.Configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 if (string.IsNullOrWhiteSpace(aiOptions.ApiKey))
