@@ -55,3 +55,18 @@ jobs:
       - name: SQL integration gate
         shell: pwsh
         run: ./Scripts/ci/run-sql-integration-ci.ps1
+
+      - name: Verify evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/sql-integration
+
+      - name: Upload SQL integration evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sql-integration-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/sql-integration
+          retention-days: 14
+          if-no-files-found: error

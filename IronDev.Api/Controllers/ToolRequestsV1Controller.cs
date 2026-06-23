@@ -4,11 +4,13 @@ using System.Text.Json.Serialization;
 using IronDev.Core.Agents;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IronDev.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[EnableRateLimiting("SensitiveApiPolicy")]
 [Route("api/v1/tool-requests")]
 public sealed class ToolRequestsV1Controller : ControllerBase
 {

@@ -2,11 +2,13 @@ using IronDev.Core.Agents;
 using IronDev.Core.Agents.Audit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IronDev.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[EnableRateLimiting("SensitiveApiPolicy")]
 [Route("api/v1/agent-runs")]
 public sealed class AgentRunsV1Controller : ControllerBase
 {
