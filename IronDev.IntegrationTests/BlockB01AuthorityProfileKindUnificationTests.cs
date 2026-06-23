@@ -159,22 +159,19 @@ public sealed class BlockB01AuthorityProfileKindUnificationTests
     }
 
     [TestMethod]
-    public void BlockB01_KnownUnsupportedAuthorityProfileKindsFailClosed()
+    public void BlockB01_BoundedRunAuthorityRemainsUnsupportedForRunProfileValidation()
     {
-        foreach (var kind in new[] { AuthorityProfileKind.AskBeforeMutation, AuthorityProfileKind.BoundedRunAuthority })
-        {
-            var profile = ProposalOnlyProfile() with { Kind = kind };
-            var validation = RunAuthorityProfileValidator.Validate(profile);
-            var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.PatchPackageWrite);
+        var profile = ProposalOnlyProfile() with { Kind = AuthorityProfileKind.BoundedRunAuthority };
+        var validation = RunAuthorityProfileValidator.Validate(profile);
+        var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.PatchPackageWrite);
 
-            Assert.IsFalse(validation.IsValid, kind.ToString());
-            AssertContains(validation.Issues, $"AuthorityProfileKindUnsupported:{kind}");
-            Assert.IsFalse(decision.IsAllowedByProfile, kind.ToString());
-            Assert.AreEqual(kind, decision.ProfileKind);
-            AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
-            AssertContains(decision.BlockedReasons, $"RunAuthorityProfileInvalid:AuthorityProfileKindUnsupported:{kind}");
-            AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
-        }
+        Assert.IsFalse(validation.IsValid);
+        AssertContains(validation.Issues, "AuthorityProfileKindUnsupported:BoundedRunAuthority");
+        Assert.IsFalse(decision.IsAllowedByProfile);
+        Assert.AreEqual(AuthorityProfileKind.BoundedRunAuthority, decision.ProfileKind);
+        AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
+        AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid:AuthorityProfileKindUnsupported:BoundedRunAuthority");
+        AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
     }
 
     [TestMethod]

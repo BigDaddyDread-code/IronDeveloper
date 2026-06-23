@@ -40,6 +40,32 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
         RunAuthorityOperationKind.DurableEventWrite
     ];
 
+    private static readonly RunAuthorityOperationKind[] ExpectedAskBeforeMutationAllowedOperations =
+    [
+        .. ExpectedProposalOnlyAllowedOperations,
+        RunAuthorityOperationKind.SourceApply,
+        RunAuthorityOperationKind.DurableSourceMutation
+    ];
+
+    private static readonly RunAuthorityOperationKind[] ExpectedAskBeforeMutationForbiddenOperations =
+    [
+        RunAuthorityOperationKind.Rollback,
+        RunAuthorityOperationKind.Commit,
+        RunAuthorityOperationKind.Push,
+        RunAuthorityOperationKind.DraftPullRequest,
+        RunAuthorityOperationKind.ReadyForReview,
+        RunAuthorityOperationKind.Merge,
+        RunAuthorityOperationKind.Release,
+        RunAuthorityOperationKind.Deployment,
+        RunAuthorityOperationKind.MemoryPromotion,
+        RunAuthorityOperationKind.WorkflowContinuation,
+        RunAuthorityOperationKind.ApprovalRequestCreate,
+        RunAuthorityOperationKind.PolicySatisfaction,
+        RunAuthorityOperationKind.ProviderMutation,
+        RunAuthorityOperationKind.PackagePublication,
+        RunAuthorityOperationKind.DurableEventWrite
+    ];
+
     [TestMethod]
     public void BlockB03_AuthorityProfileKind_IsOnlyCanonicalProfileKind()
     {
@@ -173,20 +199,46 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
     }
 
     [TestMethod]
-    public void BlockB03_KnownUnsupportedProfileKinds_DoNotBecomeRunnable()
+    public void BlockB03_AskBeforeMutation_IsSupportedOnlyBySourceApplyLaneShape()
     {
-        foreach (var kind in new[] { AuthorityProfileKind.AskBeforeMutation, AuthorityProfileKind.BoundedRunAuthority })
-        {
-            var profile = ProposalOnlyProfile() with { Kind = kind };
-            var validation = RunAuthorityProfileValidator.Validate(profile);
-            var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.PatchPackageWrite);
+        var profile = AskBeforeMutationProfile();
+        var validation = RunAuthorityProfileValidator.Validate(profile);
+        var sourceApplyDecision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.SourceApply);
+        var commitDecision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.Commit);
 
-            Assert.IsFalse(validation.IsValid, kind.ToString());
-            AssertContains(validation.Issues, $"AuthorityProfileKindUnsupported:{kind}");
-            Assert.IsFalse(decision.IsAllowedByProfile, kind.ToString());
-            AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
-            AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
-        }
+        Assert.IsTrue(validation.IsValid, string.Join(", ", validation.Issues));
+        CollectionAssert.AreEquivalent(
+            ExpectedAskBeforeMutationAllowedOperations,
+            RunAuthorityProfileValidator.AskBeforeMutationAllowedOperations.ToArray());
+        CollectionAssert.AreEquivalent(
+            ExpectedAskBeforeMutationForbiddenOperations,
+            RunAuthorityProfileValidator.AskBeforeMutationForbiddenOperations.ToArray());
+        Assert.IsTrue(sourceApplyDecision.IsAllowedByProfile, string.Join(", ", sourceApplyDecision.BlockedReasons));
+        Assert.IsFalse(commitDecision.IsAllowedByProfile);
+        AssertContains(commitDecision.BlockedReasons, "AskBeforeMutation does not allow Commit.");
+
+        var widenedProfile = profile with
+        {
+            AllowedOperations = [.. ExpectedAskBeforeMutationAllowedOperations, RunAuthorityOperationKind.Push]
+        };
+        var widenedValidation = RunAuthorityProfileValidator.Validate(widenedProfile);
+
+        Assert.IsFalse(widenedValidation.IsValid);
+        AssertContains(widenedValidation.Issues, "AskBeforeMutationCannotAllowDangerousOperation:Push");
+    }
+
+    [TestMethod]
+    public void BlockB03_BoundedRunAuthority_RemainsUnsupportedForRunProfileValidation()
+    {
+        var profile = AskBeforeMutationProfile() with { Kind = AuthorityProfileKind.BoundedRunAuthority };
+        var validation = RunAuthorityProfileValidator.Validate(profile);
+        var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.SourceApply);
+
+        Assert.IsFalse(validation.IsValid);
+        AssertContains(validation.Issues, "AuthorityProfileKindUnsupported:BoundedRunAuthority");
+        Assert.IsFalse(decision.IsAllowedByProfile);
+        AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
+        AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
     }
 
     [TestMethod]
@@ -287,7 +339,6 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
         StringAssert.Contains(doc, "RunAuthorityProfileKind must not be reintroduced.");
         StringAssert.Contains(doc, "No mapper, bridge, translator, or adapter may hide profile-kind drift.");
         StringAssert.Contains(doc, "ProposalOnly behavior did not widen.");
-        StringAssert.Contains(doc, "AskBeforeMutation and BoundedRunAuthority remain known but unsupported for run-profile evaluation.");
         StringAssert.Contains(doc, "Profile allowance is not approval, policy satisfaction, execution authority, source mutation authority, or workflow continuation.");
         StringAssert.Contains(doc, "This PR is test-only.");
         StringAssert.Contains(doc, "No executor, mutation, source apply, rollback, commit, push, PR, merge, release, deploy, memory promotion, or workflow continuation path was added.");
@@ -321,6 +372,17 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
             CanContinueWorkflow = false,
             CanExecuteProviderMutation = false,
             CanPublishPackage = false
+        };
+
+    private static RunAuthorityProfile AskBeforeMutationProfile() =>
+        ProposalOnlyProfile() with
+        {
+            ProfileId = "ask-before-mutation",
+            Kind = AuthorityProfileKind.AskBeforeMutation,
+            AllowedOperations = ExpectedAskBeforeMutationAllowedOperations,
+            ForbiddenOperations = ExpectedAskBeforeMutationForbiddenOperations,
+            CanMutateDurableSource = true,
+            CanApplyPatch = true
         };
 
     private static Type PropertyType<T>(string propertyName) =>
