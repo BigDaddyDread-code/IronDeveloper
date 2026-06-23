@@ -1,0 +1,38 @@
+name: governance-boundary-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governance-boundary-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  governance-boundary-ci:
+    name: Build and governance boundary tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore IronDev.slnx
+
+      - name: Build
+        run: dotnet build IronDev.slnx --no-restore
+
+      - name: Governance boundary tests
+        shell: pwsh
+        run: ./Scripts/ci/run-governance-boundary-ci.ps1
