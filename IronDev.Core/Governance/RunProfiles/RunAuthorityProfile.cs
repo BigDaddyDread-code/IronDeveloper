@@ -3,7 +3,7 @@ namespace IronDev.Core.Governance;
 public sealed record RunAuthorityProfile
 {
     public required string ProfileId { get; init; }
-    public required RunAuthorityProfileKind Kind { get; init; }
+    public required AuthorityProfileKind Kind { get; init; }
     public required IReadOnlyCollection<RunAuthorityOperationKind> AllowedOperations { get; init; }
     public required IReadOnlyCollection<RunAuthorityOperationKind> ForbiddenOperations { get; init; }
 

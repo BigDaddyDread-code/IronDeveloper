@@ -48,13 +48,19 @@ public static class RunAuthorityProfileValidator
 
         if (string.IsNullOrWhiteSpace(profile.ProfileId))
             issues.Add("RunAuthorityProfileIdRequired");
-        if (!Enum.IsDefined(profile.Kind) || profile.Kind == RunAuthorityProfileKind.Unknown)
-            issues.Add("RunAuthorityProfileKindKnownRequired");
+        if (!Enum.IsDefined(profile.Kind) || profile.Kind == AuthorityProfileKind.Unknown)
+            issues.Add("AuthorityProfileKindKnownRequired");
 
         ValidateOperationCollections(profile, issues);
 
-        if (profile.Kind == RunAuthorityProfileKind.ProposalOnly)
+        if (profile.Kind == AuthorityProfileKind.ProposalOnly)
+        {
             ValidateProposalOnly(profile, issues);
+        }
+        else if (Enum.IsDefined(profile.Kind) && profile.Kind != AuthorityProfileKind.Unknown)
+        {
+            issues.Add($"AuthorityProfileKindUnsupported:{profile.Kind}");
+        }
 
         return Result(issues);
     }

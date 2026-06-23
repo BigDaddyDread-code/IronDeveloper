@@ -47,7 +47,7 @@ public sealed class BlockBQRunAuthorityProfileContractTests
         var validation = RunAuthorityProfileValidator.Validate(profile);
 
         Assert.IsTrue(validation.IsValid, string.Join(", ", validation.Issues));
-        Assert.AreEqual(RunAuthorityProfileKind.ProposalOnly, profile.Kind);
+        Assert.AreEqual(AuthorityProfileKind.ProposalOnly, profile.Kind);
         CollectionAssert.AreEquivalent(ExpectedAllowedOperations, profile.AllowedOperations.ToArray());
         CollectionAssert.AreEquivalent(ExpectedForbiddenOperations, profile.ForbiddenOperations.ToArray());
     }
@@ -87,7 +87,7 @@ public sealed class BlockBQRunAuthorityProfileContractTests
             var decision = RunAuthorityProfileEvaluator.Evaluate(ProposalOnlyProfile(), operation);
 
             Assert.IsTrue(decision.IsAllowedByProfile, operation.ToString() + ": " + string.Join(", ", decision.BlockedReasons));
-            Assert.AreEqual(RunAuthorityProfileKind.ProposalOnly, decision.ProfileKind);
+            Assert.AreEqual(AuthorityProfileKind.ProposalOnly, decision.ProfileKind);
             Assert.AreEqual(operation, decision.RequestedOperation);
             Assert.IsEmpty(decision.BlockedReasons.ToArray(), operation.ToString());
             AssertContains(decision.RequiredIndependentChecks, "operation-specific validation still required");
@@ -106,7 +106,7 @@ public sealed class BlockBQRunAuthorityProfileContractTests
             var decision = RunAuthorityProfileEvaluator.Evaluate(ProposalOnlyProfile(), operation);
 
             Assert.IsFalse(decision.IsAllowedByProfile, operation.ToString());
-            Assert.AreEqual(RunAuthorityProfileKind.ProposalOnly, decision.ProfileKind);
+            Assert.AreEqual(AuthorityProfileKind.ProposalOnly, decision.ProfileKind);
             AssertContains(decision.BlockedReasons, $"ProposalOnly does not allow {operation}.");
             AssertContains(decision.ForbiddenActions, $"do not perform {operation} under ProposalOnly");
             AssertContains(decision.RequiredIndependentChecks, "explicit governed authority required outside this profile");
@@ -119,7 +119,7 @@ public sealed class BlockBQRunAuthorityProfileContractTests
         var decision = RunAuthorityProfileEvaluator.Evaluate(null, RunAuthorityOperationKind.PatchProposal);
 
         Assert.IsFalse(decision.IsAllowedByProfile);
-        Assert.AreEqual(RunAuthorityProfileKind.Unknown, decision.ProfileKind);
+        Assert.AreEqual(AuthorityProfileKind.Unknown, decision.ProfileKind);
         AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
         AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid:RunAuthorityProfileRequired");
         AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
@@ -154,8 +154,8 @@ public sealed class BlockBQRunAuthorityProfileContractTests
             },
             "RunAuthorityAllowedForbiddenOverlap:SourceApply");
         AssertInvalid(
-            ProposalOnlyProfile() with { Kind = RunAuthorityProfileKind.Unknown },
-            "RunAuthorityProfileKindKnownRequired");
+            ProposalOnlyProfile() with { Kind = AuthorityProfileKind.Unknown },
+            "AuthorityProfileKindKnownRequired");
         AssertInvalid(
             ProposalOnlyProfile() with
             {
@@ -286,7 +286,6 @@ public sealed class BlockBQRunAuthorityProfileContractTests
         var files = new[]
         {
             Path.Combine(root, "IronDev.Core", "Governance", "RunProfiles", "RunAuthorityProfile.cs"),
-            Path.Combine(root, "IronDev.Core", "Governance", "RunProfiles", "RunAuthorityProfileKind.cs"),
             Path.Combine(root, "IronDev.Core", "Governance", "RunProfiles", "RunAuthorityOperationKind.cs"),
             Path.Combine(root, "IronDev.Core", "Governance", "RunProfiles", "RunAuthorityDecision.cs"),
             Path.Combine(root, "IronDev.Core", "Governance", "RunProfiles", "RunAuthorityProfileValidator.cs"),
@@ -336,7 +335,7 @@ public sealed class BlockBQRunAuthorityProfileContractTests
         new()
         {
             ProfileId = "proposal-only",
-            Kind = RunAuthorityProfileKind.ProposalOnly,
+            Kind = AuthorityProfileKind.ProposalOnly,
             AllowedOperations = ExpectedAllowedOperations,
             ForbiddenOperations = ExpectedForbiddenOperations,
             CanReadRepo = true,
