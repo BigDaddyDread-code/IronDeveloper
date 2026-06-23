@@ -91,6 +91,10 @@ $compatibilityBoundaryFilter = @(
     "FullyQualifiedName~BlockBUSourceApplyConsumesBoundedAuthorityTests"
 ) -join "|"
 
+$securityBoundaryFilter = @(
+    "FullyQualifiedName~BlockC11SecretScanningRegressionTests"
+) -join "|"
+
 $apiBoundaryFilter = @(
     "FullyQualifiedName~BlockOOperationalReadinessApiSurfaceTests",
     "FullyQualifiedName~OperationalDebuggingApiContractTests",
@@ -110,6 +114,10 @@ Invoke-GovernanceBoundaryTestLane `
 Invoke-GovernanceBoundaryTestLane `
     -Name "BQ-BU compatibility boundary tests" `
     -Filter $compatibilityBoundaryFilter
+
+Invoke-GovernanceBoundaryTestLane `
+    -Name "Security boundary tests" `
+    -Filter $securityBoundaryFilter
 
 Invoke-ApiBoundaryTestLane `
     -Name "API boundary tests" `
