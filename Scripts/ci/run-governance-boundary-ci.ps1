@@ -44,8 +44,26 @@ function Invoke-ApiBoundaryTestLane {
         --filter $Filter
 }
 
+function Invoke-CliBoundaryTestLane {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Filter
+    )
+
+    Write-Section $Name
+    dotnet test $script:CliProject `
+        --no-restore `
+        --no-build `
+        --logger "console;verbosity=minimal" `
+        --filter $Filter
+}
+
 $script:Project = "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj"
 $script:ApiProject = "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj"
+$script:CliProject = "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj"
 
 Write-Section "Governance boundary CI"
 Write-Host "GitHub Actions CI reports evidence only."
@@ -80,6 +98,11 @@ $apiBoundaryFilter = @(
     "FullyQualifiedName~WorkflowContinuationApiRegressionTests"
 ) -join "|"
 
+$cliBoundaryFilter = @(
+    "TestCategory=ApiCliContract",
+    "TestCategory=ApiCliReleaseGate"
+) -join "|"
+
 Invoke-GovernanceBoundaryTestLane `
     -Name "B-series profile boundary tests" `
     -Filter $bSeriesBoundaryFilter
@@ -91,6 +114,10 @@ Invoke-GovernanceBoundaryTestLane `
 Invoke-ApiBoundaryTestLane `
     -Name "API boundary tests" `
     -Filter $apiBoundaryFilter
+
+Invoke-CliBoundaryTestLane `
+    -Name "CLI boundary tests" `
+    -Filter $cliBoundaryFilter
 
 Write-Section "Governance boundary CI complete"
 Write-Host "A green check is evidence, not permission."
