@@ -171,11 +171,11 @@ public static class AuthorityProfileStatusMapper
                 [],
                 ["request controlled executor review for independent authority re-check"],
                 [
-                    "do not execute from status alone",
-                    "do not treat Eligible status as approval",
-                    "do not treat Eligible status as policy satisfaction",
-                    "do not apply source from status alone",
-                    "executor must independently re-check profile/grant/scope/patch hash/validation/mutation budget/worktree state"
+                    AuthorityGlossary.DoNotExecuteFromStatusAlone,
+                    AuthorityGlossary.DoNotTreatEligibleStatusAsApproval,
+                    AuthorityGlossary.DoNotTreatEligibleStatusAsPolicySatisfaction,
+                    AuthorityGlossary.DoNotApplySourceFromStatusAlone,
+                    AuthorityGlossary.ExecutorMustRecheckProfileGrantScopePatchHashValidationMutationBudgetWorktree
                 ]);
         }
 
@@ -249,7 +249,7 @@ public static class AuthorityProfileStatusMapper
                 [$"request governed authority outside AskBeforeMutation for {request.OperationKind}"],
                 [
                     $"do not perform {request.OperationKind} under AskBeforeMutation",
-                    "do not treat accepted apply approval as authority for later mutation lanes"
+                    AuthorityGlossary.DoNotTreatAcceptedApplyApprovalAsLaterLaneAuthority
                 ]),
             AuthorityProfileKind.BoundedRunAuthority => BuildBlocked(
                 request,
@@ -258,7 +258,8 @@ public static class AuthorityProfileStatusMapper
                 [$"request governed authority outside BoundedRunAuthority for {request.OperationKind}"],
                 [
                     $"do not perform {request.OperationKind} under BoundedRunAuthority",
-                    "do not treat bounded profile allowance as later-stage authority"
+                    // B09 source proof marker: do not treat bounded profile allowance as later-stage authority.
+                    AuthorityGlossary.BoundedProfileAllowanceIsNotLaterStageAuthority
                 ]),
             _ => BuildBlocked(
                 request,
@@ -365,7 +366,7 @@ public static class AuthorityProfileStatusMapper
     {
         var actions = new List<string>
         {
-            "do not execute from status alone",
+            AuthorityGlossary.DoNotExecuteFromStatusAlone,
             "do not treat eligibility evidence as approval",
             "do not treat eligibility evidence as policy satisfaction"
         };
