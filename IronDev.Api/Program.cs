@@ -39,6 +39,8 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Events;
 
+const string CorsPolicyName = "IronDevCors";
+
 var logDirectory = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
     "IronDev",
@@ -83,6 +85,22 @@ builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
+
+var allowedCorsOrigins = ResolveAllowedCorsOrigins(builder.Configuration, builder.Environment);
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicyName, policy =>
+    {
+        var origins = allowedCorsOrigins.Length == 0
+            ? ["https://irondev-cors-disabled.invalid"]
+            : allowedCorsOrigins;
+
+        policy
+            .WithOrigins(origins)
+            .WithHeaders("Authorization", "Content-Type")
+            .WithMethods("GET", "POST", "PUT", "DELETE");
+    });
+});
 
 // Infrastructure
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
@@ -290,6 +308,8 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
 
 app.UseMiddleware<RequestTracingMiddleware>();
 app.UseHttpsRedirection();
+app.UseRouting();
+app.UseCors(CorsPolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -374,6 +394,78 @@ static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
 
     if (environmentInfo.DangerRealRepoWritesEnabled)
         throw new InvalidOperationException("LocalTest cannot enable dangerous real repo writes.");
+}
+
+static string[] ResolveAllowedCorsOrigins(IConfiguration configuration, IWebHostEnvironment environment)
+{
+    var configuredOrigins = configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>() ?? [];
+
+    if (configuredOrigins.Length == 0)
+        return [];
+
+    var normalizedOrigins = new List<string>();
+    var seenOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var allowLocalhost =
+        environment.IsDevelopment() ||
+        environment.IsEnvironment("Test") ||
+        environment.IsEnvironment("LocalTest");
+
+    foreach (var configuredOrigin in configuredOrigins)
+    {
+        var normalizedOrigin = NormalizeCorsOrigin(configuredOrigin);
+        if (!seenOrigins.Add(normalizedOrigin))
+            throw new InvalidOperationException($"Duplicate CORS origin configured: {normalizedOrigin}");
+
+        if (!allowLocalhost && IsLocalhostOrigin(normalizedOrigin))
+            throw new InvalidOperationException("Production CORS configuration cannot include localhost origins.");
+
+        normalizedOrigins.Add(normalizedOrigin);
+    }
+
+    return normalizedOrigins.ToArray();
+}
+
+static string NormalizeCorsOrigin(string? configuredOrigin)
+{
+    if (string.IsNullOrWhiteSpace(configuredOrigin))
+        throw new InvalidOperationException("Cors:AllowedOrigins cannot contain blank origins.");
+
+    var origin = configuredOrigin.Trim();
+    if (origin == "*" || origin.Contains('*'))
+        throw new InvalidOperationException("Cors:AllowedOrigins cannot contain wildcard origins.");
+
+    if (origin.EndsWith("/", StringComparison.Ordinal))
+        throw new InvalidOperationException("Cors:AllowedOrigins must not include trailing slashes.");
+
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+        throw new InvalidOperationException($"Invalid CORS origin configured: {origin}");
+
+    if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException($"CORS origin must use http or https: {origin}");
+    }
+
+    if (!string.IsNullOrEmpty(uri.AbsolutePath) && uri.AbsolutePath != "/")
+        throw new InvalidOperationException($"CORS origin must not include a path: {origin}");
+
+    if (!string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) || !string.IsNullOrEmpty(uri.UserInfo))
+        throw new InvalidOperationException($"CORS origin must not include query, fragment, or user info: {origin}");
+
+    return uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
+}
+
+static bool IsLocalhostOrigin(string origin)
+{
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+        return false;
+
+    return string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(uri.Host, "::1", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(uri.Host, "[::1]", StringComparison.OrdinalIgnoreCase);
 }
 
 static IRunReportService CreateRunReportService(IConfiguration configuration)
