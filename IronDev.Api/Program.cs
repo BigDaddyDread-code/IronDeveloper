@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using IronDev.Api.Controllers;
 using IronDev.AI;
 using IronDev.Api.Auth;
@@ -35,11 +37,14 @@ using IronDev.Infrastructure.Workflow;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Events;
 
 const string CorsPolicyName = "IronDevCors";
+const string AuthLoginRateLimitPolicyName = "AuthLoginPolicy";
+const string SensitiveApiRateLimitPolicyName = "SensitiveApiPolicy";
 
 var logDirectory = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -101,6 +106,42 @@ builder.Services.AddCors(options =>
             .WithHeaders("Authorization", "Content-Type")
             .WithMethods("GET", "POST", "PUT", "DELETE");
     });
+});
+
+var authLoginPermitLimit = ResolveRateLimitPermitLimit(
+    builder.Configuration,
+    "RateLimiting:AuthLogin:PermitLimit",
+    5);
+var sensitiveApiPermitLimit = ResolveRateLimitPermitLimit(
+    builder.Configuration,
+    "RateLimiting:SensitiveApi:PermitLimit",
+    60);
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthLoginRateLimitPolicyName, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ResolveLoginRateLimitPartitionKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = authLoginPermitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy(SensitiveApiRateLimitPolicyName, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ResolveSensitiveApiRateLimitPartitionKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = sensitiveApiPermitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true
+            }));
 });
 
 // Infrastructure
@@ -312,6 +353,7 @@ app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // Health check endpoint (anonymous)
@@ -319,9 +361,10 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
    .WithName("Health")
    .AllowAnonymous();
 
-app.MapGet("/api/environment", () => Results.Ok(environmentInfo))
+var environmentEndpoint = app.MapGet("/api/environment", () => Results.Ok(environmentInfo))
    .WithName("Environment")
    .RequireAuthorization();
+environmentEndpoint.RequireRateLimiting(SensitiveApiRateLimitPolicyName);
 
 app.MapControllers();
 
@@ -691,6 +734,45 @@ static bool IsLocalhostOrigin(string origin)
            string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
            string.Equals(uri.Host, "::1", StringComparison.OrdinalIgnoreCase) ||
            string.Equals(uri.Host, "[::1]", StringComparison.OrdinalIgnoreCase);
+}
+
+static int ResolveRateLimitPermitLimit(IConfiguration configuration, string key, int fallback)
+{
+    var configured = configuration[key];
+    if (int.TryParse(configured, out var value) && value > 0)
+        return value;
+
+    return fallback;
+}
+
+static string ResolveLoginRateLimitPartitionKey(HttpContext context) =>
+    $"ip:{NormalizeRateLimitKey(context.Connection.RemoteIpAddress?.ToString())}";
+
+static string ResolveSensitiveApiRateLimitPartitionKey(HttpContext context)
+{
+    var userId =
+        context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+        context.User.FindFirst("sub")?.Value;
+    var tenantId = context.User.FindFirst("tenant_id")?.Value;
+
+    if (!string.IsNullOrWhiteSpace(userId) && !string.IsNullOrWhiteSpace(tenantId))
+        return $"user-tenant:{NormalizeRateLimitKey(userId)}:{NormalizeRateLimitKey(tenantId)}";
+
+    return ResolveLoginRateLimitPartitionKey(context);
+}
+
+static string NormalizeRateLimitKey(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+        return "unknown";
+
+    var safe = new string(value
+        .Trim()
+        .Where(character => char.IsLetterOrDigit(character) || character is '.' or ':' or '-' or '_')
+        .Take(128)
+        .ToArray());
+
+    return string.IsNullOrWhiteSpace(safe) ? "unknown" : safe;
 }
 
 static IRunReportService CreateRunReportService(IConfiguration configuration)

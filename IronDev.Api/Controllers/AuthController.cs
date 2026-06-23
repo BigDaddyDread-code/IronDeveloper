@@ -2,7 +2,9 @@ using System.ComponentModel.DataAnnotations;
 using IronDev.Api.Auth;
 using IronDev.Core.Auth;
 using IronDev.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IronDev.Api.Controllers;
 
@@ -23,6 +25,8 @@ public sealed class AuthController : ControllerBase
 
     /// <summary>POST /api/auth/login — issues a base JWT (no tenant claim yet).</summary>
     [HttpPost("login")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthLoginPolicy")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -48,7 +52,8 @@ public sealed class AuthController : ControllerBase
 
     /// <summary>GET /api/auth/me — returns the current user's profile from JWT claims.</summary>
     [HttpGet("me")]
-    [Microsoft.AspNetCore.Authorization.Authorize]
+    [Authorize]
+    [EnableRateLimiting("SensitiveApiPolicy")]
     public IActionResult Me()
     {
         var ctx = new CurrentUserContext(HttpContext.RequestServices
@@ -59,6 +64,7 @@ public sealed class AuthController : ControllerBase
 
     /// <summary>POST /api/auth/logout — stateless JWT; just returns 200.</summary>
     [HttpPost("logout")]
-    [Microsoft.AspNetCore.Authorization.Authorize]
+    [Authorize]
+    [EnableRateLimiting("SensitiveApiPolicy")]
     public IActionResult Logout() => Ok(new { message = "Logged out." });
 }
