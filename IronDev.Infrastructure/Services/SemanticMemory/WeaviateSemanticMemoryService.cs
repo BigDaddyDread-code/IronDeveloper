@@ -76,20 +76,25 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
             string host = uri.Host;
             string port = uri.Port.ToString();
 
-            // Setup local or custom client
-            _client = await WeaviateClientBuilder.Custom(
+            // Setup local or custom client.
+            var builder = WeaviateClientBuilder.Custom(
                 restEndpoint: host,
                 restPort: port,
                 grpcEndpoint: host,
                 grpcPort: _options.GrpcPort.ToString(),
                 useSsl: uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
-            ).BuildAsync();
+            );
+
+            if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+                builder = builder.WithCredentials(Weaviate.Client.Auth.ApiKey(_options.ApiKey));
+
+            _client = await builder.BuildAsync();
 
             _initialized = true;
         }
-        catch (Exception ex)
+        catch
         {
-            throw new InvalidOperationException($"Failed to initialize Weaviate client: {ex.Message}", ex);
+            throw new InvalidOperationException("Failed to initialize Weaviate client. Check endpoint and authentication configuration.");
         }
     }
 
