@@ -1,0 +1,34 @@
+name: frontend-contract-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-contract-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-contract-ci:
+    name: Tauri type-check and OpenAPI drift
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: IronDev.TauriShell/package-lock.json
+
+      - name: Frontend contract check
+        shell: pwsh
+        run: ./Scripts/ci/run-frontend-contract-ci.ps1
