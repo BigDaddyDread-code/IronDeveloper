@@ -45,8 +45,8 @@ public abstract class ApiTestBase
                 .WithWebHostBuilder(builder =>
                 {
                     builder.UseEnvironment("Test");
-                    // Force the configuration values into the builder so Program.cs picks them up
-                    builder.UseSetting("Jwt:Key", "irondev-super-secret-jwt-key-change-in-production-min32chars");
+                    // Force test-only configuration values into the builder so Program.cs picks them up.
+                    builder.UseSetting("Jwt:Key", "irondev-test-only-jwt-key-not-from-committed-config-32chars");
                     builder.UseSetting("Jwt:Issuer", "irondev-api");
                     builder.UseSetting("Jwt:Audience", "irondev-client");
                     builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
@@ -60,6 +60,11 @@ public abstract class ApiTestBase
                         {
                             cfg.AddJsonFile(path, optional: false);
                         }
+
+                        cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                        {
+                            ["Jwt:Key"] = "irondev-test-only-jwt-key-not-from-committed-config-32chars"
+                        });
                     });
                 });
 
