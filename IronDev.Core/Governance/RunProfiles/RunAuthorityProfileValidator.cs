@@ -36,6 +36,32 @@ public static class RunAuthorityProfileValidator
         RunAuthorityOperationKind.DurableEventWrite
     ];
 
+    public static readonly IReadOnlyCollection<RunAuthorityOperationKind> AskBeforeMutationAllowedOperations =
+    [
+        .. ProposalOnlyAllowedOperations,
+        RunAuthorityOperationKind.SourceApply,
+        RunAuthorityOperationKind.DurableSourceMutation
+    ];
+
+    public static readonly IReadOnlyCollection<RunAuthorityOperationKind> AskBeforeMutationForbiddenOperations =
+    [
+        RunAuthorityOperationKind.Rollback,
+        RunAuthorityOperationKind.Commit,
+        RunAuthorityOperationKind.Push,
+        RunAuthorityOperationKind.DraftPullRequest,
+        RunAuthorityOperationKind.ReadyForReview,
+        RunAuthorityOperationKind.Merge,
+        RunAuthorityOperationKind.Release,
+        RunAuthorityOperationKind.Deployment,
+        RunAuthorityOperationKind.MemoryPromotion,
+        RunAuthorityOperationKind.WorkflowContinuation,
+        RunAuthorityOperationKind.ApprovalRequestCreate,
+        RunAuthorityOperationKind.PolicySatisfaction,
+        RunAuthorityOperationKind.ProviderMutation,
+        RunAuthorityOperationKind.PackagePublication,
+        RunAuthorityOperationKind.DurableEventWrite
+    ];
+
     public static RunAuthorityProfileValidationResult Validate(RunAuthorityProfile? profile)
     {
         var issues = new List<string>();
@@ -56,6 +82,10 @@ public static class RunAuthorityProfileValidator
         if (profile.Kind == AuthorityProfileKind.ProposalOnly)
         {
             ValidateProposalOnly(profile, issues);
+        }
+        else if (profile.Kind == AuthorityProfileKind.AskBeforeMutation)
+        {
+            ValidateAskBeforeMutation(profile, issues);
         }
         else if (Enum.IsDefined(profile.Kind) && profile.Kind != AuthorityProfileKind.Unknown)
         {
@@ -148,6 +178,52 @@ public static class RunAuthorityProfileValidator
         RejectDangerousFlag(profile.CanPublishPackage, nameof(RunAuthorityProfile.CanPublishPackage), issues);
     }
 
+    private static void ValidateAskBeforeMutation(RunAuthorityProfile profile, ICollection<string> issues)
+    {
+        if (profile.AllowedOperations is not null)
+        {
+            foreach (var operation in AskBeforeMutationAllowedOperations)
+            {
+                if (!profile.AllowedOperations.Contains(operation))
+                    issues.Add($"AskBeforeMutationRequiredAllowedOperationMissing:{operation}");
+            }
+
+            foreach (var operation in profile.AllowedOperations.Where(AskBeforeMutationForbiddenOperations.Contains).Distinct())
+                issues.Add($"AskBeforeMutationCannotAllowDangerousOperation:{operation}");
+        }
+
+        if (profile.ForbiddenOperations is not null)
+        {
+            foreach (var operation in AskBeforeMutationForbiddenOperations)
+            {
+                if (!profile.ForbiddenOperations.Contains(operation))
+                    issues.Add($"AskBeforeMutationRequiredForbiddenOperationMissing:{operation}");
+            }
+        }
+
+        RequireAskBeforeMutationFlag(profile.CanReadRepo, nameof(RunAuthorityProfile.CanReadRepo), issues);
+        RequireAskBeforeMutationFlag(profile.CanMutateDisposableWorkspace, nameof(RunAuthorityProfile.CanMutateDisposableWorkspace), issues);
+        RequireAskBeforeMutationFlag(profile.CanWriteProposalEvidence, nameof(RunAuthorityProfile.CanWriteProposalEvidence), issues);
+        RequireAskBeforeMutationFlag(profile.CanInspectGovernedStatus, nameof(RunAuthorityProfile.CanInspectGovernedStatus), issues);
+        RequireAskBeforeMutationFlag(profile.CanMutateDurableSource, nameof(RunAuthorityProfile.CanMutateDurableSource), issues);
+        RequireAskBeforeMutationFlag(profile.CanApplyPatch, nameof(RunAuthorityProfile.CanApplyPatch), issues);
+
+        RejectAskBeforeMutationFlag(profile.CanExecuteRollback, nameof(RunAuthorityProfile.CanExecuteRollback), issues);
+        RejectAskBeforeMutationFlag(profile.CanCommit, nameof(RunAuthorityProfile.CanCommit), issues);
+        RejectAskBeforeMutationFlag(profile.CanPush, nameof(RunAuthorityProfile.CanPush), issues);
+        RejectAskBeforeMutationFlag(profile.CanCreatePullRequest, nameof(RunAuthorityProfile.CanCreatePullRequest), issues);
+        RejectAskBeforeMutationFlag(profile.CanMarkReadyForReview, nameof(RunAuthorityProfile.CanMarkReadyForReview), issues);
+        RejectAskBeforeMutationFlag(profile.CanMerge, nameof(RunAuthorityProfile.CanMerge), issues);
+        RejectAskBeforeMutationFlag(profile.CanRelease, nameof(RunAuthorityProfile.CanRelease), issues);
+        RejectAskBeforeMutationFlag(profile.CanDeploy, nameof(RunAuthorityProfile.CanDeploy), issues);
+        RejectAskBeforeMutationFlag(profile.CanCreateApprovalRequest, nameof(RunAuthorityProfile.CanCreateApprovalRequest), issues);
+        RejectAskBeforeMutationFlag(profile.CanSatisfyPolicy, nameof(RunAuthorityProfile.CanSatisfyPolicy), issues);
+        RejectAskBeforeMutationFlag(profile.CanPromoteMemory, nameof(RunAuthorityProfile.CanPromoteMemory), issues);
+        RejectAskBeforeMutationFlag(profile.CanContinueWorkflow, nameof(RunAuthorityProfile.CanContinueWorkflow), issues);
+        RejectAskBeforeMutationFlag(profile.CanExecuteProviderMutation, nameof(RunAuthorityProfile.CanExecuteProviderMutation), issues);
+        RejectAskBeforeMutationFlag(profile.CanPublishPackage, nameof(RunAuthorityProfile.CanPublishPackage), issues);
+    }
+
     private static void ValidateOperationKind(
         RunAuthorityOperationKind operation,
         string issue,
@@ -167,6 +243,18 @@ public static class RunAuthorityProfileValidator
     {
         if (value)
             issues.Add($"ProposalOnlyDangerousFlagMustBeFalse:{flagName}");
+    }
+
+    private static void RequireAskBeforeMutationFlag(bool value, string flagName, ICollection<string> issues)
+    {
+        if (!value)
+            issues.Add($"AskBeforeMutationRequiredFlagMustBeTrue:{flagName}");
+    }
+
+    private static void RejectAskBeforeMutationFlag(bool value, string flagName, ICollection<string> issues)
+    {
+        if (value)
+            issues.Add($"AskBeforeMutationDangerousFlagMustBeFalse:{flagName}");
     }
 
     private static RunAuthorityProfileValidationResult Result(IEnumerable<string> issues)

@@ -68,6 +68,26 @@ public static class AuthorityProfileStatusMapper
         }
 
         if (request.ProfileKind == AuthorityProfileKind.AskBeforeMutation &&
+            RunAuthorityProfileValidator.AskBeforeMutationForbiddenOperations.Contains(request.OperationKind))
+        {
+            return BuildBlocked(
+                request,
+                [
+                    $"AskBeforeMutationOperationBlocked:{request.OperationKind}"
+                ],
+                [
+                    $"separate governed authority for {request.OperationKind}"
+                ],
+                [
+                    $"request governed authority outside AskBeforeMutation for {request.OperationKind}"
+                ],
+                [
+                    $"do not perform {request.OperationKind} under AskBeforeMutation",
+                    "do not treat accepted apply approval as authority for later mutation lanes"
+                ]);
+        }
+
+        if (request.ProfileKind == AuthorityProfileKind.AskBeforeMutation &&
             IsMutationOperation(request.OperationKind) &&
             !HasAcceptedApplyApproval(request.EvidenceRefs))
         {
