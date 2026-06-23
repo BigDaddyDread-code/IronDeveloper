@@ -68,6 +68,32 @@ public sealed class BlockB04AskBeforeMutationRunProfileTests
         RunAuthorityOperationKind.DurableEventWrite
     ];
 
+    private static readonly RunAuthorityOperationKind[] BoundedRunAuthorityAllowedOperations =
+    [
+        .. ProposalOnlyAllowedOperations,
+        RunAuthorityOperationKind.SourceApply,
+        RunAuthorityOperationKind.DurableSourceMutation,
+        RunAuthorityOperationKind.Rollback,
+        RunAuthorityOperationKind.Commit,
+        RunAuthorityOperationKind.Push,
+        RunAuthorityOperationKind.DraftPullRequest
+    ];
+
+    private static readonly RunAuthorityOperationKind[] BoundedRunAuthorityForbiddenOperations =
+    [
+        RunAuthorityOperationKind.ReadyForReview,
+        RunAuthorityOperationKind.Merge,
+        RunAuthorityOperationKind.Release,
+        RunAuthorityOperationKind.Deployment,
+        RunAuthorityOperationKind.MemoryPromotion,
+        RunAuthorityOperationKind.WorkflowContinuation,
+        RunAuthorityOperationKind.ApprovalRequestCreate,
+        RunAuthorityOperationKind.PolicySatisfaction,
+        RunAuthorityOperationKind.ProviderMutation,
+        RunAuthorityOperationKind.PackagePublication,
+        RunAuthorityOperationKind.DurableEventWrite
+    ];
+
     [TestMethod]
     public void BlockB04_AskBeforeMutation_ProfileValidatesWithSourceApplyCeiling()
     {
@@ -214,15 +240,20 @@ public sealed class BlockB04AskBeforeMutationRunProfileTests
     }
 
     [TestMethod]
-    public void BlockB04_BoundedRunAuthority_RemainsUnsupportedForRunProfileValidation()
+    public void BlockB04_BoundedRunAuthoritySupportDoesNotBroadenAskBeforeMutation()
     {
-        var profile = AskBeforeMutationProfile() with { Kind = AuthorityProfileKind.BoundedRunAuthority };
-        var validation = RunAuthorityProfileValidator.Validate(profile);
-        var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.SourceApply);
+        var boundedValidation = RunAuthorityProfileValidator.Validate(BoundedRunAuthorityProfile());
+        var askBeforeCommit = RunAuthorityProfileEvaluator.Evaluate(AskBeforeMutationProfile(), RunAuthorityOperationKind.Commit);
+        var askBeforePush = RunAuthorityProfileEvaluator.Evaluate(AskBeforeMutationProfile(), RunAuthorityOperationKind.Push);
+        var askBeforeDraftPr = RunAuthorityProfileEvaluator.Evaluate(AskBeforeMutationProfile(), RunAuthorityOperationKind.DraftPullRequest);
 
-        Assert.IsFalse(validation.IsValid);
-        AssertContains(validation.Issues, "AuthorityProfileKindUnsupported:BoundedRunAuthority");
-        Assert.IsFalse(decision.IsAllowedByProfile);
+        Assert.IsTrue(boundedValidation.IsValid, string.Join(", ", boundedValidation.Issues));
+        Assert.IsFalse(askBeforeCommit.IsAllowedByProfile);
+        Assert.IsFalse(askBeforePush.IsAllowedByProfile);
+        Assert.IsFalse(askBeforeDraftPr.IsAllowedByProfile);
+        AssertContains(askBeforeCommit.BlockedReasons, "AskBeforeMutation does not allow Commit.");
+        AssertContains(askBeforePush.BlockedReasons, "AskBeforeMutation does not allow Push.");
+        AssertContains(askBeforeDraftPr.BlockedReasons, "AskBeforeMutation does not allow DraftPullRequest.");
     }
 
     [TestMethod]
@@ -323,6 +354,19 @@ public sealed class BlockB04AskBeforeMutationRunProfileTests
             ForbiddenOperations = AskBeforeMutationForbiddenOperations,
             CanMutateDurableSource = true,
             CanApplyPatch = true
+        };
+
+    private static RunAuthorityProfile BoundedRunAuthorityProfile() =>
+        AskBeforeMutationProfile() with
+        {
+            ProfileId = "bounded-run-authority",
+            Kind = AuthorityProfileKind.BoundedRunAuthority,
+            AllowedOperations = BoundedRunAuthorityAllowedOperations,
+            ForbiddenOperations = BoundedRunAuthorityForbiddenOperations,
+            CanExecuteRollback = true,
+            CanCommit = true,
+            CanPush = true,
+            CanCreatePullRequest = true
         };
 
     private static AuthorityProfileStatusRequest StatusRequest() =>

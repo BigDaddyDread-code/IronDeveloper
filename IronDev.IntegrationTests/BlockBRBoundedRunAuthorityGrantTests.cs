@@ -83,10 +83,19 @@ public sealed class BlockBRBoundedRunAuthorityGrantTests
             ValidGrant() with { StopBeforeOperationKinds = [(RunAuthorityOperationKind)999] },
             "BoundedRunStopBeforeOperationKindKnownRequired");
 
-        foreach (var operation in RunAuthorityProfileValidator.ProposalOnlyForbiddenOperations)
+        foreach (var operation in RunAuthorityProfileValidator.BoundedRunAuthorityAllowedOperations)
+        {
+            var validation = BoundedRunAuthorityGrantValidator.Validate(
+                ValidGrant() with { AllowedOperationKinds = [operation] },
+                ObservedAtUtc);
+
+            Assert.IsTrue(validation.IsValid, operation + ": " + string.Join(", ", validation.Issues));
+        }
+
+        foreach (var operation in RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations)
         {
             AssertInvalid(
-                ValidGrant() with { AllowedOperationKinds = [.. ProposalSafeOperations, operation] },
+                ValidGrant() with { AllowedOperationKinds = [operation] },
                 $"BoundedRunAllowedOperationCannotCrossBoundary:{operation}");
         }
     }

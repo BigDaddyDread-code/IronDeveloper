@@ -62,6 +62,32 @@ public static class RunAuthorityProfileValidator
         RunAuthorityOperationKind.DurableEventWrite
     ];
 
+    public static readonly IReadOnlyCollection<RunAuthorityOperationKind> BoundedRunAuthorityAllowedOperations =
+    [
+        .. ProposalOnlyAllowedOperations,
+        RunAuthorityOperationKind.SourceApply,
+        RunAuthorityOperationKind.DurableSourceMutation,
+        RunAuthorityOperationKind.Rollback,
+        RunAuthorityOperationKind.Commit,
+        RunAuthorityOperationKind.Push,
+        RunAuthorityOperationKind.DraftPullRequest
+    ];
+
+    public static readonly IReadOnlyCollection<RunAuthorityOperationKind> BoundedRunAuthorityForbiddenOperations =
+    [
+        RunAuthorityOperationKind.ReadyForReview,
+        RunAuthorityOperationKind.Merge,
+        RunAuthorityOperationKind.Release,
+        RunAuthorityOperationKind.Deployment,
+        RunAuthorityOperationKind.MemoryPromotion,
+        RunAuthorityOperationKind.WorkflowContinuation,
+        RunAuthorityOperationKind.ApprovalRequestCreate,
+        RunAuthorityOperationKind.PolicySatisfaction,
+        RunAuthorityOperationKind.ProviderMutation,
+        RunAuthorityOperationKind.PackagePublication,
+        RunAuthorityOperationKind.DurableEventWrite
+    ];
+
     public static RunAuthorityProfileValidationResult Validate(RunAuthorityProfile? profile)
     {
         var issues = new List<string>();
@@ -86,6 +112,10 @@ public static class RunAuthorityProfileValidator
         else if (profile.Kind == AuthorityProfileKind.AskBeforeMutation)
         {
             ValidateAskBeforeMutation(profile, issues);
+        }
+        else if (profile.Kind == AuthorityProfileKind.BoundedRunAuthority)
+        {
+            ValidateBoundedRunAuthority(profile, issues);
         }
         else if (Enum.IsDefined(profile.Kind) && profile.Kind != AuthorityProfileKind.Unknown)
         {
@@ -224,6 +254,52 @@ public static class RunAuthorityProfileValidator
         RejectAskBeforeMutationFlag(profile.CanPublishPackage, nameof(RunAuthorityProfile.CanPublishPackage), issues);
     }
 
+    private static void ValidateBoundedRunAuthority(RunAuthorityProfile profile, ICollection<string> issues)
+    {
+        if (profile.AllowedOperations is not null)
+        {
+            foreach (var operation in BoundedRunAuthorityAllowedOperations)
+            {
+                if (!profile.AllowedOperations.Contains(operation))
+                    issues.Add($"BoundedRunAuthorityRequiredAllowedOperationMissing:{operation}");
+            }
+
+            foreach (var operation in profile.AllowedOperations.Where(BoundedRunAuthorityForbiddenOperations.Contains).Distinct())
+                issues.Add($"BoundedRunAuthorityCannotAllowDangerousOperation:{operation}");
+        }
+
+        if (profile.ForbiddenOperations is not null)
+        {
+            foreach (var operation in BoundedRunAuthorityForbiddenOperations)
+            {
+                if (!profile.ForbiddenOperations.Contains(operation))
+                    issues.Add($"BoundedRunAuthorityRequiredForbiddenOperationMissing:{operation}");
+            }
+        }
+
+        RequireBoundedRunAuthorityFlag(profile.CanReadRepo, nameof(RunAuthorityProfile.CanReadRepo), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanMutateDisposableWorkspace, nameof(RunAuthorityProfile.CanMutateDisposableWorkspace), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanWriteProposalEvidence, nameof(RunAuthorityProfile.CanWriteProposalEvidence), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanInspectGovernedStatus, nameof(RunAuthorityProfile.CanInspectGovernedStatus), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanMutateDurableSource, nameof(RunAuthorityProfile.CanMutateDurableSource), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanApplyPatch, nameof(RunAuthorityProfile.CanApplyPatch), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanExecuteRollback, nameof(RunAuthorityProfile.CanExecuteRollback), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanCommit, nameof(RunAuthorityProfile.CanCommit), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanPush, nameof(RunAuthorityProfile.CanPush), issues);
+        RequireBoundedRunAuthorityFlag(profile.CanCreatePullRequest, nameof(RunAuthorityProfile.CanCreatePullRequest), issues);
+
+        RejectBoundedRunAuthorityFlag(profile.CanMarkReadyForReview, nameof(RunAuthorityProfile.CanMarkReadyForReview), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanMerge, nameof(RunAuthorityProfile.CanMerge), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanRelease, nameof(RunAuthorityProfile.CanRelease), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanDeploy, nameof(RunAuthorityProfile.CanDeploy), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanCreateApprovalRequest, nameof(RunAuthorityProfile.CanCreateApprovalRequest), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanSatisfyPolicy, nameof(RunAuthorityProfile.CanSatisfyPolicy), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanPromoteMemory, nameof(RunAuthorityProfile.CanPromoteMemory), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanContinueWorkflow, nameof(RunAuthorityProfile.CanContinueWorkflow), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanExecuteProviderMutation, nameof(RunAuthorityProfile.CanExecuteProviderMutation), issues);
+        RejectBoundedRunAuthorityFlag(profile.CanPublishPackage, nameof(RunAuthorityProfile.CanPublishPackage), issues);
+    }
+
     private static void ValidateOperationKind(
         RunAuthorityOperationKind operation,
         string issue,
@@ -255,6 +331,18 @@ public static class RunAuthorityProfileValidator
     {
         if (value)
             issues.Add($"AskBeforeMutationDangerousFlagMustBeFalse:{flagName}");
+    }
+
+    private static void RequireBoundedRunAuthorityFlag(bool value, string flagName, ICollection<string> issues)
+    {
+        if (!value)
+            issues.Add($"BoundedRunAuthorityRequiredFlagMustBeTrue:{flagName}");
+    }
+
+    private static void RejectBoundedRunAuthorityFlag(bool value, string flagName, ICollection<string> issues)
+    {
+        if (value)
+            issues.Add($"BoundedRunAuthorityDangerousFlagMustBeFalse:{flagName}");
     }
 
     private static RunAuthorityProfileValidationResult Result(IEnumerable<string> issues)
